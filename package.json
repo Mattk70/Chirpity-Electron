@@ -1,0 +1,33 @@
+{
+  "name": "birdnet-electron",
+  "version": "1.0.0",
+  "description": "Electron app for sound file analysis with BirdNET.",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kahst/BirdNET-Electron.git"
+  },
+  "keywords": [
+    "Bioacoustics",
+    "Birdsong",
+    "DeepLearning",
+    "Tensorflow.js"
+  ],
+  "author": "Stefan Kahl",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kahst/BirdNET-Electron/issues"
+  },
+  "homepage": "https://github.com/kahst/BirdNET-Electron#readme",
+  "devDependencies": {
+    "electron": "^7.1.7"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs": "^1.5.1",
+    "audio-loader": "^1.0.3",
+    "audio-resampler": "^1.0.1"
+  }
+}
