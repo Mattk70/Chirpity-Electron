@@ -61,10 +61,18 @@ BirdNET requires Tensorflow.js which we install with:
 npm install @tensorflow/tfjs
 ```
 
+Install Bootstrap and its dependencies:
+
+```
+npm install bootstrap
+npm install jquery
+npm install popper.js
+```
+
 This app also needs some additional packages that we have to install.
 
 ```
-npm i audio-loader
-npm i audio-resampler
-npm i array-normalize
+npm install audio-loader
+npm install audio-resampler
+npm install array-normalize
 ```
