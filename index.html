@@ -14,6 +14,7 @@
   
   <!-- Additional JavaScript -->
   <script src="js/birdnet.js"></script>  
+  <script src="js/ui.js"></script>
 
   <!-- App title -->
   <title>BirdNET Sound Analysis</title>
@@ -26,8 +27,7 @@
     <a class="navbar-brand" href="#">BirdNET</a>
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
-    </button>
-  
+    </button>  
     <div class="collapse navbar-collapse" id="navbarSupportedContent">
       <ul class="navbar-nav mr-auto">        
         <li class="nav-item dropdown active">
@@ -35,16 +35,13 @@
             File
           </a>
           <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-            <a class="dropdown-item" href="#">Open audio file</a>
-            <a class="dropdown-item" href="#">Save analysis results</a>
+            <a class="dropdown-item" href="#" onclick="showFileDialog();">Open audio file</a>
+            <a class="dropdown-item disabled" href="#">Save analysis results</a>
             <div class="dropdown-divider"></div>
-            <a class="dropdown-item" href="#">Exit application</a>
+            <a class="dropdown-item" href="#" onclick="exitApplication();">Exit application</a>
           </div>
         </li>
       </ul>
     </div>
   </nav>
-
-  
-
 </body>
