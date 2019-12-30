@@ -1,10 +1,10 @@
 {
   "name": "birdnet-electron",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Electron app for sound file analysis with BirdNET.",
   "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "electron ."
   },
   "repository": {
     "type": "git",
@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@tensorflow/tfjs": "^1.5.1",
+    "array-normalize": "^1.1.4",
     "audio-loader": "^1.0.3",
     "audio-resampler": "^1.0.1"
   }
