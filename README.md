@@ -1,7 +1,8 @@
-# BirdNET-Electron
-Electron app for sound file analysis with BirdNET.
-
 <b>This repo is currently under development.</b>
+
+# BirdNET-Electron
+
+Electron app for sound file analysis with BirdNET.
 
 Author: Stefan Kahl
 
@@ -60,7 +61,7 @@ BirdNET requires Tensorflow.js which we install with:
 npm install @tensorflow/tfjs
 ```
 
-This app also need some additional packages that we have to install.
+This app also needs some additional packages that we have to install.
 
 ```
 npm i audio-loader
