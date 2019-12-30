@@ -29,6 +29,9 @@
     "@tensorflow/tfjs": "^1.5.1",
     "array-normalize": "^1.1.4",
     "audio-loader": "^1.0.3",
-    "audio-resampler": "^1.0.1"
+    "audio-resampler": "^1.0.1",
+    "bootstrap": "^4.4.1",
+    "jquery": "^3.4.1",
+    "popper.js": "^1.16.0"
   }
 }
