@@ -56,14 +56,10 @@
   <div class="" id="waveformContainer"></div>
 
   <!-- Spectrogram view -->
-  <div class="d-none h-33" id="specContainer"></div>
+  <div class="d-none h-33" id="specContainer" onclick="WAVESURFER.playPause();"></div>
 
   <!-- Controls view -->
-  <div class="container-fluid bg-dark text-white d-none" id="controlsWrapper">
-    <div class="row p-2">
-      <div class="col-3">
-        <button type="button" class="btn btn-primary" onclick="WAVESURFER.playPause();">Play/Pause</button>
-      </div>
-    </div>
+  <div class="container-fluid bg-dark text-white d-none" style="height: 5px;" id="controlsWrapper">
+    
   </div>
 </body>
