@@ -12,7 +12,8 @@
   <script>require('popper.js');</script>
   <script>require('bootstrap');</script>
   
-  <!-- Additional JavaScript -->
+  <!-- Additional JavaScript & CSS -->
+  <link rel="stylesheet" href="css/style.css" />
   <script src="js/birdnet.js"></script>  
   <script src="js/ui.js"></script>
 
@@ -44,4 +45,25 @@
       </ul>
     </div>
   </nav>
+
+  <!-- Load audio file hint -->
+  <div class="d-flex h-85 justify-content-center align-items-center" id="loadFileHint">
+    <p class="lead justify-content-center" id="loadFileHintText">Load an audio file for analysis by clicking</br>on <i>File > Open audio file</i> in the top menu.</p>
+    <div class="d-none spinner-border text-secondary" role="status" id="loadFileHintSpinner"></div>
+  </div>
+
+  <!-- Waveform view -->
+  <div class="" id="waveformContainer"></div>
+
+  <!-- Spectrogram view -->
+  <div class="d-none h-33" id="specContainer"></div>
+
+  <!-- Controls view -->
+  <div class="container-fluid bg-dark text-white d-none" id="controlsWrapper">
+    <div class="row p-2">
+      <div class="col-3">
+        <button type="button" class="btn btn-primary" onclick="WAVESURFER.playPause();">Play/Pause</button>
+      </div>
+    </div>
+  </div>
 </body>
