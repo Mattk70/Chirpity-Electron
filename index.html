@@ -42,6 +42,15 @@
             <a class="dropdown-item" href="#" onclick="exitApplication();">Exit application</a>
           </div>
         </li>
+        <li class="nav-item dropdown active">
+          <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            Analysis
+          </a>
+          <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+            <a class="dropdown-item" href="#" onclick="predict(AUDIO_DATA, MODEL);">Analyze entire file</a>
+            <a class="dropdown-item disabled" href="#">Analyze selected interval</a>
+          </div>
+        </li>
       </ul>
     </div>
   </nav>
