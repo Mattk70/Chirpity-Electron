@@ -10,7 +10,8 @@ const MODEL_JSON = 'model/model.json'
 const CONFIG = {
 
     sampleRate: 48000,
-    specLength: 3
+    specLength: 3,
+    sigmoid: 1.0
 
 }
 
@@ -117,7 +118,7 @@ class SigmoidLayer extends tf.layers.Layer {
 
     call(input, kwargs) { 
         
-        return tf.sigmoid(tf.mul(input[0], this.kernel.read()))
+        return tf.sigmoid(tf.mul(input[0], CONFIG.sigmoid))
         
     }   
    
