@@ -32,6 +32,7 @@
     "audio-resampler": "^1.0.1",
     "bootstrap": "^4.4.1",
     "jquery": "^3.4.1",
-    "popper.js": "^1.16.0"
+    "popper.js": "^1.16.0",
+    "wavesurfer.js": "^3.3.0"
   }
 }

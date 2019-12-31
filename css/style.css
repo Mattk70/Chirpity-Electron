@@ -1,3 +1,11 @@
+html, body {
+    height: 100%;
+}
+
 .border-10 {
     border-width:10px !important;
 }
+
+.h-33 {height: 33%;}
+.h-40 {height: 40%;}
+.h-85 {height: 85%;}
