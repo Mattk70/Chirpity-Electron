@@ -21,10 +21,11 @@ function exitApplication() {
 
 }
 
-function showElement(id) {
+function showElement(id, makeFlex=true, empty=false) {
 
     $('#' + id).removeClass('d-none');
-    $('#' + id).addClass('d-flex');
+    if (makeFlex) $('#' + id).addClass('d-flex');
+    if (empty) $('#' + id).empty();
 
 }
 
@@ -41,6 +42,7 @@ function hideAll() {
     hideElement('loadFileHint');
     hideElement('loadFileHintText');
     hideElement('loadFileHintSpinner');
+    hideElement('loadFileHintLog')
 
     // Waveform and spec
     hideElement('waveformContainer');
@@ -48,6 +50,12 @@ function hideAll() {
 
     // Controls    
     hideElement('controlsWrapper');
+
+}
+
+function log(element, text) {
+
+    $('#' + element).html('</br>' + text);
 
 }
 
