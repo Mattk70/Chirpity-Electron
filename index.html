@@ -56,19 +56,24 @@
   </nav>
 
   <!-- Load audio file hint -->
-  <div class="d-flex h-85 justify-content-center align-items-center" id="loadFileHint">
-    <p class="lead justify-content-center" id="loadFileHintText">Load an audio file for analysis by clicking</br>on <i>File > Open audio file</i> in the top menu.</p>
-    <div class="d-none spinner-border text-secondary" role="status" id="loadFileHintSpinner"></div>
-  </div>
-
-  <!-- Waveform view -->
-  <div class="" id="waveformContainer"></div>
+  <div class="d-flex h-85 flex-column align-items-center justify-content-center" id="loadFileHint">
+    <div class="row">
+      <p class="lead justify-content-center" id="loadFileHintText">Load an audio file for analysis by clicking</br>on <i>File > Open audio file</i> in the top menu.</p>
+    </div>
+    <div class="row">
+      <div class="d-none spinner-border text-secondary" role="status" id="loadFileHintSpinner"></div>
+    </div>
+    <div class="row"><p class="d-none lead" id="loadFileHintLog"></p> </div>       
+  </div>  
 
   <!-- Spectrogram view -->
   <div class="d-none h-33" id="specContainer" onclick="WAVESURFER.playPause();"></div>
 
+  <!-- Waveform view -->
+  <div class="" id="waveformContainer"></div>
+
   <!-- Controls view -->
-  <div class="container-fluid bg-dark text-white d-none" style="height: 5px;" id="controlsWrapper">
+  <!--div class="container-fluid bg-dark text-white d-none" style="height: 5px;" id="controlsWrapper"-->
     
   </div>
 </body>
