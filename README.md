@@ -75,6 +75,5 @@ This app also needs some additional packages that we have to install.
 npm install audio-loader
 npm install audio-resampler
 npm install array-normalize
-npm install wavesurfer.js
 npm install colormap
 ```
