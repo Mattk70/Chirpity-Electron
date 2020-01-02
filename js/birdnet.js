@@ -3,8 +3,6 @@ const tf = require('@tensorflow/tfjs');
 const load = require('audio-loader')
 const resampler = require('audio-resampler');
 const normalize = require('array-normalize')
-const WaveSurfer = require('wavesurfer.js');
-const SpectrogramPlugin = require('wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js');
 const colormap = require('colormap')
 
 const MODEL_JSON = 'model/model.json'
@@ -20,6 +18,7 @@ let MODEL = null;
 var AUDIO_DATA = [];
 var WAVESURFER = null;
 var CURRENT_ADUIO_BUFFER = null;
+var WS_ZOOM = 0;
 
 /////////////////////////  Build SimpleSpecLayer  /////////////////////////
 class SimpleSpecLayer extends tf.layers.Layer {
@@ -53,6 +52,9 @@ class SimpleSpecLayer extends tf.layers.Layer {
 
         // Convert magnitudes using nonlinearity
         spec = tf.pow(spec, tf.div(1.0, tf.add(1.0, tf.exp(this.mag_scale.read()))))
+
+        // Normalize values between 0 and 1
+        spec = tf.div(tf.sub(spec, tf.min(spec)), tf.max(spec));
 
         // Swap axes to fit output shape
         spec = tf.transpose(spec)
@@ -191,8 +193,6 @@ function loadAudioFile(filePath) {
             // Normalize audio data
             AUDIO_DATA = normalize(AUDIO_DATA)
 
-            //console.log(AUDIO_DATA); 
-
             // Predict
             //predict(AUDIO_DATA, MODEL);
 
@@ -214,31 +214,31 @@ function drawSpectrogram(audioBuffer) {
     CURRENT_ADUIO_BUFFER = audioBuffer;
 
     // Show waveform container
-    showElement('waveformContainer', false, true);
+    showElement('specContainer', false, true);
 
     // Setup waveform and spec views
     var options = {
-        container: '#waveformContainer',
+        container: '#specContainer',
         backgroundColor: '#363a40',
-        height: 50,
-        responsive: true,
         waveColor: '#fff',
         cursorColor: '#fff',
         progressColor: '#4b79fa',
-        mediaControls: true,
-        plugins: [
-            SpectrogramPlugin.create({
-                container: '#specContainer',
-                fftSamples: 1024,
-                pixelRatio: 1,
-                labels: false,
-                colorMap: colormap({
-                    colormap: 'viridis',
-                    nshades: 256,
-                    format: 'float'
-                })
-            })
-        ]
+        cursorWidth: 2,
+        normalize: true,
+        fillParent: true,
+        responsive: true,
+        height: 512,
+        fftSamples: 1024,
+        minPxPerSec: 50,
+        colorMap: colormap({
+                colormap: 'viridis',
+                nshades: 256,
+                format: 'rgb',
+                alpha: 1
+        }),
+        hideScrollbar: false,
+        visualization: 'spectrogram',
+        plugins: []
     };
 
     // Create wavesurfer object
@@ -246,21 +246,33 @@ function drawSpectrogram(audioBuffer) {
 
     // Load audio file
     WAVESURFER.loadDecodedBuffer(CURRENT_ADUIO_BUFFER);
+    
+    WS_ZOOM = WAVESURFER.params.minPxPerSec;
 
-    // Hide waveform view for now
-    //hideElement('waveformContainer');
-    showElement('specContainer');
 
     // Resize canvas of spec and labels
-    $('#specContainer canvas').each(function() {
-        $( this ).height($('#specContainer').height());
-    });
-    $('spectrogram').each(function() {
-        $( this ).height($('#specContainer').height());
+    $('#specContainer wave, canvas').each(function() {
+        $( this ).height(400);
     });
 
     // Show controls
-    //showElement('controlsWrapper');
+    showElement('controlsWrapper');
+
+}
+
+function zoomSpecIn() {
+
+    console.log(WAVESURFER.params.minPxPerSec);
+    console.log(WS_ZOOM);
+    WS_ZOOM += 25;
+    WAVESURFER.zoom(WS_ZOOM);
+    //WAVESURFER.drawBuffer();
+}
+
+function zoomSpecOut() {
+
+    WS_ZOOM -= 25;
+    WAVESURFER.zoom(WS_ZOOM);
 
 }
 

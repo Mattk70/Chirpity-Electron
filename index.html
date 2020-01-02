@@ -17,6 +17,11 @@
   <script src="js/birdnet.js"></script>  
   <script src="js/ui.js"></script>
 
+  <!-- Modified wavesurfer drawer -->
+  <script src="js/wavesurfer.min.js"></script>
+  <script src="js/wavesurfer.spectrogram.min.js"></script>
+  <script src="js/wavesurfer.drawer.extended.js"></script>
+
   <!-- App title -->
   <title>BirdNET Sound Analysis</title>
 
@@ -67,13 +72,24 @@
   </div>  
 
   <!-- Spectrogram view -->
-  <div class="d-none h-33" id="specContainer" onclick="WAVESURFER.playPause();"></div>
-
-  <!-- Waveform view -->
-  <div class="" id="waveformContainer"></div>
+  <div class="" id="specContainer"></div>
 
   <!-- Controls view -->
-  <!--div class="container-fluid bg-dark text-white d-none" style="height: 5px;" id="controlsWrapper"-->
+  <div class="container-fluid p-2 bg-dark text-white d-none" id="controlsWrapper">
     
+    <div class="btn-group btn-group" role="group">
+      <button class="btn btn-primary " onclick="WAVESURFER.play()">
+        <i class="material-icons">play_arrow</i><!--span>Play</span-->
+      </button>
+      <button class="btn btn-primary " onclick="WAVESURFER.pause()">
+        <i class="material-icons">pause</i><!--span>Pause</span-->
+      </button>
+      <button class="btn btn-primary " onclick="zoomSpecIn();">
+        <i class="material-icons">zoom_in</i>
+      </button>
+      <button class="btn btn-primary " onclick="zoomSpecOut();">
+        <i class="material-icons">zoom_out</i>
+      </button>
+    </div>
   </div>
 </body>
