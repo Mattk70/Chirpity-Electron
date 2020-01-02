@@ -215,6 +215,7 @@ function drawSpectrogram(audioBuffer) {
 
     // Show waveform container
     showElement('specContainer', false, true);
+    showElement('specTimeline', false, true);
 
     // Setup waveform and spec views
     var options = {
@@ -243,6 +244,7 @@ function drawSpectrogram(audioBuffer) {
 
     // Create wavesurfer object
     WAVESURFER = WaveSurfer.create(options);
+    WAVESURFER.enableDragSelection({});
 
     // Load audio file
     WAVESURFER.loadDecodedBuffer(CURRENT_ADUIO_BUFFER);
@@ -262,16 +264,13 @@ function drawSpectrogram(audioBuffer) {
 
 function zoomSpecIn() {
 
-    console.log(WAVESURFER.params.minPxPerSec);
-    console.log(WS_ZOOM);
-    WS_ZOOM += 25;
+    WS_ZOOM += 75;
     WAVESURFER.zoom(WS_ZOOM);
-    //WAVESURFER.drawBuffer();
 }
 
 function zoomSpecOut() {
 
-    WS_ZOOM -= 25;
+    WS_ZOOM -= 75;
     WAVESURFER.zoom(WS_ZOOM);
 
 }
