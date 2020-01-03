@@ -1,5 +1,7 @@
 html, body {
     height: 100%;
+    padding-top: 28px;
+    padding-bottom: 18px;
 }
 
 .border-10 {
