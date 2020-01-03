@@ -164,12 +164,7 @@ async function predict(audioData, model) {
 
     }
 }
- /////////////////////////  DO AFTER LOAD ////////////////////////////
- window.onload = function () {
 
-    loadModel()
-
-};
 
 function loadAudioFile(filePath) {
 
@@ -249,8 +244,8 @@ function drawSpectrogram(audioBuffer) {
     // Load audio file
     WAVESURFER.loadDecodedBuffer(CURRENT_ADUIO_BUFFER);
     
-    WS_ZOOM = WAVESURFER.params.minPxPerSec;
-
+    // Set initial zoom level
+    WS_ZOOM = $('#specContainer').width() / WAVESURFER.getDuration();
 
     // Resize canvas of spec and labels
     $('#specContainer wave, canvas').each(function() {
@@ -264,13 +259,13 @@ function drawSpectrogram(audioBuffer) {
 
 function zoomSpecIn() {
 
-    WS_ZOOM += 75;
+    WS_ZOOM += 50;
     WAVESURFER.zoom(WS_ZOOM);
 }
 
 function zoomSpecOut() {
 
-    WS_ZOOM -= 75;
+    WS_ZOOM -= 50;
     WAVESURFER.zoom(WS_ZOOM);
 
 }
