@@ -5,7 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "export": "electron-packager ."
+    "export": "electron-packager . --out dist --overwrite"
   },
   "repository": {
     "type": "git",
