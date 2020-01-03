@@ -284,6 +284,8 @@ function adjustSpecHeight(redraw) {
         $( this ).height($('body').height() * 0.40);
     });
 
+    $('#resultTableContainer').height($('#contentWrapper').height() - $('#specContainer').height() - $('#controlsWrapper').height() - 47);
+
 }
 
 function zoomSpecIn() {
