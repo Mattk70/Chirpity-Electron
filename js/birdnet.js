@@ -247,13 +247,24 @@ function drawSpectrogram(audioBuffer) {
     // Set initial zoom level
     WS_ZOOM = $('#specContainer').width() / WAVESURFER.getDuration();
 
+    // Set click event that removes all regions
+    $('#specContainer').mousedown(function (e) { WAVESURFER.clearRegions(); });
+
     // Resize canvas of spec and labels
-    $('#specContainer wave, canvas').each(function() {
-        $( this ).height(400);
-    });
+    adjustSpecHeight(false);
 
     // Show controls
     showElement('controlsWrapper');
+
+}
+
+function adjustSpecHeight(redraw) {
+
+    if (redraw && WAVESURFER != null) WAVESURFER.drawBuffer();
+
+    $('#specContainer wave, canvas').each(function() {
+        $( this ).height($('body').height() * 0.40);
+    });
 
 }
 
