@@ -4,7 +4,8 @@
   "description": "Electron app for sound file analysis with BirdNET.",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "export": "electron-packager ."
   },
   "repository": {
     "type": "git",
@@ -23,7 +24,8 @@
   },
   "homepage": "https://github.com/kahst/BirdNET-Electron#readme",
   "devDependencies": {
-    "electron": "^7.1.7"
+    "electron": "^7.1.7",
+    "electron-packager": "^14.1.1"
   },
   "dependencies": {
     "@tensorflow/tfjs": "^1.5.1",

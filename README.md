@@ -77,3 +77,27 @@ npm install audio-resampler
 npm install array-normalize
 npm install colormap
 ```
+
+In order to package the app for stand-alone applications, we need electron-packager:
+
+```
+npm install electron-packager --save-dev
+```
+
+We can now add the export script in the <i>package.json</i>:
+
+```
+"scripts": {
+    "start": "electron .",
+    "export": "electron-packager ."
+  }
+```
+
+After that, we can export the app with:
+
+```
+npm run export
+```
+
+
+

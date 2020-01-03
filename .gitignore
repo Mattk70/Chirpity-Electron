@@ -1,3 +1,6 @@
+# Exports
+/birdnet-electron-*
+
 # Logs
 logs
 *.log
