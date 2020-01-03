@@ -89,7 +89,7 @@ We can now add the export script in the <i>package.json</i>:
 ```
 "scripts": {
     "start": "electron .",
-    "export": "electron-packager ."
+    "export": "electron-packager . --out dist --overwrite"
   }
 ```
 
