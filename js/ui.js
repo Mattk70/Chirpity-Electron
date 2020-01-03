@@ -60,5 +60,16 @@ function log(element, text) {
 }
 
 
+ /////////////////////////  DO AFTER LOAD ////////////////////////////
+ window.onload = function () {
+
+    // Set footer year
+    $('#year').text(new Date().getFullYear());
+
+    // Load model
+    loadModel()
+
+};
+
 // Event listener
 //window.addEventListener('resize', drawSpectrogram(CURRENT_ADUIO_BUFFER), false);

@@ -31,7 +31,7 @@
 <body>
 
   <!-- Navigation bar -->
-  <nav class="navbar navbar-expand-sm navbar-dark bg-dark">
+  <nav class="navbar navbar-expand-sm navbar-dark bg-dark fixed-top">
     <a class="navbar-brand" href="#">BirdNET</a>
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
@@ -59,11 +59,12 @@
           </div>
         </li>
       </ul>
+      <img class="" src="img/logo/CLO_logo_inverted.png" width="250px"/>
     </div>
   </nav>
 
   <!-- Load audio file hint -->
-  <div class="d-flex h-85 flex-column align-items-center justify-content-center" id="loadFileHint">
+  <div class="d-flex h-100 flex-column align-items-center justify-content-center" id="loadFileHint">
     <div class="row">
       <p class="lead justify-content-center" id="loadFileHintText">Load an audio file for analysis by clicking</br>on <i>File > Open audio file</i> in the top menu.</p>
     </div>
@@ -94,5 +95,11 @@
         <i class="material-icons">zoom_out</i>
       </button>
     </div>
+  </div>
+
+
+  <!-- Footer -->
+  <div class="d-flex fixed-bottom p-2 bg-dark text-white justify-content-center">
+    <small>BirdNET | Center for Conservation Bioacoustics - Cornell Lab of Ornithology | Chair Mediainformatics - Chemnitz University of Technology | <span id="year"></span></small>
   </div>
 </body>
