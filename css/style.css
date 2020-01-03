@@ -2,6 +2,7 @@ html, body {
     height: 100%;
     padding-top: 28px;
     padding-bottom: 18px;
+    background-color: #f8f9fa;
 }
 
 .border-10 {

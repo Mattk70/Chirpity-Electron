@@ -51,6 +51,9 @@ function hideAll() {
     // Controls    
     hideElement('controlsWrapper');
 
+    // Result table
+    hideElement('resultTableContainer');
+
 }
 
 function log(element, text) {
@@ -89,6 +92,6 @@ $(function() {
 
             adjustSpecHeight(true);
         }
-    }, 500);
+    }, 1000);
 });
 

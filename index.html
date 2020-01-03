@@ -14,6 +14,7 @@
   
   <!-- Additional JavaScript & CSS -->
   <link rel="stylesheet" href="css/style.css" />
+  <script src="js/labels.js"></script>  
   <script src="js/birdnet.js"></script>  
   <script src="js/ui.js"></script>
 
@@ -64,12 +65,12 @@
   </nav>
 
   <!-- Load audio file hint -->
-  <div class="d-flex h-100 flex-column align-items-center justify-content-center" id="loadFileHint">
+  <div class="d-flex h-100 flex-column text-dark align-items-center justify-content-center" id="loadFileHint">
     <div class="row">
       <p class="lead justify-content-center" id="loadFileHintText">Load an audio file for analysis by clicking</br>on <i>File > Open audio file</i> in the top menu.</p>
     </div>
     <div class="row">
-      <div class="d-none spinner-border text-secondary" role="status" id="loadFileHintSpinner"></div>
+      <div class="d-none spinner-border" role="status" id="loadFileHintSpinner"></div>
     </div>
     <div class="row"><p class="d-none lead" id="loadFileHintLog"></p> </div>       
   </div>  
@@ -97,9 +98,27 @@
     </div>
   </div>
 
+  <!-- Result table -->
+  <div class="d-none p-3" id="resultTableContainer">
+    <table class="table table-hover">
+      <thead class="thead-dark">
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">Timestamp</th>
+          <th scope="col">Common name</th>
+          <th scope="col">Scientific name</th>
+          <th scope="col">Confidence</th>
+        </tr>
+      </thead>
+      <tbody class="text-dark" id="resultTableBody">
+        
+      </tbody>
+    </table>
+  </div>
+
 
   <!-- Footer -->
-  <div class="d-flex fixed-bottom p-2 bg-dark text-white justify-content-center">
+  <div class="d-flex fixed-bottom p-2 bg-primary text-white justify-content-center">
     <small>BirdNET | Center for Conservation Bioacoustics - Cornell Lab of Ornithology | Chair Mediainformatics - Chemnitz University of Technology | <span id="year"></span></small>
   </div>
 </body>

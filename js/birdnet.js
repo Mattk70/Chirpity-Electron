@@ -10,12 +10,15 @@ const CONFIG = {
 
     sampleRate: 48000,
     specLength: 3,
-    sigmoid: 1.0
+    sigmoid: 1.0,
+    minConfidence: 0.15,
 
 }
 
 let MODEL = null;
 var AUDIO_DATA = [];
+var RESULTS = [];
+
 var WAVESURFER = null;
 var CURRENT_ADUIO_BUFFER = null;
 var WS_ZOOM = 0;
@@ -54,7 +57,7 @@ class SimpleSpecLayer extends tf.layers.Layer {
         spec = tf.pow(spec, tf.div(1.0, tf.add(1.0, tf.exp(this.mag_scale.read()))))
 
         // Normalize values between 0 and 1
-        spec = tf.div(tf.sub(spec, tf.min(spec)), tf.max(spec));
+        //spec = tf.div(tf.sub(spec, tf.min(spec)), tf.max(spec));
 
         // Swap axes to fit output shape
         spec = tf.transpose(spec)
@@ -136,7 +139,8 @@ async function loadModel() {
     if (MODEL == null) {
         console.log('Loading model...');
         MODEL = await tf.loadLayersModel(MODEL_JSON);
-        CONFIG.labels = MODEL.getLayer('SIGMOID').config.labels;
+        //CONFIG.labels = MODEL.getLayer('SIGMOID').config.labels;
+        CONFIG.labels = LABELS;
         console.log('...done loading model!');
     }
 
@@ -145,6 +149,7 @@ async function loadModel() {
 async function predict(audioData, model) {
 
     const audioTensor = tf.tensor1d(audioData)
+    RESULTS = [];
 
     // Slice and expand
     var cunkLength = CONFIG.sampleRate * CONFIG.specLength;
@@ -162,6 +167,16 @@ async function predict(audioData, model) {
 
         console.log(index, CONFIG.labels[index], score);
 
+        if (score >= CONFIG.minConfidence) {
+            RESULTS.push({
+
+                timestamp: timestampFromSeconds(i / CONFIG.sampleRate) + ' - ' + timestampFromSeconds((i + cunkLength) / CONFIG.sampleRate),
+                sname: CONFIG.labels[index].split('_')[0],
+                cname: CONFIG.labels[index].split('_')[1],
+                score: score
+
+            });
+        }
     }
 }
 
@@ -189,13 +204,16 @@ function loadAudioFile(filePath) {
             AUDIO_DATA = normalize(AUDIO_DATA)
 
             // Predict
-            //predict(AUDIO_DATA, MODEL);
+            predict(AUDIO_DATA, MODEL);
 
             //Hide center div when done
             hideElement('loadFileHint');
             
             // Draw and show spectrogram
             drawSpectrogram(buffer);    
+
+            // Show results
+            showResults();
 
         });
 
@@ -278,6 +296,38 @@ function zoomSpecOut() {
 
     WS_ZOOM -= 50;
     WAVESURFER.zoom(WS_ZOOM);
+
+}
+
+function showResults() {
+
+    console.log(RESULTS);
+    showElement('resultTableContainer');
+
+    // Remove old results
+    $('#resultTableBody').empty();
+
+    // Add new results
+    for (var i = 0 ; i < RESULTS.length; i++) {
+
+        var tr = "<tr><th scope='row'>" + (i + 1) + "</th>";
+        tr += "<td>" + RESULTS[i].timestamp + "</td>";
+        tr += "<td>" + RESULTS[i].cname + "</td>";
+        tr += "<td>" + RESULTS[i].sname + "</td>";
+        tr += "<td>" + RESULTS[i].score + "</td>";
+        tr += "</tr>";
+
+        $('#resultTableBody').append(tr);
+
+    }
+
+}
+
+function timestampFromSeconds(seconds) {
+
+    var date = new Date(1970,0,1);
+    date.setSeconds(seconds);
+    return date.toTimeString().replace(/.*(\d{2}:\d{2}).*/, "$1");
 
 }
 
