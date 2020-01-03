@@ -71,5 +71,24 @@ function log(element, text) {
 
 };
 
-// Event listener
-//window.addEventListener('resize', drawSpectrogram(CURRENT_ADUIO_BUFFER), false);
+/*
+$(window).resize(function() {
+    adjustSpecHeight(true);
+});
+*/
+
+$(function() {
+    var $window = $(window);
+    var width = $window.width();
+    var height = $window.height();
+
+    setInterval(function () {
+        if ((width != $window.width()) || (height != $window.height())) {
+            width = $window.width();
+            height = $window.height();
+
+            adjustSpecHeight(true);
+        }
+    }, 500);
+});
+
