@@ -201,7 +201,7 @@ function loadAudioFile(filePath) {
             AUDIO_DATA = event.getAudioBuffer().getChannelData(0);
 
             // Normalize audio data
-            AUDIO_DATA = normalize(AUDIO_DATA)
+            //AUDIO_DATA = normalize(AUDIO_DATA)
 
             // Predict
             predict(AUDIO_DATA, MODEL);
