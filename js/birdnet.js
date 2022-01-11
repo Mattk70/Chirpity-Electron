@@ -20,7 +20,7 @@ var AUDIO_DATA = [];
 var RESULTS = [];
 
 var WAVESURFER = null;
-var CURRENT_ADUIO_BUFFER = null;
+var CURRENT_AUDIO_BUFFER = null;
 var WS_ZOOM = 0;
 
 /////////////////////////  Build SimpleSpecLayer  /////////////////////////
@@ -201,7 +201,7 @@ function loadAudioFile(filePath) {
             AUDIO_DATA = event.getAudioBuffer().getChannelData(0);
 
             // Normalize audio data
-            //AUDIO_DATA = normalize(AUDIO_DATA)
+            AUDIO_DATA = normalize(AUDIO_DATA)
 
             // Predict
             predict(AUDIO_DATA, MODEL);
@@ -224,7 +224,7 @@ function loadAudioFile(filePath) {
 function drawSpectrogram(audioBuffer) {
 
     // Set global buffer
-    CURRENT_ADUIO_BUFFER = audioBuffer;
+    CURRENT_AUDIO_BUFFER = audioBuffer;
 
     // Show waveform container
     showElement('specContainer', false, true);
@@ -245,13 +245,14 @@ function drawSpectrogram(audioBuffer) {
         fftSamples: 1024,
         minPxPerSec: 50,
         colorMap: colormap({
-                colormap: 'viridis',
+                colormap: 'inferno',
                 nshades: 256,
                 format: 'rgb',
                 alpha: 1
         }),
         hideScrollbar: false,
         visualization: 'spectrogram',
+        labels: true,
         plugins: []
     };
 
@@ -260,7 +261,7 @@ function drawSpectrogram(audioBuffer) {
     WAVESURFER.enableDragSelection({});
 
     // Load audio file
-    WAVESURFER.loadDecodedBuffer(CURRENT_ADUIO_BUFFER);
+    WAVESURFER.loadDecodedBuffer(CURRENT_AUDIO_BUFFER);
     
     // Set initial zoom level
     WS_ZOOM = $('#specContainer').width() / WAVESURFER.getDuration();
@@ -316,7 +317,7 @@ function showResults() {
         tr += "<td>" + RESULTS[i].timestamp + "</td>";
         tr += "<td>" + RESULTS[i].cname + "</td>";
         tr += "<td>" + RESULTS[i].sname + "</td>";
-        tr += "<td>" + RESULTS[i].score + "</td>";
+        tr += "<td>" + (parseFloat(RESULTS[i].score ) * 100).toFixed(0) + "%" + "</td>";
         tr += "</tr>";
 
         $('#resultTableBody').append(tr);
