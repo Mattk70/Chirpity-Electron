@@ -5,13 +5,13 @@ const resampler = require('audio-resampler');
 const normalize = require('array-normalize')
 const colormap = require('colormap')
 
-const MODEL_JSON = 'model/model.json'
+const MODEL_JSON = '../Chirpity/JS_model/model.json'
 const CONFIG = {
 
     sampleRate: 48000,
     specLength: 3,
     sigmoid: 1.0,
-    minConfidence: 0.15,
+    minConfidence: 0.2,
 
 }
 
@@ -138,12 +138,29 @@ async function loadModel() {
     // Load model
     if (MODEL == null) {
         console.log('Loading model...');
-        MODEL = await tf.loadLayersModel(MODEL_JSON);
+        MODEL = await tf.loadGraphModel(MODEL_JSON);
         //CONFIG.labels = MODEL.getLayer('SIGMOID').config.labels;
         CONFIG.labels = LABELS;
         console.log('...done loading model!');
     }
 
+}
+
+function normalize_and_fix_shape(spec) {
+    spec = spec.slice(253, 256);
+    // Normalize to 0-255
+    spec = tf.div(
+       tf.sub(
+          spec,
+          tf.min(spec)
+       ),
+       tf.sub(
+          tf.max(spec),
+          tf.min(spec)
+       )
+    );
+    spec = spec.mul(255);
+    return spec
 }
 
 async function predict(audioData, model) {
@@ -152,14 +169,42 @@ async function predict(audioData, model) {
     RESULTS = [];
 
     // Slice and expand
-    var cunkLength = CONFIG.sampleRate * CONFIG.specLength;
-    for (var i = 0; i < audioTensor.shape[0] - cunkLength; i += CONFIG.sampleRate) {
+    var chunkLength = CONFIG.sampleRate * CONFIG.specLength;
+    for (var i = 0; i < audioTensor.shape[0] - chunkLength; i += CONFIG.sampleRate) {
 
-        if (i + cunkLength > audioTensor.shape[0]) i = audioTensor.shape[0] - cunkLength;
-        const chunkTensor = audioTensor.slice(i, cunkLength).expandDims(0);
+        if (i + chunkLength > audioTensor.shape[0]) i = audioTensor.shape[0] - chunkLength;
+        const chunkTensor = audioTensor.slice(i, chunkLength).expandDims(0);
+        // For now, let's work with hard coded values to avoid strange errors when reading the config
+        // const spec_shape = [257, 384];
+        const frame_length = 1024;
+        const frame_step = 373;
 
+        // Perform STFT
+        let spec = tf.signal.stft(chunkTensor.squeeze(),
+                              frame_length,
+                              frame_step,
+                              )
+
+        // Cast from complex to float
+        spec = tf.cast(spec, 'float32');
+
+        // Swap axes to fit output shape
+        spec = tf.transpose(spec);
+        spec = tf.abs(spec);
+        // Fix Spectrogram shape
+        spec = normalize_and_fix_shape(spec);
+        // Add channel axis
+        spec = tf.expandDims(spec, -1);
+
+        // Add batch axis
+        spec = tf.expandDims(spec, 0);
+
+        //const verbose = true
+        //spec.print(verbose)
+
+        // console.log(spec.dataSync())
         // Make prediction
-        const prediction = model.predict(chunkTensor);
+        const prediction = model.predict(spec);
 
         // Get label
         const index = prediction.argMax(1).dataSync()[0];
@@ -170,7 +215,7 @@ async function predict(audioData, model) {
         if (score >= CONFIG.minConfidence) {
             RESULTS.push({
 
-                timestamp: timestampFromSeconds(i / CONFIG.sampleRate) + ' - ' + timestampFromSeconds((i + cunkLength) / CONFIG.sampleRate),
+                timestamp: timestampFromSeconds(i / CONFIG.sampleRate) + ' - ' + timestampFromSeconds((i + chunkLength) / CONFIG.sampleRate),
                 sname: CONFIG.labels[index].split('_')[0],
                 cname: CONFIG.labels[index].split('_')[1],
                 score: score
@@ -210,7 +255,7 @@ function loadAudioFile(filePath) {
             hideElement('loadFileHint');
             
             // Draw and show spectrogram
-            drawSpectrogram(buffer);    
+            drawSpectrogram(buffer);
 
             // Show results
             showResults();
@@ -218,7 +263,7 @@ function loadAudioFile(filePath) {
         });
 
     });
-    
+
 }
 
 function drawSpectrogram(audioBuffer) {
@@ -243,6 +288,7 @@ function drawSpectrogram(audioBuffer) {
         responsive: true,
         height: 512,
         fftSamples: 1024,
+        windowFunc: 'hamming',
         minPxPerSec: 50,
         colorMap: colormap({
                 colormap: 'inferno',
@@ -252,7 +298,6 @@ function drawSpectrogram(audioBuffer) {
         }),
         hideScrollbar: false,
         visualization: 'spectrogram',
-        labels: true,
         plugins: []
     };
 

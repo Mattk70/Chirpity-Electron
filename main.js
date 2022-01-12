@@ -8,7 +8,9 @@ function createWindow () {
     width: 1280,
     height: 768,
     webPreferences: {
-      nodeIntegration: true
+      nodeIntegration: true,
+      contextIsolation: false,
+      enableRemoteModule: true,
     }
   })
 
@@ -16,7 +18,7 @@ function createWindow () {
   win.setIcon(__dirname + '/img/icon/icon.png');
 
   // Always maximize
-  win.maximize()
+  // win.maximize()
 
   // Hide nav bar
   win.setMenuBarVisibility(false);
@@ -24,8 +26,8 @@ function createWindow () {
   // and load the index.html of the app.
   win.loadFile('index.html')
 
-  // Open the DevTools.
-  //win.webContents.openDevTools()
+  // Open the DevTools. Comment out for release
+  win.webContents.openDevTools()
 
   // Emitted when the window is closed.
   win.on('closed', () => {

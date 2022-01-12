@@ -1,7 +1,7 @@
 {
-  "name": "birdnet-electron",
+  "name": "chirpity-electron",
   "version": "0.1.0",
-  "description": "Electron app for sound file analysis with BirdNET.",
+  "description": "Electron app for sound file analysis with Chirpity.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kahst/BirdNET-Electron.git"
+    "url": "git+https://github.com/mattk70/Chirpity-Electron.git"
   },
   "keywords": [
     "Bioacoustics",
@@ -17,24 +17,28 @@
     "DeepLearning",
     "Tensorflow.js"
   ],
-  "author": "Stefan Kahl",
+  "author": "Matt Kirkland",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/kahst/BirdNET-Electron/issues"
+    "url": "https://github.com/mattk70/Chirpity-Electron/issues"
   },
-  "homepage": "https://github.com/kahst/BirdNET-Electron#readme",
+  "homepage": "https://github.com/mattk70/Chirpity-Electron#readme",
   "devDependencies": {
-    "electron": "^7.1.7",
-    "electron-packager": "^14.1.1"
+    "electron": "^7.3.3",
+    "electron-packager": "^14.2.1"
   },
   "dependencies": {
-    "@tensorflow/tfjs": "^1.5.1",
-    "array-normalize": "^1.1.4",
+    "@tensorflow/tfjs": "^3.12.0",
+    "array-normalize": "^2.0.0",
     "audio-loader": "^1.0.3",
     "audio-resampler": "^1.0.1",
-    "bootstrap": "^4.4.1",
-    "colormap": "^2.3.1",
-    "jquery": "^3.4.1",
-    "popper.js": "^1.16.0"
+    "bootstrap": "^4.6.1",
+    "colormap": "^2.3.2",
+    "jquery": "^3.6.0",
+    "popper.js": "^1.16.1",
+    "seedrandom": "^3.0.5"
+  },
+  "directories": {
+    "example": "example"
   }
 }
