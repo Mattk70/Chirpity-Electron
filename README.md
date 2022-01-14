@@ -24,7 +24,7 @@ Credit to Stephan Kahl:
 First, clone the project and install all dependencies:
 
 ```
-git clone https://github.com/kahst/Chirpity-Electron.git
+git clone https://github.com/Mattk70/Chirpity-Electron
 cd Chirpity-Electron
 npm install
 ```
