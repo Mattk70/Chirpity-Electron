@@ -1,82 +1,89 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <!-- Required meta tags -->
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <meta http-equiv="Content-Security-Policy" content="script-src 'self'  'unsafe-inline';" />
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self'  'unsafe-inline';"/>
 
-  <!-- Bootstrap & CSS-->
-  <link rel="stylesheet" href="css/bootstrap.min.css" />
-  <script>let $ = require('jquery');</script>
-  <script>require('popper.js');</script>
-  <script>require('bootstrap');</script>
-  
-  <!-- Additional JavaScript & CSS -->
-  <link rel="stylesheet" href="css/style.css" />
-  <script src="js/labels.js"></script>  
-  <script src="js/chirpity.js"></script>
-  <script src="js/ui.js"></script>
+    <!-- Bootstrap & CSS-->
+    <link rel="stylesheet" href="css/bootstrap.min.css"/>
+    <script>let $ = require('jquery');</script>
+    <script>require('popper.js');</script>
+    <script>require('bootstrap');</script>
 
-  <!-- Modified wavesurfer drawer -->
-  <script src="js/wavesurfer.min.js"></script>
-  <script src="js/wavesurfer.spectrogram.min.js"></script>
-  <script src="js/wavesurfer.drawer.extended.js"></script>
-  <script src="js/wavesurfer.regions.min.js"></script>
-  <!--script src="js/wavesurfer.timeline.min.js"></script-->
+    <!-- Additional JavaScript & CSS -->
+    <link rel="stylesheet" href="css/style.css"/>
+    <script src="js/labels.js"></script>
+    <script src="js/chirpity.js"></script>
+    <script src="js/ui.js"></script>
 
-  <!-- App title -->
-  <title>Chirpity Sound Analysis</title>
+    <!-- Modified wavesurfer drawer -->
+    <script src="js/wavesurfer.min.js"></script>
+    <script src="js/wavesurfer.spectrogram.min.js"></script>
+    <script src="js/wavesurfer.drawer.extended.js"></script>
+    <script src="js/wavesurfer.regions.min.js"></script>
+    <!--script src="js/wavesurfer.timeline.min.js"></script-->
+
+    <!-- App title -->
+    <title>Chirpity Sound Analysis</title>
 
 </head>
 <body>
 
-  <!-- Navigation bar -->
-  <nav class="navbar navbar-expand-sm navbar-dark bg-dark fixed-top">
+<!-- Navigation bar -->
+<nav class="navbar navbar-expand-sm navbar-dark bg-dark fixed-top">
     <a class="navbar-brand" href="#">Chirpity</a>
-    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>  
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
     <div class="collapse navbar-collapse" id="navbarSupportedContent">
-      <ul class="navbar-nav mr-auto">        
-        <li class="nav-item dropdown active">
-          <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-            File
-          </a>
-          <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-            <a class="dropdown-item" href="#" onclick="showFileDialog();">Open audio file</a>
-            <a class="dropdown-item disabled" href="#">Save analysis results</a>
-            <div class="dropdown-divider"></div>
-            <a class="dropdown-item" href="#" onclick="exitApplication();">Exit application</a>
-          </div>
-        </li>
-        <li class="nav-item dropdown active">
-          <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-            Analysis
-          </a>
-          <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-            <a class="dropdown-item" href="#" onclick="predict(AUDIO_DATA, MODEL);">Analyze entire file</a>
-            <a class="dropdown-item disabled" href="#">Analyze selected interval</a>
-          </div>
-        </li>
-      </ul>
-      <img class="" src="img/logo/CLO_logo_inverted.png" width="250px"/>
+        <ul class="navbar-nav mr-auto">
+            <li class="nav-item dropdown active">
+                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown"
+                   aria-haspopup="true" aria-expanded="false">
+                    File
+                </a>
+                <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                    <a class="dropdown-item" href="#" onclick="showFileDialog();">Open audio file</a>
+                    <a class="dropdown-item disabled" href="#">Save analysis results</a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="#" onclick="exitApplication();">Exit application</a>
+                </div>
+            </li>
+            <li class="nav-item dropdown active">
+                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown"
+                   aria-haspopup="true" aria-expanded="false">
+                    Analysis
+                </a>
+                <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                    <a class="dropdown-item" href="#" onclick="predict(AUDIO_DATA, MODEL);">Analyze entire file</a>
+                    <a class="dropdown-item disabled" href="#">Analyze selected interval</a>
+                </div>
+            </li>
+        </ul>
+        <img class="" src="img/logo/chirpity_logo.png" width="400px"/>
     </div>
-  </nav>
+</nav>
 
-  <!-- Content wrapper -->
-  <div class="flex-column h-100" id="contentWrapper">
+<!-- Content wrapper -->
+<div class="flex-column h-100" id="contentWrapper">
 
     <!-- Load audio file hint -->
     <div class="d-flex h-100 flex-column text-dark align-items-center justify-content-center" id="loadFileHint">
-      <div class="row">
-        <p class="lead justify-content-center" id="loadFileHintText">Load an audio file for analysis by clicking</br>on <i>File > Open audio file</i> in the top menu.</p>
-      </div>
-      <div class="row">
-        <div class="d-none spinner-border" role="status" id="loadFileHintSpinner"></div>
-      </div>
-      <div class="row"><p class="d-none lead" id="loadFileHintLog"></p> </div>       
-    </div>  
+        <!--div class="row">
+          <p class="lead justify-content-center" id="modelWarmUpText">Warming up the model...</p>
+        </div-->
+        <div class="row">
+            <p class="lead justify-content-center" id="loadFileHintText">Load an audio file for analysis by
+                clicking</br>on <i>File > Open audio file</i> in the top menu.</p>
+        </div>
+        <div class="row">
+            <div class="d-none spinner-border" role="status" id="loadFileHintSpinner"></div>
+        </div>
+        <div class="row"><p class="d-none lead" id="loadFileHintLog"></p></div>
+    </div>
 
     <!-- Spectrogram view -->
     <div class="" id="specContainer"></div>
@@ -84,46 +91,46 @@
 
     <!-- Controls view -->
     <div class="container-fluid p-2 bg-dark text-white d-none" id="controlsWrapper" style="height: 55px;">
-      
-      <div class="btn-group btn-group" role="group">
-        <button class="btn btn-primary " onclick="WAVESURFER.play()">
-          <i class="material-icons">play_arrow</i><!--span>Play</span-->
-        </button>
-        <button class="btn btn-primary " onclick="WAVESURFER.pause()">
-          <i class="material-icons">pause</i><!--span>Pause</span-->
-        </button>
-        <button class="btn btn-primary " onclick="zoomSpecIn();">
-          <i class="material-icons">zoom_in</i>
-        </button>
-        <button class="btn btn-primary " onclick="zoomSpecOut();">
-          <i class="material-icons">zoom_out</i>
-        </button>
-      </div>
+
+        <div class="btn-group btn-group" role="group">
+            <button class="btn btn-primary " onclick="WAVESURFER.play()">
+                <i class="material-icons">play_arrow</i><!--span>Play</span-->
+            </button>
+            <button class="btn btn-primary " onclick="WAVESURFER.pause()">
+                <i class="material-icons">pause</i><!--span>Pause</span-->
+            </button>
+            <button class="btn btn-primary " onclick="zoomSpecIn();">
+                <i class="material-icons">zoom_in</i>
+            </button>
+            <button class="btn btn-primary " onclick="zoomSpecOut();">
+                <i class="material-icons">zoom_out</i>
+            </button>
+        </div>
     </div>
 
     <!-- Result table -->
     <div class="d-none p-3 overflow-auto" id="resultTableContainer">
-      <table class="table table-hover">
-        <thead class="thead-dark">
-          <tr>
-            <th scope="col">#</th>
-            <th scope="col">Timestamp</th>
-            <th scope="col">Common name</th>
-            <th scope="col">Scientific name</th>
-            <th scope="col">Confidence</th>
-          </tr>
-        </thead>
-        <tbody class="text-dark" id="resultTableBody">
-          
-        </tbody>
-      </table>
+        <table class="table table-hover">
+            <thead class="thead-dark">
+            <tr>
+                <th scope="col">#</th>
+                <th scope="col">Timestamp</th>
+                <th scope="col">Common name</th>
+                <th scope="col">Scientific name</th>
+                <th scope="col">Confidence</th>
+            </tr>
+            </thead>
+            <tbody class="text-dark" id="resultTableBody">
+
+            </tbody>
+        </table>
     </div>
 
-  </div>
+</div>
 
 
-  <!-- Footer -->
-  <div class="d-flex fixed-bottom p-2 bg-primary text-white justify-content-center" id="footer">
+<!-- Footer -->
+<div class="d-flex fixed-bottom p-2 bg-primary text-white justify-content-center" id="footer">
     <small>Chirpity | <span id="year"></span></small>
-  </div>
+</div>
 </body>

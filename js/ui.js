@@ -1,4 +1,4 @@
-const { dialog } = require('electron').remote;
+const {dialog} = require('electron').remote;
 const remote = require('electron').remote;
 
 async function showFileDialog() {
@@ -6,7 +6,7 @@ async function showFileDialog() {
     // Show file dialog to select audio file
     const fileDialog = await dialog.showOpenDialog({
 
-        filters: [{name: 'Audio Files', extensions: ['mp3', 'wav'] }],
+        filters: [{name: 'Audio Files', extensions: ['mp3', 'wav']}],
         properties: ['openFile']
     });
 
@@ -21,7 +21,7 @@ function exitApplication() {
 
 }
 
-function showElement(id, makeFlex=true, empty=false) {
+function showElement(id, makeFlex = true, empty = false) {
 
     $('#' + id).removeClass('d-none');
     if (makeFlex) $('#' + id).addClass('d-flex');
@@ -30,7 +30,7 @@ function showElement(id, makeFlex=true, empty=false) {
 }
 
 function hideElement(id) {
-    
+
     $('#' + id).removeClass('d-flex');
     $('#' + id).addClass('d-none');
 
@@ -39,6 +39,7 @@ function hideElement(id) {
 function hideAll() {
 
     // File hint div
+    hideElement('modelWarmUpText')
     hideElement('loadFileHint');
     hideElement('loadFileHintText');
     hideElement('loadFileHintSpinner');
@@ -63,8 +64,8 @@ function log(element, text) {
 }
 
 
- /////////////////////////  DO AFTER LOAD ////////////////////////////
- window.onload = function () {
+/////////////////////////  DO AFTER LOAD ////////////////////////////
+window.onload = function () {
 
     // Set footer year
     $('#year').text(new Date().getFullYear());
@@ -80,7 +81,7 @@ $(window).resize(function() {
 });
 */
 
-$(function() {
+$(function () {
     var $window = $(window);
     var width = $window.width();
     var height = $window.height();

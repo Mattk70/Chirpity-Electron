@@ -2,136 +2,28 @@
 const tf = require('@tensorflow/tfjs');
 const load = require('audio-loader')
 const resampler = require('audio-resampler');
-const normalize = require('array-normalize')
+// const normalize = require('array-normalize')
 const colormap = require('colormap')
+const {norm} = require("@tensorflow/tfjs");
 
-const MODEL_JSON = '../Chirpity/JS_model/model.json'
+const MODEL_JSON = './model/model.json'
 const CONFIG = {
 
     sampleRate: 48000,
     specLength: 3,
     sigmoid: 1.0,
-    minConfidence: 0.2,
+    minConfidence: 0.3,
 
 }
 
 let MODEL = null;
-var AUDIO_DATA = [];
-var RESULTS = [];
+let AUDIO_DATA = [];
+let RESULTS = [];
 
-var WAVESURFER = null;
-var CURRENT_AUDIO_BUFFER = null;
-var WS_ZOOM = 0;
+let WAVESURFER = null;
+let CURRENT_AUDIO_BUFFER = null;
+let WS_ZOOM = 0;
 
-/////////////////////////  Build SimpleSpecLayer  /////////////////////////
-class SimpleSpecLayer extends tf.layers.Layer {
-    constructor(config) {
-      super(config);    
-
-        // For now, let's work with hard coded values to avoid strange errors when reading the config
-        this.spec_shape = [257, 384];
-        this.frame_length = 512;
-        this.frame_step = 374;
-    }
-
-    build(inputShape) {
-        this.mag_scale = this.addWeight('magnitude_scaling', [], 'float32', tf.initializers.constant({value: 1.0}));
-      }
-
-    computeOutputShape(inputShape) { return [inputShape[0], this.spec_shape[0], this.spec_shape[1], 1]; }
-   
-    call(input, kwargs) { 
-
-        // Perform STFT    
-        var spec = tf.signal.stft(input[0].squeeze(),
-                              this.frame_length,
-                              this.frame_step) 
-        
-        // Cast from complex to float
-        spec = tf.cast(spec, 'float32');
-
-        // Convert to power spectrogram
-        spec = tf.pow(spec, 2.0)
-
-        // Convert magnitudes using nonlinearity
-        spec = tf.pow(spec, tf.div(1.0, tf.add(1.0, tf.exp(this.mag_scale.read()))))
-
-        // Normalize values between 0 and 1
-        //spec = tf.div(tf.sub(spec, tf.min(spec)), tf.max(spec));
-
-        // Swap axes to fit output shape
-        spec = tf.transpose(spec)
-
-        // Add channel axis        
-        spec = tf.expandDims(spec, -1)
-
-        // Add batch axis        
-        spec = tf.expandDims(spec, 0)
-
-        return spec
-    
-    }
-   
-    static get className() { return 'SimpleSpecLayer'; }
-}
-
-tf.serialization.registerClass(SimpleSpecLayer);
-
-/////////////////////////  Build GlobalExpPool2D Layer  /////////////////////////
-function logmeanexp(x, axis, keepdims, sharpness) {
-    xmax = tf.max(x, axis, true);
-    xmax2 = tf.max(x, axis, keepdims);
-    x = tf.mul(sharpness, tf.sub(x, xmax));
-    y = tf.log(tf.mean(tf.exp(x), axis, keepdims));
-    y = tf.add(tf.div(y, sharpness), xmax2);
-    return y
-}
-
-class GlobalLogExpPooling2D extends tf.layers.Layer {
-    constructor(config) {
-      super(config);
-    }
-
-    build(inputShape) {
-        this.sharpness = this.addWeight('sharpness', [1], 'float32', tf.initializers.constant({value: 2.0}));
-    }
-
-    computeOutputShape(inputShape) { return [inputShape[0], inputShape[3]]; }
-   
-    call(input, kwargs) {
-        
-        return logmeanexp(input[0], [1, 2], false, this.sharpness.read());//.read().dataSync()[0]); 
-    
-    }
-   
-    static get className() { return 'GlobalLogExpPooling2D'; }
-}
-
-tf.serialization.registerClass(GlobalLogExpPooling2D);
-
-/////////////////////////  Build Sigmoid Layer  /////////////////////////
-class SigmoidLayer extends tf.layers.Layer {
-    constructor(config) {
-      super(config);
-      this.config = config;
-    }
-
-    build(inputShape) {
-        this.kernel = this.addWeight('scale_factor', [1], 'float32', tf.initializers.constant({value: 1.0}));
-    }
-
-    computeOutputShape(inputShape) { return inputShape; }
-
-    call(input, kwargs) { 
-        
-        return tf.sigmoid(tf.mul(input[0], CONFIG.sigmoid))
-        
-    }   
-   
-    static get className() { return 'SigmoidLayer'; }
-}
-
-tf.serialization.registerClass(SigmoidLayer);
 
 async function loadModel() {
 
@@ -142,6 +34,14 @@ async function loadModel() {
         //CONFIG.labels = MODEL.getLayer('SIGMOID').config.labels;
         CONFIG.labels = LABELS;
         console.log('...done loading model!');
+        // Warmup the model before using real data.
+        //console.log('warming up model!');
+        //showElement('modelWarmUpText')
+        //const warmupResult = MODEL.predict(tf.zeros([1,256,384,1]));
+        //hideElement('modelWarmUpText')
+        //warmupResult.dataSync();
+        //warmupResult.dispose();
+        //console.log('....done warming up model!');
     }
 
 }
@@ -149,47 +49,43 @@ async function loadModel() {
 function normalize_and_fix_shape(spec) {
     spec = spec.slice(253, 256);
     // Normalize to 0-255
-    spec = tf.div(
-       tf.sub(
-          spec,
-          tf.min(spec)
-       ),
-       tf.sub(
-          tf.max(spec),
-          tf.min(spec)
-       )
-    );
+    const spec_max = tf.max(spec)
     spec = spec.mul(255);
+    spec = spec.div(spec_max)
     return spec
 }
 
-async function predict(audioData, model) {
+function tensor2int16(data) {
+    return tf.mul(data, 32767)
+}
 
+async function predict(audioData, model) {
     const audioTensor = tf.tensor1d(audioData)
     RESULTS = [];
 
     // Slice and expand
-    var chunkLength = CONFIG.sampleRate * CONFIG.specLength;
-    for (var i = 0; i < audioTensor.shape[0] - chunkLength; i += CONFIG.sampleRate) {
+    const chunkLength = CONFIG.sampleRate * CONFIG.specLength;
+    for (let i = 0; i < audioTensor.shape[0] - chunkLength; i += chunkLength) {
 
         if (i + chunkLength > audioTensor.shape[0]) i = audioTensor.shape[0] - chunkLength;
-        const chunkTensor = audioTensor.slice(i, chunkLength).expandDims(0);
+        let chunkTensor = audioTensor.slice(i, chunkLength) //.expandDims(0);
         // For now, let's work with hard coded values to avoid strange errors when reading the config
         // const spec_shape = [257, 384];
+        //chunkTensor = tensor2int16(chunkTensor)
         const frame_length = 1024;
         const frame_step = 373;
-
         // Perform STFT
         let spec = tf.signal.stft(chunkTensor.squeeze(),
-                              frame_length,
-                              frame_step,
-                              )
+            frame_length,
+            frame_step,
+        )
 
         // Cast from complex to float
         spec = tf.cast(spec, 'float32');
 
         // Swap axes to fit output shape
         spec = tf.transpose(spec);
+        spec = tf.reverse(spec, [0])
         spec = tf.abs(spec);
         // Fix Spectrogram shape
         spec = normalize_and_fix_shape(spec);
@@ -199,10 +95,6 @@ async function predict(audioData, model) {
         // Add batch axis
         spec = tf.expandDims(spec, 0);
 
-        //const verbose = true
-        //spec.print(verbose)
-
-        // console.log(spec.dataSync())
         // Make prediction
         const prediction = model.predict(spec);
 
@@ -223,6 +115,7 @@ async function predict(audioData, model) {
             });
         }
     }
+    audioTensor.dispose()
 }
 
 
@@ -235,25 +128,24 @@ function loadAudioFile(filePath) {
     showElement('loadFileHintLog');
 
     // load one file
-    log('loadFileHintLog', 'Loading file...');
+    console.log('loadFileHintLog', 'Loading file...');
     load(filePath).then(function (buffer) {
-
         // Resample
-        log('loadFileHintLog', 'Analyzing...');
-        resampler(buffer, CONFIG.sampleRate, async function(event) {
+        console.log('loadFileHintLog', 'Analyzing...');
+        resampler(buffer, CONFIG.sampleRate, async function (event) {
 
             // Get raw audio data
             AUDIO_DATA = event.getAudioBuffer().getChannelData(0);
 
             // Normalize audio data
-            AUDIO_DATA = normalize(AUDIO_DATA)
+            // AUDIO_DATA = normalize(AUDIO_DATA)
 
             // Predict
             predict(AUDIO_DATA, MODEL);
 
             //Hide center div when done
             hideElement('loadFileHint');
-            
+
             // Draw and show spectrogram
             drawSpectrogram(buffer);
 
@@ -276,12 +168,15 @@ function drawSpectrogram(audioBuffer) {
     showElement('specTimeline', false, true);
 
     // Setup waveform and spec views
-    var options = {
+    const options = {
         container: '#specContainer',
         backgroundColor: '#363a40',
         waveColor: '#fff',
         cursorColor: '#fff',
         progressColor: '#4b79fa',
+        partialRender: true,
+        splitChannels: true,
+        splitChannelsOptions: {filterChannels: [1]},
         cursorWidth: 2,
         normalize: true,
         fillParent: true,
@@ -290,11 +185,12 @@ function drawSpectrogram(audioBuffer) {
         fftSamples: 1024,
         windowFunc: 'hamming',
         minPxPerSec: 50,
+        labels: true,
         colorMap: colormap({
-                colormap: 'inferno',
-                nshades: 256,
-                format: 'rgb',
-                alpha: 1
+            colormap: 'inferno',
+            nshades: 256,
+            format: 'rgb',
+            alpha: 1
         }),
         hideScrollbar: false,
         visualization: 'spectrogram',
@@ -307,15 +203,17 @@ function drawSpectrogram(audioBuffer) {
 
     // Load audio file
     WAVESURFER.loadDecodedBuffer(CURRENT_AUDIO_BUFFER);
-    
+
     // Set initial zoom level
     WS_ZOOM = $('#specContainer').width() / WAVESURFER.getDuration();
-
+    //console.log('ws zoom' + WS_ZOOM)
     // Set click event that removes all regions
-    $('#specContainer').mousedown(function (e) { WAVESURFER.clearRegions(); });
+    $('#specContainer').mousedown(function (e) {
+        WAVESURFER.clearRegions();
+    });
 
     // Resize canvas of spec and labels
-    adjustSpecHeight(false);
+    adjustSpecHeight(true);
 
     // Show controls
     showElement('controlsWrapper');
@@ -326,8 +224,8 @@ function adjustSpecHeight(redraw) {
 
     if (redraw && WAVESURFER != null) WAVESURFER.drawBuffer();
 
-    $('#specContainer wave, canvas').each(function() {
-        $( this ).height($('body').height() * 0.40);
+    $('#specContainer wave, canvas').each(function () {
+        $(this).height($('body').height() * 0.40);
     });
 
     $('#resultTableContainer').height($('#contentWrapper').height() - $('#specContainer').height() - $('#controlsWrapper').height() - 47);
@@ -338,6 +236,7 @@ function zoomSpecIn() {
 
     WS_ZOOM += 50;
     WAVESURFER.zoom(WS_ZOOM);
+    console.log('zoom is ' + WS_ZOOM)
 }
 
 function zoomSpecOut() {
@@ -356,13 +255,13 @@ function showResults() {
     $('#resultTableBody').empty();
 
     // Add new results
-    for (var i = 0 ; i < RESULTS.length; i++) {
+    for (let i = 0; i < RESULTS.length; i++) {
 
-        var tr = "<tr><th scope='row'>" + (i + 1) + "</th>";
+        let tr = "<tr><th scope='row'>" + (i + 1) + "</th>";
         tr += "<td>" + RESULTS[i].timestamp + "</td>";
         tr += "<td>" + RESULTS[i].cname + "</td>";
         tr += "<td>" + RESULTS[i].sname + "</td>";
-        tr += "<td>" + (parseFloat(RESULTS[i].score ) * 100).toFixed(0) + "%" + "</td>";
+        tr += "<td>" + (parseFloat(RESULTS[i].score) * 100).toFixed(0) + "%" + "</td>";
         tr += "</tr>";
 
         $('#resultTableBody').append(tr);
@@ -373,7 +272,7 @@ function showResults() {
 
 function timestampFromSeconds(seconds) {
 
-    var date = new Date(1970,0,1);
+    const date = new Date(1970, 0, 1);
     date.setSeconds(seconds);
     return date.toTimeString().replace(/.*(\d{2}:\d{2}).*/, "$1");
 
