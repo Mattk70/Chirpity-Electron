@@ -29,7 +29,6 @@
   },
   "dependencies": {
     "@tensorflow/tfjs": "^3.12.0",
-    "array-normalize": "^2.0.0",
     "audio-loader": "^1.0.3",
     "audio-resampler": "^1.0.1",
     "bootstrap": "^4.6.1",
@@ -37,8 +36,5 @@
     "jquery": "^3.6.0",
     "popper.js": "^1.16.1",
     "seedrandom": "^3.0.5"
-  },
-  "directories": {
-    "example": "example"
   }
 }

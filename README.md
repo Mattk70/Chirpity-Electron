@@ -1,16 +1,14 @@
 <b>This repo is currently under development.</b>
 
-# BirdNET-Electron
+# Chirpity-Electron
 
-Electron app for sound file analysis with BirdNET.
+Electron app for sound file analysis with Chirpity.
 
-Author: Stefan Kahl
+Author: Matthew Kirkland
 
-Contact: stefan.kahl@cs.tu-chemnitz.de
 
-Website: https://birdnet.cornell.edu/
 
-Please cite as (PDF coming soon):
+Credit to Stephan Kahl:
 
 ```
 @phdthesis{kahl2019identifying,
@@ -26,8 +24,8 @@ Please cite as (PDF coming soon):
 First, clone the project and install all dependencies:
 
 ```
-git clone https://github.com/kahst/BirdNET-Electron.git
-cd BirdNET-Electron
+git clone https://github.com/kahst/Chirpity-Electron.git
+cd Chirpity-Electron
 npm install
 ```
 
@@ -55,7 +53,7 @@ Now, we need to install <i>electron</I> with:
 npm install --save-dev electron
 ```
 
-BirdNET requires Tensorflow.js which we install with:
+Chirpity requires Tensorflow.js which we install with:
 
 ```
 npm install @tensorflow/tfjs
@@ -74,7 +72,6 @@ This app also needs some additional packages that we have to install.
 ```
 npm install audio-loader
 npm install audio-resampler
-npm install array-normalize
 npm install colormap
 ```
 
@@ -89,7 +86,7 @@ We can now add the export script in the <i>package.json</i>:
 ```
 "scripts": {
     "start": "electron .",
-    "export": "electron-packager . --out dist --overwrite"
+    "export": "electron-packager . --out packages --overwrite"
   }
 ```
 
