@@ -8,7 +8,7 @@ Author: Matthew Kirkland
 
 
 
-Credit to Stephan Kahl:
+Credit to Stefan Kahl:
 
 ```
 @phdthesis{kahl2019identifying,
