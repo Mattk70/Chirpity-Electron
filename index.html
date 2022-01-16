@@ -9,7 +9,7 @@
     <!-- Bootstrap & CSS-->
     <link rel="stylesheet" href="css/bootstrap.min.css"/>
     <script>let $ = require('jquery');</script>
-    <script>require('popper.js');</script>
+    <!--script>require('popper.js');</script-->
     <script>require('bootstrap');</script>
 
     <!-- Additional JavaScript & CSS -->
@@ -18,12 +18,12 @@
     <script src="js/chirpity.js"></script>
     <script src="js/ui.js"></script>
 
-    <!-- Modified wavesurfer drawer -->
+    <!-- Modified wavesurfer drawer >
     <script src="js/wavesurfer.min.js"></script>
     <script src="js/wavesurfer.spectrogram.min.js"></script>
     <script src="js/wavesurfer.drawer.extended.js"></script>
     <script src="js/wavesurfer.regions.min.js"></script>
-    <!--script src="js/wavesurfer.timeline.min.js"></script-->
+    <script src="js/wavesurfer.timeline.min.js"></script-->
 
     <!-- App title -->
     <title>Chirpity Sound Analysis</title>
@@ -46,8 +46,8 @@
                     File
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item" href="#" onclick="showFileDialog();">Open audio file</a>
-                    <a class="dropdown-item disabled" href="#">Save analysis results</a>
+                    <a class="dropdown-item" href="#" onclick="showOpenDialog();">Open audio file</a>
+                    <a class="dropdown-item disabled" onclick="showSaveDialog()" id="saveLabels" href="#">Save analysis results</a>
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="#" onclick="exitApplication();">Exit application</a>
                 </div>
@@ -58,7 +58,7 @@
                     Analysis
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item" href="#" onclick="predict(AUDIO_DATA, MODEL);">Analyze entire file</a>
+                    <a class="dropdown-item" href="#" id="analyze" onclick="predict(AUDIO_DATA, MODEL);">Analyze entire file</a>
                     <a class="dropdown-item disabled" href="#">Analyze selected interval</a>
                 </div>
             </li>
@@ -86,18 +86,19 @@
     </div>
 
     <!-- Spectrogram view -->
-    <div class="" id="specContainer"></div>
-    <div class="" id="specTimeline"></div>
+    <div id="waveform"></div>
+    <div class="" id="spectrogram"></div>
+    <div class="" id="timeline"></div>
 
     <!-- Controls view -->
     <div class="container-fluid p-2 bg-dark text-white d-none" id="controlsWrapper" style="height: 55px;">
 
         <div class="btn-group btn-group" role="group">
-            <button class="btn btn-primary " onclick="WAVESURFER.play()">
+            <button class="btn btn-primary " onmousedown="wavesurfer.playPause();">
                 <i class="material-icons">play_arrow</i><!--span>Play</span-->
-            </button>
-            <button class="btn btn-primary " onclick="WAVESURFER.pause()">
+                Play /
                 <i class="material-icons">pause</i><!--span>Pause</span-->
+                Pause
             </button>
             <button class="btn btn-primary " onclick="zoomSpecIn();">
                 <i class="material-icons">zoom_in</i>
@@ -131,6 +132,6 @@
 
 <!-- Footer -->
 <div class="d-flex fixed-bottom p-2 bg-primary text-white justify-content-center" id="footer">
-    <small>Chirpity | <span id="year"></span></small>
+    <small>Chirpity  &copy; Matthew Kirkland <span id="year"></span></small>
 </div>
 </body>

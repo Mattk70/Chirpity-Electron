@@ -2,10 +2,11 @@
 const tf = require('@tensorflow/tfjs');
 const load = require('audio-loader')
 const resampler = require('audio-resampler');
-// const normalize = require('array-normalize')
 const colormap = require('colormap')
-const {norm} = require("@tensorflow/tfjs");
-
+const WaveSurfer = require('wavesurfer.js')
+const SpectrogramPlugin = require('wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js');
+const SpecTimeline = require('wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js');
+const Regions = require('wavesurfer.js/dist/plugin/wavesurfer.regions.min.js');
 const MODEL_JSON = './model/model.json'
 const CONFIG = {
 
@@ -19,8 +20,9 @@ const CONFIG = {
 let MODEL = null;
 let AUDIO_DATA = [];
 let RESULTS = [];
+let AUDACITY_LABELS = [];
 
-let WAVESURFER = null;
+let wavesurfer = null;
 let CURRENT_AUDIO_BUFFER = null;
 let WS_ZOOM = 0;
 
@@ -55,13 +57,10 @@ function normalize_and_fix_shape(spec) {
     return spec
 }
 
-function tensor2int16(data) {
-    return tf.mul(data, 32767)
-}
-
 async function predict(audioData, model) {
     const audioTensor = tf.tensor1d(audioData)
     RESULTS = [];
+    AUDACITY_LABELS = []
 
     // Slice and expand
     const chunkLength = CONFIG.sampleRate * CONFIG.specLength;
@@ -103,19 +102,25 @@ async function predict(audioData, model) {
         const score = prediction.dataSync()[index];
 
         console.log(index, CONFIG.labels[index], score);
-
         if (score >= CONFIG.minConfidence) {
             RESULTS.push({
-
                 timestamp: timestampFromSeconds(i / CONFIG.sampleRate) + ' - ' + timestampFromSeconds((i + chunkLength) / CONFIG.sampleRate),
                 sname: CONFIG.labels[index].split('_')[0],
                 cname: CONFIG.labels[index].split('_')[1],
                 score: score
 
             });
+            // Update results one by one
+            let start = RESULTS.length
+            start === 1 ? showResults() : appendResults(start)
+            AUDACITY_LABELS.push({
+                timestamp: (i / CONFIG.sampleRate).toFixed(1) + '\t' + ((i + chunkLength) / CONFIG.sampleRate).toFixed(1),
+                cname: CONFIG.labels[index].split('_')[1],
+                score: score
+
+            });
         }
     }
-    audioTensor.dispose()
 }
 
 
@@ -126,13 +131,18 @@ function loadAudioFile(filePath) {
     showElement('loadFileHint');
     showElement('loadFileHintSpinner');
     showElement('loadFileHintLog');
-
+    let start = new Date()
     // load one file
     console.log('loadFileHintLog', 'Loading file...');
     load(filePath).then(function (buffer) {
         // Resample
+        let timeNow = new Date() - start
+        console.log('loading took ' + timeNow / 1000 + ' seconds');
         console.log('loadFileHintLog', 'Analyzing...');
+        start = new Date()
         resampler(buffer, CONFIG.sampleRate, async function (event) {
+            timeNow = new Date() - start;
+            console.log('resampling took ' + timeNow / 1000 + ' seconds');
 
             // Get raw audio data
             AUDIO_DATA = event.getAudioBuffer().getChannelData(0);
@@ -141,8 +151,10 @@ function loadAudioFile(filePath) {
             // AUDIO_DATA = normalize(AUDIO_DATA)
 
             // Predict
+            start = new Date()
             predict(AUDIO_DATA, MODEL);
-
+            timeNow = new Date() - start;
+            console.log('prediction took ' + timeNow / 1000 + ' seconds');
             //Hide center div when done
             hideElement('loadFileHint');
 
@@ -163,13 +175,16 @@ function drawSpectrogram(audioBuffer) {
     // Set global buffer
     CURRENT_AUDIO_BUFFER = audioBuffer;
 
-    // Show waveform container
-    showElement('specContainer', false, true);
-    showElement('specTimeline', false, true);
+    // Show spec and timecode containers
+    // showElement('waveform', false, true);
+    showElement('spectrogram', false, true);
+
 
     // Setup waveform and spec views
-    const options = {
-        container: '#specContainer',
+    wavesurfer = WaveSurfer.create({
+        //options
+        container: '#waveform',
+        backend: 'WebAudio',
         backgroundColor: '#363a40',
         waveColor: '#fff',
         cursorColor: '#fff',
@@ -179,76 +194,102 @@ function drawSpectrogram(audioBuffer) {
         splitChannelsOptions: {filterChannels: [1]},
         cursorWidth: 2,
         normalize: true,
-        fillParent: true,
+        //fillParent: true,
+        scrollParent: true,
         responsive: true,
         height: 512,
         fftSamples: 1024,
         windowFunc: 'hamming',
         minPxPerSec: 50,
-        labels: true,
-        colorMap: colormap({
-            colormap: 'inferno',
-            nshades: 256,
-            format: 'rgb',
-            alpha: 1
-        }),
         hideScrollbar: false,
-        visualization: 'spectrogram',
-        plugins: []
-    };
-
-    // Create wavesurfer object
-    WAVESURFER = WaveSurfer.create(options);
-    WAVESURFER.enableDragSelection({});
+        //visualization: 'spectrogram',
+        plugins: [
+            SpectrogramPlugin.create({
+                wavesurfer: wavesurfer,
+                container: "#spectrogram",
+                scrollParent: true,
+                labels: false,
+                colorMap: colormap({
+                    colormap: 'inferno',
+                    nshades: 256,
+                    format: 'float'
+                }),
+            }),
+            SpecTimeline.create({
+                container: "#timeline"
+            }),
+            Regions.create({
+                regionsMinLength: 2,
+                dragSelection: {
+                    slop: 5
+                }
+            })
+        ]
+    })
 
     // Load audio file
-    WAVESURFER.loadDecodedBuffer(CURRENT_AUDIO_BUFFER);
+    wavesurfer.loadDecodedBuffer(CURRENT_AUDIO_BUFFER);
 
     // Set initial zoom level
-    WS_ZOOM = $('#specContainer').width() / WAVESURFER.getDuration();
+    WS_ZOOM = $('#waveform').width() / wavesurfer.getDuration();
     //console.log('ws zoom' + WS_ZOOM)
     // Set click event that removes all regions
-    $('#specContainer').mousedown(function (e) {
-        WAVESURFER.clearRegions();
-    });
+    //$('#spectrogram').mousedown(function (e) {
+    //    wavesurfer.Regions.remove();
+    //});
 
     // Resize canvas of spec and labels
     adjustSpecHeight(true);
 
+    // Hide waveform
+    //hideElement('waveform')
     // Show controls
     showElement('controlsWrapper');
+    showElement('timeline', false, true);
 
 }
 
 function adjustSpecHeight(redraw) {
 
-    if (redraw && WAVESURFER != null) WAVESURFER.drawBuffer();
+    if (redraw && wavesurfer != null) wavesurfer.drawBuffer();
 
-    $('#specContainer wave, canvas').each(function () {
+    $('#spectrogram wave, spectrogram, canvas').each(function () {
         $(this).height($('body').height() * 0.40);
     });
 
-    $('#resultTableContainer').height($('#contentWrapper').height() - $('#specContainer').height() - $('#controlsWrapper').height() - 47);
+
+    $('#resultTableContainer').height($('#contentWrapper').height() - $('#spectrogram').height() - $('#controlsWrapper').height() - $('#waveform').height() - 47);
 
 }
 
 function zoomSpecIn() {
 
     WS_ZOOM += 50;
-    WAVESURFER.zoom(WS_ZOOM);
-    console.log('zoom is ' + WS_ZOOM)
+    wavesurfer.zoom(WS_ZOOM);
 }
 
 function zoomSpecOut() {
 
     WS_ZOOM -= 50;
-    WAVESURFER.zoom(WS_ZOOM);
+    wavesurfer.zoom(WS_ZOOM);
 
 }
 
-function showResults() {
+function appendResults(start) {
+    // Add new results
+    for (let i = start; i < RESULTS.length; i++) {
+        let tr = "<tr>><td>" + RESULTS[i].timestamp + "</td>";
+        tr += "<td>" + RESULTS[i].cname + "</td>";
+        tr += "<td>" + RESULTS[i].sname + "</td>";
+        tr += "<td>" + (parseFloat(RESULTS[i].score) * 100).toFixed(0) + "%" + "</td>";
+        tr += "</tr>";
+        $('#resultTableBody').append(tr);
+    }
+}
 
-    console.log(RESULTS);
+
+function showResults() {
+    //console.log(RESULTS);
     showElement('resultTableContainer');
 
     // Remove old results
@@ -267,7 +308,7 @@ function showResults() {
         $('#resultTableBody').append(tr);
 
     }
-
+    enableMenuItem('saveLabels')
 }
 
 function timestampFromSeconds(seconds) {
@@ -277,5 +318,3 @@ function timestampFromSeconds(seconds) {
     return date.toTimeString().replace(/.*(\d{2}:\d{2}).*/, "$1");
 
 }
-
-
