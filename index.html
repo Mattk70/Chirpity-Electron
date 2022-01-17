@@ -47,23 +47,36 @@
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
                     <a class="dropdown-item" href="#" onclick="showOpenDialog();">Open audio file</a>
-                    <a class="dropdown-item disabled" onclick="showSaveDialog()" id="saveLabels" href="#">Save analysis results</a>
+                    <a class="dropdown-item disabled" onclick="showSaveDialog()" id="saveLabels" href="#">Save analysis
+                        results</a>
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="#" onclick="exitApplication();">Exit application</a>
                 </div>
             </li>
             <li class="nav-item dropdown active">
-                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown"
+                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown2" role="button" data-toggle="dropdown"
                    aria-haspopup="true" aria-expanded="false">
                     Analysis
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item" href="#" id="analyze" onclick="predict(AUDIO_DATA, MODEL);">Analyze entire file</a>
-                    <a class="dropdown-item disabled" href="#">Analyze selected interval</a>
+                    <a class="dropdown-item" href="#" id="analyze" onclick="predict(AUDIO_DATA, MODEL);">Analyze entire
+                        file</a>
+                    <a class="dropdown-item disabled" href="#" id="analyzeSelection" onclick="predict(AUDIO_DATA, MODEL, region.start, region.end);">Analyze selected interval</a>
                 </div>
             </li>
+                        <li class="nav-item dropdown active">
+                <a class="nav-link dropdown-toggle" href="#" id="SpecDropdown" role="button" data-toggle="dropdown"
+                   aria-haspopup="true" aria-expanded="false">
+                    Spectrogram
+                </a>
+                <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                    <a class="dropdown-item" href="#" id="greyscale" onclick="specColor('greys');">Greyscale</a>
+                    <a class="dropdown-item" href="#" id="rgb" onclick="specColor('inferno');">Colour</a>
+                </div>
+            </li>
+
         </ul>
-        <img class="" src="img/logo/chirpity_logo.png" width="400px"/>
+        <img class="" src="img/logo/chirpity_logo.png" alt="Chirpity Birdcalls: Identifying birds by sound" width="400px" />
     </div>
 </nav>
 
@@ -72,9 +85,9 @@
 
     <!-- Load audio file hint -->
     <div class="d-flex h-100 flex-column text-dark align-items-center justify-content-center" id="loadFileHint">
-        <!--div class="row">
+        <div class="row">
           <p class="lead justify-content-center" id="modelWarmUpText">Warming up the model...</p>
-        </div-->
+        </div>
         <div class="row">
             <p class="lead justify-content-center" id="loadFileHintText">Load an audio file for analysis by
                 clicking</br>on <i>File > Open audio file</i> in the top menu.</p>
@@ -86,26 +99,25 @@
     </div>
 
     <!-- Spectrogram view -->
-    <div id="waveform"></div>
-    <div class="" id="spectrogram"></div>
-    <div class="" id="timeline"></div>
+    <div class="inner" id="spectrogram"></div>
+    <div class="inner" id="waveform"></div>
+    <div class="" id="dummy"></div>
+    <!--div class="" id="timeline"></div -->
 
     <!-- Controls view -->
     <div class="container-fluid p-2 bg-dark text-white d-none" id="controlsWrapper" style="height: 55px;">
 
         <div class="btn-group btn-group" role="group">
-            <button class="btn btn-primary " onmousedown="wavesurfer.playPause();">
-                <i class="material-icons">play_arrow</i><!--span>Play</span-->
-                Play /
-                <i class="material-icons">pause</i><!--span>Pause</span-->
-                Pause
+            <button class="btn btn-primary justify-content-center" onmousedown="wavesurfer.playPause();">
+                <i class="material-icons">play_arrow</i><span>Play / </span>
+                <i class="material-icons">pause</i><span>Pause</span>
             </button>
-            <button class="btn btn-primary " onclick="zoomSpecIn();">
+            <!--button class="btn btn-primary " onclick="zoomSpecIn();">
                 <i class="material-icons">zoom_in</i>
             </button>
             <button class="btn btn-primary " onclick="zoomSpecOut();">
                 <i class="material-icons">zoom_out</i>
-            </button>
+            </button-->
         </div>
     </div>
 
@@ -132,6 +144,6 @@
 
 <!-- Footer -->
 <div class="d-flex fixed-bottom p-2 bg-primary text-white justify-content-center" id="footer">
-    <small>Chirpity  &copy; Matthew Kirkland <span id="year"></span></small>
+    <small>Chirpity &copy; Matthew Kirkland <span id="year"></span></small>
 </div>
 </body>

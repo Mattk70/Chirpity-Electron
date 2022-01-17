@@ -10,10 +10,6 @@ html, body {
     border-width:10px !important;
 }
 
-.h-33 {height: 33%;}
-.h-40 {height: 40%;}
-.h-85 {height: 85%;}
-
 @font-face {
     font-family: 'Material Icons';
     font-style: normal;
@@ -27,17 +23,21 @@ html, body {
     font-family: 'Material Icons';
     font-weight: normal;
     font-style: normal;
-    font-size: 24px;  /* Preferred icon size */
+    font-size: 20px;  /* Preferred icon size */
     display: inline-block;
     line-height: 1;
     text-transform: none;
     letter-spacing: normal;
     word-wrap: normal;
     white-space: nowrap;
+    vertical-align: text-bottom;
     direction: ltr;
-    vertical-align: middle;
     padding-bottom: 0px;
   
     /* Support for all WebKit browsers. */
     -webkit-font-smoothing: antialiased;
   }
+.inner {
+    position: absolute;
+    width: 100%;
+}
