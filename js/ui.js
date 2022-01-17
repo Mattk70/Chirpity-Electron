@@ -3,6 +3,7 @@ const remote = require('electron').remote;
 const fs = require('fs');
 
 let currentFile = null
+let region = null
 
 async function showOpenDialog() {
 
@@ -65,6 +66,10 @@ function enableMenuItem(id) {
     $('#' + id).removeClass('disabled');
 }
 
+function disableMenuItem(id) {
+    $('#' + id).addClass('disabled');
+}
+
 function saveLabelFile(path) {
 
 }
@@ -117,22 +122,20 @@ window.onload = function () {
 
     // Set footer year
     $('#year').text(new Date().getFullYear());
-
+    $('#SpecDropdown').hide()
     // Load model
     loadModel()
 
 };
 
-/*
-$(window).resize(function() {
-    adjustSpecHeight(true);
-});
-*/
+window.addEventListener('resize', WindowResize);
 
-$(function () {
+
+function WindowResize() {
     var $window = $(window);
     var width = $window.width();
     var height = $window.height();
+    console.log('window resized')
 
     setInterval(function () {
         if ((width != $window.width()) || (height != $window.height())) {
@@ -141,30 +144,37 @@ $(function () {
 
             adjustSpecHeight(true);
         }
-    }, 1000);
-});
+    }, 500);
+}
 
 const GLOBAL_ACTIONS = { // eslint-disable-line
     Space: function () {
         wavesurfer.playPause();
     },
-
     ArrowLeft: function () {
         wavesurfer.skipBackward();
     },
-
     ArrowRight: function () {
         wavesurfer.skipForward();
     },
-
     KeyO: function () {
         showOpenDialog();
     },
-
     KeyS: function () {
         if (RESULTS.length > 0) {
             showSaveDialog();
         }
+    },
+    Home: function () {
+        wavesurfer.seekAndCenter(0);
+        wavesurfer.pause()
+    },
+    End: function () {
+        wavesurfer.seekAndCenter(1);
+        wavesurfer.pause()
+    },
+    KeyP: function () {
+        (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
     }
 };
 

@@ -17,7 +17,7 @@ function createWindow() {
     win.setIcon(__dirname + '/img/icon/icon.png');
 
     // Always maximize
-    win.maximize()
+    //win.maximize()
 
     // Hide nav bar
     win.setMenuBarVisibility(false);

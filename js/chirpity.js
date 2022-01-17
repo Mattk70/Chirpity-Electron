@@ -10,10 +10,7 @@ const Regions = require('wavesurfer.js/dist/plugin/wavesurfer.regions.min.js');
 const MODEL_JSON = './model/model.json'
 const CONFIG = {
 
-    sampleRate: 48000,
-    specLength: 3,
-    sigmoid: 1.0,
-    minConfidence: 0.3,
+    sampleRate: 48000, specLength: 3, sigmoid: 1.0, minConfidence: 0.3,
 
 }
 
@@ -37,13 +34,13 @@ async function loadModel() {
         CONFIG.labels = LABELS;
         console.log('...done loading model!');
         // Warmup the model before using real data.
-        //console.log('warming up model!');
-        //showElement('modelWarmUpText')
-        //const warmupResult = MODEL.predict(tf.zeros([1,256,384,1]));
-        //hideElement('modelWarmUpText')
-        //warmupResult.dataSync();
-        //warmupResult.dispose();
-        //console.log('....done warming up model!');
+        console.log('warming up model!');
+        showElement('modelWarmUpText')
+        const warmupResult = await MODEL.predict(tf.zeros([1, 256, 384, 1]));
+        hideElement('modelWarmUpText')
+        warmupResult.dataSync();
+        warmupResult.dispose();
+        console.log('....done warming up model!');
     }
 
 }
@@ -57,28 +54,25 @@ function normalize_and_fix_shape(spec) {
     return spec
 }
 
-async function predict(audioData, model) {
-    const audioTensor = tf.tensor1d(audioData)
+async function predict(audioData, model, start, end) {
+    start === undefined ? start = 0 : start = start * CONFIG.sampleRate;
+    const audioTensor = tf.tensor1d(audioData);
     RESULTS = [];
-    AUDACITY_LABELS = []
+    AUDACITY_LABELS = [];
 
     // Slice and expand
     const chunkLength = CONFIG.sampleRate * CONFIG.specLength;
-    for (let i = 0; i < audioTensor.shape[0] - chunkLength; i += chunkLength) {
-
+    for (let i = start; i < audioTensor.shape[0] - chunkLength; i += chunkLength) {
+        if (end !== undefined && i >= end * CONFIG.sampleRate) break
         if (i + chunkLength > audioTensor.shape[0]) i = audioTensor.shape[0] - chunkLength;
         let chunkTensor = audioTensor.slice(i, chunkLength) //.expandDims(0);
-        // For now, let's work with hard coded values to avoid strange errors when reading the config
-        // const spec_shape = [257, 384];
-        //chunkTensor = tensor2int16(chunkTensor)
+
         const frame_length = 1024;
         const frame_step = 373;
         // Perform STFT
-        let spec = tf.signal.stft(chunkTensor.squeeze(),
-            frame_length,
-            frame_step,
-        )
-
+        let spec = tf.signal.stft(chunkTensor.squeeze(), frame_length, frame_step,)
+        // Memory management ?
+        chunkTensor.dispose();
         // Cast from complex to float
         spec = tf.cast(spec, 'float32');
 
@@ -101,6 +95,9 @@ async function predict(audioData, model) {
         const index = prediction.argMax(1).dataSync()[0];
         const score = prediction.dataSync()[index];
 
+        // Memory management ?
+        spec.dispose();
+
         console.log(index, CONFIG.labels[index], score);
         if (score >= CONFIG.minConfidence) {
             RESULTS.push({
@@ -111,8 +108,8 @@ async function predict(audioData, model) {
 
             });
             // Update results one by one
-            let start = RESULTS.length
-            start === 1 ? showResults() : appendResults(start)
+            //let start = RESULTS.length
+            //start === 1 ? showResults() : appendResults(start)
             AUDACITY_LABELS.push({
                 timestamp: (i / CONFIG.sampleRate).toFixed(1) + '\t' + ((i + chunkLength) / CONFIG.sampleRate).toFixed(1),
                 cname: CONFIG.labels[index].split('_')[1],
@@ -121,8 +118,13 @@ async function predict(audioData, model) {
             });
         }
     }
+    showResults();
 }
 
+function specColor(color) {
+    console.log(colormap)
+
+}
 
 function loadAudioFile(filePath) {
 
@@ -150,11 +152,11 @@ function loadAudioFile(filePath) {
             // Normalize audio data
             // AUDIO_DATA = normalize(AUDIO_DATA)
 
-            // Predict
-            start = new Date()
-            predict(AUDIO_DATA, MODEL);
-            timeNow = new Date() - start;
-            console.log('prediction took ' + timeNow / 1000 + ' seconds');
+            //// Predict
+            //start = new Date()
+            //predict(AUDIO_DATA, MODEL);
+            //timeNow = new Date() - start;
+            //console.log('prediction took ' + timeNow / 1000 + ' seconds');
             //Hide center div when done
             hideElement('loadFileHint');
 
@@ -162,7 +164,7 @@ function loadAudioFile(filePath) {
             drawSpectrogram(buffer);
 
             // Show results
-            showResults();
+            //showResults();
 
         });
 
@@ -176,7 +178,7 @@ function drawSpectrogram(audioBuffer) {
     CURRENT_AUDIO_BUFFER = audioBuffer;
 
     // Show spec and timecode containers
-    // showElement('waveform', false, true);
+    showElement('waveform', false, true);
     showElement('spectrogram', false, true);
 
 
@@ -184,17 +186,13 @@ function drawSpectrogram(audioBuffer) {
     wavesurfer = WaveSurfer.create({
         //options
         container: '#waveform',
-        backend: 'WebAudio',
-        backgroundColor: '#363a40',
-        waveColor: '#fff',
+        backend: 'WebAudio', // make waveform transparent
+        backgroundColor: 'hsla(400, 100%, 30%, 0.0)',
+        waveColor: 'hsla(400, 100%, 30%, 0.0)',
+        progressColor: 'hsla(400, 100%, 30%, 0.0)', // but keep the playhead
         cursorColor: '#fff',
-        progressColor: '#4b79fa',
-        partialRender: true,
-        splitChannels: true,
-        splitChannelsOptions: {filterChannels: [1]},
         cursorWidth: 2,
         normalize: true,
-        //fillParent: true,
         scrollParent: true,
         responsive: true,
         height: 512,
@@ -202,41 +200,39 @@ function drawSpectrogram(audioBuffer) {
         windowFunc: 'hamming',
         minPxPerSec: 50,
         hideScrollbar: false,
-        //visualization: 'spectrogram',
-        plugins: [
-            SpectrogramPlugin.create({
-                wavesurfer: wavesurfer,
-                container: "#spectrogram",
-                scrollParent: true,
-                labels: false,
-                colorMap: colormap({
-                    colormap: 'inferno',
-                    nshades: 256,
-                    format: 'float'
-                }),
+        plugins: [SpectrogramPlugin.create({
+            wavesurfer: wavesurfer, container: "#spectrogram", scrollParent: true, labels: false, colorMap: colormap({
+                colormap: 'inferno', nshades: 256, format: 'float'
             }),
-            SpecTimeline.create({
-                container: "#timeline"
-            }),
+        }), /* SpecTimeline.create({
+                 container: "#timeline"
+
+             }), */
             Regions.create({
-                regionsMinLength: 2,
-                dragSelection: {
+                regionsMinLength: 2, dragSelection: {
                     slop: 5
                 }
-            })
-        ]
+            })]
     })
 
     // Load audio file
     wavesurfer.loadDecodedBuffer(CURRENT_AUDIO_BUFFER);
 
-    // Set initial zoom level
-    WS_ZOOM = $('#waveform').width() / wavesurfer.getDuration();
-    //console.log('ws zoom' + WS_ZOOM)
     // Set click event that removes all regions
-    //$('#spectrogram').mousedown(function (e) {
-    //    wavesurfer.Regions.remove();
-    //});
+    $('#waveform').mousedown(function (e) {
+        wavesurfer.clearRegions();
+        disableMenuItem('analyzeSelection');
+    });
+    // Enable analyse selection when region created
+    wavesurfer.on('region-created', function (e) {
+        // console.log(wavesurfer.regions.list)
+        region = e
+        enableMenuItem('analyzeSelection');
+    });
+
+
+    // Set initial zoom level
+    //WS_ZOOM = $('#waveform').width() / wavesurfer.getDuration();
 
     // Resize canvas of spec and labels
     adjustSpecHeight(true);
@@ -245,7 +241,8 @@ function drawSpectrogram(audioBuffer) {
     //hideElement('waveform')
     // Show controls
     showElement('controlsWrapper');
-    showElement('timeline', false, true);
+    $('#SpecDropdown').show()
+    //showElement('timeline', false, true);
 
 }
 
@@ -253,12 +250,17 @@ function adjustSpecHeight(redraw) {
 
     if (redraw && wavesurfer != null) wavesurfer.drawBuffer();
 
-    $('#spectrogram wave, spectrogram, canvas').each(function () {
-        $(this).height($('body').height() * 0.40);
+    $('#waveform wave, #waveform canvas, #spectrogram wave, #spectrogram canvas').each(function () {
+        $(this).height($('body').height() * 0.4);
+        $(this).width
     });
+    $('#dummy').css('width', '100%');
+    $('#dummy').height($('body').height() * 0.4);
+    $('#spectrogram').css('z-index', 0);
+    $('#timeline').height(20);
 
-
-    $('#resultTableContainer').height($('#contentWrapper').height() - $('#spectrogram').height() - $('#controlsWrapper').height() - $('#waveform').height() - 47);
+    $('#resultTableContainer').height($('#contentWrapper').height() - $('#dummy').height() - $('#controlsWrapper').height() - 47);
+    //$('#resultTableContainer').height($('#contentWrapper').height() - $('#spectrogram').height() - $('#controlsWrapper').height() - $('#waveform').height() - 47);
 
 }
 
