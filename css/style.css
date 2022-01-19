@@ -1,6 +1,6 @@
 html, body {
     height: 100%;
-    padding-top: 20px;
+    padding-top: 0px;
     padding-bottom: 18px;
     background-color: #c9c9c9;
     overflow: hidden;
@@ -40,4 +40,22 @@ html, body {
 .inner {
     position: absolute;
     width: 100%;
+}
+
+.navbar-nav li:hover > ul.dropdown-menu {
+    display: block;
+}
+.dropdown-submenu {
+    position:relative;
+}
+.dropdown-submenu > .dropdown-menu {
+    top: 0;
+    left: 100%;
+    margin-top:-6px;
+}
+
+/* rotate caret on hover */
+.dropdown-menu > li > a:hover:after {
+    text-decoration: underline;
+    transform: rotate(-90deg);
 }
