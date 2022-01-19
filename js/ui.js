@@ -10,7 +10,7 @@ async function showOpenDialog() {
     // Show file dialog to select audio file
     const fileDialog = await dialog.showOpenDialog({
 
-        filters: [{name: 'Audio Files', extensions: ['mp3', 'wav']}],
+        filters: [{name: 'Audio Files', extensions: ['mp3', 'wav']}], // , 'ogg', 'aac', 'flac']}],
         properties: ['openFile']
     });
 
@@ -122,7 +122,6 @@ window.onload = function () {
 
     // Set footer year
     $('#year').text(new Date().getFullYear());
-    $('#SpecDropdown').hide()
     // Load model
     loadModel()
 
@@ -144,7 +143,7 @@ function WindowResize() {
 
             adjustSpecHeight(true);
         }
-    }, 500);
+    }, 1000);
 }
 
 const GLOBAL_ACTIONS = { // eslint-disable-line

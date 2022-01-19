@@ -4,7 +4,8 @@
     <!-- Required meta tags -->
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self'  'unsafe-inline';"/>
+    <!--meta http-equiv="Content-Security-Policy" content="script-src 'self'  'unsafe-inline'; worker-src  'self' 'unsafe-inline' 'unsafe-eval' "-->
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self'  'unsafe-inline';">
 
     <!-- Bootstrap & CSS-->
     <link rel="stylesheet" href="css/bootstrap.min.css"/>
@@ -18,13 +19,6 @@
     <script src="js/chirpity.js"></script>
     <script src="js/ui.js"></script>
 
-    <!-- Modified wavesurfer drawer >
-    <script src="js/wavesurfer.min.js"></script>
-    <script src="js/wavesurfer.spectrogram.min.js"></script>
-    <script src="js/wavesurfer.drawer.extended.js"></script>
-    <script src="js/wavesurfer.regions.min.js"></script>
-    <script src="js/wavesurfer.timeline.min.js"></script-->
-
     <!-- App title -->
     <title>Chirpity Sound Analysis</title>
 
@@ -32,7 +26,7 @@
 <body>
 
 <!-- Navigation bar -->
-<nav class="navbar navbar-expand-sm navbar-dark bg-dark fixed-top">
+<nav class="navbar navbar-expand-sm navbar-dark bg-dark position-relative">
     <a class="navbar-brand" href="#">Chirpity</a>
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
             aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
@@ -46,9 +40,9 @@
                     File
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item" href="#" onclick="showOpenDialog();">Open audio file</a>
+                    <a class="dropdown-item" href="#" onclick="showOpenDialog();">Open audio file (O)</a>
                     <a class="dropdown-item disabled" onclick="showSaveDialog()" id="saveLabels" href="#">Save analysis
-                        results</a>
+                        results (S)</a>
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="#" onclick="exitApplication();">Exit application</a>
                 </div>
@@ -67,11 +61,11 @@
                         <li class="nav-item dropdown active">
                 <a class="nav-link dropdown-toggle" href="#" id="SpecDropdown" role="button" data-toggle="dropdown"
                    aria-haspopup="true" aria-expanded="false">
-                    Spectrogram
+                    Options
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item" href="#" id="greyscale" onclick="specColor('greys');">Greyscale</a>
-                    <a class="dropdown-item" href="#" id="rgb" onclick="specColor('inferno');">Colour</a>
+                    <a class="dropdown-item" href="#" id="spec" onclick="specColor('greys');">Greyscale</a>
+                    <a class="dropdown-item" href="#" id="model" onclick="specColor('inferno');">Colour</a>
                 </div>
             </li>
 
@@ -86,11 +80,11 @@
     <!-- Load audio file hint -->
     <div class="d-flex h-100 flex-column text-dark align-items-center justify-content-center" id="loadFileHint">
         <div class="row">
-          <p class="lead justify-content-center" id="modelWarmUpText">Warming up the model...</p>
+          <p class="lead justify-content-center" id="modelWarmUpText">Warming up the model...Please wait</p>
         </div>
         <div class="row">
             <p class="lead justify-content-center" id="loadFileHintText">Load an audio file for analysis by
-                clicking</br>on <i>File > Open audio file</i> in the top menu.</p>
+                clicking<br/>on <i>File > Open audio file</i> in the top menu.</p>
         </div>
         <div class="row">
             <div class="d-none spinner-border" role="status" id="loadFileHintSpinner"></div>
@@ -101,23 +95,23 @@
     <!-- Spectrogram view -->
     <div class="inner" id="spectrogram"></div>
     <div class="inner" id="waveform"></div>
-    <div class="" id="dummy"></div>
+    <div class="" id="dummy" style="width: 100%"></div>
     <!--div class="" id="timeline"></div -->
 
     <!-- Controls view -->
-    <div class="container-fluid p-2 bg-dark text-white d-none" id="controlsWrapper" style="height: 55px;">
+    <div class="container-fluid p-2 bg-dark text-white d-none" id="controlsWrapper" style="height: 55px;justify-content: center;">
 
         <div class="btn-group btn-group" role="group">
-            <button class="btn btn-primary justify-content-center" onmousedown="wavesurfer.playPause();">
+            <button class="btn btn-outline-secondary justify-content-center" onmousedown="wavesurfer.playPause();">
                 <i class="material-icons">play_arrow</i><span>Play / </span>
                 <i class="material-icons">pause</i><span>Pause</span>
             </button>
-            <!--button class="btn btn-primary " onclick="zoomSpecIn();">
+            <button class="btn btn-outline-secondary disabled" onclick="zoomSpecIn();">
                 <i class="material-icons">zoom_in</i>
             </button>
-            <button class="btn btn-primary " onclick="zoomSpecOut();">
+            <button class="btn btn-outline-secondary disabled" onclick="zoomSpecOut();">
                 <i class="material-icons">zoom_out</i>
-            </button-->
+            </button>
         </div>
     </div>
 

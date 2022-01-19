@@ -31,11 +31,11 @@
     "@tensorflow/tfjs": "^3.12.0",
     "audio-loader": "^1.0.3",
     "audio-resampler": "^1.0.1",
-    "wavesurfer.js": "^5.2.0",
     "bootstrap": "^4.6.1",
     "colormap": "^2.3.2",
     "jquery": "^3.6.0",
     "popper.js": "^1.16.1",
-    "seedrandom": "^3.0.5"
+    "seedrandom": "^3.0.5",
+    "wavesurfer.js": "^5.2.0"
   }
 }
