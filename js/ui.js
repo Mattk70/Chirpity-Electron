@@ -1,10 +1,157 @@
+const {ipcRenderer} = require('electron');
 const {dialog} = require('electron').remote;
 const remote = require('electron').remote;
 const fs = require('fs');
+const load = require("audio-loader");
+const resampler = require("audio-resampler");
+const WaveSurfer = require("wavesurfer.js");
+const SpectrogramPlugin = require('wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js');
+const SpecTimeline = require('wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js');
+const Regions = require('wavesurfer.js/dist/plugin/wavesurfer.regions.min.js');
+const colormap = require("colormap");
 //const tf = require("@tensorflow/tfjs");
 
-let currentFile = null
-let region = null
+let currentFile;
+let region;
+let AUDIO_DATA;
+let CURRENT_AUDIO_BUFFER
+let wavesurfer;
+let WS_ZOOM = 0;
+
+// set up some  for caching
+let bodyElement;
+let dummyElement;
+let specElement;
+let waveElement;
+let specCanvasElement;
+let specWaveElement;
+let waveCanvasElement;
+let waveWaveElement;
+
+function loadAudioFile(filePath) {
+    // Hide load hint and show spinnner
+    hideAll();
+    showElement('loadFileHint');
+    showElement('loadFileHintSpinner');
+    showElement('loadFileHintLog');
+    let start = new Date()
+    // load one file
+    console.log('loadFileHintLog', 'Loading file...');
+    load(filePath).then(function (buffer) {
+        // Resample
+        let timeNow = new Date() - start
+        console.log('loading took ' + timeNow / 1000 + ' seconds');
+        console.log('loadFileHintLog', 'Analyzing...');
+        start = new Date()
+        resampler(buffer, 48000, async function (event) {
+            timeNow = new Date() - start;
+            console.log('resampling took ' + timeNow / 1000 + ' seconds');
+            // Get raw audio data
+            AUDIO_DATA = event.getAudioBuffer().getChannelData(0);
+            //Hide center div when done
+            hideElement('loadFileHint');
+            // Draw and show spectrogram
+            drawSpec(buffer);
+        });
+
+    });
+}
+
+function drawSpec(audioBuffer) {
+    // Show spec and timecode containers
+    showElement('waveform', false, true);
+    showElement('spectrogram', false, true);
+
+    // Setup waveform and spec views
+    wavesurfer = WaveSurfer.create({
+        //options
+        container: '#waveform',
+        backend: 'WebAudio',
+        // make waveform transparent
+        backgroundColor: 'rgba(0,0,0,0)',
+        waveColor: 'rgba(0,0,0,0)',
+        progressColor: 'rgba(0,0,0,0)',
+        // but keep the playhead
+        cursorColor: '#fff',
+        cursorWidth: 2,
+        normalize: true,
+        scrollParent: true,
+        responsive: true,
+        height: 512,
+        fftSamples: 1024,
+        windowFunc: 'hamming',
+        minPxPerSec: 50,
+        hideScrollbar: false,
+        plugins: [SpectrogramPlugin.create({
+            wavesurfer: wavesurfer, container: "#spectrogram", scrollParent: true, labels: false, colorMap: colormap({
+                colormap: 'inferno', nshades: 256, format: 'float'
+            }),
+        }), /* SpecTimeline.create({
+                 container: "#timeline"
+
+             }), */
+            Regions.create({
+                regionsMinLength: 2,
+                dragSelection: {
+                    slop: 5,
+
+                },
+                color: "rgba(255, 255, 255, 0.2)"
+            })]
+    })
+
+    // Load audio file
+    wavesurfer.loadDecodedBuffer(audioBuffer)
+    bodyElement = $('body');
+    dummyElement = $('#dummy');
+    specElement = $('spectrogram')
+    waveElement = $('#waveform')
+    specCanvasElement = $('#spectrogram canvas')
+    waveCanvasElement = $('#waveform canvas')
+    waveWaveElement = $('#waveform wave')
+    specWaveElement = $('#spectrogram wave')
+
+    // Set click event that removes all regions
+    waveElement.mousedown(function (e) {
+        wavesurfer.clearRegions();
+        disableMenuItem('analyzeSelection');
+    });
+    // Enable analyse selection when region created
+    wavesurfer.on('region-created', function (e) {
+        // console.log(wavesurfer.regions.list)
+        region = e
+        enableMenuItem('analyzeSelection');
+    });
+
+
+    // Set initial zoom level
+    //WS_ZOOM = $('#waveform').width() / wavesurfer.getDuration();
+
+    // Resize canvas of spec and labels
+    adjustSpecHeight(true);
+
+    // Hide waveform
+    //hideElement('waveform')
+    // Show controls
+    showElement('controlsWrapper');
+    $('#SpecDropdown').show()
+    //showElement('timeline', false, true);
+
+}
+
+function zoomSpecIn() {
+    WS_ZOOM += 50;
+    wavesurfer.zoom(WS_ZOOM);
+    adjustSpecHeight(true)
+    //wavesurfer.spectrogram.render()
+}
+
+function zoomSpecOut() {
+    WS_ZOOM -= 50;
+    wavesurfer.zoom(WS_ZOOM);
+    adjustSpecHeight(true)
+    //wavesurfer.spectrogram.render()
+}
 
 async function showOpenDialog() {
 
@@ -56,6 +203,13 @@ async function showSaveDialog() {
     });
 }
 
+const analyzeLink = document.getElementById('analyze');
+
+analyzeLink.addEventListener('click', async () => {
+    console.log("UI AUDIO_DATA " + typeof AUDIO_DATA)
+    ipcRenderer.send('analyze', AUDIO_DATA);
+    analyzeLink.disabled = true;
+});
 
 function exitApplication() {
 
@@ -123,7 +277,7 @@ window.onload = function () {
     // Set footer year
     $('#year').text(new Date().getFullYear());
     // Load model
-    loadModel()
+    //loadModel()
 
 };
 
@@ -197,4 +351,48 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+});
+
+ipcRenderer.on('prediction-done', async (event, arg) => {
+    const RESULTS = arg.results;
+    showElement('resultTableContainer');
+
+    // Remove old results
+    $('#resultTableBody').empty();
+
+    // Add new results
+    for (let i = 0; i < RESULTS.length; i++) {
+
+        let tr = "<tr onclick='createRegion(" + RESULTS[i].start + " , " + RESULTS[i].end + " )'><th scope='row'>" + (i + 1) + "</th>";
+        tr += "<td>" + RESULTS[i].timestamp + "</td>";
+        tr += "<td>" + RESULTS[i].cname + "</td>";
+        tr += "<td>" + RESULTS[i].sname + "</td>";
+        tr += "<td>" + (parseFloat(RESULTS[i].score) * 100).toFixed(0) + "%" + "</td>";
+        tr += "<td><span class='material-icons rotate' onclick='toggleAlternates(&quot;.subrow" + i + "&quot;)'>expand_more</span></td>";
+        tr += "</tr>";
+
+        tr += "<tr  class='subrow" + i + "'  style='display: none' onclick='createRegion(" + RESULTS[i].start + " , " + RESULTS[i].end + " )' style='font-size: 10px;'><th scope='row'> </th>";
+        tr += "<td> </td>";
+        tr += "<td>" + RESULTS[i].cname2 + "</td>";
+        tr += "<td>" + RESULTS[i].sname2 + "</td>";
+        tr += "<td>" + (parseFloat(RESULTS[i].score2) * 100).toFixed(0) + "%" + "</td>";
+        tr += "<td> </td>";
+        tr += "</tr>";
+
+        tr += "<tr  class='subrow" + i + "'  style='display: none' onclick='createRegion(" + RESULTS[i].start + " , " + RESULTS[i].end + " )'  style='font-size: 10px;'><th scope='row'> </th>";
+        tr += "<td> </td>";
+        tr += "<td>" + RESULTS[i].cname3 + "</td>";
+        tr += "<td>" + RESULTS[i].sname3 + "</td>";
+        tr += "<td>" + (parseFloat(RESULTS[i].score3) * 100).toFixed(0) + "%" + "</td>";
+        tr += "<td> </td>"
+        tr += "</tr>";
+
+        $('#resultTableBody').append(tr);
+
+    }
+    $(".material-icons").click(function () {
+        $(this).toggleClass("down");
+    })
+    enableMenuItem('saveLabels')
+
 });
