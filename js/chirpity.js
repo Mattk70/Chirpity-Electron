@@ -45,7 +45,7 @@ async function loadModel() {
         // Warmup the model before using real data.
         console.log('warming up model!');
         showElement('modelWarmUpText', true, false);
-        //warmUp(MODEL);
+        //warmUp();
 
         hideElement('modelWarmUpText');
         console.log('....done warming up model!');
@@ -69,13 +69,25 @@ let worker = new Worker(
         };
     `
 );
-*/
+
 
 async function warmUp(model) {
     const warmupResult = model.predict(tf.zeros([1, 256, 384, 1]));
     warmupResult.dataSync();
     warmupResult.dispose();
 }
+
+
+function warmUp() {
+    const worker = new Worker("./js/worker.js");
+    const seq = tf.zeros([1, 256, 384, 1]);
+    worker.postMessage(seq);
+    worker.onmessage = function (event) {
+        console.log('prediction: ' + event.data);
+    };
+}
+
+ */
 
 function normalize_and_fix_shape(spec) {
     spec = spec.slice(253, 256);
@@ -94,11 +106,14 @@ async function predict(audioData, model, start, end) {
 
     // Slice and expand
     const chunkLength = CONFIG.sampleRate * CONFIG.specLength;
+    // pad clips < 3 seconds
+    if (audioTensor.shape[0] < chunkLength) {
+        console.log(audioData.shape[0])
+    }
     for (let i = start; i < audioTensor.shape[0] - chunkLength; i += chunkLength) {
         if (end !== undefined && i >= end * CONFIG.sampleRate) break;
         if (i + chunkLength > audioTensor.shape[0]) i = audioTensor.shape[0] - chunkLength;
         let chunkTensor = audioTensor.slice(i, chunkLength); //.expandDims(0);
-
         const frame_length = 1024;
         const frame_step = 373;
         // Perform STFT
@@ -125,8 +140,6 @@ async function predict(audioData, model, start, end) {
         //console.log(prediction.dataSync())
         // Get label
         const {indices, values} = prediction.topk(3);
-        console.log(indices.dataSync())
-        console.log(values.dataSync())
         const [primary, secondary, tertiary] = indices.dataSync();
         const [score, score2, score3] = values.dataSync();
 
@@ -189,10 +202,8 @@ function loadAudioFile(filePath) {
         resampler(buffer, CONFIG.sampleRate, async function (event) {
             timeNow = new Date() - start;
             console.log('resampling took ' + timeNow / 1000 + ' seconds');
-
             // Get raw audio data
             AUDIO_DATA = event.getAudioBuffer().getChannelData(0);
-
             // Normalize audio data
             // AUDIO_DATA = normalize(AUDIO_DATA)
 
@@ -205,7 +216,7 @@ function loadAudioFile(filePath) {
             hideElement('loadFileHint');
 
             // Draw and show spectrogram
-            drawSpectrogram(buffer);
+            drawSpec(buffer);
 
             // Show results
             //showResults();
@@ -216,7 +227,7 @@ function loadAudioFile(filePath) {
 
 }
 
-function drawSpectrogram(audioBuffer) {
+function drawSpec(audioBuffer) {
 
     // Set global buffer
     CURRENT_AUDIO_BUFFER = audioBuffer;
@@ -323,7 +334,7 @@ function adjustSpecHeight(redraw) {
         //let canvasWidth = 0
         //console.log("canvas width " + JSON.stringify(waveCanvasElements))
         //for (let i = 0; i < waveCanvasElements.length; i++){
-        specCanvasElement.width(waveCanvasElement.width())
+        //specCanvasElement.width(waveCanvasElement.width())
         //}
         //console.log("canvas width " + canvasWidth)
 
@@ -342,6 +353,8 @@ function zoomSpecIn() {
     WS_ZOOM += 50;
     wavesurfer.zoom(WS_ZOOM);
     adjustSpecHeight(true)
+    //wavesurfer.spectrogram.render()
+    console.log(wavesurfer)
 }
 
 function zoomSpecOut() {
@@ -349,6 +362,7 @@ function zoomSpecOut() {
     WS_ZOOM -= 50;
     wavesurfer.zoom(WS_ZOOM);
     adjustSpecHeight(true)
+    //wavesurfer.spectrogram.render()
 }
 
 function toggleAlternates(row) {
@@ -370,7 +384,7 @@ function showResults() {
         tr += "<td>" + RESULTS[i].cname + "</td>";
         tr += "<td>" + RESULTS[i].sname + "</td>";
         tr += "<td>" + (parseFloat(RESULTS[i].score) * 100).toFixed(0) + "%" + "</td>";
-        tr += "<td><span class='material-icons' onclick='toggleAlternates(&quot;.subrow" + i + "&quot;)'>expand_more</span></td>";
+        tr += "<td><span class='material-icons rotate' onclick='toggleAlternates(&quot;.subrow" + i + "&quot;)'>expand_more</span></td>";
         tr += "</tr>";
 
         tr += "<tr  class='subrow" + i + "'  style='display: none' onclick='createRegion(" + RESULTS[i].start + " , " + RESULTS[i].end + " )' style='font-size: 10px;'><th scope='row'> </th>";
@@ -392,6 +406,9 @@ function showResults() {
         $('#resultTableBody').append(tr);
 
     }
+    $(".material-icons").click(function () {
+        $(this).toggleClass("down");
+    })
     enableMenuItem('saveLabels')
 }
 

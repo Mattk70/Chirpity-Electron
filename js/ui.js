@@ -1,6 +1,7 @@
 const {dialog} = require('electron').remote;
 const remote = require('electron').remote;
 const fs = require('fs');
+//const tf = require("@tensorflow/tfjs");
 
 let currentFile = null
 let region = null
@@ -116,7 +117,6 @@ function log(element, text) {
 
 }
 
-
 /////////////////////////  DO AFTER LOAD ////////////////////////////
 window.onload = function () {
 
@@ -134,7 +134,6 @@ function WindowResize() {
     var $window = $(window);
     var width = $window.width();
     var height = $window.height();
-    console.log('window resized')
 
     setInterval(function () {
         if ((width != $window.width()) || (height != $window.height())) {
