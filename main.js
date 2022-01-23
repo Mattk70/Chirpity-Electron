@@ -31,7 +31,8 @@ function createWindow() {
 
     // Emitted when the window is closed.
     mainWindow.on('closed', () => {
-        mainWindow = null
+        mainWindow = null;
+        workerWindow = null;
     })
 }
 
@@ -82,10 +83,22 @@ app.on('activate', () => {
     }
 });
 
+ipcMain.on('file-loaded', async (event, arg) => {
+    const currentFile = arg.message;
+    console.log('Main received file-loaded: ' + arg.message  )
+    workerWindow.webContents.send('file-loaded', {message: currentFile});
+});
+
 ipcMain.on('analyze', async (event, arg) => {
-    const audio = arg.AUDIO_DATA;
-    console.log('Main received audio: ' + arg  )
-    workerWindow.webContents.send('analyze', {audio});
+    const currentFile = arg.message;
+    console.log('Main received go signal: ' + arg.message  )
+    workerWindow.webContents.send('analyze', {message: 'go'});
+});
+
+ipcMain.on('analyzeSelection', async (event, arg) => {
+    const currentFile = arg.message;
+    console.log('Main received go signal: ' + arg.message  )
+    workerWindow.webContents.send('analyze', {message: 'go', start: arg.start, end: arg.end});
 });
 
 ipcMain.on('prediction-done', (event, arg) => {

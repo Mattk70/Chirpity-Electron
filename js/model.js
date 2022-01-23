@@ -67,6 +67,13 @@ class Model {
 
     }
 
+    async warmUp() {
+        const warmupResult = this.model.predict(tf.zeros([1, 256, 384, 1]));
+        warmupResult.dataSync();
+        warmupResult.dispose();
+    }
+
+
     async makePrediction(audioBuffer, start, end) {
         start === undefined ? start = 0 : start = start * this.config.sampleRate;
         const audioTensor = tf.tensor1d(audioBuffer);
@@ -85,23 +92,23 @@ class Model {
             const {indices, values} = this.prediction.topk(3);
             const [primary, secondary, tertiary] = indices.dataSync();
             const [score, score2, score3] = values.dataSync();
-            //if (score >= this.config.minConfidence) {
-            this.RESULTS.push({
-                start: i / this.config.sampleRate,
-                end: (i + chunkLength) / this.config.sampleRate,
-                timestamp: this._timestampFromSeconds(i / this.config.sampleRate) + ' - '
-                    + this._timestampFromSeconds((i + chunkLength) / this.config.sampleRate),
-                sname: this.labels[primary].split('_')[0],
-                cname: this.labels[primary].split('_')[1],
-                score: score,
-                sname2: this.labels[secondary].split('_')[0],
-                cname2: this.labels[secondary].split('_')[1],
-                score2: score2,
-                sname3: this.labels[tertiary].split('_')[0],
-                cname3: this.labels[tertiary].split('_')[1],
-                score3: score3,
-            });
-            //}
+            if (score >= this.config.minConfidence) {
+                this.RESULTS.push({
+                    start: i / this.config.sampleRate,
+                    end: (i + chunkLength) / this.config.sampleRate,
+                    timestamp: this._timestampFromSeconds(i / this.config.sampleRate) + ' - '
+                        + this._timestampFromSeconds((i + chunkLength) / this.config.sampleRate),
+                    sname: this.labels[primary].split('_')[0],
+                    cname: this.labels[primary].split('_')[1],
+                    score: score,
+                    sname2: this.labels[secondary].split('_')[0],
+                    cname2: this.labels[secondary].split('_')[1],
+                    score2: score2,
+                    sname3: this.labels[tertiary].split('_')[0],
+                    cname3: this.labels[tertiary].split('_')[1],
+                    score3: score3,
+                });
+            }
             console.log(primary, this.labels[primary], score);
             //console.log(this.prediction.dataSync());
         }

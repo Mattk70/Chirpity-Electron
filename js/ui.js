@@ -52,6 +52,7 @@ function loadAudioFile(filePath) {
             hideElement('loadFileHint');
             // Draw and show spectrogram
             drawSpec(buffer);
+            ipcRenderer.send('file-loaded', {message: currentFile});
         });
 
     });
@@ -162,7 +163,7 @@ async function showOpenDialog() {
         properties: ['openFile']
     });
 
-    // Load audio file  
+    // Load audio file
     if (fileDialog.filePaths.length > 0) {
         loadAudioFile(fileDialog.filePaths[0]);
         currentFile = fileDialog.filePaths[0];
@@ -203,11 +204,19 @@ async function showSaveDialog() {
     });
 }
 
+// Worker listeners
+
 const analyzeLink = document.getElementById('analyze');
 
 analyzeLink.addEventListener('click', async () => {
-    console.log("UI AUDIO_DATA " + typeof AUDIO_DATA)
-    ipcRenderer.send('analyze', AUDIO_DATA);
+    ipcRenderer.send('analyze', {message: 'go'});
+    analyzeLink.disabled = true;
+});
+
+const analyzeSelectionLink = document.getElementById('analyzeSelection');
+
+analyzeSelectionLink.addEventListener('click', async () => {
+    ipcRenderer.send('analyzeSelection', {message: 'go', start: region.start, end: region.end});
     analyzeLink.disabled = true;
 });
 
@@ -396,3 +405,37 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
     enableMenuItem('saveLabels')
 
 });
+
+function createRegion(start, end) {
+    wavesurfer.clearRegions();
+    wavesurfer.addRegion({start: start, end: end, color: "rgba(255, 255, 255, 0.2)"});
+    const progress = start / wavesurfer.getDuration()
+    wavesurfer.seekAndCenter(progress)
+}
+
+function adjustSpecHeight(redraw) {
+    if (redraw && wavesurfer != null) {
+        wavesurfer.drawBuffer();
+
+        //$('#dummy, #waveform wave, spectrogram, #spectrogram canvas, #waveform canvas').each(function () {
+        $.each([dummyElement, waveWaveElement, specElement, specCanvasElement, waveCanvasElement], function () {
+            $(this).height(bodyElement.height() * 0.4)
+            //$(this).css('width','100%')
+
+        });
+        //let canvasWidth = 0
+        //console.log("canvas width " + JSON.stringify(waveCanvasElements))
+        //for (let i = 0; i < waveCanvasElements.length; i++){
+        //specCanvasElement.width(waveCanvasElement.width())
+        //}
+        //console.log("canvas width " + canvasWidth)
+
+        //specCanvasElement.width(canvasWidth)
+        specElement.css('z-index', 0)
+
+        //$('#timeline').height(20);
+
+        $('#resultTableContainer').height($('#contentWrapper').height() - $('#dummy').height() - $('#controlsWrapper').height() - 47);
+        //$('#resultTableContainer').height($('#contentWrapper').height() - $('#spectrogram').height() - $('#controlsWrapper').height() - $('#waveform').height() - 47);
+    }
+}

@@ -15,7 +15,7 @@
 
     <!-- Additional JavaScript & CSS -->
     <link rel="stylesheet" href="css/style.css"/>
-    <script src="js/chirpity.js"></script>
+    <!--script src="js/chirpity.js"></script -->
 
 
     <!-- App title -->
@@ -54,8 +54,7 @@
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
                     <a class="dropdown-item" href="#" id="analyze">Analyze entire
                         file</a>
-                    <a class="dropdown-item disabled" href="#" id="analyzeSelection"
-                       onclick="predict(AUDIO_DATA, MODEL, region.start, region.end);">Analyze selected interval</a>
+                    <a class="dropdown-item disabled" href="#" id="analyzeSelection">Analyze selected interval</a>
                 </div>
             </li>
             <li class="nav-item dropdown active">
@@ -80,9 +79,6 @@
 
     <!-- Load audio file hint -->
     <div class="d-flex h-100 flex-column text-dark align-items-center justify-content-center" id="loadFileHint">
-        <div class="row">
-            <p class="lead justify-content-center" id="modelWarmUpText">Warming up the model...Please wait</p>
-        </div>
         <div class="row">
             <p class="lead justify-content-center" id="loadFileHintText">Load an audio file for analysis by
                 clicking<br/>on <i>File > Open audio file</i> in the top menu.</p>
