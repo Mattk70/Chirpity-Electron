@@ -31,8 +31,7 @@ function createWindow() {
 
     // Emitted when the window is closed.
     mainWindow.on('closed', () => {
-        mainWindow = null;
-        workerWindow = null;
+        app.quit()
     })
 }
 
@@ -83,25 +82,32 @@ app.on('activate', () => {
     }
 });
 
+
 ipcMain.on('file-loaded', async (event, arg) => {
     const currentFile = arg.message;
-    console.log('Main received file-loaded: ' + arg.message  )
+    console.log('Main received file-loaded: ' + arg.message)
     workerWindow.webContents.send('file-loaded', {message: currentFile});
 });
 
 ipcMain.on('analyze', async (event, arg) => {
     const currentFile = arg.message;
-    console.log('Main received go signal: ' + arg.message  )
-    workerWindow.webContents.send('analyze', {message: 'go'});
-});
-
-ipcMain.on('analyzeSelection', async (event, arg) => {
-    const currentFile = arg.message;
-    console.log('Main received go signal: ' + arg.message  )
+    console.log('Main received go signal: ' + arg.message)
     workerWindow.webContents.send('analyze', {message: 'go', start: arg.start, end: arg.end});
 });
 
+ipcMain.on('prediction-ongoing', (event, arg) => {
+    const result = arg.result;
+    const index = arg.index;
+    console.log('Main received result: ' + arg.result + " inxed: " + index)
+    mainWindow.webContents.send('prediction-ongoing', {result, index});
+});
+
 ipcMain.on('prediction-done', (event, arg) => {
-  const results = arg.results;
-  mainWindow.webContents.send('prediction-done', {results});
+    const results = arg.results;
+    mainWindow.webContents.send('prediction-done', {results});
+});
+
+ipcMain.on('model-ready', (event, arg) => {
+    const results = arg.results;
+    mainWindow.webContents.send('model-ready', {results});
 });

@@ -11,6 +11,8 @@ const Regions = require('wavesurfer.js/dist/plugin/wavesurfer.regions.min.js');
 const colormap = require("colormap");
 //const tf = require("@tensorflow/tfjs");
 
+let modelReady = false;
+let fileLoaded = false;
 let currentFile;
 let region;
 let AUDIO_DATA;
@@ -27,10 +29,14 @@ let specCanvasElement;
 let specWaveElement;
 let waveCanvasElement;
 let waveWaveElement;
+let resultTableElement = $('#resultTableContainer');
+let contentWrapperElement = $('#contentWrapper');
+let controlsWrapperElement = $('#controlsWrapper');
 
 function loadAudioFile(filePath) {
     // Hide load hint and show spinnner
     hideAll();
+    disableMenuItem('analyze')
     showElement('loadFileHint');
     showElement('loadFileHintSpinner');
     showElement('loadFileHintLog');
@@ -53,6 +59,8 @@ function loadAudioFile(filePath) {
             // Draw and show spectrogram
             drawSpec(buffer);
             ipcRenderer.send('file-loaded', {message: currentFile});
+            fileLoaded = true;
+            if (modelReady) enableMenuItem('navbarAnalysis')
         });
 
     });
@@ -62,7 +70,7 @@ function drawSpec(audioBuffer) {
     // Show spec and timecode containers
     showElement('waveform', false, true);
     showElement('spectrogram', false, true);
-
+    if (wavesurfer !== undefined) wavesurfer.pause();
     // Setup waveform and spec views
     wavesurfer = WaveSurfer.create({
         //options
@@ -129,7 +137,7 @@ function drawSpec(audioBuffer) {
     //WS_ZOOM = $('#waveform').width() / wavesurfer.getDuration();
 
     // Resize canvas of spec and labels
-    adjustSpecHeight(true);
+    adjustSpecHeight(false);
 
     // Hide waveform
     //hideElement('waveform')
@@ -216,14 +224,21 @@ analyzeLink.addEventListener('click', async () => {
 const analyzeSelectionLink = document.getElementById('analyzeSelection');
 
 analyzeSelectionLink.addEventListener('click', async () => {
-    ipcRenderer.send('analyzeSelection', {message: 'go', start: region.start, end: region.end});
+    ipcRenderer.send('analyze', {message: 'go', start: region.start, end: region.end});
     analyzeLink.disabled = true;
 });
 
+ipcRenderer.on('model-ready', async (event, arg) => {
+    modelReady = true;
+    if (fileLoaded) {
+        enableMenuItem('analyze')
+    }
+})
+
+// Menu bar functions
+
 function exitApplication() {
-
-    remote.getCurrentWindow().close()
-
+    remote.app.quit()
 }
 
 function enableMenuItem(id) {
@@ -236,6 +251,11 @@ function disableMenuItem(id) {
 
 function saveLabelFile(path) {
 
+}
+
+function toggleAlternates(row) {
+
+    $(row).toggle('slow')
 }
 
 function showElement(id, makeFlex = true, empty = false) {
@@ -290,22 +310,30 @@ window.onload = function () {
 
 };
 
-window.addEventListener('resize', WindowResize);
+//window.addEventListener('resize', WindowResize);
 
+const waitForFinalEvent = (function () {
+    var timers = {};
+    return function (callback, ms, uniqueId) {
+        if (!uniqueId) {
+            uniqueId = "Don't call this twice without a uniqueId";
+        }
+        if (timers[uniqueId]) {
+            clearTimeout(timers[uniqueId]);
+        }
+        timers[uniqueId] = setTimeout(callback, ms);
+    };
+})();
+
+$(window).resize(function () {
+    waitForFinalEvent(function () {
+
+        WindowResize();
+    }, 500, 'id1');
+});
 
 function WindowResize() {
-    var $window = $(window);
-    var width = $window.width();
-    var height = $window.height();
-
-    setInterval(function () {
-        if ((width != $window.width()) || (height != $window.height())) {
-            width = $window.width();
-            height = $window.height();
-
-            adjustSpecHeight(true);
-        }
-    }, 1000);
+    adjustSpecHeight(true);
 }
 
 const GLOBAL_ACTIONS = { // eslint-disable-line
@@ -362,6 +390,46 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
+ipcRenderer.on('prediction-ongoing', async (event, arg) => {
+    const result = arg.result;
+    const index = arg.index;
+    if (index === 1) {
+        // Remove old results
+        $('#resultTableBody').empty();
+    }
+    showElement('resultTableContainer');
+    let tr = "<tr onclick='createRegion(" + result.start + " , " + result.end + " )'><th scope='row'>" + index + "</th>";
+    tr += "<td>" + result.timestamp + "</td>";
+    tr += "<td>" + result.cname + "</td>";
+    tr += "<td>" + result.sname + "</td>";
+    tr += "<td>" + (parseFloat(result.score) * 100).toFixed(0) + "%" + "</td>";
+    tr += "<td><span class='material-icons rotate' onclick='toggleAlternates(&quot;.subrow" + index + "&quot;)'>expand_more</span></td>";
+    tr += "</tr>";
+
+    tr += "<tr  class='subrow" + index + "'  style='font-size: 12px;display: none' onclick='createRegion(" + result.start + " , " + result.end + " )'><th scope='row'> </th>";
+    tr += "<td> </td>";
+    tr += "<td>" + result.cname2 + "</td>";
+    tr += "<td>" + result.sname2 + "</td>";
+    tr += "<td>" + (parseFloat(result.score2) * 100).toFixed(0) + "%" + "</td>";
+    tr += "<td> </td>";
+    tr += "</tr>";
+
+    tr += "<tr  class='subrow" + index + "'  style='font-size: 12px;display: none' onclick='createRegion(" + result.start + " , " + result.end + " )' ><th scope='row'> </th>";
+    tr += "<td> </td>";
+    tr += "<td>" + result.cname3 + "</td>";
+    tr += "<td>" + result.sname3 + "</td>";
+    tr += "<td>" + (parseFloat(result.score3) * 100).toFixed(0) + "%" + "</td>";
+    tr += "<td> </td>"
+    tr += "</tr>";
+
+    $('#resultTableBody').append(tr);
+
+    $(".material-icons").click(function () {
+        $(this).toggleClass("down");
+    })
+});
+
+
 ipcRenderer.on('prediction-done', async (event, arg) => {
     const RESULTS = arg.results;
     showElement('resultTableContainer');
@@ -380,7 +448,7 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
         tr += "<td><span class='material-icons rotate' onclick='toggleAlternates(&quot;.subrow" + i + "&quot;)'>expand_more</span></td>";
         tr += "</tr>";
 
-        tr += "<tr  class='subrow" + i + "'  style='display: none' onclick='createRegion(" + RESULTS[i].start + " , " + RESULTS[i].end + " )' style='font-size: 10px;'><th scope='row'> </th>";
+        tr += "<tr  class='subrow" + i + "'  style='font-size: 12px;display: none' onclick='createRegion(" + RESULTS[i].start + " , " + RESULTS[i].end + " )'><th scope='row'> </th>";
         tr += "<td> </td>";
         tr += "<td>" + RESULTS[i].cname2 + "</td>";
         tr += "<td>" + RESULTS[i].sname2 + "</td>";
@@ -388,7 +456,7 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
         tr += "<td> </td>";
         tr += "</tr>";
 
-        tr += "<tr  class='subrow" + i + "'  style='display: none' onclick='createRegion(" + RESULTS[i].start + " , " + RESULTS[i].end + " )'  style='font-size: 10px;'><th scope='row'> </th>";
+        tr += "<tr  class='subrow" + i + "'  style='font-size: 12px;display: none' onclick='createRegion(" + RESULTS[i].start + " , " + RESULTS[i].end + " )' ><th scope='row'> </th>";
         tr += "<td> </td>";
         tr += "<td>" + RESULTS[i].cname3 + "</td>";
         tr += "<td>" + RESULTS[i].sname3 + "</td>";
@@ -407,6 +475,7 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
 });
 
 function createRegion(start, end) {
+    wavesurfer.pause();
     wavesurfer.clearRegions();
     wavesurfer.addRegion({start: start, end: end, color: "rgba(255, 255, 255, 0.2)"});
     const progress = start / wavesurfer.getDuration()
@@ -416,26 +485,33 @@ function createRegion(start, end) {
 function adjustSpecHeight(redraw) {
     if (redraw && wavesurfer != null) {
         wavesurfer.drawBuffer();
-
-        //$('#dummy, #waveform wave, spectrogram, #spectrogram canvas, #waveform canvas').each(function () {
-        $.each([dummyElement, waveWaveElement, specElement, specCanvasElement, waveCanvasElement], function () {
-            $(this).height(bodyElement.height() * 0.4)
-            //$(this).css('width','100%')
-
-        });
-        //let canvasWidth = 0
-        //console.log("canvas width " + JSON.stringify(waveCanvasElements))
-        //for (let i = 0; i < waveCanvasElements.length; i++){
-        //specCanvasElement.width(waveCanvasElement.width())
-        //}
-        //console.log("canvas width " + canvasWidth)
-
-        //specCanvasElement.width(canvasWidth)
-        specElement.css('z-index', 0)
-
-        //$('#timeline').height(20);
-
-        $('#resultTableContainer').height($('#contentWrapper').height() - $('#dummy').height() - $('#controlsWrapper').height() - 47);
-        //$('#resultTableContainer').height($('#contentWrapper').height() - $('#spectrogram').height() - $('#controlsWrapper').height() - $('#waveform').height() - 47);
     }
+    //wavesurfer.spectrogram.render();
+
+    //$('#dummy, #waveform wave, spectrogram, #spectrogram canvas, #waveform canvas').each(function () {
+    $.each([dummyElement, waveWaveElement, specElement, specCanvasElement, waveCanvasElement], function () {
+        $(this).height(bodyElement.height() * 0.4)
+        //$(this).css('width','100%')
+
+    });
+    //let canvasWidth = 0
+    //console.log("canvas width " + JSON.stringify(waveCanvasElements))
+    waveCanvasElement = $('#waveform canvas')
+    let specWidth = 0;
+    for (let i = 0; i < waveCanvasElement.length; i++) {
+        specWidth += waveCanvasElement[i].width
+        console.log('wavecanvaselement ' + i + 'width is ' + waveCanvasElement[i].width + ' ' + specWidth)
+    }
+    console.log('specwidth  is ' + specWidth)
+    specCanvasElement.width(specWidth);
+    //console.log("canvas width " + canvasWidth)
+
+    //specCanvasElement.width(canvasWidth)
+    specElement.css('z-index', 0)
+
+    //$('#timeline').height(20);
+
+    resultTableElement.height(contentWrapperElement.height() - dummyElement.height() - controlsWrapperElement.height() - 47);
+    //$('#resultTableContainer').height($('#contentWrapper').height() - $('#spectrogram').height() - $('#controlsWrapper').height() - $('#waveform').height() - 47);
+
 }
