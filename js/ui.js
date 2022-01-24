@@ -60,7 +60,7 @@ function loadAudioFile(filePath) {
             drawSpec(buffer);
             ipcRenderer.send('file-loaded', {message: currentFile});
             fileLoaded = true;
-            if (modelReady) enableMenuItem('navbarAnalysis')
+            if (modelReady) enableMenuItem('analyze')
         });
 
     });
