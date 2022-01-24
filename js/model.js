@@ -12,6 +12,7 @@ class Model {
         this.model = null;
         this.labels = labels;
         this.config = CONFIG;
+        this.chunkLength = this.config.sampleRate * this.config.specLength;
         this.model_loaded = false;
         this.appPath = null;
         this.spectrogram = null;
@@ -73,45 +74,51 @@ class Model {
         warmupResult.dispose();
     }
 
+    async predictChunk(chunk, index) {
+        //index === undefined ? index = 0 : index = index * this.config.sampleRate;
+        let result;
+        chunk = tf.tensor1d(chunk);
+        this._makeSpectrogram(chunk);
+        this.prediction = this.model.predict(this.spectrogram);
+        // Get label
+        const {indices, values} = this.prediction.topk(3);
+        const [primary, secondary, tertiary] = indices.dataSync();
+        const [score, score2, score3] = values.dataSync();
+        if (score >= this.config.minConfidence) {
+            result = ({
+                start: index / this.config.sampleRate,
+                end: (index + this.chunkLength) / this.config.sampleRate,
+                timestamp: this._timestampFromSeconds(index / this.config.sampleRate) + ' - '
+                    + this._timestampFromSeconds((index + this.chunkLength) / this.config.sampleRate),
+                sname: this.labels[primary].split('_')[0],
+                cname: this.labels[primary].split('_')[1],
+                score: score,
+                sname2: this.labels[secondary].split('_')[0],
+                cname2: this.labels[secondary].split('_')[1],
+                score2: score2,
+                sname3: this.labels[tertiary].split('_')[0],
+                cname3: this.labels[tertiary].split('_')[1],
+                score3: score3,
+            });
+        }
+        console.log(primary, this.labels[primary], score);
+        return result;
+    }
 
-    async makePrediction(audioBuffer, start, end) {
+    async predictFile(audioBuffer, start, end) {
         start === undefined ? start = 0 : start = start * this.config.sampleRate;
         const audioTensor = tf.tensor1d(audioBuffer);
         console.log(audioTensor.shape);
         this.RESULTS = [];
         this.AUDACITY_LABELS = [];
-        const chunkLength = this.config.sampleRate * this.config.specLength;
-        for (let i = start; i < audioTensor.shape[0] - chunkLength; i += chunkLength) {
+        for (let i = start; i < audioTensor.shape[0] - this.chunkLength; i += this.chunkLength) {
             if (end !== undefined && i >= end * this.config.sampleRate) break;
-            if (i + chunkLength > audioTensor.shape[0]) i = audioTensor.shape[0] - chunkLength;
-            let chunkTensor = audioTensor.slice(i, chunkLength); //.expandDims(0);
-
-            this._makeSpectrogram(chunkTensor);
-            this.prediction = this.model.predict(this.spectrogram);
-            // Get label
-            const {indices, values} = this.prediction.topk(3);
-            const [primary, secondary, tertiary] = indices.dataSync();
-            const [score, score2, score3] = values.dataSync();
-            if (score >= this.config.minConfidence) {
-                this.RESULTS.push({
-                    start: i / this.config.sampleRate,
-                    end: (i + chunkLength) / this.config.sampleRate,
-                    timestamp: this._timestampFromSeconds(i / this.config.sampleRate) + ' - '
-                        + this._timestampFromSeconds((i + chunkLength) / this.config.sampleRate),
-                    sname: this.labels[primary].split('_')[0],
-                    cname: this.labels[primary].split('_')[1],
-                    score: score,
-                    sname2: this.labels[secondary].split('_')[0],
-                    cname2: this.labels[secondary].split('_')[1],
-                    score2: score2,
-                    sname3: this.labels[tertiary].split('_')[0],
-                    cname3: this.labels[tertiary].split('_')[1],
-                    score3: score3,
-                });
-            }
-            console.log(primary, this.labels[primary], score);
-            //console.log(this.prediction.dataSync());
+            if (i + this.chunkLength > audioTensor.shape[0]) i = audioTensor.shape[0] - this.chunkLength;
+            let chunkTensor = audioTensor.slice(i, this.chunkLength); //.expandDims(0);
+            let result = (await this.predictChunk(chunkTensor, i));
+            if (result) this.RESULTS.push(result);
         }
+        //console.log(this.prediction.dataSync());
         return this.RESULTS;
     }
 }

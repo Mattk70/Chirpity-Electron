@@ -47,12 +47,12 @@
                 </div>
             </li>
             <li class="nav-item dropdown active">
-                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown2" role="button" data-toggle="dropdown"
+                <a class="nav-link dropdown-toggle" href="#" id="navbarAnalysis" role="button" data-toggle="dropdown"
                    aria-haspopup="true" aria-expanded="false">
                     Analysis
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item" href="#" id="analyze">Analyze entire
+                    <a class="dropdown-item disabled" href="#" id="analyze">Analyze entire
                         file</a>
                     <a class="dropdown-item disabled" href="#" id="analyzeSelection">Analyze selected interval</a>
                 </div>
@@ -115,7 +115,7 @@
 
     <!-- Result table -->
     <div class="d-none p-3 overflow-auto" id="resultTableContainer">
-        <table class="table table-hover">
+        <table class="table table-hover" style=""width>
             <thead class="thead-dark">
             <tr>
                 <th scope="col">#</th>
@@ -123,6 +123,7 @@
                 <th scope="col">Common name</th>
                 <th scope="col">Scientific name</th>
                 <th scope="col">Confidence</th>
+                <th scope="col"> </th>
             </tr>
             </thead>
             <tbody class="text-dark" id="resultTableBody">
