@@ -15,9 +15,8 @@
 
     <!-- Additional JavaScript & CSS -->
     <link rel="stylesheet" href="css/style.css"/>
-    <script src="js/labels.js"></script>
-    <script src="js/chirpity.js"></script>
-    <script src="js/ui.js"></script>
+    <!--script src="js/chirpity.js"></script -->
+
 
     <!-- App title -->
     <title>Chirpity Sound Analysis</title>
@@ -48,17 +47,17 @@
                 </div>
             </li>
             <li class="nav-item dropdown active">
-                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown2" role="button" data-toggle="dropdown"
+                <a class="nav-link dropdown-toggle" href="#" id="navbarAnalysis" role="button" data-toggle="dropdown"
                    aria-haspopup="true" aria-expanded="false">
                     Analysis
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item" href="#" id="analyze" onclick="predict(AUDIO_DATA, MODEL);">Analyze entire
+                    <a class="dropdown-item disabled" href="#" id="analyze">Analyze entire
                         file</a>
-                    <a class="dropdown-item disabled" href="#" id="analyzeSelection" onclick="predict(AUDIO_DATA, MODEL, region.start, region.end);">Analyze selected interval</a>
+                    <a class="dropdown-item disabled" href="#" id="analyzeSelection">Analyze selected interval</a>
                 </div>
             </li>
-                        <li class="nav-item dropdown active">
+            <li class="nav-item dropdown active">
                 <a class="nav-link dropdown-toggle" href="#" id="SpecDropdown" role="button" data-toggle="dropdown"
                    aria-haspopup="true" aria-expanded="false">
                     Options
@@ -70,7 +69,8 @@
             </li>
 
         </ul>
-        <img class="" src="img/logo/chirpity_logo.png" alt="Chirpity Birdcalls: Identifying birds by sound" width="400px" />
+        <img class="" src="img/logo/chirpity_logo.png" alt="Chirpity Birdcalls: Identifying birds by sound"
+             width="400px"/>
     </div>
 </nav>
 
@@ -79,9 +79,6 @@
 
     <!-- Load audio file hint -->
     <div class="d-flex h-100 flex-column text-dark align-items-center justify-content-center" id="loadFileHint">
-        <div class="row">
-          <p class="lead justify-content-center" id="modelWarmUpText">Warming up the model...Please wait</p>
-        </div>
         <div class="row">
             <p class="lead justify-content-center" id="loadFileHintText">Load an audio file for analysis by
                 clicking<br/>on <i>File > Open audio file</i> in the top menu.</p>
@@ -99,7 +96,8 @@
     <!--div class="" id="timeline"></div -->
 
     <!-- Controls view -->
-    <div class="container-fluid p-2 bg-dark text-white d-none" id="controlsWrapper" style="height: 55px;justify-content: center;">
+    <div class="container-fluid p-2 bg-dark text-white d-none" id="controlsWrapper"
+         style="height: 55px;justify-content: center;">
 
         <div class="btn-group btn-group" role="group">
             <button class="btn btn-outline-secondary justify-content-center" onmousedown="wavesurfer.playPause();">
@@ -117,7 +115,7 @@
 
     <!-- Result table -->
     <div class="d-none p-3 overflow-auto" id="resultTableContainer">
-        <table class="table table-hover">
+        <table class="table table-hover" style=""width>
             <thead class="thead-dark">
             <tr>
                 <th scope="col">#</th>
@@ -125,6 +123,7 @@
                 <th scope="col">Common name</th>
                 <th scope="col">Scientific name</th>
                 <th scope="col">Confidence</th>
+                <th scope="col"> </th>
             </tr>
             </thead>
             <tbody class="text-dark" id="resultTableBody">
@@ -135,9 +134,10 @@
 
 </div>
 
-
 <!-- Footer -->
 <div class="d-flex fixed-bottom p-2 bg-primary text-white justify-content-center" id="footer">
     <small>Chirpity &copy; Matthew Kirkland <span id="year"></span></small>
 </div>
+<script src="js/ui.js"></script>
 </body>
+</html>

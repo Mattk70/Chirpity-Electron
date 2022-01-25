@@ -1,9 +1,10 @@
-const {app, BrowserWindow} = require('electron')
-let win
+const {app, dialog, ipcMain, BrowserWindow} = require('electron');
+let mainWindow;
+let workerWindow;
 
 function createWindow() {
     // Create the browser window.
-    win = new BrowserWindow({
+    mainWindow = new BrowserWindow({
         width: 1280,
         height: 768,
         webPreferences: {
@@ -14,28 +15,55 @@ function createWindow() {
     })
 
     // Set icon
-    win.setIcon(__dirname + '/img/icon/icon.png');
+    mainWindow.setIcon(__dirname + '/img/icon/icon.png');
 
     // Always maximize
-    //win.maximize()
+    //mainWindow.maximize()
 
     // Hide nav bar
-    win.setMenuBarVisibility(false);
+    mainWindow.setMenuBarVisibility(false);
 
     // and load the index.html of the app.
-    win.loadFile('index.html')
+    mainWindow.loadFile('index.html')
 
     // Open the DevTools. Comment out for release
-    win.webContents.openDevTools()
+    mainWindow.webContents.openDevTools()
 
     // Emitted when the window is closed.
-    win.on('closed', () => {
-        win = null
+    mainWindow.on('closed', () => {
+        app.quit()
     })
 }
 
+
+function createWorker() {
+    // hidden worker
+    workerWindow = new BrowserWindow({
+        //show: false,
+        show: true,
+        height: 800,
+        width: 1200,
+        webPreferences: {
+            nodeIntegration: true,
+            enableRemoteModule: true
+        }
+    });
+    workerWindow.loadFile('worker.html');
+
+    workerWindow.on('closed', () => {
+        workerWindow = null;
+    });
+
+    workerWindow.webContents.openDevTools();
+
+    console.log("worker created");
+}
+
 // This method will be called when Electron has finished
-app.on('ready', createWindow)
+app.on('ready', () => {
+    createWorker();
+    createWindow();
+});
 
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {
@@ -45,7 +73,41 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => {
-    if (win === null) {
-        createWindow()
+    if (mainWindow === null) {
+        createWindow();
     }
-})
+
+    if (workerWindow == null) {
+        createWorker();
+    }
+});
+
+
+ipcMain.on('file-loaded', async (event, arg) => {
+    const currentFile = arg.message;
+    console.log('Main received file-loaded: ' + arg.message)
+    workerWindow.webContents.send('file-loaded', {message: currentFile});
+});
+
+ipcMain.on('analyze', async (event, arg) => {
+    const currentFile = arg.message;
+    console.log('Main received go signal: ' + arg.message)
+    workerWindow.webContents.send('analyze', {message: 'go', start: arg.start, end: arg.end});
+});
+
+ipcMain.on('prediction-ongoing', (event, arg) => {
+    const result = arg.result;
+    const index = arg.index;
+    console.log('Main received result: ' + arg.result + " inxed: " + index)
+    mainWindow.webContents.send('prediction-ongoing', {result, index});
+});
+
+ipcMain.on('prediction-done', (event, arg) => {
+    const results = arg.results;
+    mainWindow.webContents.send('prediction-done', {results});
+});
+
+ipcMain.on('model-ready', (event, arg) => {
+    const results = arg.results;
+    mainWindow.webContents.send('model-ready', {results});
+});
