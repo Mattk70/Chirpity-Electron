@@ -58,7 +58,7 @@ ipcRenderer.on('analyze', async (event, arg) => {
             event.sender.send('prediction-ongoing', {result, 'index': index});
         }
     }
-    //event.sender.send('prediction-done', {'results': model.RESULTS});
+    event.sender.send('prediction-done', {'results': model.RESULTS});
 });
 
 

@@ -16,7 +16,7 @@ let fileLoaded = false;
 let currentFile;
 let region;
 let AUDIO_DATA;
-let CURRENT_AUDIO_BUFFER
+let AUDACITY_LABELS;
 let wavesurfer;
 let WS_ZOOM = 0;
 
@@ -421,6 +421,13 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
     tr += "<td>" + (parseFloat(result.score3) * 100).toFixed(0) + "%" + "</td>";
     tr += "<td> </td>"
     tr += "</tr>";
+    /*
+                AUDACITY_LABELS.push({
+                timestamp: (i / CONFIG.sampleRate).toFixed(1) + '\t' + ((i + chunkLength) / CONFIG.sampleRate).toFixed(1),
+                cname: CONFIG.labels[primary].split('_')[1],
+                score: score
+
+     */
 
     $('#resultTableBody').append(tr);
 
@@ -431,47 +438,8 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
 
 
 ipcRenderer.on('prediction-done', async (event, arg) => {
-    const RESULTS = arg.results;
-    showElement('resultTableContainer');
-
-    // Remove old results
-    $('#resultTableBody').empty();
-
-    // Add new results
-    for (let i = 0; i < RESULTS.length; i++) {
-
-        let tr = "<tr onclick='createRegion(" + RESULTS[i].start + " , " + RESULTS[i].end + " )'><th scope='row'>" + (i + 1) + "</th>";
-        tr += "<td>" + RESULTS[i].timestamp + "</td>";
-        tr += "<td>" + RESULTS[i].cname + "</td>";
-        tr += "<td>" + RESULTS[i].sname + "</td>";
-        tr += "<td>" + (parseFloat(RESULTS[i].score) * 100).toFixed(0) + "%" + "</td>";
-        tr += "<td><span class='material-icons rotate' onclick='toggleAlternates(&quot;.subrow" + i + "&quot;)'>expand_more</span></td>";
-        tr += "</tr>";
-
-        tr += "<tr  class='subrow" + i + "'  style='font-size: 12px;display: none' onclick='createRegion(" + RESULTS[i].start + " , " + RESULTS[i].end + " )'><th scope='row'> </th>";
-        tr += "<td> </td>";
-        tr += "<td>" + RESULTS[i].cname2 + "</td>";
-        tr += "<td>" + RESULTS[i].sname2 + "</td>";
-        tr += "<td>" + (parseFloat(RESULTS[i].score2) * 100).toFixed(0) + "%" + "</td>";
-        tr += "<td> </td>";
-        tr += "</tr>";
-
-        tr += "<tr  class='subrow" + i + "'  style='font-size: 12px;display: none' onclick='createRegion(" + RESULTS[i].start + " , " + RESULTS[i].end + " )' ><th scope='row'> </th>";
-        tr += "<td> </td>";
-        tr += "<td>" + RESULTS[i].cname3 + "</td>";
-        tr += "<td>" + RESULTS[i].sname3 + "</td>";
-        tr += "<td>" + (parseFloat(RESULTS[i].score3) * 100).toFixed(0) + "%" + "</td>";
-        tr += "<td> </td>"
-        tr += "</tr>";
-
-        $('#resultTableBody').append(tr);
-
-    }
-    $(".material-icons").click(function () {
-        $(this).toggleClass("down");
-    })
+    AUDACITY_LABELS = arg.results;
     enableMenuItem('saveLabels')
-
 });
 
 function createRegion(start, end) {
