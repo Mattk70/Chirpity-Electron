@@ -9,8 +9,6 @@
 
     <!-- Bootstrap & CSS-->
     <link rel="stylesheet" href="css/bootstrap.min.css"/>
-    <script>let $ = require('jquery');</script>
-    <!--script>require('popper.js');</script-->
     <script>require('bootstrap');</script>
 
     <!-- Additional JavaScript & CSS -->
@@ -93,11 +91,11 @@
     <div class="inner" id="spectrogram"></div>
     <div class="inner" id="waveform"></div>
     <div class="" id="dummy" style="width: 100%"></div>
-    <!--div class="" id="timeline"></div -->
+    <div class="" id="timeline"></div>
 
     <!-- Controls view -->
-    <div class="container-fluid p-2 bg-dark text-white d-none" id="controlsWrapper"
-         style="height: 55px;justify-content: center;">
+    <div class="container-fluid p-2 bg-dark text-white d-none justify-content-between" id="controlsWrapper"
+         style="height: 55px;">
 
         <div class="btn-group btn-group" role="group">
             <button class="btn btn-outline-secondary justify-content-center" onmousedown="wavesurfer.playPause();">
@@ -111,11 +109,22 @@
                 <i class="material-icons">zoom_out</i>
             </button>
         </div>
+        <div class="progressDiv" style="width: 20%;display: none"> Working...<br>
+            <div class="progress" style="width: 100%">
+                <div class="progress-bar progress-bar-striped active" role="progressbar"
+                     aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width:0">
+                    0%
+                </div>
+            </div>
+        </div>
+        <div class="complete" style="display: none">Analysis Complete <span class="material-icons">
+        check_circle</span>
+        </div>
     </div>
 
     <!-- Result table -->
     <div class="d-none p-3 overflow-auto" id="resultTableContainer">
-        <table class="table table-hover" style=""width>
+        <table class="table table-hover" style="" width>
             <thead class="thead-dark">
             <tr>
                 <th scope="col">#</th>
@@ -123,7 +132,7 @@
                 <th scope="col">Common name</th>
                 <th scope="col">Scientific name</th>
                 <th scope="col">Confidence</th>
-                <th scope="col"> </th>
+                <th scope="col"></th>
             </tr>
             </thead>
             <tbody class="text-dark" id="resultTableBody">
