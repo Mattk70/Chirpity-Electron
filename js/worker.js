@@ -28,37 +28,39 @@ ipcRenderer.on('file-loaded', async (event, arg) => {
     event.sender.send('worker-loaded', {message: currentFile});
 });
 
-/*
 ipcRenderer.on('analyze', async (event, arg) => {
-    const message = arg.message;
-    console.log('Worker received message: ' + arg.message + ' start: ' + arg.start + ' end: ' + arg.end);
-    let results = await model.predictFile(audioBuffer, arg.start, arg.end)
-    event.sender.send('prediction-done', {results});
-});
-
- */
-
-ipcRenderer.on('analyze', async (event, arg) => {
-    const message = arg.message;
     console.log('Worker received message: ' + arg.message + ' start: ' + arg.start + ' end: ' + arg.end);
     console.log(audioBuffer.length);
     const bufferLength = audioBuffer.length;
-    arg.start === undefined ? arg.start = 0 : arg.start = arg.start * model.config.sampleRate;
+    let isRegion = false;
+    if (arg.start === undefined) {
+        arg.start = 0
+    } else {
+        arg.start = arg.start * model.config.sampleRate;
+        isRegion = true
+    }
     model.RESULTS = [];
+    model.AUDACITY = [];
     let index = 0;
-    for (let i = arg.start; i < bufferLength - model.chunkLength; i += model.chunkLength) {
-
+    for (let i = arg.start; i < bufferLength; i += model.chunkLength) {
         if (arg.end !== undefined && i >= arg.end * model.config.sampleRate) break; // maybe pad here
         if (i + model.chunkLength > bufferLength) i = bufferLength - model.chunkLength;
         let chunk = audioBuffer.slice(i, i + model.chunkLength);
-        let result = (await model.predictChunk(chunk, i));
+        let [result, audacity] = (await model.predictChunk(chunk, i, isRegion));
         if (result) {
             index++;
             model.RESULTS.push(result);
+            model.AUDACITY.push(audacity);
             event.sender.send('prediction-ongoing', {result, 'index': index});
         }
+        event.sender.send('progress', {'progress': i / bufferLength});
     }
-    event.sender.send('prediction-done', {'results': model.RESULTS});
+    if (model.RESULTS.length === 0) {
+        const result = "No detections found.";
+        event.sender.send('prediction-ongoing', {result, 'index': 1});
+    }
+    event.sender.send('progress', {'progress': 1});
+    event.sender.send('prediction-done', {'labels': model.AUDACITY});
 });
 
 
@@ -71,10 +73,8 @@ async function loadAudioFile(filePath) {
                 // Get raw audio data
                 audioBuffer = await event.getAudioBuffer().getChannelData(0);
             });
-
         })
     } catch (error) {
         console.log(error)
     }
-
 }
