@@ -78,6 +78,15 @@ class Model {
         let result;
         let audacity;
         chunk = tf.tensor1d(chunk);
+
+        /*
+        console.log(chunk)
+        if (chunk.shape[0] !== this.chunkLength) {
+            chunk = tf.pad(chunk, [this.chunkLength], 0)
+        }
+        console.log(chunk.shape);
+         */
+
         this._makeSpectrogram(chunk);
         this.prediction = this.model.predict(this.spectrogram);
         // Get label

@@ -42,7 +42,7 @@ ipcRenderer.on('analyze', async (event, arg) => {
     model.RESULTS = [];
     model.AUDACITY = [];
     let index = 0;
-    for (let i = arg.start; i < bufferLength; i += model.chunkLength) {
+    for (let i = arg.start; i < bufferLength - model.chunkLength; i += model.chunkLength) {
         if (arg.end !== undefined && i >= arg.end * model.config.sampleRate) break; // maybe pad here
         if (i + model.chunkLength > bufferLength) i = bufferLength - model.chunkLength;
         let chunk = audioBuffer.slice(i, i + model.chunkLength);
@@ -69,7 +69,10 @@ async function loadAudioFile(filePath) {
     try {
         load(filePath).then(function (buffer) {
             // Resample
-            resampler(buffer, 48000, async function (event) {
+            // if mp3
+            let sampleRate = 48000;
+            if (filePath.endsWith('.mp3'))  sampleRate /= buffer.numberOfChannels;
+            resampler(buffer, sampleRate, async function (event) {
                 // Get raw audio data
                 audioBuffer = await event.getAudioBuffer().getChannelData(0);
             });

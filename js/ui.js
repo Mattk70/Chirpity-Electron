@@ -3,13 +3,14 @@ const {dialog} = require('electron').remote;
 const remote = require('electron').remote;
 const fs = require('fs');
 const load = require("audio-loader");
-const resampler = require("audio-resampler");
+const audio_buffer_from = require('audio-buffer-from');
 const WaveSurfer = require("wavesurfer.js");
 const SpectrogramPlugin = require('wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js');
 const SpecTimeline = require('wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js');
 const Regions = require('wavesurfer.js/dist/plugin/wavesurfer.regions.min.js');
 const colormap = require("colormap");
-//let $ = require('jquery');
+const $ = require('jquery');
+const resampler = require("audio-resampler");
 
 let modelReady = false;
 let fileLoaded = false;
@@ -29,10 +30,10 @@ let specCanvasElement;
 let specWaveElement;
 let waveCanvasElement;
 let waveWaveElement;
-let resultTableElement = document.querySelector('#resultTableContainer');
-let contentWrapperElement = document.querySelector('#contentWrapper');
-let controlsWrapperElement = document.querySelector('#controlsWrapper');
-;
+let resultTableElement = $('#resultTableContainer');
+let contentWrapperElement = $('#contentWrapper');
+let controlsWrapperElement = $('#controlsWrapper');
+let completeDiv = $('.complete');
 
 function loadAudioFile(filePath) {
     // Hide load hint and show spinnner
@@ -50,10 +51,13 @@ function loadAudioFile(filePath) {
         console.log('loading took ' + timeNow / 1000 + ' seconds');
         console.log('loadFileHintLog', 'Analyzing...');
         start = new Date()
-        resampler(buffer, 48000, async function (event) {
+        // if mp3
+        let sampleRate = 48000;
+        if (filePath.endsWith('.mp3')) sampleRate = sampleRate / buffer.numberOfChannels;
+        resampler(buffer, sampleRate, async function (event) {
             timeNow = new Date() - start;
             console.log('resampling took ' + timeNow / 1000 + ' seconds');
-            // Get raw audio data
+            // Get raw audio data for one channel
             AUDIO_DATA = event.getAudioBuffer().getChannelData(0);
             //Hide center div when done
             hideElement('loadFileHint');
@@ -66,7 +70,7 @@ function loadAudioFile(filePath) {
             }
             ipcRenderer.send('file-loaded', {message: currentFile});
             fileLoaded = true;
-            completeDiv.style.display = 'none';
+            completeDiv.hide();
             if (modelReady) enableMenuItem('analyze')
         });
 
@@ -167,19 +171,18 @@ function drawSpec(args) {
     }
 
 
-    bodyElement = document.querySelector('body');
-    dummyElement = document.querySelector('#dummy');
-    waveElement = document.querySelector('#waveform')
+    bodyElement = $('body');
+    dummyElement = $('#dummy');
+    waveElement = $('#waveform')
 
-    specElement = document.querySelector('spectrogram')
-    specCanvasElement = document.querySelector('#spectrogram canvas')
-    waveCanvasElement = document.querySelector('#waveform canvas')
-    waveWaveElement = document.querySelector('#waveform wave')
-    specWaveElement = document.querySelector('#spectrogram wave')
+    specElement = $('spectrogram')
+    specCanvasElement = $('#spectrogram canvas')
+    waveCanvasElement = $('#waveform canvas')
+    waveWaveElement = $('#waveform wave')
+    specWaveElement = $('#spectrogram wave')
 
 // Set click event that removes all regions
-
-    waveElement.addEventListener('click', function () {
+    waveElement.mousedown(function (e) {
         wavesurfer.clearRegions();
         disableMenuItem('analyzeSelection');
     });
@@ -196,13 +199,13 @@ function drawSpec(args) {
 //WS_ZOOM = $('#waveform').width() / wavesurfer.getDuration();
 
 // Resize canvas of spec and labels
-    adjustSpecHeight(false);
+    adjustSpecHeight(true);
 
 // Hide waveform
 //hideElement('waveform')
 // Show controls
     showElement('controlsWrapper');
-    document.querySelector('#SpecDropdown').style.display = '';
+    $('#SpecDropdown').show();
 //showElement('timeline', false, true);
 
 }
@@ -277,6 +280,7 @@ async function showSaveDialog() {
 const analyzeLink = document.getElementById('analyze');
 
 analyzeLink.addEventListener('click', async () => {
+    completeDiv.hide();
     ipcRenderer.send('analyze', {message: 'go'});
     analyzeLink.disabled = true;
 });
@@ -284,6 +288,7 @@ analyzeLink.addEventListener('click', async () => {
 const analyzeSelectionLink = document.getElementById('analyzeSelection');
 
 analyzeSelectionLink.addEventListener('click', async () => {
+    completeDiv.hide();
     ipcRenderer.send('analyze', {message: 'go', start: region.start, end: region.end});
     analyzeLink.disabled = true;
 });
@@ -302,15 +307,11 @@ function exitApplication() {
 }
 
 function enableMenuItem(id) {
-    id = '#' + id;
-    id = document.querySelector(id);
-    id.classList.remove('disabled');
+    $('#' + id).removeClass('disabled');
 }
 
 function disableMenuItem(id) {
-    id = '#' + id;
-    id = document.querySelector(id);
-    id.classList.add('disabled');
+    $('#' + id).addClass('disabled');
 }
 
 function saveLabelFile(path) {
@@ -318,25 +319,19 @@ function saveLabelFile(path) {
 }
 
 function toggleAlternates(row) {
-    row = document.querySelector(row);
-    row.classList.toggle('slow');
+
+    $(row).toggle('slow')
 }
 
 function showElement(id, makeFlex = true, empty = false) {
-    id = '#' + id;
-    const el = document.querySelector(id);
-    el.classList.remove('d-none');
-    if (makeFlex) el.classList.add('d-flex');
-    if (empty) {
-        while (el.firstChild) el.removeChild(el.firstChild);
-    }
+    $('#' + id).removeClass('d-none');
+    if (makeFlex) $('#' + id).addClass('d-flex');
+    if (empty) $('#' + id).empty();
 }
 
 function hideElement(id) {
-    id = '#' + id;
-    const el = document.querySelector(id);
-    el.classList.remove('d-flex');
-    el.classList.add('d-none');
+    $('#' + id).removeClass('d-flex');
+    $('#' + id).addClass('d-none');
 
 }
 
@@ -365,7 +360,7 @@ function hideAll() {
 window.onload = function () {
 
     // Set footer year
-    document.querySelector('#year').textContent = new Date().getFullYear().toString();
+    $('#year').textContent = new Date().getFullYear().toString();
     // Load model
     //loadModel()
 
@@ -386,10 +381,10 @@ const waitForFinalEvent = (function () {
     };
 })();
 
-window.addEventListener('resize', function () {
+$(window).resize(function () {
     waitForFinalEvent(function () {
-        adjustSpecHeight(true);
-        ;
+
+        WindowResize();
     }, 500, 'id1');
 });
 
@@ -452,12 +447,12 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 ipcRenderer.on('prediction-ongoing', async (event, arg) => {
+    completeDiv.hide();
     const result = arg.result;
     const index = arg.index;
-    const tbody = document.querySelector('#resultTableBody');
     if (index === 1) {
         // Remove old results
-        while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+        $('#resultTableBody').empty();
     }
     let tr;
     showElement('resultTableContainer');
@@ -474,7 +469,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr += "<td><span class='material-icons rotate' onclick='toggleAlternates(&quot;.subrow" + index + "&quot;)'>expand_more</span></td>";
         tr += "</tr>";
 
-        tr += "<tr  class='subrow" + index + "'  style='font-size: 12px;display: none' onclick='createRegion(" + result.start + " , " + result.end + " )'><th scope='row'> </th>";
+        tr += "<tr  class='subrow" + index + "'  onclick='createRegion(" + result.start + " , " + result.end + " )'><th scope='row'> </th>";
         tr += "<td> </td>";
         tr += "<td>" + result.cname2 + "</td>";
         tr += "<td>" + result.sname2 + "</td>";
@@ -482,7 +477,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr += "<td> </td>";
         tr += "</tr>";
 
-        tr += "<tr  class='subrow" + index + "'  style='font-size: 12px;display: none' onclick='createRegion(" + result.start + " , " + result.end + " )' ><th scope='row'> </th>";
+        tr += "<tr  class='subrow" + index + "'  onclick='createRegion(" + result.start + " , " + result.end + " )' ><th scope='row'> </th>";
         tr += "<td> </td>";
         tr += "<td>" + result.cname3 + "</td>";
         tr += "<td>" + result.sname3 + "</td>";
@@ -491,31 +486,31 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr += "</tr>";
 
     }
-    tbody.innerHTML += tr;
-    let icons = document.querySelectorAll('.material-icons.rotate')
-    icons.forEach(function (el) {
-        el.addEventListener('click', function (el2) {
-            el.classList.toggle("down");
-        })
-    })
+    $('#resultTableBody').append(tr);
 
+    $(".material-icons").click(function () {
+        $(this).toggleClass("down");
+    })
 });
-let progressDiv = document.querySelector('.progressDiv');
-let completeDiv = document.querySelector('.complete');
-let progressBar = document.querySelector('.progress .progress-bar');
+let progressDiv = $('.progressDiv');
+
+let progressBar = $('.progress .progress-bar');
 ipcRenderer.on('progress', async (event, arg) => {
-    progressDiv.style.display = ''
+    progressDiv.show();
     let progress = (arg.progress * 100).toFixed(1);
     console.log('progress update: ' + progress);
-    progressBar.style.width = progress + '%'
-    progressBar.setAttribute('aria-valuenow', progress);
-    progressBar.innerHTML = progress + '%';
+    progressBar.width(progress + '%');
+    progressBar.attr('aria-valuenow', progress);
+    progressBar.html(progress + '%');
 });
 
 ipcRenderer.on('prediction-done', async (event, arg) => {
     AUDACITY_LABELS = arg.labels;
-    progressDiv.style.display = 'none';
-    completeDiv.style.display = '';
+    progressDiv.hide();
+    progressBar.width(0 + '%');
+    progressBar.attr('aria-valuenow', 0);
+    progressBar.html(0 + '%');
+    completeDiv.show();
     enableMenuItem('saveLabels');
 });
 
@@ -527,20 +522,6 @@ function createRegion(start, end) {
     wavesurfer.seekAndCenter(progress);
 }
 
-function setHeight(el, val) {
-    console.log(el + 'type' + typeof el);
-    if (typeof val === "function") val = val();
-    if (typeof val === "string") el.style.height = val;
-    else el.style.height = val + "px";
-
-}
-
-function setWidth(el, val) {
-    if (typeof val === "function") val = val();
-    if (typeof val === "string") el.style.width = val;
-    else el.style.width = val + "px";
-}
-
 function adjustSpecHeight(redraw) {
     if (redraw && wavesurfer != null) {
         wavesurfer.drawBuffer();
@@ -548,41 +529,21 @@ function adjustSpecHeight(redraw) {
     //wavesurfer.spectrogram.render();
 
     //$('#dummy, #waveform wave, spectrogram, #spectrogram canvas, #waveform canvas').each(function () {
-    const elements = [dummyElement, waveWaveElement, specElement, specCanvasElement, waveCanvasElement];
-    let h = parseFloat(getComputedStyle(bodyElement, null).height.replace("px", ""))
-    h = 0.4 * h;
-    Array.prototype.forEach.call(elements, function (el, i) {
-        setHeight(el, h);
+    $.each([dummyElement, waveWaveElement, specElement, specCanvasElement, waveCanvasElement], function () {
+        $(this).height(bodyElement.height() * 0.4)
+
+        waveCanvasElement = $('#waveform canvas')
+        let specWidth = 0;
+        for (let i = 0; i < waveCanvasElement.length; i++) {
+            specWidth += waveCanvasElement[i].width
+            console.log('wavecanvaselement ' + i + 'width is ' + waveCanvasElement[i].width + ' ' + specWidth)
+        }
+        console.log('specwidth  is ' + specWidth)
+        specCanvasElement.width(specWidth);
+        //console.log("canvas width " + canvasWidth)
+
+        specElement.css('z-index', 0)
+
+        resultTableElement.height(contentWrapperElement.height() - dummyElement.height() - controlsWrapperElement.height() - 47);
     })
-
-
-    //$.each([dummyElement, waveWaveElement, specElement, specCanvasElement, waveCanvasElement], function () {
-    //$(this).height(bodyElement.height() * 0.4)
-    //$(this).css('width','100%')
-
-    //});
-    //let canvasWidth = 0
-    //console.log("canvas width " + JSON.stringify(waveCanvasElements))
-    waveCanvasElement = document.querySelectorAll('#waveform canvas')
-    let specWidth = 0;
-    for (let i = 0; i < waveCanvasElement.length; i++) {
-        specWidth += waveCanvasElement[i].width
-        console.log('wavecanvaselement ' + i + 'width is ' + waveCanvasElement[i].width + ' ' + specWidth)
-    }
-    console.log('specwidth  is ' + specWidth)
-    setWidth(specCanvasElement, specWidth);
-    //console.log("canvas width " + canvasWidth)
-
-    //specCanvasElement.width(canvasWidth)
-    specElement.style.zIndex = 0;
-
-    //$('#timeline').height(20);
-    h = 0;
-    h += parseFloat(getComputedStyle(bodyElement, null).height.replace("px", ""));
-    h -= parseFloat(getComputedStyle(dummyElement, null).height.replace("px", ""));
-    h -= parseFloat(getComputedStyle(controlsWrapperElement, null).height.replace("px", ""));
-    h -= 47;
-    //resultTableElement.height(contentWrapperElement.height() - dummyElement.height() - controlsWrapperElement.height() - 47);
-    //$('#resultTableContainer').height($('#contentWrapper').height() - $('#spectrogram').height() - $('#controlsWrapper').height() - $('#waveform').height() - 47);
-
 }
