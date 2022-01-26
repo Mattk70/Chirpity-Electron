@@ -63,11 +63,12 @@ html, body {
     transform: rotate(-90deg);
 }
 
-tr[class^=".subrow"] {
-    font-size: 10px;
+tr[class^="subrow"] {
+    font-size: 12px;
+    display: none
 }
 
-.rotate{
+.rotate {
     -moz-transition: all 0.2s linear;
     -webkit-transition: all 0.2s linear;
     transition: all 0.2s linear;
@@ -79,6 +80,3 @@ tr[class^=".subrow"] {
     transform: rotate(180deg);
 }
 
-.table {
-    min-width: 100%;
-}

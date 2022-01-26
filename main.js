@@ -41,8 +41,8 @@ function createWorker() {
     workerWindow = new BrowserWindow({
         //show: false,
         show: true,
-        height: 800,
-        width: 1200,
+        height: 80,
+        width: 120,
         webPreferences: {
             nodeIntegration: true,
             enableRemoteModule: true
@@ -103,11 +103,16 @@ ipcMain.on('prediction-ongoing', (event, arg) => {
 });
 
 ipcMain.on('prediction-done', (event, arg) => {
-    const results = arg.results;
-    mainWindow.webContents.send('prediction-done', {results});
+    const labels = arg.labels;
+    mainWindow.webContents.send('prediction-done', {labels});
 });
 
 ipcMain.on('model-ready', (event, arg) => {
     const results = arg.results;
     mainWindow.webContents.send('model-ready', {results});
+});
+
+ipcMain.on('progress', (event, arg) => {
+    const progress = arg.progress;
+    mainWindow.webContents.send('progress', {progress});
 });
