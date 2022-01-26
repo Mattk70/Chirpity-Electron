@@ -41,8 +41,8 @@ function createWorker() {
     workerWindow = new BrowserWindow({
         //show: false,
         show: true,
-        height: 800,
-        width: 1200,
+        height: 80,
+        width: 120,
         webPreferences: {
             nodeIntegration: true,
             enableRemoteModule: true

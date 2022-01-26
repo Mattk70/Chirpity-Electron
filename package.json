@@ -30,6 +30,7 @@
   "dependencies": {
     "@tensorflow/tfjs": "3.13.0",
     "audio-loader": "^1.0.3",
+    "audio-buffer-from": "^1.1.1",
     "audio-resampler": "^1.0.1",
     "bootstrap": "^4.6.1",
     "colormap": "^2.3.2",
