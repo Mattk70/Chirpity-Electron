@@ -180,13 +180,12 @@ function drawSpec(args) {
     waveWaveElement = $('#waveform wave')
     specWaveElement = $('#spectrogram wave')
 
-// Set click event that removes all regions
+    // Set click event that removes all regions
     waveElement.mousedown(function (e) {
         wavesurfer.clearRegions();
         disableMenuItem('analyzeSelection');
     });
-
-// Enable analyse selection when region created
+    // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
         // console.log(wavesurfer.regions.list)
         region = e
@@ -194,32 +193,32 @@ function drawSpec(args) {
     });
 
 
-// Set initial zoom level
-//WS_ZOOM = $('#waveform').width() / wavesurfer.getDuration();
+    // Set initial zoom level
+    //WS_ZOOM = $('#waveform').width() / wavesurfer.getDuration();
 
-// Resize canvas of spec and labels
+    // Resize canvas of spec and labels
     adjustSpecHeight(false);
 
-// Hide waveform
-//hideElement('waveform')
-// Show controls
+    // Hide waveform
+    //hideElement('waveform')
+    // Show controls
     showElement('controlsWrapper');
-    $('#SpecDropdown').show();
-//showElement('timeline', false, true);
+    $('#SpecDropdown').show()
+    //showElement('timeline', false, true);
 
 }
 
-async function zoomSpecIn() {
+function zoomSpecIn() {
     WS_ZOOM += 50;
     wavesurfer.zoom(WS_ZOOM);
-    await adjustSpecHeight(true)
+    adjustSpecHeight(true)
     //wavesurfer.spectrogram.render()
 }
 
-async function zoomSpecOut() {
+function zoomSpecOut() {
     WS_ZOOM -= 50;
     wavesurfer.zoom(WS_ZOOM);
-    await adjustSpecHeight(true)
+    adjustSpecHeight(true)
     //wavesurfer.spectrogram.render()
 }
 
@@ -255,7 +254,6 @@ async function showSaveDialog() {
             console.log(file.filePath.toString());
             let str = ""
             // Format results
-
             for (let i = 0; i < AUDACITY_LABELS.length; i++) {
                 str += AUDACITY_LABELS[i].timestamp + "\t";
                 str += " " + AUDACITY_LABELS[i].cname;
@@ -344,7 +342,7 @@ function hideAll() {
 
     // Waveform and spec
     hideElement('waveform');
-    hideElement('spectrogram');
+    hideElement('specContainer');
 
     // Controls    
     hideElement('controlsWrapper');
