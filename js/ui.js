@@ -16,12 +16,11 @@ let modelReady = false;
 let fileLoaded = false;
 let currentFile;
 let region;
-let AUDIO_DATA;
 let AUDACITY_LABELS;
 let wavesurfer;
 let WS_ZOOM = 0;
 
-// set up some  for caching
+// set up some DOM element caches
 let bodyElement;
 let dummyElement;
 let specElement;
@@ -35,7 +34,7 @@ let contentWrapperElement = $('#contentWrapper');
 let controlsWrapperElement = $('#controlsWrapper');
 let completeDiv = $('.complete');
 
-function loadAudioFile(filePath) {
+async function loadAudioFile(filePath) {
     // Hide load hint and show spinnner
     hideAll();
     disableMenuItem('analyze')
@@ -46,25 +45,34 @@ function loadAudioFile(filePath) {
     // load one file
     console.log('loadFileHintLog', 'Loading file...');
     load(filePath).then(function (buffer) {
-        // Resample
+        hideElement('loadFileHint');
+        console.log('load gives file with duration:' + buffer.duration)
+        let sampleRate = buffer.sampleRate;
+        //convert to mono
+        //buffer = buffer.getChannelData(0);
+        //buffer = audio_buffer_from(buffer, {'sampleRate': sampleRate})
         let timeNow = new Date() - start
         console.log('loading took ' + timeNow / 1000 + ' seconds');
-        console.log('loadFileHintLog', 'Analyzing...');
+        // Resample
         start = new Date()
-        // if mp3
-        let sampleRate = 48000;
-        if (filePath.endsWith('.mp3')) sampleRate /= buffer.numberOfChannels;
-        resampler(buffer, sampleRate, async function (event) {
+        resampler(buffer, 48000, async function (event) {
             timeNow = new Date() - start;
-            console.log('resampling took ' + timeNow / 1000 + ' seconds');
+            const audioContext = new AudioContext({sampleRate: sampleRate})
             // Get raw audio data for one channel
-            AUDIO_DATA = event.getAudioBuffer().getChannelData(0);
+            console.log('resampling took ' + timeNow / 1000 + ' seconds');
+            //AUDIO_DATA = audio_buffer_from(buffer, {'channels': 1}) //, 'sampleRate': sampleRate})
+            //    console.log('audio_buffer_from gives file with duration:' + AUDIO_DATA.duration)
             //Hide center div when done
-            hideElement('loadFileHint');
             // Draw and show spectrogram
-            let duration = event.getAudioBuffer().duration
+            let duration = buffer.duration
             if (duration < 300) {
-                drawSpec({'audio': audio_buffer_from(AUDIO_DATA), 'backend': 'WebAudio', 'alpha': 0, 'spectrogram': true});
+                drawSpec({
+                    'audio': buffer,
+                    'backend': 'WebAudio',
+                    'alpha': 0,
+                    'context': null,
+                    'spectrogram': true
+                });
             } else {
                 drawSpec({'audio': filePath, 'backend': 'MediaElementWebAudio', 'alpha': 1, 'spectrogram': false});
             }
@@ -82,94 +90,61 @@ function drawSpec(args) {
     showElement('waveform', false, true);
     showElement('spectrogram', false, true);
     if (wavesurfer !== undefined) wavesurfer.pause();
+    // Setup waveform and spec views
+    wavesurfer = WaveSurfer.create({
+        //options
+        container: '#waveform',
+        audioContext: args.context,
+        backend: args.backend, // 'MediaElementWebAudio',
+        // make waveform transparent
+        backgroundColor: 'rgba(0,0,0,0)',
+        waveColor: 'rgba(109,41,164,' + args.alpha + ')',
+        progressColor: 'rgba(109,41,164,' + args.alpha + ')',
+        // but keep the playhead
+        cursorColor: '#fff',
+        cursorWidth: 2,
+        normalize: true,
+        partialRender: true,
+        scrollParent: true,
+        responsive: true,
+        height: 512,
+        fftSamples: 1024,
+        windowFunc: 'hamming',
+        minPxPerSec: 50,
+        hideScrollbar: false,
+        plugins: [
+            SpecTimeline.create({
+                container: "#timeline"
+
+            }),
+            Regions.create({
+                regionsMinLength: 2,
+                dragSelection: {
+                    slop: 5,
+
+                },
+                color: "rgba(255, 255, 255, 0.2)"
+            })]
+    })
+
     if (args.spectrogram) {
-        // Setup waveform and spec views
-        wavesurfer = WaveSurfer.create({
-            //options
-            container: '#waveform',
-            backend: args.backend, // 'MediaElementWebAudio',
-            // make waveform transparent
-            backgroundColor: 'rgba(0,0,0,0)',
-            waveColor: 'rgba(109,41,164,' + args.alpha + ')',
-            progressColor: 'rgba(109,41,164,' + args.alpha + ')',
-            // but keep the playhead
-            cursorColor: '#fff',
-            cursorWidth: 2,
-            normalize: true,
-            partialRender: true,
+        wavesurfer.addPlugin(SpectrogramPlugin.create({
+            wavesurfer: wavesurfer,
+            container: "#spectrogram",
             scrollParent: true,
-            responsive: true,
-            height: 512,
-            fftSamples: 1024,
-            windowFunc: 'hamming',
-            minPxPerSec: 50,
-            hideScrollbar: false,
-            plugins: [
-                SpectrogramPlugin.create({
-                    wavesurfer: wavesurfer,
-                    container: "#spectrogram",
-                    scrollParent: true,
-                    labels: false,
-                    colorMap: colormap({
-                        colormap: 'inferno', nshades: 256, format: 'float'
-                    }),
-                }), SpecTimeline.create({
-                    container: "#timeline"
-
-                }),
-                Regions.create({
-                    regionsMinLength: 2,
-                    dragSelection: {
-                        slop: 5,
-
-                    },
-                    color: "rgba(255, 255, 255, 0.2)"
-                })]
-        })
+            labels: false,
+            colorMap: colormap({
+                colormap: 'inferno', nshades: 256, format: 'float'
+            })
+        })).initPlugin('spectrogram');
         wavesurfer.loadDecodedBuffer(args.audio);
     } else {
-        // Setup waveform and spec views
-        wavesurfer = WaveSurfer.create({
-            //options
-            container: '#waveform',
-            backend: args.backend, // 'MediaElementWebAudio',
-            // make waveform transparent
-            backgroundColor: 'rgba(0,0,0,0)',
-            waveColor: 'rgba(109,41,164,' + args.alpha + ')',
-            progressColor: 'rgba(109,41,164,' + args.alpha + ')',
-            // but keep the playhead
-            cursorColor: '#fff',
-            cursorWidth: 2,
-            normalize: true,
-            partialRender: true,
-            scrollParent: true,
-            responsive: true,
-            height: 512,
-            fftSamples: 1024,
-            windowFunc: 'hamming',
-            minPxPerSec: 50,
-            hideScrollbar: false,
-            plugins: [
-                SpecTimeline.create({
-                    container: "#timeline",
-                }),
-                Regions.create({
-                    regionsMinLength: 2,
-                    dragSelection: {
-                        slop: 5,
-
-                    },
-                    color: "rgba(255, 255, 255, 0.2)"
-                })]
-        })
         let audio = document.createElement('audio');
         audio.src = currentFile;
         //Set crossOrigin to anonymous to avoid CORS restrictions
         audio.crossOrigin = 'anonymous';
         wavesurfer.load(args.audio)
     }
-
-
     bodyElement = $('body');
     dummyElement = $('#dummy');
     waveElement = $('#waveform')
@@ -203,7 +178,7 @@ function drawSpec(args) {
     //hideElement('waveform')
     // Show controls
     showElement('controlsWrapper');
-    $('#SpecDropdown').show()
+    $('#OptionsDropdown').hide()
     //showElement('timeline', false, true);
 
 }
@@ -223,21 +198,16 @@ function zoomSpecOut() {
 }
 
 async function showOpenDialog() {
-
     // Show file dialog to select audio file
     const fileDialog = await dialog.showOpenDialog({
-
         filters: [{name: 'Audio Files', extensions: ['mp3', 'wav']}], // , 'ogg', 'aac', 'flac']}],
         properties: ['openFile']
     });
-
     // Load audio file
     if (fileDialog.filePaths.length > 0) {
         loadAudioFile(fileDialog.filePaths[0]);
         currentFile = fileDialog.filePaths[0];
     }
-
-
 }
 
 
@@ -260,7 +230,6 @@ async function showSaveDialog() {
                 // str += " " + AUDACITY_LABELS[i].sname ;
                 str += " " + (parseFloat(AUDACITY_LABELS[i].score) * 100).toFixed(0) + "%\r\n";
             }
-
             fs.writeFile(file.filePath.toString(),
                 str, function (err) {
                     if (err) throw err;
@@ -520,11 +489,9 @@ function createRegion(start, end) {
 }
 
 function adjustSpecHeight(redraw) {
-    if (redraw && wavesurfer != null) {
-        wavesurfer.drawBuffer();
-    }
     //wavesurfer.spectrogram.render();
-
+    specElement = $('spectrogram');
+    specCanvasElement = $('spectrogram canvas')
     //$('#dummy, #waveform wave, spectrogram, #spectrogram canvas, #waveform canvas').each(function () {
     $.each([dummyElement, waveWaveElement, specElement, specCanvasElement, waveCanvasElement], function () {
         $(this).height(bodyElement.height() * 0.4)
@@ -533,14 +500,13 @@ function adjustSpecHeight(redraw) {
         let specWidth = 0;
         for (let i = 0; i < waveCanvasElement.length; i++) {
             specWidth += waveCanvasElement[i].width
-            console.log('wavecanvaselement ' + i + 'width is ' + waveCanvasElement[i].width + ' ' + specWidth)
         }
-        console.log('specwidth  is ' + specWidth)
-        //specCanvasElement.width(specWidth);
-        //console.log("canvas width " + canvasWidth)
-
-        specElement.css('z-index', 0)
-
+        specCanvasElement.width(specWidth);
+        $('spectrogram').css('z-index', 0)
         resultTableElement.height(contentWrapperElement.height() - dummyElement.height() - controlsWrapperElement.height() - 47);
+        console.log('specwidth  is ' + specWidth)
     })
+    if (redraw && wavesurfer != null) {
+        wavesurfer.drawBuffer();
+    }
 }
