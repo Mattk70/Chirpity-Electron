@@ -70,10 +70,11 @@ async function loadAudioFile(filePath) {
         load(filePath).then(function (buffer) {
             // Resample
             // if mp3
-            let sampleRate = 48000;
+            let sampleRate = model.config.sampleRate;
             if (filePath.endsWith('.mp3'))  sampleRate /= buffer.numberOfChannels;
             resampler(buffer, sampleRate, async function (event) {
-                // Get raw audio data
+                // Get raw audio
+                console.log("model received file of duration: " + event.getAudioBuffer().duration)
                 audioBuffer = await event.getAudioBuffer().getChannelData(0);
             });
         })
