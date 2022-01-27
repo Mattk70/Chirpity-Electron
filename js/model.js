@@ -3,7 +3,7 @@ const labels = ["Tachymarptis melba_Alpine Swift", "Pluvialis dominica_American 
 const path = require("path");
 const CONFIG = {
 
-    sampleRate: 48000, specLength: 3, sigmoid: 1.0, minConfidence: 0.3,
+    sampleRate: 48000, specLength: 3, sigmoid: 1.0, minConfidence: 0.7,
 
 }
 
@@ -74,17 +74,26 @@ class Model {
         warmupResult.dispose();
     }
 
-    async predictChunk(chunk, index) {
-        //index === undefined ? index = 0 : index = index * this.config.sampleRate;
+    async predictChunk(chunk, index, isRegion) {
         let result;
+        let audacity;
         chunk = tf.tensor1d(chunk);
+
+        /*
+        console.log(chunk)
+        if (chunk.shape[0] !== this.chunkLength) {
+            chunk = tf.pad(chunk, [this.chunkLength], 0)
+        }
+        console.log(chunk.shape);
+         */
+
         this._makeSpectrogram(chunk);
         this.prediction = this.model.predict(this.spectrogram);
         // Get label
         const {indices, values} = this.prediction.topk(3);
         const [primary, secondary, tertiary] = indices.dataSync();
         const [score, score2, score3] = values.dataSync();
-        if (score >= this.config.minConfidence) {
+        if (isRegion || score >= this.config.minConfidence) {
             result = ({
                 start: index / this.config.sampleRate,
                 end: (index + this.chunkLength) / this.config.sampleRate,
@@ -100,27 +109,21 @@ class Model {
                 cname3: this.labels[tertiary].split('_')[1],
                 score3: score3,
             });
+            audacity = ({
+                timestamp: (index / CONFIG.sampleRate).toFixed(1) + '\t'
+                    + ((index + this.chunkLength) / this.config.sampleRate).toFixed(1),
+                cname: this.labels[primary].split('_')[1],
+                score: score
+            })
         }
         console.log(primary, this.labels[primary], score);
-        return result;
+        chunk.dispose();
+        indices.dispose();
+        values.dispose();
+        return [result, audacity];
+
     }
 
-    async predictFile(audioBuffer, start, end) {
-        start === undefined ? start = 0 : start = start * this.config.sampleRate;
-        const audioTensor = tf.tensor1d(audioBuffer);
-        console.log(audioTensor.shape);
-        this.RESULTS = [];
-        this.AUDACITY_LABELS = [];
-        for (let i = start; i < audioTensor.shape[0] - this.chunkLength; i += this.chunkLength) {
-            if (end !== undefined && i >= end * this.config.sampleRate) break;
-            if (i + this.chunkLength > audioTensor.shape[0]) i = audioTensor.shape[0] - this.chunkLength;
-            let chunkTensor = audioTensor.slice(i, this.chunkLength); //.expandDims(0);
-            let result = (await this.predictChunk(chunkTensor, i));
-            if (result) this.RESULTS.push(result);
-        }
-        //console.log(this.prediction.dataSync());
-        return this.RESULTS;
-    }
 }
 
 module.exports = Model;

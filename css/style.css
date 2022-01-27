@@ -2,7 +2,7 @@ html, body {
     height: 100%;
     padding-top: 0px;
     padding-bottom: 18px;
-    background-color: #c9c9c9;
+    background-color: #dbe2ed;
     overflow: hidden;
 }
 
@@ -57,17 +57,12 @@ html, body {
     margin-top: -6px;
 }
 
-/* rotate caret on hover */
-.dropdown-menu > li > a:hover:after {
-    text-decoration: underline;
-    transform: rotate(-90deg);
+tr[class^="subrow"] {
+    font-size: 12px;
+    display: none
 }
 
-tr[class^=".subrow"] {
-    font-size: 10px;
-}
-
-.rotate{
+.rotate {
     -moz-transition: all 0.2s linear;
     -webkit-transition: all 0.2s linear;
     transition: all 0.2s linear;
@@ -79,6 +74,3 @@ tr[class^=".subrow"] {
     transform: rotate(180deg);
 }
 
-.table {
-    min-width: 100%;
-}
