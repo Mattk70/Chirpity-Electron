@@ -1,10 +1,7 @@
 const {ipcRenderer} = require('electron');
 const load = require("audio-loader");
-const resampler = require("audio-resampler");
-
-const {app} = require('electron').remote; // use main modules from the renderer process
 const Model = require('./js/model.js');
-const appPath = app.getAppPath();
+const appPath = '';
 //const appPath = process.resourcesPath;
 
 console.log(appPath);
@@ -46,7 +43,7 @@ ipcRenderer.on('analyze', async (event, arg) => {
         if (arg.end !== undefined && i >= arg.end * model.config.sampleRate) break; // maybe pad here
         if (i + model.chunkLength > bufferLength) i = bufferLength - model.chunkLength;
         let chunk = audioBuffer.slice(i, i + model.chunkLength);
-        let [result, audacity] = (await model.predictChunk(chunk, i, isRegion));
+        let [result, audacity] = await model.predictChunk(chunk, i, isRegion)
         if (result) {
             index++;
             model.RESULTS.push(result);
@@ -71,11 +68,19 @@ async function loadAudioFile(filePath) {
             // Resample
             // if mp3
             let sampleRate = model.config.sampleRate;
-            if (filePath.endsWith('.mp3'))  sampleRate /= buffer.numberOfChannels;
-            resampler(buffer, sampleRate, async function (event) {
-                // Get raw audio
-                console.log("model received file of duration: " + event.getAudioBuffer().duration)
-                audioBuffer = await event.getAudioBuffer().getChannelData(0);
+            if (filePath.endsWith('.mp3')) sampleRate /= buffer.numberOfChannels;
+            const offlineCtx = new OfflineAudioContext(1,
+                buffer.duration * 48000,
+                48000);
+            const offlineSource = offlineCtx.createBufferSource();
+            offlineSource.buffer = buffer;
+            offlineSource.connect(offlineCtx.destination);
+            offlineSource.start();
+            offlineCtx.startRendering().then((resampled) => {
+                // `resampled` contains an AudioBuffer resampled at 48000Hz.
+                // use resampled.getChannelData(x) to get an Float32Array for channel x.
+                console.log("model received file of duration: " + resampled.duration)
+                audioBuffer = resampled.getChannelData(0);
             });
         })
     } catch (error) {
