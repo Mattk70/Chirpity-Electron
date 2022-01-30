@@ -29,7 +29,6 @@
   },
   "dependencies": {
     "@tensorflow/tfjs": "3.13.0",
-    "audio-loader": "^1.0.3",
     "bootstrap": "^4.6.1",
     "colormap": "^2.3.2",
     "jquery": "^3.6.0",

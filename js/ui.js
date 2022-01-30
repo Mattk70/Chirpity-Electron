@@ -2,9 +2,6 @@ const {ipcRenderer} = require('electron');
 const {dialog} = require('electron').remote;
 const remote = require('electron').remote;
 const fs = require('fs');
-const load = require("audio-loader");
-const remix = require('audio-buffer-remix');
-const util = require('audio-buffer-utils');
 const WaveSurfer = require("wavesurfer.js");
 const SpectrogramPlugin = require('wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js');
 const SpecTimeline = require('wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js');
@@ -34,6 +31,7 @@ let contentWrapperElement = $('#contentWrapper');
 let controlsWrapperElement = $('#controlsWrapper');
 let completeDiv = $('.complete');
 
+
 async function loadAudioFile(filePath) {
     // Hide load hint and show spinnner
     hideAll();
@@ -41,49 +39,59 @@ async function loadAudioFile(filePath) {
     showElement('loadFileHint');
     showElement('loadFileHintSpinner');
     showElement('loadFileHintLog');
-    let start = new Date()
-    // load one file
     console.log('loadFileHintLog', 'Loading file...');
-    load(filePath).then(function (buffer) {
-        hideElement('loadFileHint');
-        console.log('load gives file with duration:' + buffer.duration)
-        let sampleRate = buffer.sampleRate;
-        let timeNow = new Date() - start
-        console.log('loading took ' + timeNow / 1000 + ' seconds');
-        // Resample
-        start = new Date()
-        const offlineCtx = new OfflineAudioContext(1,
-            buffer.duration * 24000,
-            24000);
+    hideElement('loadFileHint');
+    // create an audio context object and load file into it
+    const audioCtx = new AudioContext();
+    let source = audioCtx.createBufferSource();
+    fs.readFile(filePath, function (err, data) {
+        if (err) {
+            reject(err)
+        } else {
+            audioCtx.decodeAudioData(data.buffer).then(function (buffer) {
+                const myBuffer = buffer;
+                source.buffer = myBuffer;
+                const chann = buffer.getChannelData(0);
+                const duration = source.buffer.duration;
+                const sampleRate = source.buffer.sampleRate;
+                const offlineCtx = new OfflineAudioContext(1, 48000 * duration, 48000);
+                const  offlineSource = offlineCtx.createBufferSource();
+                offlineSource.buffer = buffer;
+                offlineSource.connect(offlineCtx.destination);
+                offlineSource.start();
+                offlineCtx.startRendering().then(function (resampled) {
+                    console.log('Rendering completed successfully');
+                    // `resampled` contains an AudioBuffer resampled at 48000Hz.
+                    // use resampled.getChannelData(x) to get an Float32Array for channel x.
+                    const chann2 = resampled.getChannelData(0);
+                    if (resampled.duration < 300) {
+                        drawSpec({
+                            'audio': resampled,
+                            'backend': 'WebAudio',
+                            'alpha': 0,
+                            'context': null,
+                            'spectrogram': true
+                        });
+                    } else {
+                        drawSpec({
+                            'audio': filePath,
+                            'backend': 'MediaElementWebAudio',
+                            'alpha': 1,
+                            'spectrogram': false
+                        });
+                    }
+                })
+            }).catch(function (e) {
+                console.log("Error with decoding audio data" + e.err);
+            })
+        }
 
-        const offlineSource = offlineCtx.createBufferSource();
-        offlineSource.buffer = buffer;
-        offlineSource.connect(offlineCtx.destination);
-        offlineSource.start();
-        offlineCtx.startRendering().then((resampled) => {
-            // `resampled` contains an AudioBuffer resampled at 48000Hz.
-            // use resampled.getChannelData(x) to get an Float32Array for channel x.
-            timeNow = new Date() - start;
-            console.log('resampling took ' + timeNow / 1000 + ' seconds');
-            let duration = resampled.duration
-            if (duration < 300) {
-                drawSpec({
-                    'audio': resampled,
-                    'backend': 'WebAudio',
-                    'alpha': 0,
-                    'context': null,
-                    'spectrogram': true
-                });
-            } else {
-                drawSpec({'audio': filePath, 'backend': 'MediaElementWebAudio', 'alpha': 1, 'spectrogram': false});
-            }
-            ipcRenderer.send('file-loaded', {message: currentFile});
-            fileLoaded = true;
-            completeDiv.hide();
-            if (modelReady) enableMenuItem('analyze')
+    })
 
-        });
-    });
+    ipcRenderer.send('file-loaded', {message: filePath});
+    fileLoaded = true;
+    completeDiv.hide();
+    if (modelReady) enableMenuItem('analyze')
 }
 
 function drawSpec(args) {
@@ -201,7 +209,7 @@ function zoomSpecOut() {
 async function showOpenDialog() {
     // Show file dialog to select audio file
     const fileDialog = await dialog.showOpenDialog({
-        filters: [{name: 'Audio Files', extensions: ['mp3', 'wav']}], // , 'ogg', 'aac', 'flac']}],
+        filters: [{name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg']}],
         properties: ['openFile']
     });
     // Load audio file
@@ -469,7 +477,6 @@ let progressBar = $('.progress .progress-bar');
 ipcRenderer.on('progress', async (event, arg) => {
     progressDiv.show();
     let progress = (arg.progress * 100).toFixed(1);
-    console.log('progress update: ' + progress);
     progressBar.width(progress + '%');
     progressBar.attr('aria-valuenow', progress);
     progressBar.html(progress + '%');
