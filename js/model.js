@@ -3,7 +3,7 @@ const labels = ["Tachymarptis melba_Alpine Swift", "Pluvialis dominica_American 
 const path = require("path");
 const CONFIG = {
 
-    sampleRate: 48000, specLength: 3, sigmoid: 1.0, minConfidence: 0.7,
+    sampleRate: 48000, specLength: 3, sigmoid: 1.0, minConfidence: 0.5,
 
 }
 
@@ -19,7 +19,7 @@ class Model {
         this.frame_length = 1024;
         this.frame_step = 373;
         this.prediction = null;
-        this.appPath = path.join(appPath, 'model/');
+        this.appPath = path.join(appPath, '121_model/');
     }
 
     async loadModel() {
@@ -77,53 +77,55 @@ class Model {
     async predictChunk(chunk, index, isRegion) {
         let result;
         let audacity;
-        chunk = tf.tensor1d(chunk);
+        tf.tidy(() => {
+            chunk = tf.tensor1d(chunk);
 
-        /*
-        console.log(chunk)
-        if (chunk.shape[0] !== this.chunkLength) {
-            chunk = tf.pad(chunk, [this.chunkLength], 0)
-        }
-        console.log(chunk.shape);
-         */
+            /*
+            console.log(chunk)
+            if (chunk.shape[0] !== this.chunkLength) {
+                chunk = tf.pad(chunk, [this.chunkLength], 0)
+            }
+            console.log(chunk.shape);
+             */
 
-        this._makeSpectrogram(chunk);
-        this.prediction = this.model.predict(this.spectrogram);
-        // Get label
-        const {indices, values} = this.prediction.topk(3);
-        const [primary, secondary, tertiary] = indices.dataSync();
-        const [score, score2, score3] = values.dataSync();
-        if (isRegion || score >= this.config.minConfidence) {
-            result = ({
-                start: index / this.config.sampleRate,
-                end: (index + this.chunkLength) / this.config.sampleRate,
-                timestamp: this._timestampFromSeconds(index / this.config.sampleRate) + ' - '
-                    + this._timestampFromSeconds((index + this.chunkLength) / this.config.sampleRate),
-                sname: this.labels[primary].split('_')[0],
-                cname: this.labels[primary].split('_')[1],
-                score: score,
-                sname2: this.labels[secondary].split('_')[0],
-                cname2: this.labels[secondary].split('_')[1],
-                score2: score2,
-                sname3: this.labels[tertiary].split('_')[0],
-                cname3: this.labels[tertiary].split('_')[1],
-                score3: score3,
-            });
-            audacity = ({
-                timestamp: (index / CONFIG.sampleRate).toFixed(1) + '\t'
-                    + ((index + this.chunkLength) / this.config.sampleRate).toFixed(1),
-                cname: this.labels[primary].split('_')[1],
-                score: score
-            })
-        }
-        console.log(primary, this.labels[primary], score);
-        chunk.dispose();
-        indices.dispose();
-        values.dispose();
+            this._makeSpectrogram(chunk);
+            this.prediction = this.model.predict(this.spectrogram);
+            // Get label
+            const {indices, values} = this.prediction.topk(3);
+            const [primary, secondary, tertiary] = indices.dataSync();
+            const [score, score2, score3] = values.dataSync();
+            if (isRegion || score >= this.config.minConfidence) {
+                result = ({
+                    start: index / this.config.sampleRate,
+                    end: (index + this.chunkLength) / this.config.sampleRate,
+                    timestamp: this._timestampFromSeconds(index / this.config.sampleRate) + ' - '
+                        + this._timestampFromSeconds((index + this.chunkLength) / this.config.sampleRate),
+                    sname: this.labels[primary].split('_')[0],
+                    cname: this.labels[primary].split('_')[1],
+                    score: score,
+                    sname2: this.labels[secondary].split('_')[0],
+                    cname2: this.labels[secondary].split('_')[1],
+                    score2: score2,
+                    sname3: this.labels[tertiary].split('_')[0],
+                    cname3: this.labels[tertiary].split('_')[1],
+                    score3: score3,
+                });
+                audacity = ({
+                    timestamp: (index / CONFIG.sampleRate).toFixed(1) + '\t'
+                        + ((index + this.chunkLength) / this.config.sampleRate).toFixed(1),
+                    cname: this.labels[primary].split('_')[1],
+                    score: score
+                })
+            }
+            console.log(primary, this.labels[primary], score);
+            chunk.dispose();
+            indices.dispose();
+            values.dispose();
+
+        })
+        //console.table(tf.memory());
         return [result, audacity];
-
     }
-
 }
 
 module.exports = Model;
