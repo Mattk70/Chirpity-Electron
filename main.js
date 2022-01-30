@@ -45,7 +45,8 @@ function createWorker() {
         width: 120,
         webPreferences: {
             nodeIntegration: true,
-            enableRemoteModule: true
+            enableRemoteModule: false,
+            contextIsolation: false,
         }
     });
     workerWindow.loadFile('worker.html');
