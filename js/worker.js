@@ -1,6 +1,6 @@
 const {ipcRenderer} = require('electron');
-const load = require("audio-loader");
 const Model = require('./js/model.js');
+const fs = require("fs");
 const appPath = '';
 //const appPath = process.resourcesPath;
 
@@ -62,28 +62,34 @@ ipcRenderer.on('analyze', async (event, arg) => {
 
 
 async function loadAudioFile(filePath) {
-    // load one file
-    try {
-        load(filePath).then(function (buffer) {
-            // Resample
-            // if mp3
-            let sampleRate = model.config.sampleRate;
-            if (filePath.endsWith('.mp3')) sampleRate /= buffer.numberOfChannels;
-            const offlineCtx = new OfflineAudioContext(1,
-                buffer.duration * 48000,
-                48000);
-            const offlineSource = offlineCtx.createBufferSource();
-            offlineSource.buffer = buffer;
-            offlineSource.connect(offlineCtx.destination);
-            offlineSource.start();
-            offlineCtx.startRendering().then((resampled) => {
-                // `resampled` contains an AudioBuffer resampled at 48000Hz.
-                // use resampled.getChannelData(x) to get an Float32Array for channel x.
-                console.log("model received file of duration: " + resampled.duration)
-                audioBuffer = resampled.getChannelData(0);
-            });
-        })
-    } catch (error) {
-        console.log(error)
-    }
+    // create an audio context object and load file into it
+    const audioCtx = new AudioContext();
+    let source = audioCtx.createBufferSource();
+    fs.readFile(filePath, function (err, data) {
+        if (err) {
+            reject(err)
+        } else {
+            audioCtx.decodeAudioData(data.buffer).then(function (buffer) {
+                source.buffer = buffer;
+                const duration = source.buffer.duration;
+                const sampleRate = model.config.sampleRate;
+                const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
+                const  offlineSource = offlineCtx.createBufferSource();
+                offlineSource.buffer = buffer;
+                offlineSource.connect(offlineCtx.destination);
+                offlineSource.start();
+                offlineCtx.startRendering().then(function (resampled) {
+                    console.log('Rendering completed successfully');
+                    // `resampled` contains an AudioBuffer resampled at 48000Hz.
+                    // use resampled.getChannelData(x) to get an Float32Array for channel x.
+                    audioBuffer = resampled.getChannelData(0);
+
+                })
+            }).catch(function (e) {
+                console.log("Error with decoding audio data" + e.err);
+            })
+        }
+
+    })
+
 }
