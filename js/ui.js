@@ -3,14 +3,14 @@ const {dialog} = require('electron').remote;
 const remote = require('electron').remote;
 const fs = require('fs');
 const load = require("audio-loader");
-const audio_buffer_from = require('audio-buffer-from');
+const remix = require('audio-buffer-remix');
+const util = require('audio-buffer-utils');
 const WaveSurfer = require("wavesurfer.js");
 const SpectrogramPlugin = require('wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js');
 const SpecTimeline = require('wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js');
 const Regions = require('wavesurfer.js/dist/plugin/wavesurfer.regions.min.js');
 const colormap = require("colormap");
 const $ = require('jquery');
-const resampler = require("audio-resampler");
 
 let modelReady = false;
 let fileLoaded = false;
@@ -48,26 +48,27 @@ async function loadAudioFile(filePath) {
         hideElement('loadFileHint');
         console.log('load gives file with duration:' + buffer.duration)
         let sampleRate = buffer.sampleRate;
-        //convert to mono
-        //buffer = buffer.getChannelData(0);
-        //buffer = audio_buffer_from(buffer, {'sampleRate': sampleRate})
         let timeNow = new Date() - start
         console.log('loading took ' + timeNow / 1000 + ' seconds');
         // Resample
         start = new Date()
-        resampler(buffer, 48000, async function (event) {
+        const offlineCtx = new OfflineAudioContext(1,
+            buffer.duration * 24000,
+            24000);
+
+        const offlineSource = offlineCtx.createBufferSource();
+        offlineSource.buffer = buffer;
+        offlineSource.connect(offlineCtx.destination);
+        offlineSource.start();
+        offlineCtx.startRendering().then((resampled) => {
+            // `resampled` contains an AudioBuffer resampled at 48000Hz.
+            // use resampled.getChannelData(x) to get an Float32Array for channel x.
             timeNow = new Date() - start;
-            const audioContext = new AudioContext({sampleRate: sampleRate})
-            // Get raw audio data for one channel
             console.log('resampling took ' + timeNow / 1000 + ' seconds');
-            //AUDIO_DATA = audio_buffer_from(buffer, {'channels': 1}) //, 'sampleRate': sampleRate})
-            //    console.log('audio_buffer_from gives file with duration:' + AUDIO_DATA.duration)
-            //Hide center div when done
-            // Draw and show spectrogram
-            let duration = buffer.duration
+            let duration = resampled.duration
             if (duration < 300) {
                 drawSpec({
-                    'audio': buffer,
+                    'audio': resampled,
                     'backend': 'WebAudio',
                     'alpha': 0,
                     'context': null,
@@ -80,8 +81,8 @@ async function loadAudioFile(filePath) {
             fileLoaded = true;
             completeDiv.hide();
             if (modelReady) enableMenuItem('analyze')
-        });
 
+        });
     });
 }
 
@@ -375,6 +376,10 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         if (RESULTS.length > 0) {
             showSaveDialog();
         }
+    },
+    Escape: function () {
+        console.log('Operation aborted');
+        ipcRenderer.send('abort', {'abort': true})
     },
     Home: function () {
         wavesurfer.seekAndCenter(0);
