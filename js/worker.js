@@ -38,6 +38,7 @@ ipcRenderer.on('analyze', async (event, arg) => {
     }
     model.RESULTS = [];
     model.AUDACITY = [];
+    const start = new Date();
     let index = 0;
     for (let i = arg.start; i < bufferLength - model.chunkLength; i += model.chunkLength) {
         if (arg.end !== undefined && i >= arg.end * model.config.sampleRate) break; // maybe pad here
@@ -56,6 +57,8 @@ ipcRenderer.on('analyze', async (event, arg) => {
         const result = "No detections found.";
         event.sender.send('prediction-ongoing', {result, 'index': 1});
     }
+    const timenow = new Date();
+    console.log('Analysis took ' + (timenow - start) / 1000 + ' seconds.')
     event.sender.send('progress', {'progress': 1});
     event.sender.send('prediction-done', {'labels': model.AUDACITY});
 });
@@ -74,7 +77,7 @@ async function loadAudioFile(filePath) {
                 const duration = source.buffer.duration;
                 const sampleRate = model.config.sampleRate;
                 const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
-                const  offlineSource = offlineCtx.createBufferSource();
+                const offlineSource = offlineCtx.createBufferSource();
                 offlineSource.buffer = buffer;
                 offlineSource.connect(offlineCtx.destination);
                 offlineSource.start();

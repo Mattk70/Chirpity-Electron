@@ -8,6 +8,7 @@ const SpecTimeline = require('wavesurfer.js/dist/plugin/wavesurfer.timeline.min.
 const Regions = require('wavesurfer.js/dist/plugin/wavesurfer.regions.min.js');
 const colormap = require("colormap");
 const $ = require('jquery');
+const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 
 let modelReady = false;
 let fileLoaded = false;
@@ -31,79 +32,108 @@ let contentWrapperElement = $('#contentWrapper');
 let controlsWrapperElement = $('#controlsWrapper');
 let completeDiv = $('.complete');
 
+let currentBuffer;
+let bufferBegin = 0;
+let windowLength = 10;  // seconds
+
 
 async function loadAudioFile(filePath) {
     // Hide load hint and show spinnner
+    if (wavesurfer) {
+        wavesurfer.destroy();
+        wavesurfer = undefined;
+    }
     hideAll();
     disableMenuItem('analyze')
     showElement('loadFileHint');
     showElement('loadFileHintSpinner');
     showElement('loadFileHintLog');
     console.log('loadFileHintLog', 'Loading file...');
-    hideElement('loadFileHint');
+    // Reset the buffer playhead:
+    bufferBegin = 0;
     // create an audio context object and load file into it
     const audioCtx = new AudioContext();
     let source = audioCtx.createBufferSource();
     fs.readFile(filePath, function (err, data) {
-        if (err) {
-            reject(err)
-        } else {
-            audioCtx.decodeAudioData(data.buffer).then(function (buffer) {
-                const myBuffer = buffer;
-                source.buffer = myBuffer;
-                const chann = buffer.getChannelData(0);
-                const duration = source.buffer.duration;
-                const sampleRate = source.buffer.sampleRate;
-                const offlineCtx = new OfflineAudioContext(1, 48000 * duration, 48000);
-                const  offlineSource = offlineCtx.createBufferSource();
-                offlineSource.buffer = buffer;
-                offlineSource.connect(offlineCtx.destination);
-                offlineSource.start();
-                offlineCtx.startRendering().then(function (resampled) {
-                    console.log('Rendering completed successfully');
-                    // `resampled` contains an AudioBuffer resampled at 48000Hz.
-                    // use resampled.getChannelData(x) to get an Float32Array for channel x.
-                    const chann2 = resampled.getChannelData(0);
-                    if (resampled.duration < 300) {
-                        drawSpec({
-                            'audio': resampled,
-                            'backend': 'WebAudio',
-                            'alpha': 0,
-                            'context': null,
-                            'spectrogram': true
-                        });
-                    } else {
-                        drawSpec({
-                            'audio': filePath,
-                            'backend': 'MediaElementWebAudio',
-                            'alpha': 1,
-                            'spectrogram': false
-                        });
-                    }
+            if (err) {
+                reject(err)
+            } else {
+                audioCtx.decodeAudioData(data.buffer).then(function (buffer) {
+                    const myBuffer = buffer;
+                    source.buffer = myBuffer;
+                    const duration = source.buffer.duration;
+                    const sampleRate = source.buffer.sampleRate;
+                    const offlineCtx = new OfflineAudioContext(1, 48000 * duration, 48000);
+                    const offlineSource = offlineCtx.createBufferSource();
+                    offlineSource.buffer = buffer;
+                    offlineSource.connect(offlineCtx.destination);
+                    offlineSource.start();
+                    offlineCtx.startRendering().then(function (resampled) {
+                        currentBuffer = resampled;
+                        console.log('Rendering completed successfully');
+                        // `resampled` contains an AudioBuffer down-mixed to mono and resampled at 48000Hz.
+                        // use resampled.getChannelData(x) to get an Float32Array for channel x.
+                        loadBufferSegment(resampled, bufferBegin, bufferBegin + windowLength)
+                    })
+                }).catch(function (e) {
+                    console.log("Error with decoding audio data" + e.err);
                 })
-            }).catch(function (e) {
-                console.log("Error with decoding audio data" + e.err);
-            })
+            }
         }
-
-    })
-
+    )
+    //hideElement('loadFileHint');
     ipcRenderer.send('file-loaded', {message: filePath});
     fileLoaded = true;
     completeDiv.hide();
+    $('#filename').text(filePath);
+    // show the spec
+
     if (modelReady) enableMenuItem('analyze')
 }
 
-function drawSpec(args) {
+function loadBufferSegment(buffer, begin) {
+    if (begin < 0) begin = 0;
+    if (begin + windowLength > buffer.duration) begin = buffer.duration - windowLength;
+    bufferBegin = begin;
+    AudioBufferSlice(buffer, begin, begin + windowLength, function (error, slicedAudioBuffer) {
+        if (error) {
+            console.error(error);
+        } else {
+            if (!wavesurfer) {
+                initSpec({
+                    'audio': slicedAudioBuffer,
+                    'backend': 'WebAudio',
+                    'alpha': 0,
+                    'context': null,
+                    'spectrogram': true
+                });
+            } else {
+                wavesurfer.clearRegions();
+                updateSpec(slicedAudioBuffer)
+            }
+        }
+    })
+}
+
+function updateSpec(buffer) {
     // Show spec and timecode containers
-    showElement('waveform', false, true);
-    showElement('spectrogram', false, true);
+    wavesurfer.timeline.params.offset = -bufferBegin;
+    wavesurfer.loadDecodedBuffer(buffer);
+}
+
+function initSpec(args) {
+    // Show spec and timecode containers
+    hideAll();
+    showElement('dummy', false);
+    showElement('timeline', false);
+    showElement('waveform', false, false);
+    showElement('spectrogram', false, false);
     if (wavesurfer !== undefined) wavesurfer.pause();
     // Setup waveform and spec views
     wavesurfer = WaveSurfer.create({
         //options
         container: '#waveform',
-        audioContext: args.context,
+        //audioContext: args.context,
         backend: args.backend, // 'MediaElementWebAudio',
         // make waveform transparent
         backgroundColor: 'rgba(0,0,0,0)',
@@ -116,7 +146,7 @@ function drawSpec(args) {
         partialRender: true,
         scrollParent: true,
         responsive: true,
-        height: 512,
+        height: 256,
         fftSamples: 1024,
         windowFunc: 'hamming',
         minPxPerSec: 50,
@@ -147,6 +177,7 @@ function drawSpec(args) {
             })
         })).initPlugin('spectrogram');
         wavesurfer.loadDecodedBuffer(args.audio);
+
     } else {
         let audio = document.createElement('audio');
         audio.src = currentFile;
@@ -175,6 +206,13 @@ function drawSpec(args) {
         region = e
         enableMenuItem('analyzeSelection');
     });
+
+    wavesurfer.on('finish', function () {
+        if (currentBuffer.duration > bufferBegin + windowLength) {
+            loadBufferSegment(currentBuffer, bufferBegin += windowLength);
+            wavesurfer.play()
+        }
+    })
 
 
     // Set initial zoom level
@@ -209,9 +247,13 @@ function zoomSpecOut() {
 async function showOpenDialog() {
     // Show file dialog to select audio file
     const fileDialog = await dialog.showOpenDialog({
-        filters: [{name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg']}],
+        filters: [{
+            name: 'Audio Files',
+            extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg']
+        }],
         properties: ['openFile']
     });
+
     // Load audio file
     if (fileDialog.filePaths.length > 0) {
         loadAudioFile(fileDialog.filePaths[0]);
@@ -264,7 +306,14 @@ const analyzeSelectionLink = document.getElementById('analyzeSelection');
 
 analyzeSelectionLink.addEventListener('click', async () => {
     completeDiv.hide();
-    ipcRenderer.send('analyze', {message: 'go', start: region.start, end: region.end});
+    let start;
+    let end;
+    if (region.start) {
+        start = region.start + bufferBegin;
+        end = region.end + bufferBegin;
+    }
+    // Add current buffer's beginning offset to region start / end tags
+    ipcRenderer.send('analyze', {message: 'go', start: start, end: end});
     analyzeLink.disabled = true;
 });
 
@@ -318,11 +367,13 @@ function hideAll() {
     hideElement('loadFileHintSpinner');
     hideElement('loadFileHintLog')
 
-    // Waveform and spec
+    // Waveform, timeline and spec
+    hideElement('timeline');
     hideElement('waveform');
-    hideElement('specContainer');
+    hideElement('spectrogram');
+    hideElement('dummy');
 
-    // Controls    
+    // Controls
     hideElement('controlsWrapper');
 
     // Result table
@@ -335,13 +386,12 @@ function hideAll() {
 window.onload = function () {
 
     // Set footer year
-    $('#year').textContent = new Date().getFullYear().toString();
+    $('#year').text(new Date().getFullYear());
     // Load model
     //loadModel()
 
 };
 
-//window.addEventListener('resize', WindowResize);
 
 const waitForFinalEvent = (function () {
     var timers = {};
@@ -367,6 +417,10 @@ function WindowResize() {
     adjustSpecHeight(true);
 }
 
+$(document).on('click', '.play', function (e) {
+        region.play()
+})
+
 const GLOBAL_ACTIONS = { // eslint-disable-line
     Space: function () {
         wavesurfer.playPause();
@@ -390,12 +444,34 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         ipcRenderer.send('abort', {'abort': true})
     },
     Home: function () {
-        wavesurfer.seekAndCenter(0);
-        wavesurfer.pause()
+        if (currentBuffer) {
+            loadBufferSegment(currentBuffer, 0)
+            wavesurfer.seekAndCenter(0);
+            wavesurfer.pause()
+        }
     },
     End: function () {
-        wavesurfer.seekAndCenter(1);
-        wavesurfer.pause()
+        if (currentBuffer) {
+            loadBufferSegment(currentBuffer, currentBuffer.duration - windowLength)
+            wavesurfer.seekAndCenter(1);
+            wavesurfer.pause()
+        }
+    },
+    PageUp: function () {
+        if (wavesurfer) {
+            const position = wavesurfer.getCurrentTime() / windowLength;
+            loadBufferSegment(currentBuffer, bufferBegin -= windowLength)
+            wavesurfer.seekAndCenter(position);
+            wavesurfer.pause()
+        }
+    },
+    PageDown: function () {
+        if (wavesurfer) {
+            const position = wavesurfer.getCurrentTime() / windowLength;
+            loadBufferSegment(currentBuffer, bufferBegin += windowLength)
+            wavesurfer.seekAndCenter(position);
+            wavesurfer.pause()
+        }
     },
     KeyP: function () {
         (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
@@ -440,15 +516,16 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr = "<tr><td colspan='6'>" + result + "</td></tr>";
     } else {
 
-        tr = "<tr onclick='createRegion(" + result.start + " , " + result.end + " )'><th scope='row'>" + index + "</th>";
+        tr = "<tr  onmousedown='loadResultRegion(" + result.start + " , " + result.end + " )'><th scope='row'>" + index + "</th>";
         tr += "<td>" + result.timestamp + "</td>";
         tr += "<td>" + result.cname + "</td>";
         tr += "<td>" + result.sname + "</td>";
         tr += "<td>" + (parseFloat(result.score) * 100).toFixed(0) + "%" + "</td>";
+        tr += "<td><span class='material-icons play' >play_circle_filled</span></td>";
         tr += "<td><span class='material-icons rotate' onclick='toggleAlternates(&quot;.subrow" + index + "&quot;)'>expand_more</span></td>";
         tr += "</tr>";
 
-        tr += "<tr  class='subrow" + index + "'  onclick='createRegion(" + result.start + " , " + result.end + " )'><th scope='row'> </th>";
+        tr += "<tr  class='subrow" + index + "'  onclick='loadResultRegion(" + result.start + " , " + result.end + " )'><th scope='row'> </th>";
         tr += "<td> </td>";
         tr += "<td>" + result.cname2 + "</td>";
         tr += "<td>" + result.sname2 + "</td>";
@@ -456,7 +533,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr += "<td> </td>";
         tr += "</tr>";
 
-        tr += "<tr  class='subrow" + index + "'  onclick='createRegion(" + result.start + " , " + result.end + " )' ><th scope='row'> </th>";
+        tr += "<tr  class='subrow" + index + "'  onclick='loadResultRegion(" + result.start + " , " + result.end + " )' ><th scope='row'> </th>";
         tr += "<td> </td>";
         tr += "<td>" + result.cname3 + "</td>";
         tr += "<td>" + result.sname3 + "</td>";
@@ -498,6 +575,15 @@ function createRegion(start, end) {
     wavesurfer.addRegion({start: start, end: end, color: "rgba(255, 255, 255, 0.2)"});
     const progress = start / wavesurfer.getDuration();
     wavesurfer.seekAndCenter(progress);
+}
+
+function loadResultRegion(start, end) {
+    // Accepts global start and end timecodes from model detections
+    // Need to find and centre a view of the detection in the spectrogram
+    // 3 second detections
+    bufferBegin = start - (windowLength / 2) + 1.5
+    loadBufferSegment(currentBuffer, bufferBegin)
+    createRegion(start - bufferBegin, end - bufferBegin)
 }
 
 function adjustSpecHeight(redraw) {
