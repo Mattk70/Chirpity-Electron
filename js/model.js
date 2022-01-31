@@ -92,7 +92,7 @@ class Model {
             this.prediction = this.model.predict(this.spectrogram);
             // Get label
             const {indices, values} = this.prediction.topk(3);
-            const [primary, secondary, tertiary] = indices.dataSync();
+            const [primary, secondary, tertiary] =  indices.dataSync();
             const [score, score2, score3] = values.dataSync();
             if (isRegion || score >= this.config.minConfidence) {
                 result = ({
@@ -100,14 +100,14 @@ class Model {
                     end: (index + this.chunkLength) / this.config.sampleRate,
                     timestamp: this._timestampFromSeconds(index / this.config.sampleRate) + ' - '
                         + this._timestampFromSeconds((index + this.chunkLength) / this.config.sampleRate),
-                    sname: this.labels[primary].split('_')[0],
-                    cname: this.labels[primary].split('_')[1],
+                    sname: labels[primary].split('_')[0],
+                    cname: labels[primary].split('_')[1],
                     score: score,
-                    sname2: this.labels[secondary].split('_')[0],
-                    cname2: this.labels[secondary].split('_')[1],
+                    sname2: labels[secondary].split('_')[0],
+                    cname2: labels[secondary].split('_')[1],
                     score2: score2,
-                    sname3: this.labels[tertiary].split('_')[0],
-                    cname3: this.labels[tertiary].split('_')[1],
+                    sname3: labels[tertiary].split('_')[0],
+                    cname3: labels[tertiary].split('_')[1],
                     score3: score3,
                 });
                 audacity = ({

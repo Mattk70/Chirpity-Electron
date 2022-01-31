@@ -1,7 +1,7 @@
 {
-  "name": "chirpity-electron",
+  "name": "chirpity",
   "version": "0.1.0",
-  "description": "Electron app for sound file analysis with Chirpity.",
+  "description": "Nocmig application for sound file analysis.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -12,7 +12,9 @@
     "url": "git+https://github.com/mattk70/Chirpity-Electron.git"
   },
   "keywords": [
+    "Nocmig",
     "Bioacoustics",
+    "bird Calls",
     "Birdsong",
     "DeepLearning",
     "Tensorflow.js"
@@ -30,6 +32,7 @@
   "dependencies": {
     "@tensorflow/tfjs": "3.13.0",
     "bootstrap": "^4.6.1",
+    "popper.js": "^1.16.1",
     "colormap": "^2.3.2",
     "jquery": "^3.6.0",
     "seedrandom": "^3.0.5",

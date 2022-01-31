@@ -2,7 +2,7 @@
 
 # Chirpity-Electron
 
-Electron app for sound file analysis with Chirpity.
+Electron app for sound file analysis with Chirpity. 
 
 Author: Matthew Kirkland
 
@@ -64,14 +64,12 @@ Install Bootstrap and its dependencies:
 ```
 npm install bootstrap
 npm install jquery
-npm install popper.js
+npm install popper
 ```
 
-This app also needs some additional packages that we have to install.
+This app also needs an additional package that we have to install.
 
 ```
-npm install audio-loader
-npm install audio-resampler
 npm install colormap
 ```
 
@@ -96,5 +94,6 @@ After that, we can export the app with:
 npm run export
 ```
 
+The resulting application will be saves in the "packages" folder.
 
 
