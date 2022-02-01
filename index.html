@@ -24,7 +24,7 @@
 
 <!-- Navigation bar -->
 <nav class="pt-0 pb-0 navbar navbar-expand-sm navbar-dark bg-dark position-relative">
-    <a class="navbar-brand" href="#"> Chirpity</a>
+    <a class="navbar-brand" href="#">Chirpity</a>
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
             aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
@@ -61,8 +61,16 @@
                     Options
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item" href="#" id="spec" onclick="specColor('greys');">Greyscale</a>
-                    <a class="dropdown-item" href="#" id="model" onclick="specColor('inferno');">Colour</a>
+                    <a class="dropdown-item" href="#" id="loadSpectrogram">Load Spectrogram
+                        <span class='material-icons tick' style="font-size: 20px">done</span>
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <div>
+                        <a class="dropdown-item speccolor disabled" href="#" id="inferno">Inferno <i>(Default)</i></a>
+                        <a class="dropdown-item speccolor disabled" href="#" id="greys">Greyscale</a>
+                        <a class="dropdown-item speccolor disabled" href="#" id="hot">Hot</a>
+                        <a class="dropdown-item speccolor disabled" href="#" id="bone">Bone</a>
+                    </div>
                 </div>
             </li>
 
@@ -95,9 +103,17 @@
 
     <!-- Controls view -->
     <div class="container-fluid p-2 bg-dark text-white d-none justify-content-between" id="controlsWrapper">
-
-        <div class="btn-group btn-group" role="group">
-            <button class="btn btn-outline-secondary justify-content-center" onmousedown="wavesurfer.playPause();">
+        <!-- RESULTS -->
+        <ul class="nav nav-tabs pb-0">
+            <li class="nav-item details ">
+                <a class="nav-link active" href="#">Details</a>
+            </li>
+            <li class="nav-item summary">
+                <a class="nav-link disabled" href="#">Summary</a>
+            </li>
+        </ul>
+        <div class="btn-group specFeature" role="group" id="transport-controls">
+            <button class="btn btn-outline-secondary text-center" onmousedown="wavesurfer.playPause();">
                 <i class="material-icons">play_arrow</i><span>Play / </span>
                 <i class="material-icons">pause</i><span>Pause</span>
             </button>
@@ -109,7 +125,7 @@
             </button -->
 
         </div>
-        <div id="filename" class="align-bottom"></div>
+        <div id="filename" class="align-bottom p-2"></div>
         <div class="progressDiv" style="width: 20%;display: none"> Working...<br>
             <div class="progress" style="width: 100%">
                 <div class="progress-bar progress-bar-striped active" role="progressbar"
@@ -118,7 +134,7 @@
                 </div>
             </div>
         </div>
-        <div class="complete" style="display: none"><span class="align-bottom"> Analysis Complete</span> <span
+        <div class="complete p-1" style="display: none"><span class="align-bottom"> Analysis Complete</span> <span
                 class="material-icons">
         check_circle</span>
         </div>
@@ -134,7 +150,7 @@
                 <th scope="col">Common name</th>
                 <th scope="col">Scientific name</th>
                 <th scope="col">Confidence</th>
-                <th scope="col">Play</th>
+                <th scope="col" class="specFeature">Play</th>
                 <th scope="col"> View Alternates</th>
             </tr>
             </thead>
@@ -146,10 +162,10 @@
 
 </div>
 
-    <!-- Footer -->
-    <div class="d-flex fixed-bottom p-2 bg-primary text-white justify-content-center" id="footer">
-        <small>Chirpity &copy; Matthew Kirkland <span id="year"></span></small>
-    </div>
+<!-- Footer -->
+<div class="d-flex fixed-bottom p-2 bg-primary text-white justify-content-center" id="footer">
+    <small>Chirpity &copy; Matthew Kirkland <span id="year"></span></small>
+</div>
 <script src="js/ui.js"></script>
 </body>
 </html>

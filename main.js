@@ -91,6 +91,12 @@ ipcMain.on('file-loaded', async (event, arg) => {
     workerWindow.webContents.send('file-loaded', {message: currentFile});
 });
 
+ipcMain.on('worker-loaded', async (event, arg) => {
+    const currentFile = arg.message;
+    console.log('Main received worker-loaded: ' + arg.message)
+    mainWindow.webContents.send('worker-loaded', {message: currentFile});
+});
+
 ipcMain.on('analyze', async (event, arg) => {
     const currentFile = arg.message;
     console.log('Main received go signal: ' + arg.message)

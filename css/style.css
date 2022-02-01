@@ -62,7 +62,7 @@ tr[class^="subrow"] {
     display: none
 }
 
-.rotate{
+.rotate {
     -moz-transition: all 0.2s linear;
     -webkit-transition: all 0.2s linear;
     transition: all 0.2s linear;
@@ -72,4 +72,13 @@ tr[class^="subrow"] {
     -moz-transform: rotate(180deg);
     -webkit-transform: rotate(180deg);
     transform: rotate(180deg);
+}
+
+.filename {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.specFeature {
+
 }
