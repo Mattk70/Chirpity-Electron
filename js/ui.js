@@ -85,7 +85,8 @@ async function loadAudioFile(filePath) {
     ipcRenderer.send('file-loaded', {message: filePath});
     fileLoaded = true;
     completeDiv.hide();
-    $('#filename').text(filePath);
+    const filename = filePath.replace(/^.*[\\\/]/, '')
+    $('#filename').text(filename);
     // show the spec
 
     if (modelReady) enableMenuItem('analyze')
@@ -110,6 +111,7 @@ function loadBufferSegment(buffer, begin) {
             } else {
                 wavesurfer.clearRegions();
                 updateSpec(slicedAudioBuffer)
+
             }
         }
     })
@@ -119,6 +121,7 @@ function updateSpec(buffer) {
     // Show spec and timecode containers
     wavesurfer.timeline.params.offset = -bufferBegin;
     wavesurfer.loadDecodedBuffer(buffer);
+    specCanvasElement.width('100%');
 }
 
 function initSpec(args) {
@@ -418,7 +421,7 @@ function WindowResize() {
 }
 
 $(document).on('click', '.play', function (e) {
-        region.play()
+    region.play()
 })
 
 const GLOBAL_ACTIONS = { // eslint-disable-line
@@ -587,24 +590,29 @@ function loadResultRegion(start, end) {
 }
 
 function adjustSpecHeight(redraw) {
-    //wavesurfer.spectrogram.render();
-    specElement = $('spectrogram');
-    specCanvasElement = $('spectrogram canvas')
-    //$('#dummy, #waveform wave, spectrogram, #spectrogram canvas, #waveform canvas').each(function () {
     $.each([dummyElement, waveWaveElement, specElement, specCanvasElement, waveCanvasElement], function () {
         $(this).height(bodyElement.height() * 0.4)
-
-        waveCanvasElement = $('#waveform canvas')
-        let specWidth = 0;
-        for (let i = 0; i < waveCanvasElement.length; i++) {
-            specWidth += waveCanvasElement[i].width
-        }
-        specCanvasElement.width(specWidth);
-        $('spectrogram').css('z-index', 0)
-        resultTableElement.height(contentWrapperElement.height() - dummyElement.height() - controlsWrapperElement.height() - 47);
-        console.log('specwidth  is ' + specWidth)
     })
+    specElement.css('z-index', 0)
+    resultTableElement.height(contentWrapperElement.height()
+        - dummyElement.height()
+        - controlsWrapperElement.height()
+        - 98);
     if (redraw && wavesurfer != null) {
         wavesurfer.drawBuffer();
     }
+    specCanvasElement.width('100%');
 }
+
+// Fix table head
+function tableFixHead(e) {
+    const el = e.target,
+        sT = el.scrollTop;
+    el.querySelectorAll("thead th").forEach(th =>
+        th.style.transform = `translateY(${sT}px)`
+    );
+}
+
+document.querySelectorAll(".tableFixHead").forEach(el =>
+    el.addEventListener("scroll", tableFixHead)
+);
