@@ -23,8 +23,8 @@
 <body>
 
 <!-- Navigation bar -->
-<nav class="navbar navbar-expand-sm navbar-dark bg-dark position-relative">
-    <a class="navbar-brand" href="#">Chirpity</a>
+<nav class="pt-0 pb-0 navbar navbar-expand-sm navbar-dark bg-dark position-relative">
+    <a class="navbar-brand" href="#"> Chirpity</a>
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
             aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
@@ -94,8 +94,7 @@
     <div class="" id="dummy" style="width: 100%"></div>
 
     <!-- Controls view -->
-    <div class="container-fluid p-2 bg-dark text-white d-none justify-content-between" id="controlsWrapper"
-         style="height: 55px;">
+    <div class="container-fluid p-2 bg-dark text-white d-none justify-content-between" id="controlsWrapper">
 
         <div class="btn-group btn-group" role="group">
             <button class="btn btn-outline-secondary justify-content-center" onmousedown="wavesurfer.playPause();">
@@ -126,7 +125,7 @@
     </div>
 
     <!-- Result table -->
-    <div class="d-none p-3 overflow-auto" id="resultTableContainer">
+    <div class="d-none p-0 border-0 overflow-auto tableFixHead" id="resultTableContainer">
         <table class="table table-hover" style="" width>
             <thead class="thead-dark">
             <tr>
@@ -147,10 +146,10 @@
 
 </div>
 
-<!-- Footer -->
-<div class="d-flex fixed-bottom p-2 bg-primary text-white justify-content-center" id="footer">
-    <small>Chirpity &copy; Matthew Kirkland <span id="year"></span></small>
-</div>
+    <!-- Footer -->
+    <div class="d-flex fixed-bottom p-2 bg-primary text-white justify-content-center" id="footer">
+        <small>Chirpity &copy; Matthew Kirkland <span id="year"></span></small>
+    </div>
 <script src="js/ui.js"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@ const labels = ["Tachymarptis melba_Alpine Swift", "Pluvialis dominica_American 
 const path = require("path");
 const CONFIG = {
 
-    sampleRate: 48000, specLength: 3, sigmoid: 1.0, minConfidence: 0.5,
+    sampleRate: 48000, specLength: 3, sigmoid: 1.0, minConfidence: 0.7,
 
 }
 

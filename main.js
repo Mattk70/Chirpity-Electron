@@ -49,6 +49,7 @@ function createWorker() {
             contextIsolation: false,
         }
     });
+    workerWindow.setIcon(__dirname + '/img/icon/icon.png');
     workerWindow.loadFile('worker.html');
 
     workerWindow.on('closed', () => {
