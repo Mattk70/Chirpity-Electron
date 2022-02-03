@@ -45,6 +45,7 @@ try {
     config = {'spectrogram': true, 'colormap': 'inferno', 'timeline': true}
 }
 
+
 async function loadAudioFile(filePath) {
     // Hide load hint and show spinnner
     if (wavesurfer) {
@@ -90,7 +91,12 @@ async function loadAudioFile(filePath) {
                 }
             }
         )
-        //hideElement('loadFileHint');
+    } else {
+        // remove the file hint stuff
+        hideAll();
+        // Show controls
+        showElement('controlsWrapper');
+        $('.specFeature').hide()
     }
     ipcRenderer.send('file-loaded', {message: filePath});
     fileLoaded = true;
@@ -216,20 +222,11 @@ function initSpec(args) {
             wavesurfer.play()
         }
     })
-
-
-    // Set initial zoom level
-    //WS_ZOOM = $('#waveform').width() / wavesurfer.getDuration();
+    // Show controls
+    showElement('controlsWrapper');
 
     // Resize canvas of spec and labels
     adjustSpecHeight(false);
-
-    // Hide waveform
-    //hideElement('waveform')
-    // Show controls
-    showElement('controlsWrapper');
-    //showElement('timeline', false, true);
-
 }
 
 function updateElementCache() {
@@ -390,6 +387,16 @@ function hideAll() {
 
 /////////////////////////  Window Handlers ////////////////////////////
 window.onload = function () {
+    // Set menu option state
+    if (!config.spectrogram) {
+        $('#loadSpectrogram .tick').hide()
+
+    }
+    if (!config.timeline) {
+        $('#loadTimeline .tick').hide()
+    }
+    showElement(config.colormap + 'span', true)
+
     // Set footer year
     $('#year').text(new Date().getFullYear());
 };
@@ -434,7 +441,7 @@ $(document).on('click', '#loadSpectrogram', function (e) {
         hideElement('waveform');
         hideElement('spectrogram');
         $('.speccolor .timeline').addClass('disabled');
-        adjustSpecHeight(true);
+        //adjustSpecHeight(true);
         updatePrefs();
     } else {
         config.spectrogram = true;
@@ -723,7 +730,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
 
     }
     $('#resultTableBody').append(tr);
-    if (!loadSpectrogram) $('.specFeature').hide();
+    if (!config.spectrogram) $('.specFeature').hide();
     $(".material-icons").click(function () {
         $(this).toggleClass("down");
     })
