@@ -35,7 +35,15 @@ let completeDiv = $('.complete');
 let currentBuffer;
 let bufferBegin = 0;
 let windowLength = 10;  // seconds
-let loadSpectrogram = true;  // default to showing the spec
+
+// Set default Options
+let config;
+try {
+    config = JSON.parse(fs.readFileSync('config.json'))
+} catch {
+    // If file read error, use defaults
+    config = {'spectrogram': true, 'colormap': 'inferno', 'timeline': true}
+}
 
 async function loadAudioFile(filePath) {
     // Hide load hint and show spinnner
@@ -51,7 +59,7 @@ async function loadAudioFile(filePath) {
     console.log('loadFileHintLog', 'Loading file...');
     // Reset the buffer playhead:
     bufferBegin = 0;
-    if (loadSpectrogram) {
+    if (config.spectrogram) {
         // create an audio context object and load file into it
         const audioCtx = new AudioContext();
         let source = audioCtx.createBufferSource();
@@ -96,7 +104,7 @@ async function loadAudioFile(filePath) {
 
 function loadBufferSegment(buffer, begin) {
     if (begin < 0) begin = 0;
-    if (begin + windowLength > buffer.duration) begin = buffer.duration - windowLength;
+    if (begin + windowLength > buffer.duration) begin = Math.max(0, buffer.duration - windowLength);
     bufferBegin = begin;
     AudioBufferSlice(buffer, begin, begin + windowLength, function (error, slicedAudioBuffer) {
         if (error) {
@@ -126,22 +134,6 @@ function updateSpec(buffer, upDown) {
     specCanvasElement.width('100%');
 }
 
-$(document).on('click', '.speccolor', function (e) {
-    wavesurfer.destroyPlugin('spectrogram');
-    wavesurfer.addPlugin(SpectrogramPlugin.create({
-        wavesurfer: wavesurfer,
-        container: "#spectrogram",
-        scrollParent: true,
-        labels: false,
-        colorMap: colormap({
-            colormap: e.target.id, nshades: 256, format: 'float'
-        })
-    })).initPlugin('spectrogram');
-    // refresh caches
-    updateElementCache()
-    adjustSpecHeight(true)
-})
-
 function initSpec(args) {
     // Show spec and timecode containers
     hideAll();
@@ -152,9 +144,7 @@ function initSpec(args) {
     if (wavesurfer !== undefined) wavesurfer.pause();
     // Setup waveform and spec views
     wavesurfer = WaveSurfer.create({
-        //options
         container: '#waveform',
-        //audioContext: args.context,
         backend: args.backend, // 'MediaElementWebAudio',
         // make waveform transparent
         backgroundColor: 'rgba(0,0,0,0)',
@@ -179,23 +169,10 @@ function initSpec(args) {
                 scrollParent: true,
                 labels: false,
                 colorMap: colormap({
-                    colormap: 'inferno', nshades: 256, format: 'float'
-                })
-            }),
-            SpecTimeline.create({
-                container: '#timeline',
-                formatTimeCallback: formatTimeCallback,
-                timeInterval: timeInterval,
-                primaryLabelInterval: primaryLabelInterval,
-                secondaryLabelInterval: secondaryLabelInterval,
-                primaryColor: 'black',
-                secondaryColor: 'grey',
-                primaryFontColor: 'black',
-                secondaryFontColor: 'grey'
-
+                    colormap: config.colormap, nshades: 256, format: 'float'
+                }),
             }),
             Regions.create({
-                regionsMinLength: 2,
                 dragSelection: {
                     slop: 5,
 
@@ -203,9 +180,24 @@ function initSpec(args) {
                 color: "rgba(255, 255, 255, 0.2)"
             })]
     })
+    if (config.timeline) {
+        wavesurfer.addPlugin(SpecTimeline.create({
+            container: '#timeline',
+            formatTimeCallback: formatTimeCallback,
+            timeInterval: timeInterval,
+            primaryLabelInterval: primaryLabelInterval,
+            secondaryLabelInterval: secondaryLabelInterval,
+            primaryColor: 'black',
+            secondaryColor: 'grey',
+            primaryFontColor: 'black',
+            secondaryFontColor: 'grey'
+
+        })).initPlugin('timeline');
+    }
     wavesurfer.loadDecodedBuffer(args.audio);
     updateElementCache()
     $('.speccolor').removeClass('disabled');
+    showElement(config.colormap + ' .tick', false);
     // Set click event that removes all regions
     waveElement.mousedown(function (e) {
         wavesurfer.clearRegions();
@@ -396,17 +388,11 @@ function hideAll() {
 
 }
 
-
-/////////////////////////  DO AFTER LOAD ////////////////////////////
+/////////////////////////  Window Handlers ////////////////////////////
 window.onload = function () {
-
     // Set footer year
     $('#year').text(new Date().getFullYear());
-    // Load model
-    //loadModel()
-
 };
-
 
 const waitForFinalEvent = (function () {
     var timers = {};
@@ -436,23 +422,26 @@ $(document).on('click', '.play', function (e) {
     region.play()
 })
 
+///////////// Nav bar Option handlers //////////////
+
 $(document).on('click', '#loadSpectrogram', function (e) {
-    if (loadSpectrogram) {
-        loadSpectrogram = false;
-        $('.material-icons.tick').hide()
+    if (config.spectrogram) {
+        config.spectrogram = false;
+        $('#loadSpectrogram .tick').hide()
         $('.specFeature').hide()
         hideElement('dummy');
         hideElement('timeline');
         hideElement('waveform');
         hideElement('spectrogram');
-        $('.speccolor').removeClass('disabled');
+        $('.speccolor .timeline').addClass('disabled');
         adjustSpecHeight(true);
+        updatePrefs();
     } else {
-        loadSpectrogram = true;
-        $('.material-icons.tick').show()
+        config.spectrogram = true;
+        $('#loadSpectrogram .tick').show()
         $('.specFeature').show()
         if (wavesurfer && wavesurfer.isReady) {
-            $('.speccolor').removeClass('disabled');
+            $('.speccolor .timeline').removeClass('disabled');
             showElement('dummy', false);
             showElement('timeline', false);
             showElement('waveform', false, false);
@@ -460,9 +449,61 @@ $(document).on('click', '#loadSpectrogram', function (e) {
         } else {
             loadAudioFile(currentFile);
         }
+        updatePrefs();
     }
 })
 
+$(document).on('click', '.speccolor', function (e) {
+    wavesurfer.destroyPlugin('spectrogram');
+    config.colormap = e.target.id;
+    wavesurfer.addPlugin(SpectrogramPlugin.create({
+        wavesurfer: wavesurfer,
+        container: "#spectrogram",
+        scrollParent: true,
+        labels: false,
+        colorMap: colormap({
+            colormap: config.colormap, nshades: 256, format: 'float'
+        })
+    })).initPlugin('spectrogram');
+    // set tick
+    $('.speccolor .tick').addClass('d-none');
+    $(this).children('span').removeClass('d-none');
+    // refresh caches
+    updateElementCache()
+    adjustSpecHeight(true)
+    updatePrefs();
+})
+
+
+$(document).on('click', '.timeline', function (e) {
+    if (wavesurfer.timeline && wavesurfer.timeline.wrapper !== null) {
+        wavesurfer.destroyPlugin('timeline');
+        $('#loadTimeline .tick').hide()
+        config.timeline = false;
+        updatePrefs();
+    } else {
+        config.timeline = true;
+        wavesurfer.addPlugin(SpecTimeline.create({
+            wavesurfer: wavesurfer,
+            container: "#timeline",
+            formatTimeCallback: formatTimeCallback,
+            timeInterval: timeInterval,
+            primaryLabelInterval: primaryLabelInterval,
+            secondaryLabelInterval: secondaryLabelInterval,
+            primaryColor: 'black',
+            secondaryColor: 'grey',
+            primaryFontColor: 'black',
+            secondaryFontColor: 'grey'
+        })).initPlugin('timeline');
+        $('#loadTimeline .tick').show()
+        // refresh caches
+        updateElementCache()
+        adjustSpecHeight(true)
+        updatePrefs();
+    }
+})
+
+/////////// Keyboard Shortcuts  ////////////
 
 const GLOBAL_ACTIONS = { // eslint-disable-line
     Space: function () {
@@ -521,7 +562,6 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     }
 };
 
-// Bind actions to buttons and keypresses
 document.addEventListener('DOMContentLoaded', function () {
     document.addEventListener('keydown', function (e) {
         let action = e.code;
@@ -580,7 +620,7 @@ function adjustSpecHeight(redraw) {
         if (redraw && wavesurfer != null) {
             wavesurfer.drawBuffer();
         }
-        specCanvasElement.width('100%');
+        //specCanvasElement.width('100%');
     } else {
         resultTableElement.height(contentWrapperElement.height()
             - controlsWrapperElement.height()
@@ -818,4 +858,14 @@ function primaryLabelInterval(pxPerSec) {
 function secondaryLabelInterval(pxPerSec) {
     // draw one every 10s as an example
     return Math.floor(10 / timeInterval(pxPerSec));
+}
+
+////////// Store preferences //////////
+
+function updatePrefs() {
+    try {
+        fs.writeFileSync('config.json', JSON.stringify(config))
+    } catch (e) {
+        console.log(e)
+    }
 }

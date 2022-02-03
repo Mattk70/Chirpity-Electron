@@ -38,6 +38,10 @@ html, body {
     -webkit-font-smoothing: antialiased;
 }
 
+.tick {
+    font-size: 20px;
+}
+
 .inner {
     position: absolute;
     width: 100%;

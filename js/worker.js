@@ -29,36 +29,43 @@ ipcRenderer.on('analyze', async (event, arg) => {
     console.log('Worker received message: ' + arg.message + ' start: ' + arg.start + ' end: ' + arg.end);
     console.log(audioBuffer.length);
     const bufferLength = audioBuffer.length;
+    let start;
+    let end;
     let isRegion = false;
     if (arg.start === undefined) {
-        arg.start = 0
+        start = 0;
+        end = bufferLength;
     } else {
-        arg.start = arg.start * model.config.sampleRate;
+        start = arg.start * model.config.sampleRate;
+        end = arg.end * model.config.sampleRate;
         isRegion = true
     }
     model.RESULTS = [];
     model.AUDACITY = [];
-    const start = new Date();
+    const funcStart = new Date();
     let index = 0;
-    for (let i = arg.start; i < bufferLength - model.chunkLength; i += model.chunkLength) {
-        if (arg.end !== undefined && i >= arg.end * model.config.sampleRate) break; // maybe pad here
-        if (i + model.chunkLength > bufferLength) i = bufferLength - model.chunkLength;
-        let chunk = audioBuffer.slice(i, i + model.chunkLength);
-        let [result, audacity] = await model.predictChunk(chunk, i, isRegion)
-        if (result) {
-            index++;
-            model.RESULTS.push(result);
-            model.AUDACITY.push(audacity);
-            event.sender.send('prediction-ongoing', {result, 'index': index});
+    let increment;
+    end - start < model.chunkLength ? increment = end - start : increment = model.chunkLength;
+        for (let i = start; i < end; i += increment) {
+            // If we're at the end of a file and we haven't got a full chunk, scroll back to fit
+            //if (i + model.chunkLength > end && end >= model.chunkLength) i = end - model.chunkLength;
+
+            let chunk = audioBuffer.slice(i, i + increment);
+            let [result, audacity] = await model.predictChunk(chunk, i, isRegion)
+            if (result) {
+                index++;
+                model.RESULTS.push(result);
+                model.AUDACITY.push(audacity);
+                event.sender.send('prediction-ongoing', {result, 'index': index});
+            }
+            event.sender.send('progress', {'progress': i / end});
         }
-        event.sender.send('progress', {'progress': i / bufferLength});
-    }
     if (model.RESULTS.length === 0) {
         const result = "No detections found.";
         event.sender.send('prediction-ongoing', {result, 'index': 1});
     }
     const timenow = new Date();
-    console.log('Analysis took ' + (timenow - start) / 1000 + ' seconds.')
+    console.log('Analysis took ' + (timenow - funcStart) / 1000 + ' seconds.')
     event.sender.send('progress', {'progress': 1});
     event.sender.send('prediction-done', {'labels': model.AUDACITY});
 });
