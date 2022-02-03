@@ -79,15 +79,12 @@ class Model {
         let audacity;
         tf.tidy(() => {
             chunk = tf.tensor1d(chunk);
-
-            /*
-            console.log(chunk)
-            if (chunk.shape[0] !== this.chunkLength) {
-                chunk = tf.pad(chunk, [this.chunkLength], 0)
+            const currentChunkLength = chunk.shape[0];
+            // if the file is too shot, pad with zeroes.
+            if (chunk.shape[0] < this.chunkLength) {
+                let padding = tf.zeros([this.chunkLength - chunk.shape[0]]);
+                chunk = chunk.concat(padding)
             }
-            console.log(chunk.shape);
-             */
-
             this._makeSpectrogram(chunk);
             this.prediction = this.model.predict(this.spectrogram);
             // Get label
@@ -97,9 +94,9 @@ class Model {
             if (isRegion || score >= this.config.minConfidence) {
                 result = ({
                     start: index / this.config.sampleRate,
-                    end: (index + this.chunkLength) / this.config.sampleRate,
+                    end: (index + currentChunkLength) / this.config.sampleRate,
                     timestamp: this._timestampFromSeconds(index / this.config.sampleRate) + ' - '
-                        + this._timestampFromSeconds((index + this.chunkLength) / this.config.sampleRate),
+                        + this._timestampFromSeconds((index + currentChunkLength) / this.config.sampleRate),
                     sname: labels[primary].split('_')[0],
                     cname: labels[primary].split('_')[1],
                     score: score,
@@ -112,16 +109,12 @@ class Model {
                 });
                 audacity = ({
                     timestamp: (index / CONFIG.sampleRate).toFixed(1) + '\t'
-                        + ((index + this.chunkLength) / this.config.sampleRate).toFixed(1),
+                        + ((index + currentChunkLength) / this.config.sampleRate).toFixed(1),
                     cname: this.labels[primary].split('_')[1],
                     score: score
                 })
             }
             console.log(primary, this.labels[primary], score);
-            chunk.dispose();
-            indices.dispose();
-            values.dispose();
-
         })
         //console.table(tf.memory());
         return [result, audacity];
