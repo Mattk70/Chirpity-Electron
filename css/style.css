@@ -19,8 +19,64 @@ html, body {
     url(../fonts/MaterialIcons-Regular.woff2) format('woff2')
 }
 
+@font-face {
+    font-family: 'Material Icons Two Tone';
+    font-style: normal;
+    font-weight: 400;
+    src: local('Material Icons Two Tone'),
+    local('MaterialIconsTwoTone-Regular'),
+    url(../fonts/MaterialIconsTwoTone-Regular.woff2) format('woff2')
+}
+
+@font-face {
+    font-family: 'Material Icons Outlined';
+    font-style: normal;
+    font-weight: 400;
+    src: local('Material Icons Outlined'),
+    local('MaterialIconsOutlined-Regular'),
+    url(../fonts/MaterialIconsOutlined-Regular.woff2) format('woff2')
+}
+
 .material-icons {
     font-family: 'Material Icons';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 28px; /* Preferred icon size */
+    display: inline-block;
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    vertical-align: top;
+    direction: ltr;
+    padding-bottom: 0px;
+
+    /* Support for all WebKit browsers. */
+    -webkit-font-smoothing: antialiased;
+}
+
+.material-icons-two-tone {
+    font-family: 'Material Icons Two Tone';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 28px; /* Preferred icon size */
+    display: inline-block;
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    vertical-align: top;
+    direction: ltr;
+    padding-bottom: 0px;
+
+    /* Support for all WebKit browsers. */
+    -webkit-font-smoothing: antialiased;
+}
+
+.material-icons-outlined {
+    font-family: 'Material Icons Outlined';
     font-weight: normal;
     font-style: normal;
     font-size: 28px; /* Preferred icon size */

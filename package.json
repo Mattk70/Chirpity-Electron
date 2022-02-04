@@ -36,6 +36,7 @@
     "colormap": "^2.3.2",
     "jquery": "^3.6.0",
     "seedrandom": "^3.0.5",
-    "wavesurfer.js": "^5.2.0"
+    "wavesurfer.js": "^5.2.0",
+    "lamejstmp": "^1.0.1"
   }
 }

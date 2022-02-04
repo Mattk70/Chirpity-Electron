@@ -82,8 +82,8 @@
             </li>
 
         </ul>
-        <img class="" src="img/logo/chirpity_logo.png" alt="Chirpity Birdcalls: Identifying birds by sound"
-             width="400px"/>
+        <img class="" src="img/logo/chirpity_logo2.png" alt="Chirpity Birdcalls: Identifying birds by sound"
+             height="50px"/>
     </div>
 </nav>
 
@@ -93,8 +93,8 @@
     <!-- Load audio file hint -->
     <div class="d-flex h-100 flex-column text-dark align-items-center justify-content-center" id="loadFileHint">
         <div class="row">
-            <p class="lead justify-content-center" id="loadFileHintText">Load an audio file for analysis by
-                clicking<br/>on <i>File > Open audio file</i> in the top menu.</p>
+            <p class="lead align-content-center" id="loadFileHintText">Load an audio file for analysis by
+                selecting<br/> <i>File > Open audio file</i> in the top menu.</p>
         </div>
         <div class="row">
             <div class="d-none spinner-border" role="status" id="loadFileHintSpinner"></div>
@@ -142,7 +142,7 @@
             </div>
         </div>
         <div class="complete p-1" style="display: none"><span class="align-bottom"> Analysis Complete</span> <span
-                class="material-icons">
+                class="material-icons text-success">
         check_circle</span>
         </div>
     </div>
@@ -153,12 +153,13 @@
             <thead class="thead-dark">
             <tr>
                 <th scope="col">#</th>
+                <th scope="col" class="text-right"> </th>
                 <th scope="col">Timestamp</th>
                 <th scope="col">Common name</th>
                 <th scope="col">Scientific name</th>
-                <th scope="col">Confidence</th>
-                <th scope="col" class="specFeature">Play</th>
-                <th scope="col"> View Alternates</th>
+                <th scope="col" class="text-center">Confidence</th>
+                <th scope="col" class="specFeature text-center">Play Clip</th>
+                <th scope="col" class="specFeature text-center">Save Clip</th>
             </tr>
             </thead>
             <tbody class="text-dark" id="resultTableBody">

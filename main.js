@@ -123,3 +123,7 @@ ipcMain.on('progress', (event, arg) => {
     const progress = arg.progress;
     mainWindow.webContents.send('progress', {progress});
 });
+
+ipcMain.on('save', (event, arg) => {
+    workerWindow.webContents.send('save', arg);
+});
