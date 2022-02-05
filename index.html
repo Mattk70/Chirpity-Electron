@@ -111,15 +111,17 @@
     <!-- Controls view -->
     <div class="container-fluid p-2 bg-dark text-white d-none justify-content-between" id="controlsWrapper">
         <!-- RESULTS -->
-        <ul class="nav nav-tabs pb-0">
+        <!--ul class="nav nav-tabs pb-0">
             <li class="nav-item details ">
                 <a class="nav-link active" href="#">Details</a>
             </li>
             <li class="nav-item summary">
                 <a class="nav-link disabled" href="#">Summary</a>
             </li>
-        </ul>
-        <div class="btn-group specFeature" role="group" id="transport-controls">
+        </ul -->
+        <div id="filename" class="align-bottom p-2"></div>
+
+        <div class="btn-group specFeature" role="group" id="transport-controls width="150px">
             <button class="btn btn-outline-secondary text-center" onmousedown="wavesurfer.playPause();">
                 <i class="material-icons">play_arrow</i><span>Play / </span>
                 <i class="material-icons">pause</i><span>Pause</span>
@@ -132,7 +134,7 @@
             </button -->
 
         </div>
-        <div id="filename" class="align-bottom p-2"></div>
+
         <div class="progressDiv" style="width: 20%;display: none"> Working...<br>
             <div class="progress" style="width: 100%">
                 <div class="progress-bar progress-bar-striped active" role="progressbar"
