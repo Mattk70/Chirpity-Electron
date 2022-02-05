@@ -85,12 +85,6 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     Space: function () {
         wavesurfer.playPause();
     },
-    ArrowLeft: function () {
-        wavesurfer.skipBackward();
-    },
-    ArrowRight: function () {
-        wavesurfer.skipForward();
-    },
     KeyO: function () {
         showOpenDialog();
     },
@@ -133,24 +127,24 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             wavesurfer.pause()
         }
     },
-    ArrowLeft: function () {
+    ArrowLeft: function (e) {
         if (wavesurfer) {
             wavesurfer.skipBackward(0.1);
             const position = wavesurfer.getCurrentTime();
             if (position < 0.1 && bufferBegin > 0) {
-                loadBufferSegment(currentBuffer, bufferBegin -= windowLength / 2)
-                wavesurfer.seekAndCenter(0.5);
+                loadBufferSegment(currentBuffer, bufferBegin -= 0.1)
+                wavesurfer.seekAndCenter(0);
                 wavesurfer.pause()
             }
         }
     },
-    ArrowRight: function () {
+    ArrowRight: function (e) {
         if (wavesurfer) {
             wavesurfer.skipForward(0.1);
             const position = wavesurfer.getCurrentTime();
             if (position > windowLength - 0.1) {
-                loadBufferSegment(currentBuffer, bufferBegin += windowLength / 2)
-                wavesurfer.seekAndCenter(0.5);
+                loadBufferSegment(currentBuffer, bufferBegin += 0.1)
+                wavesurfer.seekAndCenter(1);
                 wavesurfer.pause()
             }
         }
@@ -214,18 +208,21 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
     if (result === "No detections found.") {
         tr = "<tr><td>" + result + "</td></tr>";
     } else {
-
-        tr = "<tr  onmousedown='loadResultRegion(" + result.start + " , " + result.end + " )' class='border-top border-secondary'><th scope='row'>" + index + "</th>";
+        const regex = /:/g;
+        const start = result.start, end = result.end;
+        const filename = result.timestamp.replace(regex, '.') + ' ' + result.cname + '.mp3'
+        tr = "<tr  onmousedown='loadResultRegion(" + start + " , " + end + " )' class='border-top border-secondary'><th scope='row'>" + index + "</th>";
         tr += "<td><span class='material-icons rotate text-right' onclick='toggleAlternates(&quot;.subrow" + index + "&quot;)'>expand_more</span></td>";
         tr += "<td>" + result.timestamp + "</td>";
         tr += "<td>" + result.cname + "</td>";
         tr += "<td><i>" + result.sname + "</i></td>";
         tr += "<td class='text-center'>" + iconizeScore(result.score) + "</td>";
         tr += "<td class='specFeature text-center'><span class='material-icons-two-tone play'>play_circle_filled</span></td>";
-        tr += "<td class='specFeature text-center'><span class='material-icons-outlined' onclick=\"ipcRenderer.send('save', {'start': " + result.start + ", 'end': " + result.end + ", 'filepath': 'test.mp3'})\">file_download</span></td>";
+        tr += "<td class='specFeature text-center'><span class='material-icons-outlined' onclick=\"sendSaveFile(" + start + ", " + end + ", '" + filename + "')\">file_download</span></td>";
+        //tr += "<td class='specFeature text-center'><span class='material-icons-outlined' onclick=\"ipcRenderer.send('save', {'start': " + start + ", 'end': " + end + ", 'filepath': '" + filename + "'})\">file_download</span></td>";
         tr += "</tr>";
 
-        tr += "<tr  class='subrow" + index + "'  onclick='loadResultRegion(" + result.start + " , " + result.end + " )'><th scope='row'> </th>";
+        tr += "<tr  class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + " )'><th scope='row'> </th>";
         tr += "<td> </td>";
         tr += "<td> </td>";
         tr += "<td>" + result.cname2 + "</td>";
@@ -234,7 +231,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr += "<td> </td>";
         tr += "</tr>";
 
-        tr += "<tr  class='subrow" + index + "'  onclick='loadResultRegion(" + result.start + " , " + result.end + " )' ><th scope='row'> </th>";
+        tr += "<tr  class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + " )' ><th scope='row'> </th>";
         tr += "<td> </td>";
         tr += "<td> </td>";
         tr += "<td>" + result.cname3 + "</td>";
@@ -250,6 +247,20 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         $(this).toggleClass("down");
     })
 });
+
+function sendSaveFile(start, end, filename) {
+    if (!start) {
+        if (!wavesurfer.regions.list === {}) {
+            start = 0;
+            end = currentBuffer.duration;
+        } else {
+            start = region.start + bufferBegin;
+            end = region.end + bufferBegin;
+        }
+        filename = 'export.mp3'
+    }
+    ipcRenderer.send('save', {'start': start, 'end': end, 'filepath': filename})
+}
 
 // create a dict mapping score to icon
 const iconDict = {

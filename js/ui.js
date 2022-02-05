@@ -62,8 +62,9 @@ async function loadAudioFile(filePath) {
     showElement('loadFileHintSpinner');
     showElement('loadFileHintLog');
     console.log('loadFileHintLog', 'Loading file...');
-    // Reset the buffer playhead:
+    // Reset the buffer playhead and zoom:
     bufferBegin = 0;
+    windowLength = 10;
     if (config.spectrogram) {
         // create an audio context object and load file into it
         const audioCtx = new AudioContext();
@@ -169,10 +170,10 @@ function initSpec(args) {
         partialRender: true,
         scrollParent: true,
         responsive: true,
-        height: 256,
+        height: 384,
         fftSamples: 1024,
         windowFunc: 'hamming',
-        minPxPerSec: 50,
+        minPxPerSec: 10,
         hideScrollbar: false,
         plugins: [
             SpectrogramPlugin.create({
@@ -220,6 +221,7 @@ function initSpec(args) {
         // console.log(wavesurfer.regions.list)
         region = e
         enableMenuItem('analyzeSelection');
+        enableMenuItem('exportMP3');
     });
 
     wavesurfer.on('finish', function () {
@@ -233,7 +235,7 @@ function initSpec(args) {
     showElement('controlsWrapper');
 
     // Resize canvas of spec and labels
-    adjustSpecHeight(false);
+    adjustSpecDims(false);
 }
 
 function updateElementCache() {
@@ -249,16 +251,29 @@ function updateElementCache() {
 }
 
 function zoomSpecIn() {
-    WS_ZOOM += 50;
-    wavesurfer.zoom(WS_ZOOM);
-    adjustSpecHeight(true)
+    if (windowLength < 2) return;
+    windowLength /= 2;
+    if (windowLength < 2){
+        wavesurfer.params.fftSamples  = 512
+        wavesurfer.spectrogram.render()
+    } else if (wavesurfer.params.fftSamples  !== 1024) {
+        wavesurfer.params.fftSamples  = 1024
+        wavesurfer.spectrogram.render()
+    }
+    loadBufferSegment(currentBuffer, bufferBegin);
+    //WS_ZOOM += 50;
+    //wavesurfer.zoom(WS_ZOOM);
+    adjustSpecDims(true)
     //wavesurfer.spectrogram.render()
 }
 
 function zoomSpecOut() {
-    WS_ZOOM -= 50;
-    wavesurfer.zoom(WS_ZOOM);
-    adjustSpecHeight(true)
+    if (windowLength > 100) return;
+    windowLength *= 2;
+    loadBufferSegment(currentBuffer, bufferBegin);
+    //WS_ZOOM -= 50;
+    //wavesurfer.zoom(WS_ZOOM);
+    adjustSpecDims(true)
     //wavesurfer.spectrogram.render()
 }
 
@@ -410,7 +425,7 @@ function loadResultRegion(start, end) {
     createRegion(start - bufferBegin, end - bufferBegin)
 }
 
-function adjustSpecHeight(redraw) {
+function adjustSpecDims(redraw) {
     $.each([dummyElement, waveWaveElement, specElement, specCanvasElement, waveCanvasElement], function () {
         $(this).height(bodyElement.height() * 0.4)
     })
@@ -472,7 +487,12 @@ function formatTimeCallback(seconds, pxPerSec) {
     seconds = seconds % 60;
 
     // fill up seconds with zeroes
-    let secondsStr = Math.round(seconds).toString();
+    let secondsStr;
+    if (windowLength >= 5) {
+        secondsStr = Math.round(seconds).toString();
+    } else {
+        secondsStr = seconds.toFixed(1).toString();
+    }
     if (minutes > 0) {
         if (seconds < 10) {
             secondsStr = '0' + secondsStr;
@@ -625,7 +645,7 @@ $(window).resize(function () {
 });
 
 function WindowResize() {
-    adjustSpecHeight(true);
+    adjustSpecDims(true);
 }
 
 $(document).on('click', '.play', function (e) {
@@ -637,8 +657,9 @@ document.addEventListener('DOMContentLoaded', function () {
     document.addEventListener('keydown', function (e) {
         let action = e.code;
         if (action in GLOBAL_ACTIONS) {
+            e.preventDefault();
             if (document == e.target || document.body == e.target || e.target.attributes["data-action"]) {
-                e.preventDefault();
+
             }
             GLOBAL_ACTIONS[action](e);
         }
