@@ -3,7 +3,6 @@ const Model = require('./js/model.js');
 const fs = require("fs");
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 const lamejs = require("lamejstmp");
-
 const appPath = '';
 //const appPath = process.resourcesPath;
 
@@ -112,52 +111,132 @@ ipcRenderer.on('save', async (event, arg) => {
     await saveMP3(arg.start, arg.end, arg.filepath)
 })
 
+
+function downloadMp3(buffer) {
+    const MP3Blob = analyzeAudioBuffer(buffer);
+    const anchor = document.createElement('a');
+    document.body.appendChild(anchor);
+    anchor.style = 'display: none';
+    const url = window.URL.createObjectURL(MP3Blob);
+    anchor.href = url;
+    anchor.download = 'audio.mp3';
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+}
+
+function analyzeAudioBuffer(aBuffer) {
+    let numOfChan = aBuffer.numberOfChannels,
+        btwLength = aBuffer.length * numOfChan * 2 + 44,
+        btwArrBuff = new ArrayBuffer(btwLength),
+        btwView = new DataView(btwArrBuff),
+        btwChnls = [],
+        btwIndex,
+        btwSample,
+        btwOffset = 0,
+        btwPos = 0;
+    setUint32(0x46464952); // "RIFF"
+    setUint32(btwLength - 8); // file length - 8
+    setUint32(0x45564157); // "WAVE"
+    setUint32(0x20746d66); // "fmt " chunk
+    setUint32(16); // length = 16
+    setUint16(1); // PCM (uncompressed)
+    setUint16(numOfChan);
+    setUint32(aBuffer.sampleRate);
+    setUint32(aBuffer.sampleRate * 2 * numOfChan); // avg. bytes/sec
+    setUint16(numOfChan * 2); // block-align
+    setUint16(16); // 16-bit
+    setUint32(0x61746164); // "data" - chunk
+    setUint32(btwLength - btwPos - 4); // chunk length
+
+    for (btwIndex = 0; btwIndex < aBuffer.numberOfChannels; btwIndex++)
+        btwChnls.push(aBuffer.getChannelData(btwIndex));
+
+    while (btwPos < btwLength) {
+        for (btwIndex = 0; btwIndex < numOfChan; btwIndex++) {
+            // interleave btwChnls
+            btwSample = Math.max(-1, Math.min(1, btwChnls[btwIndex][btwOffset])); // clamp
+            btwSample = (0.5 + btwSample < 0 ? btwSample * 32768 : btwSample * 32767) | 0; // scale to 16-bit signed int
+            btwView.setInt16(btwPos, btwSample, true); // write 16-bit sample
+            btwPos += 2;
+        }
+        btwOffset++; // next source sample
+    }
+
+    let wavHdr = lamejs.WavHeader.readHeader(new DataView(btwArrBuff));
+
+    //Stereo
+    let data = new Int16Array(btwArrBuff, wavHdr.dataOffset, wavHdr.dataLen / 2);
+    let leftData = [];
+    let rightData = [];
+    for (let i = 0; i < data.length; i += 2) {
+        leftData.push(data[i]);
+        rightData.push(data[i + 1]);
+    }
+    var left = new Int16Array(leftData);
+    var right = new Int16Array(rightData);
+
+
+    //STEREO
+    if (wavHdr.channels === 2)
+        return bufferToMp3(wavHdr.channels, wavHdr.sampleRate, left, right);
+    //MONO
+    else if (wavHdr.channels === 1)
+        return bufferToMp3(wavHdr.channels, wavHdr.sampleRate, data);
+
+
+    function setUint16(data) {
+        btwView.setUint16(btwPos, data, true);
+        btwPos += 2;
+    }
+
+    function setUint32(data) {
+        btwView.setUint32(btwPos, data, true);
+        btwPos += 4;
+    }
+}
+
+function bufferToMp3(channels, sampleRate, left, right = null) {
+    var buffer = [];
+    var mp3enc = new lamejs.Mp3Encoder(channels, sampleRate, 128);
+    var remaining = left.length;
+    var samplesPerFrame = 1152;
+
+
+    for (var i = 0; remaining >= samplesPerFrame; i += samplesPerFrame) {
+
+        if (!right) {
+            var mono = left.subarray(i, i + samplesPerFrame);
+            var mp3buf = mp3enc.encodeBuffer(mono);
+        } else {
+            var leftChunk = left.subarray(i, i + samplesPerFrame);
+            var rightChunk = right.subarray(i, i + samplesPerFrame);
+            var mp3buf = mp3enc.encodeBuffer(leftChunk, rightChunk);
+        }
+        if (mp3buf.length > 0) {
+            buffer.push(mp3buf);//new Int8Array(mp3buf));
+        }
+        remaining -= samplesPerFrame;
+    }
+    var d = mp3enc.flush();
+    if (d.length > 0) {
+        buffer.push(new Int8Array(d));
+    }
+
+    var mp3Blob = new Blob(buffer, {type: 'audio/mpeg'});
+    //var bUrl = window.URL.createObjectURL(mp3Blob);
+
+    // send the download link to the console
+    //console.log('mp3 download:', bUrl);
+    return mp3Blob;
+
+}
+
 async function saveMP3(start, end, filepath, metadata) {
-
-
-    let mp3Data = [];
-    AudioBufferSlice(audioBuffer, start, end, function (error, slicedAudioBuffer) {
+    AudioBufferSlice(audioBuffer, start, end, async function (error, slicedAudioBuffer) {
         if (error) {
             console.error(error);
         } else {
-            const mp3encoder = new lamejs.Mp3Encoder(1, 48000, 192);
-            const samples = FloatArray2Int16(slicedAudioBuffer) //one second of silence replace that with your own samples
-            const sampleBlockSize = 1152; //can be anything but make it a multiple of 576 to make encoders life easier
-
-            var mp3Data = [];
-            for (let i = 0; i < samples.length; i += sampleBlockSize) {
-                const sampleChunk = samples.slice(i, i + sampleBlockSize);
-                var mp3buf = mp3encoder.encodeBuffer(sampleChunk);
-                if (mp3buf.length > 0) {
-                    mp3Data.push(mp3buf);
-                }
-            }
-            mp3buf = mp3encoder.flush();   //finish writing mp3
-
-            if (mp3buf.length > 0) {
-                mp3Data.push(new Int8Array(mp3buf));
-            }
-            //fs.writeFile(filepath, slicedAudioBuffer, function (err) {
-                fs.writeFile(filepath, Buffer.from(mp3Data), function (err) {
-                if (err) {
-                    console.log(err);
-                } else {
-                    console.log(mp3Data.length);
-                }
-            });
-            console.log('saved mp3 file');
+            downloadMp3(slicedAudioBuffer)
         }
     })
-}
-
-function FloatArray2Int16(floatbuffer) {
-    const int16Buffer = new Int16Array(floatbuffer.length);
-    for (let i = 0, len = floatbuffer.length; i < len; i++) {
-        if (floatbuffer[i] < 0) {
-            int16Buffer[i] = 0x8000 * floatbuffer[i];
-        } else {
-            int16Buffer[i] = 0x7FFF * floatbuffer[i];
-        }
-    }
-    return int16Buffer;
 }

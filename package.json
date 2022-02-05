@@ -37,6 +37,8 @@
     "jquery": "^3.6.0",
     "seedrandom": "^3.0.5",
     "wavesurfer.js": "^5.2.0",
-    "lamejstmp": "^1.0.1"
+    "lamejstmp": "^1.0.1",
+    "xhr": "^2.6.0",
+    "audiobuffer-to-wav": "^1.0.0"
   }
 }
