@@ -112,14 +112,14 @@ ipcRenderer.on('save', async (event, arg) => {
 })
 
 
-function downloadMp3(buffer) {
+function downloadMp3(buffer, filepath) {
     const MP3Blob = analyzeAudioBuffer(buffer);
     const anchor = document.createElement('a');
     document.body.appendChild(anchor);
     anchor.style = 'display: none';
     const url = window.URL.createObjectURL(MP3Blob);
     anchor.href = url;
-    anchor.download = 'audio.mp3';
+    anchor.download = filepath;
     anchor.click();
     window.URL.revokeObjectURL(url);
 }
@@ -197,7 +197,7 @@ function analyzeAudioBuffer(aBuffer) {
 
 function bufferToMp3(channels, sampleRate, left, right = null) {
     var buffer = [];
-    var mp3enc = new lamejs.Mp3Encoder(channels, sampleRate, 128);
+    var mp3enc = new lamejs.Mp3Encoder(channels, sampleRate, 192);
     var remaining = left.length;
     var samplesPerFrame = 1152;
 
@@ -223,10 +223,7 @@ function bufferToMp3(channels, sampleRate, left, right = null) {
     }
 
     var mp3Blob = new Blob(buffer, {type: 'audio/mpeg'});
-    //var bUrl = window.URL.createObjectURL(mp3Blob);
 
-    // send the download link to the console
-    //console.log('mp3 download:', bUrl);
     return mp3Blob;
 
 }
@@ -236,7 +233,7 @@ async function saveMP3(start, end, filepath, metadata) {
         if (error) {
             console.error(error);
         } else {
-            downloadMp3(slicedAudioBuffer)
+            downloadMp3(slicedAudioBuffer, filepath)
         }
     })
 }
