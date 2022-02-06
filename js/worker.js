@@ -2,8 +2,9 @@ const {ipcRenderer} = require('electron');
 const Model = require('./js/model.js');
 const fs = require("fs");
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
-const lamejs = require("lamejstmp");
 const appPath = '';
+const lamejs = require("lamejstmp");
+const ID3Writer = require('browser-id3-writer');
 //const appPath = process.resourcesPath;
 
 console.log(appPath);
@@ -108,12 +109,12 @@ async function loadAudioFile(filePath) {
 }
 
 ipcRenderer.on('save', async (event, arg) => {
-    await saveMP3(arg.start, arg.end, arg.filepath)
+    await saveMP3(arg.start, arg.end, arg.filepath, arg.metadata)
 })
 
 
-function downloadMp3(buffer, filepath) {
-    const MP3Blob = analyzeAudioBuffer(buffer);
+function downloadMp3(buffer, filepath, metadata) {
+    const MP3Blob = analyzeAudioBuffer(buffer, metadata);
     const anchor = document.createElement('a');
     document.body.appendChild(anchor);
     anchor.style = 'display: none';
@@ -124,7 +125,7 @@ function downloadMp3(buffer, filepath) {
     window.URL.revokeObjectURL(url);
 }
 
-function analyzeAudioBuffer(aBuffer) {
+function analyzeAudioBuffer(aBuffer, metadata) {
     let numOfChan = aBuffer.numberOfChannels,
         btwLength = aBuffer.length * numOfChan * 2 + 44,
         btwArrBuff = new ArrayBuffer(btwLength),
@@ -178,10 +179,10 @@ function analyzeAudioBuffer(aBuffer) {
 
     //STEREO
     if (wavHdr.channels === 2)
-        return bufferToMp3(wavHdr.channels, wavHdr.sampleRate, left, right);
+        return bufferToMp3(metadata, wavHdr.channels, wavHdr.sampleRate, left, right);
     //MONO
     else if (wavHdr.channels === 1)
-        return bufferToMp3(wavHdr.channels, wavHdr.sampleRate, data);
+        return bufferToMp3(metadata, wavHdr.channels, wavHdr.sampleRate, data);
 
 
     function setUint16(data) {
@@ -195,13 +196,41 @@ function analyzeAudioBuffer(aBuffer) {
     }
 }
 
-function bufferToMp3(channels, sampleRate, left, right = null) {
+function bufferToMp3(metadata, channels, sampleRate, left, right = null) {
     var buffer = [];
     var mp3enc = new lamejs.Mp3Encoder(channels, sampleRate, 192);
     var remaining = left.length;
     var samplesPerFrame = 1152;
-
-
+    if (metadata) {
+        const ID3content = JSON.stringify(metadata)
+        // Add metadata
+        const writer = new ID3Writer(Buffer.alloc(0));
+        writer.setFrame('TIT2', metadata['cname'])  // Title
+            .setFrame('TIT3', metadata['sname'])
+            .setFrame('TPE1', [metadata['cname2'], metadata['cname3']])  // Contributing Artists
+            .setFrame('TCON', ['Nocmig']) // Album
+            .setFrame('TPUB', 'Chirpity Nocmig') // Publisher
+            .setFrame('TYER', new Date().getFullYear()) // Year
+            .setFrame('COMM', {description: 'Metadata', 'text': ID3content}) // Album
+            .setFrame('TXXX', {
+                description: 'ID Confidence',
+                value: parseFloat(parseFloat(metadata['score']) * 100).toFixed(0) + '%'
+            })
+            .setFrame('TXXX', {
+                description: '2nd',
+                value: metadata['cname2'] + ' (' + metadata['score2'] + ')'
+            })
+            .setFrame('TXXX', {
+                description: '3rd',
+                value: metadata['cname3'] + ' (' + metadata['score3'] + ')'
+            })
+            .setFrame('TXXX', {
+                description: 'UUID',
+                value: metadata['UUID'],
+            });
+        writer.addTag();
+        buffer.push(writer.arrayBuffer)
+    }
     for (var i = 0; remaining >= samplesPerFrame; i += samplesPerFrame) {
 
         if (!right) {
@@ -221,10 +250,7 @@ function bufferToMp3(channels, sampleRate, left, right = null) {
     if (d.length > 0) {
         buffer.push(new Int8Array(d));
     }
-
-    var mp3Blob = new Blob(buffer, {type: 'audio/mpeg'});
-
-    return mp3Blob;
+    return new Blob(buffer, {type: 'audio/mpeg'});
 
 }
 
@@ -233,7 +259,7 @@ async function saveMP3(start, end, filepath, metadata) {
         if (error) {
             console.error(error);
         } else {
-            downloadMp3(slicedAudioBuffer, filepath)
+            downloadMp3(slicedAudioBuffer, filepath, metadata)
         }
     })
 }

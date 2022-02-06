@@ -9,10 +9,9 @@ const Regions = require('wavesurfer.js/dist/plugin/wavesurfer.regions.min.js');
 const colormap = require("colormap");
 const $ = require('jquery');
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
+const p = require('path');
 
-$.getScript("./js/handlers.js", function () {
-    console.log("Handlers loaded");
-});
+let appPath = remote.app.getPath('userData');
 
 let modelReady = false;
 let fileLoaded = false;
@@ -20,7 +19,6 @@ let currentFile;
 let region;
 let AUDACITY_LABELS;
 let wavesurfer;
-let WS_ZOOM = 0;
 
 // set up some DOM element caches
 let bodyElement = $('body');
@@ -42,12 +40,6 @@ let windowLength = 10;  // seconds
 
 // Set default Options
 let config;
-try {
-    config = JSON.parse(fs.readFileSync('config.json'))
-} catch {
-    // If file read error, use defaults
-    config = {'spectrogram': true, 'colormap': 'inferno', 'timeline': true}
-}
 
 
 async function loadAudioFile(filePath) {
@@ -253,11 +245,11 @@ function updateElementCache() {
 function zoomSpecIn() {
     if (windowLength < 2) return;
     windowLength /= 2;
-    if (windowLength < 2){
-        wavesurfer.params.fftSamples  = 512
+    if (windowLength < 2) {
+        wavesurfer.params.fftSamples = 512
         wavesurfer.spectrogram.render()
-    } else if (wavesurfer.params.fftSamples  !== 1024) {
-        wavesurfer.params.fftSamples  = 1024
+    } else if (wavesurfer.params.fftSamples !== 1024) {
+        wavesurfer.params.fftSamples = 1024
         wavesurfer.spectrogram.render()
     }
     loadBufferSegment(currentBuffer, bufferBegin);
@@ -601,7 +593,7 @@ function secondaryLabelInterval(pxPerSec) {
 
 function updatePrefs() {
     try {
-        fs.writeFileSync('config.json', JSON.stringify(config))
+        fs.writeFileSync(p.join(appPath, 'config.json'), JSON.stringify(config))
     } catch (e) {
         console.log(e)
     }
@@ -610,6 +602,21 @@ function updatePrefs() {
 /////////////////////////  Window Handlers ////////////////////////////
 
 window.onload = function () {
+    try {
+
+        config = JSON.parse(fs.readFileSync(p.join(appPath, 'config.json')))
+        if (!config.UUID) {
+            const {v4: uuidv4} = require('uuid');
+            config.UUID = uuidv4()
+            updatePrefs()
+        }
+    } catch {
+        // If file read error, use defaults
+        config = {'spectrogram': true, 'colormap': 'inferno', 'timeline': true}
+        const {v4: uuidv4} = require('uuid');
+        config.UUID = uuidv4()
+        updatePrefs()
+    }
     // Set menu option state
     if (!config.spectrogram) {
         $('#loadSpectrogram .tick').hide()
@@ -675,3 +682,308 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 });
+
+///////////// Nav bar Option handlers //////////////
+
+$(document).on('click', '#loadSpectrogram', function (e) {
+    if (config.spectrogram) {
+        config.spectrogram = false;
+        $('#loadSpectrogram .tick').hide()
+        $('.specFeature').hide()
+        hideElement('dummy');
+        hideElement('timeline');
+        hideElement('waveform');
+        hideElement('spectrogram');
+        $('.speccolor .timeline').addClass('disabled');
+        //adjustSpecHeight(true);
+        updatePrefs();
+    } else {
+        config.spectrogram = true;
+        $('#loadSpectrogram .tick').show()
+        $('.specFeature').show()
+        if (wavesurfer && wavesurfer.isReady) {
+            $('.speccolor .timeline').removeClass('disabled');
+            showElement('dummy', false);
+            showElement('timeline', false);
+            showElement('waveform', false, false);
+            showElement('spectrogram', false, false);
+        } else {
+            loadAudioFile(currentFile);
+        }
+        updatePrefs();
+    }
+})
+
+$(document).on('click', '.speccolor', function (e) {
+    wavesurfer.destroyPlugin('spectrogram');
+    config.colormap = e.target.id;
+    wavesurfer.addPlugin(SpectrogramPlugin.create({
+        wavesurfer: wavesurfer,
+        container: "#spectrogram",
+        scrollParent: true,
+        labels: false,
+        colorMap: colormap({
+            colormap: config.colormap, nshades: 256, format: 'float'
+        })
+    })).initPlugin('spectrogram');
+    // set tick
+    $('.speccolor .tick').addClass('d-none');
+    $(this).children('span').removeClass('d-none');
+    // refresh caches
+    updateElementCache()
+    adjustSpecHeight(true)
+    updatePrefs();
+})
+
+
+$(document).on('click', '.timeline', function (e) {
+    if (wavesurfer.timeline && wavesurfer.timeline.wrapper !== null) {
+        wavesurfer.destroyPlugin('timeline');
+        $('#loadTimeline .tick').hide()
+        config.timeline = false;
+        updatePrefs();
+    } else {
+        config.timeline = true;
+        wavesurfer.addPlugin(SpecTimeline.create({
+            wavesurfer: wavesurfer,
+            container: "#timeline",
+            formatTimeCallback: formatTimeCallback,
+            timeInterval: timeInterval,
+            primaryLabelInterval: primaryLabelInterval,
+            secondaryLabelInterval: secondaryLabelInterval,
+            primaryColor: 'black',
+            secondaryColor: 'grey',
+            primaryFontColor: 'black',
+            secondaryFontColor: 'grey'
+        })).initPlugin('timeline');
+        $('#loadTimeline .tick').show()
+        // refresh caches
+        updateElementCache()
+        adjustSpecHeight(true)
+        updatePrefs();
+    }
+})
+
+/////////// Keyboard Shortcuts  ////////////
+
+const GLOBAL_ACTIONS = { // eslint-disable-line
+    Space: function () {
+        wavesurfer.playPause();
+    },
+    KeyO: function () {
+        showOpenDialog();
+    },
+    KeyS: function () {
+        if (AUDACITY_LABELS.length > 0) {
+            showSaveDialog();
+        }
+    },
+    Escape: function () {
+        console.log('Operation aborted');
+        ipcRenderer.send('abort', {'abort': true})
+    },
+    Home: function () {
+        if (currentBuffer) {
+            loadBufferSegment(currentBuffer, 0)
+            wavesurfer.seekAndCenter(0);
+            wavesurfer.pause()
+        }
+    },
+    End: function () {
+        if (currentBuffer) {
+            loadBufferSegment(currentBuffer, currentBuffer.duration - windowLength)
+            wavesurfer.seekAndCenter(1);
+            wavesurfer.pause()
+        }
+    },
+    PageUp: function () {
+        if (wavesurfer) {
+            const position = wavesurfer.getCurrentTime() / windowLength;
+            loadBufferSegment(currentBuffer, bufferBegin -= windowLength)
+            wavesurfer.seekAndCenter(position);
+            wavesurfer.pause()
+        }
+    },
+    PageDown: function () {
+        if (wavesurfer) {
+            const position = wavesurfer.getCurrentTime() / windowLength;
+            loadBufferSegment(currentBuffer, bufferBegin += windowLength)
+            wavesurfer.seekAndCenter(position);
+            wavesurfer.pause()
+        }
+    },
+    ArrowLeft: function (e) {
+        if (wavesurfer) {
+            wavesurfer.skipBackward(0.1);
+            const position = wavesurfer.getCurrentTime();
+            if (position < 0.1 && bufferBegin > 0) {
+                loadBufferSegment(currentBuffer, bufferBegin -= 0.1)
+                wavesurfer.seekAndCenter(0);
+                wavesurfer.pause()
+            }
+        }
+    },
+    ArrowRight: function (e) {
+        if (wavesurfer) {
+            wavesurfer.skipForward(0.1);
+            const position = wavesurfer.getCurrentTime();
+            if (position > windowLength - 0.1) {
+                loadBufferSegment(currentBuffer, bufferBegin += 0.1)
+                wavesurfer.seekAndCenter(1);
+                wavesurfer.pause()
+            }
+        }
+    },
+    KeyP: function () {
+        (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
+    }
+};
+
+
+// Electron Message handling
+
+ipcRenderer.on('model-ready', async (event, arg) => {
+    modelReady = true;
+    if (fileLoaded) {
+        enableMenuItem('analyze')
+    }
+})
+
+ipcRenderer.on('worker-loaded', async (event, arg) => {
+    if (!loadSpectrogram) {
+        console.log('UI received worker-loaded: ' + arg.message)
+        enableMenuItem('analyze')
+        hideAll();
+        showElement('controlsWrapper');
+        hideElement('transport-controls');
+        const filename = arg.message.replace(/^.*[\\\/]/, '')
+        $('#filename').html('<span class="material-icons">description</span> ' + filename);
+    }
+})
+
+ipcRenderer.on('progress', async (event, arg) => {
+    progressDiv.show();
+    let progress = (arg.progress * 100).toFixed(1);
+    progressBar.width(progress + '%');
+    progressBar.attr('aria-valuenow', progress);
+    progressBar.html(progress + '%');
+});
+
+ipcRenderer.on('prediction-done', async (event, arg) => {
+    AUDACITY_LABELS = arg.labels;
+    progressDiv.hide();
+    progressBar.width(0 + '%');
+    progressBar.attr('aria-valuenow', 0);
+    progressBar.html(0 + '%');
+    completeDiv.show();
+    enableMenuItem('saveLabels');
+});
+
+ipcRenderer.on('prediction-ongoing', async (event, arg) => {
+    completeDiv.hide();
+    const result = arg.result;
+    const index = arg.index;
+    if (index === 1) {
+        // Remove old results
+        $('#resultTableBody').empty();
+    }
+    let tr;
+    showElement('resultTableContainer');
+
+    if (result === "No detections found.") {
+        tr = "<tr><td>" + result + "</td></tr>";
+    } else {
+        const regex = /:/g;
+        const start = result.start, end = result.end;
+        const filename = result.cname + ' ' + result.timestamp.replace(regex, '.') + '.mp3'
+        tr = "<tr  onmousedown='loadResultRegion(" + start + " , " + end + " )' class='border-top border-secondary'><th scope='row'>" + index + "</th>";
+        tr += "<td><span class='material-icons rotate text-right' onclick='toggleAlternates(&quot;.subrow" + index + "&quot;)'>expand_more</span></td>";
+        tr += "<td>" + result.timestamp + "</td>";
+        tr += "<td>" + result.cname + "</td>";
+        tr += "<td><i>" + result.sname + "</i></td>";
+        tr += "<td class='text-center'>" + iconizeScore(result.score) + "</td>";
+        tr += "<td class='specFeature text-center'><span class='material-icons-two-tone play'>play_circle_filled</span></td>";
+
+        tr += `<td class='specFeature text-center'><span id='download' class='material-icons-outlined ' 
+            onclick="sendSaveFile(${start} , ${end}, '${filename}', 
+             '${result.cname}', '${result.sname}', '${result.score}',
+             '${result.cname2}', '${result.sname2}','${result.score2}',
+             '${result.cname3}', '${result.sname3}', '${result.score3}')">
+            file_download</span></td>`;
+        tr += "<td class='text-center'> <span class='material-icons-two-tone text-success'>thumb_up</span> <span class='material-icons-two-tone text-danger'>thumb_down</span></td>";
+        tr += "</tr>";
+
+        tr += "<tr  class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + " )'><th scope='row'> </th>";
+        tr += "<td> </td>";
+        tr += "<td> </td>";
+        tr += "<td>" + result.cname2 + "</td>";
+        tr += "<td><i>" + result.sname2 + "</i></td>";
+        tr += "<td class='text-center'>" + iconizeScore(result.score2) + "</td>";
+        tr += "<td> </td>";
+        tr += "<td> </td>";
+        tr += "</tr>";
+
+        tr += "<tr  class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + " )' ><th scope='row'> </th>";
+        tr += "<td> </td>";
+        tr += "<td> </td>";
+        tr += "<td>" + result.cname3 + "</td>";
+        tr += "<td><i>" + result.sname3 + "</i></td>";
+        tr += "<td class='text-center'>" + iconizeScore(result.score3) + "</td>";
+        tr += "<td> </td>";
+        tr += "<td> </td>";
+        tr += "</tr>";
+
+    }
+    $('#resultTableBody').append(tr);
+    if (!config.spectrogram) $('.specFeature').hide();
+    $(".material-icons").click(function () {
+        $(this).toggleClass("down");
+    })
+});
+
+function sendSaveFile(start, end, filename, cname, sname, score, cname2, sname2, score2, cname3, sname3, score3) {
+    if (!start && start !== 0) {
+        if (!wavesurfer.regions.list === {}) {
+            start = 0;
+            end = currentBuffer.duration;
+        } else {
+            start = region.start + bufferBegin;
+            end = region.end + bufferBegin;
+        }
+        filename = 'export.mp3'
+    }
+
+    let metadata;
+    if (cname) {
+        metadata = {
+            'UUID': config.UUID,
+            'start': start,
+            'end': end,
+            'filename': filename,
+            'cname': cname,
+            'sname': sname,
+            'score': score,
+            'cname2': cname2,
+            'sname2': sname2,
+            'score2': score2,
+            'cname3': cname3,
+            'sname3': sname3,
+            'score3': score3
+        };
+    }
+    ipcRenderer.send('save', {'start': start, 'end': end, 'filepath': filename, 'metadata': metadata})
+}
+
+// create a dict mapping score to icon
+const iconDict = {
+    'low': '<span class="material-icons text-danger border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
+    'medium': '<span class="material-icons text-warning border border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
+    'high': '<span class="material-icons text-success border border-secondary rounded" title="--%">signal_cellular_alt</span>',
+}
+
+function iconizeScore(score) {
+    const tooltip = (parseFloat(score) * 100).toFixed(0).toString()
+    if (parseFloat(score) < 0.65) return iconDict['low'].replace('--', tooltip)
+    else if (parseFloat(score) < 0.85) return iconDict['medium'].replace('--', tooltip)
+    else return iconDict['high'].replace('--', tooltip)
+}
