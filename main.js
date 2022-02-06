@@ -127,3 +127,8 @@ ipcMain.on('progress', (event, arg) => {
 ipcMain.on('save', (event, arg) => {
     workerWindow.webContents.send('save', arg);
 });
+
+ipcMain.on('path', (event) => {
+    const appPath = app.getPath('userData')
+    mainWindow.webContents.send('path', {appPath});
+});
