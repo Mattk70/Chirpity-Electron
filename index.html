@@ -24,7 +24,7 @@
 
 <!-- Navigation bar -->
 <nav class="pt-0 pb-0 navbar navbar-expand-sm navbar-dark bg-dark position-relative">
-    <a class="navbar-brand" href="#">Chirpity</a>
+    <!--a class="navbar-brand" href="#">Chirpity</a -->
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
             aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
@@ -37,14 +37,14 @@
                     File
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item" href="#" onclick="showOpenDialog();">Open audio file (O)</a>
-                    <a class="dropdown-item disabled" onclick="showSaveDialog()" id="saveLabels" href="#">Save Audacity
-                        Labels (S)</a>
+                    <a class="dropdown-item" href="#" onclick="showOpenDialog();"><u>O</u>pen audio file </a>
+                    <a class="dropdown-item disabled" onclick="showSaveDialog()" id="saveLabels" href="#"><u>S</u>ave Audacity
+                        Labels</a>
                     <a class="dropdown-item disabled" onclick="sendSaveFile()" id="exportMP3" href="#">Export Selected
                         Audio
                     </a>
                     <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="#" onclick="exitApplication();">Exit application</a>
+                    <a class="dropdown-item" href="#" onclick="exitApplication();">Exit</a>
                 </div>
             </li>
             <li class="nav-item dropdown active">
@@ -164,6 +164,7 @@
                 <th scope="col">Scientific name</th>
                 <th scope="col" class="text-center">Confidence</th>
                 <th scope="col" class="specFeature text-center">Play</th>
+                <th scope="col" class="specFeature text-center">XC</th>
                 <th scope="col" class="specFeature text-center">Save</th>
                 <th scope="col" class="specFeature text-center">Feedback</th>
             </tr>
@@ -178,7 +179,7 @@
 
 <!-- Footer -->
 <div class="d-flex fixed-bottom p-2 bg-primary text-white justify-content-center" id="footer">
-    <small>Chirpity &copy; Matthew Kirkland <span id="year"></span></small>
+    <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span></small>
 </div>
 <script src="js/ui.js"></script>
 </body>
