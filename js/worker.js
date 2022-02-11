@@ -5,13 +5,14 @@ const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 const appPath = '';
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
+const path = require("path");
 //const appPath = process.resourcesPath;
 
 console.log(appPath);
 // console.log(process.resourcesPath);
 
 let audioBuffer;
-const model = new Model(appPath);
+const model = new Model(path.join(appPath, '121_model/'));
 
 (async () => {
     await model.loadModel();
@@ -29,8 +30,9 @@ ipcRenderer.on('file-loaded', async (event, arg) => {
 });
 
 ipcRenderer.on('analyze', async (event, arg) => {
-    console.log('Worker received message: ' + arg.message + ' start: ' + arg.start + ' end: ' + arg.end);
+    console.log('Worker received message: ' + arg.confidence + ' start: ' + arg.start + ' end: ' + arg.end);
     console.log(audioBuffer.length);
+    const minConfidence = arg.confidence;
     const bufferLength = audioBuffer.length;
     let start;
     let end;
@@ -56,7 +58,7 @@ ipcRenderer.on('analyze', async (event, arg) => {
 
         let chunk = channelData.slice(i, i + increment);
         let [result, audacity] = await model.predictChunk(chunk, i, isRegion)
-        if (result) {
+        if (result.score > minConfidence) {
             index++;
             model.RESULTS.push(result);
             model.AUDACITY.push(audacity);
@@ -115,6 +117,25 @@ ipcRenderer.on('save', async (event, arg) => {
 
 function downloadMp3(buffer, filepath, metadata) {
     const MP3Blob = analyzeAudioBuffer(buffer, metadata);
+
+//
+//     var formData = new FormData();
+//     formData.append("thefile", MP3Blob);
+//
+// // post form data
+//     const xhr = new XMLHttpRequest();
+//     xhr.responseType = 'text';
+//
+// // log response
+//     xhr.onload = () => {
+//         console.log(xhr.response);
+//     };
+//
+// // create and send the reqeust
+//     xhr.open('POST', 'https://birds.mattkirkland.co.uk/upload');
+//     xhr.send(formData);
+//
+
     const anchor = document.createElement('a');
     document.body.appendChild(anchor);
     anchor.style = 'display: none';

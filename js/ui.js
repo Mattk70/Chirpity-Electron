@@ -36,7 +36,7 @@ let completeDiv = $('.complete');
 
 let currentBuffer;
 let bufferBegin = 0;
-let windowLength = 10;  // seconds
+let windowLength = 20;  // seconds
 
 // Set default Options
 let config;
@@ -56,7 +56,7 @@ async function loadAudioFile(filePath) {
     console.log('loadFileHintLog', 'Loading file...');
     // Reset the buffer playhead and zoom:
     bufferBegin = 0;
-    windowLength = 10;
+    windowLength = 20;
     if (config.spectrogram) {
         // create an audio context object and load file into it
         const audioCtx = new AudioContext();
@@ -69,7 +69,7 @@ async function loadAudioFile(filePath) {
                         const myBuffer = buffer;
                         source.buffer = myBuffer;
                         const duration = source.buffer.duration;
-                        const sampleRate = source.buffer.sampleRate;
+                        //const sampleRate = source.buffer.sampleRate;
                         const offlineCtx = new OfflineAudioContext(1, 48000 * duration, 48000);
                         const offlineSource = offlineCtx.createBufferSource();
                         offlineSource.buffer = buffer;
@@ -162,11 +162,11 @@ function initSpec(args) {
         partialRender: true,
         scrollParent: true,
         responsive: true,
-        height: 384,
+        height: 1024,
         fftSamples: 1024,
         windowFunc: 'hamming',
         minPxPerSec: 10,
-        hideScrollbar: false,
+        hideScrollbar: true,
         plugins: [
             SpectrogramPlugin.create({
                 wavesurfer: wavesurfer,
@@ -204,7 +204,7 @@ function initSpec(args) {
     $('.speccolor').removeClass('disabled');
     showElement(config.colormap + ' .tick', false);
     // Set click event that removes all regions
-    waveElement.mousedown(function (e) {
+    waveElement.mousedown(function () {
         wavesurfer.clearRegions();
         disableMenuItem('analyzeSelection');
     });
@@ -225,7 +225,7 @@ function initSpec(args) {
     })
     // Show controls
     showElement('controlsWrapper');
-
+    updateElementCache()
     // Resize canvas of spec and labels
     adjustSpecDims(false);
 }
@@ -323,7 +323,7 @@ const analyzeLink = document.getElementById('analyze');
 
 analyzeLink.addEventListener('click', async () => {
     completeDiv.hide();
-    ipcRenderer.send('analyze', {message: 'go'});
+    ipcRenderer.send('analyze', {confidence: config.minConfidence});
     analyzeLink.disabled = true;
 });
 
@@ -338,7 +338,7 @@ analyzeSelectionLink.addEventListener('click', async () => {
         end = region.end + bufferBegin;
     }
     // Add current buffer's beginning offset to region start / end tags
-    ipcRenderer.send('analyze', {message: 'go', start: start, end: end});
+    ipcRenderer.send('analyze', {confidence: 0.1, start: start, end: end});
     analyzeLink.disabled = true;
 });
 
@@ -357,8 +357,8 @@ function disableMenuItem(id) {
 }
 
 function toggleAlternates(row) {
-
-    $(row).toggle('slow')
+    $(row).toggle('slow');
+    return false
 }
 
 function showElement(id, makeFlex = true, empty = false) {
@@ -419,7 +419,8 @@ function loadResultRegion(start, end) {
 
 function adjustSpecDims(redraw) {
     $.each([dummyElement, waveWaveElement, specElement, specCanvasElement, waveCanvasElement], function () {
-        $(this).height(bodyElement.height() * 0.4)
+        // Expand up to 512px
+        $(this).height(Math.min(bodyElement.height() * 0.4, 512))
     })
     if (loadSpectrogram) {
         specElement.css('z-index', 0)
@@ -470,12 +471,11 @@ document.querySelectorAll(".tableFixHead").forEach(el =>
  * @param: seconds
  * @param: pxPerSec
  */
-function formatTimeCallback(seconds, pxPerSec) {
+function formatTimeCallback(seconds) {
     seconds = Number(seconds);
     seconds += Math.floor(bufferBegin);
     let minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
-    let timeStr;
     seconds = seconds % 60;
 
     // fill up seconds with zeroes
@@ -515,7 +515,7 @@ function formatTimeCallback(seconds, pxPerSec) {
  * @param: pxPerSec
  */
 function timeInterval(pxPerSec) {
-    var retval = 1;
+    let retval;
     if (pxPerSec >= 25 * 100) {
         retval = 0.01;
     } else if (pxPerSec >= 25 * 40) {
@@ -548,7 +548,7 @@ function timeInterval(pxPerSec) {
  * @param pxPerSec
  */
 function primaryLabelInterval(pxPerSec) {
-    var retval = 1;
+    var retval;
     if (pxPerSec >= 25 * 100) {
         retval = 10;
     } else if (pxPerSec >= 25 * 40) {
@@ -612,7 +612,7 @@ window.onload = function () {
         }
     } catch {
         // If file read error, use defaults
-        config = {'spectrogram': true, 'colormap': 'inferno', 'timeline': true}
+        config = {'spectrogram': true, 'colormap': 'inferno', 'timeline': true, 'minConfidence': 0.2}
         const {v4: uuidv4} = require('uuid');
         config.UUID = uuidv4()
         updatePrefs()
@@ -655,17 +655,18 @@ function WindowResize() {
     adjustSpecDims(true);
 }
 
-$(document).on('click', '.play', function (e) {
+$(document).on('click', '.play', function () {
     region.play()
 })
 
 
 document.addEventListener('DOMContentLoaded', function () {
+
     document.addEventListener('keydown', function (e) {
         let action = e.code;
         if (action in GLOBAL_ACTIONS) {
             e.preventDefault();
-            if (document == e.target || document.body == e.target || e.target.attributes["data-action"]) {
+            if (document === e.target || document.body === e.target || e.target.attributes["data-action"]) {
 
             }
             GLOBAL_ACTIONS[action](e);
@@ -685,7 +686,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 ///////////// Nav bar Option handlers //////////////
 
-$(document).on('click', '#loadSpectrogram', function (e) {
+$(document).on('click', '#loadSpectrogram', function () {
     if (config.spectrogram) {
         config.spectrogram = false;
         $('#loadSpectrogram .tick').hide()
@@ -695,7 +696,7 @@ $(document).on('click', '#loadSpectrogram', function (e) {
         hideElement('waveform');
         hideElement('spectrogram');
         $('.speccolor .timeline').addClass('disabled');
-        //adjustSpecHeight(true);
+        //adjustSpecDims(true);
         updatePrefs();
     } else {
         config.spectrogram = true;
@@ -731,12 +732,12 @@ $(document).on('click', '.speccolor', function (e) {
     $(this).children('span').removeClass('d-none');
     // refresh caches
     updateElementCache()
-    adjustSpecHeight(true)
+    adjustSpecDims(true)
     updatePrefs();
 })
 
 
-$(document).on('click', '.timeline', function (e) {
+$(document).on('click', '.timeline', function () {
     if (wavesurfer.timeline && wavesurfer.timeline.wrapper !== null) {
         wavesurfer.destroyPlugin('timeline');
         $('#loadTimeline .tick').hide()
@@ -759,7 +760,7 @@ $(document).on('click', '.timeline', function (e) {
         $('#loadTimeline .tick').show()
         // refresh caches
         updateElementCache()
-        adjustSpecHeight(true)
+        adjustSpecDims(true)
         updatePrefs();
     }
 })
@@ -770,12 +771,12 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     Space: function () {
         wavesurfer.playPause();
     },
-    KeyO: function () {
-        showOpenDialog();
+    KeyO: function (e) {
+        if (e.ctrlKey) showOpenDialog();
     },
     KeyS: function () {
         if (AUDACITY_LABELS.length > 0) {
-            showSaveDialog();
+            if (e.ctrlKey) showSaveDialog();
         }
     },
     Escape: function () {
@@ -799,20 +800,24 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     PageUp: function () {
         if (wavesurfer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
-            loadBufferSegment(currentBuffer, bufferBegin -= windowLength)
-            wavesurfer.seekAndCenter(position);
+            bufferBegin -= windowLength
+            const playhead = bufferBegin + wavesurfer.getCurrentTime()
+            loadBufferSegment(currentBuffer, bufferBegin)
+            playhead <= 0 ? wavesurfer.seekAndCenter(0) : wavesurfer.seekAndCenter(position);
             wavesurfer.pause()
         }
     },
     PageDown: function () {
         if (wavesurfer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
-            loadBufferSegment(currentBuffer, bufferBegin += windowLength)
-            wavesurfer.seekAndCenter(position);
+            bufferBegin += windowLength
+            const playhead = bufferBegin + wavesurfer.getCurrentTime()
+            loadBufferSegment(currentBuffer, bufferBegin)
+            playhead >= currentBuffer.duration ? wavesurfer.seekAndCenter(1) : wavesurfer.seekAndCenter(position);
             wavesurfer.pause()
         }
     },
-    ArrowLeft: function (e) {
+    ArrowLeft: function () {
         if (wavesurfer) {
             wavesurfer.skipBackward(0.1);
             const position = wavesurfer.getCurrentTime();
@@ -823,7 +828,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             }
         }
     },
-    ArrowRight: function (e) {
+    ArrowRight: function () {
         if (wavesurfer) {
             wavesurfer.skipForward(0.1);
             const position = wavesurfer.getCurrentTime();
@@ -842,7 +847,8 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
 
 // Electron Message handling
 
-ipcRenderer.on('model-ready', async (event, arg) => {
+
+ipcRenderer.on('model-ready', async () => {
     modelReady = true;
     if (fileLoaded) {
         enableMenuItem('analyze')
@@ -877,43 +883,46 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
     progressBar.html(0 + '%');
     completeDiv.show();
     enableMenuItem('saveLabels');
+    $('.download').removeClass('disabled');
+
 });
 
 ipcRenderer.on('prediction-ongoing', async (event, arg) => {
     completeDiv.hide();
     const result = arg.result;
     const index = arg.index;
+    const resultTable = $('#resultTableBody')
     if (index === 1) {
         // Remove old results
-        $('#resultTableBody').empty();
+        resultTable.empty();
     }
     let tr;
     showElement('resultTableContainer');
-
     if (result === "No detections found.") {
         tr = "<tr><td>" + result + "</td></tr>";
     } else {
         const regex = /:/g;
         const start = result.start, end = result.end;
-        const filename = result.cname + ' ' + result.timestamp.replace(regex, '.') + '.mp3'
-        tr = "<tr  onmousedown='loadResultRegion(" + start + " , " + end + " )' class='border-top border-secondary'><th scope='row'>" + index + "</th>";
-        tr += "<td><span class='material-icons rotate text-right' onclick='toggleAlternates(&quot;.subrow" + index + "&quot;)'>expand_more</span></td>";
+        const filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp.replace(regex, '.') + '.mp3';
+        tr = "<tr  onmousedown='loadResultRegion(" + start + " , " + end + " )' class='border-top border-secondary top-row'><th scope='row'>" + index + "</th>";
+        tr += "<td><span class='material-icons rotate text-right pointer' onclick='toggleAlternates(&quot;.subrow" + index + "&quot;)'>expand_more</span></td>";
         tr += "<td>" + result.timestamp + "</td>";
         tr += "<td>" + result.cname + "</td>";
         tr += "<td><i>" + result.sname + "</i></td>";
         tr += "<td class='text-center'>" + iconizeScore(result.score) + "</td>";
-        tr += "<td class='specFeature text-center'><span class='material-icons-two-tone play'>play_circle_filled</span></td>";
+        tr += "<td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>";
+        tr += `<td class='specFeature text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="_blank"><img src='img/logo/XC.png' alt='Search on Xeno Canto'></a></td>`
 
-        tr += `<td class='specFeature text-center'><span id='download' class='material-icons-outlined ' 
+        tr += `<td class='specFeature text-center'><span class='material-icons-outlined pointer disabled download' 
             onclick="sendSaveFile(${start} , ${end}, '${filename}', 
-             '${result.cname}', '${result.sname}', '${result.score}',
-             '${result.cname2}', '${result.sname2}','${result.score2}',
-             '${result.cname3}', '${result.sname3}', '${result.score3}')">
+             '${result.cname.replace(/'/g, "\\'")}', '${result.sname}', '${result.score}',
+             '${result.cname2.replace(/'/g, "\\'")}', '${result.sname2}','${result.score2}',
+             '${result.cname3.replace(/'/g, "\\'")}', '${result.sname3}', '${result.score3}')">
             file_download</span></td>`;
-        tr += "<td class='text-center'> <span class='material-icons-two-tone text-success'>thumb_up</span> <span class='material-icons-two-tone text-danger'>thumb_down</span></td>";
+        tr += "<td class='text-center'> <span class='material-icons-two-tone text-success pointer'>thumb_up</span> <span class='material-icons-two-tone text-danger pointer'>thumb_down</span></td>";
         tr += "</tr>";
 
-        tr += "<tr  class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + " )'><th scope='row'> </th>";
+        tr += "<tr class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + " )'><th scope='row'> </th>";
         tr += "<td> </td>";
         tr += "<td> </td>";
         tr += "<td>" + result.cname2 + "</td>";
@@ -923,7 +932,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr += "<td> </td>";
         tr += "</tr>";
 
-        tr += "<tr  class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + " )' ><th scope='row'> </th>";
+        tr += "<tr class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + " )' ><th scope='row'> </th>";
         tr += "<td> </td>";
         tr += "<td> </td>";
         tr += "<td>" + result.cname3 + "</td>";
@@ -932,12 +941,21 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr += "<td> </td>";
         tr += "<td> </td>";
         tr += "</tr>";
-
     }
-    $('#resultTableBody').append(tr);
+    resultTable.append(tr);
+
     if (!config.spectrogram) $('.specFeature').hide();
     $(".material-icons").click(function () {
         $(this).toggleClass("down");
+    })
+
+    const toprow = $('.top-row')
+
+    toprow.click(function () {
+        toprow.each(function () {
+            $(this).removeClass('table-active')
+        })
+        $(this).addClass("table-active");
     })
 });
 
