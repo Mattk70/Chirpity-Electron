@@ -12,7 +12,7 @@ console.log(appPath);
 // console.log(process.resourcesPath);
 
 let audioBuffer;
-const model = new Model(path.join(appPath, 'UK_list_256x384_model/'));
+const model = new Model(path.join(appPath, '121_model/'));
 
 (async () => {
     await model.loadModel();
