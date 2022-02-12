@@ -5,7 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "export": "electron-packager . --out packages --overwrite"
+    "export": "electron-packager . --platform=win32 --arch=x64 --prune=true --out packages --overwrite"
   },
   "repository": {
     "type": "git",
@@ -36,6 +36,9 @@
     "colormap": "^2.3.2",
     "jquery": "^3.6.0",
     "seedrandom": "^3.0.5",
-    "wavesurfer.js": "^5.2.0"
+    "wavesurfer.js": "^5.2.0",
+    "lamejstmp": "^1.0.1",
+    "browser-id3-writer": "^4.4.0",
+    "uuid": "^8.3.2"
   }
 }

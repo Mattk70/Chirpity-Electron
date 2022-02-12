@@ -9,6 +9,9 @@ const Regions = require('wavesurfer.js/dist/plugin/wavesurfer.regions.min.js');
 const colormap = require("colormap");
 const $ = require('jquery');
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
+const p = require('path');
+
+let appPath = remote.app.getPath('userData');
 
 let modelReady = false;
 let fileLoaded = false;
@@ -16,7 +19,6 @@ let currentFile;
 let region;
 let AUDACITY_LABELS;
 let wavesurfer;
-let WS_ZOOM = 0;
 
 // set up some DOM element caches
 let bodyElement = $('body');
@@ -34,16 +36,10 @@ let completeDiv = $('.complete');
 
 let currentBuffer;
 let bufferBegin = 0;
-let windowLength = 10;  // seconds
+let windowLength = 20;  // seconds
 
 // Set default Options
 let config;
-try {
-    config = JSON.parse(fs.readFileSync('config.json'))
-} catch {
-    // If file read error, use defaults
-    config = {'spectrogram': true, 'colormap': 'inferno', 'timeline': true}
-}
 
 
 async function loadAudioFile(filePath) {
@@ -58,8 +54,9 @@ async function loadAudioFile(filePath) {
     showElement('loadFileHintSpinner');
     showElement('loadFileHintLog');
     console.log('loadFileHintLog', 'Loading file...');
-    // Reset the buffer playhead:
+    // Reset the buffer playhead and zoom:
     bufferBegin = 0;
+    windowLength = 20;
     if (config.spectrogram) {
         // create an audio context object and load file into it
         const audioCtx = new AudioContext();
@@ -72,7 +69,7 @@ async function loadAudioFile(filePath) {
                         const myBuffer = buffer;
                         source.buffer = myBuffer;
                         const duration = source.buffer.duration;
-                        const sampleRate = source.buffer.sampleRate;
+                        //const sampleRate = source.buffer.sampleRate;
                         const offlineCtx = new OfflineAudioContext(1, 48000 * duration, 48000);
                         const offlineSource = offlineCtx.createBufferSource();
                         offlineSource.buffer = buffer;
@@ -102,17 +99,18 @@ async function loadAudioFile(filePath) {
     fileLoaded = true;
     completeDiv.hide();
     const filename = filePath.replace(/^.*[\\\/]/, '')
-    $('#filename').html('<span class="material-icons">description</span> ' + filename);
+    $('#filename').html('<span class="material-icons-two-tone">audio_file</span> ' + filename);
     // show the spec
 
     if (modelReady) enableMenuItem('analyze')
 }
 
-function loadBufferSegment(buffer, begin) {
+function loadBufferSegment(buffer, begin, end) {
+    if (!end) end = windowLength;
     if (begin < 0) begin = 0;
-    if (begin + windowLength > buffer.duration) begin = Math.max(0, buffer.duration - windowLength);
+    if (begin + end > buffer.duration) begin = Math.max(0, buffer.duration - end);
     bufferBegin = begin;
-    AudioBufferSlice(buffer, begin, begin + windowLength, function (error, slicedAudioBuffer) {
+    AudioBufferSlice(buffer, begin, begin + end, function (error, slicedAudioBuffer) {
         if (error) {
             console.error(error);
         } else {
@@ -159,15 +157,16 @@ function initSpec(args) {
         // but keep the playhead
         cursorColor: '#fff',
         cursorWidth: 2,
+        skipLength: 0.1,
         normalize: true,
         partialRender: true,
         scrollParent: true,
         responsive: true,
-        height: 256,
+        height: 1024,
         fftSamples: 1024,
         windowFunc: 'hamming',
-        minPxPerSec: 50,
-        hideScrollbar: false,
+        minPxPerSec: 10,
+        hideScrollbar: true,
         plugins: [
             SpectrogramPlugin.create({
                 wavesurfer: wavesurfer,
@@ -205,7 +204,7 @@ function initSpec(args) {
     $('.speccolor').removeClass('disabled');
     showElement(config.colormap + ' .tick', false);
     // Set click event that removes all regions
-    waveElement.mousedown(function (e) {
+    waveElement.mousedown(function () {
         wavesurfer.clearRegions();
         disableMenuItem('analyzeSelection');
     });
@@ -214,19 +213,21 @@ function initSpec(args) {
         // console.log(wavesurfer.regions.list)
         region = e
         enableMenuItem('analyzeSelection');
+        enableMenuItem('exportMP3');
     });
 
     wavesurfer.on('finish', function () {
         if (currentBuffer.duration > bufferBegin + windowLength) {
-            loadBufferSegment(currentBuffer, bufferBegin += windowLength);
+            bufferBegin += windowLength;
+            loadBufferSegment(currentBuffer, bufferBegin);
             wavesurfer.play()
         }
     })
     // Show controls
     showElement('controlsWrapper');
-
+    updateElementCache()
     // Resize canvas of spec and labels
-    adjustSpecHeight(false);
+    adjustSpecDims(false);
 }
 
 function updateElementCache() {
@@ -242,16 +243,29 @@ function updateElementCache() {
 }
 
 function zoomSpecIn() {
-    WS_ZOOM += 50;
-    wavesurfer.zoom(WS_ZOOM);
-    adjustSpecHeight(true)
+    if (windowLength < 2) return;
+    windowLength /= 2;
+    if (windowLength < 2) {
+        wavesurfer.params.fftSamples = 512
+        wavesurfer.spectrogram.render()
+    } else if (wavesurfer.params.fftSamples !== 1024) {
+        wavesurfer.params.fftSamples = 1024
+        wavesurfer.spectrogram.render()
+    }
+    loadBufferSegment(currentBuffer, bufferBegin);
+    //WS_ZOOM += 50;
+    //wavesurfer.zoom(WS_ZOOM);
+    adjustSpecDims(true)
     //wavesurfer.spectrogram.render()
 }
 
 function zoomSpecOut() {
-    WS_ZOOM -= 50;
-    wavesurfer.zoom(WS_ZOOM);
-    adjustSpecHeight(true)
+    if (windowLength > 100) return;
+    windowLength *= 2;
+    loadBufferSegment(currentBuffer, bufferBegin);
+    //WS_ZOOM -= 50;
+    //wavesurfer.zoom(WS_ZOOM);
+    adjustSpecDims(true)
     //wavesurfer.spectrogram.render()
 }
 
@@ -309,7 +323,7 @@ const analyzeLink = document.getElementById('analyze');
 
 analyzeLink.addEventListener('click', async () => {
     completeDiv.hide();
-    ipcRenderer.send('analyze', {message: 'go'});
+    ipcRenderer.send('analyze', {confidence: config.minConfidence});
     analyzeLink.disabled = true;
 });
 
@@ -324,7 +338,7 @@ analyzeSelectionLink.addEventListener('click', async () => {
         end = region.end + bufferBegin;
     }
     // Add current buffer's beginning offset to region start / end tags
-    ipcRenderer.send('analyze', {message: 'go', start: start, end: end});
+    ipcRenderer.send('analyze', {confidence: 0.1, start: start, end: end});
     analyzeLink.disabled = true;
 });
 
@@ -342,13 +356,9 @@ function disableMenuItem(id) {
     $('#' + id).addClass('disabled');
 }
 
-function saveLabelFile(path) {
-
-}
-
 function toggleAlternates(row) {
-
-    $(row).toggle('slow')
+    $(row).toggle('slow');
+    return false
 }
 
 function showElement(id, makeFlex = true, empty = false) {
@@ -385,213 +395,6 @@ function hideAll() {
 
 }
 
-/////////////////////////  Window Handlers ////////////////////////////
-window.onload = function () {
-    // Set menu option state
-    if (!config.spectrogram) {
-        $('#loadSpectrogram .tick').hide()
-
-    }
-    if (!config.timeline) {
-        $('#loadTimeline .tick').hide()
-    }
-    showElement(config.colormap + 'span', true)
-
-    // Set footer year
-    $('#year').text(new Date().getFullYear());
-};
-
-const waitForFinalEvent = (function () {
-    var timers = {};
-    return function (callback, ms, uniqueId) {
-        if (!uniqueId) {
-            uniqueId = "Don't call this twice without a uniqueId";
-        }
-        if (timers[uniqueId]) {
-            clearTimeout(timers[uniqueId]);
-        }
-        timers[uniqueId] = setTimeout(callback, ms);
-    };
-})();
-
-$(window).resize(function () {
-    waitForFinalEvent(function () {
-
-        WindowResize();
-    }, 500, 'id1');
-});
-
-function WindowResize() {
-    adjustSpecHeight(true);
-}
-
-$(document).on('click', '.play', function (e) {
-    region.play()
-})
-
-///////////// Nav bar Option handlers //////////////
-
-$(document).on('click', '#loadSpectrogram', function (e) {
-    if (config.spectrogram) {
-        config.spectrogram = false;
-        $('#loadSpectrogram .tick').hide()
-        $('.specFeature').hide()
-        hideElement('dummy');
-        hideElement('timeline');
-        hideElement('waveform');
-        hideElement('spectrogram');
-        $('.speccolor .timeline').addClass('disabled');
-        //adjustSpecHeight(true);
-        updatePrefs();
-    } else {
-        config.spectrogram = true;
-        $('#loadSpectrogram .tick').show()
-        $('.specFeature').show()
-        if (wavesurfer && wavesurfer.isReady) {
-            $('.speccolor .timeline').removeClass('disabled');
-            showElement('dummy', false);
-            showElement('timeline', false);
-            showElement('waveform', false, false);
-            showElement('spectrogram', false, false);
-        } else {
-            loadAudioFile(currentFile);
-        }
-        updatePrefs();
-    }
-})
-
-$(document).on('click', '.speccolor', function (e) {
-    wavesurfer.destroyPlugin('spectrogram');
-    config.colormap = e.target.id;
-    wavesurfer.addPlugin(SpectrogramPlugin.create({
-        wavesurfer: wavesurfer,
-        container: "#spectrogram",
-        scrollParent: true,
-        labels: false,
-        colorMap: colormap({
-            colormap: config.colormap, nshades: 256, format: 'float'
-        })
-    })).initPlugin('spectrogram');
-    // set tick
-    $('.speccolor .tick').addClass('d-none');
-    $(this).children('span').removeClass('d-none');
-    // refresh caches
-    updateElementCache()
-    adjustSpecHeight(true)
-    updatePrefs();
-})
-
-
-$(document).on('click', '.timeline', function (e) {
-    if (wavesurfer.timeline && wavesurfer.timeline.wrapper !== null) {
-        wavesurfer.destroyPlugin('timeline');
-        $('#loadTimeline .tick').hide()
-        config.timeline = false;
-        updatePrefs();
-    } else {
-        config.timeline = true;
-        wavesurfer.addPlugin(SpecTimeline.create({
-            wavesurfer: wavesurfer,
-            container: "#timeline",
-            formatTimeCallback: formatTimeCallback,
-            timeInterval: timeInterval,
-            primaryLabelInterval: primaryLabelInterval,
-            secondaryLabelInterval: secondaryLabelInterval,
-            primaryColor: 'black',
-            secondaryColor: 'grey',
-            primaryFontColor: 'black',
-            secondaryFontColor: 'grey'
-        })).initPlugin('timeline');
-        $('#loadTimeline .tick').show()
-        // refresh caches
-        updateElementCache()
-        adjustSpecHeight(true)
-        updatePrefs();
-    }
-})
-
-/////////// Keyboard Shortcuts  ////////////
-
-const GLOBAL_ACTIONS = { // eslint-disable-line
-    Space: function () {
-        wavesurfer.playPause();
-    },
-    ArrowLeft: function () {
-        wavesurfer.skipBackward();
-    },
-    ArrowRight: function () {
-        wavesurfer.skipForward();
-    },
-    KeyO: function () {
-        showOpenDialog();
-    },
-    KeyS: function () {
-        if (RESULTS.length > 0) {
-            showSaveDialog();
-        }
-    },
-    Escape: function () {
-        console.log('Operation aborted');
-        ipcRenderer.send('abort', {'abort': true})
-    },
-    Home: function () {
-        if (currentBuffer) {
-            loadBufferSegment(currentBuffer, 0)
-            wavesurfer.seekAndCenter(0);
-            wavesurfer.pause()
-        }
-    },
-    End: function () {
-        if (currentBuffer) {
-            loadBufferSegment(currentBuffer, currentBuffer.duration - windowLength)
-            wavesurfer.seekAndCenter(1);
-            wavesurfer.pause()
-        }
-    },
-    PageUp: function () {
-        if (wavesurfer) {
-            const position = wavesurfer.getCurrentTime() / windowLength;
-            loadBufferSegment(currentBuffer, bufferBegin -= windowLength)
-            wavesurfer.seekAndCenter(position);
-            wavesurfer.pause()
-        }
-    },
-    PageDown: function () {
-        if (wavesurfer) {
-            const position = wavesurfer.getCurrentTime() / windowLength;
-            loadBufferSegment(currentBuffer, bufferBegin += windowLength)
-            wavesurfer.seekAndCenter(position);
-            wavesurfer.pause()
-        }
-    },
-    KeyP: function () {
-        (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
-    }
-};
-
-document.addEventListener('DOMContentLoaded', function () {
-    document.addEventListener('keydown', function (e) {
-        let action = e.code;
-        if (action in GLOBAL_ACTIONS) {
-            if (document == e.target || document.body == e.target || e.target.attributes["data-action"]) {
-                e.preventDefault();
-            }
-            GLOBAL_ACTIONS[action](e);
-        }
-    });
-
-    [].forEach.call(document.querySelectorAll('[data-action]'), function (el) {
-        el.addEventListener('click', function (e) {
-            let action = e.currentTarget.dataset.action;
-            if (action in GLOBAL_ACTIONS) {
-                e.preventDefault();
-                GLOBAL_ACTIONS[action](e);
-            }
-        });
-    });
-});
-
-
 let progressDiv = $('.progressDiv');
 
 let progressBar = $('.progress .progress-bar');
@@ -614,23 +417,26 @@ function loadResultRegion(start, end) {
     createRegion(start - bufferBegin, end - bufferBegin)
 }
 
-function adjustSpecHeight(redraw) {
+function adjustSpecDims(redraw) {
     $.each([dummyElement, waveWaveElement, specElement, specCanvasElement, waveCanvasElement], function () {
-        $(this).height(bodyElement.height() * 0.4)
+        // Expand up to 512px
+        $(this).height(Math.min(bodyElement.height() * 0.4, 512))
     })
     if (loadSpectrogram) {
         specElement.css('z-index', 0)
         resultTableElement.height(contentWrapperElement.height()
             - dummyElement.height()
             - controlsWrapperElement.height()
-            - 98);
+            - $('#timeline').height()
+            - 65);
         if (redraw && wavesurfer != null) {
             wavesurfer.drawBuffer();
         }
-        //specCanvasElement.width('100%');
+        specCanvasElement.width('100%');
     } else {
         resultTableElement.height(contentWrapperElement.height()
             - controlsWrapperElement.height()
+
             - 98);
     }
 }
@@ -649,94 +455,6 @@ document.querySelectorAll(".tableFixHead").forEach(el =>
 );
 
 
-// Electron Message handling
-
-ipcRenderer.on('model-ready', async (event, arg) => {
-    modelReady = true;
-    if (fileLoaded) {
-        enableMenuItem('analyze')
-    }
-})
-
-ipcRenderer.on('worker-loaded', async (event, arg) => {
-    if (!loadSpectrogram) {
-        console.log('UI received worker-loaded: ' + arg.message)
-        enableMenuItem('analyze')
-        hideAll();
-        showElement('controlsWrapper');
-        hideElement('transport-controls');
-        const filename = arg.message.replace(/^.*[\\\/]/, '')
-        $('#filename').html('<span class="material-icons">description</span> ' + filename);
-    }
-})
-
-ipcRenderer.on('progress', async (event, arg) => {
-    progressDiv.show();
-    let progress = (arg.progress * 100).toFixed(1);
-    progressBar.width(progress + '%');
-    progressBar.attr('aria-valuenow', progress);
-    progressBar.html(progress + '%');
-});
-
-ipcRenderer.on('prediction-done', async (event, arg) => {
-    AUDACITY_LABELS = arg.labels;
-    progressDiv.hide();
-    progressBar.width(0 + '%');
-    progressBar.attr('aria-valuenow', 0);
-    progressBar.html(0 + '%');
-    completeDiv.show();
-    enableMenuItem('saveLabels');
-});
-
-ipcRenderer.on('prediction-ongoing', async (event, arg) => {
-    completeDiv.hide();
-    const result = arg.result;
-    const index = arg.index;
-    if (index === 1) {
-        // Remove old results
-        $('#resultTableBody').empty();
-    }
-    let tr;
-    showElement('resultTableContainer');
-
-    if (result === "No detections found.") {
-        tr = "<tr><td>" + result + "</td></tr>";
-    } else {
-
-        tr = "<tr  onmousedown='loadResultRegion(" + result.start + " , " + result.end + " )'><th scope='row'>" + index + "</th>";
-        tr += "<td>" + result.timestamp + "</td>";
-        tr += "<td>" + result.cname + "</td>";
-        tr += "<td>" + result.sname + "</td>";
-        tr += "<td>" + (parseFloat(result.score) * 100).toFixed(0) + "%" + "</td>";
-        tr += "<td class='specFeature'><span class='material-icons play' >play_circle_filled</span></td>";
-        tr += "<td><span class='material-icons rotate' onclick='toggleAlternates(&quot;.subrow" + index + "&quot;)'>expand_more</span></td>";
-        tr += "</tr>";
-
-        tr += "<tr  class='subrow" + index + "'  onclick='loadResultRegion(" + result.start + " , " + result.end + " )'><th scope='row'> </th>";
-        tr += "<td> </td>";
-        tr += "<td>" + result.cname2 + "</td>";
-        tr += "<td>" + result.sname2 + "</td>";
-        tr += "<td>" + (parseFloat(result.score2) * 100).toFixed(0) + "%" + "</td>";
-        tr += "<td> </td>";
-        tr += "</tr>";
-
-        tr += "<tr  class='subrow" + index + "'  onclick='loadResultRegion(" + result.start + " , " + result.end + " )' ><th scope='row'> </th>";
-        tr += "<td> </td>";
-        tr += "<td>" + result.cname3 + "</td>";
-        tr += "<td>" + result.sname3 + "</td>";
-        tr += "<td>" + (parseFloat(result.score3) * 100).toFixed(0) + "%" + "</td>";
-        tr += "<td> </td>";
-        tr += "</tr>";
-
-    }
-    $('#resultTableBody').append(tr);
-    if (!config.spectrogram) $('.specFeature').hide();
-    $(".material-icons").click(function () {
-        $(this).toggleClass("down");
-    })
-});
-
-
 ///////////////////////// Timeline Callbacks /////////////////////////
 
 /**
@@ -753,16 +471,20 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
  * @param: seconds
  * @param: pxPerSec
  */
-function formatTimeCallback(seconds, pxPerSec) {
+function formatTimeCallback(seconds) {
     seconds = Number(seconds);
     seconds += Math.floor(bufferBegin);
     let minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
-    let timeStr;
     seconds = seconds % 60;
 
     // fill up seconds with zeroes
-    let secondsStr = Math.round(seconds).toString();
+    let secondsStr;
+    if (windowLength >= 5) {
+        secondsStr = Math.round(seconds).toString();
+    } else {
+        secondsStr = seconds.toFixed(1).toString();
+    }
     if (minutes > 0) {
         if (seconds < 10) {
             secondsStr = '0' + secondsStr;
@@ -793,7 +515,7 @@ function formatTimeCallback(seconds, pxPerSec) {
  * @param: pxPerSec
  */
 function timeInterval(pxPerSec) {
-    var retval = 1;
+    let retval;
     if (pxPerSec >= 25 * 100) {
         retval = 0.01;
     } else if (pxPerSec >= 25 * 40) {
@@ -826,7 +548,7 @@ function timeInterval(pxPerSec) {
  * @param pxPerSec
  */
 function primaryLabelInterval(pxPerSec) {
-    var retval = 1;
+    var retval;
     if (pxPerSec >= 25 * 100) {
         retval = 10;
     } else if (pxPerSec >= 25 * 40) {
@@ -871,8 +593,415 @@ function secondaryLabelInterval(pxPerSec) {
 
 function updatePrefs() {
     try {
-        fs.writeFileSync('config.json', JSON.stringify(config))
+        fs.writeFileSync(p.join(appPath, 'config.json'), JSON.stringify(config))
     } catch (e) {
         console.log(e)
     }
+}
+
+/////////////////////////  Window Handlers ////////////////////////////
+
+window.onload = function () {
+    try {
+
+        config = JSON.parse(fs.readFileSync(p.join(appPath, 'config.json')))
+        if (!config.UUID) {
+            const {v4: uuidv4} = require('uuid');
+            config.UUID = uuidv4()
+            updatePrefs()
+        }
+    } catch {
+        // If file read error, use defaults
+        config = {'spectrogram': true, 'colormap': 'inferno', 'timeline': true, 'minConfidence': 0.2}
+        const {v4: uuidv4} = require('uuid');
+        config.UUID = uuidv4()
+        updatePrefs()
+    }
+    // Set menu option state
+    if (!config.spectrogram) {
+        $('#loadSpectrogram .tick').hide()
+
+    }
+    if (!config.timeline) {
+        $('#loadTimeline .tick').hide()
+    }
+    showElement(config.colormap + 'span', true)
+
+    // Set footer year
+    $('#year').text(new Date().getFullYear());
+};
+
+const waitForFinalEvent = (function () {
+    var timers = {};
+    return function (callback, ms, uniqueId) {
+        if (!uniqueId) {
+            uniqueId = "Don't call this twice without a uniqueId";
+        }
+        if (timers[uniqueId]) {
+            clearTimeout(timers[uniqueId]);
+        }
+        timers[uniqueId] = setTimeout(callback, ms);
+    };
+})();
+
+$(window).resize(function () {
+    waitForFinalEvent(function () {
+
+        WindowResize();
+    }, 500, 'id1');
+});
+
+function WindowResize() {
+    adjustSpecDims(true);
+}
+
+$(document).on('click', '.play', function () {
+    region.play()
+})
+
+
+document.addEventListener('DOMContentLoaded', function () {
+
+    document.addEventListener('keydown', function (e) {
+        let action = e.code;
+        if (action in GLOBAL_ACTIONS) {
+            e.preventDefault();
+            if (document === e.target || document.body === e.target || e.target.attributes["data-action"]) {
+
+            }
+            GLOBAL_ACTIONS[action](e);
+        }
+    });
+
+    [].forEach.call(document.querySelectorAll('[data-action]'), function (el) {
+        el.addEventListener('click', function (e) {
+            let action = e.currentTarget.dataset.action;
+            if (action in GLOBAL_ACTIONS) {
+                e.preventDefault();
+                GLOBAL_ACTIONS[action](e);
+            }
+        });
+    });
+});
+
+///////////// Nav bar Option handlers //////////////
+
+$(document).on('click', '#loadSpectrogram', function () {
+    if (config.spectrogram) {
+        config.spectrogram = false;
+        $('#loadSpectrogram .tick').hide()
+        $('.specFeature').hide()
+        hideElement('dummy');
+        hideElement('timeline');
+        hideElement('waveform');
+        hideElement('spectrogram');
+        $('.speccolor .timeline').addClass('disabled');
+        //adjustSpecDims(true);
+        updatePrefs();
+    } else {
+        config.spectrogram = true;
+        $('#loadSpectrogram .tick').show()
+        $('.specFeature').show()
+        if (wavesurfer && wavesurfer.isReady) {
+            $('.speccolor .timeline').removeClass('disabled');
+            showElement('dummy', false);
+            showElement('timeline', false);
+            showElement('waveform', false, false);
+            showElement('spectrogram', false, false);
+        } else {
+            loadAudioFile(currentFile);
+        }
+        updatePrefs();
+    }
+})
+
+$(document).on('click', '.speccolor', function (e) {
+    wavesurfer.destroyPlugin('spectrogram');
+    config.colormap = e.target.id;
+    wavesurfer.addPlugin(SpectrogramPlugin.create({
+        wavesurfer: wavesurfer,
+        container: "#spectrogram",
+        scrollParent: true,
+        labels: false,
+        colorMap: colormap({
+            colormap: config.colormap, nshades: 256, format: 'float'
+        })
+    })).initPlugin('spectrogram');
+    // set tick
+    $('.speccolor .tick').addClass('d-none');
+    $(this).children('span').removeClass('d-none');
+    // refresh caches
+    updateElementCache()
+    adjustSpecDims(true)
+    updatePrefs();
+})
+
+
+$(document).on('click', '.timeline', function () {
+    if (wavesurfer.timeline && wavesurfer.timeline.wrapper !== null) {
+        wavesurfer.destroyPlugin('timeline');
+        $('#loadTimeline .tick').hide()
+        config.timeline = false;
+        updatePrefs();
+    } else {
+        config.timeline = true;
+        wavesurfer.addPlugin(SpecTimeline.create({
+            wavesurfer: wavesurfer,
+            container: "#timeline",
+            formatTimeCallback: formatTimeCallback,
+            timeInterval: timeInterval,
+            primaryLabelInterval: primaryLabelInterval,
+            secondaryLabelInterval: secondaryLabelInterval,
+            primaryColor: 'black',
+            secondaryColor: 'grey',
+            primaryFontColor: 'black',
+            secondaryFontColor: 'grey'
+        })).initPlugin('timeline');
+        $('#loadTimeline .tick').show()
+        // refresh caches
+        updateElementCache()
+        adjustSpecDims(true)
+        updatePrefs();
+    }
+})
+
+/////////// Keyboard Shortcuts  ////////////
+
+const GLOBAL_ACTIONS = { // eslint-disable-line
+    Space: function () {
+        wavesurfer.playPause();
+    },
+    KeyO: function (e) {
+        if (e.ctrlKey) showOpenDialog();
+    },
+    KeyS: function () {
+        if (AUDACITY_LABELS.length > 0) {
+            if (e.ctrlKey) showSaveDialog();
+        }
+    },
+    Escape: function () {
+        console.log('Operation aborted');
+        ipcRenderer.send('abort', {'abort': true})
+    },
+    Home: function () {
+        if (currentBuffer) {
+            loadBufferSegment(currentBuffer, 0)
+            wavesurfer.seekAndCenter(0);
+            wavesurfer.pause()
+        }
+    },
+    End: function () {
+        if (currentBuffer) {
+            loadBufferSegment(currentBuffer, currentBuffer.duration - windowLength)
+            wavesurfer.seekAndCenter(1);
+            wavesurfer.pause()
+        }
+    },
+    PageUp: function () {
+        if (wavesurfer) {
+            const position = wavesurfer.getCurrentTime() / windowLength;
+            bufferBegin -= windowLength
+            const playhead = bufferBegin + wavesurfer.getCurrentTime()
+            loadBufferSegment(currentBuffer, bufferBegin)
+            playhead <= 0 ? wavesurfer.seekAndCenter(0) : wavesurfer.seekAndCenter(position);
+            wavesurfer.pause()
+        }
+    },
+    PageDown: function () {
+        if (wavesurfer) {
+            const position = wavesurfer.getCurrentTime() / windowLength;
+            bufferBegin += windowLength
+            const playhead = bufferBegin + wavesurfer.getCurrentTime()
+            loadBufferSegment(currentBuffer, bufferBegin)
+            playhead >= currentBuffer.duration ? wavesurfer.seekAndCenter(1) : wavesurfer.seekAndCenter(position);
+            wavesurfer.pause()
+        }
+    },
+    ArrowLeft: function () {
+        if (wavesurfer) {
+            wavesurfer.skipBackward(0.1);
+            const position = wavesurfer.getCurrentTime();
+            if (position < 0.1 && bufferBegin > 0) {
+                loadBufferSegment(currentBuffer, bufferBegin -= 0.1)
+                wavesurfer.seekAndCenter(0);
+                wavesurfer.pause()
+            }
+        }
+    },
+    ArrowRight: function () {
+        if (wavesurfer) {
+            wavesurfer.skipForward(0.1);
+            const position = wavesurfer.getCurrentTime();
+            if (position > windowLength - 0.1) {
+                loadBufferSegment(currentBuffer, bufferBegin += 0.1)
+                wavesurfer.seekAndCenter(1);
+                wavesurfer.pause()
+            }
+        }
+    },
+    KeyP: function () {
+        (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
+    }
+};
+
+
+// Electron Message handling
+
+
+ipcRenderer.on('model-ready', async () => {
+    modelReady = true;
+    if (fileLoaded) {
+        enableMenuItem('analyze')
+    }
+})
+
+ipcRenderer.on('worker-loaded', async (event, arg) => {
+    if (!loadSpectrogram) {
+        console.log('UI received worker-loaded: ' + arg.message)
+        enableMenuItem('analyze')
+        hideAll();
+        showElement('controlsWrapper');
+        hideElement('transport-controls');
+        const filename = arg.message.replace(/^.*[\\\/]/, '')
+        $('#filename').html('<span class="material-icons">description</span> ' + filename);
+    }
+})
+
+ipcRenderer.on('progress', async (event, arg) => {
+    progressDiv.show();
+    let progress = (arg.progress * 100).toFixed(1);
+    progressBar.width(progress + '%');
+    progressBar.attr('aria-valuenow', progress);
+    progressBar.html(progress + '%');
+});
+
+ipcRenderer.on('prediction-done', async (event, arg) => {
+    AUDACITY_LABELS = arg.labels;
+    progressDiv.hide();
+    progressBar.width(0 + '%');
+    progressBar.attr('aria-valuenow', 0);
+    progressBar.html(0 + '%');
+    completeDiv.show();
+    enableMenuItem('saveLabels');
+    $('.download').removeClass('disabled');
+
+});
+
+ipcRenderer.on('prediction-ongoing', async (event, arg) => {
+    completeDiv.hide();
+    const result = arg.result;
+    const index = arg.index;
+    const resultTable = $('#resultTableBody')
+    if (index === 1) {
+        // Remove old results
+        resultTable.empty();
+    }
+    let tr;
+    showElement('resultTableContainer');
+    if (result === "No detections found.") {
+        tr = "<tr><td>" + result + "</td></tr>";
+    } else {
+        const regex = /:/g;
+        const start = result.start, end = result.end;
+        const filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp.replace(regex, '.') + '.mp3';
+        tr = "<tr  onmousedown='loadResultRegion(" + start + " , " + end + " )' class='border-top border-secondary top-row'><th scope='row'>" + index + "</th>";
+        tr += "<td><span class='material-icons rotate text-right pointer' onclick='toggleAlternates(&quot;.subrow" + index + "&quot;)'>expand_more</span></td>";
+        tr += "<td>" + result.timestamp + "</td>";
+        tr += "<td>" + result.cname + "</td>";
+        tr += "<td><i>" + result.sname + "</i></td>";
+        tr += "<td class='text-center'>" + iconizeScore(result.score) + "</td>";
+        tr += "<td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>";
+        tr += `<td class='specFeature text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="_blank"><img src='img/logo/XC.png' alt='Search on Xeno Canto'></a></td>`
+
+        tr += `<td class='specFeature text-center'><span class='material-icons-outlined pointer disabled download' 
+            onclick="sendSaveFile(${start} , ${end}, '${filename}', 
+             '${result.cname.replace(/'/g, "\\'")}', '${result.sname}', '${result.score}',
+             '${result.cname2.replace(/'/g, "\\'")}', '${result.sname2}','${result.score2}',
+             '${result.cname3.replace(/'/g, "\\'")}', '${result.sname3}', '${result.score3}')">
+            file_download</span></td>`;
+        tr += "<td class='text-center'> <span class='material-icons-two-tone text-success pointer'>thumb_up</span> <span class='material-icons-two-tone text-danger pointer'>thumb_down</span></td>";
+        tr += "</tr>";
+
+        tr += "<tr class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + " )'><th scope='row'> </th>";
+        tr += "<td> </td>";
+        tr += "<td> </td>";
+        tr += "<td>" + result.cname2 + "</td>";
+        tr += "<td><i>" + result.sname2 + "</i></td>";
+        tr += "<td class='text-center'>" + iconizeScore(result.score2) + "</td>";
+        tr += "<td> </td>";
+        tr += "<td> </td>";
+        tr += "</tr>";
+
+        tr += "<tr class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + " )' ><th scope='row'> </th>";
+        tr += "<td> </td>";
+        tr += "<td> </td>";
+        tr += "<td>" + result.cname3 + "</td>";
+        tr += "<td><i>" + result.sname3 + "</i></td>";
+        tr += "<td class='text-center'>" + iconizeScore(result.score3) + "</td>";
+        tr += "<td> </td>";
+        tr += "<td> </td>";
+        tr += "</tr>";
+    }
+    resultTable.append(tr);
+
+    if (!config.spectrogram) $('.specFeature').hide();
+    $(".material-icons").click(function () {
+        $(this).toggleClass("down");
+    })
+
+    const toprow = $('.top-row')
+
+    toprow.click(function () {
+        toprow.each(function () {
+            $(this).removeClass('table-active')
+        })
+        $(this).addClass("table-active");
+    })
+});
+
+function sendSaveFile(start, end, filename, cname, sname, score, cname2, sname2, score2, cname3, sname3, score3) {
+    if (!start && start !== 0) {
+        if (!wavesurfer.regions.list === {}) {
+            start = 0;
+            end = currentBuffer.duration;
+        } else {
+            start = region.start + bufferBegin;
+            end = region.end + bufferBegin;
+        }
+        filename = 'export.mp3'
+    }
+
+    let metadata;
+    if (cname) {
+        metadata = {
+            'UUID': config.UUID,
+            'start': start,
+            'end': end,
+            'filename': filename,
+            'cname': cname,
+            'sname': sname,
+            'score': score,
+            'cname2': cname2,
+            'sname2': sname2,
+            'score2': score2,
+            'cname3': cname3,
+            'sname3': sname3,
+            'score3': score3
+        };
+    }
+    ipcRenderer.send('save', {'start': start, 'end': end, 'filepath': filename, 'metadata': metadata})
+}
+
+// create a dict mapping score to icon
+const iconDict = {
+    'low': '<span class="material-icons text-danger border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
+    'medium': '<span class="material-icons text-warning border border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
+    'high': '<span class="material-icons text-success border border-secondary rounded" title="--%">signal_cellular_alt</span>',
+}
+
+function iconizeScore(score) {
+    const tooltip = (parseFloat(score) * 100).toFixed(0).toString()
+    if (parseFloat(score) < 0.65) return iconDict['low'].replace('--', tooltip)
+    else if (parseFloat(score) < 0.85) return iconDict['medium'].replace('--', tooltip)
+    else return iconDict['high'].replace('--', tooltip)
 }
