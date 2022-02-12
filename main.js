@@ -62,9 +62,15 @@ function createWorker() {
 }
 
 // This method will be called when Electron has finished
+
 app.on('ready', () => {
     createWorker();
     createWindow();
+
+    mainWindow.webContents.on('new-window', function (e, url) {
+        e.preventDefault();
+        require('electron').shell.openExternal(url);
+    });
 });
 
 // Quit when all windows are closed.
@@ -98,15 +104,14 @@ ipcMain.on('worker-loaded', async (event, arg) => {
 });
 
 ipcMain.on('analyze', async (event, arg) => {
-    const currentFile = arg.message;
-    console.log('Main received go signal: ' + arg.message)
-    workerWindow.webContents.send('analyze', {message: 'go', start: arg.start, end: arg.end});
+    console.log('Main received go signal: ' + arg.confidence)
+    workerWindow.webContents.send('analyze', {start: arg.start, end: arg.end, confidence: arg.confidence});
 });
 
 ipcMain.on('prediction-ongoing', (event, arg) => {
     const result = arg.result;
     const index = arg.index
-    mainWindow.webContents.send('prediction-ongoing', {result, index});
+    mainWindow.webContents.send('prediction-ongoing', arg);
 });
 
 ipcMain.on('prediction-done', (event, arg) => {
@@ -123,3 +128,13 @@ ipcMain.on('progress', (event, arg) => {
     const progress = arg.progress;
     mainWindow.webContents.send('progress', {progress});
 });
+
+ipcMain.on('save', (event, arg) => {
+    workerWindow.webContents.send('save', arg);
+});
+
+ipcMain.on('path', (event) => {
+    const appPath = app.getPath('userData')
+    mainWindow.webContents.send('path', {appPath});
+});
+
