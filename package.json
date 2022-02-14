@@ -30,15 +30,15 @@
     "electron-packager": "^14.2.1"
   },
   "dependencies": {
-    "@tensorflow/tfjs": "3.13.0",
+    "@tensorflow/tfjs": "^3.13.0",
     "bootstrap": "^4.6.1",
-    "popper.js": "^1.16.1",
+    "browser-id3-writer": "^4.4.0",
     "colormap": "^2.3.2",
     "jquery": "^3.6.0",
-    "seedrandom": "^3.0.5",
-    "wavesurfer.js": "^5.2.0",
     "lamejstmp": "^1.0.1",
-    "browser-id3-writer": "^4.4.0",
-    "uuid": "^8.3.2"
+    "popper.js": "^1.16.1",
+    "seedrandom": "^3.0.5",
+    "uuid": "^8.3.2",
+    "wavesurfer.js": "^5.2.0"
   }
 }

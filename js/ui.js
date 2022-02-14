@@ -12,7 +12,6 @@ const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 const p = require('path');
 
 let appPath = remote.app.getPath('userData');
-
 let modelReady = false;
 let fileLoaded = false;
 let currentFile;
@@ -652,6 +651,7 @@ $(window).resize(function () {
 });
 
 function WindowResize() {
+    updateElementCache();
     adjustSpecDims(true);
 }
 
