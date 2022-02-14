@@ -75,7 +75,7 @@ class Model {
         //const arraycheck = this.spectrogram.dataSync();
         //const max = Math.max(...arraycheck), min =Math.min(...arraycheck);
         // Resize to model shape
-        //this.spectrogram = tf.image.resizeBilinear(this.spectrogram, [this.inputShape[1], this.inputShape[2]])
+        this.spectrogram = tf.image.resizeBilinear(this.spectrogram, [this.inputShape[1], this.inputShape[2]])
         // Add batch axis
         this.spectrogram = tf.expandDims(this.spectrogram, 0);
 
