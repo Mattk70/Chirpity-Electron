@@ -34,6 +34,7 @@ let resultTableElement = $('#resultTableContainer');
 let contentWrapperElement = $('#contentWrapper');
 let controlsWrapperElement = $('#controlsWrapper');
 let completeDiv = $('.complete');
+const resultTable = $('#resultTableBody')
 
 let currentBuffer;
 let bufferBegin = 0;
@@ -41,6 +42,54 @@ let windowLength = 20;  // seconds
 
 // Set default Options
 let config;
+
+let controller = new AbortController();
+let signal = controller.signal;
+
+const audioCtx = new AudioContext();
+const fetchAudioFile = (filePath, cb) =>
+    fetch(filePath, {signal})
+        .then((res => res.arrayBuffer()))
+        .then((arrayBuffer) => audioCtx.decodeAudioData(arrayBuffer))
+        .then((buffer) => {
+            let source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+            const duration = source.buffer.duration;
+
+            // set fileStart time
+            if (config.timeOfDay) {
+                fileStart = new Date(ctime - (duration * 1000))
+            } else {
+                fileStart = new Date();
+                fileStart.setHours(0, 0, 0, 0)
+            }
+
+            const sampleRate = 48000;
+            const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
+            const offlineSource = offlineCtx.createBufferSource();
+            offlineSource.buffer = buffer;
+            offlineSource.connect(offlineCtx.destination);
+            offlineSource.start();
+            offlineCtx.startRendering().then(function (resampled) {
+                console.log('Rendering completed successfully');
+                // `resampled` contains an AudioBuffer resampled at 48000Hz.
+                // use resampled.getChannelData(x) to get an Float32Array for channel x.
+                currentBuffer = resampled;
+                loadBufferSegment(resampled, bufferBegin)
+            })
+        })
+        .catch(function (e) {
+            console.log("Error with decoding audio data " + e.message);
+            if (e.name === "AbortError") {
+                // We know it's been canceled!
+                console.warn('Fetch aborted sending massage to worker')
+                hideAll();
+                disableMenuItem('analyze')
+                showElement('loadFileHint');
+                showElement('loadFileHintText', false);
+            }
+        })
+        .then(cb)
 
 
 async function loadAudioFile(filePath) {
@@ -64,46 +113,49 @@ async function loadAudioFile(filePath) {
     bufferBegin = 0;
     windowLength = 20;
     if (config.spectrogram) {
+        controller = new AbortController();
+        signal = controller.signal;
+        await fetchAudioFile(filePath, console.log('finished'))
         // create an audio context object and load file into it
-        const audioCtx = new AudioContext();
-        let source = audioCtx.createBufferSource();
-        fs.readFile(filePath, function (err, data) {
-                if (err) {
-                    reject(err)
-                } else {
-
-                    audioCtx.decodeAudioData(data.buffer).then(function (buffer) {
-                        const myBuffer = buffer;
-                        source.buffer = myBuffer;
-                        const duration = source.buffer.duration;
-
-                        // set fileStart time
-                        if (config.timeOfDay) {
-                            fileStart = new Date (ctime - (duration * 1000))
-                        } else {
-                            fileStart = new Date();
-                            fileStart.setHours(0, 0, 0, 0)
-                        }
-
-                        //const sampleRate = source.buffer.sampleRate;
-                        const offlineCtx = new OfflineAudioContext(1, 48000 * duration, 48000);
-                        const offlineSource = offlineCtx.createBufferSource();
-                        offlineSource.buffer = buffer;
-                        offlineSource.connect(offlineCtx.destination);
-                        offlineSource.start();
-                        offlineCtx.startRendering().then(function (resampled) {
-                            currentBuffer = resampled;
-                            console.log('Rendering completed successfully');
-                            // `resampled` contains an AudioBuffer down-mixed to mono and resampled at 48000Hz.
-                            // use resampled.getChannelData(x) to get an Float32Array for channel x.
-                            loadBufferSegment(resampled, bufferBegin)
-                        })
-                    }).catch(function (e) {
-                        console.log("Error with decoding audio data" + e.err);
-                    })
-                }
-            }
-        )
+        //const audioCtx = new AudioContext();
+        //let source = audioCtx.createBufferSource();
+        // fs.readFile(filePath, function (err, data) {
+        //         if (err) {
+        //             reject(err)
+        //         } else {
+        //
+        //             audioCtx.decodeAudioData(data.buffer).then(function (buffer) {
+        //                 const myBuffer = buffer;
+        //                 source.buffer = myBuffer;
+        //                 const duration = source.buffer.duration;
+        //
+        //                 // set fileStart time
+        //                 if (config.timeOfDay) {
+        //                     fileStart = new Date(ctime - (duration * 1000))
+        //                 } else {
+        //                     fileStart = new Date();
+        //                     fileStart.setHours(0, 0, 0, 0)
+        //                 }
+        //
+        //                 //const sampleRate = source.buffer.sampleRate;
+        //                 const offlineCtx = new OfflineAudioContext(1, 48000 * duration, 48000);
+        //                 const offlineSource = offlineCtx.createBufferSource();
+        //                 offlineSource.buffer = buffer;
+        //                 offlineSource.connect(offlineCtx.destination);
+        //                 offlineSource.start();
+        //                 offlineCtx.startRendering().then(function (resampled) {
+        //                     currentBuffer = resampled;
+        //                     console.log('Rendering completed successfully');
+        //                     // `resampled` contains an AudioBuffer down-mixed to mono and resampled at 48000Hz.
+        //                     // use resampled.getChannelData(x) to get an Float32Array for channel x.
+        //                     loadBufferSegment(resampled, bufferBegin)
+        //                 })
+        //             }).catch(function (e) {
+        //                 console.log("Error with decoding audio data" + e.err);
+        //             })
+        //         }
+        //     }
+        // )
     } else {
         // remove the file hint stuff
         hideAll();
@@ -874,6 +926,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         }
     },
     Escape: function () {
+        controller.abort();
         console.log('Operation aborted');
         ipcRenderer.send('abort', {'abort': true})
     },
@@ -989,7 +1042,6 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
     completeDiv.hide();
     const result = arg.result;
     const index = arg.index;
-    const resultTable = $('#resultTableBody')
     if (index === 1) {
         // Remove old results
         resultTable.empty();

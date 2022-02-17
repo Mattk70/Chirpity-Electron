@@ -130,6 +130,11 @@ ipcMain.on('save', (event, arg) => {
     workerWindow.webContents.send('save', arg);
 });
 
+ipcMain.on('abort', (event, arg) => {
+        console.log('Main received abort: ' + arg.abort)
+    workerWindow.webContents.send('abort', arg);
+});
+
 ipcMain.on('path', (event) => {
     const appPath = app.getPath('userData')
     mainWindow.webContents.send('path', {appPath});

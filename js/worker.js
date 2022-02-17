@@ -1,11 +1,13 @@
 const {ipcRenderer} = require('electron');
 const Model = require('./js/model.js');
-const fs = require("fs");
+const fs = require("fs"),
+    es = require('event-stream');
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 const appPath = '';
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
 const path = require("path");
+const {min} = require("@tensorflow/tfjs");
 //const appPath = process.resourcesPath;
 
 console.log(appPath);
@@ -25,8 +27,9 @@ const model = new Model(path.join(appPath, '256x384_model/'));
 ipcRenderer.on('file-loaded', async (event, arg) => {
     const currentFile = arg.message;
     console.log('Worker received audio ' + arg.message);
-    loadAudioFile(currentFile);
-    event.sender.send('worker-loaded', {message: currentFile});
+    controller = new AbortController()
+    signal = controller.signal;
+    await loadAudioFile(currentFile);
 });
 
 ipcRenderer.on('analyze', async (event, arg) => {
@@ -45,6 +48,11 @@ ipcRenderer.on('analyze', async (event, arg) => {
         end = arg.end * model.config.sampleRate;
         isRegion = true
     }
+    await doPrediction(start, end, minConfidence, isRegion)
+});
+
+
+async function doPrediction(start, end, minConfidence, isRegion) {
     model.RESULTS = [];
     model.AUDACITY = [];
     const funcStart = new Date();
@@ -62,58 +70,63 @@ ipcRenderer.on('analyze', async (event, arg) => {
             index++;
             model.RESULTS.push(result);
             model.AUDACITY.push(audacity);
-            event.sender.send('prediction-ongoing', {result, 'index': index});
+            ipcRenderer.send('prediction-ongoing', {result, 'index': index});
         }
-        event.sender.send('progress', {'progress': i / end});
+        ipcRenderer.send('progress', {'progress': i / end});
     }
     if (model.RESULTS.length === 0) {
         const result = "No detections found.";
-        event.sender.send('prediction-ongoing', {result, 'index': 1});
+        ipcRenderer.send('prediction-ongoing', {result, 'index': 1});
     }
     const timenow = new Date();
     console.log('Analysis took ' + (timenow - funcStart) / 1000 + ' seconds.')
-    event.sender.send('progress', {'progress': 1});
-    event.sender.send('prediction-done', {'labels': model.AUDACITY});
-});
-
-
-function loadAudioFile(filePath) {
-    // create an audio context object and load file into it
-    const audioCtx = new AudioContext();
-    let source = audioCtx.createBufferSource();
-    fs.readFile(filePath, function (err, data) {
-        if (err) {
-            reject(err)
-        } else {
-            audioCtx.decodeAudioData(data.buffer).then(function (buffer) {
-                source.buffer = buffer;
-                const duration = source.buffer.duration;
-                const sampleRate = model.config.sampleRate;
-                const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
-                const offlineSource = offlineCtx.createBufferSource();
-                offlineSource.buffer = buffer;
-                offlineSource.connect(offlineCtx.destination);
-                offlineSource.start();
-                offlineCtx.startRendering().then(function (resampled) {
-                    console.log('Rendering completed successfully');
-                    // `resampled` contains an AudioBuffer resampled at 48000Hz.
-                    // use resampled.getChannelData(x) to get an Float32Array for channel x.
-                    audioBuffer = resampled;
-
-                })
-            }).catch(function (e) {
-                console.log("Error with decoding audio data" + e.err);
-            })
-        }
-
-    })
-
+    ipcRenderer.send('progress', {'progress': 1});
+    ipcRenderer.send('prediction-done', {'labels': model.AUDACITY});
 }
+
+let controller = new AbortController()
+let signal = controller.signal;
+const audioCtx = new AudioContext();
+const loadAudioFile = (filePath, cb) =>
+    fetch(filePath, {signal})
+        .then((res => res.arrayBuffer()))
+        .then((arrayBuffer) => audioCtx.decodeAudioData(arrayBuffer))
+        .then((buffer) => {
+            let source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+            const duration = source.buffer.duration;
+            const sampleRate = model.config.sampleRate;
+            const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
+            const offlineSource = offlineCtx.createBufferSource();
+            offlineSource.buffer = buffer;
+            offlineSource.connect(offlineCtx.destination);
+            offlineSource.start();
+            offlineCtx.startRendering().then(function (resampled) {
+                console.log('Rendering completed successfully');
+                ipcRenderer.send('worker loaded file', {message: filePath});
+                // `resampled` contains an AudioBuffer resampled at 48000Hz.
+                // use resampled.getChannelData(x) to get an Float32Array for channel x.
+                audioBuffer = resampled;
+            })
+        })
+        .catch(function (e) {
+            console.log("Error with decoding audio data" + e.err);
+            if (e.name === "AbortError") {
+                // We know it's been canceled!
+                console.warn('Worker fetch aborted')
+            }
+        })
+        .then(cb)
+
 
 ipcRenderer.on('save', async (event, arg) => {
     await saveMP3(arg.start, arg.end, arg.filepath, arg.metadata)
 })
 
+ipcRenderer.on('abort', (event, arg) => {
+    console.log("abort received")
+    controller.abort()
+})
 
 function downloadMp3(buffer, filepath, metadata) {
     const MP3Blob = analyzeAudioBuffer(buffer, metadata);
