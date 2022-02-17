@@ -5,7 +5,6 @@ const appPath = '';
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
 const path = require("path");
-const {min} = require("@tensorflow/tfjs");
 //const appPath = process.resourcesPath;
 
 console.log(appPath);
