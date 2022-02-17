@@ -1,6 +1,5 @@
 const {ipcRenderer} = require('electron');
 const Model = require('./js/model.js');
-const fs = require("fs");
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 const appPath = '';
 const lamejs = require("lamejstmp");
