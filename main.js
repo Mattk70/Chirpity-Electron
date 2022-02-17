@@ -17,9 +17,6 @@ function createWindow() {
     // Set icon
     mainWindow.setIcon(__dirname + '/img/icon/icon.png');
 
-    // Always maximize
-    //mainWindow.maximize()
-
     // Hide nav bar
     mainWindow.setMenuBarVisibility(false);
 
@@ -27,7 +24,7 @@ function createWindow() {
     mainWindow.loadFile('index.html')
 
     // Open the DevTools. Comment out for release
-    mainWindow.webContents.openDevTools()
+    //mainWindow.webContents.openDevTools()
 
     // Emitted when the window is closed.
     mainWindow.on('closed', () => {

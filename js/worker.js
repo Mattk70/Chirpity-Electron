@@ -12,7 +12,7 @@ console.log(appPath);
 // console.log(process.resourcesPath);
 
 let audioBuffer;
-const model = new Model(path.join(appPath, '128x192_model/'));
+const model = new Model(path.join(appPath, '256x384_model/'));
 
 (async () => {
     await model.loadModel();
@@ -25,7 +25,7 @@ const model = new Model(path.join(appPath, '128x192_model/'));
 ipcRenderer.on('file-loaded', async (event, arg) => {
     const currentFile = arg.message;
     console.log('Worker received audio ' + arg.message);
-    await loadAudioFile(currentFile);
+    loadAudioFile(currentFile);
     event.sender.send('worker-loaded', {message: currentFile});
 });
 
@@ -77,7 +77,7 @@ ipcRenderer.on('analyze', async (event, arg) => {
 });
 
 
-async function loadAudioFile(filePath) {
+function loadAudioFile(filePath) {
     // create an audio context object and load file into it
     const audioCtx = new AudioContext();
     let source = audioCtx.createBufferSource();
