@@ -18,6 +18,8 @@ let currentFile;
 let region;
 let AUDACITY_LABELS;
 let wavesurfer;
+let summary = {};
+let fileStart, startTime, ctime;
 
 // set up some DOM element caches
 let bodyElement = $('body');
@@ -42,11 +44,16 @@ let config;
 
 
 async function loadAudioFile(filePath) {
+    summary = {};
     // Hide load hint and show spinnner
     if (wavesurfer) {
         wavesurfer.destroy();
         wavesurfer = undefined;
     }
+    // set file creation time
+    ctime = fs.statSync(filePath).ctime
+
+
     hideAll();
     disableMenuItem('analyze')
     showElement('loadFileHint');
@@ -64,10 +71,20 @@ async function loadAudioFile(filePath) {
                 if (err) {
                     reject(err)
                 } else {
+
                     audioCtx.decodeAudioData(data.buffer).then(function (buffer) {
                         const myBuffer = buffer;
                         source.buffer = myBuffer;
                         const duration = source.buffer.duration;
+
+                        // set fileStart time
+                        if (config.timeOfDay) {
+                            fileStart = new Date (ctime - (duration * 1000))
+                        } else {
+                            fileStart = new Date();
+                            fileStart.setHours(0, 0, 0, 0)
+                        }
+
                         //const sampleRate = source.buffer.sampleRate;
                         const offlineCtx = new OfflineAudioContext(1, 48000 * duration, 48000);
                         const offlineSource = offlineCtx.createBufferSource();
@@ -79,7 +96,7 @@ async function loadAudioFile(filePath) {
                             console.log('Rendering completed successfully');
                             // `resampled` contains an AudioBuffer down-mixed to mono and resampled at 48000Hz.
                             // use resampled.getChannelData(x) to get an Float32Array for channel x.
-                            loadBufferSegment(resampled, bufferBegin, bufferBegin + windowLength)
+                            loadBufferSegment(resampled, bufferBegin)
                         })
                     }).catch(function (e) {
                         console.log("Error with decoding audio data" + e.err);
@@ -104,14 +121,16 @@ async function loadAudioFile(filePath) {
     if (modelReady) enableMenuItem('analyze')
 }
 
-function loadBufferSegment(buffer, begin, end) {
-    if (!end) end = windowLength;
+function loadBufferSegment(buffer, begin, saveRegion, scrolling) {
     if (begin < 0) begin = 0;
-    if (begin + end > buffer.duration) begin = Math.max(0, buffer.duration - end);
+    if (begin + windowLength > buffer.duration) {
+        begin = Math.max(0, buffer.duration - windowLength);
+    }
     bufferBegin = begin;
-    AudioBufferSlice(buffer, begin, begin + end, function (error, slicedAudioBuffer) {
+    startTime = new Date(fileStart.getTime() + (bufferBegin * 1000))
+    AudioBufferSlice(buffer, begin, begin + windowLength, function (error, slicedAudioBuffer) {
         if (error) {
-            console.error(error);
+            console.log(error);
         } else {
             if (!wavesurfer) {
                 initSpec({
@@ -122,9 +141,10 @@ function loadBufferSegment(buffer, begin, end) {
                     'spectrogram': true
                 });
             } else {
-                wavesurfer.clearRegions();
+                if (!saveRegion) {
+                    wavesurfer.clearRegions();
+                }
                 updateSpec(slicedAudioBuffer)
-
             }
         }
     })
@@ -251,7 +271,7 @@ function zoomSpecIn() {
         wavesurfer.params.fftSamples = 1024
         wavesurfer.spectrogram.render()
     }
-    loadBufferSegment(currentBuffer, bufferBegin);
+    loadBufferSegment(currentBuffer, bufferBegin, true);
     //WS_ZOOM += 50;
     //wavesurfer.zoom(WS_ZOOM);
     adjustSpecDims(true)
@@ -261,7 +281,7 @@ function zoomSpecIn() {
 function zoomSpecOut() {
     if (windowLength > 100) return;
     windowLength *= 2;
-    loadBufferSegment(currentBuffer, bufferBegin);
+    loadBufferSegment(currentBuffer, bufferBegin, true);
     //WS_ZOOM -= 50;
     //wavesurfer.zoom(WS_ZOOM);
     adjustSpecDims(true)
@@ -340,6 +360,7 @@ analyzeSelectionLink.addEventListener('click', async () => {
     ipcRenderer.send('analyze', {confidence: 0.1, start: start, end: end});
     analyzeLink.disabled = true;
 });
+
 
 // Menu bar functions
 
@@ -470,38 +491,78 @@ document.querySelectorAll(".tableFixHead").forEach(el =>
  * @param: seconds
  * @param: pxPerSec
  */
-function formatTimeCallback(seconds) {
-    seconds = Number(seconds);
-    seconds += Math.floor(bufferBegin);
-    let minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    seconds = seconds % 60;
+
+
+function formatTimeCallback(secs) {
+    secs = Number(secs);
+    const now = new Date(startTime.getTime() + (secs * 1000))
+    const milliSeconds = now.getMilliseconds();
+    const seconds = now.getSeconds();
+    const minutes = now.getMinutes();
+    const hours = now.getHours();
 
     // fill up seconds with zeroes
     let secondsStr;
     if (windowLength >= 5) {
-        secondsStr = Math.round(seconds).toString();
+        secondsStr = seconds.toString();
     } else {
-        secondsStr = seconds.toFixed(1).toString();
+        secondsStr = seconds.toString() + '.' + Math.round(milliSeconds / 100).toString();
     }
-    if (minutes > 0) {
+    if (minutes > 0 || config.timeOfDay) {
         if (seconds < 10) {
             secondsStr = '0' + secondsStr;
         }
-    } else {
+    } else if (!config.timeOfDay) {
         return secondsStr;
     }
-    minutes = minutes % 60;
-    let minutesStr = Math.round(minutes).toString();
-    if (hours > 0) {
+    let minutesStr = minutes.toString();
+    if (config.timeOfDay || hours > 0) {
         if (minutes < 10) {
             minutesStr = '0' + minutesStr;
         }
-    } else {
+    } else if (!config.timeOfDay) {
         return `${minutes}:${secondsStr}`
+    }
+    if (hours < 10 && config.timeOfDay) {
+        let hoursStr = '0' + hours.toString();
+        return `${hoursStr}:${minutesStr}:${secondsStr}`
     }
     return `${hours}:${minutesStr}:${secondsStr}`
 }
+
+
+// function formatTimeCallback(seconds) {
+//     seconds = Number(seconds);
+//     seconds += Math.floor(bufferBegin);
+//     let minutes = Math.floor(seconds / 60);
+//     const hours = Math.floor(minutes / 60);
+//     seconds = seconds % 60;
+//
+//     // fill up seconds with zeroes
+//     let secondsStr;
+//     if (windowLength >= 5) {
+//         secondsStr = Math.round(seconds).toString();
+//     } else {
+//         secondsStr = seconds.toFixed(1).toString();
+//     }
+//     if (minutes > 0) {
+//         if (seconds < 10) {
+//             secondsStr = '0' + secondsStr;
+//         }
+//     } else {
+//         return secondsStr;
+//     }
+//     minutes = minutes % 60;
+//     let minutesStr = Math.round(minutes).toString();
+//     if (hours > 0) {
+//         if (minutes < 10) {
+//             minutesStr = '0' + minutesStr;
+//         }
+//     } else {
+//         return `${minutes}:${secondsStr}`
+//     }
+//     return `${hours}:${minutesStr}:${secondsStr}`
+// }
 
 /**
  * Use timeInterval to set the period between notches, in seconds,
@@ -524,9 +585,9 @@ function timeInterval(pxPerSec) {
     } else if (pxPerSec >= 25 * 4) {
         retval = 0.25;
     } else if (pxPerSec >= 25) {
-        retval = 1;
-    } else if (pxPerSec * 5 >= 25) {
         retval = 5;
+    } else if (pxPerSec * 5 >= 25) {
+        retval = 10;
     } else if (pxPerSec * 15 >= 25) {
         retval = 15;
     } else {
@@ -584,8 +645,8 @@ function primaryLabelInterval(pxPerSec) {
  * @param pxPerSec
  */
 function secondaryLabelInterval(pxPerSec) {
-    // draw one every 10s as an example
-    return Math.floor(10 / timeInterval(pxPerSec));
+    // draw one every 1s as an example
+    return Math.floor(1 / timeInterval(pxPerSec));
 }
 
 ////////// Store preferences //////////
@@ -611,7 +672,13 @@ window.onload = function () {
         }
     } catch {
         // If file read error, use defaults
-        config = {'spectrogram': true, 'colormap': 'inferno', 'timeline': true, 'minConfidence': 0.2}
+        config = {
+            'spectrogram': true,
+            'colormap': 'inferno',
+            'timeline': true,
+            'minConfidence': 0.5,
+            'timeOfDay': false
+        }
         const {v4: uuidv4} = require('uuid');
         config.UUID = uuidv4()
         updatePrefs()
@@ -623,6 +690,13 @@ window.onload = function () {
     }
     if (!config.timeline) {
         $('#loadTimeline .tick').hide()
+    }
+    if (config.timeOfDay) {
+        $('#timecode .tick').hide()
+        $('#timeOfDay .tick').show()
+    } else {
+        $('#timecode .tick').show()
+        $('#timeOfDay .tick').hide()
     }
     showElement(config.colormap + 'span', true)
 
@@ -765,6 +839,26 @@ $(document).on('click', '.timeline', function () {
     }
 })
 
+$(document).on('click', '#timeOfDay', function () {
+    // set file creation time
+    config.timeOfDay = true
+    $('#timecode .tick').hide()
+    $('#timeOfDay .tick').show()
+    fileStart = ctime
+    loadBufferSegment(currentBuffer, bufferBegin);
+    updatePrefs();
+})
+$(document).on('click', '#timecode', function () {
+    config.timeOfDay = false
+    $('#timeOfDay .tick').hide()
+    $('#timecode .tick').show()
+    //start at zero
+    fileStart = new Date();
+    fileStart.setHours(0, 0, 0, 0);
+    loadBufferSegment(currentBuffer, bufferBegin);
+    updatePrefs();
+})
+
 /////////// Keyboard Shortcuts  ////////////
 
 const GLOBAL_ACTIONS = { // eslint-disable-line
@@ -801,6 +895,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         if (wavesurfer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
             bufferBegin -= windowLength
+            // Set new date for timeline
             const playhead = bufferBegin + wavesurfer.getCurrentTime()
             loadBufferSegment(currentBuffer, bufferBegin)
             playhead <= 0 ? wavesurfer.seekAndCenter(0) : wavesurfer.seekAndCenter(position);
@@ -811,6 +906,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         if (wavesurfer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
             bufferBegin += windowLength
+            // Set new date for timeline
             const playhead = bufferBegin + wavesurfer.getCurrentTime()
             loadBufferSegment(currentBuffer, bufferBegin)
             playhead >= currentBuffer.duration ? wavesurfer.seekAndCenter(1) : wavesurfer.seekAndCenter(position);
@@ -885,6 +981,8 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
     enableMenuItem('saveLabels');
     $('.download').removeClass('disabled');
 
+    console.table(summary);
+
 });
 
 ipcRenderer.on('prediction-ongoing', async (event, arg) => {
@@ -901,6 +999,12 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
     if (result === "No detections found.") {
         tr = "<tr><td>" + result + "</td></tr>";
     } else {
+        if (result.cname in summary) {
+            summary[result.cname] += 1
+        } else {
+            summary[result.cname] = 1
+        }
+
         const regex = /:/g;
         const start = result.start, end = result.end;
         const filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp.replace(regex, '.') + '.mp3';
@@ -919,7 +1023,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
              '${result.cname2.replace(/'/g, "\\'")}', '${result.sname2}','${result.score2}',
              '${result.cname3.replace(/'/g, "\\'")}', '${result.sname3}', '${result.score3}')">
             file_download</span></td>`;
-        tr += "<td class='text-center'> <span class='material-icons-two-tone text-success pointer'>thumb_up</span> <span class='material-icons-two-tone text-danger pointer'>thumb_down</span></td>";
+        tr += "<td class='text-center'> <span class='material-icons-two-tone text-success pointer'>thumb_up_alt</span> <span class='material-icons-two-tone text-danger pointer'>thumb_down_alt</span></td>";
         tr += "</tr>";
 
         tr += "<tr class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + " )'><th scope='row'> </th>";

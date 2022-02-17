@@ -23,6 +23,7 @@
 <body>
 
 <!-- Navigation bar -->
+
 <nav class="pt-0 pb-0 navbar navbar-expand-sm navbar-dark bg-dark position-relative">
     <!--a class="navbar-brand" href="#">Chirpity</a -->
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
@@ -38,7 +39,8 @@
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
                     <a class="dropdown-item" href="#" onclick="showOpenDialog();"><u>O</u>pen Audio File </a>
-                    <a class="dropdown-item disabled" onclick="showSaveDialog()" id="saveLabels" href="#"><u>S</u>ave Audacity
+                    <a class="dropdown-item disabled" onclick="showSaveDialog()" id="saveLabels" href="#"><u>S</u>ave
+                        Audacity
                         Labels</a>
                     <a class="dropdown-item disabled" onclick="sendSaveFile()" id="exportMP3" href="#">Export Selected
                         Audio
@@ -64,26 +66,51 @@
                     Options
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item" href="#" id="loadSpectrogram">Load Spectrogram
-                        <span class='material-icons tick'>done</span>
-                    </a>
-                    <a class="dropdown-item timeline" href="#" id="loadTimeline">Show Timeline
-                        <span class='material-icons tick'>done</span>
-                    </a>
-                    <div class="dropdown-divider"></div>
-                    <div>
-                        <a class="dropdown-item speccolor disabled" href="#" id="inferno">Colour
-                            <span class='material-icons tick d-none'>done</span>
-                        </a>
-                        <a class="dropdown-item speccolor disabled" href="#" id="greys">Grayscale
-                            <span class='material-icons tick d-none'>done</span>
-                        </a>
-                        <!-- a class="dropdown-item speccolor disabled" href="#" id="hot">Hot</a>
-                        <a class="dropdown-item speccolor disabled" href="#" id="bone">Bone</a -->
-                    </div>
+                    <a class="dropdown-item disabled" href="#" id="modelOptions">Model</a>
+                    <ul class="nav navbar-nav">
+                        <li class="dropdown-submenu">
+                            <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
+                               aria-haspopup="true" aria-expanded="false"> <span
+                                    class="nav-label">Spectrogram</span><span class="material-icons-two-tone arrow">navigate_next</span></a>
+                            <ul class="dropdown-menu">
+                                <a class="dropdown-item" href="#" id="loadSpectrogram">Enable
+                                    <span class='material-icons tick'>done</span>
+                                </a>
+                                <div class="dropdown-divider"></div>
+                                <div class="dropdown-submenu" aria-labelledby="navbarDropdown">
+                                    <ul class="nav navbar-nav">
+                                        <li class="dropdown-submenu">
+                                            <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
+                                               aria-haspopup="true" aria-expanded="false"> <span
+                                                    class="nav-label">Timeline</span><span class="material-icons-two-tone arrow">navigate_next</span></a>
+                                            <ul class="dropdown-menu">
+                                                <a class="dropdown-item timeline" href="#" id="loadTimeline">Enable
+                                                    <span class='material-icons tick'>done</span>
+                                                </a>
+                                                <div class="dropdown-divider"></div>
+                                                <a class="dropdown-item " href="#" id="timecode">Time Elapsed
+                                                    <span class='material-icons tick'>done</span>
+                                                </a>
+                                                <a class="dropdown-item" href="#" id="timeOfDay">
+                                                  Time of Day <span class='material-icons tick'>done</span>
+                                                </a>
+                                            </ul>
+                                        </li>
+                                    </ul>
+
+
+                                </div>
+                                <a class="dropdown-item speccolor disabled" href="#" id="inferno">Colour
+                                    <span class='material-icons tick d-none'>done</span>
+                                </a>
+                                <a class="dropdown-item speccolor disabled" href="#" id="greys">Grayscale
+                                    <span class='material-icons tick d-none'>done</span>
+                                </a>
+                            </ul>
+                        </li>
+                    </ul>
                 </div>
             </li>
-
         </ul>
         <img class="" src="img/logo/chirpity_logo2.png" alt="Chirpity Birdcalls: Identifying birds by sound"
              height="50px"/>
