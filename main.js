@@ -38,8 +38,8 @@ function createWorker() {
     workerWindow = new BrowserWindow({
         //show: false,
         show: true,
-        height: 80,
-        width: 120,
+        height: 800,
+        width: 1200,
         webPreferences: {
             nodeIntegration: true,
             enableRemoteModule: false,
@@ -128,6 +128,10 @@ ipcMain.on('progress', (event, arg) => {
 
 ipcMain.on('save', (event, arg) => {
     workerWindow.webContents.send('save', arg);
+});
+
+ipcMain.on('post', (event, arg) => {
+    workerWindow.webContents.send('post', arg);
 });
 
 ipcMain.on('abort', (event, arg) => {
