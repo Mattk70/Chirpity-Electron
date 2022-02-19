@@ -12,41 +12,28 @@ const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 const p = require('path');
 
 let appPath = remote.app.getPath('userData');
-let modelReady = false;
-let fileLoaded = false;
-let currentFile;
-let region;
-let AUDACITY_LABELS;
-let wavesurfer;
-let summary = {};
+let modelReady = false, fileLoaded = false, currentFile;
+let region, AUDACITY_LABELS, wavesurfer, summary = {};
 let fileStart, startTime, ctime;
 
 // set up some DOM element caches
 let bodyElement = $('body');
-let dummyElement;
-let specElement;
-let waveElement;
-let specCanvasElement;
-let specWaveElement;
-let waveCanvasElement;
-let waveWaveElement;
-let resultTableElement = $('#resultTableContainer');
+let dummyElement, specElement, waveElement, specCanvasElement, specWaveElement;
+let waveCanvasElement, waveWaveElement, resultTableElement = $('#resultTableContainer');
 let contentWrapperElement = $('#contentWrapper');
 let controlsWrapperElement = $('#controlsWrapper');
 let completeDiv = $('.complete');
 const resultTable = $('#resultTableBody')
 
-let currentBuffer;
-let bufferBegin = 0;
-let windowLength = 20;  // seconds
+let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
 
 // Set default Options
 let config;
-
+const sampleRate = 48000;
 let controller = new AbortController();
 let signal = controller.signal;
 
-const audioCtx = new AudioContext();
+const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
 const fetchAudioFile = (filePath, cb) =>
     fetch(filePath, {signal})
         .then((res => res.arrayBuffer()))
@@ -64,7 +51,6 @@ const fetchAudioFile = (filePath, cb) =>
                 fileStart.setHours(0, 0, 0, 0)
             }
 
-            const sampleRate = 48000;
             const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
             const offlineSource = offlineCtx.createBufferSource();
             offlineSource.buffer = buffer;
@@ -85,6 +71,7 @@ const fetchAudioFile = (filePath, cb) =>
                 console.warn('Fetch aborted sending massage to worker')
                 hideAll();
                 disableMenuItem('analyze')
+                disableMenuItem('analyzeSelection');
                 showElement('loadFileHint');
                 showElement('loadFileHintText', false);
             }
@@ -93,6 +80,7 @@ const fetchAudioFile = (filePath, cb) =>
 
 
 async function loadAudioFile(filePath) {
+    ipcRenderer.send('file-loaded', {message: filePath});
     summary = {};
     // Hide load hint and show spinnner
     if (wavesurfer) {
@@ -163,14 +151,11 @@ async function loadAudioFile(filePath) {
         showElement('controlsWrapper');
         $('.specFeature').hide()
     }
-    ipcRenderer.send('file-loaded', {message: filePath});
     fileLoaded = true;
     completeDiv.hide();
     const filename = filePath.replace(/^.*[\\\/]/, '')
     $('#filename').html('<span class="material-icons-two-tone">audio_file</span> ' + filename);
     // show the spec
-
-    if (modelReady) enableMenuItem('analyze')
 }
 
 function loadBufferSegment(buffer, begin, saveRegion, scrolling) {
@@ -394,6 +379,8 @@ const analyzeLink = document.getElementById('analyze');
 
 analyzeLink.addEventListener('click', async () => {
     completeDiv.hide();
+    disableMenuItem('analyze')
+    disableMenuItem('analyzeSelection');
     ipcRenderer.send('analyze', {confidence: config.minConfidence});
     analyzeLink.disabled = true;
 });
@@ -402,6 +389,8 @@ const analyzeSelectionLink = document.getElementById('analyzeSelection');
 
 analyzeSelectionLink.addEventListener('click', async () => {
     completeDiv.hide();
+    disableMenuItem('analyze')
+    disableMenuItem('analyzeSelection');
     let start;
     let end;
     if (region.start) {
@@ -436,7 +425,10 @@ function toggleAlternates(row) {
 function showElement(id, makeFlex = true, empty = false) {
     $('#' + id).removeClass('d-none');
     if (makeFlex) $('#' + id).addClass('d-flex');
-    if (empty) $('#' + id).empty();
+    if (empty) {
+        $('#' + id).height(0);
+        $('#' + id).empty()
+    }
 }
 
 function hideElement(id) {
@@ -999,15 +991,12 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
 
 ipcRenderer.on('model-ready', async () => {
     modelReady = true;
-    if (fileLoaded) {
-        enableMenuItem('analyze')
-    }
 })
 
 ipcRenderer.on('worker-loaded', async (event, arg) => {
+    console.log('UI received worker-loaded: ' + arg.message)
+    enableMenuItem('analyze')
     if (!loadSpectrogram) {
-        console.log('UI received worker-loaded: ' + arg.message)
-        enableMenuItem('analyze')
         hideAll();
         showElement('controlsWrapper');
         hideElement('transport-controls');
@@ -1044,7 +1033,8 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
     const index = arg.index;
     if (index === 1) {
         // Remove old results
-        resultTable.empty();
+        resultTable.empty()
+
     }
     let tr;
     showElement('resultTableContainer');
@@ -1070,12 +1060,23 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr += `<td class='specFeature text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="_blank"><img src='img/logo/XC.png' alt='Search on Xeno Canto'></a></td>`
 
         tr += `<td class='specFeature text-center'><span class='material-icons-outlined pointer disabled download' 
-            onclick="sendSaveFile(${start} , ${end}, '${filename}', 
+            onclick="sendFile(${start} , ${end}, '${filename}', 
              '${result.cname.replace(/'/g, "\\'")}', '${result.sname}', '${result.score}',
              '${result.cname2.replace(/'/g, "\\'")}', '${result.sname2}','${result.score2}',
-             '${result.cname3.replace(/'/g, "\\'")}', '${result.sname3}', '${result.score3}')">
+             '${result.cname3.replace(/'/g, "\\'")}', '${result.sname3}', '${result.score3}',
+             'save')">
             file_download</span></td>`;
-        tr += "<td class='text-center'> <span class='material-icons-two-tone text-success pointer'>thumb_up_alt</span> <span class='material-icons-two-tone text-danger pointer'>thumb_down_alt</span></td>";
+        tr += `<td class='text-center'> <span class='material-icons-two-tone text-success pointer' 
+            onclick="if (confirm('Submit this correct prediction?')) sendFile(${start} , ${end}, '${filename}', 
+             '${result.cname.replace(/'/g, "\\'")}', '${result.sname}', '${result.score}',
+             '${result.cname2.replace(/'/g, "\\'")}', '${result.sname2}','${result.score2}',
+             '${result.cname3.replace(/'/g, "\\'")}', '${result.sname3}', '${result.score3}',
+             'correct')">thumb_up_alt</span> <span class='material-icons-two-tone text-danger pointer'
+             onclick="if (confirm('Submit this prediction as incorrect?')) sendFile(${start} , ${end}, '${filename}', 
+             '${result.cname.replace(/'/g, "\\'")}', '${result.sname}', '${result.score}',
+             '${result.cname2.replace(/'/g, "\\'")}', '${result.sname2}','${result.score2}',
+             '${result.cname3.replace(/'/g, "\\'")}', '${result.sname3}', '${result.score3}',
+             'incorrect')">thumb_down_alt</span></td>`;
         tr += "</tr>";
 
         tr += "<tr class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + " )'><th scope='row'> </th>";
@@ -1115,7 +1116,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
     })
 });
 
-function sendSaveFile(start, end, filename, cname, sname, score, cname2, sname2, score2, cname3, sname3, score3) {
+function sendFile(start, end, filename, cname, sname, score, cname2, sname2, score2, cname3, sname3, score3, action) {
     if (!start && start !== 0) {
         if (!wavesurfer.regions.list === {}) {
             start = 0;
@@ -1145,7 +1146,18 @@ function sendSaveFile(start, end, filename, cname, sname, score, cname2, sname2,
             'score3': score3
         };
     }
-    ipcRenderer.send('save', {'start': start, 'end': end, 'filepath': filename, 'metadata': metadata})
+    if (action === 'save') {
+        ipcRenderer.send('save', {
+            'start': start, 'end': end, 'filepath': filename, 'metadata': metadata})
+    } else {
+        if (!config.seenThanks) {
+            alert('Thank you, your feedback helps improve Chirpity predictions');
+            config.seenThanks = true;
+            updatePrefs()
+        }
+        ipcRenderer.send('post', {
+            'start': start, 'end': end, 'filepath': filename, 'metadata': metadata, 'action': action})
+    }
 }
 
 // create a dict mapping score to icon

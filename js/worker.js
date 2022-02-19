@@ -99,11 +99,11 @@ const loadAudioFile = (filePath, cb) =>
             offlineSource.connect(offlineCtx.destination);
             offlineSource.start();
             offlineCtx.startRendering().then(function (resampled) {
-                console.log('Rendering completed successfully');
-                ipcRenderer.send('worker loaded file', {message: filePath});
                 // `resampled` contains an AudioBuffer resampled at 48000Hz.
                 // use resampled.getChannelData(x) to get an Float32Array for channel x.
                 audioBuffer = resampled;
+                console.log('Rendering completed successfully');
+                ipcRenderer.send('worker-loaded', {message: filePath});
             })
         })
         .catch(function (e) {
@@ -120,6 +120,10 @@ ipcRenderer.on('save', async (event, arg) => {
     await saveMP3(arg.start, arg.end, arg.filepath, arg.metadata)
 })
 
+ipcRenderer.on('post', async (event, arg) => {
+    await postMP3(arg.start, arg.end, arg.filepath, arg.metadata, arg.action)
+})
+
 ipcRenderer.on('abort', (event, arg) => {
     console.log("abort received")
     controller.abort()
@@ -127,25 +131,6 @@ ipcRenderer.on('abort', (event, arg) => {
 
 function downloadMp3(buffer, filepath, metadata) {
     const MP3Blob = analyzeAudioBuffer(buffer, metadata);
-
-//
-//     var formData = new FormData();
-//     formData.append("thefile", MP3Blob);
-//
-// // post form data
-//     const xhr = new XMLHttpRequest();
-//     xhr.responseType = 'text';
-//
-// // log response
-//     xhr.onload = () => {
-//         console.log(xhr.response);
-//     };
-//
-// // create and send the reqeust
-//     xhr.open('POST', 'https://birds.mattkirkland.co.uk/upload');
-//     xhr.send(formData);
-//
-
     const anchor = document.createElement('a');
     document.body.appendChild(anchor);
     anchor.style = 'display: none';
@@ -154,6 +139,26 @@ function downloadMp3(buffer, filepath, metadata) {
     anchor.download = filepath;
     anchor.click();
     window.URL.revokeObjectURL(url);
+}
+
+function uploadMp3(buffer, filepath, metadata, action) {
+    const MP3Blob = analyzeAudioBuffer(buffer, metadata);
+// Populate a form with the file (blob) and filename
+    var formData = new FormData();
+    const timestamp = Date.now()
+    formData.append("thefile", MP3Blob, metadata.filename);
+    // Was the prediction a correct one?
+        formData.append("Chirpity_assessment", action);
+// post form data
+    const xhr = new XMLHttpRequest();
+    xhr.responseType = 'text';
+// log response
+    xhr.onload = () => {
+        console.log(xhr.response);
+    };
+// create and send the reqeust
+    xhr.open('POST', 'https://birds.mattkirkland.co.uk/upload');
+    xhr.send(formData);
 }
 
 function analyzeAudioBuffer(aBuffer, metadata) {
@@ -291,6 +296,17 @@ async function saveMP3(start, end, filepath, metadata) {
             console.error(error);
         } else {
             downloadMp3(slicedAudioBuffer, filepath, metadata)
+        }
+    })
+}
+
+
+async function postMP3(start, end, filepath, metadata, action) {
+    AudioBufferSlice(audioBuffer, start, end, async function (error, slicedAudioBuffer) {
+        if (error) {
+            console.error(error);
+        } else {
+            uploadMp3(slicedAudioBuffer, filepath, metadata, action)
         }
     })
 }
