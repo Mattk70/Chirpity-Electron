@@ -42,7 +42,7 @@
                     <a class="dropdown-item disabled" onclick="showSaveDialog()" id="saveLabels" href="#"><u>S</u>ave
                         Audacity
                         Labels</a>
-                    <a class="dropdown-item disabled" onclick="sendSaveFile()" id="exportMP3" href="#">Export Selected
+                    <a class="dropdown-item disabled" onclick="sendFile()" id="exportMP3" href="#">Export Selected
                         Audio
                     </a>
                     <div class="dropdown-divider"></div>
@@ -73,39 +73,46 @@
                                aria-haspopup="true" aria-expanded="false"> <span
                                     class="nav-label">Spectrogram</span><span class="material-icons-two-tone arrow">navigate_next</span></a>
                             <ul class="dropdown-menu">
-                                <a class="dropdown-item" href="#" id="loadSpectrogram">Enable
+                                <li><a class="dropdown-item" href="#" id="loadSpectrogram">Enable
                                     <span class='material-icons tick'>done</span>
-                                </a>
-                                <div class="dropdown-divider"></div>
-                                <div class="dropdown-submenu" aria-labelledby="navbarDropdown">
-                                    <ul class="nav navbar-nav">
-                                        <li class="dropdown-submenu">
-                                            <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
-                                               aria-haspopup="true" aria-expanded="false"> <span
-                                                    class="nav-label">Timeline</span><span class="material-icons-two-tone arrow">navigate_next</span></a>
-                                            <ul class="dropdown-menu">
-                                                <a class="dropdown-item timeline" href="#" id="loadTimeline">Enable
-                                                    <span class='material-icons tick'>done</span>
-                                                </a>
-                                                <div class="dropdown-divider"></div>
-                                                <a class="dropdown-item " href="#" id="timecode">Time Elapsed
-                                                    <span class='material-icons tick'>done</span>
-                                                </a>
-                                                <a class="dropdown-item" href="#" id="timeOfDay">
-                                                  Time of Day <span class='material-icons tick'>done</span>
-                                                </a>
-                                            </ul>
-                                        </li>
-                                    </ul>
+                                </a></li>
+                                <li>
+                                    <div class="dropdown-divider"></div>
+                                </li>
+                                <li>
+                                    <div class="dropdown-submenu" aria-labelledby="navbarDropdown">
+                                        <ul class="nav navbar-nav">
+                                            <li class="dropdown-submenu">
+                                                <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
+                                                   aria-haspopup="true" aria-expanded="false"> <span
+                                                        class="nav-label">Timeline</span><span
+                                                        class="material-icons-two-tone arrow">navigate_next</span></a>
+                                                <ul class="dropdown-menu">
+                                                    <li><a class="dropdown-item timeline" href="#" id="loadTimeline">Enable
+                                                        <span class='material-icons tick'>done</span>
+                                                    </a></li>
+                                                    <li>
+                                                        <div class="dropdown-divider"></div>
+                                                    </li>
+                                                    <li><a class="dropdown-item " href="#" id="timecode">Time Elapsed
+                                                        <span class='material-icons tick'>done</span>
+                                                    </a></li>
+                                                    <li><a class="dropdown-item" href="#" id="timeOfDay">
+                                                        Time of Day <span class='material-icons tick'>done</span>
+                                                    </a></li>
+                                                </ul>
+                                            </li>
+                                        </ul>
 
 
-                                </div>
-                                <a class="dropdown-item speccolor disabled" href="#" id="inferno">Colour
+                                    </div>
+                                </li>
+                                <li><a class="dropdown-item speccolor disabled" href="#" id="inferno">Colour
                                     <span class='material-icons tick d-none'>done</span>
-                                </a>
-                                <a class="dropdown-item speccolor disabled" href="#" id="greys">Grayscale
+                                </a></li>
+                                <li><a class="dropdown-item speccolor disabled" href="#" id="greys">Grayscale
                                     <span class='material-icons tick d-none'>done</span>
-                                </a>
+                                </a></li>
                             </ul>
                         </li>
                     </ul>
@@ -139,7 +146,7 @@
     <div class="" id="dummy" style="width: 100%"></div>
 
     <!-- Controls view -->
-    <div class="container-fluid p-2 bg-dark text-white d-none justify-content-between" id="controlsWrapper">
+    <div class="container-fluid p-1 bg-dark text-white d-none justify-content-between" id="controlsWrapper">
         <!-- RESULTS -->
         <!--ul class="nav nav-tabs pb-0">
             <li class="nav-item details ">
@@ -153,14 +160,14 @@
 
         <div class="btn-group specFeature" role="group" id="transport-controls">
             <button class="btn btn-outline-secondary text-center" onmousedown="wavesurfer.playPause();">
-                <i class="material-icons">play_arrow</i><span>Play / </span>
-                <i class="material-icons">pause</i><span>Pause</span>
+                <i class="material-icons">play_arrow</i><span class="align-bottom">Play / </span>
+                <i class="material-icons">pause</i><span class="align-bottom">Pause</span>
             </button>
             <button class="btn btn-outline-secondary" onclick="zoomSpecIn();">
-                <i class="material-icons">zoom_in</i>
+                <i class="material-icons-two-tone">zoom_in</i>
             </button>
             <button class="btn btn-outline-secondary" onclick="zoomSpecOut();">
-                <i class="material-icons">zoom_out</i>
+                <i class="material-icons-two-tone">zoom_out</i>
             </button>
 
         </div>
@@ -181,7 +188,7 @@
 
     <!-- Result table -->
     <div class="d-none p-0 border-0 overflow-auto tableFixHead" id="resultTableContainer">
-        <table class="table table-hover" style="" width>
+        <table class="table table-hover  p-1">
             <thead class="thead-dark">
             <tr>
                 <th scope="col">#</th>

@@ -145,7 +145,7 @@ function uploadMp3(buffer, filepath, metadata, action) {
     const MP3Blob = analyzeAudioBuffer(buffer, metadata);
 // Populate a form with the file (blob) and filename
     var formData = new FormData();
-    const timestamp = Date.now()
+    //const timestamp = Date.now()
     formData.append("thefile", MP3Blob, metadata.filename);
     // Was the prediction a correct one?
         formData.append("Chirpity_assessment", action);
