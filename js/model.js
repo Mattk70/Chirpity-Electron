@@ -109,7 +109,7 @@ class Model {
         warmupResult.dispose();
     }
 
-    async predictChunk(chunk, index, isRegion) {
+    async predictChunk(chunk, index) {
         let result;
         let audacity;
         tf.tidy(() => {

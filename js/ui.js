@@ -158,7 +158,7 @@ async function loadAudioFile(filePath) {
     // show the spec
 }
 
-function loadBufferSegment(buffer, begin, saveRegion, scrolling) {
+function loadBufferSegment(buffer, begin, saveRegion) {
     if (begin < 0) begin = 0;
     if (begin + windowLength > buffer.duration) {
         begin = Math.max(0, buffer.duration - windowLength);
@@ -187,7 +187,7 @@ function loadBufferSegment(buffer, begin, saveRegion, scrolling) {
     })
 }
 
-function updateSpec(buffer, upDown) {
+function updateSpec(buffer) {
     // Show spec and timecode containers
     //wavesurfer.timeline.params.offset = -bufferBegin;
     wavesurfer.loadDecodedBuffer(buffer);
@@ -263,6 +263,7 @@ function initSpec(args) {
     waveElement.mousedown(function () {
         wavesurfer.clearRegions();
         disableMenuItem('analyzeSelection');
+        enableMenuItem('analyze');
     });
     // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
@@ -346,7 +347,7 @@ async function showOpenDialog() {
 async function showSaveDialog() {
     // Show file dialog to save Audacity label file
     currentFile = currentFile.substr(0, currentFile.lastIndexOf(".")) + ".txt";
-    const fileDialog = await dialog.showSaveDialog({
+    await dialog.showSaveDialog({
         filters: [{name: 'Text Files', extensions: ['txt']}],
         defaultPath: currentFile
     }).then(file => {
@@ -423,17 +424,19 @@ function toggleAlternates(row) {
 }
 
 function showElement(id, makeFlex = true, empty = false) {
-    $('#' + id).removeClass('d-none');
-    if (makeFlex) $('#' + id).addClass('d-flex');
+    const thisElement = $('#' + id);
+    thisElement.removeClass('d-none');
+    if (makeFlex) thisElement.addClass('d-flex');
     if (empty) {
-        $('#' + id).height(0);
-        $('#' + id).empty()
+        thisElement.height(0);
+        thisElement.empty()
     }
 }
 
 function hideElement(id) {
-    $('#' + id).removeClass('d-flex');
-    $('#' + id).addClass('d-none');
+    const thisElement = $('#' + id);
+    thisElement.removeClass('d-flex');
+    thisElement.addClass('d-none');
 
 }
 
@@ -1020,9 +1023,12 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
     progressBar.attr('aria-valuenow', 0);
     progressBar.html(0 + '%');
     completeDiv.show();
-    enableMenuItem('saveLabels');
-    $('.download').removeClass('disabled');
-
+    if (AUDACITY_LABELS.length > 0) {
+        enableMenuItem('saveLabels');
+        $('.download').removeClass('disabled');
+    } else {
+        disableMenuItem('saveLabels');
+    }
     console.table(summary);
 
 });
@@ -1148,7 +1154,8 @@ function sendFile(start, end, filename, cname, sname, score, cname2, sname2, sco
     }
     if (action === 'save') {
         ipcRenderer.send('save', {
-            'start': start, 'end': end, 'filepath': filename, 'metadata': metadata})
+            'start': start, 'end': end, 'filepath': filename, 'metadata': metadata
+        })
     } else {
         if (!config.seenThanks) {
             alert('Thank you, your feedback helps improve Chirpity predictions');
@@ -1156,7 +1163,8 @@ function sendFile(start, end, filename, cname, sname, score, cname2, sname2, sco
             updatePrefs()
         }
         ipcRenderer.send('post', {
-            'start': start, 'end': end, 'filepath': filename, 'metadata': metadata, 'action': action})
+            'start': start, 'end': end, 'filepath': filename, 'metadata': metadata, 'action': action
+        })
     }
 }
 
