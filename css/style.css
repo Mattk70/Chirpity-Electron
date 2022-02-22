@@ -125,6 +125,13 @@ tr[class^="subrow"] {
     display: none
 }
 
+span[id^="filename_"] {
+    border-bottom: 1px;
+    border-bottom: #818182;
+    left: 25px;
+    z-index: 100;
+}
+
 .rotate {
     -moz-transition: all 0.2s linear;
     -webkit-transition: all 0.2s linear;
@@ -147,7 +154,26 @@ tr[class^="subrow"] {
     cursor: pointer;
 }
 
+.openFiles {
+    display: none;
+}
+
+.openFiles.visible {
+    display: block;
+}
+
+#controlsWrapper .row, #transport-controls {
+    height: 40px;
+    z-index: 6;
+}
+
+#transport-controls {
+    position: absolute;
+    z-index: 7;
+}
+
 div#contentWrapper {
     background: #dbe2ed url(../img/Redwing-flight.png);
     background-size: cover;
 }
+

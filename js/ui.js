@@ -12,7 +12,7 @@ const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 const p = require('path');
 
 let appPath = remote.app.getPath('userData');
-let modelReady = false, fileLoaded = false, currentFile;
+let modelReady = false, fileLoaded = false, currentFile, fileList, resultHistory = {};
 let region, AUDACITY_LABELS, wavesurfer, summary = {};
 let fileStart, startTime, ctime;
 
@@ -104,46 +104,6 @@ async function loadAudioFile(filePath) {
         controller = new AbortController();
         signal = controller.signal;
         await fetchAudioFile(filePath, console.log('finished'))
-        // create an audio context object and load file into it
-        //const audioCtx = new AudioContext();
-        //let source = audioCtx.createBufferSource();
-        // fs.readFile(filePath, function (err, data) {
-        //         if (err) {
-        //             reject(err)
-        //         } else {
-        //
-        //             audioCtx.decodeAudioData(data.buffer).then(function (buffer) {
-        //                 const myBuffer = buffer;
-        //                 source.buffer = myBuffer;
-        //                 const duration = source.buffer.duration;
-        //
-        //                 // set fileStart time
-        //                 if (config.timeOfDay) {
-        //                     fileStart = new Date(ctime - (duration * 1000))
-        //                 } else {
-        //                     fileStart = new Date();
-        //                     fileStart.setHours(0, 0, 0, 0)
-        //                 }
-        //
-        //                 //const sampleRate = source.buffer.sampleRate;
-        //                 const offlineCtx = new OfflineAudioContext(1, 48000 * duration, 48000);
-        //                 const offlineSource = offlineCtx.createBufferSource();
-        //                 offlineSource.buffer = buffer;
-        //                 offlineSource.connect(offlineCtx.destination);
-        //                 offlineSource.start();
-        //                 offlineCtx.startRendering().then(function (resampled) {
-        //                     currentBuffer = resampled;
-        //                     console.log('Rendering completed successfully');
-        //                     // `resampled` contains an AudioBuffer down-mixed to mono and resampled at 48000Hz.
-        //                     // use resampled.getChannelData(x) to get an Float32Array for channel x.
-        //                     loadBufferSegment(resampled, bufferBegin)
-        //                 })
-        //             }).catch(function (e) {
-        //                 console.log("Error with decoding audio data" + e.err);
-        //             })
-        //         }
-        //     }
-        // )
     } else {
         // remove the file hint stuff
         hideAll();
@@ -154,9 +114,49 @@ async function loadAudioFile(filePath) {
     fileLoaded = true;
     completeDiv.hide();
     const filename = filePath.replace(/^.*[\\\/]/, '')
-    $('#filename').html('<span class="material-icons-two-tone">audio_file</span> ' + filename);
-    // show the spec
+    let filenameElement = document.getElementById('filename');
+    filenameElement.innerHTML = '';
+
+    //
+    let count = 0
+    let appendstr = '<div id="fileContainer" class="bg-dark pr-3">';
+    fileList.forEach(item => {
+        if (count === 0) {
+            if (fileList.length > 1) {
+                appendstr += '<span class="revealFiles visible pointer" id="filename_' + count + '">'
+                appendstr += '<span class="material-icons-two-tone pointer">library_music</span>'
+            } else {
+                appendstr += '<span class="material-icons-two-tone">audio_file</span>'
+            }
+        } else {
+            appendstr += '<span class="openFiles pointer" id="filename_' + count + '"><span class="material-icons-two-tone">audio_file</span>'
+        }
+        appendstr += item.replace(/^.*[\\\/]/, "") + '<br></span>';
+        count += 1;
+    })
+    filenameElement.innerHTML += appendstr + '</div>';
+
 }
+
+$(document).on("click", ".openFiles", function (e) {
+    const openFiles = $('.openFiles')
+    openFiles.removeClass('visible')
+    this.classList.add('visible')
+    if (openFiles.length > 1) this.firstChild.innerHTML = "library_music"
+    this.classList.remove('openFiles')
+    this.classList.add('revealFiles')
+    e.stopImmediatePropagation()
+});
+
+$(document).on("click", ".revealFiles", function (e) {
+    this.classList.remove('revealFiles')
+    this.classList.add('openFiles')
+    this.firstChild.innerHTML = "audio_file"
+    const openFiles = $('.openFiles');
+    openFiles.addClass('visible');
+    e.stopImmediatePropagation()
+});
+
 
 function loadBufferSegment(buffer, begin, saveRegion) {
     if (begin < 0) begin = 0;
@@ -333,11 +333,12 @@ async function showOpenDialog() {
             name: 'Audio Files',
             extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg']
         }],
-        properties: ['openFile']
+        properties: ['openFile', 'multiSelections']
     });
 
-    // Load audio file
+    // Load First audio file
     if (fileDialog.filePaths.length > 0) {
+        fileList = fileDialog.filePaths
         loadAudioFile(fileDialog.filePaths[0]);
         currentFile = fileDialog.filePaths[0];
     }
@@ -576,40 +577,6 @@ function formatTimeCallback(secs) {
     }
     return `${hours}:${minutesStr}:${secondsStr}`
 }
-
-
-// function formatTimeCallback(seconds) {
-//     seconds = Number(seconds);
-//     seconds += Math.floor(bufferBegin);
-//     let minutes = Math.floor(seconds / 60);
-//     const hours = Math.floor(minutes / 60);
-//     seconds = seconds % 60;
-//
-//     // fill up seconds with zeroes
-//     let secondsStr;
-//     if (windowLength >= 5) {
-//         secondsStr = Math.round(seconds).toString();
-//     } else {
-//         secondsStr = seconds.toFixed(1).toString();
-//     }
-//     if (minutes > 0) {
-//         if (seconds < 10) {
-//             secondsStr = '0' + secondsStr;
-//         }
-//     } else {
-//         return secondsStr;
-//     }
-//     minutes = minutes % 60;
-//     let minutesStr = Math.round(minutes).toString();
-//     if (hours > 0) {
-//         if (minutes < 10) {
-//             minutesStr = '0' + minutesStr;
-//         }
-//     } else {
-//         return `${minutes}:${secondsStr}`
-//     }
-//     return `${hours}:${minutesStr}:${secondsStr}`
-// }
 
 /**
  * Use timeInterval to set the period between notches, in seconds,
@@ -1029,6 +996,8 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
     } else {
         disableMenuItem('saveLabels');
     }
+    // Save the results for this file to the history
+    resultHistory[currentFile] = resultTable[0].innerHTML
     console.table(summary);
 
 });
