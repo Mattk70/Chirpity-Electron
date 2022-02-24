@@ -10,14 +10,16 @@ const colormap = require("colormap");
 const $ = require('jquery');
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 const p = require('path');
-let appPath;
+const {v4: uuidv4} = require("uuid");
+//let appPath;
 /// Get  path to USerData
-ipcRenderer.send('path', {})
-ipcRenderer.on('path', (event, arg) => {
-    appPath = arg.appPath
-})
+// ipcRenderer.send('path', {})
+// ipcRenderer.on('path', (event, arg) => {
+//     appPath = arg.appPath
+// })
 
-// let appPath = app.getPath('userData');
+let appPath = remote.app.getPath('userData');
+
 let modelReady = false, fileLoaded = false, currentFile, fileList, resultHistory = {};
 let region, AUDACITY_LABELS, wavesurfer, summary = {};
 let fileStart, startTime, ctime;
@@ -30,6 +32,7 @@ let contentWrapperElement = $('#contentWrapper');
 let controlsWrapperElement = $('#controlsWrapper');
 let completeDiv = $('.complete');
 const resultTable = $('#resultTableBody')
+const modalTable = $('#modalBody');
 let predictions = {}
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
@@ -141,10 +144,10 @@ async function loadAudioFile(filePath) {
                     appendstr += '<span class="revealFiles visible pointer" id="filename_' + count + '">'
                     appendstr += '<span class="material-icons-two-tone pointer">library_music</span>'
                 } else {
-                    appendstr += '<span class="material-icons-two-tone">audio_file</span>'
+                    appendstr += '<span class="material-icons-two-tone align-bottom">audio_file</span>'
                 }
             } else {
-                appendstr += '<span class="openFiles pointer" id="filename_' + count + '"><span class="material-icons-two-tone">audio_file</span>'
+                appendstr += '<span class="openFiles pointer" id="filename_' + count + '"><span class="material-icons-two-tone align-bottom">audio_file</span>'
             }
             appendstr += item.replace(/^.*[\\\/]/, "") + '<br></span>';
             count += 1;
@@ -324,7 +327,7 @@ function zoomSpecIn() {
         wavesurfer.params.fftSamples = 512
         wavesurfer.spectrogram.render()
     }
-    loadBufferSegment(currentBuffer, bufferBegin, true);
+    loadBufferSegment(currentBuffer, bufferBegin, false);
     wavesurfer.seekAndCenter(0.5)
     adjustSpecDims(true)
 
@@ -339,7 +342,7 @@ function zoomSpecOut() {
         wavesurfer.params.fftSamples = 1024
         wavesurfer.spectrogram.render()
     }
-    loadBufferSegment(currentBuffer, bufferBegin, true);
+    loadBufferSegment(currentBuffer, bufferBegin, false);
     wavesurfer.seekAndCenter(0.5)
     adjustSpecDims(true)
 }
@@ -667,47 +670,46 @@ function updatePrefs() {
 /////////////////////////  Window Handlers ////////////////////////////
 
 window.onload = function () {
-    try {
-
-        const fileContents = fs.readFileSync(p.join(appPath, 'config.json'), 'utf8')
-        config = JSON.parse(fileContents)
-        //console.log('Successfully loaded UUID: ' + config.UUID)
-        if (!config.UUID) {
+    // Load preferences and options
+    fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
+        if (err) {
+            console.log('JSON parse error ' + err);
+            // If file read error, use defaults
+            config = {
+                'spectrogram': true,
+                'colormap': 'inferno',
+                'timeline': true,
+                'minConfidence': 0.5,
+                'timeOfDay': false
+            }
             const {v4: uuidv4} = require('uuid');
             config.UUID = uuidv4()
             updatePrefs()
+            return
         }
-    } catch (e) {
-        console.log('JSON parse error ' + e)
-        // If file read error, use defaults
-        config = {
-            'spectrogram': true,
-            'colormap': 'inferno',
-            'timeline': true,
-            'minConfidence': 0.5,
-            'timeOfDay': false
+        config = JSON.parse(data)
+        //console.log('Successfully loaded UUID: ' + config.UUID)
+        if (!config.UUID) {
+            const {v4: uuidv4} = require('uuid');
+            config.UUID = uuidv4();
+            updatePrefs()
         }
-        const {v4: uuidv4} = require('uuid');
-        config.UUID = uuidv4()
-        updatePrefs()
-    }
-    // Set menu option state
-    if (!config.spectrogram) {
-        $('#loadSpectrogram .tick').hide()
-
-    }
-    if (!config.timeline) {
-        $('#loadTimeline .tick').hide()
-    }
-    if (config.timeOfDay) {
-        $('#timecode .tick').hide()
-        $('#timeOfDay .tick').show()
-    } else {
-        $('#timecode .tick').show()
-        $('#timeOfDay .tick').hide()
-    }
-    showElement(config.colormap + 'span', true)
-
+        // Set menu option state
+        if (!config.spectrogram) {
+            $('#loadSpectrogram .tick').hide()
+        }
+        if (!config.timeline) {
+            $('#loadTimeline .tick').hide()
+        }
+        if (config.timeOfDay) {
+            $('#timecode .tick').hide()
+            $('#timeOfDay .tick').show()
+        } else {
+            $('#timecode .tick').show()
+            $('#timeOfDay .tick').hide()
+        }
+        showElement(config.colormap + 'span', true)
+    })
     // Set footer year
     $('#year').text(new Date().getFullYear());
 };
@@ -1003,7 +1005,33 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
     // Save the results for this file to the history
     resultHistory[currentFile] = resultTable[0].innerHTML
     console.table(summary);
+    // Sort summary by count
+    let sortable = [];
+    for (const bird in summary) {
+        sortable.push([bird, summary[bird]]);
+    }
+    sortable.sort(function (a, b) {
+        return a[1] - b[1];
+    });
+    //count down from most seen:
+    sortable = sortable.reverse();
+    // Recreate object
+    var summarySorted = {}
+    sortable.forEach(function (item) {
+        summarySorted[item[0]] = item[1]
+    })
 
+    let summaryHTML = `<table class="table table-striped table-dark table-hover p-1"><thead class="thead-dark">
+            <tr>
+                <th scope="col">Species</th>
+                <th scope="col" class="text-right">Count</th>
+            </tr>
+            </thead><tbody>`;
+    for (const [key, value] of Object.entries(summarySorted)) {
+        summaryHTML += `<tr><td>${key}</td><td class="text-right"> ${value}</td></tr>`;
+    }
+    summaryHTML += '</tbody></table>';
+    modalTable.append(summaryHTML);
 });
 
 ipcRenderer.on('prediction-ongoing', async (event, arg) => {
@@ -1016,8 +1044,8 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
     if (!selection) {
         if (index === 1) {
             // Remove old results
-            resultTable.empty()
-
+            resultTable.empty();
+            modalTable.empty();
         }
     } else {
         if (index === 1) {

@@ -22,6 +22,7 @@
 </head>
 <body>
 
+
 <!-- Navigation bar -->
 
 <nav class="pt-0 pb-0 navbar navbar-expand-sm navbar-dark bg-dark position-relative">
@@ -124,6 +125,25 @@
 
 <!-- Content wrapper -->
 <div class="flex-column h-100" id="contentWrapper">
+    <!-- Summary Modal -->
+    <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center">
+                    <h5 class="modal-title" id="exampleModalLabel">Detections Summary</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div id="modalBody" class="modal-body">
+                    ...
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Load audio file hint -->
     <div class="d-flex h-100 flex-column text-dark align-items-center justify-content-center" id="loadFileHint">
@@ -147,7 +167,7 @@
     <div class="container-fluid p-1 bg-dark text-white d-none justify-content-between" id="controlsWrapper">
         <div class="row w-100">
 
-            <div id="filename" class="align-bottom p-2"></div>
+            <div id="filename" class="align-bottom p-2 pl-3"></div>
             <div class="btn-group bg-dark specFeature offset-5" role="group" id="transport-controls">
                 <button class="btn btn-outline-secondary" onmousedown="wavesurfer.playPause();">
                     <i class="material-icons">play_arrow</i><span class="align-bottom">Play / </span>
@@ -172,7 +192,12 @@
                     </div>
                 </div>
                 <div class="complete p-1 float-sm-right" style="display: none">
-                    <span class="align-bottom"> Analysis Complete</span><span class="material-icons-two-tone text-success">check_circle</span>
+                    <!-- Button trigger modal -->
+                    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#exampleModal">
+                        Show Summary
+                    </button>
+                    <!--span class="align-bottom"> Analysis Complete</span><span
+                        class="material-icons-two-tone text-success">check_circle</span-->
                 </div>
             </div>
         </div>
