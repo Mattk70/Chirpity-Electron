@@ -670,6 +670,7 @@ window.onload = function () {
 
         const fileContents = fs.readFileSync(p.join(appPath, 'config.json'), 'utf8')
         config = JSON.parse(fileContents)
+        //console.log('Successfully loaded UUID: ' + config.UUID)
         if (!config.UUID) {
             const {v4: uuidv4} = require('uuid');
             config.UUID = uuidv4()
@@ -1044,12 +1045,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr += "<td class='text-center'>" + iconizeScore(result.score) + "</td>";
         tr += "<td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>";
         tr += `<td class='specFeature text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="_blank"><img src='img/logo/XC.png' alt='Search on Xeno Canto'></a></td>`
-        tr += `<td class='specFeature text-center'><span class='material-icons-outlined pointer download' 
-            onclick="sendFile(${start} , ${end}, '${result.filename}', 
-             '${result.cname.replace(/'/g, "\\'")}', '${result.sname}', '${result.score}',
-             '${result.cname2.replace(/'/g, "\\'")}', '${result.sname2}','${result.score2}',
-             '${result.cname3.replace(/'/g, "\\'")}', '${result.sname3}', '${result.score3}',
-             'save')">
+        tr += `<td class='specFeature text-center download'><span class='material-icons-outlined pointer'>
             file_download</span></td>`;
         tr += `<td id="${index}" class='text-center feedback'> <span class='material-icons-two-tone text-success pointer'>
              thumb_up_alt</span> <span class='material-icons-two-tone text-danger pointer'>thumb_down_alt</span></td>`;
@@ -1075,7 +1071,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr += "<td> </td>";
         tr += "</tr>";
     }
-    selection ? resultTable.prepend(tr):resultTable.append(tr)
+    selection ? resultTable.prepend(tr) : resultTable.append(tr)
 
     if (!config.spectrogram) $('.specFeature').hide();
     $(".material-icons").click(function () {
@@ -1083,7 +1079,11 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
     })
 
     const toprow = $('.top-row')
-
+    $(document).on('click', '.download', function (e) {
+        let action = 'save';
+        sendFile(action, predictions[index])
+        e.stopImmediatePropagation();
+    });
     $(document).on('click', '.feedback', function (e) {
         if (confirm('Submit feedback?')) {
             let index = e.target.parentNode.id;
