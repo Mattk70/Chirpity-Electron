@@ -39,12 +39,10 @@
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
                     <a class="dropdown-item" href="#" onclick="showOpenDialog();"><u>O</u>pen Audio File </a>
-                    <a class="dropdown-item disabled" onclick="showSaveDialog()" id="saveLabels" href="#"><u>S</u>ave
-                        Audacity
-                        Labels</a>
-                    <a class="dropdown-item disabled" onclick="sendFile()" id="exportMP3" href="#">Export Selected
-                        Audio
-                    </a>
+                    <a class="dropdown-item disabled" onclick="showSaveDialog()" id="saveLabels" href="#">
+                        <u>S</u>ave Audacity Labels</a>
+                    <a class="dropdown-item disabled" onclick="sendFile('save')" id="exportMP3" href="#">
+                        Export Selected Audio</a>
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="#" onclick="exitApplication();">Exit</a>
                 </div>
@@ -156,10 +154,10 @@
                     <i class="material-icons">pause</i><span class="align-bottom">Pause</span>
                 </button>
                 <button class="btn btn-outline-secondary" onclick="zoomSpecIn();">
-                    <i class="material-icons-two-tone">zoom_in</i>
+                    <i class="material-icons-two-tone zoom">zoom_in</i>
                 </button>
                 <button class="btn btn-outline-secondary" onclick="zoomSpecOut();">
-                    <i class="material-icons-two-tone">zoom_out</i>
+                    <i class="material-icons-two-tone zoom">zoom_out</i>
                 </button>
 
             </div>

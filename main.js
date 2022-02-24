@@ -1,4 +1,7 @@
 const {app, dialog, ipcMain, BrowserWindow} = require('electron');
+const fs = require("fs");
+// In the main process:
+//require('@electron/remote/main').initialize()
 let mainWindow;
 let workerWindow;
 
@@ -42,6 +45,7 @@ function createWorker() {
         width: 1200,
         webPreferences: {
             nodeIntegration: true,
+            nodeIntegrationInWorker: true,
             enableRemoteModule: false,
             contextIsolation: false,
         }
@@ -88,10 +92,10 @@ app.on('activate', () => {
 });
 
 
-ipcMain.on('file-loaded', async (event, arg) => {
+ipcMain.on('file-load-request', async (event, arg) => {
     const currentFile = arg.message;
-    console.log('Main received file-loaded: ' + arg.message)
-    workerWindow.webContents.send('file-loaded', {message: currentFile});
+    console.log('Main received file-load-request: ' + arg.message)
+    workerWindow.webContents.send('file-load-request', {message: currentFile});
 });
 
 ipcMain.on('worker-loaded', async (event, arg) => {
@@ -117,7 +121,7 @@ ipcMain.on('prediction-done', (event, arg) => {
 });
 
 ipcMain.on('model-ready', (event, arg) => {
-    const results = arg.results;
+    const results = arg.message;
     mainWindow.webContents.send('model-ready', {results});
 });
 
@@ -135,12 +139,60 @@ ipcMain.on('post', (event, arg) => {
 });
 
 ipcMain.on('abort', (event, arg) => {
-        console.log('Main received abort: ' + arg.abort)
+    console.log('Main received abort: ' + arg.abort)
     workerWindow.webContents.send('abort', arg);
 });
 
 ipcMain.on('path', (event) => {
     const appPath = app.getPath('userData')
     mainWindow.webContents.send('path', {appPath});
+    workerWindow.webContents.send('path', {appPath});
 });
 
+ipcMain.on('openFiles', (event) => {
+    // Show file dialog to select audio file
+    dialog.showOpenDialog({
+        filters: [{
+            name: 'Audio Files',
+            extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg']
+        }],
+        properties: ['openFile', 'multiSelections']
+    }).then(result => {
+        if (!result.canceled) {
+            console.log('files', result.filePaths)
+            mainWindow.webContents.send('openFiles', {filePaths: result.filePaths});
+        }
+    })
+})
+
+ipcMain.on('saveFile', (event, arg) => {
+    // Show file dialog to select audio file
+    let currentFile = arg.currentFile.substr(0, arg.currentFile.lastIndexOf(".")) + ".txt";
+    dialog.showSaveDialog({
+        filters: [{name: 'Text Files', extensions: ['txt']}],
+        defaultPath: currentFile
+    }).then(file => {
+        // Stating whether dialog operation was cancelled or not.
+        console.log(file.canceled);
+        if (!file.canceled) {
+            const AUDACITY_LABELS = arg.labels;
+            console.log(file.filePath.toString());
+            let str = ""
+            // Format results
+            for (let i = 0; i < AUDACITY_LABELS.length; i++) {
+                str += AUDACITY_LABELS[i].timestamp + "\t";
+                str += " " + AUDACITY_LABELS[i].cname;
+                // str += " " + AUDACITY_LABELS[i].sname ;
+                str += " " + (parseFloat(AUDACITY_LABELS[i].score) * 100).toFixed(0) + "%\r\n";
+            }
+            fs.writeFile(file.filePath.toString(),
+                str, function (err) {
+                    if (err) throw err;
+                    console.log('Saved!');
+                });
+        }
+    }).catch(err => {
+        console.log(err)
+    });
+    mainWindow.webContents.send('saveFile', {message: 'file saved!'});
+})

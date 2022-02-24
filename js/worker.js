@@ -1,119 +1,112 @@
 const {ipcRenderer} = require('electron');
 const Model = require('./js/model.js');
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
-const appPath = '';
+let appPath = '../256x384_model/';
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
 const path = require("path");
+const {min} = require("@tensorflow/tfjs");
 //const appPath = process.resourcesPath;
 
 console.log(appPath);
 // console.log(process.resourcesPath);
 
 let audioBuffer;
-const model = new Model(path.join(appPath, '256x384_model/'));
+//const model = new Model(path.join(appPath, '256x384_model/'));
 
-(async () => {
-    await model.loadModel();
-    await model.warmUp();
-    ipcRenderer.send('model-ready', {message: 'ready'})
+// (async () => {
+//     await model.loadModel();
+//     await model.warmUp();
+//     ipcRenderer.send('model-ready', {message: 'ready'})
+//
+// })();
+let chunkLength, minConfidence, index, end, AUDACITY, RESULTS, predictionStart;
+let sampleRate = 48000;
+let predictWorker;
+let predicting = false;
+let selection = false;
+let controller;
 
-})();
-
-
-ipcRenderer.on('file-loaded', async (event, arg) => {
+ipcRenderer.on('file-load-request', async (event, arg) => {
     const currentFile = arg.message;
     console.log('Worker received audio ' + arg.message);
-    controller = new AbortController()
-    signal = controller.signal;
     await loadAudioFile(currentFile);
 });
 
 ipcRenderer.on('analyze', async (event, arg) => {
     console.log('Worker received message: ' + arg.confidence + ' start: ' + arg.start + ' end: ' + arg.end);
     console.log(audioBuffer.length);
-    const minConfidence = arg.confidence;
+    minConfidence = arg.confidence;
     const bufferLength = audioBuffer.length;
+    selection = false;
     let start;
-    let end;
-    let isRegion = false;
     if (arg.start === undefined) {
         start = 0;
         end = bufferLength;
     } else {
-        start = arg.start * model.config.sampleRate;
-        end = arg.end * model.config.sampleRate;
-        isRegion = true
+        start = arg.start * sampleRate;
+        end = arg.end * sampleRate;
+        selection = true;
+
     }
-    await doPrediction(start, end, minConfidence, isRegion)
+    predicting = true;
+    await doPrediction(start, end)
 });
 
 
-async function doPrediction(start, end, minConfidence, isRegion) {
-    model.RESULTS = [];
-    model.AUDACITY = [];
-    const funcStart = new Date();
-    let index = 0;
+async function doPrediction(start, end) {
+    AUDACITY = [];
+    RESULTS = [];
+    predictionStart = new Date();
+    index = 0;
     let increment;
-    end - start < model.chunkLength ? increment = end - start : increment = model.chunkLength;
+    end - start < chunkLength ? increment = end - start : increment = chunkLength;
     let channelData = audioBuffer.getChannelData(0);
     for (let i = start; i < end; i += increment) {
         // If we're at the end of a file and we haven't got a full chunk, scroll back to fit
-        //if (i + model.chunkLength > end && end >= model.chunkLength) i = end - model.chunkLength;
-
+        //if (i + chunkLength > end && end >= chunkLength) i = end - chunkLength;
         let chunk = channelData.slice(i, i + increment);
-        let [result, audacity] = await model.predictChunk(chunk, i, isRegion)
-        if (result.score > minConfidence) {
-            index++;
-            model.RESULTS.push(result);
-            model.AUDACITY.push(audacity);
-            ipcRenderer.send('prediction-ongoing', {result, 'index': index});
-        }
-        ipcRenderer.send('progress', {'progress': i / end});
+        predictWorker.postMessage(['predict', chunk, i])
     }
-    if (model.RESULTS.length === 0) {
-        const result = "No detections found.";
-        ipcRenderer.send('prediction-ongoing', {result, 'index': 1});
-    }
-    const timenow = new Date();
-    console.log('Analysis took ' + (timenow - funcStart) / 1000 + ' seconds.')
-    ipcRenderer.send('progress', {'progress': 1});
-    ipcRenderer.send('prediction-done', {'labels': model.AUDACITY});
 }
 
-let controller = new AbortController()
-let signal = controller.signal;
 const audioCtx = new AudioContext();
-const loadAudioFile = (filePath, cb) =>
+
+async function loadAudioFile(filePath) {
+    controller = new AbortController()
+    const signal = controller.signal;
     fetch(filePath, {signal})
         .then((res => res.arrayBuffer()))
         .then((arrayBuffer) => audioCtx.decodeAudioData(arrayBuffer))
         .then((buffer) => {
-            let source = audioCtx.createBufferSource();
-            source.buffer = buffer;
-            const duration = source.buffer.duration;
-            const sampleRate = model.config.sampleRate;
-            const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
-            const offlineSource = offlineCtx.createBufferSource();
-            offlineSource.buffer = buffer;
-            offlineSource.connect(offlineCtx.destination);
-            offlineSource.start();
-            offlineCtx.startRendering().then(function (resampled) {
-                // `resampled` contains an AudioBuffer resampled at 48000Hz.
-                // use resampled.getChannelData(x) to get an Float32Array for channel x.
-                audioBuffer = resampled;
-                console.log('Rendering completed successfully');
-                ipcRenderer.send('worker-loaded', {message: filePath});
-            })
-        })
-        .catch(function (e) {
-            console.log("Error with decoding audio data" + e.err);
-            if (e.name === "AbortError") {
-                // We know it's been canceled!
-                console.warn('Worker fetch aborted')
+            if (!controller.signal.aborted) {
+                let source = audioCtx.createBufferSource();
+                source.buffer = buffer;
+                const duration = source.buffer.duration;
+                const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
+                const offlineSource = offlineCtx.createBufferSource();
+                offlineSource.buffer = buffer;
+                offlineSource.connect(offlineCtx.destination);
+                offlineSource.start();
+                offlineCtx.startRendering().then(function (resampled) {
+                    // `resampled` contains an AudioBuffer resampled at 48000Hz.
+                    // use resampled.getChannelData(x) to get an Float32Array for channel x.
+                    audioBuffer = resampled;
+                    console.log('Rendering completed successfully');
+                    ipcRenderer.send('worker-loaded', {message: filePath});
+                })
+            } else {
+                throw new DOMException('Rendering cancelled at user request', "AbortError")
             }
         })
-        .then(cb)
+        .catch(function (e) {
+            console.log("Error with decoding audio data " + e);
+            if (e.name === "AbortError") {
+                // We know it's been canceled!
+                console.log('Worker fetch aborted')
+            }
+        })
+}
 
 
 ipcRenderer.on('save', async (event, arg) => {
@@ -126,7 +119,14 @@ ipcRenderer.on('post', async (event, arg) => {
 
 ipcRenderer.on('abort', (event, arg) => {
     console.log("abort received")
-    controller.abort()
+    if (controller) {
+        controller.abort()
+    }
+    if (predicting) {
+        //restart the worker
+        predictWorker.terminate()
+        spawnWorker()
+    }
 })
 
 function downloadMp3(buffer, filepath, metadata) {
@@ -148,7 +148,7 @@ function uploadMp3(buffer, filepath, metadata, action) {
     //const timestamp = Date.now()
     formData.append("thefile", MP3Blob, metadata.filename);
     // Was the prediction a correct one?
-        formData.append("Chirpity_assessment", action);
+    formData.append("Chirpity_assessment", action);
 // post form data
     const xhr = new XMLHttpRequest();
     xhr.responseType = 'text';
@@ -310,3 +310,48 @@ async function postMP3(start, end, filepath, metadata, action) {
         }
     })
 }
+
+
+/// Workers  From the MDN example
+async function spawnWorker() {
+    predictWorker = new Worker('./js/model.js');
+    predictWorker.postMessage(['load', appPath])
+
+    predictWorker.onmessage = (e) => {
+        const response = e.data;
+
+        if (response['message'] === 'model-ready') {
+            chunkLength = response['chunkLength'];
+            sampleRate = response['sampleRate']
+            ipcRenderer.send('model-ready', {message: 'ready'})
+        } else if (response['message'] === 'prediction') {
+            let result = response['result'];
+            let audacity = response['audacity'];
+            //console.log('Prediction received from worker', result);
+            if (result.score > minConfidence) {
+                index++;
+                ipcRenderer.send('prediction-ongoing', {result, 'index': index, 'selection': selection});
+                AUDACITY.push(audacity);
+                RESULTS.push(result);
+            }
+            ipcRenderer.send('progress', {'progress': response.i / end});
+            if (response.i + chunkLength >= end) {
+                console.log('Prediction done');
+                console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
+                if (RESULTS.length === 0) {
+                    const result = "No detections found.";
+                    ipcRenderer.send('prediction-ongoing', {result, 'index': 1, 'selection': selection});
+                }
+                ipcRenderer.send('progress', {'progress': 1});
+                ipcRenderer.send('prediction-done', {'labels': AUDACITY});
+                predicting = false;
+            }
+        }
+    }
+}
+
+const worker = spawnWorker();
+
+
+
+
