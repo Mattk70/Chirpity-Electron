@@ -1,5 +1,5 @@
 const {ipcRenderer} = require('electron');
-const {dialog} = require('electron').remote;
+//const {remote, dialog} = require('electron/remote');
 const remote = require('electron').remote;
 const fs = require('fs');
 const WaveSurfer = require("wavesurfer.js");
@@ -10,8 +10,14 @@ const colormap = require("colormap");
 const $ = require('jquery');
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 const p = require('path');
+let appPath;
+/// Get  path to USerData
+ipcRenderer.send('path', {})
+ipcRenderer.on('path', (event, arg) => {
+    appPath = arg.appPath
+})
 
-let appPath = remote.app.getPath('userData');
+// let appPath = app.getPath('userData');
 let modelReady = false, fileLoaded = false, currentFile, fileList, resultHistory = {};
 let region, AUDACITY_LABELS, wavesurfer, summary = {};
 let fileStart, startTime, ctime;
@@ -24,9 +30,10 @@ let contentWrapperElement = $('#contentWrapper');
 let controlsWrapperElement = $('#controlsWrapper');
 let completeDiv = $('.complete');
 const resultTable = $('#resultTableBody')
+let predictions = {}
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
-
+let workerLoaded = false;
 // Set default Options
 let config;
 const sampleRate = 48000;
@@ -34,41 +41,45 @@ let controller = new AbortController();
 let signal = controller.signal;
 
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
-const fetchAudioFile = (filePath, cb) =>
+const fetchAudioFile = (filePath) =>
     fetch(filePath, {signal})
         .then((res => res.arrayBuffer()))
         .then((arrayBuffer) => audioCtx.decodeAudioData(arrayBuffer))
         .then((buffer) => {
-            let source = audioCtx.createBufferSource();
-            source.buffer = buffer;
-            const duration = source.buffer.duration;
+            if (!controller.signal.aborted) {
+                let source = audioCtx.createBufferSource();
+                source.buffer = buffer;
+                const duration = source.buffer.duration;
 
-            // set fileStart time
-            if (config.timeOfDay) {
-                fileStart = new Date(ctime - (duration * 1000))
+                // set fileStart time
+                if (config.timeOfDay) {
+                    fileStart = new Date(ctime - (duration * 1000))
+                } else {
+                    fileStart = new Date();
+                    fileStart.setHours(0, 0, 0, 0)
+                }
+
+                const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
+                const offlineSource = offlineCtx.createBufferSource();
+                offlineSource.buffer = buffer;
+                offlineSource.connect(offlineCtx.destination);
+                offlineSource.start();
+                offlineCtx.startRendering().then(function (resampled) {
+                    console.log('Rendering completed successfully');
+                    // `resampled` contains an AudioBuffer resampled at 48000Hz.
+                    // use resampled.getChannelData(x) to get an Float32Array for channel x.
+                    currentBuffer = resampled;
+                    loadBufferSegment(resampled, bufferBegin)
+                })
             } else {
-                fileStart = new Date();
-                fileStart.setHours(0, 0, 0, 0)
+                throw new DOMException('Rendering cancelled at user request', "AbortError")
             }
-
-            const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
-            const offlineSource = offlineCtx.createBufferSource();
-            offlineSource.buffer = buffer;
-            offlineSource.connect(offlineCtx.destination);
-            offlineSource.start();
-            offlineCtx.startRendering().then(function (resampled) {
-                console.log('Rendering completed successfully');
-                // `resampled` contains an AudioBuffer resampled at 48000Hz.
-                // use resampled.getChannelData(x) to get an Float32Array for channel x.
-                currentBuffer = resampled;
-                loadBufferSegment(resampled, bufferBegin)
-            })
         })
         .catch(function (e) {
             console.log("Error with decoding audio data " + e.message);
             if (e.name === "AbortError") {
                 // We know it's been canceled!
-                console.warn('Fetch aborted sending massage to worker')
+                console.warn('Fetch aborted: sending message to worker')
                 hideAll();
                 disableMenuItem('analyze')
                 disableMenuItem('analyzeSelection');
@@ -76,11 +87,13 @@ const fetchAudioFile = (filePath, cb) =>
                 showElement('loadFileHintText', false);
             }
         })
-        .then(cb)
+
+//.then(cb)
 
 
 async function loadAudioFile(filePath) {
-    ipcRenderer.send('file-loaded', {message: filePath});
+    ipcRenderer.send('file-load-request', {message: filePath});
+    workerLoaded = false;
     summary = {};
     // Hide load hint and show spinnner
     if (wavesurfer) {
@@ -93,17 +106,18 @@ async function loadAudioFile(filePath) {
 
     hideAll();
     disableMenuItem('analyze')
+    disableMenuItem('analyzeSelection');
     showElement('loadFileHint');
     showElement('loadFileHintSpinner');
     showElement('loadFileHintLog');
-    console.log('loadFileHintLog', 'Loading file...');
+
     // Reset the buffer playhead and zoom:
     bufferBegin = 0;
     windowLength = 20;
     if (config.spectrogram) {
         controller = new AbortController();
         signal = controller.signal;
-        await fetchAudioFile(filePath, console.log('finished'))
+        await fetchAudioFile(filePath);
     } else {
         // remove the file hint stuff
         hideAll();
@@ -111,31 +125,32 @@ async function loadAudioFile(filePath) {
         showElement('controlsWrapper');
         $('.specFeature').hide()
     }
-    fileLoaded = true;
-    completeDiv.hide();
-    const filename = filePath.replace(/^.*[\\\/]/, '')
-    let filenameElement = document.getElementById('filename');
-    filenameElement.innerHTML = '';
+    if (!controller.signal.aborted) {
+        fileLoaded = true;
+        completeDiv.hide();
+        const filename = filePath.replace(/^.*[\\\/]/, '')
+        let filenameElement = document.getElementById('filename');
+        filenameElement.innerHTML = '';
 
-    //
-    let count = 0
-    let appendstr = '<div id="fileContainer" class="bg-dark pr-3">';
-    fileList.forEach(item => {
-        if (count === 0) {
-            if (fileList.length > 1) {
-                appendstr += '<span class="revealFiles visible pointer" id="filename_' + count + '">'
-                appendstr += '<span class="material-icons-two-tone pointer">library_music</span>'
+        //
+        let count = 0
+        let appendstr = '<div id="fileContainer" class="bg-dark pr-3">';
+        fileList.forEach(item => {
+            if (count === 0) {
+                if (fileList.length > 1) {
+                    appendstr += '<span class="revealFiles visible pointer" id="filename_' + count + '">'
+                    appendstr += '<span class="material-icons-two-tone pointer">library_music</span>'
+                } else {
+                    appendstr += '<span class="material-icons-two-tone">audio_file</span>'
+                }
             } else {
-                appendstr += '<span class="material-icons-two-tone">audio_file</span>'
+                appendstr += '<span class="openFiles pointer" id="filename_' + count + '"><span class="material-icons-two-tone">audio_file</span>'
             }
-        } else {
-            appendstr += '<span class="openFiles pointer" id="filename_' + count + '"><span class="material-icons-two-tone">audio_file</span>'
-        }
-        appendstr += item.replace(/^.*[\\\/]/, "") + '<br></span>';
-        count += 1;
-    })
-    filenameElement.innerHTML += appendstr + '</div>';
-
+            appendstr += item.replace(/^.*[\\\/]/, "") + '<br></span>';
+            count += 1;
+        })
+        filenameElement.innerHTML += appendstr + '</div>';
+    }
 }
 
 $(document).on("click", ".openFiles", function (e) {
@@ -262,8 +277,10 @@ function initSpec(args) {
     // Set click event that removes all regions
     waveElement.mousedown(function () {
         wavesurfer.clearRegions();
+        region = false;
         disableMenuItem('analyzeSelection');
-        enableMenuItem('analyze');
+        disableMenuItem('exportMP3');
+        if (workerLoaded) enableMenuItem('analyze');
     });
     // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
@@ -327,52 +344,23 @@ function zoomSpecOut() {
 }
 
 async function showOpenDialog() {
-    // Show file dialog to select audio file
-    const fileDialog = await dialog.showOpenDialog({
-        filters: [{
-            name: 'Audio Files',
-            extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg']
-        }],
-        properties: ['openFile', 'multiSelections']
-    });
-
-    // Load First audio file
-    if (fileDialog.filePaths.length > 0) {
-        fileList = fileDialog.filePaths
-        loadAudioFile(fileDialog.filePaths[0]);
-        currentFile = fileDialog.filePaths[0];
-    }
+    ipcRenderer.send('openFiles');
 }
+
+ipcRenderer.on('openFiles', async (event, arg) => {
+    // Store the file list and Load First audio file
+    fileList = arg.filePaths
+    await loadAudioFile(fileList[0]);
+    currentFile = fileList[0];
+})
 
 
 async function showSaveDialog() {
     // Show file dialog to save Audacity label file
-    currentFile = currentFile.substr(0, currentFile.lastIndexOf(".")) + ".txt";
-    await dialog.showSaveDialog({
-        filters: [{name: 'Text Files', extensions: ['txt']}],
-        defaultPath: currentFile
-    }).then(file => {
-        // Stating whether dialog operation was cancelled or not.
-        console.log(file.canceled);
-        if (!file.canceled) {
-            console.log(file.filePath.toString());
-            let str = ""
-            // Format results
-            for (let i = 0; i < AUDACITY_LABELS.length; i++) {
-                str += AUDACITY_LABELS[i].timestamp + "\t";
-                str += " " + AUDACITY_LABELS[i].cname;
-                // str += " " + AUDACITY_LABELS[i].sname ;
-                str += " " + (parseFloat(AUDACITY_LABELS[i].score) * 100).toFixed(0) + "%\r\n";
-            }
-            fs.writeFile(file.filePath.toString(),
-                str, function (err) {
-                    if (err) throw err;
-                    console.log('Saved!');
-                });
-        }
-    }).catch(err => {
-        console.log(err)
-    });
+    ipcRenderer.send('saveFile', {'currentFile': currentFile, 'labels': AUDACITY_LABELS});
+    ipcRenderer.on('safeFile', (event, arg) => {
+        console.log(arg.message)
+    })
 }
 
 // Worker listeners
@@ -382,8 +370,9 @@ const analyzeLink = document.getElementById('analyze');
 analyzeLink.addEventListener('click', async () => {
     completeDiv.hide();
     disableMenuItem('analyze')
-    disableMenuItem('analyzeSelection');
+    //disableMenuItem('analyzeSelection');
     ipcRenderer.send('analyze', {confidence: config.minConfidence});
+    summary = {};
     analyzeLink.disabled = true;
 });
 
@@ -392,7 +381,7 @@ const analyzeSelectionLink = document.getElementById('analyzeSelection');
 analyzeSelectionLink.addEventListener('click', async () => {
     completeDiv.hide();
     disableMenuItem('analyze')
-    disableMenuItem('analyzeSelection');
+    //disableMenuItem('analyzeSelection');
     let start;
     let end;
     if (region.start) {
@@ -401,6 +390,7 @@ analyzeSelectionLink.addEventListener('click', async () => {
     }
     // Add current buffer's beginning offset to region start / end tags
     ipcRenderer.send('analyze', {confidence: 0.1, start: start, end: end});
+    summary = {};
     analyzeLink.disabled = true;
 });
 
@@ -678,13 +668,15 @@ function updatePrefs() {
 window.onload = function () {
     try {
 
-        config = JSON.parse(fs.readFileSync(p.join(appPath, 'config.json')))
+        const fileContents = fs.readFileSync(p.join(appPath, 'config.json'))
+        config = JSON.parse(fileContents)
         if (!config.UUID) {
             const {v4: uuidv4} = require('uuid');
             config.UUID = uuidv4()
             updatePrefs()
         }
-    } catch {
+    } catch (e) {
+        console.log('JSON parse error ' + e)
         // If file read error, use defaults
         config = {
             'spectrogram': true,
@@ -888,24 +880,29 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         }
     },
     Escape: function () {
-        controller.abort();
         console.log('Operation aborted');
-        ipcRenderer.send('abort', {'abort': true})
-    },
+        controller.abort();
+        ipcRenderer.send('abort', {'abort': true});
+        alert('Operation cancelled');
+
+    }
+    ,
     Home: function () {
         if (currentBuffer) {
             loadBufferSegment(currentBuffer, 0)
             wavesurfer.seekAndCenter(0);
             wavesurfer.pause()
         }
-    },
+    }
+    ,
     End: function () {
         if (currentBuffer) {
             loadBufferSegment(currentBuffer, currentBuffer.duration - windowLength)
             wavesurfer.seekAndCenter(1);
             wavesurfer.pause()
         }
-    },
+    }
+    ,
     PageUp: function () {
         if (wavesurfer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
@@ -916,7 +913,8 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             playhead <= 0 ? wavesurfer.seekAndCenter(0) : wavesurfer.seekAndCenter(position);
             wavesurfer.pause()
         }
-    },
+    }
+    ,
     PageDown: function () {
         if (wavesurfer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
@@ -927,7 +925,8 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             playhead >= currentBuffer.duration ? wavesurfer.seekAndCenter(1) : wavesurfer.seekAndCenter(position);
             wavesurfer.pause()
         }
-    },
+    }
+    ,
     ArrowLeft: function () {
         if (wavesurfer) {
             wavesurfer.skipBackward(0.1);
@@ -938,7 +937,8 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
                 wavesurfer.pause()
             }
         }
-    },
+    }
+    ,
     ArrowRight: function () {
         if (wavesurfer) {
             wavesurfer.skipForward(0.1);
@@ -949,7 +949,8 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
                 wavesurfer.pause()
             }
         }
-    },
+    }
+    ,
     KeyP: function () {
         (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
     }
@@ -965,6 +966,7 @@ ipcRenderer.on('model-ready', async () => {
 
 ipcRenderer.on('worker-loaded', async (event, arg) => {
     console.log('UI received worker-loaded: ' + arg.message)
+    workerLoaded = true;
     enableMenuItem('analyze')
     if (!loadSpectrogram) {
         hideAll();
@@ -1006,15 +1008,24 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
     completeDiv.hide();
     const result = arg.result;
     const index = arg.index;
-    if (index === 1) {
-        // Remove old results
-        resultTable.empty()
+    const selection = arg.selection;
+    let tr = '';
+    predictions[index] = result;
+    if (!selection) {
+        if (index === 1) {
+            // Remove old results
+            resultTable.empty()
 
+        }
+    } else {
+        if (index === 1) {
+            resultTable.prepend('<tr><td class="bg-dark text-white text-center" colspan="10"><b>Selection Analysis<span class="material-icons-two-tone align-bottom">arrow_upward</span></b></td></tr>')
+        }
     }
-    let tr;
+
     showElement('resultTableContainer');
     if (result === "No detections found.") {
-        tr = "<tr><td>" + result + "</td></tr>";
+        tr += "<tr><td>" + result + "</td></tr>";
     } else {
         if (result.cname in summary) {
             summary[result.cname] += 1
@@ -1024,8 +1035,8 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
 
         const regex = /:/g;
         const start = result.start, end = result.end;
-        const filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp.replace(regex, '.') + '.mp3';
-        tr = "<tr  onmousedown='loadResultRegion(" + start + " , " + end + " )' class='border-top border-secondary top-row'><th scope='row'>" + index + "</th>";
+        result.filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp.replace(regex, '.') + '.mp3';
+        tr += `<tr onmousedown='loadResultRegion( ${start} , ${end} );' class='border-top border-secondary top-row'><th scope='row'>${index}</th>`;
         tr += "<td><span class='material-icons rotate text-right pointer' onclick='toggleAlternates(&quot;.subrow" + index + "&quot;)'>expand_more</span></td>";
         tr += "<td>" + result.timestamp + "</td>";
         tr += "<td>" + result.cname + "</td>";
@@ -1033,28 +1044,18 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr += "<td class='text-center'>" + iconizeScore(result.score) + "</td>";
         tr += "<td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>";
         tr += `<td class='specFeature text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="_blank"><img src='img/logo/XC.png' alt='Search on Xeno Canto'></a></td>`
-
-        tr += `<td class='specFeature text-center'><span class='material-icons-outlined pointer disabled download' 
+        tr += `<td class='specFeature text-center'><span class='material-icons-outlined pointer download' 
             onclick="sendFile(${start} , ${end}, '${filename}', 
              '${result.cname.replace(/'/g, "\\'")}', '${result.sname}', '${result.score}',
              '${result.cname2.replace(/'/g, "\\'")}', '${result.sname2}','${result.score2}',
              '${result.cname3.replace(/'/g, "\\'")}', '${result.sname3}', '${result.score3}',
              'save')">
             file_download</span></td>`;
-        tr += `<td class='text-center'> <span class='material-icons-two-tone text-success pointer' 
-            onclick="if (confirm('Submit this correct prediction?')) sendFile(${start} , ${end}, '${filename}', 
-             '${result.cname.replace(/'/g, "\\'")}', '${result.sname}', '${result.score}',
-             '${result.cname2.replace(/'/g, "\\'")}', '${result.sname2}','${result.score2}',
-             '${result.cname3.replace(/'/g, "\\'")}', '${result.sname3}', '${result.score3}',
-             'correct')">thumb_up_alt</span> <span class='material-icons-two-tone text-danger pointer'
-             onclick="if (confirm('Submit this prediction as incorrect?')) sendFile(${start} , ${end}, '${filename}', 
-             '${result.cname.replace(/'/g, "\\'")}', '${result.sname}', '${result.score}',
-             '${result.cname2.replace(/'/g, "\\'")}', '${result.sname2}','${result.score2}',
-             '${result.cname3.replace(/'/g, "\\'")}', '${result.sname3}', '${result.score3}',
-             'incorrect')">thumb_down_alt</span></td>`;
+        tr += `<td id="${index}" class='text-center feedback'> <span class='material-icons-two-tone text-success pointer'>
+             thumb_up_alt</span> <span class='material-icons-two-tone text-danger pointer'>thumb_down_alt</span></td>`;
         tr += "</tr>";
 
-        tr += "<tr class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + " )'><th scope='row'> </th>";
+        tr += "<tr class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + ")'><th scope='row'> </th>";
         tr += "<td> </td>";
         tr += "<td> </td>";
         tr += "<td>" + result.cname2 + "</td>";
@@ -1074,7 +1075,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr += "<td> </td>";
         tr += "</tr>";
     }
-    resultTable.append(tr);
+    selection ? resultTable.prepend(tr):resultTable.append(tr)
 
     if (!config.spectrogram) $('.specFeature').hide();
     $(".material-icons").click(function () {
@@ -1082,6 +1083,18 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
     })
 
     const toprow = $('.top-row')
+
+    $(document).on('click', '.feedback', function (e) {
+        if (confirm('Submit feedback?')) {
+            let index = e.target.parentNode.id;
+            e.target.parentNode.onclick = null;
+            let action;
+            (e.target.classList.contains('text-success')) ? action = 'correct' : action = 'incorrect';
+            sendFile(action, predictions[index])
+            e.target.parentNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>'
+        }
+        e.stopImmediatePropagation();
+    });
 
     toprow.click(function () {
         toprow.each(function () {
@@ -1091,9 +1104,11 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
     })
 });
 
-function sendFile(start, end, filename, cname, sname, score, cname2, sname2, score2, cname3, sname3, score3, action) {
+
+function sendFile(action, result) {
+    let start = result.start, end = result.end, filename = result.filename;
     if (!start && start !== 0) {
-        if (!wavesurfer.regions.list === {}) {
+        if (!region.start) {
             start = 0;
             end = currentBuffer.duration;
         } else {
@@ -1104,21 +1119,21 @@ function sendFile(start, end, filename, cname, sname, score, cname2, sname2, sco
     }
 
     let metadata;
-    if (cname) {
+    if (result.cname) {
         metadata = {
             'UUID': config.UUID,
             'start': start,
             'end': end,
-            'filename': filename,
-            'cname': cname,
-            'sname': sname,
-            'score': score,
-            'cname2': cname2,
-            'sname2': sname2,
-            'score2': score2,
-            'cname3': cname3,
-            'sname3': sname3,
-            'score3': score3
+            'filename': result.filename,
+            'cname': result.cname,
+            'sname': result.sname,
+            'score': result.score,
+            'cname2': result.cname2,
+            'sname2': result.sname2,
+            'score2': result.score2,
+            'cname3': result.cname3,
+            'sname3': result.sname3,
+            'score3': result.score3
         };
     }
     if (action === 'save') {
@@ -1139,9 +1154,12 @@ function sendFile(start, end, filename, cname, sname, score, cname2, sname2, sco
 
 // create a dict mapping score to icon
 const iconDict = {
-    'low': '<span class="material-icons text-danger border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
-    'medium': '<span class="material-icons text-warning border border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
-    'high': '<span class="material-icons text-success border border-secondary rounded" title="--%">signal_cellular_alt</span>',
+    // 'low': '<span class="material-icons text-danger border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
+    // 'medium': '<span class="material-icons text-warning border border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
+    // 'high': '<span class="material-icons text-success border border-secondary rounded" title="--%">signal_cellular_alt</span>',
+    'low': '<span class="material-icons text-danger border border-secondary rounded" title="Low">signal_cellular_alt_1_bar</span>',
+    'medium': '<span class="material-icons text-warning border border-secondary rounded" title="Medium">signal_cellular_alt_2_bar</span>',
+    'high': '<span class="material-icons text-success border border-secondary rounded" title="High">signal_cellular_alt</span>',
 }
 
 function iconizeScore(score) {

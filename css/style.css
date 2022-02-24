@@ -177,3 +177,7 @@ div#contentWrapper {
     background-size: cover;
 }
 
+.zoom {
+    font-size: 35px;
+    vertical-align: text-bottom;
+}
