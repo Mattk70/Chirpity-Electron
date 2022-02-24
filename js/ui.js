@@ -319,28 +319,29 @@ function updateElementCache() {
 function zoomSpecIn() {
     if (windowLength < 2) return;
     windowLength /= 2;
+    bufferBegin = bufferBegin + wavesurfer.getCurrentTime() - (windowLength / 2)
     if (windowLength < 2) {
         wavesurfer.params.fftSamples = 512
         wavesurfer.spectrogram.render()
-    } else if (wavesurfer.params.fftSamples !== 1024) {
-        wavesurfer.params.fftSamples = 1024
-        wavesurfer.spectrogram.render()
     }
     loadBufferSegment(currentBuffer, bufferBegin, true);
-    //WS_ZOOM += 50;
-    //wavesurfer.zoom(WS_ZOOM);
+    wavesurfer.seekAndCenter(0.5)
     adjustSpecDims(true)
-    //wavesurfer.spectrogram.render()
+
 }
 
 function zoomSpecOut() {
     if (windowLength > 100) return;
     windowLength *= 2;
+    // Centre on playhead
+    bufferBegin = bufferBegin + wavesurfer.getCurrentTime() - (windowLength / 2)
+    if (wavesurfer.params.fftSamples !== 1024) {
+        wavesurfer.params.fftSamples = 1024
+        wavesurfer.spectrogram.render()
+    }
     loadBufferSegment(currentBuffer, bufferBegin, true);
-    //WS_ZOOM -= 50;
-    //wavesurfer.zoom(WS_ZOOM);
+    wavesurfer.seekAndCenter(0.5)
     adjustSpecDims(true)
-    //wavesurfer.spectrogram.render()
 }
 
 async function showOpenDialog() {
