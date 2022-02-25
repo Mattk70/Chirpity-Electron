@@ -303,7 +303,6 @@ function BirdNetSetup() {
 module.exports = Model;
 
 
-
 let myModel;
 
 onmessage = async function (e) {
