@@ -1205,7 +1205,7 @@ $('#feedbackModal').on('hidden.bs.modal', function (e) {
     enableKeyDownEvent();
     if (correctedSpecies) {
         currentPrediction.filename = correctedSpecies + '_' + Date.now().toString();
-        sendFile(action, currentPrediction);
+        sendFile('incorrect', currentPrediction);
         correctedSpecies = undefined;
         currentNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>';
     }
