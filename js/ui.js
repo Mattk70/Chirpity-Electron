@@ -1204,7 +1204,7 @@ function findSpecies() {
 $('#feedbackModal').on('hidden.bs.modal', function (e) {
     enableKeyDownEvent();
     if (correctedSpecies) {
-        currentPrediction.filename = correctedSpecies + '_' + Date.now().toString();
+        currentPrediction.filename = correctedSpecies + '_' + Date.now().toString() + '.mp3';
         sendFile('incorrect', currentPrediction);
         correctedSpecies = undefined;
         currentNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>';
