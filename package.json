@@ -5,7 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "export": "electron-packager . --platform=win32 --arch=x64 --prune=true --out packages --overwrite"
+    "export": "electron-packager . --platform=win32 --arch=x64 --prune --out packages --overwrite"
   },
   "repository": {
     "type": "git",
@@ -27,7 +27,8 @@
   "homepage": "https://github.com/mattk70/Chirpity-Electron#readme",
   "devDependencies": {
     "electron": "^7.3.3",
-    "electron-packager": "^14.2.1"
+    "electron-packager": "^14.2.1",
+    "electron-wix-msi": "^3.2.0"
   },
   "dependencies": {
     "@tensorflow/tfjs": "^3.13.0",
