@@ -35,7 +35,7 @@ let completeDiv = $('.complete');
 const resultTable = $('#resultTableBody')
 const modalTable = $('#modalBody');
 const feedbackTable = $('#feedbackModalBody');
-let predictions = {}, correctedSpecies, action, currentNode;
+let predictions = {}, correctedSpecies, speciesListItems, action, clickedNode, clickedIndex;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
 let workerLoaded = false;
@@ -739,7 +739,7 @@ window.onload = function () {
         </script>
         
         <p>What sound do you think this is?</p>
-        <input type="text" id="myInput" onkeyup="myFunction()" placeholder="Search for sound..">
+        <input type="text" id="myInput" onkeyup="myFunction()" placeholder="Search for a species...">
         <ul id="myUL">
             <li><a href="#">Animal<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
             <li><a href="#">Environmental noise<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
@@ -754,12 +754,14 @@ window.onload = function () {
     }
     feedbackHTML += '</ul>';
     feedbackTable.append(feedbackHTML);
+    //Cache list elements
+    speciesListItems = $('#myUL li span');
 };
 
 // Feedback list handler
 $(document).on('click', '#myUL li', function (e) {
     correctedSpecies = e.target.innerText;
-    $('#myUL li span').addClass('d-none');
+    speciesListItems.addClass('d-none');
     e.target.childNodes[1].classList.remove('d-none');
 })
 
@@ -796,7 +798,7 @@ $(document).on('click', '.play', function () {
 function handleKeyDown(e) {
     let action = e.code;
     if (action in GLOBAL_ACTIONS) {
-        //e.preventDefault();
+        e.preventDefault();
         if (document === e.target || document.body === e.target || e.target.attributes["data-action"]) {
 
         }
@@ -807,7 +809,7 @@ function handleKeyDown(e) {
         el.addEventListener('click', function (e) {
             let action = e.currentTarget.dataset.action;
             if (action in GLOBAL_ACTIONS) {
-                //e.preventDefault();
+                e.preventDefault();
                 GLOBAL_ACTIONS[action](e);
             }
         });
@@ -1097,7 +1099,6 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
     const selection = arg.selection;
     let tr = '';
     predictions[index] = result;
-    currentPrediction = predictions[index];
     if (!selection) {
         if (index === 1) {
             // Remove old results
@@ -1130,7 +1131,8 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr += "<td><i>" + result.sname + "</i></td>";
         tr += "<td class='text-center'>" + iconizeScore(result.score) + "</td>";
         tr += "<td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>";
-        tr += `<td class='specFeature text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="_blank"><img src='img/logo/XC.png' alt='Search on Xeno Canto'></a></td>`
+        tr += `<td class='specFeature text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="_blank">
+                    <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>`
         tr += `<td class='specFeature text-center download'><span class='material-icons-outlined pointer'>
             file_download</span></td>`;
         tr += `<td id="${index}" class='text-center feedback'> <span class='material-icons-two-tone text-success pointer'>
@@ -1144,7 +1146,8 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr += "<td><i>" + result.sname2 + "</i></td>";
         tr += "<td class='text-center'>" + iconizeScore(result.score2) + "</td>";
         tr += "<td> </td>";
-        tr += "<td> </td>";
+        tr += `<td><a href='https://xeno-canto.org/explore?query=${result.sname2}%20type:nocturnal' target=\"_blank\">
+                    <img src='img/logo/XC.png' alt='Search ${result.cname2} on Xeno Canto' title='${result.cname2} NFCs on Xeno Canto'></a> </td>`;
         tr += "</tr>";
 
         tr += "<tr class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + " )' ><th scope='row'> </th>";
@@ -1154,6 +1157,8 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr += "<td><i>" + result.sname3 + "</i></td>";
         tr += "<td class='text-center'>" + iconizeScore(result.score3) + "</td>";
         tr += "<td> </td>";
+        tr += `<td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:nocturnal' target=\"_blank\">
+                    <img src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>`;
         tr += "<td> </td>";
         tr += "</tr>";
     }
@@ -1167,7 +1172,9 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
     const toprow = $('.top-row')
     $(document).on('click', '.download', function (e) {
         action = 'save';
-        sendFile(action, predictions[index])
+        clickedNode = e.target.parentNode
+        clickedIndex = clickedNode.parentNode.firstChild.innerText
+        sendFile(action, predictions[clickedIndex])
         e.stopImmediatePropagation();
     });
     $(document).on('click', '.feedback', function (e) {
@@ -1176,11 +1183,12 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         e.target.parentNode.onclick = null;
         let action;
         (e.target.classList.contains('text-success')) ? action = 'correct' : action = 'incorrect';
-        currentNode = e.target.parentNode
+        clickedNode = e.target.parentNode
+        clickedIndex = clickedNode.parentNode.firstChild.innerText
         if (action === 'incorrect') {
             findSpecies();
         } else if (confirm('Submit feedback?')) {
-            currentNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>'
+            clickedNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>'
 
         }
         e.stopImmediatePropagation();
@@ -1197,6 +1205,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
 
 function findSpecies() {
     document.removeEventListener('keydown', handleKeyDown, true);
+    speciesListItems.addClass('d-none');
     $('#feedbackModal').modal();
 }
 
@@ -1204,10 +1213,10 @@ function findSpecies() {
 $('#feedbackModal').on('hidden.bs.modal', function (e) {
     enableKeyDownEvent();
     if (correctedSpecies) {
-        currentPrediction.filename = correctedSpecies + '_' + Date.now().toString() + '.mp3';
-        sendFile('incorrect', currentPrediction);
+        predictions[clickedIndex].filename = correctedSpecies + '_' + Date.now().toString() + '.mp3';
+        sendFile('incorrect', predictions[clickedIndex]);
         correctedSpecies = undefined;
-        currentNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>';
+        clickedNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>';
     }
 })
 
