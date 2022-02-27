@@ -13,7 +13,7 @@ const path = require("path");
 const {model} = require("@tensorflow/tfjs");
 const CONFIG = {
 
-    sampleRate: 48000, specLength: 3, sigmoid: 1.0,
+    sampleRate: 24000, specLength: 3, sigmoid: 1.0,
 
 }
 
@@ -28,8 +28,8 @@ class Model {
         this.model_loaded = false;
         this.appPath = null;
         this.spectrogram = null;
-        this.frame_length = 1024;
-        this.frame_step = 373;
+        this.frame_length = 512;
+        this.frame_step = 186;
         this.prediction = null;
         this.appPath = appPath;
     }
@@ -60,7 +60,7 @@ class Model {
     }
 
     _normalize_and_fix_shape(spec) {
-        spec = spec.slice(253, 256);
+        spec = spec.slice(0, 253);
         // Normalize to 0-255
         const spec_max = tf.max(spec);
         spec = spec.mul(255);

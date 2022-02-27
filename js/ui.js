@@ -41,7 +41,7 @@ let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
 let workerLoaded = false;
 // Set default Options
 let config;
-const sampleRate = 48000;
+const sampleRate = 24000;
 let controller = new AbortController();
 let signal = controller.signal;
 
@@ -225,6 +225,7 @@ function initSpec(args) {
     // Setup waveform and spec views
     wavesurfer = WaveSurfer.create({
         container: '#waveform',
+        audioContext: audioCtx,
         backend: args.backend, // 'MediaElementWebAudio',
         // make waveform transparent
         backgroundColor: 'rgba(0,0,0,0)',
@@ -234,21 +235,23 @@ function initSpec(args) {
         cursorColor: '#fff',
         cursorWidth: 2,
         skipLength: 0.1,
-        normalize: true,
+
         partialRender: true,
         scrollParent: true,
         responsive: true,
-        height: 1024,
-        fftSamples: 1024,
-        windowFunc: 'hamming',
-        minPxPerSec: 10,
-        hideScrollbar: true,
+        height: 256,
+
         plugins: [
             SpectrogramPlugin.create({
                 wavesurfer: wavesurfer,
                 container: "#spectrogram",
                 scrollParent: true,
+                windowFunc: 'hamming',
+                minPxPerSec: 10,
+                normalize: true,
+                hideScrollbar: true,
                 labels: false,
+                fftSamples: 1024,
                 colorMap: colormap({
                     colormap: config.colormap, nshades: 256, format: 'float'
                 }),
@@ -326,7 +329,7 @@ function zoomSpecIn() {
     windowLength /= 2;
     bufferBegin = bufferBegin + wavesurfer.getCurrentTime() - (windowLength / 2)
     if (windowLength < 2) {
-        wavesurfer.params.fftSamples = 512
+        wavesurfer.spectrogram.params.fftSamples = 256
         wavesurfer.spectrogram.render()
     }
     loadBufferSegment(currentBuffer, bufferBegin, false);
@@ -340,8 +343,8 @@ function zoomSpecOut() {
     windowLength *= 2;
     // Centre on playhead
     bufferBegin = bufferBegin + wavesurfer.getCurrentTime() - (windowLength / 2)
-    if (wavesurfer.params.fftSamples !== 1024) {
-        wavesurfer.params.fftSamples = 1024
+    if (wavesurfer.spectrogram.params.fftSamples !== 512) {
+        wavesurfer.spectrogram.params.fftSamples = 512
         wavesurfer.spectrogram.render()
     }
     loadBufferSegment(currentBuffer, bufferBegin, false);
@@ -864,10 +867,15 @@ $(document).on('click', '.speccolor', function (e) {
         wavesurfer: wavesurfer,
         container: "#spectrogram",
         scrollParent: true,
+        windowFunc: 'hamming',
+        minPxPerSec: 10,
+        normalize: true,
+        hideScrollbar: true,
         labels: false,
+        fftSamples: 1024,
         colorMap: colormap({
             colormap: config.colormap, nshades: 256, format: 'float'
-        })
+        }),
     })).initPlugin('spectrogram');
     // set tick
     $('.speccolor .tick').addClass('d-none');
