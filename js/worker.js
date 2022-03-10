@@ -1,7 +1,7 @@
 const {ipcRenderer} = require('electron');
 const Model = require('./js/model.js');
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
-let appPath = '../256x384_model/';
+let appPath = '../256x384v2_model/';
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
 const path = require("path");
@@ -21,7 +21,7 @@ let audioBuffer;
 //
 // })();
 let chunkLength, minConfidence, index, end, AUDACITY, RESULTS, predictionStart;
-let sampleRate = 48000;
+let sampleRate; // Value obtained from model.js CONFIG
 let predictWorker;
 let predicting = false;
 let selection = false;
