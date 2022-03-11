@@ -46,6 +46,7 @@ let controller = new AbortController();
 let signal = controller.signal;
 
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
+
 const fetchAudioFile = (filePath) =>
     fetch(filePath, {signal})
         .then((res => res.arrayBuffer()))
@@ -92,8 +93,6 @@ const fetchAudioFile = (filePath) =>
                 showElement('loadFileHintText', false);
             }
         })
-
-//.then(cb)
 
 
 async function loadAudioFile(filePath) {
@@ -194,8 +193,6 @@ function loadBufferSegment(buffer, begin, saveRegion) {
                     'audio': slicedAudioBuffer,
                     'backend': 'WebAudio',
                     'alpha': 0,
-                    'context': null,
-                    'spectrogram': true
                 });
             } else {
                 if (!saveRegion) {
@@ -212,6 +209,8 @@ function updateSpec(buffer) {
     //wavesurfer.timeline.params.offset = -bufferBegin;
     wavesurfer.loadDecodedBuffer(buffer);
     specCanvasElement.width('100%');
+    $('.spec-labels').width('55px');
+
 }
 
 function initSpec(args) {
@@ -235,11 +234,10 @@ function initSpec(args) {
         cursorColor: '#fff',
         cursorWidth: 2,
         skipLength: 0.1,
-
         partialRender: true,
         scrollParent: true,
         responsive: true,
-        height: 256,
+        height: 512,
 
         plugins: [
             SpectrogramPlugin.create({
@@ -250,7 +248,7 @@ function initSpec(args) {
                 minPxPerSec: 10,
                 normalize: true,
                 hideScrollbar: true,
-                labels: false,
+                labels: true,
                 fftSamples: 1024,
                 colorMap: colormap({
                     colormap: config.colormap, nshades: 256, format: 'float'
@@ -485,12 +483,21 @@ function loadResultRegion(start, end) {
 }
 
 function adjustSpecDims(redraw) {
+    // if (wavesurfer) {
+    //     if (dummyElement.height() > 384) {
+    //         wavesurfer.spectrogram.fftSamples = 1024
+    //     } else {
+    //         wavesurfer.spectrogram.fftSamples = 512
+    //     }
+    //     wavesurfer.spectrogram.init();
+    // }
     $.each([dummyElement, waveWaveElement, specElement, specCanvasElement, waveCanvasElement], function () {
         // Expand up to 512px
         $(this).height(Math.min(bodyElement.height() * 0.4, 512))
     })
-    if (loadSpectrogram) {
-        specElement.css('z-index', 0)
+    if (wavesurfer) {
+
+        specElement.css('z-index', 0);
         resultTableElement.height(contentWrapperElement.height()
             - dummyElement.height()
             - controlsWrapperElement.height()
@@ -500,6 +507,7 @@ function adjustSpecDims(redraw) {
             wavesurfer.drawBuffer();
         }
         specCanvasElement.width('100%');
+        $('.spec-labels').width('55px')
     } else {
         resultTableElement.height(contentWrapperElement.height()
             - controlsWrapperElement.height()
@@ -684,7 +692,7 @@ window.onload = function () {
                 'spectrogram': true,
                 'colormap': 'inferno',
                 'timeline': true,
-                'minConfidence': 0.5,
+                'minConfidence': 0.4,
                 'timeOfDay': false
             }
             const {v4: uuidv4} = require('uuid');
@@ -1196,8 +1204,9 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         if (action === 'incorrect') {
             findSpecies();
         } else if (confirm('Submit feedback?')) {
+            predictions[clickedIndex].filename = predictions[clickedIndex].cname + '_' + Date.now().toString() + '.mp3';
+            sendFile('correct', predictions[clickedIndex]);
             clickedNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>'
-
         }
         e.stopImmediatePropagation();
 
@@ -1229,7 +1238,12 @@ $('#feedbackModal').on('hidden.bs.modal', function (e) {
 })
 
 function sendFile(action, result) {
-    let start = result.start, end = result.end, filename = result.filename;
+    let start, end, filename;
+    if (result) {
+        start = result.start;
+        end = result.end;
+        filename = result.filename
+    }
     if (!start && start !== 0) {
         if (!region.start) {
             start = 0;
@@ -1242,7 +1256,7 @@ function sendFile(action, result) {
     }
 
     let metadata;
-    if (result.cname) {
+    if (result) {
         metadata = {
             'UUID': config.UUID,
             'start': start,

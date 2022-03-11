@@ -1,7 +1,7 @@
 const {ipcRenderer} = require('electron');
 const Model = require('./js/model.js');
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
-let appPath = '../256x384v2_model/';
+let appPath = '../256x384_model/';
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
 const path = require("path");
@@ -21,7 +21,7 @@ let audioBuffer;
 //
 // })();
 let chunkLength, minConfidence, index, end, AUDACITY, RESULTS, predictionStart;
-let sampleRate = 24000;
+let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
 let predictWorker;
 let predicting = false;
 let selection = false;
@@ -110,6 +110,7 @@ async function loadAudioFile(filePath) {
 
 
 ipcRenderer.on('save', async (event, arg) => {
+    console.log("file save requested")
     await saveMP3(arg.start, arg.end, arg.filepath, arg.metadata)
 })
 

@@ -27,8 +27,7 @@
   "homepage": "https://github.com/mattk70/Chirpity-Electron#readme",
   "devDependencies": {
     "electron": "^7.3.3",
-    "electron-packager": "^14.2.1",
-    "electron-wix-msi": "^3.2.0"
+    "electron-packager": "^14.2.1"
   },
   "dependencies": {
     "@tensorflow/tfjs": "^3.13.0",
@@ -40,6 +39,6 @@
     "popper.js": "^1.16.1",
     "seedrandom": "^3.0.5",
     "uuid": "^8.3.2",
-    "wavesurfer.js": "^5.2.0"
+    "wavesurfer.js": "^6.0.4"
   }
 }
