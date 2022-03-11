@@ -173,7 +173,7 @@ ipcMain.on('saveFile', (event, arg) => {
         defaultPath: currentFile
     }).then(file => {
         // Stating whether dialog operation was cancelled or not.
-        console.log(file.canceled);
+        //console.log(file.canceled);
         if (!file.canceled) {
             const AUDACITY_LABELS = arg.labels;
             console.log(file.filePath.toString());

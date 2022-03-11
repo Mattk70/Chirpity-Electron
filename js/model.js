@@ -60,7 +60,7 @@ class Model {
     }
 
     _normalize_and_fix_shape(spec) {
-        spec = spec.slice(0, 253);
+        spec = spec.slice(0, 252);
         // Normalize to 0-255
         const spec_max = tf.max(spec);
         spec = spec.mul(255);
