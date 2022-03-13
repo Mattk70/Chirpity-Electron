@@ -240,20 +240,6 @@ function initSpec(args) {
         height: 512,
 
         plugins: [
-            SpectrogramPlugin.create({
-                wavesurfer: wavesurfer,
-                container: "#spectrogram",
-                scrollParent: true,
-                windowFunc: 'hamming',
-                minPxPerSec: 10,
-                normalize: true,
-                hideScrollbar: true,
-                labels: true,
-                fftSamples: 1024,
-                colorMap: colormap({
-                    colormap: config.colormap, nshades: 256, format: 'float'
-                }),
-            }),
             Regions.create({
                 dragSelection: {
                     slop: 5,
@@ -262,6 +248,9 @@ function initSpec(args) {
                 color: "rgba(255, 255, 255, 0.2)"
             })]
     })
+    if (config.spectrogram) {
+        initSpectrogram()
+    }
     if (config.timeline) {
         wavesurfer.addPlugin(SpecTimeline.create({
             container: '#timeline',
@@ -326,10 +315,7 @@ function zoomSpecIn() {
     if (windowLength < 2) return;
     windowLength /= 2;
     bufferBegin = bufferBegin + wavesurfer.getCurrentTime() - (windowLength / 2)
-    if (windowLength < 2) {
-        wavesurfer.spectrogram.params.fftSamples = 256
-        wavesurfer.spectrogram.render()
-    }
+    initSpectrogram();
     loadBufferSegment(currentBuffer, bufferBegin, false);
     wavesurfer.seekAndCenter(0.5)
     adjustSpecDims(true)
@@ -341,14 +327,12 @@ function zoomSpecOut() {
     windowLength *= 2;
     // Centre on playhead
     bufferBegin = bufferBegin + wavesurfer.getCurrentTime() - (windowLength / 2)
-    if (wavesurfer.spectrogram.params.fftSamples !== 512) {
-        wavesurfer.spectrogram.params.fftSamples = 512
-        wavesurfer.spectrogram.render()
-    }
+    initSpectrogram();
     loadBufferSegment(currentBuffer, bufferBegin, false);
     wavesurfer.seekAndCenter(0.5)
     adjustSpecDims(true)
 }
+
 
 async function showOpenDialog() {
     ipcRenderer.send('openFiles');
@@ -868,9 +852,16 @@ $(document).on('click', '#loadSpectrogram', function () {
     }
 })
 
-$(document).on('click', '.speccolor', function (e) {
-    wavesurfer.destroyPlugin('spectrogram');
-    config.colormap = e.target.id;
+function initSpectrogram() {
+    let fftSamples;
+    if (windowLength < 2) {
+        fftSamples = 256;
+    } else if (windowLength < 10) {
+        fftSamples = 512;
+    } else {
+        fftSamples = 1024;
+    }
+    if (wavesurfer.spectrogram) wavesurfer.destroyPlugin('spectrogram');
     wavesurfer.addPlugin(SpectrogramPlugin.create({
         wavesurfer: wavesurfer,
         container: "#spectrogram",
@@ -879,12 +870,18 @@ $(document).on('click', '.speccolor', function (e) {
         minPxPerSec: 10,
         normalize: true,
         hideScrollbar: true,
-        labels: false,
-        fftSamples: 1024,
+        labels: true,
+        fftSamples: fftSamples,
         colorMap: colormap({
             colormap: config.colormap, nshades: 256, format: 'float'
         }),
     })).initPlugin('spectrogram');
+    updateElementCache();
+}
+
+$(document).on('click', '.speccolor', function (e) {
+    config.colormap = e.target.id;
+    initSpectrogram();
     // set tick
     $('.speccolor .tick').addClass('d-none');
     $(this).children('span').removeClass('d-none');
