@@ -34,7 +34,7 @@ let completeDiv = $('.complete');
 const resultTable = $('#resultTableBody')
 const modalTable = $('#modalBody');
 const feedbackTable = $('#feedbackModalBody');
-let predictions = {}, correctedSpecies, speciesListItems, action, clickedNode, clickedIndex;
+let predictions = {}, correctedSpecies, speciesListItems, action, clickedNode, clickedIndex, speciesName;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
 let workerLoaded = false;
@@ -1092,15 +1092,38 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
 
     let summaryHTML = `<table class="table table-striped table-dark table-hover p-1"><thead class="thead-dark">
             <tr>
+                <th scope="col">Filter</th>
                 <th scope="col">Species</th>
                 <th scope="col" class="text-right">Count</th>
             </tr>
             </thead><tbody>`;
     for (const [key, value] of Object.entries(summarySorted)) {
-        summaryHTML += `<tr><td>${key}</td><td class="text-right"> ${value}</td></tr>`;
+        summaryHTML += `<tr>
+                        <td><span id="${key}" class="material-icons-two-tone align-bottom speciesFilter pointer">filter_alt</span></td>
+                        <td>${key}</td><td class="text-right"> ${value}</td></tr>`;
     }
     summaryHTML += '</tbody></table>';
     modalTable.append(summaryHTML);
+
+    $(document).on('click', '.speciesFilter', function (e) {
+        const speciesName = document.querySelectorAll('.cname');
+        if (e.target.classList.contains('text-success')) {
+            e.target.classList.remove('text-success')
+            speciesName.forEach(function(el){
+                el.parentNode.classList.remove('d-none')
+            })
+        } else {
+            $('.speciesFilter').removeClass('text-success');
+            e.target.classList.add('text-success');
+            speciesName.forEach(function (el) {
+                el.parentNode.classList.remove('d-none')
+                if (el.innerText !== e.target.id) {
+                    el.parentNode.classList.add('d-none')
+                }
+            });
+        }
+        e.stopImmediatePropagation();
+    });
 });
 
 ipcRenderer.on('prediction-ongoing', async (event, arg) => {
@@ -1138,7 +1161,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr += `<tr onmousedown='loadResultRegion( ${start} , ${end} );' class='border-top border-secondary top-row'><th scope='row'>${index}</th>`;
         tr += "<td><span class='material-icons rotate text-right pointer' onclick='toggleAlternates(&quot;.subrow" + index + "&quot;)'>expand_more</span></td>";
         tr += "<td>" + result.timestamp + "</td>";
-        tr += "<td>" + result.cname + "</td>";
+        tr += "<td class='cname'>" + result.cname + "</td>";
         tr += "<td><i>" + result.sname + "</i></td>";
         tr += "<td class='text-center'>" + iconizeScore(result.score) + "</td>";
         tr += "<td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>";
