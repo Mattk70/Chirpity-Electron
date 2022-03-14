@@ -20,7 +20,6 @@ const labels = ["Tachymarptis melba_Alpine Swift", "Pluvialis dominica_American 
 // })
 let currentPrediction;
 let appPath = remote.app.getPath('userData');
-
 let modelReady = false, fileLoaded = false, currentFile, fileList, resultHistory = {};
 let region, AUDACITY_LABELS, wavesurfer, summary = {};
 let fileStart, startTime, ctime;
@@ -737,14 +736,14 @@ window.onload = function () {
         <input type="text" id="myInput" onkeyup="myFunction()" placeholder="Search for a species...">
         <ul id="myUL">
             <li><a href="#">Animal<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
-            <li><a href="#">Environmental noise<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
+            <li><a href="#">Ambient Noise<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
             <li><a href="#">Human<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
             <li><a href="#">Vehicle<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>`;
     const excluded = new Set(['human', 'vehicles', 'animals', 'No call']);
     for (const item in labels) {
-        const cname = labels[item].split('_')[1]
+        const [sname, cname] = labels[item].split('_');
         if (!excluded.has(cname)) {
-            feedbackHTML += `<li><a href="#">${cname}<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>`;
+            feedbackHTML += `<li><a href="#">${cname} - ${sname}<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>`;
         }
     }
     feedbackHTML += '</ul>';
@@ -755,9 +754,10 @@ window.onload = function () {
 
 // Feedback list handler
 $(document).on('click', '#myUL li', function (e) {
-    correctedSpecies = e.target.innerText;
+    correctedSpecies = formatFilename(e.target.innerText);
     speciesListItems.addClass('d-none');
     e.target.childNodes[1].classList.remove('d-none');
+    //e.target.closest('.d-none').classList.remove('d-none');
 })
 
 
@@ -856,10 +856,8 @@ function initSpectrogram() {
     let fftSamples;
     if (windowLength < 2) {
         fftSamples = 256;
-    } else if (windowLength < 10) {
-        fftSamples = 512;
     } else {
-        fftSamples = 1024;
+        fftSamples = 512;
     }
     if (wavesurfer.spectrogram) wavesurfer.destroyPlugin('spectrogram');
     wavesurfer.addPlugin(SpectrogramPlugin.create({
@@ -1181,8 +1179,26 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
     $(".material-icons").click(function () {
         $(this).toggleClass("down");
     })
-
+    let filterMode = null;
     const toprow = $('.top-row')
+
+    $(document).on('click', '.filter', function (e) {
+        if (!filterMode) {
+            filterMode = 'low';
+            $('.score.text-danger').parent().parent().hide();
+            e.target.classList.add('text-warning')
+        } else if (filterMode === 'low') {
+            filterMode = 'medium'
+            $('.score.text-warning').parent().parent().hide();
+            e.target.classList.remove('text-warning');
+            e.target.classList.add('text-success')
+        } else {
+            filterMode = null;
+            $('.score').parent().parent('.top-row').show();
+            e.target.classList.remove('text-success');
+        }
+    });
+
     $(document).on('click', '.download', function (e) {
         action = 'save';
         clickedNode = e.target.parentNode
@@ -1201,7 +1217,8 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         if (action === 'incorrect') {
             findSpecies();
         } else if (confirm('Submit feedback?')) {
-            predictions[clickedIndex].filename = predictions[clickedIndex].cname + '_' + Date.now().toString() + '.mp3';
+            predictions[clickedIndex].filename = predictions[clickedIndex].cname.replace(/\s+/g, '_') +
+                '~' + predictions[clickedIndex].sname.replace(' ', '_') + '_' + Date.now().toString() + '.mp3';
             sendFile('correct', predictions[clickedIndex]);
             clickedNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>'
         }
@@ -1223,6 +1240,11 @@ function findSpecies() {
     $('#feedbackModal').modal();
 }
 
+function formatFilename(filename) {
+    filename = filename.replace(' - ', '~').replace(/\s+/g, '_',);
+    if (!filename.includes('~')) filename = filename + '~' + filename; // dummy latin
+    return filename;
+}
 
 $('#feedbackModal').on('hidden.bs.modal', function (e) {
     enableKeyDownEvent();
@@ -1288,12 +1310,12 @@ function sendFile(action, result) {
 
 // create a dict mapping score to icon
 const iconDict = {
-    // 'low': '<span class="material-icons text-danger border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
-    // 'medium': '<span class="material-icons text-warning border border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
-    // 'high': '<span class="material-icons text-success border border-secondary rounded" title="--%">signal_cellular_alt</span>',
-    'low': '<span class="material-icons text-danger border border-secondary rounded" title="Low">signal_cellular_alt_1_bar</span>',
-    'medium': '<span class="material-icons text-warning border border-secondary rounded" title="Medium">signal_cellular_alt_2_bar</span>',
-    'high': '<span class="material-icons text-success border border-secondary rounded" title="High">signal_cellular_alt</span>',
+    'low': '<span class="material-icons score text-danger border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
+    'medium': '<span class="material-icons score text-warning border border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
+    'high': '<span class="material-icons score text-success border border-secondary rounded" title="--%">signal_cellular_alt</span>',
+    //'low': '<span class="material-icons text-danger border border-secondary rounded" title="Low">signal_cellular_alt_1_bar</span>',
+    //'medium': '<span class="material-icons text-warning border border-secondary rounded" title="Medium">signal_cellular_alt_2_bar</span>',
+    //'high': '<span class="material-icons text-success border border-secondary rounded" title="High">signal_cellular_alt</span>',
 }
 
 function iconizeScore(score) {
