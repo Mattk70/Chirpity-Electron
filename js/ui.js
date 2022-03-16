@@ -34,7 +34,8 @@ let completeDiv = $('.complete');
 const resultTable = $('#resultTableBody')
 const modalTable = $('#modalBody');
 const feedbackTable = $('#feedbackModalBody');
-let predictions = {}, correctedSpecies, speciesListItems, action, clickedNode, clickedIndex, speciesName;
+let predictions = {}, correctedSpecies, speciesListItems, action, clickedNode,
+    clickedIndex, speciesName, speciesFilter, speciesExclude, subRows, scrolled;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
 let workerLoaded = false;
@@ -397,11 +398,6 @@ function enableMenuItem(id) {
 
 function disableMenuItem(id) {
     $('#' + id).addClass('disabled');
-}
-
-function toggleAlternates(row) {
-    $(row).toggle('slow');
-    return false
 }
 
 function showElement(id, makeFlex = true, empty = false) {
@@ -1059,6 +1055,7 @@ ipcRenderer.on('progress', async (event, arg) => {
 });
 
 ipcRenderer.on('prediction-done', async (event, arg) => {
+    scrolled = false;
     AUDACITY_LABELS = arg.labels;
     progressDiv.hide();
     progressBar.width(0 + '%');
@@ -1092,39 +1089,94 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
 
     let summaryHTML = `<table class="table table-striped table-dark table-hover p-1"><thead class="thead-dark">
             <tr>
-                <th scope="col">Filter</th>
+                <th scope="col"  class="text-center">Filter</th>
+                <th scope="col" class="text-center">Exclude</th>
                 <th scope="col">Species</th>
                 <th scope="col" class="text-right">Count</th>
             </tr>
             </thead><tbody>`;
     for (const [key, value] of Object.entries(summarySorted)) {
         summaryHTML += `<tr>
-                        <td><span id="${key}" class="material-icons-two-tone align-bottom speciesFilter pointer">filter_alt</span></td>
+                        <td class="text-center"><span class="spinner-border spinner-border-sm text-success d-none" role="status"></span>
+                        <span id="${key}" class="material-icons-two-tone align-bottom speciesFilter pointer">filter_alt</span>
+                        </td>
+                        <td class="text-center"><span class="spinner-border spinner-border-sm text-danger d-none" role="status"></span>
+                        <span id="${key}" class="material-icons-two-tone align-bottom speciesExclude pointer">clear</span>
+                        </td>                        
                         <td>${key}</td><td class="text-right"> ${value}</td></tr>`;
     }
     summaryHTML += '</tbody></table>';
     modalTable.append(summaryHTML);
+    speciesName = document.querySelectorAll('.cname');
+    subRows = document.querySelectorAll('.subrow')
+    const materialIcons = document.querySelectorAll('.rotate')
+    speciesFilter = document.querySelectorAll('.speciesFilter');
+    speciesExclude = document.querySelectorAll('.speciesExclude');
+
+    $(document).on('click', '.speciesExclude', function (e) {
+        const spinner = e.target.parentNode.firstChild.classList;
+        spinner.remove('d-none');
+        const targetClass = e.target.classList;
+        targetClass.add('d-none');
+        if (targetClass.contains('text-danger')) {
+            targetClass.remove('text-danger')
+            const setDelay = setTimeout(matchSpecies, 10, e, 'unfilter');
+        } else {
+            targetClass.add('text-danger');
+            const setDelay = setTimeout(matchSpecies, 1, e, 'exclude');
+        }
+        e.stopImmediatePropagation();
+    });
 
     $(document).on('click', '.speciesFilter', function (e) {
-        const speciesName = document.querySelectorAll('.cname');
-        if (e.target.classList.contains('text-success')) {
-            e.target.classList.remove('text-success')
-            speciesName.forEach(function(el){
+        const spinner = e.target.parentNode.firstChild.classList;
+        // Remove any exclusion from the species to filter
+        e.target.parentNode.nextElementSibling.children[1].classList.remove('text-danger');
+        const targetClass = e.target.classList;
+        if (targetClass.contains('text-success')) {
+            // Clicked on filtered species icon
+            targetClass.remove('text-success')
+            speciesExclude.forEach(function (el) {
+                el.classList.remove('text-danger');
+            })
+            speciesName.forEach(function (el) {
                 el.parentNode.classList.remove('d-none')
             })
         } else {
-            $('.speciesFilter').removeClass('text-success');
-            e.target.classList.add('text-success');
-            speciesName.forEach(function (el) {
-                el.parentNode.classList.remove('d-none')
-                if (el.innerText !== e.target.id) {
-                    el.parentNode.classList.add('d-none')
-                }
-            });
+            // Clicked on unfiltered species icon
+            speciesFilter.forEach(function (el) {
+                el.classList.remove('text-success');
+            })
+            // Hide open subrows
+            subRows.forEach(function (el) {
+                el.classList.add('d-none');
+            })
+            // Flip open icon back up
+            materialIcons.forEach(function (el) {
+                el.classList.remove('down');
+            })
+            targetClass.add('text-success');
+            targetClass.add('d-none');
+            spinner.remove('d-none');
+            // Allow spinner to show
+            const setDelay = setTimeout(matchSpecies, 1, e, 'include');
         }
         e.stopImmediatePropagation();
     });
 });
+
+function matchSpecies(e, mode) {
+    const spinner = e.target.parentNode.firstChild.classList;
+    const targetClass = e.target.classList;
+    speciesName.forEach(function (el) {
+        const classes = el.parentNode.classList;
+        if (el.innerText === e.target.id) {
+            (mode === 'include' || mode === 'unfilter') ? classes.remove('d-none') : classes.add('d-none')
+        } else if (mode === 'include') classes.add('d-none')
+    })
+    spinner.add('d-none');
+    targetClass.remove('d-none');
+}
 
 ipcRenderer.on('prediction-ongoing', async (event, arg) => {
     completeDiv.hide();
@@ -1154,16 +1206,16 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         } else {
             summary[result.cname] = 1
         }
-
+//onclick='toggleAlternates(&quot;${index}&quot;)'
         const regex = /:/g;
         const start = result.start, end = result.end;
         result.filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp.replace(regex, '.') + '.mp3';
         tr += `<tr onmousedown='loadResultRegion( ${start} , ${end} );' class='border-top border-secondary top-row'><th scope='row'>${index}</th>`;
-        tr += "<td><span class='material-icons rotate text-right pointer' onclick='toggleAlternates(&quot;.subrow" + index + "&quot;)'>expand_more</span></td>";
         tr += "<td>" + result.timestamp + "</td>";
         tr += "<td class='cname'>" + result.cname + "</td>";
         tr += "<td><i>" + result.sname + "</i></td>";
         tr += "<td class='text-center'>" + iconizeScore(result.score) + "</td>";
+        tr += `<td class='text-center'><span id='${index}' class='material-icons rotate pointer d-none'>expand_more</span></td>`;
         tr += "<td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>";
         tr += `<td class='specFeature text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="_blank">
                     <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>`
@@ -1172,42 +1224,62 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr += `<td id="${index}" class='text-center feedback'> <span class='material-icons-two-tone text-success pointer'>
              thumb_up_alt</span> <span class='material-icons-two-tone text-danger pointer'>thumb_down_alt</span></td>`;
         tr += "</tr>";
-
-        tr += "<tr class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + ")'><th scope='row'> </th>";
-        tr += "<td> </td>";
-        tr += "<td> </td>";
-        tr += "<td>" + result.cname2 + "</td>";
-        tr += "<td><i>" + result.sname2 + "</i></td>";
-        tr += "<td class='text-center'>" + iconizeScore(result.score2) + "</td>";
-        tr += "<td> </td>";
-        tr += `<td><a href='https://xeno-canto.org/explore?query=${result.sname2}%20type:nocturnal' target=\"_blank\">
+        if (result.score2 > 0.2) {
+            tr += `<tr id='subrow${index}' class='subrow d-none' onclick='loadResultRegion(${start},${end})'><th scope='row'>${index}</th>`;
+            tr += "<td> </td>";
+            tr += "<td class='cname2'>" + result.cname2 + "</td>";
+            tr += "<td><i>" + result.sname2 + "</i></td>";
+            tr += "<td class='text-center'>" + iconizeScore(result.score2) + "</td>";
+            tr += "<td> </td>";
+            tr += "<td> </td>";
+            tr += `<td><a href='https://xeno-canto.org/explore?query=${result.sname2}%20type:nocturnal' target=\"_blank\">
                     <img src='img/logo/XC.png' alt='Search ${result.cname2} on Xeno Canto' title='${result.cname2} NFCs on Xeno Canto'></a> </td>`;
-        tr += "</tr>";
-
-        tr += "<tr class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + " )' ><th scope='row'> </th>";
-        tr += "<td> </td>";
-        tr += "<td> </td>";
-        tr += "<td>" + result.cname3 + "</td>";
-        tr += "<td><i>" + result.sname3 + "</i></td>";
-        tr += "<td class='text-center'>" + iconizeScore(result.score3) + "</td>";
-        tr += "<td> </td>";
-        tr += `<td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:nocturnal' target=\"_blank\">
+            tr += "<td> </td>";
+            tr += "<td> </td>";
+            tr += "</tr>";
+            if (result.score3 > 0.2) {
+                tr += `<tr id='subsubrow${index}' class=' subrow d-none' onclick='loadResultRegion(${start},${end})' ><th scope='row'>${index}</th>`;
+                tr += "<td> </td>";
+                tr += "<td class='cname3'>" + result.cname3 + "</td>";
+                tr += "<td><i>" + result.sname3 + "</i></td>";
+                tr += "<td class='text-center'>" + iconizeScore(result.score3) + "</td>";
+                tr += "<td> </td>";
+                tr += "<td> </td>";
+                tr += `<td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:nocturnal' target=\"_blank\">
                     <img src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>`;
-        tr += "<td> </td>";
-        tr += "</tr>";
+                tr += "<td> </td>";
+                tr += "<td> </td>";
+                tr += "</tr>";
+            }
+        }
     }
     selection ? resultTable.prepend(tr) : resultTable.append(tr)
+    const tableRows = document.querySelectorAll('#results tr');
 
+// line is zero-based
+// line is the row number that you want to see into view after scroll
+    if (!scrolled) {
+        tableRows[0].scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest'
+        })
+        scrolled = true
+    }
+    // Show the alternate detections toggle:
+    if (result.score2 > 0.2) {
+        document.getElementById(index).classList.remove('d-none')
+    }
     if (!config.spectrogram) $('.specFeature').hide();
-    $(".material-icons").click(function () {
+    $(document).on('click', '.material-icons', function (e) {
         $(this).toggleClass("down");
     })
     let filterMode = null;
     const toprow = $('.top-row')
-
+    speciesName = document.querySelectorAll('.cname');
     $(document).on('click', '.filter', function (e) {
         if (!filterMode) {
             filterMode = 'low';
+
             $('.score.text-danger').parent().parent().hide();
             e.target.classList.add('text-warning')
         } else if (filterMode === 'low') {
@@ -1220,6 +1292,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
             $('.score').parent().parent('.top-row').show();
             e.target.classList.remove('text-success');
         }
+        e.stopImmediatePropagation();
     });
 
     $(document).on('click', '.download', function (e) {
@@ -1248,6 +1321,13 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         e.stopImmediatePropagation();
 
     });
+    $(document).on('click', '.rotate', function (e) {
+        const row1 = e.target.parentNode.parentNode.nextSibling;
+        const row2 = row1.nextSibling;
+        row1.classList.toggle('d-none')
+        if (!row2.classList.contains('top-row')) row2.classList.toggle('d-none')
+        e.stopImmediatePropagation();
+    })
 
     toprow.click(function () {
         toprow.each(function () {
