@@ -65,8 +65,18 @@
                     Options
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item disabled" href="#" id="modelOptions">Model</a>
                     <ul class="nav navbar-nav">
+                        <li class="dropdown-submenu">
+                            <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
+                               aria-haspopup="true" aria-expanded="false"> <span
+                                    class="nav-label">Model</span><span class="material-icons-two-tone arrow">navigate_next</span></a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#" id="useWhitelist">Use Whitelist
+                                    <span class='material-icons tick'>done</span>
+                                </a></li>
+                            </ul>
+                        </li>
+
                         <li class="dropdown-submenu">
                             <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
                                aria-haspopup="true" aria-expanded="false"> <span
@@ -221,15 +231,18 @@
 
     <!-- Result table -->
     <div class="d-none p-0 border-0 overflow-auto tableFixHead" id="resultTableContainer">
-        <table class="table table-hover  p-1">
+        <table id='results' class="table table-hover  p-1">
             <thead class="thead-dark">
             <tr>
                 <th scope="col">#</th>
-                <th scope="col" class="text-right"></th>
                 <th scope="col">Timestamp</th>
                 <th scope="col">Common name</th>
                 <th scope="col">Scientific name</th>
-                <th scope="col" class="text-center">Confidence</th>
+                <th scope="col" class="text-center">Confidence <span
+                        class="material-icons-two-tone align-bottom filter pointer">
+filter_list
+</span></th>
+                <th scope="col" class="text-center">Other IDs</th>
                 <th scope="col" class="specFeature text-center">Play</th>
                 <th scope="col" class="specFeature text-center">XC</th>
                 <th scope="col" class="specFeature text-center">Save</th>

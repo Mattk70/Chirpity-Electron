@@ -672,7 +672,8 @@ window.onload = function () {
                 'colormap': 'inferno',
                 'timeline': true,
                 'minConfidence': 0.4,
-                'timeOfDay': false
+                'timeOfDay': false,
+                'useWhitelist': true
             }
             const {v4: uuidv4} = require('uuid');
             config.UUID = uuidv4()
@@ -681,12 +682,18 @@ window.onload = function () {
         }
         config = JSON.parse(data)
         //console.log('Successfully loaded UUID: ' + config.UUID)
+
+        ipcRenderer.send('load-model', {useWhitelist: config.useWhitelist})
+
         if (!config.UUID) {
             const {v4: uuidv4} = require('uuid');
             config.UUID = uuidv4();
             updatePrefs()
         }
         // Set menu option state
+        if (!config.useWhitelist) {
+            $('#useWhitelist .tick').hide()
+        }
         if (!config.spectrogram) {
             $('#loadSpectrogram .tick').hide()
         }
@@ -885,6 +892,17 @@ $(document).on('click', '.speccolor', function (e) {
     updatePrefs();
 })
 
+$(document).on('click', '#useWhitelist', function () {
+    if (config.useWhitelist) {
+        config.useWhitelist = false;
+        $('#useWhitelist .tick').hide()
+    } else {
+        config.useWhitelist = true;
+        $('#useWhitelist .tick').show()
+    }
+    ipcRenderer.send('load-model', {useWhitelist: config.useWhitelist});
+    updatePrefs();
+})
 
 $(document).on('click', '.timeline', function () {
     if (wavesurfer.timeline && wavesurfer.timeline.wrapper !== null) {
