@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>About Chirpity Nocmig</title>
+</head>
+<body>
+<h6>The Chirpity Vision, and a Note on Accuracy</h6>
+<p>
+    Chirpity Nocmig works by detecting calls found in 3-second audio windows. Actually, it detects <i>images</i> of
+    calls generated from audio files. Behind the scenes it takes audio, converts and resamples it from the source format
+    and creates a
+    spectrogram for each audio sample. It performs 1200 predictions per hour. By one measure - number of predictions /
+    number correct - it often achieves around 99% accuracy. However, that figure will not reflect the experience of
+    using the software in the real world. The fact is, most of us are not interested to know that thousands of "no call"
+    predictions were correct, it's the quality of species detections that matter.
+</p>
+<p>
+    The reality is that this prototype can still easily be thrown off by novel sounds, sounds it has not seen enough of
+    during its training. A new car alarm sound can trigger dozens of false IDs. Wind in trees, pops and bangs, people
+    playing football a quarter of a mile away - all these noises can appear similar to a bird call.
+</p>
+<p>
+    Generally though, it is not difficult to breeze past these shortcomings with a little practice. You learn that
+    people and dogs may be confused with geese and swans, that a car alarm can be confused with a wader. As the dawn
+    chorus approaches and the density of bird vocalizations increases the chance that it may mistake a snatch of robin
+    sub-song for a skylark.
+</p>
+<p>
+    The value of Chirpity Nocmig lies in its ability to <i>simplify and support</i> the process of identifying birds by
+    sound. It is
+    sufficiently accurate, even now, to be a useful tool. It's a long way from beating Kasparov at Chess, but for anyone
+    struggling to get a handle on bird identification by sound, this software will help enormously.
+</p>
+<p>
+    Over time, the software will improve. As the model is exposed to a greater variety of noise data, it will learn
+    to ignore more of those noises, and the false positives will diminish. Refinements to the deep learning architecture
+    will also bring improvements - future updates may incorporate location and date information to refine predictions,
+    for example.
+</p>
+<p>
+    If you don't expect perfection, you won't be disappointed.
+</p>
+
+</body>
+</html>

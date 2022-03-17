@@ -1235,11 +1235,11 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         tr += "<td class='text-center'>" + iconizeScore(result.score) + "</td>";
         tr += `<td class='text-center'><span id='${index}' class='material-icons rotate pointer d-none'>expand_more</span></td>`;
         tr += "<td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>";
-        tr += `<td class='specFeature text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="_blank">
+        tr += `<td class='text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
                     <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>`
         tr += `<td class='specFeature text-center download'><span class='material-icons-outlined pointer'>
             file_download</span></td>`;
-        tr += `<td id="${index}" class='text-center feedback'> <span class='material-icons-two-tone text-success pointer'>
+        tr += `<td id="${index}" class='specFeature text-center feedback'> <span class='material-icons-two-tone text-success pointer'>
              thumb_up_alt</span> <span class='material-icons-two-tone text-danger pointer'>thumb_down_alt</span></td>`;
         tr += "</tr>";
         if (result.score2 > 0.2) {
@@ -1249,11 +1249,11 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
             tr += "<td><i>" + result.sname2 + "</i></td>";
             tr += "<td class='text-center'>" + iconizeScore(result.score2) + "</td>";
             tr += "<td> </td>";
-            tr += "<td> </td>";
+            tr += "<td class='specFeature'> </td>";
             tr += `<td><a href='https://xeno-canto.org/explore?query=${result.sname2}%20type:nocturnal' target=\"_blank\">
                     <img src='img/logo/XC.png' alt='Search ${result.cname2} on Xeno Canto' title='${result.cname2} NFCs on Xeno Canto'></a> </td>`;
-            tr += "<td> </td>";
-            tr += "<td> </td>";
+            tr += "<td class='specFeature'> </td>";
+            tr += "<td class='specFeature'> </td>";
             tr += "</tr>";
             if (result.score3 > 0.2) {
                 tr += `<tr id='subsubrow${index}' class=' subrow d-none' onclick='loadResultRegion(${start},${end})' ><th scope='row'>${index}</th>`;
@@ -1262,11 +1262,11 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
                 tr += "<td><i>" + result.sname3 + "</i></td>";
                 tr += "<td class='text-center'>" + iconizeScore(result.score3) + "</td>";
                 tr += "<td> </td>";
-                tr += "<td> </td>";
+                tr += "<td class='specFeature'> </td>";
                 tr += `<td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:nocturnal' target=\"_blank\">
                     <img src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>`;
-                tr += "<td> </td>";
-                tr += "<td> </td>";
+                tr += "<td class='specFeature'> </td>";
+                tr += "<td class='specFeature'> </td>";
                 tr += "</tr>";
             }
         }
@@ -1431,6 +1431,7 @@ function sendFile(action, result) {
 
 // create a dict mapping score to icon
 const iconDict = {
+    'guess': '<span class="material-icons score border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
     'low': '<span class="material-icons score text-danger border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
     'medium': '<span class="material-icons score text-warning border border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
     'high': '<span class="material-icons score text-success border border-secondary rounded" title="--%">signal_cellular_alt</span>',
@@ -1441,7 +1442,38 @@ const iconDict = {
 
 function iconizeScore(score) {
     const tooltip = (parseFloat(score) * 100).toFixed(0).toString()
-    if (parseFloat(score) < 0.65) return iconDict['low'].replace('--', tooltip)
+    if (parseFloat(score) < 0.5) return iconDict['guess'].replace('--', tooltip)
+    else if (parseFloat(score) < 0.65) return iconDict['low'].replace('--', tooltip)
     else if (parseFloat(score) < 0.85) return iconDict['medium'].replace('--', tooltip)
     else return iconDict['high'].replace('--', tooltip)
 }
+
+// Help content handling
+
+$('#keyboard').on('click',function(){
+    $('#helpModalLabel').text('Keyboard shortcuts');
+    $('#helpModalBody').load('Help/keyboard.html', function(){
+        $('#helpModal').modal({show:true});
+    });
+});
+
+$('#options').on('click',function(){
+    $('#helpModalLabel').text('Options Help');
+    $('#helpModalBody').load('Help/options.html', function(){
+        $('#helpModal').modal({show:true});
+    });
+});
+
+$('#usage').on('click',function(){
+    $('#helpModalLabel').text('Usage Guide');
+    $('#helpModalBody').load('Help/usage.html', function(){
+        $('#helpModal').modal({show:true});
+    });
+});
+
+// $('#about').on('click',function(){
+//     $('#helpModalLabel').html( "About Chirpity Nocmig");
+//     $('#helpModalBody').load('Help/about.html', function(){
+//         $('#helpModal').modal({show:true});
+//     });
+// });

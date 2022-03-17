@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chirpity Nocmig usage guide</title>
+</head>
+<body>
+<h4 class="text-center">Suggested Workflow</h4>
+<ol>
+    <li>Open an audio file. Ideally, this will be the file that was recorded by your digital recorder with its original
+        timestamp. By using this file, you will be able to take advantage of the <b>Options > Spectrogram >
+            Timeline >
+            Time of Day</b> mode for the spectrogram timeline, which will show the actual time calls were detected.
+        <b>N.B.</b>
+        It is possible to cancel a file load operation by pressing the <b>Esc</b> key.
+    </li>
+    <li>
+        Once the file has loaded, select &quot;<i>Analyse entire file</i>&quot; from the <b>Analysis</b> menu. Depending
+        on the file length, this may take several minutes. A progress indicator will appear to guide you on how long
+        this is likely to take. To stop the analysis, press the <b>Esc</b> key.
+    </li>
+</ol>
+<h5 class="pt-2">Exploring Detections</h5>
+<ol start="3">
+    <li>
+        As the model makes detections, they appear in a table below the spectrogram. Clicking the detection's row in
+        the table will cause the playhead to jump to the start of that detection. Press <b>P</b>, or the
+        <span class='material-icons play pointer align-bottom'>play_circle_filled</span> icon to play the detection.
+        Alternatively, you may press the SpaceBar to play from the beginning of the selection and continue playing the
+        audio until you press the SpaceBar again. Clicking the spectrogram will move the playhead to that position.
+        Playback will continue, so this allows you to replay a call repeatedly.
+    </li>
+    <li>
+        Selecting the <img src="img/logo/XC.png" alt="XC"> icon will open a search result (in your default web broswer)
+        for the
+        detected species' night flight calls on the Xeno Canto website. Here you can compare the result to Nocmig
+        recordings
+        uploaded by others.
+    </li>
+    <li>
+        If multiple species were detected, or if the detection has an alternative ID for the call, a
+        <span class='material-icons-two-tone'>expand_more</span> icon will be displayed in the Other IDs
+        table column. Clicking this will open rows beneath with the details of those species.
+    </li>
+</ol>
+<h5 class="pt-2">Summary and Filtering Detections</h5>
+<ol start="6">
+    <li>
+        <button type="button" class="btn btn-primary btn-sm" data-toggle="modal">
+            Show Summary
+        </button>
+        appears once the model has completed its analysis. Clicking the button will open a summary table of the
+        detections across the file. Importantly, this table allows you to filter the results displayed in the main
+        results
+        table. Click the filter icon ( <span class="material-icons-two-tone align-bottom  ">filter_alt</span> ) to limit
+        the
+        display to that single species, or the <span class="material-icons-two-tone align-bottom ">clear</span> icon to
+        exclude a species from the result table. This is <i>extremely</i> useful if several hundred Robin calls were
+        detected!
+    </li>
+</ol>
+<h5 class="pt-2">Custom "Deep Dive" Detections</h5>
+<ol start="7">
+    <li>Sometimes, a call is missed or a detection is erroneous due to the position of the analysis window in relation
+        to the call. The window can be moved by dragging it, or you can create a new window by clicking and
+        dragging out a custom region on the spectrogram. Once you have a new region, select <b>Analysis > Analyse
+            selected interval</b> from the menu. The custom detection is placed at the top of the results table.
+        <b>N.B.</b> The detection threshold is much reduced for custom detections, so exercise appropriate caution since
+        false positives are more likely. Uncoloured confidence icons should be treated as a "wild guess", even
+        considered by the model more likely to be wrong than right.
+    </li>
+</ol>
+
+<h5 class="pt-2">Saving Results</h5>
+<ol start="8">
+    <li>Currently, there are three ways to save results:
+        <ul>
+            <li>Save the detections as a label file in Audacity format. Press <b>Ctrl-S</b> or select <b>File > Save
+                Audacity Labels</b> from the menu. By default, the label file will have the same name as the audio file,
+                with a ".txt" extension.
+            </li>
+            <li>
+                Save a 3-second audio clip of a detection (in MP3 format). To do this, click the <span
+                    class='material-icons-outlined align-bottom'>
+            file_download</span> icon in the result table. By default, the filename will contain the species and
+                timestamp of the detection identifying its position in the original audio file.
+            </li>
+            <li>
+                Save a custom MP3 clip. Select a region of the spectrogram by dragging the mouse over the area of audio
+                you
+                want
+                to save.
+                From the File menu, select <b>Export Selected Audio</b> to bring up a file save dialog.
+            </li>
+        </ul>
+    </li>
+</ol>
+<h5 class="pt-2">Feedback</h5>
+<ol start="9">
+    <li>
+        <p>Machine Learning requires vast amounts of data. Adequate results can be obtained from a few hundred examples
+            of a
+            call, but for robust and reliable results several thousand examples are needed. Those examples need to be
+            representative of the
+            range of vocalisations a bird can make, under a wide range of conditions.
+            Providing feedback is the best way to help improve the quality of detections and takes as few as two clicks
+            of a
+            mouse.</p>
+        <ul>
+            <li>
+                If you think a detection is correct, click the <span
+                    class='material-icons-two-tone text-success align-bottom'>
+             thumb_up_alt</span> icon and confirm to submit the feedback.
+            </li>
+            <li>
+                If you think the prediction is incorrect, click the <span
+                    class='material-icons-two-tone text-danger align-bottom'>
+             thumb_down_alt</span> icon. This will bring up a prompt inviting you to say what you think the prediction
+                should have been. The list can be filtered by entering the first few letters of the species in the box.
+                Selecting the species will check the ID, and hitting send will submit the feedback.
+            </li>
+            <li>In either case, hitting <b>Esc</b> will cancel the submission.</li>
+        </ul>
+    </li>
+</ol>
+</body>
+</html>

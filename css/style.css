@@ -122,7 +122,6 @@ html, body {
 
 tr[id^="sub"] {
     font-size: 12px;
-
 }
 
 span[id^="filename_"] {
@@ -214,8 +213,4 @@ div#contentWrapper {
 
 #myUL li a:hover:not(.header) {
   background-color: #eee; /* Add a hover effect to all links, except for headers */
-}
-
-.modal-body {
-    max-height: 320px;
 }
