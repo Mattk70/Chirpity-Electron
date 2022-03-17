@@ -120,9 +120,9 @@ html, body {
     margin-top: -6px;
 }
 
-tr[class^="subrow"] {
+tr[id^="sub"] {
     font-size: 12px;
-    display: none
+
 }
 
 span[id^="filename_"] {

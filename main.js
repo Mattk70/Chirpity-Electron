@@ -91,6 +91,11 @@ app.on('activate', () => {
     }
 });
 
+ipcMain.on('load-model', async (event, arg) => {
+    const useWhitelist = arg.useWhitelist;
+    console.log('Main received load-model, using whitelist: ' + arg.useWhitelist)
+    workerWindow.webContents.send('load-model', {useWhitelist: useWhitelist});
+});
 
 ipcMain.on('file-load-request', async (event, arg) => {
     const currentFile = arg.message;
