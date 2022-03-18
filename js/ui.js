@@ -1041,6 +1041,31 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     KeyP: function () {
         (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
     }
+    ,
+    Equal: function () {
+        if (wavesurfer) {
+            zoomSpecIn()
+        }
+    }
+    ,
+    NumpadAdd: function () {
+        if (wavesurfer) {
+            zoomSpecIn()
+        }
+    }
+        ,
+    Minus: function () {
+        if (wavesurfer) {
+            zoomSpecOut()
+        }
+    }
+    ,
+    NumpadSubtract: function () {
+        if (wavesurfer) {
+            zoomSpecOut()
+        }
+    }
+
 };
 
 
@@ -1450,24 +1475,24 @@ function iconizeScore(score) {
 
 // Help content handling
 
-$('#keyboard').on('click',function(){
+$('#keyboard').on('click', function () {
     $('#helpModalLabel').text('Keyboard shortcuts');
-    $('#helpModalBody').load('Help/keyboard.html', function(){
-        $('#helpModal').modal({show:true});
+    $('#helpModalBody').load('Help/keyboard.html', function () {
+        $('#helpModal').modal({show: true});
     });
 });
 
-$('#options').on('click',function(){
+$('#options').on('click', function () {
     $('#helpModalLabel').text('Options Help');
-    $('#helpModalBody').load('Help/options.html', function(){
-        $('#helpModal').modal({show:true});
+    $('#helpModalBody').load('Help/options.html', function () {
+        $('#helpModal').modal({show: true});
     });
 });
 
-$('#usage').on('click',function(){
+$('#usage').on('click', function () {
     $('#helpModalLabel').text('Usage Guide');
-    $('#helpModalBody').load('Help/usage.html', function(){
-        $('#helpModal').modal({show:true});
+    $('#helpModalBody').load('Help/usage.html', function () {
+        $('#helpModal').modal({show: true});
     });
 });
 
