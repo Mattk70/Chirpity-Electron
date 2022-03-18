@@ -20,7 +20,6 @@ const labels = ["Tachymarptis melba_Alpine Swift", "Pluvialis dominica_American 
 // })
 let currentPrediction;
 let appPath = remote.app.getPath('userData');
-
 let modelReady = false, fileLoaded = false, currentFile, fileList, resultHistory = {};
 let region, AUDACITY_LABELS, wavesurfer, summary = {};
 let fileStart, startTime, ctime;
@@ -35,17 +34,19 @@ let completeDiv = $('.complete');
 const resultTable = $('#resultTableBody')
 const modalTable = $('#modalBody');
 const feedbackTable = $('#feedbackModalBody');
-let predictions = {}, correctedSpecies, speciesListItems, action, clickedNode, clickedIndex;
+let predictions = {}, correctedSpecies, speciesListItems, action, clickedNode,
+    clickedIndex, speciesName, speciesFilter, speciesExclude, subRows, scrolled;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
 let workerLoaded = false;
 // Set default Options
 let config;
-const sampleRate = 48000;
+const sampleRate = 24000;
 let controller = new AbortController();
 let signal = controller.signal;
 
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
+
 const fetchAudioFile = (filePath) =>
     fetch(filePath, {signal})
         .then((res => res.arrayBuffer()))
@@ -92,8 +93,6 @@ const fetchAudioFile = (filePath) =>
                 showElement('loadFileHintText', false);
             }
         })
-
-//.then(cb)
 
 
 async function loadAudioFile(filePath) {
@@ -194,8 +193,6 @@ function loadBufferSegment(buffer, begin, saveRegion) {
                     'audio': slicedAudioBuffer,
                     'backend': 'WebAudio',
                     'alpha': 0,
-                    'context': null,
-                    'spectrogram': true
                 });
             } else {
                 if (!saveRegion) {
@@ -212,6 +209,8 @@ function updateSpec(buffer) {
     //wavesurfer.timeline.params.offset = -bufferBegin;
     wavesurfer.loadDecodedBuffer(buffer);
     specCanvasElement.width('100%');
+    $('.spec-labels').width('55px');
+
 }
 
 function initSpec(args) {
@@ -225,6 +224,7 @@ function initSpec(args) {
     // Setup waveform and spec views
     wavesurfer = WaveSurfer.create({
         container: '#waveform',
+        audioContext: audioCtx,
         backend: args.backend, // 'MediaElementWebAudio',
         // make waveform transparent
         backgroundColor: 'rgba(0,0,0,0)',
@@ -234,25 +234,12 @@ function initSpec(args) {
         cursorColor: '#fff',
         cursorWidth: 2,
         skipLength: 0.1,
-        normalize: true,
         partialRender: true,
         scrollParent: true,
         responsive: true,
-        height: 1024,
-        fftSamples: 1024,
-        windowFunc: 'hamming',
-        minPxPerSec: 10,
-        hideScrollbar: true,
+        height: 512,
+
         plugins: [
-            SpectrogramPlugin.create({
-                wavesurfer: wavesurfer,
-                container: "#spectrogram",
-                scrollParent: true,
-                labels: false,
-                colorMap: colormap({
-                    colormap: config.colormap, nshades: 256, format: 'float'
-                }),
-            }),
             Regions.create({
                 dragSelection: {
                     slop: 5,
@@ -261,6 +248,9 @@ function initSpec(args) {
                 color: "rgba(255, 255, 255, 0.2)"
             })]
     })
+    if (config.spectrogram) {
+        initSpectrogram()
+    }
     if (config.timeline) {
         wavesurfer.addPlugin(SpecTimeline.create({
             container: '#timeline',
@@ -325,10 +315,7 @@ function zoomSpecIn() {
     if (windowLength < 2) return;
     windowLength /= 2;
     bufferBegin = bufferBegin + wavesurfer.getCurrentTime() - (windowLength / 2)
-    if (windowLength < 2) {
-        wavesurfer.params.fftSamples = 512
-        wavesurfer.spectrogram.render()
-    }
+    initSpectrogram();
     loadBufferSegment(currentBuffer, bufferBegin, false);
     wavesurfer.seekAndCenter(0.5)
     adjustSpecDims(true)
@@ -340,14 +327,12 @@ function zoomSpecOut() {
     windowLength *= 2;
     // Centre on playhead
     bufferBegin = bufferBegin + wavesurfer.getCurrentTime() - (windowLength / 2)
-    if (wavesurfer.params.fftSamples !== 1024) {
-        wavesurfer.params.fftSamples = 1024
-        wavesurfer.spectrogram.render()
-    }
+    initSpectrogram();
     loadBufferSegment(currentBuffer, bufferBegin, false);
     wavesurfer.seekAndCenter(0.5)
     adjustSpecDims(true)
 }
+
 
 async function showOpenDialog() {
     ipcRenderer.send('openFiles');
@@ -415,11 +400,6 @@ function disableMenuItem(id) {
     $('#' + id).addClass('disabled');
 }
 
-function toggleAlternates(row) {
-    $(row).toggle('slow');
-    return false
-}
-
 function showElement(id, makeFlex = true, empty = false) {
     const thisElement = $('#' + id);
     thisElement.removeClass('d-none');
@@ -482,12 +462,21 @@ function loadResultRegion(start, end) {
 }
 
 function adjustSpecDims(redraw) {
+    // if (wavesurfer) {
+    //     if (dummyElement.height() > 384) {
+    //         wavesurfer.spectrogram.fftSamples = 1024
+    //     } else {
+    //         wavesurfer.spectrogram.fftSamples = 512
+    //     }
+    //     wavesurfer.spectrogram.init();
+    // }
     $.each([dummyElement, waveWaveElement, specElement, specCanvasElement, waveCanvasElement], function () {
         // Expand up to 512px
         $(this).height(Math.min(bodyElement.height() * 0.4, 512))
     })
-    if (loadSpectrogram) {
-        specElement.css('z-index', 0)
+    if (wavesurfer) {
+
+        specElement.css('z-index', 0);
         resultTableElement.height(contentWrapperElement.height()
             - dummyElement.height()
             - controlsWrapperElement.height()
@@ -497,6 +486,7 @@ function adjustSpecDims(redraw) {
             wavesurfer.drawBuffer();
         }
         specCanvasElement.width('100%');
+        $('.spec-labels').width('55px')
     } else {
         resultTableElement.height(contentWrapperElement.height()
             - controlsWrapperElement.height()
@@ -681,8 +671,9 @@ window.onload = function () {
                 'spectrogram': true,
                 'colormap': 'inferno',
                 'timeline': true,
-                'minConfidence': 0.5,
-                'timeOfDay': false
+                'minConfidence': 0.4,
+                'timeOfDay': false,
+                'useWhitelist': true
             }
             const {v4: uuidv4} = require('uuid');
             config.UUID = uuidv4()
@@ -691,12 +682,18 @@ window.onload = function () {
         }
         config = JSON.parse(data)
         //console.log('Successfully loaded UUID: ' + config.UUID)
+
+        ipcRenderer.send('load-model', {useWhitelist: config.useWhitelist})
+
         if (!config.UUID) {
             const {v4: uuidv4} = require('uuid');
             config.UUID = uuidv4();
             updatePrefs()
         }
         // Set menu option state
+        if (!config.useWhitelist) {
+            $('#useWhitelist .tick').hide()
+        }
         if (!config.spectrogram) {
             $('#loadSpectrogram .tick').hide()
         }
@@ -742,14 +739,14 @@ window.onload = function () {
         <input type="text" id="myInput" onkeyup="myFunction()" placeholder="Search for a species...">
         <ul id="myUL">
             <li><a href="#">Animal<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
-            <li><a href="#">Environmental noise<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
+            <li><a href="#">Ambient Noise<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
             <li><a href="#">Human<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
             <li><a href="#">Vehicle<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>`;
     const excluded = new Set(['human', 'vehicles', 'animals', 'No call']);
     for (const item in labels) {
-        const cname = labels[item].split('_')[1]
+        const [sname, cname] = labels[item].split('_');
         if (!excluded.has(cname)) {
-            feedbackHTML += `<li><a href="#">${cname}<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>`;
+            feedbackHTML += `<li><a href="#">${cname} - ${sname}<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>`;
         }
     }
     feedbackHTML += '</ul>';
@@ -760,9 +757,10 @@ window.onload = function () {
 
 // Feedback list handler
 $(document).on('click', '#myUL li', function (e) {
-    correctedSpecies = e.target.innerText;
+    correctedSpecies = formatFilename(e.target.innerText);
     speciesListItems.addClass('d-none');
     e.target.childNodes[1].classList.remove('d-none');
+    //e.target.closest('.d-none').classList.remove('d-none');
 })
 
 
@@ -857,18 +855,34 @@ $(document).on('click', '#loadSpectrogram', function () {
     }
 })
 
-$(document).on('click', '.speccolor', function (e) {
-    wavesurfer.destroyPlugin('spectrogram');
-    config.colormap = e.target.id;
+function initSpectrogram() {
+    let fftSamples;
+    if (windowLength < 2) {
+        fftSamples = 256;
+    } else {
+        fftSamples = 512;
+    }
+    if (wavesurfer.spectrogram) wavesurfer.destroyPlugin('spectrogram');
     wavesurfer.addPlugin(SpectrogramPlugin.create({
         wavesurfer: wavesurfer,
         container: "#spectrogram",
         scrollParent: true,
-        labels: false,
+        windowFunc: 'hamming',
+        minPxPerSec: 10,
+        normalize: true,
+        hideScrollbar: true,
+        labels: true,
+        fftSamples: fftSamples,
         colorMap: colormap({
             colormap: config.colormap, nshades: 256, format: 'float'
-        })
+        }),
     })).initPlugin('spectrogram');
+    updateElementCache();
+}
+
+$(document).on('click', '.speccolor', function (e) {
+    config.colormap = e.target.id;
+    initSpectrogram();
     // set tick
     $('.speccolor .tick').addClass('d-none');
     $(this).children('span').removeClass('d-none');
@@ -878,6 +892,17 @@ $(document).on('click', '.speccolor', function (e) {
     updatePrefs();
 })
 
+$(document).on('click', '#useWhitelist', function () {
+    if (config.useWhitelist) {
+        config.useWhitelist = false;
+        $('#useWhitelist .tick').hide()
+    } else {
+        config.useWhitelist = true;
+        $('#useWhitelist .tick').show()
+    }
+    ipcRenderer.send('load-model', {useWhitelist: config.useWhitelist});
+    updatePrefs();
+})
 
 $(document).on('click', '.timeline', function () {
     if (wavesurfer.timeline && wavesurfer.timeline.wrapper !== null) {
@@ -1016,6 +1041,31 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     KeyP: function () {
         (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
     }
+    ,
+    Equal: function () {
+        if (wavesurfer) {
+            zoomSpecIn()
+        }
+    }
+    ,
+    NumpadAdd: function () {
+        if (wavesurfer) {
+            zoomSpecIn()
+        }
+    }
+        ,
+    Minus: function () {
+        if (wavesurfer) {
+            zoomSpecOut()
+        }
+    }
+    ,
+    NumpadSubtract: function () {
+        if (wavesurfer) {
+            zoomSpecOut()
+        }
+    }
+
 };
 
 
@@ -1048,6 +1098,7 @@ ipcRenderer.on('progress', async (event, arg) => {
 });
 
 ipcRenderer.on('prediction-done', async (event, arg) => {
+    scrolled = false;
     AUDACITY_LABELS = arg.labels;
     progressDiv.hide();
     progressBar.width(0 + '%');
@@ -1081,16 +1132,94 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
 
     let summaryHTML = `<table class="table table-striped table-dark table-hover p-1"><thead class="thead-dark">
             <tr>
+                <th scope="col"  class="text-center">Filter</th>
+                <th scope="col" class="text-center">Exclude</th>
                 <th scope="col">Species</th>
                 <th scope="col" class="text-right">Count</th>
             </tr>
             </thead><tbody>`;
     for (const [key, value] of Object.entries(summarySorted)) {
-        summaryHTML += `<tr><td>${key}</td><td class="text-right"> ${value}</td></tr>`;
+        summaryHTML += `<tr>
+                        <td class="text-center"><span class="spinner-border spinner-border-sm text-success d-none" role="status"></span>
+                        <span id="${key}" class="material-icons-two-tone align-bottom speciesFilter pointer">filter_alt</span>
+                        </td>
+                        <td class="text-center"><span class="spinner-border spinner-border-sm text-danger d-none" role="status"></span>
+                        <span id="${key}" class="material-icons-two-tone align-bottom speciesExclude pointer">clear</span>
+                        </td>                        
+                        <td>${key}</td><td class="text-right"> ${value}</td></tr>`;
     }
     summaryHTML += '</tbody></table>';
     modalTable.append(summaryHTML);
+    speciesName = document.querySelectorAll('.cname');
+    subRows = document.querySelectorAll('.subrow')
+    const materialIcons = document.querySelectorAll('.rotate')
+    speciesFilter = document.querySelectorAll('.speciesFilter');
+    speciesExclude = document.querySelectorAll('.speciesExclude');
+
+    $(document).on('click', '.speciesExclude', function (e) {
+        const spinner = e.target.parentNode.firstChild.classList;
+        spinner.remove('d-none');
+        const targetClass = e.target.classList;
+        targetClass.add('d-none');
+        if (targetClass.contains('text-danger')) {
+            targetClass.remove('text-danger')
+            const setDelay = setTimeout(matchSpecies, 10, e, 'unfilter');
+        } else {
+            targetClass.add('text-danger');
+            const setDelay = setTimeout(matchSpecies, 1, e, 'exclude');
+        }
+        e.stopImmediatePropagation();
+    });
+
+    $(document).on('click', '.speciesFilter', function (e) {
+        const spinner = e.target.parentNode.firstChild.classList;
+        // Remove any exclusion from the species to filter
+        e.target.parentNode.nextElementSibling.children[1].classList.remove('text-danger');
+        const targetClass = e.target.classList;
+        if (targetClass.contains('text-success')) {
+            // Clicked on filtered species icon
+            targetClass.remove('text-success')
+            speciesExclude.forEach(function (el) {
+                el.classList.remove('text-danger');
+            })
+            speciesName.forEach(function (el) {
+                el.parentNode.classList.remove('d-none')
+            })
+        } else {
+            // Clicked on unfiltered species icon
+            speciesFilter.forEach(function (el) {
+                el.classList.remove('text-success');
+            })
+            // Hide open subrows
+            subRows.forEach(function (el) {
+                el.classList.add('d-none');
+            })
+            // Flip open icon back up
+            materialIcons.forEach(function (el) {
+                el.classList.remove('down');
+            })
+            targetClass.add('text-success');
+            targetClass.add('d-none');
+            spinner.remove('d-none');
+            // Allow spinner to show
+            const setDelay = setTimeout(matchSpecies, 1, e, 'include');
+        }
+        e.stopImmediatePropagation();
+    });
 });
+
+function matchSpecies(e, mode) {
+    const spinner = e.target.parentNode.firstChild.classList;
+    const targetClass = e.target.classList;
+    speciesName.forEach(function (el) {
+        const classes = el.parentNode.classList;
+        if (el.innerText === e.target.id) {
+            (mode === 'include' || mode === 'unfilter') ? classes.remove('d-none') : classes.add('d-none')
+        } else if (mode === 'include') classes.add('d-none')
+    })
+    spinner.add('d-none');
+    targetClass.remove('d-none');
+}
 
 ipcRenderer.on('prediction-ongoing', async (event, arg) => {
     completeDiv.hide();
@@ -1120,56 +1249,95 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         } else {
             summary[result.cname] = 1
         }
-
+//onclick='toggleAlternates(&quot;${index}&quot;)'
         const regex = /:/g;
         const start = result.start, end = result.end;
         result.filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp.replace(regex, '.') + '.mp3';
         tr += `<tr onmousedown='loadResultRegion( ${start} , ${end} );' class='border-top border-secondary top-row'><th scope='row'>${index}</th>`;
-        tr += "<td><span class='material-icons rotate text-right pointer' onclick='toggleAlternates(&quot;.subrow" + index + "&quot;)'>expand_more</span></td>";
         tr += "<td>" + result.timestamp + "</td>";
-        tr += "<td>" + result.cname + "</td>";
+        tr += "<td class='cname'>" + result.cname + "</td>";
         tr += "<td><i>" + result.sname + "</i></td>";
         tr += "<td class='text-center'>" + iconizeScore(result.score) + "</td>";
+        tr += `<td class='text-center'><span id='${index}' class='material-icons rotate pointer d-none'>expand_more</span></td>`;
         tr += "<td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>";
-        tr += `<td class='specFeature text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="_blank">
+        tr += `<td class='text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
                     <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>`
         tr += `<td class='specFeature text-center download'><span class='material-icons-outlined pointer'>
             file_download</span></td>`;
-        tr += `<td id="${index}" class='text-center feedback'> <span class='material-icons-two-tone text-success pointer'>
+        tr += `<td id="${index}" class='specFeature text-center feedback'> <span class='material-icons-two-tone text-success pointer'>
              thumb_up_alt</span> <span class='material-icons-two-tone text-danger pointer'>thumb_down_alt</span></td>`;
         tr += "</tr>";
-
-        tr += "<tr class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + ")'><th scope='row'> </th>";
-        tr += "<td> </td>";
-        tr += "<td> </td>";
-        tr += "<td>" + result.cname2 + "</td>";
-        tr += "<td><i>" + result.sname2 + "</i></td>";
-        tr += "<td class='text-center'>" + iconizeScore(result.score2) + "</td>";
-        tr += "<td> </td>";
-        tr += `<td><a href='https://xeno-canto.org/explore?query=${result.sname2}%20type:nocturnal' target=\"_blank\">
+        if (result.score2 > 0.2) {
+            tr += `<tr id='subrow${index}' class='subrow d-none' onclick='loadResultRegion(${start},${end})'><th scope='row'>${index}</th>`;
+            tr += "<td> </td>";
+            tr += "<td class='cname2'>" + result.cname2 + "</td>";
+            tr += "<td><i>" + result.sname2 + "</i></td>";
+            tr += "<td class='text-center'>" + iconizeScore(result.score2) + "</td>";
+            tr += "<td> </td>";
+            tr += "<td class='specFeature'> </td>";
+            tr += `<td><a href='https://xeno-canto.org/explore?query=${result.sname2}%20type:nocturnal' target=\"_blank\">
                     <img src='img/logo/XC.png' alt='Search ${result.cname2} on Xeno Canto' title='${result.cname2} NFCs on Xeno Canto'></a> </td>`;
-        tr += "</tr>";
-
-        tr += "<tr class='subrow" + index + "'  onclick='loadResultRegion(" + start + " , " + end + " )' ><th scope='row'> </th>";
-        tr += "<td> </td>";
-        tr += "<td> </td>";
-        tr += "<td>" + result.cname3 + "</td>";
-        tr += "<td><i>" + result.sname3 + "</i></td>";
-        tr += "<td class='text-center'>" + iconizeScore(result.score3) + "</td>";
-        tr += "<td> </td>";
-        tr += `<td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:nocturnal' target=\"_blank\">
+            tr += "<td class='specFeature'> </td>";
+            tr += "<td class='specFeature'> </td>";
+            tr += "</tr>";
+            if (result.score3 > 0.2) {
+                tr += `<tr id='subsubrow${index}' class=' subrow d-none' onclick='loadResultRegion(${start},${end})' ><th scope='row'>${index}</th>`;
+                tr += "<td> </td>";
+                tr += "<td class='cname3'>" + result.cname3 + "</td>";
+                tr += "<td><i>" + result.sname3 + "</i></td>";
+                tr += "<td class='text-center'>" + iconizeScore(result.score3) + "</td>";
+                tr += "<td> </td>";
+                tr += "<td class='specFeature'> </td>";
+                tr += `<td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:nocturnal' target=\"_blank\">
                     <img src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>`;
-        tr += "<td> </td>";
-        tr += "</tr>";
+                tr += "<td class='specFeature'> </td>";
+                tr += "<td class='specFeature'> </td>";
+                tr += "</tr>";
+            }
+        }
     }
     selection ? resultTable.prepend(tr) : resultTable.append(tr)
+    const tableRows = document.querySelectorAll('#results tr');
 
+// line is zero-based
+// line is the row number that you want to see into view after scroll
+    if (!scrolled) {
+        tableRows[0].scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest'
+        })
+        scrolled = true
+    }
+    // Show the alternate detections toggle:
+    if (result.score2 > 0.2) {
+        document.getElementById(index).classList.remove('d-none')
+    }
     if (!config.spectrogram) $('.specFeature').hide();
-    $(".material-icons").click(function () {
+    $(document).on('click', '.material-icons', function (e) {
         $(this).toggleClass("down");
     })
-
+    let filterMode = null;
     const toprow = $('.top-row')
+    speciesName = document.querySelectorAll('.cname');
+    $(document).on('click', '.filter', function (e) {
+        if (!filterMode) {
+            filterMode = 'low';
+
+            $('.score.text-danger').parent().parent().hide();
+            e.target.classList.add('text-warning')
+        } else if (filterMode === 'low') {
+            filterMode = 'medium'
+            $('.score.text-warning').parent().parent().hide();
+            e.target.classList.remove('text-warning');
+            e.target.classList.add('text-success')
+        } else {
+            filterMode = null;
+            $('.score').parent().parent('.top-row').show();
+            e.target.classList.remove('text-success');
+        }
+        e.stopImmediatePropagation();
+    });
+
     $(document).on('click', '.download', function (e) {
         action = 'save';
         clickedNode = e.target.parentNode
@@ -1188,12 +1356,21 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         if (action === 'incorrect') {
             findSpecies();
         } else if (confirm('Submit feedback?')) {
+            predictions[clickedIndex].filename = predictions[clickedIndex].cname.replace(/\s+/g, '_') +
+                '~' + predictions[clickedIndex].sname.replace(' ', '_') + '_' + Date.now().toString() + '.mp3';
+            sendFile('correct', predictions[clickedIndex]);
             clickedNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>'
-
         }
         e.stopImmediatePropagation();
 
     });
+    $(document).on('click', '.rotate', function (e) {
+        const row1 = e.target.parentNode.parentNode.nextSibling;
+        const row2 = row1.nextSibling;
+        row1.classList.toggle('d-none')
+        if (!row2.classList.contains('top-row')) row2.classList.toggle('d-none')
+        e.stopImmediatePropagation();
+    })
 
     toprow.click(function () {
         toprow.each(function () {
@@ -1209,6 +1386,11 @@ function findSpecies() {
     $('#feedbackModal').modal();
 }
 
+function formatFilename(filename) {
+    filename = filename.replace(' - ', '~').replace(/\s+/g, '_',);
+    if (!filename.includes('~')) filename = filename + '~' + filename; // dummy latin
+    return filename;
+}
 
 $('#feedbackModal').on('hidden.bs.modal', function (e) {
     enableKeyDownEvent();
@@ -1221,7 +1403,12 @@ $('#feedbackModal').on('hidden.bs.modal', function (e) {
 })
 
 function sendFile(action, result) {
-    let start = result.start, end = result.end, filename = result.filename;
+    let start, end, filename;
+    if (result) {
+        start = result.start;
+        end = result.end;
+        filename = result.filename
+    }
     if (!start && start !== 0) {
         if (!region.start) {
             start = 0;
@@ -1234,7 +1421,7 @@ function sendFile(action, result) {
     }
 
     let metadata;
-    if (result.cname) {
+    if (result) {
         metadata = {
             'UUID': config.UUID,
             'start': start,
@@ -1269,17 +1456,49 @@ function sendFile(action, result) {
 
 // create a dict mapping score to icon
 const iconDict = {
-    // 'low': '<span class="material-icons text-danger border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
-    // 'medium': '<span class="material-icons text-warning border border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
-    // 'high': '<span class="material-icons text-success border border-secondary rounded" title="--%">signal_cellular_alt</span>',
-    'low': '<span class="material-icons text-danger border border-secondary rounded" title="Low">signal_cellular_alt_1_bar</span>',
-    'medium': '<span class="material-icons text-warning border border-secondary rounded" title="Medium">signal_cellular_alt_2_bar</span>',
-    'high': '<span class="material-icons text-success border border-secondary rounded" title="High">signal_cellular_alt</span>',
+    'guess': '<span class="material-icons score border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
+    'low': '<span class="material-icons score text-danger border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
+    'medium': '<span class="material-icons score text-warning border border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
+    'high': '<span class="material-icons score text-success border border-secondary rounded" title="--%">signal_cellular_alt</span>',
+    //'low': '<span class="material-icons text-danger border border-secondary rounded" title="Low">signal_cellular_alt_1_bar</span>',
+    //'medium': '<span class="material-icons text-warning border border-secondary rounded" title="Medium">signal_cellular_alt_2_bar</span>',
+    //'high': '<span class="material-icons text-success border border-secondary rounded" title="High">signal_cellular_alt</span>',
 }
 
 function iconizeScore(score) {
     const tooltip = (parseFloat(score) * 100).toFixed(0).toString()
-    if (parseFloat(score) < 0.65) return iconDict['low'].replace('--', tooltip)
+    if (parseFloat(score) < 0.5) return iconDict['guess'].replace('--', tooltip)
+    else if (parseFloat(score) < 0.65) return iconDict['low'].replace('--', tooltip)
     else if (parseFloat(score) < 0.85) return iconDict['medium'].replace('--', tooltip)
     else return iconDict['high'].replace('--', tooltip)
 }
+
+// Help content handling
+
+$('#keyboard').on('click', function () {
+    $('#helpModalLabel').text('Keyboard shortcuts');
+    $('#helpModalBody').load('Help/keyboard.html', function () {
+        $('#helpModal').modal({show: true});
+    });
+});
+
+$('#options').on('click', function () {
+    $('#helpModalLabel').text('Options Help');
+    $('#helpModalBody').load('Help/options.html', function () {
+        $('#helpModal').modal({show: true});
+    });
+});
+
+$('#usage').on('click', function () {
+    $('#helpModalLabel').text('Usage Guide');
+    $('#helpModalBody').load('Help/usage.html', function () {
+        $('#helpModal').modal({show: true});
+    });
+});
+
+// $('#about').on('click',function(){
+//     $('#helpModalLabel').html( "About Chirpity Nocmig");
+//     $('#helpModalBody').load('Help/about.html', function(){
+//         $('#helpModal').modal({show:true});
+//     });
+// });

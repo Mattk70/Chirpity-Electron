@@ -94,6 +94,6 @@ After that, we can export the app with:
 npm run export
 ```
 
-The resulting application will be saves in the "packages" folder.
+The resulting application will be saved in the "packages" folder.
 
 

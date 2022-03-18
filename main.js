@@ -1,7 +1,39 @@
-const {app, dialog, ipcMain, BrowserWindow} = require('electron');
+const {app, dialog, autoUpdater, ipcMain, BrowserWindow} = require('electron');
 const fs = require("fs");
+require('update-electron-app')();
 // In the main process:
 //require('@electron/remote/main').initialize()
+
+//Updater
+const server = 'https://chirpity-electron-releases.vercel.app';
+const url = `${server}/update/${process.platform}/${app.getVersion()}`
+
+autoUpdater.setFeedURL({ url })
+
+setInterval(() => {
+  autoUpdater.checkForUpdates()
+}, 60000)
+
+// Update handling
+autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName) => {
+  const dialogOpts = {
+    type: 'info',
+    buttons: ['Restart', 'Later'],
+    title: 'Application Update',
+    message: process.platform === 'win32' ? releaseNotes : releaseName,
+    detail: 'A new version has been downloaded. Restart the application to apply the updates.'
+  }
+
+  dialog.showMessageBox(dialogOpts).then((returnValue) => {
+    if (returnValue.response === 0) autoUpdater.quitAndInstall()
+  })
+})
+
+autoUpdater.on('error', message => {
+  console.error('There was a problem updating the application')
+  console.error(message)
+})
+
 let mainWindow;
 let workerWindow;
 
@@ -39,7 +71,7 @@ function createWindow() {
 function createWorker() {
     // hidden worker
     workerWindow = new BrowserWindow({
-        show: false,
+        show: true,
         //show: true,
         height: 800,
         width: 1200,
@@ -57,7 +89,7 @@ function createWorker() {
         workerWindow = null;
     });
 
-    //workerWindow.webContents.openDevTools();
+    workerWindow.webContents.openDevTools();
 
     console.log("worker created");
 }
@@ -91,6 +123,11 @@ app.on('activate', () => {
     }
 });
 
+ipcMain.on('load-model', async (event, arg) => {
+    const useWhitelist = arg.useWhitelist;
+    console.log('Main received load-model, using whitelist: ' + arg.useWhitelist)
+    workerWindow.webContents.send('load-model', {useWhitelist: useWhitelist});
+});
 
 ipcMain.on('file-load-request', async (event, arg) => {
     const currentFile = arg.message;
@@ -173,7 +210,7 @@ ipcMain.on('saveFile', (event, arg) => {
         defaultPath: currentFile
     }).then(file => {
         // Stating whether dialog operation was cancelled or not.
-        console.log(file.canceled);
+        //console.log(file.canceled);
         if (!file.canceled) {
             const AUDACITY_LABELS = arg.labels;
             console.log(file.filePath.toString());

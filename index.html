@@ -65,8 +65,18 @@
                     Options
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item disabled" href="#" id="modelOptions">Model</a>
                     <ul class="nav navbar-nav">
+                        <li class="dropdown-submenu">
+                            <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
+                               aria-haspopup="true" aria-expanded="false"> <span
+                                    class="nav-label">Model</span><span class="material-icons-two-tone arrow">navigate_next</span></a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#" id="useWhitelist">Use Whitelist
+                                    <span class='material-icons tick'>done</span>
+                                </a></li>
+                            </ul>
+                        </li>
+
                         <li class="dropdown-submenu">
                             <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
                                aria-haspopup="true" aria-expanded="false"> <span
@@ -117,6 +127,18 @@
                     </ul>
                 </div>
             </li>
+            <li class="nav-item dropdown active">
+                <a class="nav-link dropdown-toggle" href="#" id="help" role="button" data-toggle="dropdown"
+                   aria-haspopup="true" aria-expanded="false">
+                    Help
+                </a>
+                <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                    <a class="dropdown-item" id="usage" href="#">Usage</a>
+                    <a class="dropdown-item" id="options" href="#">Options</a>
+                    <a class="dropdown-item" id="keyboard" href="#">Keyboard Shortcuts</a>
+                    <a class="dropdown-item disabled" id="about" href="#">About Chirpity Nocmig</a>
+                </div>
+            </li>
         </ul>
         <img class="" src="img/logo/chirpity_logo2.png" alt="Chirpity Birdcalls: Identifying birds by sound"
              height="50px"/>
@@ -157,6 +179,23 @@
                 <div id="feedbackModalBody" class="modal-body"></div>
                 <div class="modal-footer justify-content-center">
                     <button type="button" class="btn btn-primary" data-dismiss="modal">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Help Modal -->
+    <div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+        <div class="modal-dialog  modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center">
+                    <h5 class="modal-title" id="helpModalLabel">Help</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div id="helpModalBody" class="modal-body"></div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -221,17 +260,20 @@
 
     <!-- Result table -->
     <div class="d-none p-0 border-0 overflow-auto tableFixHead" id="resultTableContainer">
-        <table class="table table-hover  p-1">
+        <table id='results' class="table table-hover  p-1">
             <thead class="thead-dark">
             <tr>
                 <th scope="col">#</th>
-                <th scope="col" class="text-right"></th>
                 <th scope="col">Timestamp</th>
                 <th scope="col">Common name</th>
                 <th scope="col">Scientific name</th>
-                <th scope="col" class="text-center">Confidence</th>
+                <th scope="col" class="text-center">Confidence <span
+                        class="material-icons-two-tone align-bottom filter pointer">
+filter_list
+</span></th>
+                <th scope="col" class="text-center">Other IDs</th>
                 <th scope="col" class="specFeature text-center">Play</th>
-                <th scope="col" class="specFeature text-center">XC</th>
+                <th scope="col" class="text-center">XC</th>
                 <th scope="col" class="specFeature text-center">Save</th>
                 <th scope="col" class="specFeature text-center">Feedback</th>
             </tr>
