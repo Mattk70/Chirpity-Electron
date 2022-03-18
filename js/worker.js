@@ -1,7 +1,8 @@
 const {ipcRenderer} = require('electron');
 const Model = require('./js/model.js');
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
-let appPath = '../256x384v2_model/';
+//let appPath = '../256x384_model/';
+let appPath = '../24000_v5/';
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
 const path = require("path");
@@ -21,11 +22,12 @@ let audioBuffer;
 //
 // })();
 let chunkLength, minConfidence, index, end, AUDACITY, RESULTS, predictionStart;
-let sampleRate; // Value obtained from model.js CONFIG
+let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
 let predictWorker;
 let predicting = false;
 let selection = false;
 let controller;
+let useWhitelist = true;
 
 ipcRenderer.on('file-load-request', async (event, arg) => {
     const currentFile = arg.message;
@@ -110,7 +112,14 @@ async function loadAudioFile(filePath) {
 
 
 ipcRenderer.on('save', async (event, arg) => {
+    console.log("file save requested")
     await saveMP3(arg.start, arg.end, arg.filepath, arg.metadata)
+})
+
+ipcRenderer.on('load-model', async (event, arg) => {
+    console.log("model-loading, using whitelist: " + arg.useWhitelist)
+    useWhitelist = arg.useWhitelist;
+    await spawnWorker(useWhitelist)
 })
 
 ipcRenderer.on('post', async (event, arg) => {
@@ -125,7 +134,7 @@ ipcRenderer.on('abort', (event, arg) => {
     if (predicting) {
         //restart the worker
         predictWorker.terminate()
-        spawnWorker()
+        spawnWorker(useWhitelist)
     }
 })
 
@@ -313,9 +322,9 @@ async function postMP3(start, end, filepath, metadata, action) {
 
 
 /// Workers  From the MDN example
-async function spawnWorker() {
+async function spawnWorker(useWhitelist) {
     predictWorker = new Worker('./js/model.js');
-    predictWorker.postMessage(['load', appPath])
+    predictWorker.postMessage(['load', appPath, useWhitelist])
 
     predictWorker.onmessage = (e) => {
         const response = e.data;
@@ -350,7 +359,7 @@ async function spawnWorker() {
     }
 }
 
-const worker = spawnWorker();
+
 
 
 

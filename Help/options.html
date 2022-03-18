@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chirpity Nocmig Options</title>
+</head>
+<body>
+
+<table class="table table-hover p-1">
+    <tr>
+        <td colspan="2" class="text-center bg-dark text-white"><h5>Model options</h5></td>
+    </tr>
+    <tr>
+        <td><b>Use whitelist</b></td>
+        <td>Enabled by default. This option limits the species detections shown to those recorded at UK Nocmig sites
+            submitting data to Trektellen.
+            <p>If disabled, the full list of potential detections is used. This includes
+                UK vagrants as well as those birds not known to call or fly at night. Non-bird detections will also
+                appear. </p>
+            This full list comprises 306 bird species and the following non-bird classes:
+            <ul>
+                <li><b>Ambient noise:</b> wind, rain, pops and bangs. Things that go bump in the night...</li>
+                <li><b>Animals:</b> cats, dogs, bats, etc.</li>
+                <li><b>Human:</b> voices, whistles, etc.</li>
+                <li><b>Vehicles:</b> Wheel and engine noise of cars, trucks, trains and aircraft. Also sirens and alarms
+                    (including domestic burglar alarms) and horns.
+                </li>
+            </ul>
+            <p>If you wish to see the full list of species Chirpity <i>Nocmig</i> was trained on, it is contained in the
+                feedback prompt offered when giving feedback on an incorrect prediction.</p>
+            Disabling the whitelist is <em>not</em> recommended for general use. It will lead to an increase in false
+            positive detections, and clutter the results table with irrelevant detections.
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center bg-dark text-white"><h5>Spectrogram options</h5></td>
+    </tr>
+    <tr>
+        <td><b>Enable</b></td>
+        <td>Whether to display the Spectrogram view. Will reduce the computer RAM required for larger files, at the cost
+            of significantly reduced functionality. However, results will be displayed and a label file may be exported
+            for use in Audacity.
+        </td>
+    </tr>
+    <tr>
+        <td><b>Timeline</b></td>
+        <td>Whether to display a timeline above the spectrogram. The timeline has two modes.
+            <ul>
+                <li>
+                    <b>Time Elapsed</b> displays the time from the beginning of the file.
+                </li>
+                <li>
+                    <b>Time of Day</b> uses the file timestamp to
+                    calculate the actual time of the calls detected. If a file does not have a timestamp reflecting the
+                    time of the recording, this will give a spurious reading.
+                </li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Colour</b></td>
+        <td>Displays the spectrogram in colour</td>
+    </tr>
+    <tr>
+        <td><b>Grayscale</b></td>
+        <td>Displays the spectrogram in black and white.</td>
+    </tr>
+</table>
+
+</body>
+</html>
