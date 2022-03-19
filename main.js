@@ -3,7 +3,9 @@ const fs = require("fs");
 require('update-electron-app')();
 
 //Updater
-const server = 'https://hazel-chirpity-releases.vercel.app';
+const server = 'https://chirpity-electron-releases.vercel.app';
+console.log('process platform ' + process.platform)
+console.log('app version  ' + app.getVersion())
 const url = `${server}/update/${process.platform}/${app.getVersion()}`
 
 autoUpdater.setFeedURL({url})
@@ -125,7 +127,7 @@ app.on('ready', () => {
 
     setInterval(() => {
         autoUpdater.checkForUpdates()
-    }, 60000)
+    }, 600000)
 });
 
 // Quit when all windows are closed.
