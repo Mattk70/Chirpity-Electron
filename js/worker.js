@@ -1,27 +1,14 @@
-const {ipcRenderer} = require('electron');
-const Model = require('./js/model.js');
+const {app, ipcRenderer} = require('electron');
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 //let appPath = '../256x384_model/';
 let appPath = '../24000_v5/';
 
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
-const path = require("path");
-const {min} = require("@tensorflow/tfjs");
-//const appPath = process.resourcesPath;
 
 console.log(appPath);
-// console.log(process.resourcesPath);
 
 let audioBuffer;
-//const model = new Model(path.join(appPath, '256x384_model/'));
-
-// (async () => {
-//     await model.loadModel();
-//     await model.warmUp();
-//     ipcRenderer.send('model-ready', {message: 'ready'})
-//
-// })();
 let chunkLength, minConfidence, index, end, AUDACITY, RESULTS, predictionStart;
 
 let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
@@ -39,7 +26,7 @@ ipcRenderer.on('file-load-request', async (event, arg) => {
 
 ipcRenderer.on('analyze', async (event, arg) => {
     console.log('Worker received message: ' + arg.confidence + ' start: ' + arg.start + ' end: ' + arg.end);
-    console.log(audioBuffer.length);
+    console.log(audioBuffer.duration);
     minConfidence = arg.confidence;
     const bufferLength = audioBuffer.length;
     selection = false;
@@ -73,12 +60,12 @@ async function doPrediction(start, end) {
         predictWorker.postMessage(['predict', chunk, i])
     }
 }
+// TODO: extract and modularise fetch Audio functions across worker and ui
+const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
+controller = new AbortController()
+const signal = controller.signal;
 
-const audioCtx = new AudioContext();
-
-async function loadAudioFile(filePath) {
-    controller = new AbortController()
-    const signal = controller.signal;
+const loadAudioFile = (filePath) =>
     fetch(filePath, {signal})
         .then((res => res.arrayBuffer()))
         .then((arrayBuffer) => audioCtx.decodeAudioData(arrayBuffer))
@@ -110,7 +97,6 @@ async function loadAudioFile(filePath) {
                 console.log('Worker fetch aborted')
             }
         })
-}
 
 
 ipcRenderer.on('save', async (event, arg) => {
