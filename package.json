@@ -1,6 +1,6 @@
 {
   "name": "chirpity",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Nocmig application for sound file analysis.",
   "main": "main.js",
   "scripts": {
@@ -27,7 +27,8 @@
   "homepage": "https://github.com/mattk70/Chirpity-Electron#readme",
   "devDependencies": {
     "electron": "^7.3.3",
-    "electron-packager": "^14.2.1"
+    "electron-packager": "^14.2.1",
+    "electron-wix-msi": "^3.2.0"
   },
   "dependencies": {
     "@tensorflow/tfjs": "^3.13.0",
