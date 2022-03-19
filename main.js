@@ -1,37 +1,32 @@
 const {app, dialog, autoUpdater, ipcMain, BrowserWindow} = require('electron');
 const fs = require("fs");
 require('update-electron-app')();
-// In the main process:
-//require('@electron/remote/main').initialize()
 
 //Updater
 const server = 'https://chirpity-electron-releases.vercel.app';
 const url = `${server}/update/${process.platform}/${app.getVersion()}`
 
-autoUpdater.setFeedURL({ url })
+autoUpdater.setFeedURL({url})
 
-setInterval(() => {
-  autoUpdater.checkForUpdates()
-}, 60000)
 
-// Update handling
+//Update handling
 autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName) => {
-  const dialogOpts = {
-    type: 'info',
-    buttons: ['Restart', 'Later'],
-    title: 'Application Update',
-    message: process.platform === 'win32' ? releaseNotes : releaseName,
-    detail: 'A new version has been downloaded. Restart the application to apply the updates.'
-  }
+    const dialogOpts = {
+        type: 'info',
+        buttons: ['Restart', 'Later'],
+        title: 'Application Update',
+        message: process.platform === 'win32' ? releaseNotes : releaseName,
+        detail: 'A new version has been downloaded. Restart the application to apply the updates.'
+    }
 
-  dialog.showMessageBox(dialogOpts).then((returnValue) => {
-    if (returnValue.response === 0) autoUpdater.quitAndInstall()
-  })
+    dialog.showMessageBox(dialogOpts).then((returnValue) => {
+        if (returnValue.response === 0) autoUpdater.quitAndInstall()
+    })
 })
 
 autoUpdater.on('error', message => {
-  console.error('There was a problem updating the application')
-  console.error(message)
+    console.error('There was a problem updating the application')
+    console.error(message)
 })
 
 let mainWindow;
@@ -40,6 +35,7 @@ let workerWindow;
 function createWindow() {
     // Create the browser window.
     mainWindow = new BrowserWindow({
+        show: false,
         width: 1280,
         height: 768,
         webPreferences: {
@@ -61,6 +57,9 @@ function createWindow() {
     // Open the DevTools. Comment out for release
     //mainWindow.webContents.openDevTools()
 
+    mainWindow.once('ready-to-show', () => {
+        mainWindow.show()
+    })
     // Emitted when the window is closed.
     mainWindow.on('closed', () => {
         app.quit()
@@ -72,7 +71,6 @@ function createWorker() {
     // hidden worker
     workerWindow = new BrowserWindow({
         show: false,
-        //show: true,
         height: 800,
         width: 1200,
         webPreferences: {
@@ -104,6 +102,30 @@ app.on('ready', () => {
         e.preventDefault();
         require('electron').shell.openExternal(url);
     });
+
+    workerWindow.webContents.on('crashed', (e, d) => {
+        console.log(e);
+        const dialogOpts = {
+            type: 'warning',
+            title: 'File too large',
+            detail: 'The file loaded was too long. Currently, Chirpity is limited to analysing files with the following limits:\n' +
+                'Sample Rate     Maximum Duration\n' +
+                '48000Hz            3 hours 6 minutes and 20 seconds\n' +
+                '44100Hz            3 hours 22 minutes and 49 seconds\n' +
+                '24000Hz            6 hours 12 minutes 40 seconds'
+        }
+
+        dialog.showMessageBox(dialogOpts).then((returnValue) => {
+            if (returnValue.response === 0) {
+                app.relaunch();
+                app.quit()
+            }
+        })
+    });
+
+    setInterval(() => {
+        autoUpdater.checkForUpdates()
+    }, 60000)
 });
 
 // Quit when all windows are closed.
