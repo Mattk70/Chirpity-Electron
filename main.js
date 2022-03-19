@@ -3,7 +3,7 @@ const fs = require("fs");
 require('update-electron-app')();
 
 //Updater
-const server = 'https://chirpity-electron-releases.vercel.app';
+const server = 'https://hazel-chirpity-releases.vercel.app';
 const url = `${server}/update/${process.platform}/${app.getVersion()}`
 
 autoUpdater.setFeedURL({url})
