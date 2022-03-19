@@ -23,7 +23,7 @@ const msiCreator = new MSICreator({
     shortcutFolderName: 'Chirpity',
     appIconPath: "C:\\Users\\simpo\\PycharmProjects\\Chirpity-Electron\\img\\icon\\icon.ico",
     manufacturer: 'KDC Ltd.',
-    version: '0.2.1',
+    version: '0.2.3',
 
     // Configure installer User Interface
     ui: {
