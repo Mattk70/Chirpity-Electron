@@ -19,6 +19,8 @@ const msiCreator = new MSICreator({
     // Configure metadata
     description: 'Nocmig application for sound file analysis.',
     exe: 'Chirpity',
+    arch: 'x64',
+    upgradeCode: 'abb4ec5e-3d82-42ce-89a6-1dc7de7e04d3',
     name: 'Chirpity Nocmig',
     shortcutFolderName: 'Chirpity',
     appIconPath: "C:\\Users\\simpo\\PycharmProjects\\Chirpity-Electron\\img\\icon\\icon.ico",
