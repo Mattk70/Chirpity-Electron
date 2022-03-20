@@ -200,6 +200,10 @@ div#contentWrapper {
   margin: 0;
 }
 
+#feedbackModalBody {
+    max-height: 320px;
+}
+
 #myUL li a {
   border: 1px solid #ddd; /* Add a border to all links */
   margin-top: -1px; /* Prevent double borders */

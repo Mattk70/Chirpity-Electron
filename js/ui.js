@@ -1075,8 +1075,24 @@ ipcRenderer.on('model-ready', async () => {
     modelReady = true;
 })
 
-ipcRenderer.on('worker-loaded', async (event, arg) => {
-    console.log('UI received worker-loaded: ' + arg.message)
+ipcRenderer.on('update-error', async (event, args) => {
+    console.error('update error' + args.error)
+})
+
+ipcRenderer.on('update-not-available', async (event, args) => {
+    console.log('update not available ' + args.message)
+})
+
+ipcRenderer.on('update-available', async (event, args) => {
+    console.log('update available ' + args.message)
+})
+
+ipcRenderer.on('update-downloaded', async (event, args) => {
+    console.log('update downloaded' + args.releaseNotes)
+})
+
+ipcRenderer.on('worker-loaded', async (event, args) => {
+    console.log('UI received worker-loaded: ' + args.message)
     workerLoaded = true;
     enableMenuItem('analyze')
     if (!loadSpectrogram) {
@@ -1320,19 +1336,24 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
     speciesName = document.querySelectorAll('.cname');
     $(document).on('click', '.filter', function (e) {
         if (!filterMode) {
-            filterMode = 'low';
-
-            $('.score.text-danger').parent().parent().hide();
+            filterMode = 'guess';
+            $('.score.text-secondary').parent().parent('.top-row').hide();
+            e.target.classList.add('text-danger')
+        } else if (filterMode === 'guess') {
+            filterMode = 'low'
+            $('.score.text-danger').parent().parent('.top-row').hide();
+            e.target.classList.remove('text-danger');
             e.target.classList.add('text-warning')
         } else if (filterMode === 'low') {
             filterMode = 'medium'
-            $('.score.text-warning').parent().parent().hide();
+            $('.score.text-warning').parent().parent('.top-row').hide();
             e.target.classList.remove('text-warning');
             e.target.classList.add('text-success')
         } else {
             filterMode = null;
             $('.score').parent().parent('.top-row').show();
             e.target.classList.remove('text-success');
+            e.target.classList.add('text-secondary')
         }
         e.stopImmediatePropagation();
     });
@@ -1455,7 +1476,7 @@ function sendFile(action, result) {
 
 // create a dict mapping score to icon
 const iconDict = {
-    'guess': '<span class="material-icons score border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
+    'guess': '<span class="material-icons text-secondary score border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
     'low': '<span class="material-icons score text-danger border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
     'medium': '<span class="material-icons score text-warning border border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
     'high': '<span class="material-icons score text-success border border-secondary rounded" title="--%">signal_cellular_alt</span>',

@@ -26,10 +26,6 @@ autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName) => {
     })
 })
 
-autoUpdater.on('error', message => {
-    console.error('There was a problem updating the application')
-    console.error(message)
-})
 
 let mainWindow;
 let workerWindow;
@@ -105,7 +101,7 @@ app.on('ready', () => {
         require('electron').shell.openExternal(url);
     });
 
-    workerWindow.webContents.on('crashed', (e, d) => {
+    workerWindow.webContents.on('crashed', (e) => {
         console.log(e);
         const dialogOpts = {
             type: 'warning',
@@ -127,7 +123,21 @@ app.on('ready', () => {
 
     setInterval(() => {
         autoUpdater.checkForUpdates()
-    }, 600000)
+    }, 6000000)
+
+    autoUpdater.on('error', message => {
+        mainWindow.webContents.send('update-error', {error: message});
+        console.error('There was a problem updating the application')
+        console.error(message)
+    })
+
+    autoUpdater.on('update-not-available', message => {
+        mainWindow.webContents.send('update-not-available', {message: 'update-not-available'});
+    })
+
+    autoUpdater.on('update-available', message => {
+        mainWindow.webContents.send('update-available', {message: 'update-available'});
+    })
 });
 
 // Quit when all windows are closed.
