@@ -20,7 +20,8 @@ const labels = ["Tachymarptis melba_Alpine Swift", "Pluvialis dominica_American 
 let currentPrediction;
 let appPath = remote.app.getPath('userData');
 let modelReady = false, fileLoaded = false, currentFile, fileList, resultHistory = {};
-let region, AUDACITY_LABELS, wavesurfer, summary = {};
+let region, AUDACITY_LABELS, wavesurfer;
+let summary = {}; summary['suppressed'] = [];
 let fileStart, startTime, ctime;
 
 // set up some DOM element caches
@@ -98,6 +99,7 @@ async function loadAudioFile(filePath) {
     ipcRenderer.send('file-load-request', {message: filePath});
     workerLoaded = false;
     summary = {};
+    summary['suppressed'] = [];
     // Hide load hint and show spinnner
     if (wavesurfer) {
         wavesurfer.destroy();
@@ -363,6 +365,7 @@ analyzeLink.addEventListener('click', async () => {
     //disableMenuItem('analyzeSelection');
     ipcRenderer.send('analyze', {confidence: config.minConfidence});
     summary = {};
+    summary['suppressed'] = []
     analyzeLink.disabled = true;
 });
 
@@ -381,6 +384,7 @@ analyzeSelectionLink.addEventListener('click', async () => {
     // Add current buffer's beginning offset to region start / end tags
     ipcRenderer.send('analyze', {confidence: 0.1, start: start, end: end});
     summary = {};
+    summary['suppressed'] = []
     analyzeLink.disabled = true;
 });
 
@@ -1052,7 +1056,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             zoomSpecIn()
         }
     }
-        ,
+    ,
     Minus: function () {
         if (wavesurfer) {
             zoomSpecOut()
@@ -1132,7 +1136,7 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
     // Sort summary by count
     let sortable = [];
     for (const bird in summary) {
-        sortable.push([bird, summary[bird]]);
+        if (bird !== 'suppressed') sortable.push([bird, summary[bird]]);
     }
     sortable.sort(function (a, b) {
         return a[1] - b[1];
@@ -1153,7 +1157,9 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
                 <th scope="col" class="text-right">Count</th>
             </tr>
             </thead><tbody>`;
+    let suppression_warning = '';
     for (const [key, value] of Object.entries(summarySorted)) {
+        (summary['suppressed'].indexOf(key) !== -1) ? suppression_warning = '<span class="material-icons-two-tone text-danger align-bottom" title="Species suppression may affect this total.\n See result table for details.">priority_high</span>' : suppression_warning = '';
         summaryHTML += `<tr>
                         <td class="text-center"><span class="spinner-border spinner-border-sm text-success d-none" role="status"></span>
                         <span id="${key}" class="material-icons-two-tone align-bottom speciesFilter pointer">filter_alt</span>
@@ -1161,7 +1167,7 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
                         <td class="text-center"><span class="spinner-border spinner-border-sm text-danger d-none" role="status"></span>
                         <span id="${key}" class="material-icons-two-tone align-bottom speciesExclude pointer">clear</span>
                         </td>                        
-                        <td>${key}</td><td class="text-right"> ${value}</td></tr>`;
+                        <td>${suppression_warning}${key}</td><td class="text-right"> ${value}</td></tr>`;
     }
     summaryHTML += '</tbody></table>';
     modalTable.append(summaryHTML);
@@ -1264,16 +1270,18 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         } else {
             summary[result.cname] = 1
         }
-//onclick='toggleAlternates(&quot;${index}&quot;)'
+        if (result.suppressed === 'text-danger') summary['suppressed'].push(result.cname);
         const regex = /:/g;
         const start = result.start, end = result.end;
+        let warning;
+        result.suppressed ? warning = `<span class="material-icons-two-tone ${result.suppressed}" title="A detection considered more likely was suppressed.">sync_problem</span>` : warning = '';
         result.filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp.replace(regex, '.') + '.mp3';
         tr += `<tr onmousedown='loadResultRegion( ${start} , ${end} );' class='border-top border-secondary top-row'><th scope='row'>${index}</th>`;
         tr += "<td>" + result.timestamp + "</td>";
         tr += "<td class='cname'>" + result.cname + "</td>";
         tr += "<td><i>" + result.sname + "</i></td>";
         tr += "<td class='text-center'>" + iconizeScore(result.score) + "</td>";
-        tr += `<td class='text-center'><span id='${index}' class='material-icons rotate pointer d-none'>expand_more</span></td>`;
+        tr += `<td class='text-center'>${warning}<span id='${index}' class='material-icons rotate pointer d-none'>expand_more</span></td>`;
         tr += "<td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>";
         tr += `<td class='text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
                     <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>`

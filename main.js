@@ -1,7 +1,7 @@
 const {app, dialog, autoUpdater, ipcMain, BrowserWindow} = require('electron');
 const fs = require("fs");
 require('update-electron-app')();
-
+app.commandLine.appendSwitch("disable-renderer-backgrounding");
 //Updater
 const server = 'https://chirpity-electron-releases.vercel.app';
 console.log('process platform ' + process.platform)
@@ -40,6 +40,7 @@ function createWindow() {
             nodeIntegration: true,
             contextIsolation: false,
             enableRemoteModule: true,
+            backgroundThrottling: false
         }
     })
 
@@ -76,6 +77,7 @@ function createWorker() {
             nodeIntegrationInWorker: true,
             enableRemoteModule: false,
             contextIsolation: false,
+            backgroundThrottling: false
         }
     });
     workerWindow.setIcon(__dirname + '/img/icon/icon.png');
@@ -84,9 +86,7 @@ function createWorker() {
     workerWindow.on('closed', () => {
         workerWindow = null;
     });
-
-    //workerWindow.webContents.openDevTools();
-
+    workerWindow.webContents.openDevTools();
     console.log("worker created");
 }
 

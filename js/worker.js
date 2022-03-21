@@ -1,7 +1,7 @@
 const {app, ipcRenderer} = require('electron');
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 //let appPath = '../256x384_model/';
-let appPath = '../24000_v5/';
+let appPath = '../24000_v6/';
 
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
@@ -17,6 +17,13 @@ let predicting = false;
 let selection = false;
 let controller;
 let useWhitelist = true;
+
+// Avoid throttling of this worker window by playing silence
+let context = new AudioContext()
+src = context.createBufferSource()
+src.connect(context.destination)
+src.start(0)
+
 
 ipcRenderer.on('file-load-request', async (event, arg) => {
     const currentFile = arg.message;
@@ -60,6 +67,7 @@ async function doPrediction(start, end) {
         predictWorker.postMessage(['predict', chunk, i])
     }
 }
+
 // TODO: extract and modularise fetch Audio functions across worker and ui
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
 controller = new AbortController()
