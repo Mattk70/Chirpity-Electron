@@ -1,7 +1,7 @@
 const {app, dialog, autoUpdater, ipcMain, BrowserWindow} = require('electron');
 const fs = require("fs");
 require('update-electron-app')();
-app.commandLine.appendSwitch("disable-renderer-backgrounding");
+
 //Updater
 const server = 'https://chirpity-electron-releases.vercel.app';
 console.log('process platform ' + process.platform)

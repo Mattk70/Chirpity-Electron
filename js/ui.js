@@ -1159,7 +1159,7 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
             </thead><tbody>`;
     let suppression_warning = '';
     for (const [key, value] of Object.entries(summarySorted)) {
-        (summary['suppressed'].indexOf(key) !== -1) ? suppression_warning = '<span class="material-icons-two-tone text-danger align-bottom" title="Species suppression may affect this total.\n See result table for details.">priority_high</span>' : suppression_warning = '';
+        (summary['suppressed'].indexOf(key) !== -1) ? suppression_warning = '<span class="material-icons-two-tone text-danger align-bottom" title="Species suppression may have invalidated this total.\nRefer to the results table for details.">priority_high</span>' : suppression_warning = '';
         summaryHTML += `<tr>
                         <td class="text-center"><span class="spinner-border spinner-border-sm text-success d-none" role="status"></span>
                         <span id="${key}" class="material-icons-two-tone align-bottom speciesFilter pointer">filter_alt</span>
@@ -1167,7 +1167,7 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
                         <td class="text-center"><span class="spinner-border spinner-border-sm text-danger d-none" role="status"></span>
                         <span id="${key}" class="material-icons-two-tone align-bottom speciesExclude pointer">clear</span>
                         </td>                        
-                        <td>${suppression_warning}${key}</td><td class="text-right"> ${value}</td></tr>`;
+                        <td>${key}${suppression_warning}</td><td class="text-right"> ${value}</td></tr>`;
     }
     summaryHTML += '</tbody></table>';
     modalTable.append(summaryHTML);
