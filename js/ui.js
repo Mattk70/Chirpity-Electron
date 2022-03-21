@@ -674,7 +674,7 @@ window.onload = function () {
                 'spectrogram': true,
                 'colormap': 'inferno',
                 'timeline': true,
-                'minConfidence': 0.4,
+                'minConfidence': 0.45,
                 'timeOfDay': false,
                 'useWhitelist': true
             }
