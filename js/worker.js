@@ -15,19 +15,15 @@ let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need d
 
 let predicting = false;
 let selection = false;
-let controller;
+let controller = new AbortController();
+let signal = controller.signal;
 let useWhitelist = true;
-
-// Avoid throttling of this worker window by playing silence
-let context = new AudioContext()
-src = context.createBufferSource()
-src.connect(context.destination)
-src.start(0)
-
 
 ipcRenderer.on('file-load-request', async (event, arg) => {
     const currentFile = arg.message;
     console.log('Worker received audio ' + arg.message);
+    controller = new AbortController();
+    signal = controller.signal;
     await loadAudioFile(currentFile);
 });
 
@@ -70,8 +66,6 @@ async function doPrediction(start, end) {
 
 // TODO: extract and modularise fetch Audio functions across worker and ui
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
-controller = new AbortController()
-const signal = controller.signal;
 
 const loadAudioFile = (filePath) =>
     fetch(filePath, {signal})
