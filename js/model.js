@@ -149,7 +149,7 @@ class Model {
                 // Use whitelist for top prediction only
                 if (blocked_IDs.indexOf(primary) !== -1) {
                     // Just warn if Ambient noise
-                    this.labels[primary].split('_')[1] === "Ambient Noise" ? suppressed = 'text-warning': suppressed = 'text-danger'
+                    this.labels[primary].split('_')[1] === "Ambient Noise" ? suppressed = false: suppressed = 'text-danger'
                     //make a copy of the top prediction
                     const [temp_index, temp_score] = [primary, score]
                     // Is the secondary prediction blocked too?

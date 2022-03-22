@@ -21,7 +21,8 @@ let currentPrediction;
 let appPath = remote.app.getPath('userData');
 let modelReady = false, fileLoaded = false, currentFile, fileList, resultHistory = {};
 let region, AUDACITY_LABELS, wavesurfer;
-let summary = {}; summary['suppressed'] = [];
+let summary = {};
+summary['suppressed'] = [];
 let fileStart, startTime, ctime;
 
 // set up some DOM element caches
@@ -34,6 +35,7 @@ let completeDiv = $('.complete');
 const resultTable = $('#resultTableBody')
 const modalTable = $('#modalBody');
 const feedbackTable = $('#feedbackModalBody');
+let activeRow;
 let predictions = {}, correctedSpecies, speciesListItems, action, clickedNode,
     clickedIndex, speciesName, speciesFilter, speciesExclude, subRows, scrolled;
 
@@ -44,6 +46,7 @@ let config;
 const sampleRate = 24000;
 let controller = new AbortController();
 let signal = controller.signal;
+
 
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
 
@@ -447,21 +450,28 @@ let progressDiv = $('.progressDiv');
 let progressBar = $('.progress .progress-bar');
 
 
-function createRegion(start, end) {
+function createRegion(start, end, label) {
     wavesurfer.pause();
     wavesurfer.clearRegions();
-    wavesurfer.addRegion({start: start, end: end, color: "rgba(255, 255, 255, 0.2)"});
+    wavesurfer.addRegion({
+        start: start,
+        end: end,
+        color: "rgba(255, 255, 255, 0.2)",
+        attributes: {
+            label: label
+        }
+    });
     const progress = start / wavesurfer.getDuration();
     wavesurfer.seekAndCenter(progress);
 }
 
-function loadResultRegion(start, end) {
+function loadResultRegion(start, end, label) {
     // Accepts global start and end timecodes from model detections
     // Need to find and centre a view of the detection in the spectrogram
     // 3 second detections
     bufferBegin = start - (windowLength / 2) + 1.5
     loadBufferSegment(currentBuffer, bufferBegin)
-    createRegion(start - bufferBegin, end - bufferBegin)
+    createRegion(start - bufferBegin, end - bufferBegin, label)
 }
 
 function adjustSpecDims(redraw) {
@@ -964,7 +974,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     KeyO: function (e) {
         if (e.ctrlKey) showOpenDialog();
     },
-    KeyS: function () {
+    KeyS: function (e) {
         if (AUDACITY_LABELS.length > 0) {
             if (e.ctrlKey) showSaveDialog();
         }
@@ -1068,7 +1078,29 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             zoomSpecOut()
         }
     }
-
+    ,
+    Tab: function (e) {
+        if (activeRow) {
+            if (e.shiftKey) {
+                if (activeRow.previousSibling !== null) {
+                    activeRow.classList.remove('table-active')
+                    while (activeRow.previousSibling.classList.contains('d-none')) {
+                        activeRow = activeRow.previousSibling;
+                    }
+                    activeRow = activeRow.previousSibling;
+                }
+            } else {
+                if (activeRow.nextSibling !== null) {
+                    activeRow.classList.remove('table-active')
+                    while (activeRow.nextSibling.classList.contains('d-none')) {
+                        activeRow = activeRow.nextSibling;
+                    }
+                    activeRow = activeRow.nextSibling;
+                }
+            }
+            if (activeRow !== null) activeRow.click();
+        }
+    }
 };
 
 
@@ -1159,7 +1191,10 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
             </thead><tbody>`;
     let suppression_warning = '';
     for (const [key, value] of Object.entries(summarySorted)) {
-        (summary['suppressed'].indexOf(key) !== -1) ? suppression_warning = '<span class="material-icons-two-tone text-danger align-bottom" title="Species suppression may have invalidated this total.\nRefer to the results table for details.">priority_high</span>' : suppression_warning = '';
+        (summary['suppressed'].indexOf(key) !== -1) ? suppression_warning = `
+            <span class="material-icons-two-tone align-bottom"  style="font-size: 20px" 
+            title="Species suppression may have affected the count.\nRefer to the results table for details.">
+            priority_high</span>` : suppression_warning = '';
         summaryHTML += `<tr>
                         <td class="text-center"><span class="spinner-border spinner-border-sm text-success d-none" role="status"></span>
                         <span id="${key}" class="material-icons-two-tone align-bottom speciesFilter pointer">filter_alt</span>
@@ -1176,7 +1211,7 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
     const materialIcons = document.querySelectorAll('.rotate')
     speciesFilter = document.querySelectorAll('.speciesFilter');
     speciesExclude = document.querySelectorAll('.speciesExclude');
-
+    const tableRows = document.querySelectorAll('#results tr');
     $(document).on('click', '.speciesExclude', function (e) {
         const spinner = e.target.parentNode.firstChild.classList;
         spinner.remove('d-none');
@@ -1184,11 +1219,15 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
         targetClass.add('d-none');
         if (targetClass.contains('text-danger')) {
             targetClass.remove('text-danger')
-            const setDelay = setTimeout(matchSpecies, 10, e, 'unfilter');
+            const setDelay = setTimeout(matchSpecies, 1, e, 'unfilter');
         } else {
             targetClass.add('text-danger');
             const setDelay = setTimeout(matchSpecies, 1, e, 'exclude');
         }
+        tableRows[0].scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest'
+        })
         e.stopImmediatePropagation();
     });
 
@@ -1225,6 +1264,10 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
             // Allow spinner to show
             const setDelay = setTimeout(matchSpecies, 1, e, 'include');
         }
+        tableRows[0].scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest'
+        })
         e.stopImmediatePropagation();
     });
 });
@@ -1243,7 +1286,6 @@ function matchSpecies(e, mode) {
 }
 
 ipcRenderer.on('prediction-ongoing', async (event, arg) => {
-    completeDiv.hide();
     const result = arg.result;
     const index = arg.index;
     const selection = arg.selection;
@@ -1273,25 +1315,35 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         if (result.suppressed === 'text-danger') summary['suppressed'].push(result.cname);
         const regex = /:/g;
         const start = result.start, end = result.end;
-        let warning;
-        result.suppressed ? warning = `<span class="material-icons-two-tone ${result.suppressed}" title="A detection considered more likely was suppressed.">sync_problem</span>` : warning = '';
+        let icon_text;
+        let feedback_icons;
+        let confidence = '';
+        if (result.score < 0.65) {
+            confidence = ' ?';
+            feedback_icons = `<span class='material-icons-two-tone text-success feedback pointer'>thumb_up_alt</span>`;
+        } else if (result.score < 0.85) {
+            feedback_icons = `<span class='material-icons-two-tone text-success feedback pointer'>thumb_up_alt</span>
+                              <span class='material-icons-two-tone text-danger feedback pointer'>thumb_down_alt</span>`;
+        } else {
+            feedback_icons = "<span class='material-icons-two-tone text-danger feedback pointer'>thumb_down_alt</span>";
+        }
+        result.suppressed ? icon_text = `sync_problem` : icon_text = 'sync';
         result.filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp.replace(regex, '.') + '.mp3';
-        tr += `<tr onmousedown='loadResultRegion( ${start} , ${end} );' class='border-top border-secondary top-row'><th scope='row'>${index}</th>`;
+        tr += `<tr onclick='loadResultRegion( ${start},${end} , &quot;${result.cname}${confidence}&quot; )' class='border-top border-secondary top-row'><th scope='row'>${index}</th>`;
         tr += "<td>" + result.timestamp + "</td>";
         tr += "<td class='cname'>" + result.cname + "</td>";
         tr += "<td><i>" + result.sname + "</i></td>";
         tr += "<td class='text-center'>" + iconizeScore(result.score) + "</td>";
-        tr += `<td class='text-center'>${warning}<span id='${index}' class='material-icons rotate pointer d-none'>expand_more</span></td>`;
+        tr += `<td class='text-center'><span id='${index}' title="Click for additional detections" class='material-icons rotate pointer d-none'>${icon_text}</span></td>`;
         tr += "<td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>";
         tr += `<td class='text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
                     <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>`
         tr += `<td class='specFeature text-center download'><span class='material-icons-outlined pointer'>
             file_download</span></td>`;
-        tr += `<td id="${index}" class='specFeature text-center feedback'> <span class='material-icons-two-tone text-success pointer'>
-             thumb_up_alt</span> <span class='material-icons-two-tone text-danger pointer'>thumb_down_alt</span></td>`;
+        tr += `<td id="${index}" class='specFeature text-center'>${feedback_icons}</td>`;
         tr += "</tr>";
         if (result.score2 > 0.2) {
-            tr += `<tr id='subrow${index}' class='subrow d-none' onclick='loadResultRegion(${start},${end})'><th scope='row'>${index}</th>`;
+            tr += `<tr id='subrow${index}' class='subrow d-none' onclick='loadResultRegion(${start},${end},&quot;${result.cname}${confidence}&quot;)'><th scope='row'>${index}</th>`;
             tr += "<td> </td>";
             tr += "<td class='cname2'>" + result.cname2 + "</td>";
             tr += "<td><i>" + result.sname2 + "</i></td>";
@@ -1304,7 +1356,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
             tr += "<td class='specFeature'> </td>";
             tr += "</tr>";
             if (result.score3 > 0.2) {
-                tr += `<tr id='subsubrow${index}' class=' subrow d-none' onclick='loadResultRegion(${start},${end})' ><th scope='row'>${index}</th>`;
+                tr += `<tr id='subsubrow${index}' class=' subrow d-none' onclick='loadResultRegion(${start},${end}, &quot;${result.cname}${confidence}&quot;)' ><th scope='row'>${index}</th>`;
                 tr += "<td> </td>";
                 tr += "<td class='cname3'>" + result.cname3 + "</td>";
                 tr += "<td><i>" + result.sname3 + "</i></td>";
@@ -1340,7 +1392,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         $(this).toggleClass("down");
     })
     let filterMode = null;
-    const toprow = $('.top-row')
+
     speciesName = document.querySelectorAll('.cname');
     $(document).on('click', '.filter', function (e) {
         if (!filterMode) {
@@ -1399,12 +1451,18 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         if (!row2.classList.contains('top-row')) row2.classList.toggle('d-none')
         e.stopImmediatePropagation();
     })
+    const toprow = document.querySelectorAll('.top-row');
+    toprow.forEach(item => {
+        item.addEventListener('click', function (e) {
+            if (activeRow) activeRow.classList.remove('table-active')
+            activeRow = e.target.closest('tr');
+            activeRow.classList.add("table-active");
+            activeRow.scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest'
+            })
 
-    toprow.click(function () {
-        toprow.each(function () {
-            $(this).removeClass('table-active')
         })
-        $(this).addClass("table-active");
     })
 });
 
