@@ -40,8 +40,10 @@
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
                     <a class="dropdown-item" href="#" onclick="showOpenDialog();"><u>O</u>pen Audio File </a>
+                    <a class="dropdown-item disabled" onclick="saveDetections()" id="saveDetections" href="#">
+                        <u>S</u>ave Detections</a>
                     <a class="dropdown-item disabled" onclick="showSaveDialog()" id="saveLabels" href="#">
-                        <u>S</u>ave Audacity Labels</a>
+                        Save <u>A</u>udacity Labels</a>
                     <a class="dropdown-item disabled" onclick="sendFile('save')" id="exportMP3" href="#">
                         Export Selected Audio</a>
                     <div class="dropdown-divider"></div>
@@ -264,7 +266,8 @@
             <thead class="thead-dark">
             <tr>
                 <th scope="col">#</th>
-                <th scope="col">Timestamp</th>
+                <th scope="col" class="timestamp">Time</th>
+                <th scope="col">Position</th>
                 <th scope="col">Common name</th>
                 <th scope="col">Scientific name</th>
                 <th scope="col" class="text-center">Confidence <span

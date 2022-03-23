@@ -98,11 +98,12 @@ class Model {
 
     }
 
-    _timestampFromSeconds(seconds) {
-
-        const date = new Date(1970, 0, 1);
-        date.setSeconds(seconds);
-        return date.toTimeString().replace(/.*(\d:\d{2}:\d{2}).*/, "$1");
+    _timestampFromSeconds(seconds, fileStart) {
+        const date = new Date(fileStart);
+        if (fileStart === 0) date.setHours(date.getHours() - 1);
+        //const date = new Date(1970, 0, 1);
+        date.setSeconds(date.getSeconds() + seconds);
+        return date.toTimeString().replace(/.*(\d{2}:\d{2}:\d{2}).*/, "$1");
 
     }
 
@@ -115,7 +116,7 @@ class Model {
         warmupResult.dispose();
     }
 
-    async predictChunk(chunk, index) {
+    async predictChunk(chunk, index, fileStart) {
         let result;
         let audacity;
         tf.tidy(() => {
@@ -186,8 +187,8 @@ class Model {
                 result = ({
                     start: index / this.config.sampleRate,
                     end: (index + currentChunkLength) / this.config.sampleRate,
-                    timestamp: this._timestampFromSeconds(index / this.config.sampleRate) + ' - '
-                        + this._timestampFromSeconds((index + currentChunkLength) / this.config.sampleRate),
+                    timestamp: this._timestampFromSeconds(index / this.config.sampleRate, fileStart),
+                    position: this._timestampFromSeconds(index / this.config.sampleRate, 0),
                     sname: this.labels[primary].split('_')[0],
                     cname: this.labels[primary].split('_')[1],
                     score: score,
@@ -239,7 +240,8 @@ onmessage = async function (e) {
         let response = {};
         const chunk = e.data[1];
         const index = e.data[2];
-        const [result, audacity] = await myModel.predictChunk(chunk, index)
+        const fileStart = e.data[3];
+        const [result, audacity] = await myModel.predictChunk(chunk, index, fileStart);
         //console.log('Worker: Posting message back to main script');
         response['message'] = 'prediction';
         response['i'] = index;

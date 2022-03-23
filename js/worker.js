@@ -28,9 +28,11 @@ ipcRenderer.on('file-load-request', async (event, arg) => {
 });
 
 ipcRenderer.on('analyze', async (event, arg) => {
-    console.log('Worker received message: ' + arg.confidence + ' start: ' + arg.start + ' end: ' + arg.end);
+    console.log(`Worker received message: ${arg.confidence}, start: ${arg.start},  
+                    end: ${arg.end},  fstart: ${arg.fileStart}`);
     console.log(audioBuffer.duration);
     minConfidence = arg.confidence;
+    const fileStart = arg.fileStart;
     const bufferLength = audioBuffer.length;
     selection = false;
     let start;
@@ -44,11 +46,11 @@ ipcRenderer.on('analyze', async (event, arg) => {
 
     }
     predicting = true;
-    await doPrediction(start, end)
+    await doPrediction(start, end, fileStart)
 });
 
 
-async function doPrediction(start, end) {
+async function doPrediction(start, end, fileStart) {
     AUDACITY = [];
     RESULTS = [];
     predictionStart = new Date();
@@ -60,7 +62,7 @@ async function doPrediction(start, end) {
         // If we're at the end of a file and we haven't got a full chunk, scroll back to fit
         //if (i + chunkLength > end && end >= chunkLength) i = end - chunkLength;
         let chunk = channelData.slice(i, i + increment);
-        predictWorker.postMessage(['predict', chunk, i])
+        predictWorker.postMessage(['predict', chunk, i, fileStart])
     }
 }
 
