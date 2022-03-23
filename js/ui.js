@@ -366,7 +366,7 @@ analyzeLink.addEventListener('click', async () => {
     completeDiv.hide();
     disableMenuItem('analyze')
     //disableMenuItem('analyzeSelection');
-    ipcRenderer.send('analyze', {confidence: config.minConfidence});
+    ipcRenderer.send('analyze', {confidence: config.minConfidence, fileStart: fileStart});
     summary = {};
     summary['suppressed'] = []
     analyzeLink.disabled = true;
@@ -385,7 +385,7 @@ analyzeSelectionLink.addEventListener('click', async () => {
         end = region.end + bufferBegin;
     }
     // Add current buffer's beginning offset to region start / end tags
-    ipcRenderer.send('analyze', {confidence: 0.1, start: start, end: end});
+    ipcRenderer.send('analyze', {confidence: 0.1, start: start, end: end, fileStart: fileStart});
     summary = {};
     summary['suppressed'] = []
     analyzeLink.disabled = true;
@@ -672,6 +672,35 @@ function updatePrefs() {
     }
 }
 
+//////////// Save Detections CSV ////////////
+function saveDetections() {
+    const folder = p.parse(currentFile).dir;
+    const source = p.parse(currentFile).name;
+    const headings = 'Source File,Position,Time of Day,Common Name,Scientific Name,Confidence';
+    let detections_file = p.join(folder, 'Chirpity - detections.csv');
+    let detections_list = '';
+    // Check if file exists
+    fs.access(detections_file, fs.F_OK, (err) => {
+        if (err) {
+            // It doesn't, so write headings
+            detections_list = headings + '\n';
+            console.log(err)
+        }
+        if (!confirm('Append results to existing file?')) {
+            detections_list = headings + '\n';
+            detections_file = p.join(folder, `Chirpity - detections (${source}).csv`);
+        }
+        // Convert predictions to csv string buffer
+        for (const [_, value] of Object.entries(predictions)) {
+            detections_list += `${source},${value.position},${value.timestamp},${value.cname},${value.sname},${value.score.toFixed(2)}\n`;
+        }
+        fs.appendFile(detections_file, detections_list, function (err) {
+            if (err) throw err;
+            alert('Saved file as: ' + detections_file);
+        })
+    })
+}
+
 /////////////////////////  Window Handlers ////////////////////////////
 
 window.onload = function () {
@@ -947,17 +976,26 @@ $(document).on('click', '.timeline', function () {
 
 $(document).on('click', '#timeOfDay', function () {
     // set file creation time
-    config.timeOfDay = true
-    $('#timecode .tick').hide()
-    $('#timeOfDay .tick').show()
-    fileStart = ctime
+    config.timeOfDay = true;
+    const timefields = document.querySelectorAll('.timestamp')
+    timefields.forEach(time => {
+        time.classList.remove('d-none');
+    })
+    $('#timecode .tick').hide();
+    $('#timeOfDay .tick').show();
+    fileStart = ctime;
     loadBufferSegment(currentBuffer, bufferBegin);
     updatePrefs();
 })
 $(document).on('click', '#timecode', function () {
-    config.timeOfDay = false
-    $('#timeOfDay .tick').hide()
-    $('#timecode .tick').show()
+    config.timeOfDay = false;
+    const timefields = document.querySelectorAll('.timestamp')
+    timefields.forEach(time => {
+        time.classList.add('d-none');
+    })
+
+    $('#timeOfDay .tick').hide();
+    $('#timecode .tick').show();
     //start at zero
     fileStart = new Date();
     fileStart.setHours(0, 0, 0, 0);
@@ -975,6 +1013,11 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         if (e.ctrlKey) showOpenDialog();
     },
     KeyS: function (e) {
+        if (AUDACITY_LABELS.length > 0) {
+            if (e.ctrlKey) saveDetections();
+        }
+    },
+    KeyA: function (e) {
         if (AUDACITY_LABELS.length > 0) {
             if (e.ctrlKey) showSaveDialog();
         }
@@ -1158,9 +1201,11 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
     completeDiv.show();
     if (AUDACITY_LABELS.length > 0) {
         enableMenuItem('saveLabels');
+        enableMenuItem('saveDetections');
         $('.download').removeClass('disabled');
     } else {
         disableMenuItem('saveLabels');
+        disableMenuItem('saveDetections');
     }
     // Save the results for this file to the history
     resultHistory[currentFile] = resultTable[0].innerHTML
@@ -1192,7 +1237,7 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
     let suppression_warning = '';
     for (const [key, value] of Object.entries(summarySorted)) {
         (summary['suppressed'].indexOf(key) !== -1) ? suppression_warning = `
-            <span class="material-icons-two-tone align-bottom"  style="font-size: 20px" 
+            <span class="material-icons-two-tone"  style="font-size: 20px" 
             title="Species suppression may have affected the count.\nRefer to the results table for details.">
             priority_high</span>` : suppression_warning = '';
         summaryHTML += `<tr>
@@ -1330,7 +1375,8 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         result.suppressed ? icon_text = `sync_problem` : icon_text = 'sync';
         result.filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp.replace(regex, '.') + '.mp3';
         tr += `<tr onclick='loadResultRegion( ${start},${end} , &quot;${result.cname}${confidence}&quot; )' class='border-top border-secondary top-row'><th scope='row'>${index}</th>`;
-        tr += "<td>" + result.timestamp + "</td>";
+        tr += "<td class='timestamp'>" + result.timestamp + "</td>";
+        tr += "<td >" + result.position + "</td>";
         tr += "<td class='cname'>" + result.cname + "</td>";
         tr += "<td><i>" + result.sname + "</i></td>";
         tr += "<td class='text-center'>" + iconizeScore(result.score) + "</td>";
@@ -1345,6 +1391,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         if (result.score2 > 0.2) {
             tr += `<tr id='subrow${index}' class='subrow d-none' onclick='loadResultRegion(${start},${end},&quot;${result.cname}${confidence}&quot;)'><th scope='row'>${index}</th>`;
             tr += "<td> </td>";
+            tr += "<td> </td>";
             tr += "<td class='cname2'>" + result.cname2 + "</td>";
             tr += "<td><i>" + result.sname2 + "</i></td>";
             tr += "<td class='text-center'>" + iconizeScore(result.score2) + "</td>";
@@ -1357,6 +1404,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
             tr += "</tr>";
             if (result.score3 > 0.2) {
                 tr += `<tr id='subsubrow${index}' class=' subrow d-none' onclick='loadResultRegion(${start},${end}, &quot;${result.cname}${confidence}&quot;)' ><th scope='row'>${index}</th>`;
+                tr += "<td> </td>";
                 tr += "<td> </td>";
                 tr += "<td class='cname3'>" + result.cname3 + "</td>";
                 tr += "<td><i>" + result.sname3 + "</i></td>";

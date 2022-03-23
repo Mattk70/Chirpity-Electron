@@ -98,9 +98,15 @@
 
 <h5 class="pt-2">Saving Results</h5>
 <ol start="8">
-    <li>Currently, there are three ways to save results:
+    <li>Currently, there are four ways to save results:
         <ul>
-            <li>Save the detections as a label file in Audacity format. Press <b>Ctrl-S</b> or select <b>File > Save
+            <li>Save the detections as a CSV file. Press <b>Ctrl-S</b> or select <b>File > Save
+                Detections</b> from the menu. A file named "Chirpity - detections.csv" will be created in the folder
+                contining the current audio file. If you attempt to save and this file exists, it will offer to append
+                the new results to the existing file. If you don't want to do that, it will save
+                a file with the following name format: "Chirpity - detections (&lt;filename&gt;).csv".
+            </li>
+            <li>Save the detections as a label file in Audacity format. Press <b>Ctrl-A</b> or select <b>File > Save
                 Audacity Labels</b> from the menu. By default, the label file will have the same name as the audio file,
                 with a ".txt" extension.
             </li>
