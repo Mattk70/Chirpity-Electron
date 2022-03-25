@@ -210,7 +210,8 @@ ipcMain.on('post', (event, arg) => {
 });
 
 ipcMain.on('abort', (event, arg) => {
-    console.log('Main received abort: ' + arg.abort)
+    const message = arg.abort || arg.sendlabels;
+    console.log('Main received abort: ' + arg)
     workerWindow.webContents.send('abort', arg);
 });
 

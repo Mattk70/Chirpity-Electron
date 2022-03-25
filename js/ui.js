@@ -479,10 +479,17 @@ function createRegion(start, end, label) {
     wavesurfer.seekAndCenter(progress);
 }
 
-function loadResultRegion(start, end, label) {
+function loadResultRegion(start, end, label, el) {
     // Accepts global start and end timecodes from model detections
     // Need to find and centre a view of the detection in the spectrogram
     // 3 second detections
+    if (activeRow) activeRow.classList.remove('table-active')
+    el.classList.add('table-active');
+    activeRow = el;
+    activeRow.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest'
+                })
     bufferBegin = start - (windowLength / 2) + 1.5
     loadBufferSegment(currentBuffer, bufferBegin)
     createRegion(start - bufferBegin, end - bufferBegin, label)
@@ -708,6 +715,9 @@ function saveDetections() {
         }
         // Convert predictions to csv string buffer
         for (const [_, value] of Object.entries(predictions)) {
+            if (config.nocmig && value.dayNight === 'daytime') {
+                continue
+            }
             detections_list += `${source},${value.position},${value.timestamp},${value.cname},${value.sname},${value.score.toFixed(2)}\n`;
         }
         fs.appendFile(detections_file, detections_list, function (err) {
@@ -751,7 +761,7 @@ window.onload = function () {
             config.UUID = uuidv4();
             updatePrefs()
         }
-        // Set menu option state
+        // Set UI option state
         if (!config.useWhitelist) {
             $('#useWhitelist .tick').hide()
         }
@@ -767,6 +777,9 @@ window.onload = function () {
         } else {
             $('#timecode .tick').show()
             $('#timeOfDay .tick').hide()
+        }
+        if (config.nocmig) {
+            nocmigButton.classList.add('active')
         }
         showElement(config.colormap + 'span', true)
     })
@@ -1294,7 +1307,32 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
         })
         e.stopImmediatePropagation();
     });
+    let filterMode = null;
 
+    speciesName = document.querySelectorAll('.cname');
+    $(document).on('click', '#confidenceFilter', function (e) {
+        if (!filterMode) {
+            filterMode = 'guess';
+            $('.score.text-secondary').parent().parent('.top-row').hide();
+            e.target.classList.add('text-danger')
+        } else if (filterMode === 'guess') {
+            filterMode = 'low'
+            $('.score.text-danger').parent().parent('.top-row').hide();
+            e.target.classList.remove('text-danger');
+            e.target.classList.add('text-warning')
+        } else if (filterMode === 'low') {
+            filterMode = 'medium'
+            $('.score.text-warning').parent().parent('.top-row').hide();
+            e.target.classList.remove('text-warning');
+            e.target.classList.add('text-success')
+        } else {
+            filterMode = null;
+            $('.score').parent().parent('.top-row').show();
+            e.target.classList.remove('text-success');
+            e.target.classList.add('text-secondary')
+        }
+        e.stopImmediatePropagation();
+    });
     $(document).on('click', '.speciesFilter', function (e) {
         const spinner = e.target.parentNode.firstChild.classList;
         // Remove any exclusion from the species to filter
@@ -1350,218 +1388,197 @@ function matchSpecies(e, mode) {
 }
 
 ipcRenderer.on('prediction-ongoing', async (event, arg) => {
-    const result = arg.result;
-    const index = arg.index;
-    const selection = arg.selection;
-    result.timestamp = new Date(result.timestamp);
-    result.position = new Date(result.position);
-    // Datetime wrangling for Nocmig mode
-    if (config.nocmig) {
+        const result = arg.result;
+        const index = arg.index;
+        const selection = arg.selection;
+        result.timestamp = new Date(result.timestamp);
+        result.position = new Date(result.position);
+        // Datetime wrangling for Nocmig mode
         if (dusk <= result.timestamp || dawn >= result.timestamp) {
             result.dayNight = 'nighttime';
         } else {
-            result.dayNight = 'daytime d-none';
+            result.dayNight = 'daytime';
         }
-    }
-
-    let tr = '';
-    predictions[index] = result;
-    if (!selection) {
-        if (index === 1) {
-            // Remove old results
-            resultTable.empty();
-            modalTable.empty();
-        }
-    } else {
-        if (index === 1) {
-            resultTable.prepend('<tr><td class="bg-dark text-white text-center" colspan="10"><b>Selection Analysis<span class="material-icons-two-tone align-bottom">arrow_upward</span></b></td></tr>')
-        }
-    }
-
-    showElement('resultTableContainer');
-    if (result === "No detections found.") {
-        tr += "<tr><td>" + result + "</td></tr>";
-    } else {
-        if (seenTheDarkness && result.dayNight !== 'nighttime') {
-            ipcRenderer.send('abort', {'sendlabels': true});
-        }
-        if (config.nocmig && result.dayNight === 'nighttime') {
-            seenTheDarkness = true;
-            if (result.cname in summary) {
-                summary[result.cname] += 1
-            } else {
-                summary[result.cname] = 1
+        let tableRows;
+        let tr = '';
+        if (!selection) {
+            if (index === 1) {
+                // Remove old results
+                resultTable.empty();
+                modalTable.empty();
+                tableRows = document.querySelectorAll('#results tr');
+                tableRows[0].scrollIntoView({behavior: 'smooth', block: 'nearest'})
             }
         } else {
+            if (index === 1) {
+                resultTable.prepend('<tr><td class="bg-dark text-white text-center" colspan="10"><b>Selection Analysis<span class="material-icons-two-tone align-bottom">arrow_upward</span></b></td></tr>')
+                tableRows = document.querySelectorAll('#results tr');
+                tableRows[0].scrollIntoView({behavior: 'smooth', block: 'nearest'})
+            }
+        }
+        showElement('resultTableContainer');
+        if (result === "No detections found.") {
+            tr += "<tr><td>" + result + "</td></tr>";
+        } else {
+            if (config.nocmig) {
+                // We want to skip results recorded before dark
+                // process results during the night
+                // abort entirely when dawn breaks
+                if (!seenTheDarkness && result.dayNight === 'daytime') {
+                    // Not dark yet
+                    return
+                } else if (result.dayNight === 'nighttime') {
+                    seenTheDarkness = true;
+                } else if (seenTheDarkness && result.dayNight === 'daytime') {
+                    // Abort
+                    ipcRenderer.send('abort', {'sendlabels': true});
+                    return
+                }
+            }
+
             if (result.cname in summary) {
                 summary[result.cname] += 1
             } else {
                 summary[result.cname] = 1
             }
-        }
-        if (result.suppressed === 'text-danger') summary['suppressed'].push(result.cname);
-        const regex = /:/g;
-        const start = result.start, end = result.end;
-        let icon_text;
-        let feedback_icons;
-        let confidence = '';
-        if (result.score < 0.65) {
-            confidence = ' ?';
-            feedback_icons = `<span class='material-icons-two-tone text-success feedback pointer'>thumb_up_alt</span>`;
-        } else if (result.score < 0.85) {
-            feedback_icons = `<span class='material-icons-two-tone text-success feedback pointer'>thumb_up_alt</span>
+
+
+            if (result.suppressed === 'text-danger') summary['suppressed'].push(result.cname);
+            const regex = /:/g;
+            const start = result.start, end = result.end;
+            let icon_text;
+            let feedback_icons;
+            let confidence = '';
+            if (result.score < 0.65) {
+                confidence = ' ?';
+                feedback_icons = `<span class='material-icons-two-tone text-success feedback pointer'>thumb_up_alt</span>`;
+            } else if (result.score < 0.85) {
+                feedback_icons = `<span class='material-icons-two-tone text-success feedback pointer'>thumb_up_alt</span>
                               <span class='material-icons-two-tone text-danger feedback pointer'>thumb_down_alt</span>`;
-        } else {
-            feedback_icons = "<span class='material-icons-two-tone text-danger feedback pointer'>thumb_down_alt</span>";
-        }
-        result.suppressed ? icon_text = `sync_problem` : icon_text = 'sync';
-        result.filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp + '.mp3';
-        let callTime = new Date(0);
-        callTime.setUTCMilliseconds(result.timestamp);
-        callTime = callTime.toTimeString().split(' ')[0]
-        let position;
-        result.position < 3600000 ? position = new Date(result.position).toISOString().substr(14, 5) : position = new Date(result.position).toISOString().substr(11, 8);
+            } else {
+                feedback_icons = "<span class='material-icons-two-tone text-danger feedback pointer'>thumb_down_alt</span>";
+            }
+            result.suppressed ? icon_text = `sync_problem` : icon_text = 'sync';
+            result.filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp + '.mp3';
+            let callTime = new Date(0);
+            callTime.setUTCMilliseconds(result.timestamp);
+            result.timestamp = callTime.toTimeString().split(' ')[0]
+            let spliceStart;
+            result.position < 3600000 ? spliceStart = 14 : spliceStart = 11;
+            result.position = new Date(result.position).toISOString().substring(spliceStart, 19);
+            // Now we have formatted the fields, and skipped detections as required by nocmig mode, add result to predictions file
+            predictions[index] = result;
 
-
-        tr += `<tr onclick='loadResultRegion( ${start},${end} , &quot;${result.cname}${confidence}&quot; )' class='border-top border-secondary top-row ${result.dayNight}'><th scope='row'>${index}</th>`;
-        tr += "<td class='timestamp'>" + callTime + "</td>";
-        tr += "<td >" + position + "</td>";
-        tr += "<td class='cname'>" + result.cname + "</td>";
-        tr += "<td><i>" + result.sname + "</i></td>";
-        tr += "<td class='text-center'>" + iconizeScore(result.score) + "</td>";
-        tr += `<td class='text-center'><span id='${index}' title="Click for additional detections" class='material-icons rotate pointer d-none'>${icon_text}</span></td>`;
-        tr += "<td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>";
-        tr += `<td class='text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
+            tr += `<tr onclick='loadResultRegion( ${start},${end} , &quot;${result.cname}${confidence}&quot, this)' class='border-top border-secondary top-row ${result.dayNight}'><th scope='row'>${index}</th>`;
+            tr += "<td class='timestamp'>" + result.timestamp + "</td>";
+            tr += "<td >" + result.position + "</td>";
+            tr += "<td class='cname'>" + result.cname + "</td>";
+            tr += "<td><i>" + result.sname + "</i></td>";
+            tr += "<td class='text-center'>" + iconizeScore(result.score) + "</td>";
+            tr += `<td class='text-center'><span id='${index}' title="Click for additional detections" class='material-icons rotate pointer d-none'>${icon_text}</span></td>`;
+            tr += "<td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>";
+            tr += `<td class='text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
                     <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>`
-        tr += `<td class='specFeature text-center download'><span class='material-icons-outlined pointer'>
+            tr += `<td class='specFeature text-center download'><span class='material-icons-outlined pointer'>
             file_download</span></td>`;
-        tr += `<td id="${index}" class='specFeature text-center'>${feedback_icons}</td>`;
-        tr += "</tr>";
-        if (result.score2 > 0.2) {
-            tr += `<tr id='subrow${index}' class='subrow d-none' onclick='loadResultRegion(${start},${end},&quot;${result.cname}${confidence}&quot;)'><th scope='row'>${index}</th>`;
-            tr += "<td> </td>";
-            tr += "<td> </td>";
-            tr += "<td class='cname2'>" + result.cname2 + "</td>";
-            tr += "<td><i>" + result.sname2 + "</i></td>";
-            tr += "<td class='text-center'>" + iconizeScore(result.score2) + "</td>";
-            tr += "<td> </td>";
-            tr += "<td class='specFeature'> </td>";
-            tr += `<td><a href='https://xeno-canto.org/explore?query=${result.sname2}%20type:nocturnal' target=\"_blank\">
-                    <img src='img/logo/XC.png' alt='Search ${result.cname2} on Xeno Canto' title='${result.cname2} NFCs on Xeno Canto'></a> </td>`;
-            tr += "<td class='specFeature'> </td>";
-            tr += "<td class='specFeature'> </td>";
+            tr += `<td id="${index}" class='specFeature text-center'>${feedback_icons}</td>`;
             tr += "</tr>";
-            if (result.score3 > 0.2) {
-                tr += `<tr id='subsubrow${index}' class=' subrow d-none' onclick='loadResultRegion(${start},${end}, &quot;${result.cname}${confidence}&quot;)' ><th scope='row'>${index}</th>`;
+            if (result.score2 > 0.2) {
+                tr += `<tr id='subrow${index}' class='subrow d-none' onclick='loadResultRegion(${start},${end},&quot;${result.cname}${confidence}&quot;)'><th scope='row'>${index}</th>`;
                 tr += "<td> </td>";
                 tr += "<td> </td>";
-                tr += "<td class='cname3'>" + result.cname3 + "</td>";
-                tr += "<td><i>" + result.sname3 + "</i></td>";
-                tr += "<td class='text-center'>" + iconizeScore(result.score3) + "</td>";
+                tr += "<td class='cname2'>" + result.cname2 + "</td>";
+                tr += "<td><i>" + result.sname2 + "</i></td>";
+                tr += "<td class='text-center'>" + iconizeScore(result.score2) + "</td>";
                 tr += "<td> </td>";
                 tr += "<td class='specFeature'> </td>";
-                tr += `<td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:nocturnal' target=\"_blank\">
-                    <img src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>`;
+                tr += `<td><a href='https://xeno-canto.org/explore?query=${result.sname2}%20type:nocturnal' target=\"_blank\">
+                    <img src='img/logo/XC.png' alt='Search ${result.cname2} on Xeno Canto' title='${result.cname2} NFCs on Xeno Canto'></a> </td>`;
                 tr += "<td class='specFeature'> </td>";
                 tr += "<td class='specFeature'> </td>";
                 tr += "</tr>";
+                if (result.score3 > 0.2) {
+                    tr += `<tr id='subsubrow${index}' class=' subrow d-none' onclick='loadResultRegion(${start},${end}, &quot;${result.cname}${confidence}&quot;)' ><th scope='row'>${index}</th>`;
+                    tr += "<td> </td>";
+                    tr += "<td> </td>";
+                    tr += "<td class='cname3'>" + result.cname3 + "</td>";
+                    tr += "<td><i>" + result.sname3 + "</i></td>";
+                    tr += "<td class='text-center'>" + iconizeScore(result.score3) + "</td>";
+                    tr += "<td> </td>";
+                    tr += "<td class='specFeature'> </td>";
+                    tr += `<td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:nocturnal' target=\"_blank\">
+                    <img src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>`;
+                    tr += "<td class='specFeature'> </td>";
+                    tr += "<td class='specFeature'> </td>";
+                    tr += "</tr>";
+                }
             }
         }
-    }
-    selection ? resultTable.prepend(tr) : resultTable.append(tr)
-    const tableRows = document.querySelectorAll('#results tr');
+        selection ? resultTable.prepend(tr) : resultTable.append(tr)
 
-// line is zero-based
-// line is the row number that you want to see into view after scroll
-    if (!scrolled) {
-        tableRows[0].scrollIntoView({
-            behavior: 'smooth',
-            block: 'nearest'
-        })
-        scrolled = true
-    }
-    // Show the alternate detections toggle:
-    if (result.score2 > 0.2) {
-        document.getElementById(index).classList.remove('d-none')
-    }
-    if (!config.spectrogram) $('.specFeature').hide();
-    $(document).on('click', '.material-icons', function (e) {
-        $(this).toggleClass("down");
-    })
-    let filterMode = null;
-
-    speciesName = document.querySelectorAll('.cname');
-    $(document).on('click', '.filter', function (e) {
-        if (!filterMode) {
-            filterMode = 'guess';
-            $('.score.text-secondary').parent().parent('.top-row').hide();
-            e.target.classList.add('text-danger')
-        } else if (filterMode === 'guess') {
-            filterMode = 'low'
-            $('.score.text-danger').parent().parent('.top-row').hide();
-            e.target.classList.remove('text-danger');
-            e.target.classList.add('text-warning')
-        } else if (filterMode === 'low') {
-            filterMode = 'medium'
-            $('.score.text-warning').parent().parent('.top-row').hide();
-            e.target.classList.remove('text-warning');
-            e.target.classList.add('text-success')
-        } else {
-            filterMode = null;
-            $('.score').parent().parent('.top-row').show();
-            e.target.classList.remove('text-success');
-            e.target.classList.add('text-secondary')
+        // Show the alternate detections toggle:
+        if (result.score2 > 0.2) {
+            document.getElementById(index).classList.remove('d-none')
         }
-        e.stopImmediatePropagation();
-    });
+        if (!config.spectrogram) $('.specFeature').hide();
 
-    $(document).on('click', '.download', function (e) {
-        action = 'save';
-        clickedNode = e.target.parentNode
-        clickedIndex = clickedNode.parentNode.firstChild.innerText
-        sendFile(action, predictions[clickedIndex])
-        e.stopImmediatePropagation();
-    });
-    $(document).on('click', '.feedback', function (e) {
+        // const toprow = document.querySelectorAll('.top-row');
+        // toprow.forEach(item => {
+        //     item.addEventListener('click', function (e) {
+        //         if (activeRow) activeRow.classList.remove('table-active')
+        //         activeRow = e.target.closest('tr');
+        //         activeRow.classList.add("table-active");
+        //         activeRow.scrollIntoView({
+        //             behavior: 'smooth',
+        //             block: 'nearest'
+        //         })
+        //
+        //     })
+        // })
+    }
+)
+;
 
-        let index = e.target.parentNode.id;
-        e.target.parentNode.onclick = null;
-        let action;
-        (e.target.classList.contains('text-success')) ? action = 'correct' : action = 'incorrect';
-        clickedNode = e.target.parentNode
-        clickedIndex = clickedNode.parentNode.firstChild.innerText
-        if (action === 'incorrect') {
-            findSpecies();
-        } else if (confirm('Submit feedback?')) {
-            predictions[clickedIndex].filename = predictions[clickedIndex].cname.replace(/\s+/g, '_') +
-                '~' + predictions[clickedIndex].sname.replace(' ', '_') + '_' + Date.now().toString() + '.mp3';
-            sendFile('correct', predictions[clickedIndex]);
-            clickedNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>'
-        }
-        e.stopImmediatePropagation();
+$(document).on('click', '.material-icons', function (e) {
+    $(this).toggleClass("down");
+})
 
-    });
-    $(document).on('click', '.rotate', function (e) {
-        const row1 = e.target.parentNode.parentNode.nextSibling;
-        const row2 = row1.nextSibling;
-        row1.classList.toggle('d-none')
-        if (!row2.classList.contains('top-row')) row2.classList.toggle('d-none')
-        e.stopImmediatePropagation();
-    })
-    const toprow = document.querySelectorAll('.top-row');
-    toprow.forEach(item => {
-        item.addEventListener('click', function (e) {
-            if (activeRow) activeRow.classList.remove('table-active')
-            activeRow = e.target.closest('tr');
-            activeRow.classList.add("table-active");
-            activeRow.scrollIntoView({
-                behavior: 'smooth',
-                block: 'nearest'
-            })
+// Results event handlers
 
-        })
-    })
+$(document).on('click', '.download', function (e) {
+    action = 'save';
+    clickedNode = e.target.parentNode
+    clickedIndex = clickedNode.parentNode.firstChild.innerText
+    sendFile(action, predictions[clickedIndex])
+    e.stopImmediatePropagation();
 });
+$(document).on('click', '.feedback', function (e) {
+
+    let index = e.target.parentNode.id;
+    e.target.parentNode.onclick = null;
+    let action;
+    (e.target.classList.contains('text-success')) ? action = 'correct' : action = 'incorrect';
+    clickedNode = e.target.parentNode
+    clickedIndex = clickedNode.parentNode.firstChild.innerText
+    if (action === 'incorrect') {
+        findSpecies();
+    } else if (confirm('Submit feedback?')) {
+        predictions[clickedIndex].filename = predictions[clickedIndex].cname.replace(/\s+/g, '_') +
+            '~' + predictions[clickedIndex].sname.replace(' ', '_') + '_' + Date.now().toString() + '.mp3';
+        sendFile('correct', predictions[clickedIndex]);
+        clickedNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>'
+    }
+    e.stopImmediatePropagation();
+
+});
+$(document).on('click', '.rotate', function (e) {
+    const row1 = e.target.parentNode.parentNode.nextSibling;
+    const row2 = row1.nextSibling;
+    row1.classList.toggle('d-none')
+    if (!row2.classList.contains('top-row')) row2.classList.toggle('d-none')
+    e.stopImmediatePropagation();
+})
+
 
 function findSpecies() {
     document.removeEventListener('keydown', handleKeyDown, true);
@@ -1584,6 +1601,7 @@ $('#feedbackModal').on('hidden.bs.modal', function (e) {
         clickedNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>';
     }
 })
+
 
 function sendFile(action, result) {
     let start, end, filename;
@@ -1678,6 +1696,12 @@ $('#usage').on('click', function () {
         $('#helpModal').modal({show: true});
     });
 });
+const nocmigButton = document.getElementById('nocmigMode');
+nocmigButton.addEventListener('click', function (e) {
+    config.nocmig ? config.nocmig = false : config.nocmig = true;
+    nocmigButton.classList.toggle('active');
+    updatePrefs();
+})
 
 // $('#about').on('click',function(){
 //     $('#helpModalLabel').html( "About Chirpity Nocmig");

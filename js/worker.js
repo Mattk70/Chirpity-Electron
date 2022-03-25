@@ -1,7 +1,7 @@
 const {app, ipcRenderer} = require('electron');
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 //let appPath = '../256x384_model/';
-let appPath = '../24000_v8/';
+let appPath = '../24000_v6/';
 
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');

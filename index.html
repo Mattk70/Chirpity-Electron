@@ -71,7 +71,7 @@
                         <li class="dropdown-submenu">
                             <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
                                aria-haspopup="true" aria-expanded="false"> <span
-                                    class="nav-label">Model</span><span class="material-icons-two-tone arrow">navigate_next</span></a>
+                                    class="nav-label">Predictions</span><span class="material-icons-two-tone arrow">navigate_next</span></a>
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" href="#" id="useWhitelist">Use Whitelist
                                     <span class='material-icons tick'>done</span>
@@ -250,13 +250,15 @@
                 </div>
                 <div class="complete float-sm-right" style="display: none">
                     <!-- Button trigger modal -->
-                    <button type="button" class="btn btn-primary align-bottom" data-toggle="modal" data-target="#exampleModal">
+                    <button type="button" class="btn btn-primary align-bottom" data-toggle="modal"
+                            data-target="#exampleModal">
                         Show Summary
                     </button>
                 </div>
             </div>
             <div class="align-bottom">
-                <span title="Toggle Nocmig mode" id="nocmigMode" class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">dark_mode</span>
+                <span title="Toggle Nocmig mode" id="nocmigMode"
+                      class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">dark_mode</span>
             </div>
         </div>
     </div>
@@ -271,10 +273,9 @@
                 <th scope="col">Position</th>
                 <th scope="col">Common name</th>
                 <th scope="col">Scientific name</th>
-                <th scope="col" class="text-center">Confidence <span
-                        class="material-icons-two-tone text-secondary align-bottom filter pointer">
-filter_list
-</span></th>
+                <th scope="col" class="text-center">Confidence
+                    <span id="confidenceFilter" class="material-icons-two-tone text-secondary align-bottom pointer">filter_list</span>
+                </th>
                 <th scope="col" class="text-center">Other IDs</th>
                 <th scope="col" class="specFeature text-center">Play</th>
                 <th scope="col" class="text-center">XC</th>
