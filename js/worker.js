@@ -1,7 +1,7 @@
 const {app, ipcRenderer} = require('electron');
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 //let appPath = '../256x384_model/';
-let appPath = '../24000_v6/';
+let appPath = '../24000_v8/';
 
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
@@ -127,6 +127,9 @@ ipcRenderer.on('abort', (event, arg) => {
         //restart the worker
         predictWorker.terminate()
         spawnWorker(useWhitelist)
+    }
+    if (arg.sendlabels){
+        ipcRenderer.send('prediction-done', {'labels': AUDACITY});
     }
 })
 

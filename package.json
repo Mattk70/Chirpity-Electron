@@ -41,6 +41,7 @@
     "seedrandom": "^3.0.5",
     "uuid": "^8.3.2",
     "wavesurfer.js": "^6.0.4",
+    "suncalc2": "^1.8.1",
     "update-electron-app": "^2.0.1"
   }
 }
