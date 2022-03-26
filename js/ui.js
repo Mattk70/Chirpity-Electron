@@ -21,6 +21,7 @@ const labels = ["Tachymarptis melba_Alpine Swift", "Pluvialis dominica_American 
 // })
 let currentPrediction;
 let appPath = remote.app.getPath('userData');
+let version = remote.app.getVersion()
 let modelReady = false, fileLoaded = false, currentFile, fileList, resultHistory = {};
 let region, AUDACITY_LABELS, wavesurfer;
 let summary = {};
@@ -69,13 +70,13 @@ const fetchAudioFile = (filePath) =>
                     dusk = astro.dusk;
                     dawn = astro.dawn;
                     //fileStart = Date.parse(fileStart) / 1000;
-                    if (fileStart > dawn) {
-                        // the dawn we care about is for the next day
-                        const nextDay = new Date();
-                        nextDay.setDate(fileStart.getDate() + 1);
-                        astro = SunCalc.getTimes(nextDay, config.latitude, config.longitude);
-                        dawn = Date.parse(astro.dawn) / 1000;
-                    }
+                    // if (fileStart > dawn) {
+                    //     // the dawn we care about is for the next day
+                    //     const nextDay = new Date();
+                    //     nextDay.setDate(fileStart.getDate() + 1);
+                    //     astro = SunCalc.getTimes(nextDay, config.latitude, config.longitude);
+                    //     dawn = Date.parse(astro.dawn) / 1000;
+                    // }
                 } else {
                     fileStart = new Date();
                     fileStart.setHours(0, 0, 0, 0)
@@ -123,7 +124,7 @@ async function loadAudioFile(filePath) {
         wavesurfer = undefined;
     }
     // set file creation time
-    ctime = fs.statSync(filePath).ctime
+    ctime = fs.statSync(filePath).mtime
 
 
     hideAll();
@@ -378,7 +379,6 @@ const analyzeLink = document.getElementById('analyze');
 
 analyzeLink.addEventListener('click', async () => {
     completeDiv.hide();
-    disableMenuItem('analyze')
     //disableMenuItem('analyzeSelection');
     ipcRenderer.send('analyze', {confidence: config.minConfidence, fileStart: fileStart});
     summary = {};
@@ -390,8 +390,6 @@ const analyzeSelectionLink = document.getElementById('analyzeSelection');
 
 analyzeSelectionLink.addEventListener('click', async () => {
     completeDiv.hide();
-    disableMenuItem('analyze')
-    //disableMenuItem('analyzeSelection');
     let start;
     let end;
     if (region.start) {
@@ -487,9 +485,9 @@ function loadResultRegion(start, end, label, el) {
     el.classList.add('table-active');
     activeRow = el;
     activeRow.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'nearest'
-                })
+        behavior: 'smooth',
+        block: 'nearest'
+    })
     bufferBegin = start - (windowLength / 2) + 1.5
     loadBufferSegment(currentBuffer, bufferBegin)
     createRegion(start - bufferBegin, end - bufferBegin, label)
@@ -744,7 +742,7 @@ window.onload = function () {
                 'useWhitelist': true,
                 'latitude': 51.9,
                 'longitude': -0.4,
-                'nocmig': true
+                'nocmig': false
             }
             const {v4: uuidv4} = require('uuid');
             config.UUID = uuidv4();
@@ -832,9 +830,10 @@ window.onload = function () {
 // Feedback list handler
 $(document).on('click', '#myUL li', function (e) {
     correctedSpecies = formatFilename(e.target.innerText);
+    const regex = /done$/;
+    correctedSpecies = correctedSpecies.replace(regex, '');
     speciesListItems.addClass('d-none');
-    e.target.childNodes[1].classList.remove('d-none');
-    //e.target.closest('.d-none').classList.remove('d-none');
+    e.target.closest('a').childNodes[1].classList.remove('d-none');
 })
 
 
@@ -1184,6 +1183,11 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
 
 ipcRenderer.on('model-ready', async () => {
     modelReady = true;
+    const warmupText = document.getElementById('warmup');
+    warmupText.classList.add('d-none');
+    if (workerLoaded) {
+        enableMenuItem('analyze')
+    }
 })
 
 ipcRenderer.on('update-error', async (event, args) => {
@@ -1205,7 +1209,7 @@ ipcRenderer.on('update-downloaded', async (event, args) => {
 ipcRenderer.on('worker-loaded', async (event, args) => {
     console.log('UI received worker-loaded: ' + args.message)
     workerLoaded = true;
-    enableMenuItem('analyze')
+    if (modelReady) enableMenuItem('analyze');
     if (!loadSpectrogram) {
         hideAll();
         showElement('controlsWrapper');
@@ -1224,6 +1228,9 @@ ipcRenderer.on('progress', async (event, arg) => {
 });
 
 ipcRenderer.on('prediction-done', async (event, arg) => {
+    if (!seenTheDarkness && config.nocmig && !region) {
+        alert(`Nocmig mode is enabled, but all timestamps in this file were during daylight hours. Any detections will have been suppressed.\n\nDisable Nocmig mode and re-run the analysis to see them.`)
+    }
     scrolled = false;
     AUDACITY_LABELS = arg.labels;
     progressDiv.hide();
@@ -1394,10 +1401,11 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         result.timestamp = new Date(result.timestamp);
         result.position = new Date(result.position);
         // Datetime wrangling for Nocmig mode
-        if (dusk <= result.timestamp || dawn >= result.timestamp) {
-            result.dayNight = 'nighttime';
-        } else {
+        let astro = SunCalc.getTimes(result.timestamp, config.latitude, config.longitude);
+        if (astro.dawn < result.timestamp && astro.dusk > result.timestamp) {
             result.dayNight = 'daytime';
+        } else {
+            result.dayNight = 'nighttime';
         }
         let tableRows;
         let tr = '';
@@ -1411,7 +1419,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
             }
         } else {
             if (index === 1) {
-                resultTable.prepend('<tr><td class="bg-dark text-white text-center" colspan="10"><b>Selection Analysis<span class="material-icons-two-tone align-bottom">arrow_upward</span></b></td></tr>')
+                resultTable.prepend('<tr><td class="bg-dark text-white text-center" colspan="11"><b>Selection Analysis<span class="material-icons-two-tone align-bottom">arrow_upward</span></b></td></tr>')
                 tableRows = document.querySelectorAll('#results tr');
                 tableRows[0].scrollIntoView({behavior: 'smooth', block: 'nearest'})
             }
@@ -1420,7 +1428,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         if (result === "No detections found.") {
             tr += "<tr><td>" + result + "</td></tr>";
         } else {
-            if (config.nocmig) {
+            if (config.nocmig && !region) {
                 // We want to skip results recorded before dark
                 // process results during the night
                 // abort entirely when dawn breaks
@@ -1442,9 +1450,8 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
                 summary[result.cname] = 1
             }
 
-
             if (result.suppressed === 'text-danger') summary['suppressed'].push(result.cname);
-            const regex = /:/g;
+
             const start = result.start, end = result.end;
             let icon_text;
             let feedback_icons;
@@ -1459,10 +1466,11 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
                 feedback_icons = "<span class='material-icons-two-tone text-danger feedback pointer'>thumb_down_alt</span>";
             }
             result.suppressed ? icon_text = `sync_problem` : icon_text = 'sync';
-            result.filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp + '.mp3';
+            result.date = result.timestamp;
             let callTime = new Date(0);
-            callTime.setUTCMilliseconds(result.timestamp);
-            result.timestamp = callTime.toTimeString().split(' ')[0]
+            callTime.setUTCMilliseconds(Date.parse(result.timestamp));
+            result.timestamp = result.timestamp.toString().split(' ')[4];
+            result.filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp + '.mp3';
             let spliceStart;
             result.position < 3600000 ? spliceStart = 14 : spliceStart = 11;
             result.position = new Date(result.position).toISOString().substring(spliceStart, 19);
@@ -1636,7 +1644,11 @@ function sendFile(action, result) {
             'score2': result.score2,
             'cname3': result.cname3,
             'sname3': result.sname3,
-            'score3': result.score3
+            'score3': result.score3,
+            'date': result.date,
+            'lat': config.latitude,
+            'lon': config.longitude,
+            'version': version
         };
     }
     if (action === 'save') {
@@ -1698,7 +1710,15 @@ $('#usage').on('click', function () {
 });
 const nocmigButton = document.getElementById('nocmigMode');
 nocmigButton.addEventListener('click', function (e) {
-    config.nocmig ? config.nocmig = false : config.nocmig = true;
+    if (config.nocmig) {
+        config.nocmig = false
+    } else {
+        config.nocmig = true;
+        config.timeOfDay = true;
+        $('#timecode .tick').hide();
+        $('#timeOfDay .tick').show();
+
+    }
     nocmigButton.classList.toggle('active');
     updatePrefs();
 })
