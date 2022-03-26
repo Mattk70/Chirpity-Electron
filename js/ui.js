@@ -1020,6 +1020,8 @@ $(document).on('click', '#timeOfDay', function () {
 })
 $(document).on('click', '#timecode', function () {
     config.timeOfDay = false;
+    config.nocmig = false;
+    nocmigButton.classList.remove('active');
     const timefields = document.querySelectorAll('.timestamp')
     timefields.forEach(time => {
         time.classList.add('d-none');
