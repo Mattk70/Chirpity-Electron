@@ -69,8 +69,7 @@ class Model {
             }
             greylist.forEach(species => suppressed_IDs.push(labels.indexOf(species)))
             goldenlist.forEach(species => enhanced_IDs.push(labels.indexOf(species)))
-            //blacklist.forEach(species => blocked_IDs.push([labels.indexOf(species)]))
-            //blocked_IDs = tf.tensor2d(blocked_IDs,[blocked_IDs.length, 1] ,'int32')
+
             this.inputShape = this.model.inputs[0].shape
         }
     }

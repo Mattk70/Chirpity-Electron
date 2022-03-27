@@ -37,11 +37,12 @@
     "colormap": "^2.3.2",
     "jquery": "^3.6.0",
     "lamejstmp": "^1.0.1",
+    "popper": "^1.0.1",
     "popper.js": "^1.16.1",
     "seedrandom": "^3.0.5",
-    "uuid": "^8.3.2",
-    "wavesurfer.js": "^6.0.4",
     "suncalc2": "^1.8.1",
-    "update-electron-app": "^2.0.1"
+    "update-electron-app": "^2.0.1",
+    "uuid": "^8.3.2",
+    "wavesurfer.js": "^6.0.4"
   }
 }
