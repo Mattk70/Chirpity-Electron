@@ -40,7 +40,7 @@ const modalTable = $('#modalBody');
 const feedbackTable = $('#feedbackModalBody');
 let activeRow;
 let predictions = {}, correctedSpecies, speciesListItems, action, clickedNode,
-    clickedIndex, speciesName, speciesFilter, speciesExclude, subRows, scrolled;
+    clickedIndex, speciesName, speciesFilter, speciesExclude, subRows, scrolled, currentFileDuration;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
 let workerLoaded = false;
@@ -61,27 +61,19 @@ const fetchAudioFile = (filePath) =>
             if (!controller.signal.aborted) {
                 let source = audioCtx.createBufferSource();
                 source.buffer = buffer;
-                const duration = source.buffer.duration;
-
+                currentFileDuration = source.buffer.duration;
+                if (currentFileDuration < 20) windowLength = currentFileDuration;
                 // set fileStart time
                 if (config.timeOfDay) {
-                    fileStart = new Date(ctime - (duration * 1000));
+                    fileStart = new Date(ctime - (currentFileDuration * 1000));
                     let astro = SunCalc.getTimes(fileStart, config.latitude, config.longitude);
                     dusk = astro.dusk;
                     dawn = astro.dawn;
-                    //fileStart = Date.parse(fileStart) / 1000;
-                    // if (fileStart > dawn) {
-                    //     // the dawn we care about is for the next day
-                    //     const nextDay = new Date();
-                    //     nextDay.setDate(fileStart.getDate() + 1);
-                    //     astro = SunCalc.getTimes(nextDay, config.latitude, config.longitude);
-                    //     dawn = Date.parse(astro.dawn) / 1000;
-                    // }
                 } else {
                     fileStart = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
                 }
 
-                const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
+                const offlineCtx = new OfflineAudioContext(1, sampleRate * currentFileDuration, sampleRate);
                 const offlineSource = offlineCtx.createBufferSource();
                 offlineSource.buffer = buffer;
                 offlineSource.connect(offlineCtx.destination);
@@ -330,7 +322,7 @@ function updateElementCache() {
 }
 
 function zoomSpecIn() {
-    if (windowLength < 2) return;
+    if (windowLength < 1.5) return;
     windowLength /= 2;
     bufferBegin = bufferBegin + wavesurfer.getCurrentTime() - (windowLength / 2)
     initSpectrogram();
@@ -343,6 +335,9 @@ function zoomSpecIn() {
 function zoomSpecOut() {
     if (windowLength > 100) return;
     windowLength *= 2;
+    if (windowLength > currentFileDuration) {
+        windowLength = currentFileDuration
+    }
     // Centre on playhead
     bufferBegin = bufferBegin + wavesurfer.getCurrentTime() - (windowLength / 2)
     initSpectrogram();
@@ -573,7 +568,7 @@ function formatTimeCallback(secs) {
     } else {
         secondsStr = seconds.toString() + '.' + Math.round(milliSeconds / 100).toString();
     }
-    if ( hours > 0 || minutes > 0 || config.timeOfDay) {
+    if (hours > 0 || minutes > 0 || config.timeOfDay) {
         if (seconds < 10) {
             secondsStr = '0' + secondsStr;
         }
@@ -1476,7 +1471,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
             predictions[index] = result;
 
             tr += `<tr onclick='loadResultRegion( ${start},${end} , &quot;${result.cname}${confidence}&quot, this)' class='border-top border-secondary top-row ${result.dayNight}'><th scope='row'>${index}</th>`;
-            tr += "<td class='timestamp'>" + result.timestamp + "</td>";
+            tr += "<td class='timestamp d-none'>" + result.timestamp + "</td>";
             tr += "<td >" + result.position + "</td>";
             tr += "<td class='cname'>" + result.cname + "</td>";
             tr += "<td><i>" + result.sname + "</i></td>";
