@@ -1336,10 +1336,6 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
             targetClass.add('text-danger');
             const setDelay = setTimeout(matchSpecies, 1, e, 'exclude');
         }
-        tableRows[0].scrollIntoView({
-            behavior: 'smooth',
-            block: 'nearest'
-        })
         e.stopImmediatePropagation();
     });
     let filterMode = null;
