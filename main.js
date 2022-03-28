@@ -10,7 +10,6 @@ const url = `${server}/update/${process.platform}/${app.getVersion()}`
 
 autoUpdater.setFeedURL({url})
 
-
 //Update handling
 autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName) => {
     const dialogOpts = {
@@ -69,7 +68,7 @@ function createWindow() {
 function createWorker() {
     // hidden worker
     workerWindow = new BrowserWindow({
-        show: false,
+        show: true,
         height: 800,
         width: 1200,
         webPreferences: {
@@ -177,7 +176,7 @@ ipcMain.on('worker-loaded', async (event, arg) => {
 
 ipcMain.on('analyze', async (event, arg) => {
     console.log('Main received go signal: ' + arg.confidence)
-    workerWindow.webContents.send('analyze', {start: arg.start, end: arg.end, confidence: arg.confidence});
+    workerWindow.webContents.send('analyze', arg);
 });
 
 ipcMain.on('prediction-ongoing', (event, arg) => {
@@ -210,7 +209,8 @@ ipcMain.on('post', (event, arg) => {
 });
 
 ipcMain.on('abort', (event, arg) => {
-    console.log('Main received abort: ' + arg.abort)
+    const message = arg.abort || arg.sendlabels;
+    console.log('Main received abort: ' + arg)
     workerWindow.webContents.send('abort', arg);
 });
 

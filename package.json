@@ -1,6 +1,6 @@
 {
   "name": "chirpity",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "description": "Nocmig application for sound file analysis.",
   "main": "main.js",
   "scripts": {
@@ -39,8 +39,9 @@
     "lamejstmp": "^1.0.1",
     "popper.js": "^1.16.1",
     "seedrandom": "^3.0.5",
+    "suncalc2": "^1.8.1",
+    "update-electron-app": "^2.0.1",
     "uuid": "^8.3.2",
-    "wavesurfer.js": "^6.0.4",
-    "update-electron-app": "^2.0.1"
+    "wavesurfer.js": "^6.0.4"
   }
 }
