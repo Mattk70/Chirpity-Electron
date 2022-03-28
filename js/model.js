@@ -14,8 +14,8 @@ const whitelist = ["Pluvialis dominica_American Golden Plover", "Acanthis hornem
 //const blacklist = ["Human_Human", "Ambient Noise_Ambient Noise", "Animal_Animal", "Vehicle_Vehicle"];
 const blacklist = [];
 //const greylist = ["Phylloscopus fuscatus_Dusky Warbler", "Gallinago gallinago_Snipe", "Accipiter gentilis_Goshawk", "Asio otus_Long-eared Owl", "Bubo bubo_Eurasian Eagle-Owl", "Oriolus oriolus_Golden Oriole", "Cuculus canorus_Cuckoo"];
-const greylist = [];
-const goldenlist = ["Turdus Iliacus_Redwing"];
+const greylist = ["Sylvia curruca_Lesser Whitethroat", "Asio otus_Long-eared Owl", "Botaurus stellaris_Bittern"];
+const goldenlist = ["Turdus iliacus_Redwing", "Turdus philomelos_Song Thrush"];
 let blocked_IDs = [];
 let allowed_IDs = [];
 let suppressed_IDs = [];
@@ -144,7 +144,7 @@ class Model {
                 //blocked_IDs.forEach(id => this.prediction[id] = 0.0)
                 suppressed_IDs.forEach(id => this.prediction[id] = this.prediction[id] ** 3)
             // 4th root of redwings
-                enhanced_IDs.forEach(id => this.prediction[id] = Math.pow(this.prediction[id], 1/4))
+                enhanced_IDs.forEach(id => this.prediction[id] = Math.cbrt(this.prediction[id]))
                 // Recreate the tensor
                 this.prediction = tf.tensor(this.prediction)
                 this.prediction = tf.expandDims(this.prediction, 0)
