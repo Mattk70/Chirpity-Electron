@@ -1,7 +1,7 @@
 const {app, ipcRenderer} = require('electron');
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 //let appPath = '../256x384_model/';
-let appPath = '../24000_v6/';
+let appPath = '../24000_v9/';
 
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
@@ -28,9 +28,11 @@ ipcRenderer.on('file-load-request', async (event, arg) => {
 });
 
 ipcRenderer.on('analyze', async (event, arg) => {
-    console.log('Worker received message: ' + arg.confidence + ' start: ' + arg.start + ' end: ' + arg.end);
+    console.log(`Worker received message: ${arg.confidence}, start: ${arg.start},  
+                    end: ${arg.end},  fstart: ${arg.fileStart}`);
     console.log(audioBuffer.duration);
     minConfidence = arg.confidence;
+    const fileStart = arg.fileStart;
     const bufferLength = audioBuffer.length;
     selection = false;
     let start;
@@ -44,11 +46,11 @@ ipcRenderer.on('analyze', async (event, arg) => {
 
     }
     predicting = true;
-    await doPrediction(start, end)
+    await doPrediction(start, end, fileStart)
 });
 
 
-async function doPrediction(start, end) {
+async function doPrediction(start, end, fileStart) {
     AUDACITY = [];
     RESULTS = [];
     predictionStart = new Date();
@@ -60,7 +62,7 @@ async function doPrediction(start, end) {
         // If we're at the end of a file and we haven't got a full chunk, scroll back to fit
         //if (i + chunkLength > end && end >= chunkLength) i = end - chunkLength;
         let chunk = channelData.slice(i, i + increment);
-        predictWorker.postMessage(['predict', chunk, i])
+        predictWorker.postMessage(['predict', chunk, i, fileStart])
     }
 }
 
@@ -125,6 +127,9 @@ ipcRenderer.on('abort', (event, arg) => {
         //restart the worker
         predictWorker.terminate()
         spawnWorker(useWhitelist)
+    }
+    if (arg.sendlabels) {
+        ipcRenderer.send('prediction-done', {'labels': AUDACITY});
     }
 })
 
@@ -240,24 +245,35 @@ function bufferToMp3(metadata, channels, sampleRate, left, right = null) {
         const ID3content = JSON.stringify(metadata)
         // Add metadata
         const writer = new ID3Writer(Buffer.alloc(0));
-        writer.setFrame('TIT2', metadata['cname'])  // Title
+        writer.setFrame('TPE1', [metadata['cname']])  // Artist Name
             .setFrame('TIT3', metadata['sname'])
-            .setFrame('TPE1', [metadata['cname2'], metadata['cname3']])  // Contributing Artists
-            .setFrame('TCON', ['Nocmig']) // Album
-            .setFrame('TPUB', 'Chirpity Nocmig') // Publisher
+            .setFrame('TPE2', [metadata['cname2'], metadata['cname3']])  // Contributing Artists
+            .setFrame('TCON', ['Nocmig']) // Genre
+            .setFrame('TPUB', 'Chirpity Nocmig ' + metadata['version']) // Publisher
             .setFrame('TYER', new Date().getFullYear()) // Year
-            .setFrame('COMM', {description: 'Metadata', 'text': ID3content}) // Album
             .setFrame('TXXX', {
                 description: 'ID Confidence',
                 value: parseFloat(parseFloat(metadata['score']) * 100).toFixed(0) + '%'
             })
             .setFrame('TXXX', {
+                description: 'Time of detection',
+                value: metadata['date']
+            })
+            .setFrame('TXXX', {
+                description: 'Latitude',
+                value: metadata['lat']
+            })
+            .setFrame('TXXX', {
+                description: 'Longitude',
+                value: metadata['lon']
+            })
+            .setFrame('TXXX', {
                 description: '2nd',
-                value: metadata['cname2'] + ' (' + metadata['score2'] + ')'
+                value: metadata['cname2'] + ' (' + parseFloat(parseFloat(metadata['score2']) * 100).toFixed(0) + '%)'
             })
             .setFrame('TXXX', {
                 description: '3rd',
-                value: metadata['cname3'] + ' (' + metadata['score3'] + ')'
+                value: metadata['cname3'] + ' (' + parseFloat(parseFloat(metadata['score']) * 100).toFixed(0) + '%)'
             })
             .setFrame('TXXX', {
                 description: 'UUID',
@@ -312,7 +328,7 @@ async function postMP3(start, end, filepath, metadata, action) {
 
 
 /// Workers  From the MDN example
-async function spawnWorker(useWhitelist) {
+function spawnWorker(useWhitelist) {
     predictWorker = new Worker('./js/model.js');
     predictWorker.postMessage(['load', appPath, useWhitelist])
 
