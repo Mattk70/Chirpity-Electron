@@ -240,3 +240,7 @@ region.wavesurfer-region[data-region-highlight] {
 .daytime {
     background-color: rgba(86, 180, 239, 0.2);
 }
+
+.strikethrough{
+    text-decoration: line-through;
+}
