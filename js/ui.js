@@ -1501,8 +1501,9 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
             let icon_text;
             let feedback_icons;
             let confidence = '';
-            // if (result.score < 0.65) {
-            //     confidence = ' ?';
+            if (result.score < 0.65) {
+                confidence = ' ?';
+            }
             //     feedback_icons = `<span class='material-icons-two-tone text-success feedback pointer'>thumb_up_alt</span>`;
             // } else if (result.score < 0.85) {
             feedback_icons = `<span class='material-icons-two-tone text-success feedback pointer'>thumb_up_alt</span>
