@@ -244,3 +244,17 @@ region.wavesurfer-region[data-region-highlight] {
 .strikethrough{
     text-decoration: line-through;
 }
+
+/* Disable blue selection highlight in drag */
+:not(input):not(textarea),
+:not(input):not(textarea)::after,
+:not(input):not(textarea)::before {
+    user-select: none;
+    cursor: default;
+}
+
+/* Menu Dropdown on Hover */
+.dropdown:hover .dropdown-menu.top-level {
+    display: block;
+    margin-top: 0; // remove the gap so it doesn't close
+ }
