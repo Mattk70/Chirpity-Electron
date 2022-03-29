@@ -97,10 +97,9 @@ const fetchAudioFile = (filePath) =>
                 // We know it's been canceled!
                 console.warn('Fetch aborted: sending message to worker')
                 hideAll();
-                disableMenuItem('analyze')
-                disableMenuItem('analyzeSelection');
-                showElement('loadFileHint');
-                showElement('loadFileHintText', false);
+                disableMenuItem(['analyze', 'analyzeSelection'])
+                showElement(['loadFileHint']);
+                showElement(['loadFileHintText'], false);
             }
         })
 
@@ -119,14 +118,10 @@ async function loadAudioFile(filePath) {
     }
     // set file creation time
     ctime = fs.statSync(filePath).mtime
-
-
     hideAll();
-    disableMenuItem('analyze')
-    disableMenuItem('analyzeSelection');
-    showElement('loadFileHint');
-    showElement('loadFileHintSpinner');
-    showElement('loadFileHintLog');
+    disableMenuItem(['analyzeSelection', 'analyze'])
+    showElement(['loadFileHint', 'loadFileHintSpinner', 'loadFileHintLog']);
+
 
     // Reset the buffer playhead and zoom:
     bufferBegin = 0;
@@ -139,7 +134,7 @@ async function loadAudioFile(filePath) {
         // remove the file hint stuff
         hideAll();
         // Show controls
-        showElement('controlsWrapper');
+        showElement(['controlsWrapper']);
         $('.specFeature').hide()
     }
     if (!controller.signal.aborted) {
@@ -229,10 +224,8 @@ function updateSpec(buffer) {
 function initSpec(args) {
     // Show spec and timecode containers
     hideAll();
-    showElement('dummy', false);
-    showElement('timeline', false);
-    showElement('waveform', false, false);
-    showElement('spectrogram', false, false);
+    showElement(['dummy', 'timeline', 'waveform', 'spectrogram'], false);
+
     if (wavesurfer !== undefined) wavesurfer.pause();
     // Setup waveform and spec views
     wavesurfer = WaveSurfer.create({
@@ -281,21 +274,19 @@ function initSpec(args) {
     wavesurfer.loadDecodedBuffer(args.audio);
     updateElementCache()
     $('.speccolor').removeClass('disabled');
-    showElement(config.colormap + ' .tick', false);
+    showElement([config.colormap + ' .tick'], false);
     // Set click event that removes all regions
     waveElement.mousedown(function () {
         wavesurfer.clearRegions();
         region = false;
-        disableMenuItem('analyzeSelection');
-        disableMenuItem('exportMP3');
-        if (workerLoaded) enableMenuItem('analyze');
+        disableMenuItem(['analyzeSelection', 'exportMP3']);
+        if (workerLoaded) enableMenuItem(['analyze']);
     });
     // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
         // console.log(wavesurfer.regions.list)
         region = e
-        enableMenuItem('analyzeSelection');
-        enableMenuItem('exportMP3');
+        enableMenuItem(['analyzeSelection', 'exportMP3']);
     });
 
     wavesurfer.on('finish', function () {
@@ -306,7 +297,7 @@ function initSpec(args) {
         }
     })
     // Show controls
-    showElement('controlsWrapper');
+    showElement(['controlsWrapper']);
     updateElementCache()
     // Resize canvas of spec and labels
     adjustSpecDims(false);
@@ -376,7 +367,8 @@ const analyzeLink = document.getElementById('analyze');
 
 analyzeLink.addEventListener('click', async () => {
     completeDiv.hide();
-    //disableMenuItem('analyzeSelection');
+    seenTheDarkness = false;
+    //disableMenuItem(['analyzeSelection']);
     ipcRenderer.send('analyze', {confidence: config.minConfidence, fileStart: fileStart});
     summary = {};
     summary['suppressed'] = []
@@ -407,51 +399,42 @@ function exitApplication() {
     remote.app.quit()
 }
 
-function enableMenuItem(id) {
-    $('#' + id).removeClass('disabled');
+function enableMenuItem(id_list) {
+    id_list.forEach(id => {
+        $('#' + id).removeClass('disabled');
+    })
 }
 
-function disableMenuItem(id) {
-    $('#' + id).addClass('disabled');
+function disableMenuItem(id_list) {
+    id_list.forEach(id => {
+        $('#' + id).addClass('disabled');
+    })
 }
 
-function showElement(id, makeFlex = true, empty = false) {
-    const thisElement = $('#' + id);
-    thisElement.removeClass('d-none');
-    if (makeFlex) thisElement.addClass('d-flex');
-    if (empty) {
-        thisElement.height(0);
-        thisElement.empty()
-    }
+function showElement(id_list, makeFlex = true, empty = false) {
+    id_list.forEach(id => {
+        const thisElement = $('#' + id);
+        thisElement.removeClass('d-none');
+        if (makeFlex) thisElement.addClass('d-flex');
+        if (empty) {
+            thisElement.height(0);
+            thisElement.empty()
+        }
+    })
 }
 
-function hideElement(id) {
-    const thisElement = $('#' + id);
-    thisElement.removeClass('d-flex');
-    thisElement.addClass('d-none');
-
+function hideElement(id_list) {
+    id_list.forEach(id => {
+        const thisElement = $('#' + id);
+        thisElement.removeClass('d-flex');
+        thisElement.addClass('d-none');
+    })
 }
 
 function hideAll() {
-
-    // File hint div
-    hideElement('loadFileHint');
-    hideElement('loadFileHintText');
-    hideElement('loadFileHintSpinner');
-    hideElement('loadFileHintLog')
-
-    // Waveform, timeline and spec
-    hideElement('timeline');
-    hideElement('waveform');
-    hideElement('spectrogram');
-    hideElement('dummy');
-
-    // Controls
-    hideElement('controlsWrapper');
-
-    // Result table
-    hideElement('resultTableContainer');
-
+    // File hint div,  Waveform, timeline and spec, controls and result table
+    hideElement(['loadFileHint', 'loadFileHintText', 'loadFileHintSpinner', 'loadFileHintLog',
+        'timeline', 'waveform', 'spectrogram', 'dummy', 'controlsWrapper', 'resultTableContainer']);
 }
 
 let progressDiv = $('.progressDiv');
@@ -491,14 +474,6 @@ function loadResultRegion(start, end, label, el) {
 }
 
 function adjustSpecDims(redraw) {
-    // if (wavesurfer) {
-    //     if (dummyElement.height() > 384) {
-    //         wavesurfer.spectrogram.fftSamples = 1024
-    //     } else {
-    //         wavesurfer.spectrogram.fftSamples = 512
-    //     }
-    //     wavesurfer.spectrogram.init();
-    // }
     $.each([dummyElement, waveWaveElement, specElement, specCanvasElement, waveCanvasElement], function () {
         // Expand up to 512px
         $(this).height(Math.min(bodyElement.height() * 0.4, 512))
@@ -510,7 +485,7 @@ function adjustSpecDims(redraw) {
             - dummyElement.height()
             - controlsWrapperElement.height()
             - $('#timeline').height()
-            - 65);
+            - 55);
         if (redraw && wavesurfer != null) {
             wavesurfer.drawBuffer();
         }
@@ -774,7 +749,6 @@ window.onload = function () {
         if (!('nocmig' in config)) {
             config.nocmig = false;
         }
-
         if (!('useWhitelist' in config)) {
             config.useWhitelist = true;
         }
@@ -798,7 +772,7 @@ window.onload = function () {
         if (config.nocmig) {
             nocmigButton.classList.add('active')
         }
-        showElement(config.colormap + 'span', true)
+        showElement([config.colormap + 'span'], true)
     })
     // Set footer year
     $('#year').text(new Date().getFullYear());
@@ -923,10 +897,7 @@ $(document).on('click', '#loadSpectrogram', function () {
         config.spectrogram = false;
         $('#loadSpectrogram .tick').hide()
         $('.specFeature').hide()
-        hideElement('dummy');
-        hideElement('timeline');
-        hideElement('waveform');
-        hideElement('spectrogram');
+        hideElement(['dummy', 'timeline', 'waveform', 'spectrogram']);
         $('.speccolor .timeline').addClass('disabled');
         //adjustSpecDims(true);
         updatePrefs();
@@ -936,10 +907,7 @@ $(document).on('click', '#loadSpectrogram', function () {
         $('.specFeature').show()
         if (wavesurfer && wavesurfer.isReady) {
             $('.speccolor .timeline').removeClass('disabled');
-            showElement('dummy', false);
-            showElement('timeline', false);
-            showElement('waveform', false, false);
-            showElement('spectrogram', false, false);
+            showElement(['dummy', 'timeline', 'waveform', 'spectrogram'], false);
         } else {
             loadAudioFile(currentFile);
         }
@@ -1206,7 +1174,7 @@ ipcRenderer.on('model-ready', async () => {
     const warmupText = document.getElementById('warmup');
     warmupText.classList.add('d-none');
     if (workerLoaded) {
-        enableMenuItem('analyze')
+        enableMenuItem(['analyze'])
     }
 })
 
@@ -1229,11 +1197,11 @@ ipcRenderer.on('update-downloaded', async (event, args) => {
 ipcRenderer.on('worker-loaded', async (event, args) => {
     console.log('UI received worker-loaded: ' + args.message)
     workerLoaded = true;
-    if (modelReady) enableMenuItem('analyze');
+    if (modelReady) enableMenuItem(['analyze']);
     if (!loadSpectrogram) {
         hideAll();
-        showElement('controlsWrapper');
-        hideElement('transport-controls');
+        showElement(['controlsWrapper']);
+        hideElement(['transport-controls']);
         const filename = arg.message.replace(/^.*[\\\/]/, '')
         $('#filename').html('<span class="material-icons">description</span> ' + filename);
     }
@@ -1259,13 +1227,12 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
     progressBar.html(0 + '%');
     completeDiv.show();
     if (AUDACITY_LABELS.length > 0) {
-        enableMenuItem('saveLabels');
-        enableMenuItem('saveDetections');
+        enableMenuItem(['saveLabels', 'saveDetections']);
         $('.download').removeClass('disabled');
     } else {
-        disableMenuItem('saveLabels');
-        disableMenuItem('saveDetections');
+        disableMenuItem(['saveLabels', 'saveDetections']);
     }
+    analyzeLink.disabled = false;
     // Save the results for this file to the history
     resultHistory[currentFile] = resultTable[0].innerHTML
     console.table(summary);
@@ -1326,11 +1293,16 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
         spinner.remove('d-none');
         const targetClass = e.target.classList;
         targetClass.add('d-none');
+        e.target.parentNode.previousElementSibling.children[1].classList.remove('text-success');
         if (targetClass.contains('text-danger')) {
             targetClass.remove('text-danger')
             const setDelay = setTimeout(matchSpecies, 1, e, 'unhide');
         } else {
             targetClass.add('text-danger');
+            speciesName.forEach(function (el) {
+                const classes = el.parentNode.classList;
+                if (!classes.contains('hidden')) classes.remove('d-none')
+            })
             const setDelay = setTimeout(matchSpecies, 1, e, 'hide');
         }
         tableRows[0].scrollIntoView({
@@ -1387,11 +1359,9 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
         if (targetClass.contains('text-success')) {
             // Clicked on filtered species icon
             targetClass.remove('text-success')
-            speciesExclude.forEach(function (el) {
-                el.classList.remove('text-danger');
-            })
             speciesName.forEach(function (el) {
-                el.parentNode.classList.remove('d-none')
+                const classes = el.parentNode.classList;
+                if (!classes.contains('hidden')) classes.remove('d-none')
             })
         } else {
             // Clicked on unfiltered species icon
@@ -1410,7 +1380,7 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
             targetClass.add('d-none');
             spinner.remove('d-none');
             // Allow spinner to show
-            const setDelay = setTimeout(matchSpecies, 1, e, 'include');
+            const setDelay = setTimeout(matchSpecies, 1, e, 'filter');
         }
         tableRows[0].scrollIntoView({
             behavior: 'smooth',
@@ -1423,22 +1393,22 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
 function matchSpecies(e, mode) {
     const spinner = e.target.parentNode.firstChild.classList;
     const targetClass = e.target.classList;
-    let selectedSpecies, currentRow;
+    let resultSpecies, currentRow;
     const tableContext = e.target.closest('table').id;
     if (tableContext === 'results') {
         currentRow = e.target.closest('tr');
         currentRow.classList.add('strikethrough');
-        selectedSpecies = currentRow.querySelectorAll('td.cname');
+        resultSpecies = currentRow.querySelectorAll('td.cname');
     } else {
-        selectedSpecies = speciesName;
+        resultSpecies = speciesName;
     }
-    selectedSpecies.forEach(function (el) {
+    resultSpecies.forEach(function (el) {
         const classes = el.parentNode.classList;
         const excludeIcon = el.parentNode.getElementsByClassName('speciesExclude')[0]
         const index = el.parentNode.firstElementChild.innerText;
         if (el.innerText === e.target.id || tableContext === 'results') {
-            if (mode === 'include' || mode === 'unhide') {
-                classes.remove('d-none');
+            if (mode === 'filter' || mode === 'unhide') {
+                classes.remove('d-none', 'hidden');
                 excludeIcon.classList.remove('text-danger');
             } else if (mode === 'exclude') {
                 classes.add('strikethrough');
@@ -1448,8 +1418,8 @@ function matchSpecies(e, mode) {
                 classes.remove('strikethrough');
                 excludeIcon.classList.remove('text-danger');
                 predictions[index].excluded = false;
-            } else classes.add('d-none');
-        } else if (mode === 'include') classes.add('d-none');
+            } else classes.add('d-none', 'hidden'); // mode == hide
+        } else if (mode === 'filter') classes.add('d-none');
     })
     spinner.add('d-none');
     targetClass.remove('d-none');
@@ -1486,7 +1456,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
                 tableRows[0].scrollIntoView({behavior: 'smooth', block: 'nearest'})
             }
         }
-        showElement('resultTableContainer');
+        showElement(['resultTableContainer']);
         if (result === "No detections found.") {
             tr += "<tr><td>" + result + "</td></tr>";
         } else {
