@@ -337,8 +337,10 @@ function spawnWorker(useWhitelist) {
 
         if (response['message'] === 'model-ready') {
             chunkLength = response['chunkLength'];
-            sampleRate = response['sampleRate']
-            ipcRenderer.send('model-ready', {message: 'ready'})
+            sampleRate = response['sampleRate'];
+            const backend = response['backend'];
+            console.log(backend);
+            ipcRenderer.send('model-ready', {message: 'ready', backend: backend})
         } else if (response['message'] === 'prediction') {
             let result = response['result'];
             let audacity = response['audacity'];

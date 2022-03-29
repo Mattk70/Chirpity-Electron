@@ -40,7 +40,7 @@ const resultTable = $('#resultTableBody')
 const modalTable = $('#modalBody');
 const feedbackTable = $('#feedbackModalBody');
 let activeRow;
-let predictions = {}, correctedSpecies, speciesListItems, action, clickedNode,
+let predictions = {}, correctedSpecies, speciesListItems, action, clickedNode, lastIndex,
     clickedIndex, speciesName, speciesFilter, speciesHide, speciesExclude, subRows, scrolled, currentFileDuration;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
@@ -50,6 +50,35 @@ let config;
 const sampleRate = 24000;
 let controller = new AbortController();
 let signal = controller.signal;
+
+//////// Collect Diagnostics Information ////////
+// Diagnostics keys:
+// GPUx - name of GPU(s)
+// backend: tensorflow backend in use
+// warmup: time to warm up model (seconds)
+// "Analysis Duration": time on detections (seconds)
+// "Audio Duration": length of audio (seconds)
+// "Chirpity Version": app version
+// "Tensorflow Backend"
+// Analysis Rate: x real time performance
+
+// Timers
+let t0_warmup, t1_warmup, t0_analysis, t1_analysis
+let diagnostics = {}
+diagnostics['Chirpity Version'] = version;
+const gpuInfo = require('gpu-info');
+var os = require('os');
+diagnostics['CPU'] = os.cpus()[0].model;
+diagnostics['Cores'] = os.cpus().length;
+diagnostics['Memory'] = (os.totalmem() / Math.pow(1024, 3)).toFixed(0) + ' GB';
+gpuInfo().then(function (data) {
+    let count = 0
+    data.forEach(gpu => {
+        const key = 'GPU' + count;
+        diagnostics[key] = gpu.Caption;
+        count += 1;
+    })
+});
 
 
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
@@ -63,6 +92,8 @@ const fetchAudioFile = (filePath) =>
                 let source = audioCtx.createBufferSource();
                 source.buffer = buffer;
                 currentFileDuration = source.buffer.duration;
+                // Diagnostics
+                diagnostics['Audio Duration'] = currentFileDuration.toFixed(2) + ' seconds';
                 if (currentFileDuration < 20) windowLength = currentFileDuration;
                 // set fileStart time
                 if (config.timeOfDay) {
@@ -108,6 +139,7 @@ async function loadAudioFile(filePath) {
     ipcRenderer.send('file-load-request', {message: filePath});
     workerLoaded = false;
     summary = {};
+    predictions = {};
     seenTheDarkness = false;
     shownDaylightBanner = false;
     summary['suppressed'] = [];
@@ -368,7 +400,9 @@ const analyzeLink = document.getElementById('analyze');
 analyzeLink.addEventListener('click', async () => {
     completeDiv.hide();
     seenTheDarkness = false;
-    //disableMenuItem(['analyzeSelection']);
+    predictions = {};
+    // Diagnostics
+    t0_analysis = Date.now();
     ipcRenderer.send('analyze', {confidence: config.minConfidence, fileStart: fileStart});
     summary = {};
     summary['suppressed'] = []
@@ -732,7 +766,7 @@ window.onload = function () {
         }
         config = JSON.parse(data)
         //console.log('Successfully loaded UUID: ' + config.UUID)
-
+        t0_warmup = Date.now();
         ipcRenderer.send('load-model', {useWhitelist: config.useWhitelist})
 
         // Check for keys
@@ -1168,14 +1202,16 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
 
 // Electron Message handling
 
-
-ipcRenderer.on('model-ready', async () => {
+ipcRenderer.on('model-ready', async (event, args) => {
     modelReady = true;
     const warmupText = document.getElementById('warmup');
     warmupText.classList.add('d-none');
     if (workerLoaded) {
         enableMenuItem(['analyze'])
     }
+    t1_warmup = Date.now();
+    diagnostics['Warm Up'] = ((t1_warmup - t0_warmup) / 1000).toFixed(2) + ' seconds';
+    diagnostics['Tensorflow Backend'] = args.backend;
 })
 
 ipcRenderer.on('update-error', async (event, args) => {
@@ -1388,6 +1424,11 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
         })
         e.stopImmediatePropagation();
     });
+
+    // Diagnostics:
+    t1_analysis = Date.now();
+    diagnostics['Analysis Duration'] = ((t1_analysis - t0_analysis) / 1000).toFixed(2) + ' seconds';
+    diagnostics['Analysis Rate'] = (currentFileDuration / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
 });
 
 function matchSpecies(e, mode) {
@@ -1423,11 +1464,12 @@ function matchSpecies(e, mode) {
     })
     spinner.add('d-none');
     targetClass.remove('d-none');
+
 }
 
 ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         const result = arg.result;
-        const index = arg.index;
+        let index = arg.index;
         const selection = arg.selection;
         result.timestamp = new Date(result.timestamp);
         result.position = new Date(result.position);
@@ -1443,17 +1485,15 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         let tr = '';
         if (!selection) {
             if (index === 1) {
+                tableRows = document.querySelectorAll('#results tr');
                 // Remove old results
                 resultTable.empty();
                 modalTable.empty();
-                tableRows = document.querySelectorAll('#results tr');
                 tableRows[0].scrollIntoView({behavior: 'smooth', block: 'nearest'})
             }
         } else {
             if (index === 1) {
-                resultTable.prepend('<tr><td class="bg-dark text-white text-center" colspan="20"><b>Selection Analysis<span class="material-icons-two-tone align-bottom">arrow_upward</span></b></td></tr>')
-                tableRows = document.querySelectorAll('#results tr');
-                tableRows[0].scrollIntoView({behavior: 'smooth', block: 'nearest'})
+                resultTable.append('<tr><td class="bg-dark text-white text-center" colspan="20"><b>Selection Analysis</b></td></tr>')
             }
         }
         showElement(['resultTableContainer']);
@@ -1519,6 +1559,10 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
             result.position < 3600000 ? spliceStart = 14 : spliceStart = 11;
             result.position = new Date(result.position).toISOString().substring(spliceStart, 19);
             // Now we have formatted the fields, and skipped detections as required by nocmig mode, add result to predictions file
+            if (selection) {
+                tableRows = document.querySelectorAll('#results tr.top-row');
+                index = tableRows.length + 1;
+            }
             predictions[index] = result;
             let showTimeOfDay;
             config.timeOfDay ? showTimeOfDay = '' : showTimeOfDay = 'd-none';
@@ -1560,30 +1604,18 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
                 }
             }
         }
-        selection ? resultTable.prepend(tr) : resultTable.append(tr)
-
+        resultTable.append(tr)
+        if (selection) {
+            tableRows = document.querySelectorAll('#results tr.top-row');
+            tableRows[tableRows.length - 1].scrollIntoView({behavior: 'smooth', block: 'nearest'})
+        }
         // Show the alternate detections toggle:
         if (result.score2 > 0.2) {
             document.getElementById(index).classList.remove('d-none')
         }
         if (!config.spectrogram) $('.specFeature').hide();
-
-        // const toprow = document.querySelectorAll('.top-row');
-        // toprow.forEach(item => {
-        //     item.addEventListener('click', function (e) {
-        //         if (activeRow) activeRow.classList.remove('table-active')
-        //         activeRow = e.target.closest('tr');
-        //         activeRow.classList.add("table-active");
-        //         activeRow.scrollIntoView({
-        //             behavior: 'smooth',
-        //             block: 'nearest'
-        //         })
-        //
-        //     })
-        // })
     }
-)
-;
+);
 
 $(document).on('click', '.material-icons', function (e) {
     $(this).toggleClass("down");
@@ -1760,9 +1792,13 @@ nocmigButton.addEventListener('click', function (e) {
     updatePrefs();
 })
 
-// $('#about').on('click',function(){
-//     $('#helpModalLabel').html( "About Chirpity Nocmig");
-//     $('#helpModalBody').load('Help/about.html', function(){
-//         $('#helpModal').modal({show:true});
-//     });
-// });
+$('#diagnostics').on('click', function () {
+    let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
+    for (const [key, value] of Object.entries(diagnostics)) {
+        diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
+    }
+    diagnosticTable += "</table>";
+    $('#diagnostocsModalBody').html(diagnosticTable);
+    $('#diagnostocsModal').modal({show: true});
+
+});

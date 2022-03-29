@@ -244,7 +244,8 @@ onmessage = async function (e) {
             postMessage({
                 message: 'model-ready',
                 sampleRate: myModel.config.sampleRate,
-                chunkLength: myModel.chunkLength
+                chunkLength: myModel.chunkLength,
+                backend: tf.getBackend()
             });
         });
 
