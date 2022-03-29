@@ -760,19 +760,26 @@ window.onload = function () {
 
         ipcRenderer.send('load-model', {useWhitelist: config.useWhitelist})
 
-        if (!config.UUID) {
+        // Check for keys
+        if (!('UUID' in config)) {
             const {v4: uuidv4} = require('uuid');
             config.UUID = uuidv4();
-            updatePrefs()
         }
-        if (!config.latitude) {
+        if (!('latitude' in config)) {
             config.latitude = 51.9
-            updatePrefs()
         }
-        if (!config.longitude) {
+        if (!('longitude' in config)) {
             config.longitude = -0.4
-            updatePrefs()
         }
+        if (!('nocmig' in config)) {
+            config.nocmig = false;
+        }
+
+        if (!('useWhitelist' in config)) {
+            config.useWhitelist = true;
+        }
+        updatePrefs()
+
         // Set UI option state
         if (!config.useWhitelist) {
             $('#useWhitelist .tick').hide()
