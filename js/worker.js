@@ -13,7 +13,7 @@ let chunkLength, minConfidence, index, end, AUDACITY, RESULTS, predictionStart;
 
 let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
 
-let predicting = false;
+let predictWorker, predicting = false;
 let selection = false;
 let controller = new AbortController();
 let signal = controller.signal;
@@ -62,6 +62,7 @@ async function doPrediction(start, end, fileStart) {
         // If we're at the end of a file and we haven't got a full chunk, scroll back to fit
         //if (i + chunkLength > end && end >= chunkLength) i = end - chunkLength;
         let chunk = channelData.slice(i, i + increment);
+
         predictWorker.postMessage(['predict', chunk, i, fileStart])
     }
 }
