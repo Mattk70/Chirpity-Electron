@@ -37,7 +37,7 @@ let contentWrapperElement = $('#contentWrapper');
 let controlsWrapperElement = $('#controlsWrapper');
 let completeDiv = $('.complete');
 const resultTable = $('#resultTableBody')
-const modalTable = $('#modalBody');
+const summaryTable = $('#modalBody');
 const feedbackTable = $('#feedbackModalBody');
 let activeRow;
 let predictions = {}, correctedSpecies, speciesListItems, action, clickedNode, lastIndex,
@@ -78,7 +78,9 @@ gpuInfo().then(function (data) {
         diagnostics[key] = gpu.Caption;
         count += 1;
     })
-});
+}).catch(err => {
+    console.log('GPU info missing: ' +  err.message)
+})
 
 
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
@@ -405,6 +407,7 @@ analyzeLink.addEventListener('click', async () => {
     t0_analysis = Date.now();
     ipcRenderer.send('analyze', {confidence: config.minConfidence, fileStart: fileStart});
     summary = {};
+    summaryTable.empty();
     summary['suppressed'] = []
     analyzeLink.disabled = true;
 });
@@ -1315,7 +1318,7 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
                          <span id="${key}" class="material-icons-two-tone align-bottom speciesExclude pointer">clear</span></td></tr>`;
     }
     summaryHTML += '</tbody></table>';
-    modalTable.append(summaryHTML);
+    summaryTable.append(summaryHTML);
     speciesName = document.querySelectorAll('.cname');
     subRows = document.querySelectorAll('.subrow')
     const materialIcons = document.querySelectorAll('.rotate')
@@ -1474,12 +1477,14 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         result.timestamp = new Date(result.timestamp);
         result.position = new Date(result.position);
         // Datetime wrangling for Nocmig mode
-        let astro = SunCalc.getTimes(result.timestamp, config.latitude, config.longitude);
-        if (astro.dawn < result.timestamp && astro.dusk > result.timestamp) {
-            result.dayNight = 'daytime';
-        } else {
-            result.dayNight = 'nighttime';
-            seenTheDarkness = true;
+        if (result !== "No detections found.") {
+            let astro = SunCalc.getTimes(result.timestamp, config.latitude, config.longitude);
+            if (astro.dawn < result.timestamp && astro.dusk > result.timestamp) {
+                result.dayNight = 'daytime';
+            } else {
+                result.dayNight = 'nighttime';
+                seenTheDarkness = true;
+            }
         }
         let tableRows;
         let tr = '';
@@ -1488,7 +1493,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
                 tableRows = document.querySelectorAll('#results tr');
                 // Remove old results
                 resultTable.empty();
-                modalTable.empty();
+                summaryTable.empty();
                 tableRows[0].scrollIntoView({behavior: 'smooth', block: 'nearest'})
             }
         } else {
@@ -1623,10 +1628,14 @@ $(document).on('click', '.material-icons', function (e) {
 
 // Results event handlers
 
+function getSpeciesIndex(e) {
+    clickedNode = e.target.parentNode
+    clickedIndex = clickedNode.parentNode.querySelector('th').innerText
+}
+
 $(document).on('click', '.download', function (e) {
     action = 'save';
-    clickedNode = e.target.parentNode
-    clickedIndex = clickedNode.parentNode.firstChild.innerText
+    getSpeciesIndex(e);
     sendFile(action, predictions[clickedIndex])
     e.stopImmediatePropagation();
 });
@@ -1636,8 +1645,7 @@ $(document).on('click', '.feedback', function (e) {
     e.target.parentNode.onclick = null;
     let action;
     (e.target.classList.contains('text-success')) ? action = 'correct' : action = 'incorrect';
-    clickedNode = e.target.parentNode
-    clickedIndex = clickedNode.parentNode.firstChild.innerText
+    getSpeciesIndex(e);
     if (action === 'incorrect') {
         findSpecies();
     } else if (confirm('Submit feedback?')) {
