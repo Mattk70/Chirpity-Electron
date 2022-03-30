@@ -153,7 +153,7 @@ class Model {
                     if (suppressed_IDs.includes(item.index)) {
                         item.score = item.score ** 3;
                     } else if (enhanced_IDs.includes(item.index)) {
-                        item.score = Math.pow(item.score, 0.35);
+                        if (item.score > 0.1) item.score =  Math.pow(item.score, 0.35);
                     }
                 })
 
@@ -167,7 +167,7 @@ class Model {
                 // Use whitelist for top prediction only
                 if (blocked_IDs.indexOf(r[0].index) !== -1) {
                     // Just warn if Ambient noise
-                    this.labels[r[0].index].split('_')[1] === "Ambient Noise" ? suppressed = false : suppressed = 'text-danger'
+                    //this.labels[r[0].index].split('_')[1] === "Ambient Noise" ? suppressed = false : suppressed = 'text-danger'
                     //make a copy of the top prediction
                     const [temp_index, temp_score] = [r[0].index, r[0].score]
                     // Is the secondary prediction blocked too?
