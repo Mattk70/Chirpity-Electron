@@ -38,7 +38,7 @@
                    aria-haspopup="true" aria-expanded="false">
                     File
                 </a>
-                <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
                     <a class="dropdown-item" href="#" onclick="showOpenDialog();"><u>O</u>pen Audio File </a>
                     <a class="dropdown-item disabled" onclick="saveDetections()" id="saveDetections" href="#">
                         <u>S</u>ave Detections</a>
@@ -55,7 +55,7 @@
                    aria-haspopup="true" aria-expanded="false">
                     Analysis
                 </a>
-                <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
                     <a class="dropdown-item text-danger" href="#" id="warmup">Model Warming up
                         <div class="spinner-grow spinner-grow-sm" role="status">
                             <span class="sr-only">Loading...</span>
@@ -71,7 +71,7 @@
                    aria-haspopup="true" aria-expanded="false">
                     Options
                 </a>
-                <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                <div class="dropdown-menu top-level" aria-labelledby="navbarDropdown">
                     <ul class="nav navbar-nav">
                         <li class="dropdown-submenu">
                             <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
@@ -139,11 +139,11 @@
                    aria-haspopup="true" aria-expanded="false">
                     Help
                 </a>
-                <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
                     <a class="dropdown-item" id="usage" href="#">Usage</a>
                     <a class="dropdown-item" id="options" href="#">Options</a>
                     <a class="dropdown-item" id="keyboard" href="#">Keyboard Shortcuts</a>
-                    <a class="dropdown-item disabled" id="about" href="#">About Chirpity Nocmig</a>
+                    <a class="dropdown-item" id="diagnostics" href="#">Diagnostics</a>
                 </div>
             </li>
         </ul>
@@ -188,6 +188,23 @@
             </div>
         </div>
     </div>
+    <!-- Diagnostic Modal -->
+    <div class="modal fade" id="diagnostocsModal" tabindex="-1" aria-labelledby="diagnostocsModalLabel" aria-hidden="true">
+        <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center">
+                    <h5 class="modal-title" id="diagnostocsModalLabel">Diagnostic Information</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div id="diagnostocsModalBody" class="modal-body"></div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>    
     <!-- Help Modal -->
     <div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
         <div class="modal-dialog  modal-xl modal-dialog-centered modal-dialog-scrollable">

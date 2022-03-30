@@ -143,8 +143,8 @@ class Model {
                 // Squash blacklisted predictions
                 //blocked_IDs.forEach(id => this.prediction[id] = 0.0)
                 suppressed_IDs.forEach(id => this.prediction[id] = this.prediction[id] ** 3)
-            // 4th root of redwings
-                enhanced_IDs.forEach(id => this.prediction[id] = Math.cbrt(this.prediction[id]))
+                //
+                enhanced_IDs.forEach(id => this.prediction[id] = Math.pow(this.prediction[id], 0.35))
                 // Recreate the tensor
                 this.prediction = tf.tensor(this.prediction)
                 this.prediction = tf.expandDims(this.prediction, 0)
@@ -244,7 +244,8 @@ onmessage = async function (e) {
             postMessage({
                 message: 'model-ready',
                 sampleRate: myModel.config.sampleRate,
-                chunkLength: myModel.chunkLength
+                chunkLength: myModel.chunkLength,
+                backend: tf.getBackend()
             });
         });
 

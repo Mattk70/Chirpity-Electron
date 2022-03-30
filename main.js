@@ -68,7 +68,7 @@ function createWindow() {
 function createWorker() {
     // hidden worker
     workerWindow = new BrowserWindow({
-        show: true,
+        show: false,
         height: 800,
         width: 1200,
         webPreferences: {
@@ -94,10 +94,9 @@ function createWorker() {
 app.on('ready', () => {
     createWorker();
     createWindow();
-
     mainWindow.webContents.on('new-window', function (e, url) {
         e.preventDefault();
-        require('electron').shell.openExternal(url);
+        require('electron').shell.openExternal(url).then(r => console.log(r));
     });
 
     workerWindow.webContents.on('crashed', (e) => {
@@ -190,9 +189,9 @@ ipcMain.on('prediction-done', (event, arg) => {
     mainWindow.webContents.send('prediction-done', {labels});
 });
 
-ipcMain.on('model-ready', (event, arg) => {
-    const results = arg.message;
-    mainWindow.webContents.send('model-ready', {results});
+ipcMain.on('model-ready', (event, args) => {
+    console.log(args.backend);
+    mainWindow.webContents.send('model-ready', {backend: args.backend});
 });
 
 ipcMain.on('progress', (event, arg) => {
