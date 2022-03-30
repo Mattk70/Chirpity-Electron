@@ -5,7 +5,7 @@ let appPath = '../24000_v9/';
 
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
-
+const BATCH_SIZE = 16;
 console.log(appPath);
 
 let audioBuffer;
@@ -58,12 +58,22 @@ async function doPrediction(start, end, fileStart) {
     let increment;
     end - start < chunkLength ? increment = end - start : increment = chunkLength;
     let channelData = audioBuffer.getChannelData(0);
+    let chunks = {};
     for (let i = start; i < end; i += increment) {
         // If we're at the end of a file and we haven't got a full chunk, scroll back to fit
         //if (i + chunkLength > end && end >= chunkLength) i = end - chunkLength;
         let chunk = channelData.slice(i, i + increment);
-
-        predictWorker.postMessage(['predict', chunk, i, fileStart])
+        // Batch predictions
+        chunks[i] = chunk;
+        if (Object.keys(chunks).length === BATCH_SIZE){
+            predictWorker.postMessage(['predict', chunks, fileStart]);
+            chunks = {};
+        }
+    }
+    //clear up remainder less than BATCH_SIZE
+    if (Object.keys(chunks).length > 0){
+        predictWorker.postMessage(['predict', chunks, fileStart]);
+        chunks = {}
     }
 }
 

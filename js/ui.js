@@ -44,7 +44,7 @@ let predictions = {}, correctedSpecies, speciesListItems, action, clickedNode, l
     clickedIndex, speciesName, speciesFilter, speciesHide, speciesExclude, subRows, scrolled, currentFileDuration;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
-let workerLoaded = false;
+let workerHasLoadedFile = false;
 // Set default Options
 let config;
 const sampleRate = 24000;
@@ -79,7 +79,7 @@ gpuInfo().then(function (data) {
         count += 1;
     })
 }).catch(err => {
-    console.log('GPU info missing: ' +  err.message)
+    console.log('GPU info missing: ' + err.message)
 })
 
 
@@ -136,14 +136,20 @@ const fetchAudioFile = (filePath) =>
             }
         })
 
-
-async function loadAudioFile(filePath) {
-    ipcRenderer.send('file-load-request', {message: filePath});
-    workerLoaded = false;
+function resetResults() {
     summary = {};
+    summaryTable.empty();
+    resultTable.empty();
+    summary['suppressed'] = []
     predictions = {};
     seenTheDarkness = false;
     shownDaylightBanner = false;
+}
+
+async function loadAudioFile(filePath) {
+    ipcRenderer.send('file-load-request', {message: filePath});
+    workerHasLoadedFile = false;
+    resetResults();
     summary['suppressed'] = [];
     // Hide load hint and show spinnner
     if (wavesurfer) {
@@ -314,7 +320,7 @@ function initSpec(args) {
         wavesurfer.clearRegions();
         region = false;
         disableMenuItem(['analyzeSelection', 'exportMP3']);
-        if (workerLoaded) enableMenuItem(['analyze']);
+        if (workerHasLoadedFile) enableMenuItem(['analyze']);
     });
     // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
@@ -401,14 +407,10 @@ const analyzeLink = document.getElementById('analyze');
 
 analyzeLink.addEventListener('click', async () => {
     completeDiv.hide();
-    seenTheDarkness = false;
-    predictions = {};
+    resetResults();
     // Diagnostics
     t0_analysis = Date.now();
     ipcRenderer.send('analyze', {confidence: config.minConfidence, fileStart: fileStart});
-    summary = {};
-    summaryTable.empty();
-    summary['suppressed'] = []
     analyzeLink.disabled = true;
 });
 
@@ -1209,7 +1211,7 @@ ipcRenderer.on('model-ready', async (event, args) => {
     modelReady = true;
     const warmupText = document.getElementById('warmup');
     warmupText.classList.add('d-none');
-    if (workerLoaded) {
+    if (workerHasLoadedFile) {
         enableMenuItem(['analyze'])
     }
     t1_warmup = Date.now();
@@ -1235,7 +1237,7 @@ ipcRenderer.on('update-downloaded', async (event, args) => {
 
 ipcRenderer.on('worker-loaded', async (event, args) => {
     console.log('UI received worker-loaded: ' + args.message)
-    workerLoaded = true;
+    workerHasLoadedFile = true;
     if (modelReady) enableMenuItem(['analyze']);
     if (!loadSpectrogram) {
         hideAll();
@@ -1503,7 +1505,7 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
         }
         showElement(['resultTableContainer']);
         if (result === "No detections found.") {
-            tr += "<tr><td>" + result + "</td></tr>";
+            tr += "<tr><td class='align-content-center' colspan='20'>" + result + "</td></tr>";
         } else {
             if (config.nocmig && !region) {
                 // We want to skip results recorded before dark
@@ -1806,7 +1808,7 @@ $('#diagnostics').on('click', function () {
         diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
     }
     diagnosticTable += "</table>";
-    $('#diagnostocsModalBody').html(diagnosticTable);
-    $('#diagnostocsModal').modal({show: true});
+    $('#diagnosticsModalBody').html(diagnosticTable);
+    $('#diagnosticsModal').modal({show: true});
 
 });
