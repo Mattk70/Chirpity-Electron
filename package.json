@@ -11,6 +11,16 @@
     "type": "git",
     "url": "git+https://github.com/mattk70/Chirpity-Electron.git"
   },
+  "build": {
+    "fileAssociations": [
+      {
+        "ext": "chirp",
+        "name": "Chirpity Results File",
+        "role": "Editor",
+        "perMachine": true
+      }
+    ]
+  },
   "keywords": [
     "Nocmig",
     "Bioacoustics",
@@ -26,6 +36,7 @@
   },
   "homepage": "https://github.com/mattk70/Chirpity-Electron#readme",
   "devDependencies": {
+    "@tensorflow/tfjs-node-gpu": "^3.15.0",
     "electron": "^7.3.3",
     "electron-packager": "^14.2.1",
     "electron-wix-msi": "^3.2.0"
@@ -35,15 +46,15 @@
     "bootstrap": "^4.6.1",
     "browser-id3-writer": "^4.4.0",
     "colormap": "^2.3.2",
+    "gpu-info": "^0.0.1",
     "jquery": "^3.6.0",
     "lamejstmp": "^1.0.1",
+    "os": "^0.1.2",
     "popper.js": "^1.16.1",
     "seedrandom": "^3.0.5",
     "suncalc2": "^1.8.1",
     "update-electron-app": "^2.0.1",
     "uuid": "^8.3.2",
-    "wavesurfer.js": "^6.0.4",
-    "os": "^0.1.2",
-    "gpu-info": "^0.0.1"
+    "wavesurfer.js": "^6.0.4"
   }
 }
