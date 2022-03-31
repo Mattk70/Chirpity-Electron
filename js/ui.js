@@ -62,6 +62,8 @@ let signal = controller.signal;
 // "Tensorflow Backend"
 // Analysis Rate: x real time performance
 
+console.log("CMD line arg:" + remote.getGlobal('sharedObject').prop1);
+
 // Timers
 let t0_warmup, t1_warmup, t0_analysis, t1_analysis
 let diagnostics = {}
@@ -265,6 +267,7 @@ function initSpec(args) {
     wavesurfer = WaveSurfer.create({
         container: '#waveform',
         audioContext: audioCtx,
+        maxCanvasWidth: 10000,
         backend: args.backend, // 'MediaElementWebAudio',
         // make waveform transparent
         backgroundColor: 'rgba(0,0,0,0)',
@@ -351,6 +354,7 @@ function updateElementCache() {
 
 function zoomSpecIn() {
     if (windowLength < 1.5) return;
+    updateElementCache()
     windowLength /= 2;
     bufferBegin = bufferBegin + wavesurfer.getCurrentTime() - (windowLength / 2)
     initSpectrogram();
@@ -362,6 +366,7 @@ function zoomSpecIn() {
 
 function zoomSpecOut() {
     if (windowLength > 100) return;
+    updateElementCache()
     windowLength *= 2;
     if (windowLength > currentFileDuration) {
         windowLength = currentFileDuration
@@ -526,7 +531,9 @@ function adjustSpecDims(redraw) {
         if (redraw && wavesurfer != null) {
             wavesurfer.drawBuffer();
         }
+        $('#timeline canvas').width('100%');
         specCanvasElement.width('100%');
+        waveCanvasElement.width('100%');
         $('.spec-labels').width('55px')
     } else {
         resultTableElement.height(contentWrapperElement.height()
@@ -965,7 +972,7 @@ function initSpectrogram() {
         container: "#spectrogram",
         scrollParent: true,
         windowFunc: 'hamming',
-        minPxPerSec: 10,
+        minPxPerSec: 1,
         normalize: true,
         hideScrollbar: true,
         labels: true,

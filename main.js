@@ -1,6 +1,7 @@
 const {app, dialog, autoUpdater, ipcMain, BrowserWindow} = require('electron');
 const fs = require("fs");
 require('update-electron-app')();
+global.sharedObject = {prop1: process.argv};
 
 //Updater
 const server = 'https://chirpity-electron-releases.vercel.app';
@@ -68,7 +69,7 @@ function createWindow() {
 function createWorker() {
     // hidden worker
     workerWindow = new BrowserWindow({
-        show: false,
+        show: true,
         height: 800,
         width: 1200,
         webPreferences: {
