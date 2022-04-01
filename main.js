@@ -1,6 +1,7 @@
-const {app, dialog, autoUpdater, ipcMain, BrowserWindow} = require('electron');
+const {app, dialog, autoUpdater, ipcMain, BrowserWindow, remote} = require('electron');
 const fs = require("fs");
 require('update-electron-app')();
+global.sharedObject = {prop1: process.argv};
 
 //Updater
 const server = 'https://chirpity-electron-releases.vercel.app';
@@ -58,6 +59,7 @@ function createWindow() {
     mainWindow.once('ready-to-show', () => {
         mainWindow.show()
     })
+
     // Emitted when the window is closed.
     mainWindow.on('closed', () => {
         app.quit()
@@ -87,6 +89,7 @@ function createWorker() {
     });
     workerWindow.webContents.openDevTools();
     console.log("worker created");
+
 }
 
 // This method will be called when Electron has finished
@@ -159,6 +162,10 @@ ipcMain.on('load-model', async (event, arg) => {
     const useWhitelist = arg.useWhitelist;
     console.log('Main received load-model, using whitelist: ' + arg.useWhitelist)
     workerWindow.webContents.send('load-model', {useWhitelist: useWhitelist});
+    const args = sharedObject.prop1;
+    if (args.length > 1) {
+        mainWindow.webContents.send('load-results', {file: args[args.length - 1]});
+    }
 });
 
 ipcMain.on('file-load-request', async (event, arg) => {
