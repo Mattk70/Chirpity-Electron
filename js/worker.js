@@ -5,7 +5,7 @@ let appPath = '../24000_v9/';
 
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
-const BATCH_SIZE = 4;
+const BATCH_SIZE = 12;
 console.log(appPath);
 
 let audioBuffer;
@@ -59,21 +59,21 @@ async function doPrediction(start, end, fileStart) {
     end - start < chunkLength ? increment = end - start : increment = chunkLength;
     let channelData = audioBuffer.getChannelData(0);
     let chunks = {};
-    for (let i = start; i < end; i += increment) {
+    let i;
+    for (i = start; i < end; i += increment) {
         // If we're at the end of a file and we haven't got a full chunk, scroll back to fit
         //if (i + chunkLength > end && end >= chunkLength) i = end - chunkLength;
         let chunk = channelData.slice(i, i + increment);
         // Batch predictions
         chunks[i] = chunk;
-        if (Object.keys(chunks).length === BATCH_SIZE){
+        if (Object.keys(chunks).length === BATCH_SIZE) {
             predictWorker.postMessage(['predict', chunks, fileStart]);
             chunks = {};
         }
     }
-    //clear up remainder less than BATCH_SIZE
-    if (Object.keys(chunks).length > 0){
+    //clear up remainder less than BATCH_SIZE, by *padding the batch*
+    if (Object.keys(chunks).length > 0) {
         predictWorker.postMessage(['predict', chunks, fileStart]);
-        chunks = {}
     }
 }
 
@@ -341,7 +341,7 @@ async function postMP3(start, end, filepath, metadata, action) {
 /// Workers  From the MDN example
 function spawnWorker(useWhitelist) {
     predictWorker = new Worker('./js/model.js');
-    predictWorker.postMessage(['load', appPath, useWhitelist])
+    predictWorker.postMessage(['load', appPath, useWhitelist, BATCH_SIZE])
 
     predictWorker.onmessage = (e) => {
         const response = e.data;
@@ -353,27 +353,33 @@ function spawnWorker(useWhitelist) {
             console.log(backend);
             ipcRenderer.send('model-ready', {message: 'ready', backend: backend})
         } else if (response['message'] === 'prediction') {
-            let result = response['result'];
-            let audacity = response['audacity'];
-            console.log('Prediction received from worker', result);
-             if (result.score > minConfidence) {
-                 index++;
-                 ipcRenderer.send('prediction-ongoing', {result, 'index': index, 'selection': selection});
-                 AUDACITY.push(audacity);
-                 RESULTS.push(result);
-             }
-             ipcRenderer.send('progress', {'progress': response.i / end});
-             if (response.i + chunkLength >= end) {
-                 console.log('Prediction done');
-                 console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
-                 if (RESULTS.length === 0) {
-                     const result = "No detections found.";
-                     ipcRenderer.send('prediction-ongoing', {result, 'index': 1, 'selection': selection});
-                 }
-                 ipcRenderer.send('progress', {'progress': 1});
-                 ipcRenderer.send('prediction-done', {'labels': AUDACITY});
-                 predicting = false;
-            }
+
+            response['result'].forEach(prediction => {
+                const position = prediction[0];
+                const result = prediction[1];
+                const audacity = prediction[2];
+
+                //console.log('Prediction received from worker', result);
+                if (result.score > minConfidence) {
+                    index++;
+                    ipcRenderer.send('prediction-ongoing', {result, 'index': index, 'selection': selection});
+                    AUDACITY.push(audacity);
+                    RESULTS.push(result);
+                }
+                ipcRenderer.send('progress', {'progress': position / end});
+                if (isNaN(position) || position + chunkLength >= end) {
+                    console.log('Prediction done');
+                    console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
+                    ipcRenderer.send('progress', {'progress': 1});
+                    ipcRenderer.send('prediction-done', {'labels': AUDACITY});
+                    predicting = false;
+                }
+                if (RESULTS.length === 0) {
+                    const result = "No detections found.";
+                    ipcRenderer.send('prediction-ongoing', {result, 'index': 1, 'selection': selection});
+                }
+
+            })
         }
     }
 }
