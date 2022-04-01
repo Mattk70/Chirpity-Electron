@@ -1,7 +1,7 @@
 {
   "name": "chirpity",
-  "version": "0.3.0",
-  "description": "Nocmig application for sound file analysis.",
+  "version": "0.3.2",
+  "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -16,6 +16,54 @@
       {
         "ext": "chirp",
         "name": "Chirpity Results File",
+        "role": "Editor",
+        "perMachine": true
+      },
+      {
+        "ext": "mp3",
+        "name": "MP3 File",
+        "role": "Editor",
+        "perMachine": true
+      },
+      {
+        "ext": "wav",
+        "name": "WAVE File",
+        "role": "Editor",
+        "perMachine": true
+      },
+      {
+        "ext": "ogg",
+        "name": "WAVE File",
+        "role": "Editor",
+        "perMachine": true
+      },
+      {
+        "ext": "mpga",
+        "name": "MPEG Audio File",
+        "role": "Editor",
+        "perMachine": true
+      },
+      {
+        "ext": "aac",
+        "name": "AAC File",
+        "role": "Editor",
+        "perMachine": true
+      },
+      {
+        "ext": "mpa",
+        "name": "MPA File",
+        "role": "Editor",
+        "perMachine": true
+      },
+      {
+        "ext": "flac",
+        "name": "FLAC File",
+        "role": "Editor",
+        "perMachine": true
+      },
+      {
+        "ext": "mp4",
+        "name": "MPEG4 File",
         "role": "Editor",
         "perMachine": true
       }
@@ -58,3 +106,4 @@
     "wavesurfer.js": "^6.0.4"
   }
 }
+

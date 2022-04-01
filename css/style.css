@@ -3,6 +3,7 @@ html, body {
     padding-top: 0px;
     padding-bottom: 18px;
     overflow: hidden;
+    transition: background 1.5s linear;
 }
 
 .border-10 {
