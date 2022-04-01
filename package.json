@@ -4,7 +4,7 @@
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "electron . ",
     "export": "electron-packager . --platform=win32 --arch=x64 --prune --out packages --overwrite"
   },
   "repository": {
