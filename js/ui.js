@@ -156,7 +156,8 @@ async function loadAudioFile(filePath, OriginalCtime) {
     }
     // set file creation time
     try {
-        ctime = fs.statSync(filePath).mtime
+        ctime = fs.statSync(filePath).mtime;
+        ipcRenderer.send('file-load-request', {message: filePath});
     } catch (e) {
         const supported_files = ['.mp3', '.wav', '.mpga', '.ogg', '.flac', '.aac'];
         const dir = p.parse(filePath).dir;
@@ -760,7 +761,7 @@ async function loadChirp(file) {
         const data = fs.readFileSync(file, 'utf8');
         let savedPredictions = JSON.parse(data);
         currentFile = savedPredictions['source'];
-        ctime = savedPredictions['ctime'];
+        ctime = Date.parse(savedPredictions['ctime']);
         for (const [key, value] of Object.entries(savedPredictions)) {
             if (key === 'source' || key === 'ctime') continue;
             await renderResult(value, key, false);
