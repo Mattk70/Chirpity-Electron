@@ -234,7 +234,7 @@ class Model {
                     batched_results.push([result, audacity]);
                 }
             })
-            return batched_results;
+            this.prediction = batched_results;
         })
     }
 }
@@ -272,7 +272,7 @@ onmessage = async function (e) {
 
         response['message'] = 'prediction';
         response['i'] = 0; //index;
-        response['result'] = batched;
+        response['result'] = myModel.prediction;
         //response['audacity'] = audacity;
         postMessage(response);
 

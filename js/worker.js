@@ -5,7 +5,7 @@ let appPath = '../24000_v9/';
 
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
-const BATCH_SIZE = 2;
+const BATCH_SIZE = 4;
 console.log(appPath);
 
 let audioBuffer;
@@ -355,25 +355,25 @@ function spawnWorker(useWhitelist) {
         } else if (response['message'] === 'prediction') {
             let result = response['result'];
             let audacity = response['audacity'];
-            //console.log('Prediction received from worker', result);
-            // if (result.score > minConfidence) {
-            //     index++;
-            //     ipcRenderer.send('prediction-ongoing', {result, 'index': index, 'selection': selection});
-            //     AUDACITY.push(audacity);
-            //     RESULTS.push(result);
-            // }
-            // ipcRenderer.send('progress', {'progress': response.i / end});
-            // if (response.i + chunkLength >= end) {
-            //     console.log('Prediction done');
-            //     console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
-            //     if (RESULTS.length === 0) {
-            //         const result = "No detections found.";
-            //         ipcRenderer.send('prediction-ongoing', {result, 'index': 1, 'selection': selection});
-            //     }
-            //     ipcRenderer.send('progress', {'progress': 1});
-            //     ipcRenderer.send('prediction-done', {'labels': AUDACITY});
-            //     predicting = false;
-            //}
+            console.log('Prediction received from worker', result);
+             if (result.score > minConfidence) {
+                 index++;
+                 ipcRenderer.send('prediction-ongoing', {result, 'index': index, 'selection': selection});
+                 AUDACITY.push(audacity);
+                 RESULTS.push(result);
+             }
+             ipcRenderer.send('progress', {'progress': response.i / end});
+             if (response.i + chunkLength >= end) {
+                 console.log('Prediction done');
+                 console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
+                 if (RESULTS.length === 0) {
+                     const result = "No detections found.";
+                     ipcRenderer.send('prediction-ongoing', {result, 'index': 1, 'selection': selection});
+                 }
+                 ipcRenderer.send('progress', {'progress': 1});
+                 ipcRenderer.send('prediction-done', {'labels': AUDACITY});
+                 predicting = false;
+            }
         }
     }
 }
