@@ -70,7 +70,7 @@ function createWindow() {
 function createWorker() {
     // hidden worker
     workerWindow = new BrowserWindow({
-        show: false,
+        show: true,
         height: 800,
         width: 1200,
         webPreferences: {
