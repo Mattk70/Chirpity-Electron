@@ -812,7 +812,7 @@ function saveDetections() {
         }
         // Convert predictions to csv string buffer
         for (const [key, value] of Object.entries(predictions)) {
-            if (key === 'source') continue;
+            if (key === 'source' || key === 'ctime') continue;
             if ((config.nocmig && value.dayNight === 'daytime') || value.excluded) {
                 continue
             }
