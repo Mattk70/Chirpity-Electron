@@ -1847,7 +1847,7 @@ $('#diagnostics').on('click', function () {
         diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
     }
     diagnosticTable += "</table>";
-    $('#diagnostocsModalBody').html(diagnosticTable);
-    $('#diagnostocsModal').modal({show: true});
+    $('#diagnosticsModalBody').html(diagnosticTable);
+    $('#diagnosticsModal').modal({show: true});
 
 });
