@@ -44,7 +44,7 @@ let predictions = {}, correctedSpecies, speciesListItems, action, clickedNode, l
     clickedIndex, speciesName, speciesFilter, speciesHide, speciesExclude, subRows, scrolled, currentFileDuration;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
-let workerLoaded = false;
+let workerHasLoadedFile = false;
 // Set default Options
 let config;
 const sampleRate = 24000;
@@ -63,14 +63,12 @@ let restore = false;
 // "Tensorflow Backend"
 // Analysis Rate: x real time performance
 
-
 // Timers
 let t0_warmup, t1_warmup, t0_analysis, t1_analysis
 let diagnostics = {}
 diagnostics['Chirpity Version'] = version;
 const gpuInfo = require('gpu-info');
 var os = require('os');
-const {string} = require("@tensorflow/tfjs");
 diagnostics['CPU'] = os.cpus()[0].model;
 diagnostics['Cores'] = os.cpus().length;
 diagnostics['Memory'] = (os.totalmem() / Math.pow(1024, 3)).toFixed(0) + ' GB';
@@ -82,7 +80,7 @@ gpuInfo().then(function (data) {
         count += 1;
     })
 }).catch(err => {
-    console.log('GPU info missing: ' + err.message)
+    console.log('GPU info missing: ' +  err.message)
 })
 
 
@@ -142,12 +140,20 @@ const fetchAudioFile = (filePath) =>
         })
 
 
-async function loadAudioFile(filePath, OriginalCtime) {
-    workerLoaded = false;
+function resetResults() {
     summary = {};
+    summaryTable.empty();
+    resultTable.empty();
+    summary['suppressed'] = []
     predictions = {};
     seenTheDarkness = false;
     shownDaylightBanner = false;
+}
+
+async function loadAudioFile(filePath, OriginalCtime) {
+    ipcRenderer.send('file-load-request', {message: filePath});
+    workerHasLoadedFile = false;
+    resetResults();
     summary['suppressed'] = [];
     // Hide load hint and show spinnner
     if (wavesurfer) {
@@ -295,7 +301,6 @@ function initSpec(args) {
     wavesurfer = WaveSurfer.create({
         container: '#waveform',
         audioContext: audioCtx,
-        maxCanvasWidth: 10000,
         backend: args.backend, // 'MediaElementWebAudio',
         // make waveform transparent
         backgroundColor: 'rgba(0,0,0,0)',
@@ -345,7 +350,7 @@ function initSpec(args) {
         wavesurfer.clearRegions();
         region = false;
         disableMenuItem(['analyzeSelection', 'exportMP3']);
-        if (workerLoaded) enableMenuItem(['analyze']);
+        if (workerHasLoadedFile) enableMenuItem(['analyze']);
     });
     // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
@@ -441,14 +446,10 @@ const analyzeLink = document.getElementById('analyze');
 
 analyzeLink.addEventListener('click', async () => {
     completeDiv.hide();
-    seenTheDarkness = false;
-    predictions = {};
+    resetResults();
     // Diagnostics
     t0_analysis = Date.now();
     ipcRenderer.send('analyze', {confidence: config.minConfidence, fileStart: fileStart});
-    summary = {};
-    summaryTable.empty();
-    summary['suppressed'] = []
     analyzeLink.disabled = true;
 });
 
@@ -566,9 +567,7 @@ function adjustSpecDims(redraw) {
         if (redraw && wavesurfer != null) {
             wavesurfer.drawBuffer();
         }
-        $('#timeline canvas').width('100%');
         specCanvasElement.width('100%');
-        waveCanvasElement.width('100%');
         $('.spec-labels').width('55px')
     } else {
         resultTableElement.height(contentWrapperElement.height()
@@ -742,47 +741,8 @@ function updatePrefs() {
     }
 }
 
-//////////// Save Detections  ////////////
-function saveChirp() {
-    predictions['source'] = currentFile;
-    predictions['ctime'] = ctime;  // Preserve creation date
-    const content = JSON.stringify(predictions);
-    const folder = p.parse(currentFile).dir;
-    const source = p.parse(currentFile).name;
-    const chirpFile = p.join(folder, source + '.chirp');
-    fs.writeFile(chirpFile, content, function (err) {
-        if (err) throw err;
-    })
-}
-
-async function loadChirp(file) {
-    if (file.endsWith('chirp')) {
-        restore = true;
-        const data = fs.readFileSync(file, 'utf8');
-        let savedPredictions = JSON.parse(data);
-        currentFile = savedPredictions['source'];
-        ctime = Date.parse(savedPredictions['ctime']);
-        for (const [key, value] of Object.entries(savedPredictions)) {
-            if (key === 'source' || key === 'ctime') continue;
-            await renderResult(value, key, false);
-        }
-        savedPredictions = {};
-        ipcRenderer.send('prediction-done', {'labels': {}});
-    } else {
-        currentFile = file;
-    }
-    fileList = [currentFile];
-    await loadAudioFile(currentFile, ctime);
-}
-
-function showTheResults() {
-    const resultTableContainer = document.getElementById('resultTableContainer');
-    resultTableContainer.classList.remove('d-none');
-    restore = false;
-}
-
+//////////// Save Detections CSV ////////////
 function saveDetections() {
-    saveChirp();
     const folder = p.parse(currentFile).dir;
     const source = p.parse(currentFile).name;
     const headings = 'Source File,Position,Time of Day,Common Name,Scientific Name,Confidence';
@@ -811,8 +771,7 @@ function saveDetections() {
             }
         }
         // Convert predictions to csv string buffer
-        for (const [key, value] of Object.entries(predictions)) {
-            if (key === 'source' || key === 'ctime') continue;
+        for (const [, value] of Object.entries(predictions)) {
             if ((config.nocmig && value.dayNight === 'daytime') || value.excluded) {
                 continue
             }
@@ -1047,7 +1006,7 @@ function initSpectrogram() {
         container: "#spectrogram",
         scrollParent: true,
         windowFunc: 'hamming',
-        minPxPerSec: 1,
+        minPxPerSec: 10,
         normalize: true,
         hideScrollbar: true,
         labels: true,
@@ -1291,7 +1250,7 @@ ipcRenderer.on('model-ready', async (event, args) => {
     modelReady = true;
     const warmupText = document.getElementById('warmup');
     warmupText.classList.add('d-none');
-    if (workerLoaded) {
+    if (workerHasLoadedFile) {
         enableMenuItem(['analyze'])
     }
     t1_warmup = Date.now();
@@ -1317,7 +1276,7 @@ ipcRenderer.on('update-downloaded', async (event, args) => {
 
 ipcRenderer.on('worker-loaded', async (event, args) => {
     console.log('UI received worker-loaded: ' + args.message)
-    workerLoaded = true;
+    workerHasLoadedFile = true;
     if (modelReady) enableMenuItem(['analyze']);
     if (!loadSpectrogram) {
         hideAll();
@@ -1338,7 +1297,7 @@ ipcRenderer.on('progress', async (event, arg) => {
 
 ipcRenderer.on('prediction-done', async (event, arg) => {
     if (!seenTheDarkness && config.nocmig && !region) {
-        if (!restore) alert(`Nocmig mode is enabled, but all timestamps in this file were during daylight hours. Any detections will have been suppressed.\n\nDisable Nocmig mode and re-run the analysis to see them.`)
+        alert(`Nocmig mode is enabled, but all timestamps in this file were during daylight hours. Any detections will have been suppressed.\n\nDisable Nocmig mode and re-run the analysis to see them.`)
     }
     scrolled = false;
     AUDACITY_LABELS = arg.labels;
@@ -1680,7 +1639,7 @@ async function renderResult(result, index, selection) {
                         <td><i>${result.sname3}</i></td><td class='text-center'>${iconizeScore(result.score3)}</td>
                         <td> </td><td class='specFeature'> </td>
                         <td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:nocturnal' target=\"_blank\">
-                            <im g src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>
+                            <img src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>
                         <td class='specFeature'> </td>
                         <td class='specFeature'> </td>
                         <td class='specFeature'> </td>
@@ -1888,7 +1847,7 @@ $('#diagnostics').on('click', function () {
         diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
     }
     diagnosticTable += "</table>";
-    $('#diagnosticsModalBody').html(diagnosticTable);
-    $('#diagnosticsModal').modal({show: true});
+    $('#diagnostocsModalBody').html(diagnosticTable);
+    $('#diagnostocsModal').modal({show: true});
 
 });
