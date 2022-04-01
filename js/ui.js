@@ -142,8 +142,7 @@ const fetchAudioFile = (filePath) =>
         })
 
 
-async function loadAudioFile(filePath, restore) {
-    ipcRenderer.send('file-load-request', {message: filePath});
+async function loadAudioFile(filePath, OriginalCtime) {
     workerLoaded = false;
     summary = {};
     predictions = {};
@@ -156,7 +155,32 @@ async function loadAudioFile(filePath, restore) {
         wavesurfer = undefined;
     }
     // set file creation time
-    ctime = fs.statSync(filePath).mtime
+    try {
+        ctime = fs.statSync(filePath).mtime
+    } catch (e) {
+        const supported_files = ['.mp3', '.wav', '.mpga', '.ogg', '.flac', '.aac'];
+        const dir = p.parse(filePath).dir;
+        const name = p.parse(filePath).name;
+        let file;
+        supported_files.some(ext => {
+            try {
+                file = p.join(dir, name + ext);
+                ctime = fs.statSync(file).mtime;
+            } catch (e) {
+                // Try the next extension
+            }
+            return ctime;
+        })
+        if (!ctime) {
+            alert("Unable to load source file with any supported file extension: " + filePath)
+            return;
+        }
+        else {
+            if (file) filePath = file;
+            if (OriginalCtime) ctime = OriginalCtime;
+            ipcRenderer.send('file-load-request', {message: filePath});}
+    }
+
     hideAll();
     disableMenuItem(['analyzeSelection', 'analyze'])
     showElement(['loadFileHint', 'loadFileHintSpinner', 'loadFileHintLog']);
@@ -179,7 +203,7 @@ async function loadAudioFile(filePath, restore) {
     if (!controller.signal.aborted) {
         fileLoaded = true;
         completeDiv.hide();
-        const filename = filePath.replace(/^.*[\\\/]/, '')
+        //const filename = filePath.replace(/^.*[\\\/]/, '')
         let filenameElement = document.getElementById('filename');
         filenameElement.innerHTML = '';
 
@@ -720,6 +744,7 @@ function updatePrefs() {
 //////////// Save Detections  ////////////
 function saveChirp() {
     predictions['source'] = currentFile;
+    predictions['ctime'] = ctime;  // Preserve creation date
     const content = JSON.stringify(predictions);
     const folder = p.parse(currentFile).dir;
     const source = p.parse(currentFile).name;
@@ -735,8 +760,9 @@ async function loadChirp(file) {
         const data = fs.readFileSync(file, 'utf8');
         let savedPredictions = JSON.parse(data);
         currentFile = savedPredictions['source'];
+        ctime = savedPredictions['ctime'];
         for (const [key, value] of Object.entries(savedPredictions)) {
-            if (key === 'source') continue;
+            if (key === 'source' || key === 'ctime') continue;
             await renderResult(value, key, false);
         }
         savedPredictions = {};
@@ -745,13 +771,13 @@ async function loadChirp(file) {
         currentFile = file;
     }
     fileList = [currentFile];
-    await loadAudioFile(currentFile, true);
+    await loadAudioFile(currentFile, ctime);
 }
 
 function showTheResults() {
     const resultTableContainer = document.getElementById('resultTableContainer');
     resultTableContainer.classList.remove('d-none');
-        restore = false;
+    restore = false;
 }
 
 function saveDetections() {
