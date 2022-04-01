@@ -7,10 +7,17 @@
 <body>
 <h4 class="text-center bg-dark text-white p-3">Suggested Workflow</h4>
 <ol>
-    <li>Open an audio file. Ideally, this will be the file that was recorded by your digital recorder with its original
-        timestamp. By using this file, you will be able to take advantage of the <b>Options > Spectrogram >
-            Timeline >
-            Time of Day</b> mode for the spectrogram timeline, which will show the actual time calls were detected.
+    <li>Open an audio file. There are a two ways to do this:
+        <ul>
+            <li>From Windows Explorer, select an audio file and right-click with your mouse to <b>"Open with" &gt;
+                Chirpity Nocmig</b>
+            </li>
+            <li>In the Application, select <b>File > Open Audio File</b> or press <b>Ctrl-O</b></li>
+        </ul>
+        Ideally, this will be the file that was recorded by your digital recorder with its original
+        timestamp. By using this file, you will be able to take advantage of the <b>Options &gt; Spectrogram &gt;
+            Timeline &gt; Time of Day</b> mode for the spectrogram timeline, which will show the actual time calls were
+        detected.
         <br/><b>N.B.</b>
         <ol type="A">
             <li>The maximum duration of an audio file Chirpity can process is dependent on the audio sample rate. The
@@ -117,8 +124,9 @@
 
 <h5 class="pt-2">Saving Results</h5>
 <ol start="9">
-    <li>Currently, there are four ways to save results:
-        <ul>
+    <li>There are several ways to save results:
+        <ol>
+            <li>A CHIRP file is saved automatically each time an analysis is completed. This file can be used to <a href="#reload">reload the results of the analysis</A>.</li>
             <li>Save the detections as a CSV file. Press <b>Ctrl-S</b> or select <b>File > Save
                 Detections</b> from the menu. A file named "Chirpity - detections.csv" will be created in the folder
                 contining the current audio file. If you attempt to save and this file exists, it will offer to append
@@ -142,7 +150,7 @@
                 to save.
                 From the File menu, select <b>Export Selected Audio</b> to bring up a file save dialog.
             </li>
-        </ul>
+        </ol>
     </li>
 </ol>
 <h5 class="pt-2">Feedback</h5>
@@ -173,5 +181,10 @@
         </ul>
     </li>
 </ol>
+<h5 id="reload" class="pt-2">Restoring Results</h5>
+When you run an analysis in Chirpity Nocmig, a CHIRP file is created matching the name of the source audio file. This
+will be saved in the same directory as the source file, and have the same name - but with a CHIRP extension. If you
+select this file and <b>"Open with" &gt; Chirpity Nocmig</b> It will load the source file (so long as it is still in the
+same directory) and pull in the results of the analysis.
 </body>
 </html>

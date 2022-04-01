@@ -50,6 +50,7 @@ let config;
 const sampleRate = 24000;
 let controller = new AbortController();
 let signal = controller.signal;
+let restore = false;
 
 //////// Collect Diagnostics Information ////////
 // Diagnostics keys:
@@ -62,7 +63,6 @@ let signal = controller.signal;
 // "Tensorflow Backend"
 // Analysis Rate: x real time performance
 
-console.log("CMD line arg:" + remote.getGlobal('sharedObject').prop1);
 
 // Timers
 let t0_warmup, t1_warmup, t0_analysis, t1_analysis
@@ -70,6 +70,7 @@ let diagnostics = {}
 diagnostics['Chirpity Version'] = version;
 const gpuInfo = require('gpu-info');
 var os = require('os');
+const {string} = require("@tensorflow/tfjs");
 diagnostics['CPU'] = os.cpus()[0].model;
 diagnostics['Cores'] = os.cpus().length;
 diagnostics['Memory'] = (os.totalmem() / Math.pow(1024, 3)).toFixed(0) + ' GB';
@@ -81,7 +82,7 @@ gpuInfo().then(function (data) {
         count += 1;
     })
 }).catch(err => {
-    console.log('GPU info missing: ' +  err.message)
+    console.log('GPU info missing: ' + err.message)
 })
 
 
@@ -117,10 +118,12 @@ const fetchAudioFile = (filePath) =>
                 offlineSource.start();
                 offlineCtx.startRendering().then(function (resampled) {
                     console.log('Rendering completed successfully');
-                    // `resampled` contains an AudioBuffer resampled at 48000Hz.
+                    // `resampled` contains an AudioBuffer resampled at 24000Hz.
                     // use resampled.getChannelData(x) to get an Float32Array for channel x.
                     currentBuffer = resampled;
                     loadBufferSegment(resampled, bufferBegin)
+                }).then(() => {
+                    if (restore) showTheResults();
                 })
             } else {
                 throw new DOMException('Rendering cancelled at user request', "AbortError")
@@ -139,7 +142,7 @@ const fetchAudioFile = (filePath) =>
         })
 
 
-async function loadAudioFile(filePath) {
+async function loadAudioFile(filePath, restore) {
     ipcRenderer.send('file-load-request', {message: filePath});
     workerLoaded = false;
     summary = {};
@@ -199,6 +202,7 @@ async function loadAudioFile(filePath) {
         })
         filenameElement.innerHTML += appendstr + '</div>';
     }
+    if (restore) showTheResults();
 }
 
 $(document).on("click", ".openFiles", function (e) {
@@ -389,6 +393,13 @@ ipcRenderer.on('openFiles', async (event, arg) => {
     fileList = arg.filePaths
     await loadAudioFile(fileList[0]);
     currentFile = fileList[0];
+})
+
+ipcRenderer.on('load-results', async (event, arg) => {
+    console.log("file received: " + arg.file)
+    if (arg.file !== '.') {
+        await loadChirp(arg.file);
+    }
 })
 
 
@@ -707,8 +718,46 @@ function updatePrefs() {
     }
 }
 
-//////////// Save Detections CSV ////////////
+//////////// Save Detections  ////////////
+function saveChirp() {
+    predictions['source'] = currentFile;
+    const content = JSON.stringify(predictions);
+    const folder = p.parse(currentFile).dir;
+    const source = p.parse(currentFile).name;
+    const chirpFile = p.join(folder, source + '.chirp');
+    fs.writeFile(chirpFile, content, function (err) {
+        if (err) throw err;
+    })
+}
+
+async function loadChirp(file) {
+    if (file.endsWith('chirp')) {
+        restore = true;
+        const data = fs.readFileSync(file, 'utf8');
+        let savedPredictions = JSON.parse(data);
+        currentFile = savedPredictions['source'];
+        for (const [key, value] of Object.entries(savedPredictions)) {
+            if (key === 'source') continue;
+            await renderResult(value, key, false);
+        }
+        //window.setTimeout(showTheResults, 100);
+        savedPredictions = {};
+        ipcRenderer.send('prediction-done', {'labels': {}});
+    } else {
+        currentFile = file;
+    }
+    fileList = [currentFile];
+    await loadAudioFile(currentFile, true);
+}
+
+function showTheResults() {
+    const resultTableContainer = document.getElementById('resultTableContainer');
+    resultTableContainer.classList.remove('d-none')
+    restore = false;
+}
+
 function saveDetections() {
+    saveChirp();
     const folder = p.parse(currentFile).dir;
     const source = p.parse(currentFile).name;
     const headings = 'Source File,Position,Time of Day,Common Name,Scientific Name,Confidence';
@@ -737,7 +786,8 @@ function saveDetections() {
             }
         }
         // Convert predictions to csv string buffer
-        for (const [, value] of Object.entries(predictions)) {
+        for (const [key, value] of Object.entries(predictions)) {
+            if (key === 'source') continue;
             if ((config.nocmig && value.dayNight === 'daytime') || value.excluded) {
                 continue
             }
@@ -1263,7 +1313,7 @@ ipcRenderer.on('progress', async (event, arg) => {
 
 ipcRenderer.on('prediction-done', async (event, arg) => {
     if (!seenTheDarkness && config.nocmig && !region) {
-        alert(`Nocmig mode is enabled, but all timestamps in this file were during daylight hours. Any detections will have been suppressed.\n\nDisable Nocmig mode and re-run the analysis to see them.`)
+        if (!restore) alert(`Nocmig mode is enabled, but all timestamps in this file were during daylight hours. Any detections will have been suppressed.\n\nDisable Nocmig mode and re-run the analysis to see them.`)
     }
     scrolled = false;
     AUDACITY_LABELS = arg.labels;
@@ -1477,110 +1527,107 @@ function matchSpecies(e, mode) {
 
 }
 
-ipcRenderer.on('prediction-ongoing', async (event, arg) => {
-        const result = arg.result;
-        let index = arg.index;
-        const selection = arg.selection;
-        result.timestamp = new Date(result.timestamp);
-        result.position = new Date(result.position);
-        // Datetime wrangling for Nocmig mode
-        if (result !== "No detections found.") {
-            let astro = SunCalc.getTimes(result.timestamp, config.latitude, config.longitude);
-            if (astro.dawn < result.timestamp && astro.dusk > result.timestamp) {
-                result.dayNight = 'daytime';
-            } else {
-                result.dayNight = 'nighttime';
-                seenTheDarkness = true;
-            }
-        }
-        let tableRows;
-        let tr = '';
-        if (!selection) {
-            if (index === 1) {
-                tableRows = document.querySelectorAll('#results tr');
-                // Remove old results
-                resultTable.empty();
-                summaryTable.empty();
-                tableRows[0].scrollIntoView({behavior: 'smooth', block: 'nearest'})
-            }
+async function renderResult(result, index, selection) {
+    result.timestamp = new Date(result.timestamp);
+    result.position = new Date(result.position);
+    // Datetime wrangling for Nocmig mode
+    if (result !== "No detections found.") {
+        let astro = SunCalc.getTimes(result.timestamp, config.latitude, config.longitude);
+        if (astro.dawn < result.timestamp && astro.dusk > result.timestamp) {
+            result.dayNight = 'daytime';
         } else {
-            if (index === 1) {
-                resultTable.append('<tr><td class="bg-dark text-white text-center" colspan="20"><b>Selection Analysis</b></td></tr>')
-            }
+            result.dayNight = 'nighttime';
+            seenTheDarkness = true;
         }
-        showElement(['resultTableContainer']);
-        if (result === "No detections found.") {
-            tr += "<tr><td>" + result + "</td></tr>";
-        } else {
-            if (config.nocmig && !region) {
-                // We want to skip results recorded before dark
-                // process results during the night
-                // abort entirely when dawn breaks
-                if (!seenTheDarkness && result.dayNight === 'daytime') {
-                    // Not dark yet
-                    return
-                } else if (seenTheDarkness && result.dayNight === 'daytime') {
-                    // Show the twilight start bar
-                    resultTable.append(`<tr class="bg-dark text-white"><td colspan="20" class="text-center">
-                                        Start of civil twilight
-                                        <span class="material-icons-two-tone text-warning align-bottom">wb_twilight</span>
-                                    </td></tr>`);
-                    // Abort
-                    console.log("Aborting as reached daytime");
-                    await ipcRenderer.send('abort', {'sendlabels': true});
-                    return
-                }
-            }
-            // Show the twilight bar even if nocmig mode off - cue to change of table row colour
-            if (seenTheDarkness && result.dayNight === 'daytime' && shownDaylightBanner === false) {
+    }
+    let tableRows;
+    let tr = '';
+    if (!selection) {
+        if (index === 1) {
+            tableRows = document.querySelectorAll('#results tr');
+            // Remove old results
+            resultTable.empty();
+            summaryTable.empty();
+            tableRows[0].scrollIntoView({behavior: 'smooth', block: 'nearest'})
+        }
+    } else {
+        if (index === 1) {
+            resultTable.append('<tr><td class="bg-dark text-white text-center" colspan="20"><b>Selection Analysis</b></td></tr>')
+        }
+    }
+    showElement(['resultTableContainer']);
+    if (result === "No detections found.") {
+        tr += "<tr><td>" + result + "</td></tr>";
+    } else {
+        if (config.nocmig && !region) {
+            // We want to skip results recorded before dark
+            // process results during the night
+            // abort entirely when dawn breaks
+            if (!seenTheDarkness && result.dayNight === 'daytime') {
+                // Not dark yet
+                return
+            } else if (seenTheDarkness && result.dayNight === 'daytime') {
                 // Show the twilight start bar
                 resultTable.append(`<tr class="bg-dark text-white"><td colspan="20" class="text-center">
                                         Start of civil twilight
                                         <span class="material-icons-two-tone text-warning align-bottom">wb_twilight</span>
                                     </td></tr>`);
-                shownDaylightBanner = true;
+                // Abort
+                console.log("Aborting as reached daytime");
+                await ipcRenderer.send('abort', {'sendlabels': true});
+                return
             }
+        }
+        // Show the twilight bar even if nocmig mode off - cue to change of table row colour
+        if (seenTheDarkness && result.dayNight === 'daytime' && shownDaylightBanner === false) {
+            // Show the twilight start bar
+            resultTable.append(`<tr class="bg-dark text-white"><td colspan="20" class="text-center">
+                                        Start of civil twilight
+                                        <span class="material-icons-two-tone text-warning align-bottom">wb_twilight</span>
+                                    </td></tr>`);
+            shownDaylightBanner = true;
+        }
 
-            if (result.cname in summary) {
-                summary[result.cname] += 1
-            } else {
-                summary[result.cname] = 1
-            }
+        if (result.cname in summary) {
+            summary[result.cname] += 1
+        } else {
+            summary[result.cname] = 1
+        }
 
-            if (result.suppressed === 'text-danger') summary['suppressed'].push(result.cname);
+        if (result.suppressed === 'text-danger') summary['suppressed'].push(result.cname);
 
-            const start = result.start, end = result.end;
-            let icon_text;
-            let feedback_icons;
-            let confidence = '';
-            if (result.score < 0.65) {
-                confidence = ' ?';
-            }
-            //     feedback_icons = `<span class='material-icons-two-tone text-success feedback pointer'>thumb_up_alt</span>`;
-            // } else if (result.score < 0.85) {
-            feedback_icons = `<span class='material-icons-two-tone text-success feedback pointer'>thumb_up_alt</span>
+        const start = result.start, end = result.end;
+        let icon_text;
+        let feedback_icons;
+        let confidence = '';
+        if (result.score < 0.65) {
+            confidence = ' ?';
+        }
+        //     feedback_icons = `<span class='material-icons-two-tone text-success feedback pointer'>thumb_up_alt</span>`;
+        // } else if (result.score < 0.85) {
+        feedback_icons = `<span class='material-icons-two-tone text-success feedback pointer'>thumb_up_alt</span>
                               <span class='material-icons-two-tone text-danger feedback pointer'>thumb_down_alt</span>`;
-            // } else {
-            //     feedback_icons = "<span class='material-icons-two-tone text-danger feedback pointer'>thumb_down_alt</span>";
-            // }
-            result.suppressed ? icon_text = `sync_problem` : icon_text = 'sync';
-            result.date = result.timestamp;
-            result.timestamp = result.timestamp.toString().split(' ')[4];
-            result.filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp + '.mp3';
-            let spliceStart;
-            result.position < 3600000 ? spliceStart = 14 : spliceStart = 11;
-            result.position = new Date(result.position).toISOString().substring(spliceStart, 19);
-            // Now we have formatted the fields, and skipped detections as required by nocmig mode, add result to predictions file
-            if (selection) {
-                tableRows = document.querySelectorAll('#results tr.top-row');
-                index = tableRows.length + 1;
-            }
-            predictions[index] = result;
-            let showTimeOfDay;
-            config.timeOfDay ? showTimeOfDay = '' : showTimeOfDay = 'd-none';
-            tr += `<tr onclick='loadResultRegion( ${start},${end} , &quot;${result.cname}${confidence}&quot, this)' class='border-top border-secondary top-row ${result.dayNight}'>
-                    <th scope='row'>${index}</th><td class='timestamp ${showTimeOfDay}'>${result.timestamp}</td>
-                    <td >${result.position}</td><td class='cname'>${result.cname}</td>
+        // } else {
+        //     feedback_icons = "<span class='material-icons-two-tone text-danger feedback pointer'>thumb_down_alt</span>";
+        // }
+        result.suppressed ? icon_text = `sync_problem` : icon_text = 'sync';
+        result.date = result.timestamp;
+        const UI_timestamp = result.timestamp.toString().split(' ')[4];
+        result.filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp + '.mp3';
+        let spliceStart;
+        result.position < 3600000 ? spliceStart = 14 : spliceStart = 11;
+        const UI_position = new Date(result.position).toISOString().substring(spliceStart, 19);
+        // Now we have formatted the fields, and skipped detections as required by nocmig mode, add result to predictions file
+        if (selection) {
+            tableRows = document.querySelectorAll('#results tr.top-row');
+            index = tableRows.length + 1;
+        }
+        predictions[index] = result;
+        let showTimeOfDay;
+        config.timeOfDay ? showTimeOfDay = '' : showTimeOfDay = 'd-none';
+        tr += `<tr onclick='loadResultRegion( ${start},${end} , &quot;${result.cname}${confidence}&quot, this)' class='border-top border-secondary top-row ${result.dayNight}'>
+                    <th scope='row'>${index}</th><td class='timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
+                    <td >${UI_position}</td><td class='cname'>${result.cname}</td>
                     <td><i>${result.sname}</i></td><td class='text-center'>${iconizeScore(result.score)}</td>
                     <td class='text-center'><span id='${index}' title="Click for additional detections" class='material-icons rotate pointer d-none'>${icon_text}</span></td>
                     <td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
@@ -1591,8 +1638,8 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
                          <span class="material-icons-two-tone align-bottom speciesExclude pointer">clear</span></td>
                     <td id="${index}" class='specFeature text-center'>${feedback_icons}</td>
                    </tr>`;
-            if (result.score2 > 0.2) {
-                tr += `<tr id='subrow${index}' class='subrow d-none' onclick='loadResultRegion(${start},${end},&quot;${result.cname}${confidence}&quot;)'>
+        if (result.score2 > 0.2) {
+            tr += `<tr id='subrow${index}' class='subrow d-none' onclick='loadResultRegion(${start},${end},&quot;${result.cname}${confidence}&quot;)'>
                         <th scope='row'>${index}</th><td> </td><td> </td><td class='cname2'>${result.cname2}</td>
                         <td><i>${result.sname2}</i></td><td class='text-center'>${iconizeScore(result.score2)}</td>
                         <td> </td><td class='specFeature'> </td>
@@ -1602,32 +1649,35 @@ ipcRenderer.on('prediction-ongoing', async (event, arg) => {
                         <td class='specFeature'> </td>
                         <td class='specFeature'> </td>
                        </tr>`;
-                if (result.score3 > 0.2) {
-                    tr += `<tr id='subsubrow${index}' class='subrow d-none' onclick='loadResultRegion(${start},${end},&quot;${result.cname}${confidence}&quot;)'>
+            if (result.score3 > 0.2) {
+                tr += `<tr id='subsubrow${index}' class='subrow d-none' onclick='loadResultRegion(${start},${end},&quot;${result.cname}${confidence}&quot;)'>
                         <th scope='row'>${index}</th><td> </td><td> </td><td class='cname3'>${result.cname3}</td>
                         <td><i>${result.sname3}</i></td><td class='text-center'>${iconizeScore(result.score3)}</td>
                         <td> </td><td class='specFeature'> </td>
                         <td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:nocturnal' target=\"_blank\">
-                            <img src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>
+                            <im g src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>
                         <td class='specFeature'> </td>
                         <td class='specFeature'> </td>
                         <td class='specFeature'> </td>
                        </tr>`;
-                }
             }
         }
-        resultTable.append(tr)
-        if (selection) {
-            tableRows = document.querySelectorAll('#results tr.top-row');
-            tableRows[tableRows.length - 1].scrollIntoView({behavior: 'smooth', block: 'nearest'})
-        }
-        // Show the alternate detections toggle:
-        if (result.score2 > 0.2) {
-            document.getElementById(index).classList.remove('d-none')
-        }
-        if (!config.spectrogram) $('.specFeature').hide();
     }
-);
+    resultTable.append(tr)
+    if (selection) {
+        tableRows = document.querySelectorAll('#results tr.top-row');
+        tableRows[tableRows.length - 1].scrollIntoView({behavior: 'smooth', block: 'nearest'})
+    }
+    // Show the alternate detections toggle:
+    if (result.score2 > 0.2) {
+        document.getElementById(index).classList.remove('d-none')
+    }
+    if (!config.spectrogram) $('.specFeature').hide();
+}
+
+ipcRenderer.on('prediction-ongoing', async (event, arg) => {
+    await renderResult(arg.result, arg.index, arg.selection)
+});
 
 $(document).on('click', '.material-icons', function (e) {
     $(this).toggleClass("down");
