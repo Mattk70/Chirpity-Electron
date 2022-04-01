@@ -126,7 +126,9 @@
 <ol start="9">
     <li>There are several ways to save results:
         <ol>
-            <li>A CHIRP file is saved automatically each time an analysis is completed. This file can be used to <a href="#reload">reload the results of the analysis</A>.</li>
+            <li>A CHIRP file is saved automatically each time an analysis is completed. This file can be used to <a
+                    href="#reload">reload the results of the analysis</A>.
+            </li>
             <li>Save the detections as a CSV file. Press <b>Ctrl-S</b> or select <b>File > Save
                 Detections</b> from the menu. A file named "Chirpity - detections.csv" will be created in the folder
                 contining the current audio file. If you attempt to save and this file exists, it will offer to append
@@ -185,6 +187,9 @@
 When you run an analysis in Chirpity Nocmig, a CHIRP file is created matching the name of the source audio file. This
 will be saved in the same directory as the source file, and have the same name - but with a CHIRP extension. If you
 select this file and <b>"Open with" &gt; Chirpity Nocmig</b> It will load the source file (so long as it is still in the
-same directory) and pull in the results of the analysis.
+same directory) and pull in the results of the analysis. <b>N.B.</b> If the original file is missing because it has
+since been compressed to one of the supported formats ('.mp3', '.wav', '.mpga', '.ogg', '.flac', '.aac'), so long as it
+retains the same name, but with a new extension, Chirpity will find and load that file instead and, rather tha take its
+cue from this file's creation time, use the original one.
 </body>
 </html>
