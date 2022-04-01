@@ -202,7 +202,6 @@ async function loadAudioFile(filePath, restore) {
         })
         filenameElement.innerHTML += appendstr + '</div>';
     }
-    if (restore) showTheResults();
 }
 
 $(document).on("click", ".openFiles", function (e) {
@@ -740,7 +739,6 @@ async function loadChirp(file) {
             if (key === 'source') continue;
             await renderResult(value, key, false);
         }
-        //window.setTimeout(showTheResults, 100);
         savedPredictions = {};
         ipcRenderer.send('prediction-done', {'labels': {}});
     } else {
@@ -752,8 +750,8 @@ async function loadChirp(file) {
 
 function showTheResults() {
     const resultTableContainer = document.getElementById('resultTableContainer');
-    resultTableContainer.classList.remove('d-none')
-    restore = false;
+    resultTableContainer.classList.remove('d-none');
+        restore = false;
 }
 
 function saveDetections() {
