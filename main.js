@@ -1,4 +1,4 @@
-const {app, dialog, ipcMain, BrowserWindow, remote} = require('electron');
+const {app, dialog, ipcMain, BrowserWindow, Tray, remote} = require('electron');
 const fs = require("fs");
 //require('update-electron-app')();
 global.sharedObject = {prop1: process.argv};
@@ -30,10 +30,12 @@ let files = [];
 let mainWindow;
 let workerWindow;
 
+
 function createWindow() {
     // Create the browser window.
     mainWindow = new BrowserWindow({
         show: false,
+        title: "Chirpity Nocmig",
         width: 1280,
         height: 768,
         webPreferences: {
@@ -95,11 +97,16 @@ function createWorker() {
 // This method will be called when Electron has finished
 
 app.on('ready', () => {
+    if (process.platform === 'darwin') {
+        //const appIcon = new Tray('./img/icon/icon.png')
+        app.dock.setIcon( __dirname + '/img/icon/icon.png');
+        app.dock.bounce();
+    }
     createWorker();
     createWindow();
 
     // if (files.length > 0) {
-        mainWindow.webContents.send('load-results', {file: 'test'});
+    mainWindow.webContents.send('load-results', {file: 'test'});
     // }
 
     mainWindow.webContents.on('new-window', function (e, url) {
@@ -174,7 +181,9 @@ ipcMain.on('load-model', async (event, arg) => {
     console.log('Main received load-model, using whitelist: ' + arg.useWhitelist)
     workerWindow.webContents.send('load-model', {useWhitelist: useWhitelist});
     const args = sharedObject.prop1;
-    if (args.length > 1) {
+    if (files.length > 0) {
+        mainWindow.webContents.send('mac-files', {files: files[0]})
+    } else if (args.length > 1) {
         mainWindow.webContents.send('load-results', {file: args[args.length - 1]});
     }
 });
@@ -208,7 +217,7 @@ ipcMain.on('prediction-done', (event, arg) => {
 });
 
 ipcMain.on('model-ready', (event, args) => {
-    console.log(args.backend);
+    console.log(`Using ${args.backend} backend`);
     mainWindow.webContents.send('model-ready', {backend: args.backend});
 });
 
