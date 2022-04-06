@@ -1,30 +1,30 @@
-const {app, dialog, autoUpdater, ipcMain, BrowserWindow, remote} = require('electron');
+const {app, dialog, ipcMain, BrowserWindow, remote} = require('electron');
 const fs = require("fs");
-require('update-electron-app')();
+//require('update-electron-app')();
 global.sharedObject = {prop1: process.argv};
-
+let files = [];
 //Updater
-const server = 'https://chirpity-electron-releases.vercel.app';
-console.log('process platform ' + process.platform)
-console.log('app version  ' + app.getVersion())
-const url = `${server}/update/${process.platform}/${app.getVersion()}`
-
-autoUpdater.setFeedURL({url})
+//const server = 'https://chirpity-electron-releases.vercel.app';
+//console.log('process platform ' + process.platform)
+//console.log('app version  ' + app.getVersion())
+//const url = `${server}/update/${process.platform}/${app.getVersion()}`
+//
+//autoUpdater.setFeedURL({url})
 
 //Update handling
-autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName) => {
-    const dialogOpts = {
-        type: 'info',
-        buttons: ['Restart', 'Later'],
-        title: 'Application Update',
-        message: process.platform === 'win32' ? releaseNotes : releaseName,
-        detail: 'A new version has been downloaded. Restart the application to apply the updates.'
-    }
-
-    dialog.showMessageBox(dialogOpts).then((returnValue) => {
-        if (returnValue.response === 0) autoUpdater.quitAndInstall()
-    })
-})
+//autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName) => {
+//    const dialogOpts = {
+//        type: 'info',
+//        buttons: ['Restart', 'Later'],
+//        title: 'Application Update',
+//        message: process.platform === 'win32' ? releaseNotes : releaseName,
+//        detail: 'A new version has been downloaded. Restart the application to apply the updates.'
+//    }
+//
+//    dialog.showMessageBox(dialogOpts).then((returnValue) => {
+//        if (returnValue.response === 0) autoUpdater.quitAndInstall()
+//    })
+//})
 
 
 let mainWindow;
@@ -54,7 +54,7 @@ function createWindow() {
     mainWindow.loadFile('index.html')
 
     // Open the DevTools. Comment out for release
-    //mainWindow.webContents.openDevTools()
+    mainWindow.webContents.openDevTools()
 
     mainWindow.once('ready-to-show', () => {
         mainWindow.show()
@@ -97,6 +97,11 @@ function createWorker() {
 app.on('ready', () => {
     createWorker();
     createWindow();
+
+    // if (files.length > 0) {
+        mainWindow.webContents.send('load-results', {file: 'test'});
+    // }
+
     mainWindow.webContents.on('new-window', function (e, url) {
         e.preventDefault();
         require('electron').shell.openExternal(url).then(r => console.log(r));
@@ -122,23 +127,29 @@ app.on('ready', () => {
         })
     });
 
-    setInterval(() => {
-        autoUpdater.checkForUpdates()
-    }, 6000000)
+//
+//    setInterval(() => {
+//        autoUpdater.checkForUpdates()
+//    }, 6000000)
 
-    autoUpdater.on('error', message => {
-        mainWindow.webContents.send('update-error', {error: message});
-        console.error('There was a problem updating the application')
-        console.error(message)
-    })
+//    autoUpdater.on('error', message => {
+//        mainWindow.webContents.send('update-error', {error: message});
+//        console.error('There was a problem updating the application')
+//        console.error(message)
+//    })
+//
+//    autoUpdater.on('update-not-available', message => {
+//        mainWindow.webContents.send('update-not-available', {message: 'update-not-available'});
+//    })
+//
+//    autoUpdater.on('update-available', message => {
+//        mainWindow.webContents.send('update-available', {message: 'update-available'});
+//    })
+});
 
-    autoUpdater.on('update-not-available', message => {
-        mainWindow.webContents.send('update-not-available', {message: 'update-not-available'});
-    })
 
-    autoUpdater.on('update-available', message => {
-        mainWindow.webContents.send('update-available', {message: 'update-available'});
-    })
+app.on('open-file', (event, path) => {
+    files.push(path);
 });
 
 // Quit when all windows are closed.
@@ -231,7 +242,7 @@ ipcMain.on('openFiles', (event) => {
     dialog.showOpenDialog({
         filters: [{
             name: 'Audio Files',
-            extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg']
+            extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4']
         }],
         properties: ['openFile', 'multiSelections']
     }).then(result => {
