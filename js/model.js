@@ -11,7 +11,7 @@ const labels = ["Tachymarptis melba_Alpine Swift", "Ambient Noise_Ambient Noise"
 const whitelist = ["Pluvialis dominica_American Golden Plover", "Acanthis hornemanni_Arctic Redpoll", "Sterna paradisaea_Arctic Tern", "Recurvirostra avosetta_Avocet", "Limosa lapponica_Bar-tailed Godwit", "Tyto alba_Barn Owl", "Branta leucopsis_Barnacle Goose", "Cygnus columbianus_Bewick's Swan", "Botaurus stellaris_Bittern", "Chroicocephalus ridibundus_Black-headed Gull", "Podiceps nigricollis_Black-necked Grebe", "Limosa limosa_Black-tailed Godwit", "Turdus merula_Blackbird", "Sylvia atricapilla_Blackcap", "Cyanistes caeruleus_Blue Tit", "Fringilla montifringilla_Brambling", "Branta bernicla_Brent Goose", "Pyrrhula pyrrhula_Bullfinch", "Buteo buteo_Buzzard", "Branta canadensis_Canada Goose", "Corvus corone_Carrion Crow", "Larus cachinnans_Caspian Gull", "Cettia cetti_Cetti's Warbler", "Fringilla coelebs_Chaffinch", "Phylloscopus collybita_Chiffchaff", "Periparus ater_Coal Tit", "Streptopelia decaocto_Collared Dove", "Loxia curvirostra_Common Crossbill", "Larus canus_Common Gull", "Acanthis flammea_Common Redpoll", "Actitis hypoleucos_Common Sandpiper", "Melanitta nigra_Common Scoter", "Sterna hirundo_Common Tern", "Fulica atra_Coot", "Phalacrocorax carbo_Cormorant", "Crex crex_Corncrake", "Grus grus_Crane", "Cuculus canorus_Cuckoo", "Calidris ferruginea_Curlew Sandpiper", "Numenius arquata_Curlew", "Charadrius morinellus_Dotterel", "Calidris alpina_Dunlin", "Prunella modularis_Dunnock", "Alopochen aegyptiaca_Egyptian Goose", "Somateria mollissima_Eider", "Turdus pilaris_Fieldfare", "Mareca strepera_Gadwall", "Sylvia borin_Garden Warbler", "Spatula querquedula_Garganey", "Regulus regulus_Goldcrest", "Pluvialis apricaria_Golden Plover", "Bucephala clangula_Goldeneye", "Carduelis carduelis_Goldfinch", "Mergus merganser_Goosander", "Locustella naevia_Grasshopper Warbler", "Larus marinus_Great Black-backed Gull", "Podiceps cristatus_Great Crested Grebe", "Parus major_Great Tit", "Tringa ochropus_Green Sandpiper", "Picus viridis_Green Woodpecker", "Chloris chloris_Greenfinch", "Tringa nebularia_Greenshank", "Ardea cinerea_Grey Heron", "Perdix perdix_Grey Partridge", "Pluvialis squatarola_Grey Plover", "Motacilla cinerea_Grey Wagtail", "Anser anser_Greylag Goose", "Uria aalge_Guillemot", "Coccothraustes coccothraustes_Hawfinch", "Larus argentatus_Herring Gull", "Corvus cornix_Hooded Crow", "Delichon urbicum_House Martin", "Passer domesticus_House Sparrow", "Lymnocryptes minimus_Jack Snipe", "Coloeus monedula_Jackdaw", "Garrulus glandarius_Jay", "Falco tinnunculus_Kestrel", "Alcedo atthis_Kingfisher", "Rissa tridactyla_Kittiwake", "Calidris canutus_Knot", "Calcarius lapponicus_Lapland Bunting", "Vanellus vanellus_Lapwing", "Larus fuscus_Lesser Black-backed Gull", "Acanthis cabaret_Lesser Redpoll", "Sylvia curruca_Lesser Whitethroat", "Linaria cannabina_Linnet", "Egretta garzetta_Little Egret", "Tachybaptus ruficollis_Little Grebe", "Hydrocoloeus minutus_Little Gull", "Athene noctua_Little Owl", "Charadrius dubius_Little Ringed Plover", "Calidris minuta_Little Stint", "Sternula albifrons_Little Tern", "Asio otus_Long-eared Owl", "Clangula hyemalis_Long-tailed Duck", "Aegithalos caudatus_Long-tailed Tit", "Pica pica_Magpie", "Anas platyrhynchos_Mallard", "Aix galericulata_Mandarin Duck", "Puffinus puffinus_Manx Shearwater", "Poecile palustris_Marsh Tit", "Anthus pratensis_Meadow Pipit", "Ichthyaetus melanocephalus_Mediterranean Gull", "Turdus viscivorus_Mistle Thrush", "Gallinula chloropus_Moorhen", "Cygnus olor_Mute Swan", "Luscinia megarhynchos_Nightingale", "Caprimulgus europaeus_Nightjar", "Sitta europaea_Nuthatch", "Emberiza hortulana_Ortolan Bunting", "Haematopus ostralegus_Oystercatcher", "Phasianus colchicus_Pheasant", "Ficedula hypoleuca_Pied Flycatcher", "Motacilla alba_Pied Wagtail", "Anser brachyrhynchus_Pink-footed Goose", "Anas acuta_Pintail", "Aythya ferina_Pochard", "Calidris maritima_Purple Sandpiper", "Coturnix coturnix_Quail", "Corvus corax_Raven", "Alca torda_Razorbill", "Mergus serrator_Red-breasted Merganser", "Netta rufina_Red-crested Pochard", "Alectoris rufa_Red-legged Partridge", "Gavia stellata_Red-throated Diver", "Milvus milvus_Red Kite", "Tringa totanus_Redshank", "Phoenicurus phoenicurus_Redstart", "Turdus iliacus_Redwing", "Emberiza schoeniclus_Reed Bunting", "Acrocephalus scirpaceus_Reed Warbler", "Psittacula krameri_Ring-necked Parakeet", "Turdus torquatus_Ring Ouzel", "Charadrius hiaticula_Ringed Plover", "Erithacus rubecula_Robin", "Columba livia_Rock Dove", "Anthus petrosus_Rock Pipit", "Corvus frugilegus_Rook", "Sterna dougallii_Roseate Tern", "Calidris pugnax_Ruff", "Riparia riparia_Sand Martin", "Calidris alba_Sanderling", "Thalasseus sandvicensis_Sandwich Tern", "Aythya marila_Scaup", "Loxia scotica_Scottish Crossbill", "Acrocephalus schoenobaenus_Sedge Warbler", "Tadorna tadorna_Shelduck", "Asio flammeus_Short-eared Owl", "Spatula clypeata_Shoveler", "Spinus spinus_Siskin", "Alauda arvensis_Skylark", "Gallinago gallinago_Snipe", "Plectrophenax nivalis_Snow Bunting", "Turdus philomelos_Song Thrush", "Accipiter nisus_Sparrowhawk", "Porzana porzana_Spotted Crake", "Muscicapa striata_Spotted Flycatcher", "Tringa erythropus_Spotted Redshank", "Sturnus vulgaris_Starling", "Columba oenas_Stock Dove", "Burhinus oedicnemus_Stone-curlew", "Saxicola rubicola_Stonechat", "Hirundo rustica_Swallow", "Apus apus_Swift", "Anser fabalis_Taiga Bean Goose", "Strix aluco_Tawny Owl", "Anas crecca_Teal", "Anthus trivialis_Tree Pipit", "Passer montanus_Tree Sparrow", "Certhia familiaris_Treecreeper", "Aythya fuligula_Tufted Duck", "Anser serrirostris_Tundra Bean Goose", "Arenaria interpres_Turnstone", "Rallus aquaticus_Water Rail", "Numenius phaeopus_Whimbrel", "Anser albifrons_White-fronted Goose", "Sylvia communis_Whitethroat", "Cygnus cygnus_Whooper Swan", "Mareca penelope_Wigeon", "Poecile montanus_Willow Tit", "Phylloscopus trochilus_Willow Warbler", "Tringa glareola_Wood Sandpiper", "Scolopax rusticola_Woodcock", "Columba palumbus_Woodpigeon", "Troglodytes troglodytes_Wren", "Larus michahellis_Yellow-legged Gull", "Motacilla flava_Yellow Wagtail", "Emberiza citrinella_Yellowhammer"];
 
 //const blacklist = ["Human_Human", "Ambient Noise_Ambient Noise", "Animal_Animal", "Vehicle_Vehicle"];
-const blacklist = [];
+//const blacklist = [];
 //const greylist = ["Phylloscopus fuscatus_Dusky Warbler", "Gallinago gallinago_Snipe", "Accipiter gentilis_Goshawk", "Asio otus_Long-eared Owl", "Bubo bubo_Eurasian Eagle-Owl", "Oriolus oriolus_Golden Oriole", "Cuculus canorus_Cuckoo"];
 const greylist = ["Sylvia curruca_Lesser Whitethroat", "Asio otus_Long-eared Owl", "Botaurus stellaris_Bittern"];
 const goldenlist = ["Turdus iliacus_Redwing", "Turdus philomelos_Song Thrush"];
@@ -83,6 +83,7 @@ class Model {
     }
 
     _makeSpectrogram(audioBuffer) {
+        // const s0 = performance.now();
         this.spectrogram = tf.signal.stft(audioBuffer.squeeze(), this.frame_length, this.frame_step,);
         // Cast from complex to float
         this.spectrogram = tf.cast(this.spectrogram, 'float32');
@@ -95,7 +96,8 @@ class Model {
         this.spectrogram = this._normalize_and_fix_shape(this.spectrogram);
         // Add channel axis
         this.spectrogram = tf.expandDims(this.spectrogram, -1);
-
+        // const s1 = performance.now();
+        // console.log(`Spec creation took ${s1-s0} milliseconds`)
     }
 
     _timestampFromSeconds(seconds, fileStart) {
@@ -128,10 +130,12 @@ class Model {
             for (const [key, value] of Object.entries(chunks)) {
                 keys.push(key);
                 let chunk = tf.tensor1d(value);
-                // if the file is too short, pad with zeroes.
-                if (chunk.shape[0] < this.chunkLength) {
-                    let padding = tf.zeros([this.chunkLength - chunk.shape[0]]);
-                    chunk = chunk.concat(padding);
+                // if the file is too short, pad with zeroes. Only if at least 1 second of signal
+                if (chunk.shape[0] < this.chunkLength){
+                    if (chunk.shape[0] > this.chunkLength / 6) {
+                        let padding = tf.zeros([this.chunkLength - chunk.shape[0]]);
+                        chunk = chunk.concat(padding);
+                    } else { continue }  // Ignore chunk fragment
                 }
                 this._makeSpectrogram(chunk);
                 tensorArray.push(this.spectrogram);
@@ -143,12 +147,13 @@ class Model {
             }
             let t0 = performance.now();
             this.prediction = this.model.predict(this.batch, {batchSize: this.batchSize})
+            let t1 = performance.now()
+            console.log(`predictions took: ${t1 - t0} milliseconds`)
             // Get label
             const {indices, values} = this.prediction.topk(3);
             let top3 = indices.arraySync();
             let top3scores = values.arraySync();
-            let t1 = performance.now()
-            console.log(`predictions took: ${t1 - t0} milliseconds`)
+
             const batch = {};
             for (let j = 0; j < top3.length; j++) {
                 batch[keys[j]] = ({'index': top3[j], 'score': top3scores[j]});
@@ -253,7 +258,8 @@ onmessage = async function (e) {
         console.log('model received load instruction. Using whitelist:' + e.data[2])
         myModel = new Model(appPath, useWhitelist);
         await myModel.loadModel();
-        myModel.warmUp(batch).then(function (value) {
+        myModel.warmUp(batch).then(function (err) {
+            if (err) {console.log('Problem warming up model ' + err)}
             postMessage({
                 message: 'model-ready',
                 sampleRate: myModel.config.sampleRate,

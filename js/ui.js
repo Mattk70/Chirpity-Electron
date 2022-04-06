@@ -448,6 +448,10 @@ ipcRenderer.on('load-results', async (event, arg) => {
     }
 })
 
+ipcRenderer.on('mac-files', async (event, arg) => {
+    console.log("files received: " + arg.files);
+    await loadChirp(arg.files);
+})
 
 async function showSaveDialog() {
     // Show file dialog to save Audacity label file
@@ -783,7 +787,9 @@ function saveChirp() {
         console.log(e);
     })
 }
+
 let savedPredictions;
+
 async function loadChirp(file) {
     if (file.endsWith('chirp')) {
         restore = true;
@@ -807,11 +813,9 @@ async function loadChirp(file) {
         })
     } else {
         currentFile = file;
-        await loadAudioFile(currentFile, ctime);
         fileList = [currentFile];
+        await loadAudioFile(currentFile, ctime);
     }
-
-
 }
 
 function showTheResults() {
@@ -1790,7 +1794,7 @@ $(document).on('click', '.rotate', function (e) {
     const row1 = e.target.parentNode.parentNode.nextSibling;
     const row2 = row1.nextSibling;
     row1.classList.toggle('d-none')
-    if (!row2.classList.contains('top-row')) row2.classList.toggle('d-none')
+    if ( row2 && !row2.classList.contains('top-row')) row2.classList.toggle('d-none')
     e.stopImmediatePropagation();
 })
 

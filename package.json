@@ -1,11 +1,11 @@
 {
-  "name": "chirpity",
+  "name": "Chirpity",
   "version": "0.4.0",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
     "start": "electron . \"/Users/matthew/Downloads/oie sp 24032022.chirp\"",
-    "export": "electron-packager . --platform=darwin --arch=x64 --prune --out packages --overwrite"
+    "export": "electron-packager . --platform=darwin --arch=x64 --prune --out packages --overwrite --icon=/Users/matthew/PycharmProjects/Chirpity-Electron/img/icon/icon"
   },
   "repository": {
     "type": "git",
@@ -69,7 +69,7 @@
       }
     ],
       "mac": {
-    "icon": "packages/img/icon/icon.icns",
+    "icon": "./packages/img/icon/icon.icns",
     "category": "public.app-category.utilities",
     "fileAssociations": [
       {
