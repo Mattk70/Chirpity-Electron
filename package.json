@@ -4,8 +4,8 @@
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "export": "electron-packager . --platform=win32 --arch=x64 --prune --out packages --overwrite"
+    "start": "electron . \"/Users/matthew/Downloads/oie sp 24032022.chirp\"",
+    "export": "electron-packager . --platform=darwin --arch=x64 --prune --out packages --overwrite"
   },
   "repository": {
     "type": "git",
@@ -67,7 +67,29 @@
         "role": "Editor",
         "perMachine": true
       }
+    ],
+      "mac": {
+    "icon": "packages/img/icon/icon.icns",
+    "category": "public.app-category.utilities",
+    "fileAssociations": [
+      {
+        "ext": [
+          "wav",
+          "mp3",
+          "mpeg",
+          "m4a",
+          "aac",
+          "mpga",
+          "ogg",
+          "chirp",
+          "mp4",
+          "flac"
+        ],
+        "description": "Audio files",
+        "role": "Viewer"
+      }
     ]
+  }
   },
   "keywords": [
     "Nocmig",
@@ -84,7 +106,6 @@
   },
   "homepage": "https://github.com/mattk70/Chirpity-Electron#readme",
   "devDependencies": {
-    "@tensorflow/tfjs-node-gpu": "^3.15.0",
     "electron": "^7.3.3",
     "electron-packager": "^14.2.1",
     "electron-wix-msi": "^3.2.0"
@@ -94,16 +115,16 @@
     "bootstrap": "^4.6.1",
     "browser-id3-writer": "^4.4.0",
     "colormap": "^2.3.2",
-    "gpu-info": "^0.0.1",
     "jquery": "^3.6.0",
     "lamejstmp": "^1.0.1",
     "os": "^0.1.2",
     "popper.js": "^1.16.1",
     "seedrandom": "^3.0.5",
     "suncalc2": "^1.8.1",
-    "update-electron-app": "^2.0.1",
     "uuid": "^8.3.2",
-    "wavesurfer.js": "^6.0.4"
+    "wavesurfer.js": "^6.0.4",
+    "node-gzip": "^1.1.2",
+    "systeminformation": "^5.11.9"
   }
 }
 
