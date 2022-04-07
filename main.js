@@ -89,7 +89,7 @@ function createWorker() {
     workerWindow.on('closed', () => {
         workerWindow = null;
     });
-    //workerWindow.webContents.openDevTools();
+    workerWindow.webContents.openDevTools();
     console.log("worker created");
 
 }

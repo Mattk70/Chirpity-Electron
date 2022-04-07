@@ -41,6 +41,9 @@ class Model {
         this.frame_length = 512;
         this.frame_step = 186;
         this.prediction = null;
+        this.prediction_batch = null;
+        this.keys_batch = [];
+        this.result = null;
         this.appPath = appPath;
         this.useWhitelist = useWhitelist;
     }
@@ -120,126 +123,155 @@ class Model {
     }
 
 
-    async predictChunk(chunks, fileStart) {
+    async predictChunk(chunks, fileStart, lastKey) {
         let batched_results = [];
         let result;
         let audacity;
-        tf.tidy(() => {
-            let tensorArray = [];
-            let keys = [];
-            for (const [key, value] of Object.entries(chunks)) {
-                keys.push(key);
-                let chunk = tf.tensor1d(value);
-                // if the file is too short, pad with zeroes. Only if at least 1 second of signal
-                if (chunk.shape[0] < this.chunkLength){
-                    if (chunk.shape[0] > this.chunkLength / 6) {
-                        let padding = tf.zeros([this.chunkLength - chunk.shape[0]]);
-                        chunk = chunk.concat(padding);
-                    } else { continue }  // Ignore chunk fragment
-                }
-                this._makeSpectrogram(chunk);
-                tensorArray.push(this.spectrogram);
+        //tf.tidy(() => {
+        let tensorArray = [];
+        let keys = [];
+        for (const [key, value] of Object.entries(chunks)) {
+            keys.push(key);
+            let chunk = tf.tensor1d(value);
+            // if the file is too short, pad with zeroes. Only if at least 1 second of signal
+            if (chunk.shape[0] < this.chunkLength) {
+                if (chunk.shape[0] > this.chunkLength / 6) {
+                    let padding = tf.zeros([this.chunkLength - chunk.shape[0]]);
+                    chunk = chunk.concat(padding);
+                } else {
+                    continue
+                }  // Ignore chunk fragment
             }
-            this.batch = tf.stack(tensorArray);
-            if (this.batch.shape[0] < this.batchSize){
-                const padding = tf.zeros([this.batchSize - this.batch.shape[0], this.inputShape[1], this.inputShape[2], this.inputShape[3]]);
-                this.batch = tf.concat([this.batch, padding], 0)
+            this._makeSpectrogram(chunk);
+            tensorArray.push(this.spectrogram);
+        }
+        this.batch = tf.stack(tensorArray);
+        if (this.batch.shape[0] < this.batchSize) {
+            const padding = tf.zeros([this.batchSize - this.batch.shape[0], this.inputShape[1], this.inputShape[2], this.inputShape[3]]);
+            this.batch = tf.concat([this.batch, padding], 0)
+        }
+        //let t0 = performance.now();
+        this.prediction = this.model.predict(this.batch, {batchSize: this.batchSize})
+        //let t1 = performance.now()
+        //console.log(`predictions took: ${t1 - t0} milliseconds`)
+        // Get label
+        let top3, top3scores;
+        if (this.prediction_batch && (this.prediction_batch.shape[0] === this.batchSize * 3 || keys[keys.length - 1] >= lastKey)) {
+            this.keys_batch = this.keys_batch.concat(keys);
+            this.prediction_batch = tf.concat([this.prediction_batch, this.prediction], 0)
+            //let t0 = performance.now();
+            const {indices, values} = this.prediction_batch.topk(3);
+            //let t1 = performance.now()
+            //console.log(`topk took: ${t1 - t0} milliseconds`)
+            //t0 = performance.now();
+            top3 = indices.arraySync();
+            top3scores = values.arraySync();
+            //t1 = performance.now()
+            //console.log(`arraysync took: ${t1 - t0} milliseconds`)
+            this.prediction_batch = null;
+        } else {
+            if (this.prediction_batch) {
+                this.keys_batch = this.keys_batch.concat(keys);
+                this.prediction_batch = tf.concat([this.prediction_batch, this.prediction], 0)
+                this.prediction = null;
+            } else {
+                this.prediction_batch = this.prediction;
+                this.keys_batch = keys;
+                this.prediction = null;
             }
-            let t0 = performance.now();
-            this.prediction = this.model.predict(this.batch, {batchSize: this.batchSize})
-            let t1 = performance.now()
-            console.log(`predictions took: ${t1 - t0} milliseconds`)
-            // Get label
-            const {indices, values} = this.prediction.topk(3);
-            let top3 = indices.arraySync();
-            let top3scores = values.arraySync();
+            return false
+        }
 
-            const batch = {};
-            for (let j = 0; j < top3.length; j++) {
-                batch[keys[j]] = ({'index': top3[j], 'score': top3scores[j]});
-            }
-            // Try this method of adjusting results
-
-            for (const [key, item] of Object.entries(batch)) {
-                for (let i = 0; i < item.index.length; i++) {
-                    if (suppressed_IDs.includes(item.index[i])) {
-                        item.score[i] = item.score[i] ** 3;
-                    } else if (enhanced_IDs.includes(item.index[i])) {
-                        item.score[i] = Math.pow(item.score[i], 0.35);
-                    }
+        //t0 = performance.now();
+        const batch = {};
+        for (let j = 0; j < top3.length; j++) {
+            batch[this.keys_batch[j]] = ({'index': top3[j], 'score': top3scores[j]});
+        }
+        this.keys_batch = [];
+        // Try this method of adjusting results
+        for (const [key, item] of Object.entries(batch)) {
+            for (let i = 0; i < item.index.length; i++) {
+                if (suppressed_IDs.includes(item.index[i])) {
+                    item.score[i] = item.score[i] ** 3;
+                } else if (enhanced_IDs.includes(item.index[i])) {
+                    item.score[i] = Math.pow(item.score[i], 0.35);
                 }
-                // Sort by value:
-                // item.sort(function (a, b) {
-                //     return ((a.score > b.score) ? -1 : ((a.score === b.score) ? 0 : 1));
-                // });
-                //let primary, secondary, tertiary] = top3;
-                //let [score, score2, score3] = top3scores;
-                let suppressed = false;
-                // Use whitelist for top prediction only
-                if (blocked_IDs.indexOf(item.index[0]) !== -1) {
-                    // Just warn if Ambient noise
-                    labels[item.index[0]].split('_')[1] === "Ambient Noise" ? suppressed = false : suppressed = 'text-danger'
-                    //this.labels[r[0].index].split('_')[1] === "Ambient Noise" ? suppressed = false : suppressed = 'text-danger'
-                    //make a copy of the top prediction
-                    const [temp_index, temp_score] = [item.index[0], item.score[0]]
-                    // Is the secondary prediction blocked too?
-                    if (blocked_IDs.indexOf(item.index[1]) !== -1) {
-                        // How about if all top three are blocked
-                        if (blocked_IDs.indexOf(item.index[2]) !== -1) {
-                            // Squash the top prediction
-                            item.score[0] = 0.0;
-                            suppressed = false;
-                        } else {
-                            //make a copy of the second prediction too
-                            const [temp_index2, temp_score2] = [item.index[1], item.score[1]]
-                            // Bump up the third prediction
-                            item.index[0] = item.index[2]
-                            item.score[0] = item.score[2]
-                            // Copy primary to secondary
-                            item.index[1] = temp_index
-                            item.score[1] = temp_score
-                            // Copy secondary to tertiary
-                            item.index[2] = temp_index2
-                            item.score[2] = temp_score2
-                        }
+            }
+            // Sort by value:
+            // item.sort(function (a, b) {
+            //     return ((a.score > b.score) ? -1 : ((a.score === b.score) ? 0 : 1));
+            // });
+            //let primary, secondary, tertiary] = top3;
+            //let [score, score2, score3] = top3scores;
+            let suppressed = false;
+            // Use whitelist for top prediction only
+            if (blocked_IDs.indexOf(item.index[0]) !== -1) {
+                // Just warn if Ambient noise
+                labels[item.index[0]].split('_')[1] === "Ambient Noise" ? suppressed = false : suppressed = 'text-danger'
+                //this.labels[r[0].index].split('_')[1] === "Ambient Noise" ? suppressed = false : suppressed = 'text-danger'
+                //make a copy of the top prediction
+                const [temp_index, temp_score] = [item.index[0], item.score[0]]
+                // Is the secondary prediction blocked too?
+                if (blocked_IDs.indexOf(item.index[1]) !== -1) {
+                    // How about if all top three are blocked
+                    if (blocked_IDs.indexOf(item.index[2]) !== -1) {
+                        // Squash the top prediction
+                        item.score[0] = 0.0;
+                        suppressed = false;
                     } else {
-                        //make a copy of the prediction
-                        const [temp_index, temp_score] = [item.index[0], item.score[0]]
-                        // Bump up the second prediction
-                        item.index[0] = item.index[1]
-                        item.score[0] = item.score[1]
+                        //make a copy of the second prediction too
+                        const [temp_index2, temp_score2] = [item.index[1], item.score[1]]
+                        // Bump up the third prediction
+                        item.index[0] = item.index[2]
+                        item.score[0] = item.score[2]
                         // Copy primary to secondary
                         item.index[1] = temp_index
                         item.score[1] = temp_score
+                        // Copy secondary to tertiary
+                        item.index[2] = temp_index2
+                        item.score[2] = temp_score2
                     }
+                } else {
+                    //make a copy of the prediction
+                    const [temp_index, temp_score] = [item.index[0], item.score[0]]
+                    // Bump up the second prediction
+                    item.index[0] = item.index[1]
+                    item.score[0] = item.score[1]
+                    // Copy primary to secondary
+                    item.index[1] = temp_index
+                    item.score[1] = temp_score
                 }
-                result = ({
-                    start: key / this.config.sampleRate,
-                    end: (key / this.config.sampleRate) + CONFIG.specLength,
-                    timestamp: myModel._timestampFromSeconds(key / this.config.sampleRate, fileStart),
-                    position: myModel._timestampFromSeconds(key / this.config.sampleRate, 0),
-                    sname: this.labels[item.index[0]].split('_')[0],
-                    cname: this.labels[item.index[0]].split('_')[1],
-                    score: item.score[0],
-                    sname2: this.labels[item.index[1]].split('_')[0],
-                    cname2: this.labels[item.index[1]].split('_')[1],
-                    score2: item.score[1],
-                    sname3: this.labels[item.index[2]].split('_')[0],
-                    cname3: this.labels[item.index[2]].split('_')[1],
-                    score3: item.score[2],
-                    suppressed: suppressed
-                });
-                audacity = ({
-                    timestamp: (key / this.config.sampleRate) + '\t' + ((key / this.config.sampleRate) + this.config.specLength),
-                    cname: this.labels[item.index[0]].split('_')[1],
-                    score: item.score[0]
-                })
-                //prepare summary
-                console.log(key / this.config.sampleRate, item.index[0], this.labels[item.index[0]], item.score[0]);
-                batched_results.push([parseInt(key), result, audacity]);
             }
-            this.prediction = batched_results;
-        })
+            result = ({
+                start: key / this.config.sampleRate,
+                end: (key / this.config.sampleRate) + CONFIG.specLength,
+                timestamp: myModel._timestampFromSeconds(key / this.config.sampleRate, fileStart),
+                position: myModel._timestampFromSeconds(key / this.config.sampleRate, 0),
+                sname: this.labels[item.index[0]].split('_')[0],
+                cname: this.labels[item.index[0]].split('_')[1],
+                score: item.score[0],
+                sname2: this.labels[item.index[1]].split('_')[0],
+                cname2: this.labels[item.index[1]].split('_')[1],
+                score2: item.score[1],
+                sname3: this.labels[item.index[2]].split('_')[0],
+                cname3: this.labels[item.index[2]].split('_')[1],
+                score3: item.score[2],
+                suppressed: suppressed
+            });
+            audacity = ({
+                timestamp: (key / this.config.sampleRate) + '\t' + ((key / this.config.sampleRate) + this.config.specLength),
+                cname: this.labels[item.index[0]].split('_')[1],
+                score: item.score[0]
+            })
+            //prepare summary
+            console.log(key / this.config.sampleRate, item.index[0], this.labels[item.index[0]], item.score[0]);
+            batched_results.push([parseInt(key), result, audacity]);
+        }
+        this.result = batched_results;
+        //t1 = performance.now()
+        //console.log(`result prep took: ${t1 - t0} milliseconds`)
+        return true
+        //})
     }
 }
 
@@ -250,7 +282,7 @@ let myModel;
 
 onmessage = async function (e) {
     //console.log('Worker: Message received from main script');
-    const modelRequest = e.data[0];
+    const modelRequest = e.data.message || e.data[0];
     if (modelRequest === 'load') {
         const appPath = e.data[1];
         const useWhitelist = e.data[2];
@@ -258,8 +290,7 @@ onmessage = async function (e) {
         console.log('model received load instruction. Using whitelist:' + e.data[2])
         myModel = new Model(appPath, useWhitelist);
         await myModel.loadModel();
-        myModel.warmUp(batch).then(function (err) {
-            if (err) {console.log('Problem warming up model ' + err)}
+        myModel.warmUp(batch).then(function (value) {
             postMessage({
                 message: 'model-ready',
                 sampleRate: myModel.config.sampleRate,
@@ -269,15 +300,29 @@ onmessage = async function (e) {
         });
 
     } else if (modelRequest === 'predict') {
+        let t0 = performance.now();
         let response = {};
-        const chunks = e.data[1];
-        const fileStart = e.data[2];
+        let chunks = {};
+        let i = e.data.chunkStart;
+        for (let j = 0; j < e.data.numberOfChunks; j++) {
+            let key = 'chunk' + j;
+            chunks[i] = e.data[key];
+            i = i + myModel.chunkLength;
+        }
 
-        await myModel.predictChunk(chunks, fileStart);
-        response['message'] = 'prediction';
-        response['result'] = myModel.prediction;
+        const fileStart = e.data.fileStart;
+        const lastKey = e.data.lastKey;
+        //const postTime = e.data.t0;
+        //console.log(`sending message to model.js took: ${t0 - postTime} milliseconds`)
+        const readyToSend = await myModel.predictChunk(chunks, fileStart, lastKey);
+        if (readyToSend) {
+            response['message'] = 'prediction';
+            response['result'] = myModel.result;
+            response['time'] = performance.now();
+            postMessage(response);
 
-        postMessage(response);
-
+            let t1 = performance.now();
+            console.log(`receive to post took: ${t1 - t0} milliseconds`)
+        }
     }
 }
