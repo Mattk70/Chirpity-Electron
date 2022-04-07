@@ -102,7 +102,7 @@ async function doPrediction(start, end, fileStart) {
             sendMessageToWorker(chunkStart, chunks, fileStart, lastKey);
             //predictWorker.postMessage(objData, chunkbuffers);
             chunks = [];
-            break;
+            //break;
         }
     }
     //clear up remainder less than BATCH_SIZE, by *padding the batch*
