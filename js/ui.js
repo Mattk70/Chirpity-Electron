@@ -7,7 +7,7 @@ const SpecTimeline = require('wavesurfer.js/dist/plugin/wavesurfer.timeline.min.
 const Regions = require('wavesurfer.js/dist/plugin/wavesurfer.regions.min.js');
 const colormap = require("colormap");
 const $ = require('jquery');
-const AudioBufferSlice = require('./js/AudioBufferSlice.js');
+const AudioBufferSlice = require('./AudioBufferSlice.js');
 const p = require('path');
 const SunCalc = require('suncalc2');
 const {v4: uuidv4} = require("uuid");
@@ -69,6 +69,7 @@ let diagnostics = {}
 diagnostics['Chirpity Version'] = version;
 
 const si = require('systeminformation');
+const {models} = require("@tensorflow/tfjs");
 
 // promises style - new since version 3
 si.graphics()
@@ -373,7 +374,8 @@ function initSpec(args) {
     wavesurfer.on('region-created', function (e) {
         // console.log(wavesurfer.regions.list)
         region = e
-        enableMenuItem(['analyzeSelection', 'exportMP3']);
+        enableMenuItem(['exportMP3']);
+        if (modelReady)  enableMenuItem(['analyzeSelection']);
     });
 
     wavesurfer.on('finish', function () {
@@ -462,39 +464,38 @@ async function showSaveDialog() {
 }
 
 // Worker listeners
+function analyseReset() {
+    // hide exclude x in the table
+    speciesExclude.forEach(el => {
+        el.classList.add('d-none');
+    })
+    completeDiv.hide();
+    progressDiv.show();
+    // Diagnostics
+    t0_analysis = Date.now();
+}
+
 
 const analyzeLink = document.getElementById('analyze');
 speciesExclude = document.querySelectorAll('speciesExclude');
 analyzeLink.addEventListener('click', async () => {
-    completeDiv.hide();
-    speciesExclude.forEach(el => {
-        el.classList.add('d-none');
-    })
+    analyseReset();
     resetResults();
-    // Diagnostics
-    t0_analysis = Date.now();
     ipcRenderer.send('analyze', {confidence: config.minConfidence, fileStart: fileStart});
-    analyzeLink.disabled = true;
 });
 
 const analyzeSelectionLink = document.getElementById('analyzeSelection');
 
 analyzeSelectionLink.addEventListener('click', async () => {
-    completeDiv.hide();
-    speciesExclude.forEach(el => {
-        el.classList.add('d-none');
-    })
+    analyseReset();
     let start;
     let end;
-    if (region.start) {
-        start = region.start + bufferBegin;
-        end = region.end + bufferBegin;
-    }
+    start = region.start + bufferBegin;
+    end = region.end + bufferBegin;
     // Add current buffer's beginning offset to region start / end tags
     ipcRenderer.send('analyze', {confidence: 0.1, start: start, end: end, fileStart: fileStart});
     summary = {};
     summary['suppressed'] = []
-    analyzeLink.disabled = true;
 });
 
 
@@ -562,17 +563,26 @@ function createRegion(start, end, label) {
     wavesurfer.seekAndCenter(progress);
 }
 
-function loadResultRegion(start, end, label, el) {
-    // Accepts global start and end timecodes from model detections
-    // Need to find and centre a view of the detection in the spectrogram
-    // 3 second detections
+const tbody = document.getElementById('resultTableBody')
+tbody.addEventListener('click', function (e) {
     if (activeRow) activeRow.classList.remove('table-active')
-    el.classList.add('table-active');
-    activeRow = el;
+    const row = e.target.closest('tr');
+    row.classList.add('table-active');
+    activeRow = row;
     activeRow.scrollIntoView({
         behavior: 'smooth',
         block: 'nearest'
     })
+    loadResultRegion(row.attributes[0].value.split(','));
+})
+
+function loadResultRegion(paramlist) {
+    // Accepts global start and end timecodes from model detections
+    // Need to find and centre a view of the detection in the spectrogram
+    // 3 second detections
+    let [start, end, label] = paramlist;
+    start = parseFloat(start);
+    end = parseFloat(end);
     bufferBegin = start - (windowLength / 2) + 1.5
     loadBufferSegment(currentBuffer, bufferBegin)
     createRegion(start - bufferBegin, end - bufferBegin, label)
@@ -1337,6 +1347,7 @@ ipcRenderer.on('model-ready', async (event, args) => {
     if (workerHasLoadedFile) {
         enableMenuItem(['analyze'])
     }
+    if (region) enableMenuItem(['analyzeSelection'])
     t1_warmup = Date.now();
     diagnostics['Warm Up'] = ((t1_warmup - t0_warmup) / 1000).toFixed(2) + ' seconds';
     diagnostics['Tensorflow Backend'] = args.backend;
@@ -1372,7 +1383,6 @@ ipcRenderer.on('worker-loaded', async (event, args) => {
 })
 
 ipcRenderer.on('progress', async (event, arg) => {
-    progressDiv.show();
     let progress = (arg.progress * 100).toFixed(1);
     progressBar.width(progress + '%');
     progressBar.attr('aria-valuenow', progress);
@@ -1677,7 +1687,7 @@ async function renderResult(result, index, selection) {
         let feedback_icons;
         let confidence = '';
         if (result.score < 0.65) {
-            confidence = ' ?';
+            confidence = '&#63;';
         }
         //     feedback_icons = `<span class='material-icons-two-tone text-success feedback pointer'>thumb_up_alt</span>`;
         // } else if (result.score < 0.85) {
@@ -1701,7 +1711,8 @@ async function renderResult(result, index, selection) {
         predictions[index] = result;
         let showTimeOfDay;
         config.timeOfDay ? showTimeOfDay = '' : showTimeOfDay = 'd-none';
-        tr += `<tr onclick='loadResultRegion( ${start},${end} , &quot;${result.cname}${confidence}&quot, this)' class='border-top border-secondary top-row ${result.dayNight}'>
+        //tr += `<tr onclick='loadResultRegion( ${start},${end} , &quot;${result.cname}${confidence}&quot, this)' class='border-top border-secondary top-row ${result.dayNight}'>
+        tr += `<tr name="${start},${end},${result.cname}${confidence}" class='border-top border-secondary top-row ${result.dayNight}'>
                     <th scope='row'>${index}</th><td class='timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
                     <td >${UI_position}</td><td class='cname'>${result.cname}</td>
                     <td><i>${result.sname}</i></td><td class='text-center'>${iconizeScore(result.score)}</td>
@@ -1715,7 +1726,7 @@ async function renderResult(result, index, selection) {
                     <td id="${index}" class='specFeature text-center'>${feedback_icons}</td>
                    </tr>`;
         if (result.score2 > 0.2) {
-            tr += `<tr id='subrow${index}' class='subrow d-none' onclick='loadResultRegion(${start},${end},&quot;${result.cname}${confidence}&quot;)'>
+            tr += `<tr name="${start},${end},${result.cname}${confidence}" id='subrow${index}' class='subrow d-none'>
                         <th scope='row'>${index}</th><td> </td><td> </td><td class='cname2'>${result.cname2}</td>
                         <td><i>${result.sname2}</i></td><td class='text-center'>${iconizeScore(result.score2)}</td>
                         <td> </td><td class='specFeature'> </td>
@@ -1726,7 +1737,7 @@ async function renderResult(result, index, selection) {
                         <td class='specFeature'> </td>
                        </tr>`;
             if (result.score3 > 0.2) {
-                tr += `<tr id='subsubrow${index}' class='subrow d-none' onclick='loadResultRegion(${start},${end},&quot;${result.cname}${confidence}&quot;)'>
+                tr += `<tr name="${start},${end},${result.cname}${confidence}" id='subsubrow${index}' class='subrow d-none'>
                         <th scope='row'>${index}</th><td> </td><td> </td><td class='cname3'>${result.cname3}</td>
                         <td><i>${result.sname3}</i></td><td class='text-center'>${iconizeScore(result.score3)}</td>
                         <td> </td><td class='specFeature'> </td>
@@ -1794,7 +1805,7 @@ $(document).on('click', '.rotate', function (e) {
     const row1 = e.target.parentNode.parentNode.nextSibling;
     const row2 = row1.nextSibling;
     row1.classList.toggle('d-none')
-    if ( row2 && !row2.classList.contains('top-row')) row2.classList.toggle('d-none')
+    if (row2 && !row2.classList.contains('top-row')) row2.classList.toggle('d-none')
     e.stopImmediatePropagation();
 })
 
@@ -1897,7 +1908,29 @@ function iconizeScore(score) {
     else return iconDict['high'].replace('--', tooltip)
 }
 
-// Help content handling
+// File menu handling
+
+$('#open').on('click', function () {
+    showOpenDialog();
+});
+
+$('#saveDetections').on('click', function () {
+    saveDetections();
+});
+
+$('#saveLabels').on('click', function () {
+    showSaveDialog();
+});
+
+$('#exportMP3').on('click', function () {
+    sendFile('save');
+});
+
+$('#exit').on('click', function () {
+    exitApplication();
+});
+
+// Help menu handling
 
 $('#keyboard').on('click', function () {
     $('#helpModalLabel').text('Keyboard shortcuts');
@@ -1943,3 +1976,18 @@ $('#diagnostics').on('click', function () {
     $('#diagnosticsModal').modal({show: true});
 
 });
+
+// Transport controls handling
+
+$('#playToggle').on('mousedown', function () {
+    wavesurfer.playPause();
+});
+
+$('#zoomIn').on('click', function () {
+    zoomSpecIn();
+});
+
+$('#zoomOut').on('click', function () {
+    zoomSpecOut();
+});
+

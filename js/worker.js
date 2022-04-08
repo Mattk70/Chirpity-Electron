@@ -78,53 +78,19 @@ async function doPrediction(start, end, fileStart) {
     let chunks = [];
     let i;
     for (i = start; i < end; i += increment) {
-        // If we're at the end of a file and we haven't got a full chunk, scroll back to fit
-        //if (i + chunkLength > end && end >= chunkLength) i = end - chunkLength;
         let chunk = channelData.slice(i, i + increment);
         // Batch predictions
         chunks.push(chunk);
         if (chunks.length === BATCH_SIZE) {
-            //t0 = performance.now();
-            // const objData = {
-            //     message:'predict',
-            //     chunkStart:i - ((chunks.length - 1) * chunkLength),
-            //     numberOfChunks: chunks.length,
-            //     fileStart:fileStart,
-            //     lastKey:lastKey,
-            //     //t0:t0
-            // }
-            // let chunkbuffers = [];
-            // for (let i = 0; i < chunks.length; i++){
-            //     objData['chunk' + i] = chunks[i];
-            //     chunkbuffers.push(objData['chunk' + i].buffer)
-            // }
-            const chunkStart = i - ((chunks.length - 1) * chunkLength);
+            const chunkStart = i - ((chunks.length - 1) * increment);
             sendMessageToWorker(chunkStart, chunks, fileStart, lastKey);
-            //predictWorker.postMessage(objData, chunkbuffers);
             chunks = [];
-            //break;
         }
     }
     //clear up remainder less than BATCH_SIZE, by *padding the batch*
     if (chunks.length > 0) {
-            //t0 = performance.now();
-            const objData = {
-                message:'predict',
-                chunkStart:i - ((chunks.length - 1) * chunkLength),
-                numberOfChunks: chunks.length,
-                fileStart:fileStart,
-                lastKey:lastKey,
-                //t0:t0
-            }
-            let chunkbuffers = [];
-            for (let i = 0; i < chunks.length; i++){
-                objData['chunk' + i] = chunks[i];
-                chunkbuffers.push(objData['chunk' + i].buffer)
-            }
-            const chunkStart = i - ((chunks.length - 1) * chunkLength);
-            const setDelay = setTimeout(sendMessageToWorker, 1200, chunkStart, chunks, fileStart, lastKey)
-
-            //predictWorker.postMessage(objData, chunkbuffers);
+        const chunkStart = i - ((chunks.length) * increment);
+        sendMessageToWorker(chunkStart, chunks, fileStart, lastKey);
     }
 }
 
@@ -173,7 +139,7 @@ ipcRenderer.on('save', async (event, arg) => {
 ipcRenderer.on('load-model', async (event, arg) => {
     //console.log("model-loading, using whitelist: " + arg.useWhitelist)
     useWhitelist = arg.useWhitelist;
-    await spawnWorker(useWhitelist)
+    spawnWorker(useWhitelist)
 })
 
 ipcRenderer.on('post', async (event, arg) => {
@@ -396,57 +362,60 @@ function spawnWorker(useWhitelist) {
     predictWorker.postMessage(['load', appPath, useWhitelist, BATCH_SIZE])
 
     predictWorker.onmessage = (e) => {
-        const response = e.data;
-        if (response['message'] === 'model-ready') {
-            chunkLength = response['chunkLength'];
-            sampleRate = response['sampleRate'];
-            const backend = response['backend'];
-            console.log(backend);
-            ipcRenderer.send('model-ready', {message: 'ready', backend: backend})
-        } else if (response['message'] === 'prediction') {
-            console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
-            //t1 = performance.now();
-            //console.log(`post from worker took: ${t1 - response['time']} milliseconds`)
-            //console.log(`post to receive took: ${t1 - t0} milliseconds`)
-            response['result'].forEach(prediction => {
-                const position = prediction[0];
-                const result = prediction[1];
-                const audacity = prediction[2];
-
-                //console.log('Prediction received from worker', result);
-                if (result.score > minConfidence && predicting) {
-                    index++;
-                    ipcRenderer.send('prediction-ongoing', {result, 'index': index, 'selection': selection});
-                    AUDACITY.push(audacity);
-                    RESULTS.push(result);
-                }
-                if (predicting) ipcRenderer.send('progress', {'progress': position / end});
-                if (isNaN(position) || position + chunkLength >= end) {
-                    console.log('Prediction done');
-                    console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
-                    if (predicting) {
-                        if (RESULTS.length === 0) {
-                            const result = "No detections found.";
-                            ipcRenderer.send('prediction-ongoing', {result, 'index': 1, 'selection': selection});
-                            console.log('sent another prediction ongoing')
-                        }
-                        ipcRenderer.send('progress', {'progress': 1});
-                        ipcRenderer.send('prediction-done', {'labels': AUDACITY});
-                        predicting = false;
-                        return
-                    }
-                }
-
-
-            })
-        } //else if (response['message'] === 'ready-for-next') {
-            //t1 = performance.now();
-            //console.log(`ready-for-next from worker took: ${t1 - response['time']} milliseconds`)
-        //}
+        runPredictions(e)
     }
 }
 
+function runPredictions(e) {
+    const response = e.data;
+    if (response['message'] === 'model-ready') {
+        chunkLength = response['chunkLength'];
+        sampleRate = response['sampleRate'];
+        const backend = response['backend'];
+        console.log(backend);
+        ipcRenderer.send('model-ready', {message: 'ready', backend: backend})
+    } else if (response['message'] === 'prediction') {
+        if (!predicting) return; // stop batch padding sending more results
+        console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
+        //t1 = performance.now();
+        //console.log(`post from worker took: ${t1 - response['time']} milliseconds`)
+        //console.log(`post to receive took: ${t1 - t0} milliseconds`)
+        response['result'].forEach(prediction => {
+            const position = prediction[0];
+            const result = prediction[1];
+            const audacity = prediction[2];
 
+            //console.log('Prediction received from worker', result);
+            if (!isNaN(position) && result.score > minConfidence) {
+                index++;
+                ipcRenderer.send('prediction-ongoing', {result, 'index': index, 'selection': selection});
+                AUDACITY.push(audacity);
+                RESULTS.push(result);
+                ipcRenderer.send('progress', {'progress': position / end});
+            }
+
+            if (isNaN(position) || position + chunkLength >= end) {
+                console.log('Prediction done');
+                console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
+                if (predicting) {
+                    if (RESULTS.length === 0) {
+                        const result = "No detections found.";
+                        ipcRenderer.send('prediction-ongoing', {result, 'index': 1, 'selection': selection});
+                        console.log('sent another prediction ongoing')
+                    }
+                    ipcRenderer.send('progress', {'progress': 1});
+                    ipcRenderer.send('prediction-done', {'labels': AUDACITY});
+                    predicting = false;
+
+                }
+            }
+            //doPrediction(response['start'], response['end'], response['fileStart'])
+        })
+    } //else if (response['message'] === 'ready-for-next') {
+    //t1 = performance.now();
+    //console.log(`ready-for-next from worker took: ${t1 - response['time']} milliseconds`)
+    //}
+}
 
 
 
