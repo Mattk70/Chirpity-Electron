@@ -37,15 +37,15 @@
                     File
                 </a>
                 <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item" href="#" onclick="showOpenDialog();"><u>O</u>pen Audio File </a>
-                    <a class="dropdown-item disabled" onclick="saveDetections()" id="saveDetections" href="#">
+                    <a id="open" class="dropdown-item" href="#"><u>O</u>pen Audio File </a>
+                    <a class="dropdown-item disabled" id="saveDetections" href="#">
                         <u>S</u>ave Detections</a>
-                    <a class="dropdown-item disabled" onclick="showSaveDialog()" id="saveLabels" href="#">
+                    <a class="dropdown-item disabled" id="saveLabels" href="#">
                         Save <u>A</u>udacity Labels</a>
-                    <a class="dropdown-item disabled" onclick="sendFile('save')" id="exportMP3" href="#">
+                    <a class="dropdown-item disabled" id="exportMP3" href="#">
                         Export Selected Audio</a>
                     <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="#" onclick="exitApplication();">Exit</a>
+                    <a class="dropdown-item" href="#" id="exit">Exit</a>
                 </div>
             </li>
             <li class="nav-item dropdown active">
@@ -244,14 +244,14 @@
 
             <div id="filename" class="align-bottom p-2 pl-3"></div>
             <div class="btn-group bg-dark specFeature offset-5" role="group" id="transport-controls">
-                <button class="btn btn-outline-secondary" onmousedown="wavesurfer.playPause();">
+                <button id="playToggle" class="btn btn-outline-secondary">
                     <i class="material-icons">play_arrow</i><span class="align-bottom">Play / </span>
                     <i class="material-icons">pause</i><span class="align-bottom">Pause</span>
                 </button>
-                <button class="btn btn-outline-secondary" onclick="zoomSpecIn();">
+                <button id="zoomIn" class="btn btn-outline-secondary">
                     <i class="material-icons-two-tone zoom">zoom_in</i>
                 </button>
-                <button class="btn btn-outline-secondary" onclick="zoomSpecOut();">
+                <button id="zoomOut" class="btn btn-outline-secondary">
                     <i class="material-icons-two-tone zoom">zoom_out</i>
                 </button>
 
@@ -264,7 +264,6 @@
                              aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width:0">
                             0%
                         </div>
-                        <small class="justify-content-center d-flex position-absolute w-100">60% complete</small>
                     </div>
                 </div>
                 <div class="complete float-sm-right" style="display: none">
@@ -315,6 +314,6 @@
 <div class="d-flex fixed-bottom p-2 bg-primary text-white justify-content-center" id="footer">
     <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span></small>
 </div>
-<script src="js/ui.js"></script>
+<script>require("./js/ui.js")</script>
 </body>
 </html>

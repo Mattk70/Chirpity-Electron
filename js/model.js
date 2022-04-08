@@ -138,14 +138,15 @@ class Model {
                 if (chunk.shape[0] > this.chunkLength / 6) {
                     let padding = tf.zeros([this.chunkLength - chunk.shape[0]]);
                     chunk = chunk.concat(padding);
-                } else {
+                } else { // Ignore chunk fragment
                     continue
-                }  // Ignore chunk fragment
+                }
             }
             this._makeSpectrogram(chunk);
             tensorArray.push(this.spectrogram);
         }
-        this.batch = tf.stack(tensorArray);
+        // If we have any tensors, stack them, else create ones
+        tensorArray.length ? this.batch = tf.stack(tensorArray) : this.batch = tf.zeros([1, this.inputShape[1], this.inputShape[2], this.inputShape[3]]);
         if (this.batch.shape[0] < this.batchSize) {
             const padding = tf.zeros([this.batchSize - this.batch.shape[0], this.inputShape[1], this.inputShape[2], this.inputShape[3]]);
             this.batch = tf.concat([this.batch, padding], 0)
@@ -156,9 +157,13 @@ class Model {
         //console.log(`predictions took: ${t1 - t0} milliseconds`)
         // Get label
         let top3, top3scores;
-        if (this.prediction_batch && (this.prediction_batch.shape[0] === this.batchSize * 3 || keys[keys.length - 1] >= lastKey)) {
+        if ((this.prediction_batch && this.prediction_batch.shape[0] === this.batchSize * 2) || keys[keys.length - 1] >= lastKey) {
             this.keys_batch = this.keys_batch.concat(keys);
-            this.prediction_batch = tf.concat([this.prediction_batch, this.prediction], 0)
+            if (this.prediction_batch) {
+                this.prediction_batch = tf.concat([this.prediction_batch, this.prediction], 0)
+            } else {
+                this.prediction_batch = this.prediction;
+            }
             //let t0 = performance.now();
             const {indices, values} = this.prediction_batch.topk(3);
             //let t1 = performance.now()
@@ -277,11 +282,13 @@ class Model {
 
 module.exports = Model;
 
-
 let myModel;
-
 onmessage = async function (e) {
     //console.log('Worker: Message received from main script');
+        await runPredictions(e)
+}
+
+async function runPredictions(e){
     const modelRequest = e.data.message || e.data[0];
     if (modelRequest === 'load') {
         const appPath = e.data[1];
@@ -319,6 +326,10 @@ onmessage = async function (e) {
             response['message'] = 'prediction';
             response['result'] = myModel.result;
             response['time'] = performance.now();
+            response['end'] = lastKey;
+            response['fileStart'] = fileStart;
+            // add a chunk to the start
+            response['start'] = i + myModel.chunkLength;
             postMessage(response);
 
             let t1 = performance.now();
