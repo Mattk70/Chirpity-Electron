@@ -1,4 +1,4 @@
-const {app, dialog, ipcMain, BrowserWindow, Tray, remote} = require('electron');
+const {app, dialog, ipcMain, BrowserWindow} = require('electron');
 const fs = require("fs");
 //require('update-electron-app')();
 global.sharedObject = {prop1: process.argv};

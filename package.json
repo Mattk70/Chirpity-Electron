@@ -4,7 +4,7 @@
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
-    "start": "electron . \"/Users/matthew/Downloads/oie sp 24032022.chirp\"",
+    "start": "electron . \"/Users/matthew/Downloads/XC338781 - Pied Avocet - Recurvirostra avosetta.chirp\"",
     "export": "electron-packager . --platform=darwin --arch=x64 --prune --out packages --overwrite --icon=/Users/matthew/PycharmProjects/Chirpity-Electron/img/icon/icon"
   },
   "repository": {

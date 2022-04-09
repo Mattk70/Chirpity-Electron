@@ -27,8 +27,9 @@ let modelReady = false, fileLoaded = false, currentFile, fileList, resultHistory
 let region, AUDACITY_LABELS, wavesurfer;
 let summary = {};
 summary['suppressed'] = [];
-let fileStart, startTime, ctime;
-
+let fileStart, bufferStartTime, ctime;
+let startPosition; //
+let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
 // set up some DOM element caches
 let bodyElement = $('body');
 let dummyElement, specElement, waveElement, specCanvasElement, specWaveElement;
@@ -118,17 +119,15 @@ const fetchAudioFile = (filePath) =>
                 // Diagnostics
                 diagnostics['Audio Duration'] = currentFileDuration.toFixed(2) + ' seconds';
                 if (currentFileDuration < 20) windowLength = currentFileDuration;
-                // set fileStart time
-                if (config.timeOfDay) {
-                    fileStart = new Date(ctime - (currentFileDuration * 1000));
-                    let astro = SunCalc.getTimes(fileStart, config.latitude, config.longitude);
-                    dusk = astro.dusk;
-                    dawn = astro.dawn;
-                } else {
-                    fileStart = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
-                    //fileStart = new Date(ctime - (currentFileDuration * 1000));
-                }
 
+                fileStart = new Date(ctime - (currentFileDuration * 1000));
+                let astro = SunCalc.getTimes(fileStart, config.latitude, config.longitude);
+                dusk = astro.dusk;
+                dawn = astro.dawn;
+                if (config.nocmig && ctime < dusk && fileStart > dawn) {
+                    alert(`All timestamps in this file are during daylight hours. \n\nNocmig mode will be disabled.`)
+                    $('#timecode').click();
+                }
                 const offlineCtx = new OfflineAudioContext(1, sampleRate * currentFileDuration, sampleRate);
                 const offlineSource = offlineCtx.createBufferSource();
                 offlineSource.buffer = buffer;
@@ -279,7 +278,11 @@ function loadBufferSegment(buffer, begin, saveRegion) {
         begin = Math.max(0, buffer.duration - windowLength);
     }
     bufferBegin = begin;
-    startTime = new Date(fileStart.getTime() + (bufferBegin * 1000))
+    if (config.timeOfDay) {
+        bufferStartTime = new Date(fileStart.getTime() + (bufferBegin * 1000))
+    } else {
+        bufferStartTime = new Date(zero.getTime() + (bufferBegin * 1000))
+    }
     AudioBufferSlice(buffer, begin, begin + windowLength, function (error, slicedAudioBuffer) {
         if (error) {
             console.log(error);
@@ -301,12 +304,9 @@ function loadBufferSegment(buffer, begin, saveRegion) {
 }
 
 function updateSpec(buffer) {
-    // Show spec and timecode containers
-    //wavesurfer.timeline.params.offset = -bufferBegin;
     wavesurfer.loadDecodedBuffer(buffer);
     specCanvasElement.width('100%');
     $('.spec-labels').width('55px');
-
 }
 
 function initSpec(args) {
@@ -372,10 +372,9 @@ function initSpec(args) {
     });
     // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
-        // console.log(wavesurfer.regions.list)
         region = e
         enableMenuItem(['exportMP3']);
-        if (modelReady)  enableMenuItem(['analyzeSelection']);
+        if (modelReady) enableMenuItem(['analyzeSelection']);
     });
 
     wavesurfer.on('finish', function () {
@@ -648,7 +647,7 @@ document.querySelectorAll(".tableFixHead").forEach(el =>
 
 function formatTimeCallback(secs) {
     secs = Number(secs);
-    const now = new Date(startTime.getTime() + (secs * 1000))
+    const now = new Date(bufferStartTime.getTime() + (secs * 1000))
     const milliSeconds = now.getMilliseconds();
     const seconds = now.getSeconds();
     const minutes = now.getMinutes();
@@ -786,9 +785,6 @@ function saveChirp() {
     const folder = p.parse(currentFile).dir;
     const source = p.parse(currentFile).name;
     gzip(content).then(buffer => {
-        // if (err) {
-        //     console.log('u-oh' + err)
-        // }
         const chirpFile = p.join(folder, source + '.chirp');
         fs.writeFile(chirpFile, buffer, function (err) {
             if (err) throw err;
@@ -804,23 +800,19 @@ async function loadChirp(file) {
     if (file.endsWith('chirp')) {
         restore = true;
         const data = fs.readFileSync(file);
-        ungzip(data).then(buffer => {
-            // if (err) {
-            //     console.log('u-oh' + err)
-            // }
+        await ungzip(data).then(buffer => {
             savedPredictions = JSON.parse(buffer.toString());
             currentFile = savedPredictions['source'];
             ctime = Date.parse(savedPredictions['ctime']);
-            ipcRenderer.send('prediction-done', {'labels': {}});
-
-        }).then(() => {
-            loadAudioFile(currentFile, ctime);
-            fileList = [currentFile];
-            for (const [key, value] of Object.entries(savedPredictions)) {
-                if (key === 'source' || key === 'ctime') continue;
-                renderResult(value, key, false);
-            }
         })
+        fileList = [currentFile];
+        await loadAudioFile(currentFile, ctime);
+        for (const [key, value] of Object.entries(savedPredictions)) {
+            if (key === 'source' || key === 'ctime') continue;
+            await renderResult(value, key, false);
+        }
+        ipcRenderer.send('prediction-done', {'labels': {}});
+        completeDiv.show();
     } else {
         currentFile = file;
         fileList = [currentFile];
@@ -903,7 +895,6 @@ window.onload = function () {
             return
         }
         config = JSON.parse(data)
-        //console.log('Successfully loaded UUID: ' + config.UUID)
         t0_warmup = Date.now();
         ipcRenderer.send('load-model', {useWhitelist: config.useWhitelist})
 
@@ -1173,7 +1164,7 @@ $(document).on('click', '#timeOfDay', function () {
     })
     $('#timecode .tick').hide();
     $('#timeOfDay .tick').show();
-    fileStart = new Date(ctime - (currentFileDuration * 1000));
+    startPosition = fileStart;
     if (fileLoaded) loadBufferSegment(currentBuffer, bufferBegin);
     updatePrefs();
 })
@@ -1189,7 +1180,7 @@ $(document).on('click', '#timecode', function () {
     $('#timeOfDay .tick').hide();
     $('#timecode .tick').show();
     //start at zero. UTC for DST handling
-    fileStart = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
+    startPosition = zero;
     if (fileLoaded) loadBufferSegment(currentBuffer, bufferBegin);
     updatePrefs();
 })
@@ -1599,6 +1590,7 @@ function matchSpecies(e, mode) {
                     classes.add('d-none');
                 }
                 classes.add('strikethrough');
+                // add state to predictions
                 excludeIcon.classList.add('text-danger');
                 predictions[index].excluded = true;
             } else if (mode === 'unexclude') {
@@ -1610,7 +1602,6 @@ function matchSpecies(e, mode) {
     })
     spinner.add('d-none');
     targetClass.remove('d-none');
-
 }
 
 async function renderResult(result, index, selection) {
@@ -1646,9 +1637,11 @@ async function renderResult(result, index, selection) {
         tr += "<tr><td>" + result + "</td></tr>";
     } else {
         if (config.nocmig && !region) {
-            // We want to skip results recorded before dark
-            // process results during the night
-            // abort entirely when dawn breaks
+            /*
+            * We want to skip results recorded before dark
+            * process results during the night
+            * abort entirely when dawn breaks
+            */
             if (!seenTheDarkness && result.dayNight === 'daytime') {
                 // Not dark yet
                 return
@@ -1673,8 +1666,8 @@ async function renderResult(result, index, selection) {
                                     </td></tr>`);
             shownDaylightBanner = true;
         }
-
         if (result.cname in summary) {
+            if (result)
             summary[result.cname] += 1
         } else {
             summary[result.cname] = 1
@@ -1689,13 +1682,8 @@ async function renderResult(result, index, selection) {
         if (result.score < 0.65) {
             confidence = '&#63;';
         }
-        //     feedback_icons = `<span class='material-icons-two-tone text-success feedback pointer'>thumb_up_alt</span>`;
-        // } else if (result.score < 0.85) {
         feedback_icons = `<span class='material-icons-two-tone text-success feedback pointer'>thumb_up_alt</span>
                               <span class='material-icons-two-tone text-danger feedback pointer'>thumb_down_alt</span>`;
-        // } else {
-        //     feedback_icons = "<span class='material-icons-two-tone text-danger feedback pointer'>thumb_down_alt</span>";
-        // }
         result.suppressed ? icon_text = `sync_problem` : icon_text = 'sync';
         result.date = result.timestamp;
         const UI_timestamp = result.timestamp.toString().split(' ')[4];
@@ -1711,42 +1699,43 @@ async function renderResult(result, index, selection) {
         predictions[index] = result;
         let showTimeOfDay;
         config.timeOfDay ? showTimeOfDay = '' : showTimeOfDay = 'd-none';
-        //tr += `<tr onclick='loadResultRegion( ${start},${end} , &quot;${result.cname}${confidence}&quot, this)' class='border-top border-secondary top-row ${result.dayNight}'>
-        tr += `<tr name="${start},${end},${result.cname}${confidence}" class='border-top border-secondary top-row ${result.dayNight}'>
-                    <th scope='row'>${index}</th><td class='timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
-                    <td >${UI_position}</td><td class='cname'>${result.cname}</td>
-                    <td><i>${result.sname}</i></td><td class='text-center'>${iconizeScore(result.score)}</td>
-                    <td class='text-center'><span id='${index}' title="Click for additional detections" class='material-icons rotate pointer d-none'>${icon_text}</span></td>
-                    <td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
-                    <td class='text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
-                    <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
-                    <td class='specFeature text-center download'><span class='material-icons-outlined pointer'>file_download</span></td>
-                    <td class="text-center speciesExclude d-none"><span class="spinner-border spinner-border-sm text-danger d-none" role="status"></span>
-                         <span class="material-icons-two-tone align-bottom pointer">clear</span></td>
-                    <td id="${index}" class='specFeature text-center'>${feedback_icons}</td>
-                   </tr>`;
+        let excluded;
+        result.excluded ? excluded = 'strikethrough' : excluded = '';
+        tr += `<tr name="${start},${end},${result.cname}${confidence}" class='border-top border-secondary top-row ${excluded} ${result.dayNight}'>
+            <th scope='row'>${index}</th><td class='timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
+            <td >${UI_position}</td><td class='cname'>${result.cname}</td>
+            <td><i>${result.sname}</i></td><td class='text-center'>${iconizeScore(result.score)}</td>
+            <td class='text-center'><span id='${index}' title="Click for additional detections" class='material-icons rotate pointer d-none'>${icon_text}</span></td>
+            <td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
+            <td class='text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
+            <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
+            <td class='specFeature text-center download'><span class='material-icons-outlined pointer'>file_download</span></td>
+            <td class="text-center speciesExclude d-none"><span class="spinner-border spinner-border-sm text-danger d-none" role="status"></span>
+                 <span class="material-icons-two-tone align-bottom pointer">clear</span></td>
+            <td id="${index}" class='specFeature text-center'>${feedback_icons}</td>
+        </tr>`;
         if (result.score2 > 0.2) {
             tr += `<tr name="${start},${end},${result.cname}${confidence}" id='subrow${index}' class='subrow d-none'>
-                        <th scope='row'>${index}</th><td> </td><td> </td><td class='cname2'>${result.cname2}</td>
-                        <td><i>${result.sname2}</i></td><td class='text-center'>${iconizeScore(result.score2)}</td>
-                        <td> </td><td class='specFeature'> </td>
-                        <td><a href='https://xeno-canto.org/explore?query=${result.sname2}%20type:nocturnal' target=\"_blank\">
-                            <img src='img/logo/XC.png' alt='Search ${result.cname2} on Xeno Canto' title='${result.cname2} NFCs on Xeno Canto'></a> </td>
-                        <td class='specFeature'> </td>
-                        <td class='specFeature speciesExclude d-none'> </td>
-                        <td class='specFeature'> </td>
-                       </tr>`;
+                <th scope='row'>${index}</th><td> </td><td> </td><td class='cname2'>${result.cname2}</td>
+                <td><i>${result.sname2}</i></td><td class='text-center'>${iconizeScore(result.score2)}</td>
+                <td> </td><td class='specFeature'> </td>
+                <td><a href='https://xeno-canto.org/explore?query=${result.sname2}%20type:nocturnal' target=\"_blank\">
+                    <img src='img/logo/XC.png' alt='Search ${result.cname2} on Xeno Canto' title='${result.cname2} NFCs on Xeno Canto'></a> </td>
+                <td class='specFeature'> </td>
+                <td class='specFeature speciesExclude d-none'> </td>
+                <td class='specFeature'> </td>
+               </tr>`;
             if (result.score3 > 0.2) {
                 tr += `<tr name="${start},${end},${result.cname}${confidence}" id='subsubrow${index}' class='subrow d-none'>
-                        <th scope='row'>${index}</th><td> </td><td> </td><td class='cname3'>${result.cname3}</td>
-                        <td><i>${result.sname3}</i></td><td class='text-center'>${iconizeScore(result.score3)}</td>
-                        <td> </td><td class='specFeature'> </td>
-                        <td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:nocturnal' target=\"_blank\">
-                            <img src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>
-                        <td class='specFeature'> </td>
-                        <td class='specFeature speciesExclude d-none'> </td>
-                        <td class='specFeature'> </td>
-                       </tr>`;
+                    <th scope='row'>${index}</th><td> </td><td> </td><td class='cname3'>${result.cname3}</td>
+                    <td><i>${result.sname3}</i></td><td class='text-center'>${iconizeScore(result.score3)}</td>
+                    <td> </td><td class='specFeature'> </td>
+                    <td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:nocturnal' target=\"_blank\">
+                        <img src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>
+                    <td class='specFeature'> </td>
+                    <td class='specFeature speciesExclude d-none'> </td>
+                    <td class='specFeature'> </td>
+                   </tr>`;
             }
         }
     }
