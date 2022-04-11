@@ -297,12 +297,7 @@ let queue = [];
 let busy = false;
 let myModel;
 onmessage = async function (e) {
-    if (busy) {
-        queue.push(e);
-    } else {
         busy = await runPredictions(e)
-    }
-
 }
 
 async function runPredictions(e) {
@@ -351,12 +346,5 @@ async function runPredictions(e) {
         }
         let t1 = performance.now();
         console.log(`receive to post took: ${t1 - t0} milliseconds`)
-    }
-    if (queue.length) {
-        // run the next queued item
-        busy = true;
-        await runPredictions(queue.shift());
-    } else {
-        return false;
     }
 }

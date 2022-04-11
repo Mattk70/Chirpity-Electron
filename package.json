@@ -1,11 +1,11 @@
 {
   "name": "Chirpity",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
     "start": "electron . \"/Users/matthew/Downloads/XC338781 - Pied Avocet - Recurvirostra avosetta.chirp\"",
-    "export": "electron-packager . --platform=darwin --arch=x64 --prune --out packages --overwrite --icon=/Users/matthew/PycharmProjects/Chirpity-Electron/img/icon/icon"
+    "export": "electron-packager . --platform=all --arch=x64 --prune --out packages --overwrite --icon=/Users/matthew/PycharmProjects/Chirpity-Electron/img/icon/icon"
   },
   "repository": {
     "type": "git",
