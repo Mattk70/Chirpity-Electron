@@ -90,7 +90,7 @@ async function doPrediction(start, end, fileStart) {
     }
     //clear up remainder less than BATCH_SIZE, by *padding the batch*
     if (chunks.length > 0) {
-        const chunkStart = i - ((chunks.length -1) * increment);
+        const chunkStart = i - ((chunks.length) * increment);
         sendMessageToWorker(chunkStart, chunks, fileStart, lastKey);
     }
 }
@@ -376,11 +376,11 @@ function runPredictions(e) {
         console.log(backend);
         ipcRenderer.send('model-ready', {message: 'ready', backend: backend})
     } else if (response['message'] === 'prediction') {
+        const lastKey = response['end'];
         //t1 = performance.now();
         //console.log(`post from worker took: ${t1 - response['time']} milliseconds`)
         //console.log(`post to receive took: ${t1 - t0} milliseconds`)
         response['result'].forEach(prediction => {
-            const lastKey = (end - chunkLength) / sampleRate;
             const position = parseFloat(prediction[0]);
             const result = prediction[1];
             const audacity = prediction[2];
