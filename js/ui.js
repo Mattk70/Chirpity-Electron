@@ -171,7 +171,6 @@ function resetResults() {
 async function loadAudioFile(filePath, OriginalCtime) {
     workerHasLoadedFile = false;
     resetResults();
-    summary['suppressed'] = [];
     // Hide load hint and show spinnner
     if (wavesurfer) {
         wavesurfer.destroy();
@@ -335,6 +334,7 @@ function initSpec(args) {
 
         plugins: [
             Regions.create({
+                regionsMinLength: 0.5,  // Aligned to model's minimum chunksize
                 dragSelection: {
                     slop: 5,
 

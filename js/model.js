@@ -131,11 +131,12 @@ class Model {
         let tensorArray = [];
         let keys = [];
         for (const [key, value] of Object.entries(chunks)) {
-            keys.push(key);
             let chunk = tf.tensor1d(value);
-            // if the file is too short, pad with zeroes. Only if at least 1 second of signal
+            keys.push([parseFloat(key), parseFloat(key) + chunk.shape[0]]);
+            // if the file is too short, pad with zeroes. Only if at least 0.5 second of signal.
+            // Align to region min length (set in UI.js), so user can't select a region too short for model
             if (chunk.shape[0] < this.chunkLength) {
-                if (chunk.shape[0] > this.chunkLength / 6) {
+                if (chunk.shape[0] >= this.chunkLength / 6) {
                     let padding = tf.zeros([this.chunkLength - chunk.shape[0]]);
                     chunk = chunk.concat(padding);
                 } else { // Ignore chunk fragment
@@ -152,12 +153,18 @@ class Model {
             this.batch = tf.concat([this.batch, padding], 0)
         }
         //let t0 = performance.now();
-        this.prediction = this.model.predict(this.batch, {batchSize: this.batchSize})
+        this.prediction = await this.model.predict(this.batch, {batchSize: this.batchSize})
         //let t1 = performance.now()
         //console.log(`predictions took: ${t1 - t0} milliseconds`)
         // Get label
         let top3, top3scores;
-        if ((this.prediction_batch && this.prediction_batch.shape[0] === this.batchSize * 2) || keys[keys.length - 1] >= lastKey) {
+        // Get the start time for the last chunk in the batch
+        let [lastChunkStart,] = keys[keys.length - 1];
+        lastChunkStart = lastChunkStart / this.config.sampleRate;
+        // Have we reached the batch limit, or the end of the chunks available?
+        if ((this.prediction_batch && this.prediction_batch.shape[0] === this.batchSize * 3) ||
+                lastChunkStart >= lastKey
+            ) {
             this.keys_batch = this.keys_batch.concat(keys);
             if (this.prediction_batch) {
                 this.prediction_batch = tf.concat([this.prediction_batch, this.prediction], 0)
@@ -171,30 +178,39 @@ class Model {
             //t0 = performance.now();
             top3 = indices.arraySync();
             top3scores = values.arraySync();
-            //t1 = performance.now()
-            //console.log(`arraysync took: ${t1 - t0} milliseconds`)
+            //Now we have pulled the predictions from the GPU, we don't need the batch of prediction tensors
             this.prediction_batch = null;
         } else {
+            // We have more chunks to put into the batch
+            this.keys_batch = this.keys_batch.concat(keys);
             if (this.prediction_batch) {
-                this.keys_batch = this.keys_batch.concat(keys);
+                // We've started a batch already
                 this.prediction_batch = tf.concat([this.prediction_batch, this.prediction], 0)
-                this.prediction = null;
             } else {
+                // Prepare a new batch
                 this.prediction_batch = this.prediction;
-                this.keys_batch = keys;
-                this.prediction = null;
             }
+            // Dispose of prediction
+            this.prediction = null;
+            // Not ready to send a response back yet, but get more chunks
             return false
         }
 
         //t0 = performance.now();
+        // batch holds predictions: key (chunk start time): {index: score: end:}. Key = start time. Ignore results from pad tensors
+        // by only adding those with keys.
         const batch = {};
-        for (let j = 0; j < top3.length; j++) {
-            batch[this.keys_batch[j]] = ({'index': top3[j], 'score': top3scores[j]});
+        for (let j = 0; j < this.keys_batch.length; j++) {
+            const currentKeys = this.keys_batch[j];
+            batch[currentKeys[0]] = ({'index': top3[j], 'score': top3scores[j], 'end': currentKeys[1]});
         }
+        // done with the keys_batch, so reset it
         this.keys_batch = [];
         // Try this method of adjusting results
-        for (const [key, item] of Object.entries(batch)) {
+        for (let [key, item] of Object.entries(batch)) {
+            // turn the key back to a number and convert from samples to seconds:
+            key = parseFloat(key) / this.config.sampleRate;
+            const end = item.end / this.config.sampleRate;
             for (let i = 0; i < item.index.length; i++) {
                 if (suppressed_IDs.includes(item.index[i])) {
                     item.score[i] = item.score[i] ** 3;
@@ -202,29 +218,26 @@ class Model {
                     item.score[i] = Math.pow(item.score[i], 0.35);
                 }
             }
-            // Sort by value:
-            // item.sort(function (a, b) {
-            //     return ((a.score > b.score) ? -1 : ((a.score === b.score) ? 0 : 1));
-            // });
-            //let primary, secondary, tertiary] = top3;
-            //let [score, score2, score3] = top3scores;
             let suppressed = false;
-            // Use whitelist for top prediction only
-            if (blocked_IDs.indexOf(item.index[0]) !== -1) {
-                // Just warn if Ambient noise
+            // If using the whitelist, we want to promote allowed IDs above any blocked IDs, so they will be visible
+            // if they meet the confidence threshold.
+            if (this.useWhitelist && blocked_IDs.indexOf(item.index[0]) !== -1) {
+                // i.e. the top prediction is disallowed....
+                // Is it Ambient noise?
                 labels[item.index[0]].split('_')[1] === "Ambient Noise" ? suppressed = false : suppressed = 'text-danger'
-                //this.labels[r[0].index].split('_')[1] === "Ambient Noise" ? suppressed = false : suppressed = 'text-danger'
                 //make a copy of the top prediction
                 const [temp_index, temp_score] = [item.index[0], item.score[0]]
                 // Is the secondary prediction blocked too?
                 if (blocked_IDs.indexOf(item.index[1]) !== -1) {
-                    // How about if all top three are blocked
+                    // How about if all three predictions are blocked
                     if (blocked_IDs.indexOf(item.index[2]) !== -1) {
-                        // Squash the top prediction
+                        // switch off the suppressed warning and squash the confidence of the top prediction,
+                        // so it doesn't appear in the results
                         item.score[0] = 0.0;
                         suppressed = false;
                     } else {
-                        //make a copy of the second prediction too
+                        // third prediction is allowed, but top two aren't
+                        // so, make a copy of the second prediction too
                         const [temp_index2, temp_score2] = [item.index[1], item.score[1]]
                         // Bump up the third prediction
                         item.index[0] = item.index[2]
@@ -237,8 +250,7 @@ class Model {
                         item.score[2] = temp_score2
                     }
                 } else {
-                    //make a copy of the prediction
-                    const [temp_index, temp_score] = [item.index[0], item.score[0]]
+                    // Just the top prediction is blocked, so demote it
                     // Bump up the second prediction
                     item.index[0] = item.index[1]
                     item.score[0] = item.score[1]
@@ -248,10 +260,10 @@ class Model {
                 }
             }
             result = ({
-                start: key / this.config.sampleRate,
-                end: (key / this.config.sampleRate) + CONFIG.specLength,
-                timestamp: myModel._timestampFromSeconds(key / this.config.sampleRate, fileStart),
-                position: myModel._timestampFromSeconds(key / this.config.sampleRate, 0),
+                start: key,
+                end: end,
+                timestamp: myModel._timestampFromSeconds(key, fileStart),
+                position: myModel._timestampFromSeconds(key, 0),
                 sname: this.labels[item.index[0]].split('_')[0],
                 cname: this.labels[item.index[0]].split('_')[1],
                 score: item.score[0],
@@ -264,13 +276,13 @@ class Model {
                 suppressed: suppressed
             });
             audacity = ({
-                timestamp: (key / this.config.sampleRate) + '\t' + ((key / this.config.sampleRate) + this.config.specLength),
+                timestamp: key + '\t' + end, // + this.config.specLength),
                 cname: this.labels[item.index[0]].split('_')[1],
                 score: item.score[0]
             })
             //prepare summary
-            console.log(key / this.config.sampleRate, item.index[0], this.labels[item.index[0]], item.score[0]);
-            batched_results.push([parseInt(key), result, audacity]);
+            console.log(key, item.index[0], this.labels[item.index[0]], item.score[0]);
+            batched_results.push([key, result, audacity]);
         }
         this.result = batched_results;
         //t1 = performance.now()
@@ -281,14 +293,19 @@ class Model {
 }
 
 module.exports = Model;
-
+let queue = [];
+let busy = false;
 let myModel;
 onmessage = async function (e) {
-    //console.log('Worker: Message received from main script');
-        await runPredictions(e)
+    if (busy) {
+        queue.push(e);
+    } else {
+        busy = await runPredictions(e)
+    }
+
 }
 
-async function runPredictions(e){
+async function runPredictions(e) {
     const modelRequest = e.data.message || e.data[0];
     if (modelRequest === 'load') {
         const appPath = e.data[1];
@@ -297,14 +314,14 @@ async function runPredictions(e){
         console.log('model received load instruction. Using whitelist:' + e.data[2])
         myModel = new Model(appPath, useWhitelist);
         await myModel.loadModel();
-        myModel.warmUp(batch).then(function (value) {
-            postMessage({
-                message: 'model-ready',
-                sampleRate: myModel.config.sampleRate,
-                chunkLength: myModel.chunkLength,
-                backend: tf.getBackend()
-            });
+        await myModel.warmUp(batch);
+        postMessage({
+            message: 'model-ready',
+            sampleRate: myModel.config.sampleRate,
+            chunkLength: myModel.chunkLength,
+            backend: tf.getBackend()
         });
+
 
     } else if (modelRequest === 'predict') {
         let t0 = performance.now();
@@ -331,9 +348,15 @@ async function runPredictions(e){
             // add a chunk to the start
             response['start'] = i + myModel.chunkLength;
             postMessage(response);
-
-            let t1 = performance.now();
-            console.log(`receive to post took: ${t1 - t0} milliseconds`)
         }
+        let t1 = performance.now();
+        console.log(`receive to post took: ${t1 - t0} milliseconds`)
+    }
+    if (queue.length) {
+        // run the next queued item
+        busy = true;
+        await runPredictions(queue.shift());
+    } else {
+        return false;
     }
 }

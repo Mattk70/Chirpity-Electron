@@ -36,7 +36,7 @@ ipcRenderer.on('analyze', async (event, arg) => {
     const fileStart = arg.fileStart;
     const bufferLength = audioBuffer.length;
     selection = false;
-    let start;
+    let start, end;
     if (arg.start === undefined) {
         start = 0;
         end = bufferLength;
@@ -70,7 +70,8 @@ async function doPrediction(start, end, fileStart) {
     AUDACITY = [];
     RESULTS = [];
     predictionStart = new Date();
-    let lastKey = end - start - chunkLength;
+    // position of the last key in seconds
+    const lastKey = (end - chunkLength) / sampleRate;
     index = 0;
     let increment;
     end - start < chunkLength ? increment = end - start : increment = chunkLength;
@@ -89,7 +90,7 @@ async function doPrediction(start, end, fileStart) {
     }
     //clear up remainder less than BATCH_SIZE, by *padding the batch*
     if (chunks.length > 0) {
-        const chunkStart = i - ((chunks.length) * increment);
+        const chunkStart = i - ((chunks.length -1) * increment);
         sendMessageToWorker(chunkStart, chunks, fileStart, lastKey);
     }
 }
@@ -310,7 +311,7 @@ function bufferToMp3(metadata, channels, sampleRate, left, right = null) {
         writer.addTag();
         buffer.push(writer.arrayBuffer)
     }
-    for (var i = 0; remaining >= samplesPerFrame; i += samplesPerFrame) {
+    for (let i = 0; remaining >= samplesPerFrame; i += samplesPerFrame) {
 
         if (!right) {
             var mono = left.subarray(i, i + samplesPerFrame);
@@ -375,46 +376,36 @@ function runPredictions(e) {
         console.log(backend);
         ipcRenderer.send('model-ready', {message: 'ready', backend: backend})
     } else if (response['message'] === 'prediction') {
-        if (!predicting) return; // stop batch padding sending more results
-        console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
         //t1 = performance.now();
         //console.log(`post from worker took: ${t1 - response['time']} milliseconds`)
         //console.log(`post to receive took: ${t1 - t0} milliseconds`)
         response['result'].forEach(prediction => {
-            const position = prediction[0];
+            const lastKey = (end - chunkLength) / sampleRate;
+            const position = parseFloat(prediction[0]);
             const result = prediction[1];
             const audacity = prediction[2];
-
+            ipcRenderer.send('progress', {'progress': (position / lastKey)});
             //console.log('Prediction received from worker', result);
-            if (!isNaN(position) && result.score > minConfidence) {
+            if (result.score > minConfidence) {
                 index++;
                 ipcRenderer.send('prediction-ongoing', {result, 'index': index, 'selection': selection});
                 AUDACITY.push(audacity);
                 RESULTS.push(result);
-                ipcRenderer.send('progress', {'progress': position / end});
             }
-
-            if (isNaN(position) || position + chunkLength >= end) {
+            //console.log(`Position is ${position}, end is ${lastKey}`)
+            if (position >= lastKey) {
                 console.log('Prediction done');
                 console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
-                if (predicting) {
-                    if (RESULTS.length === 0) {
-                        const result = "No detections found.";
-                        ipcRenderer.send('prediction-ongoing', {result, 'index': 1, 'selection': selection});
-                        console.log('sent another prediction ongoing')
-                    }
-                    ipcRenderer.send('progress', {'progress': 1});
-                    ipcRenderer.send('prediction-done', {'labels': AUDACITY});
-                    predicting = false;
-
+                if (RESULTS.length === 0) {
+                    const result = "No detections found.";
+                    ipcRenderer.send('prediction-ongoing', {result, 'index': 1, 'selection': selection});
                 }
+                ipcRenderer.send('progress', {'progress': 1});
+                ipcRenderer.send('prediction-done', {'labels': AUDACITY});
+                predicting = false;
             }
-            //doPrediction(response['start'], response['end'], response['fileStart'])
         })
-    } //else if (response['message'] === 'ready-for-next') {
-    //t1 = performance.now();
-    //console.log(`ready-for-next from worker took: ${t1 - response['time']} milliseconds`)
-    //}
+    }
 }
 
 
