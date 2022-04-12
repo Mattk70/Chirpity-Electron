@@ -331,16 +331,14 @@ function initSpec(args) {
         scrollParent: true,
         responsive: true,
         height: 512,
-
         plugins: [
             Regions.create({
-                regionsMinLength: 0.5,  // Aligned to model's minimum chunksize
-                dragSelection: {
-                    slop: 5,
-
-                },
+                regionsMinLength: 0.5,
+                dragSelection: true,
+                slop: 5,
                 color: "rgba(255, 255, 255, 0.2)"
-            })]
+            })
+        ]
     })
     if (config.spectrogram) {
         initSpectrogram()
@@ -487,10 +485,9 @@ const analyzeSelectionLink = document.getElementById('analyzeSelection');
 
 analyzeSelectionLink.addEventListener('click', async () => {
     analyseReset();
-    let start;
-    let end;
-    start = region.start + bufferBegin;
-    end = region.end + bufferBegin;
+    const start = region.start + bufferBegin;
+    let end = region.end + bufferBegin;
+    if (start - end < 0.5) { region.end = region.start + 0.5; end = start + 0.5 }
     // Add current buffer's beginning offset to region start / end tags
     ipcRenderer.send('analyze', {confidence: 0.1, start: start, end: end, fileStart: fileStart});
     summary = {};
@@ -646,10 +643,10 @@ document.querySelectorAll(".tableFixHead").forEach(el =>
 
 
 function formatTimeCallback(secs) {
-    secs = Number(secs);
+    secs = secs.toFixed(2);
     const now = new Date(bufferStartTime.getTime() + (secs * 1000))
     const milliSeconds = now.getMilliseconds();
-    const seconds = now.getSeconds();
+    let seconds = now.getSeconds();
     const minutes = now.getMinutes();
     const hours = now.getHours();
 
@@ -658,7 +655,12 @@ function formatTimeCallback(secs) {
     if (windowLength >= 5) {
         secondsStr = seconds.toString();
     } else {
-        secondsStr = seconds.toString() + '.' + Math.round(milliSeconds / 100).toString();
+        let fraction = Math.round(milliSeconds / 100);
+        if (fraction === 10) {
+            seconds += 1;
+            fraction = 0;
+        }
+        secondsStr = seconds.toString() + '.' + fraction.toString();
     }
     if (hours > 0 || minutes > 0 || config.timeOfDay) {
         if (seconds < 10) {
