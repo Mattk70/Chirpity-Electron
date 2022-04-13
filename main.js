@@ -1,5 +1,7 @@
-const {app, dialog, ipcMain, BrowserWindow} = require('electron');
+const {app, dialog, ipcMain, MessageChannelMain, BrowserWindow} = require('electron');
 const fs = require("fs");
+const path = require('path')
+
 //require('update-electron-app')();
 global.sharedObject = {prop1: process.argv};
 let files = [];
@@ -39,9 +41,9 @@ function createWindow() {
         width: 1280,
         height: 768,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
-            enableRemoteModule: true,
+            preload: path.join(__dirname, 'preload.js'),
+            nodeIntegration: false,
+            contextIsolation: true,
             backgroundThrottling: false
         }
     })
@@ -56,7 +58,7 @@ function createWindow() {
     mainWindow.loadFile('index.html')
 
     // Open the DevTools. Comment out for release
-    //mainWindow.webContents.openDevTools()
+    mainWindow.webContents.openDevTools()
 
     mainWindow.once('ready-to-show', () => {
         mainWindow.show()
@@ -69,7 +71,7 @@ function createWindow() {
 }
 
 
-function createWorker() {
+async function createWorker() {
     // hidden worker
     workerWindow = new BrowserWindow({
         show: true,
@@ -78,13 +80,12 @@ function createWorker() {
         webPreferences: {
             nodeIntegration: true,
             nodeIntegrationInWorker: true,
-            enableRemoteModule: false,
             contextIsolation: false,
             backgroundThrottling: false
         }
     });
     workerWindow.setIcon(__dirname + '/img/icon/icon.png');
-    workerWindow.loadFile('worker.html');
+    await workerWindow.loadFile('worker.html');
 
     workerWindow.on('closed', () => {
         workerWindow = null;
@@ -95,15 +96,43 @@ function createWorker() {
 }
 
 // This method will be called when Electron has finished
+app.whenReady().then(async () => {
+    ipcMain.handle('getPath', () => app.getPath("appData"));
+    ipcMain.handle('getVersion', () => app.getVersion());
+    await createWorker();
+    createWindow();
+    // We'll be sending one end of this channel to the main world of the
+    // context-isolated page.
 
-app.on('ready', () => {
+    // We can't use ipcMain.handle() here, because the reply needs to transfer a
+    // MessagePort.
+    ipcMain.on('request-worker-channel', (event) => {
+        // For security reasons, let's make sure only the frames we expect can
+        // access the worker.
+        if (event.senderFrame === mainWindow.webContents.mainFrame) {
+            // Create a new channel ...
+            const {port1, port2} = new MessageChannelMain()
+            // ... send one end to the worker ...
+            workerWindow.webContents.postMessage('new-client', null, [port1])
+            // ... and the other end to the UI window.
+            event.senderFrame.postMessage('provide-worker-channel', null, [port2])
+            // Now the main window and the worker can communicate with each other
+            // without going through the main process!
+        }
+    })
+
     if (process.platform === 'darwin') {
         //const appIcon = new Tray('./img/icon/icon.png')
-        app.dock.setIcon( __dirname + '/img/icon/icon.png');
+        app.dock.setIcon(__dirname + '/img/icon/icon.png');
         app.dock.bounce();
     }
-    createWorker();
-    createWindow();
+
+    app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+            createWorker();
+            createWindow();
+        }
+    })
 
     // if (files.length > 0) {
     mainWindow.webContents.send('load-results', {file: 'test'});
@@ -176,92 +205,21 @@ app.on('activate', () => {
     }
 });
 
-ipcMain.on('load-model', async (event, arg) => {
-    const useWhitelist = arg.useWhitelist;
-    console.log('Main received load-model, using whitelist: ' + arg.useWhitelist)
-    workerWindow.webContents.send('load-model', {useWhitelist: useWhitelist});
-    const args = sharedObject.prop1;
-    if (files.length > 0) {
-        mainWindow.webContents.send('mac-files', {files: files[0]})
-    } else if (args.length > 1) {
-        mainWindow.webContents.send('load-results', {file: args[args.length - 1]});
-    }
+ipcMain.handle('dialog', (event, method, params) => {
+    dialog[method](mainWindow, params);
 });
 
-ipcMain.on('file-load-request', async (event, arg) => {
-    const currentFile = arg.message;
-    console.log('Main received file-load-request: ' + arg.message)
-    workerWindow.webContents.send('file-load-request', {message: currentFile});
-});
-
-ipcMain.on('worker-loaded', async (event, arg) => {
-    const currentFile = arg.message;
-    console.log('Main received worker-loaded: ' + arg.message)
-    mainWindow.webContents.send('worker-loaded', {message: currentFile});
-});
-
-ipcMain.on('analyze', async (event, arg) => {
-    console.log('Main received go signal: ' + arg.confidence)
-    workerWindow.webContents.send('analyze', arg);
-});
-
-ipcMain.on('prediction-ongoing', (event, arg) => {
-    const result = arg.result;
-    const index = arg.index
-    mainWindow.webContents.send('prediction-ongoing', arg);
-});
-
-ipcMain.on('prediction-done', (event, arg) => {
-    const labels = arg.labels;
-    mainWindow.webContents.send('prediction-done', {labels});
-});
-
-ipcMain.on('model-ready', (event, args) => {
-    console.log(`Using ${args.backend} backend`);
-    mainWindow.webContents.send('model-ready', {backend: args.backend});
-});
-
-ipcMain.on('progress', (event, arg) => {
-    const progress = arg.progress;
-    mainWindow.webContents.send('progress', {progress});
-});
-
-ipcMain.on('save', (event, arg) => {
-    workerWindow.webContents.send('save', arg);
-});
-
-ipcMain.on('post', (event, arg) => {
-    workerWindow.webContents.send('post', arg);
-});
-
-ipcMain.on('abort', (event, arg) => {
-    const message = arg.abort || arg.sendlabels;
-    console.log('Main received abort: ' + arg)
-    workerWindow.webContents.send('abort', arg);
-});
-
-ipcMain.on('path', (event) => {
-    const appPath = app.getPath('userData')
-    mainWindow.webContents.send('path', {appPath});
-    workerWindow.webContents.send('path', {appPath});
-});
-
-ipcMain.on('openFiles', (event) => {
+ipcMain.handle('openFiles', async(event) => {
     // Show file dialog to select audio file
-    dialog.showOpenDialog({
+    const result = await dialog.showOpenDialog(mainWindow,{
         filters: [{
             name: 'Audio Files',
             extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4']
         }],
         properties: ['openFile', 'multiSelections']
-    }).then(result => {
-        if (!result.canceled) {
-            console.log('files', result.filePaths)
-            mainWindow.webContents.send('openFiles', {filePaths: result.filePaths});
-        }
-    })
+    });
+    return result;
 })
-
 ipcMain.on('saveFile', (event, arg) => {
     // Show file dialog to select audio file
     let currentFile = arg.currentFile.substr(0, arg.currentFile.lastIndexOf(".")) + ".txt";

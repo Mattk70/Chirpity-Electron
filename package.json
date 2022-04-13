@@ -68,28 +68,28 @@
         "perMachine": true
       }
     ],
-      "mac": {
-    "icon": "./packages/img/icon/icon.icns",
-    "category": "public.app-category.utilities",
-    "fileAssociations": [
-      {
-        "ext": [
-          "wav",
-          "mp3",
-          "mpeg",
-          "m4a",
-          "aac",
-          "mpga",
-          "ogg",
-          "chirp",
-          "mp4",
-          "flac"
-        ],
-        "description": "Audio files",
-        "role": "Viewer"
-      }
-    ]
-  }
+    "mac": {
+      "icon": "./packages/img/icon/icon.icns",
+      "category": "public.app-category.utilities",
+      "fileAssociations": [
+        {
+          "ext": [
+            "wav",
+            "mp3",
+            "mpeg",
+            "m4a",
+            "aac",
+            "mpga",
+            "ogg",
+            "chirp",
+            "mp4",
+            "flac"
+          ],
+          "description": "Audio files",
+          "role": "Viewer"
+        }
+      ]
+    }
   },
   "keywords": [
     "Nocmig",
@@ -106,8 +106,9 @@
   },
   "homepage": "https://github.com/mattk70/Chirpity-Electron#readme",
   "devDependencies": {
-    "electron": "^7.3.3",
-    "electron-packager": "^14.2.1",
+    "electron": "^18.0.3",
+    "electron-devtools-installer": "^3.2.0",
+    "electron-packager": "^15.4.0",
     "electron-wix-msi": "^3.2.0"
   },
   "dependencies": {
@@ -117,14 +118,13 @@
     "colormap": "^2.3.2",
     "jquery": "^3.6.0",
     "lamejstmp": "^1.0.1",
+    "node-gzip": "^1.1.2",
     "os": "^0.1.2",
     "popper.js": "^1.16.1",
     "seedrandom": "^3.0.5",
     "suncalc2": "^1.8.1",
+    "systeminformation": "^5.11.9",
     "uuid": "^8.3.2",
-    "wavesurfer.js": "^6.0.4",
-    "node-gzip": "^1.1.2",
-    "systeminformation": "^5.11.9"
+    "wavesurfer.js": "^6.0.4"
   }
 }
-

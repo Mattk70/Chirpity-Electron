@@ -1,28 +1,97 @@
-const {ipcRenderer} = require('electron');
-const remote = require('electron').remote;
-const fs = require('fs');
-const WaveSurfer = require("wavesurfer.js");
-const SpectrogramPlugin = require('wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js');
-const SpecTimeline = require('wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js');
-const Regions = require('wavesurfer.js/dist/plugin/wavesurfer.regions.min.js');
-const colormap = require("colormap");
-const $ = require('jquery');
-const AudioBufferSlice = require('./AudioBufferSlice.js');
-const p = require('path');
-const SunCalc = require('suncalc2');
-const {v4: uuidv4} = require("uuid");
-const {gzip, ungzip} = require('node-gzip');
 let dawn, dusk, seenTheDarkness = false, shownDaylightBanner = false;
 const labels = ["Tachymarptis melba_Alpine Swift", "Pluvialis dominica_American Golden Plover", "Mareca americana_American Wigeon", "Acrocephalus paludicola_Aquatic Warbler", "Acanthis hornemanni_Arctic Redpoll", "Stercorarius parasiticus_Arctic Skua", "Sterna paradisaea_Arctic Tern", "Phylloscopus borealis_Arctic Warbler", "Recurvirostra avosetta_Avocet", "Porzana pusilla_Baillon's Crake", "Limosa lapponica_Bar-tailed Godwit", "Tyto alba_Barn Owl", "Branta leucopsis_Barnacle Goose", "Sylvia nisoria_Barred Warbler", "Panurus biarmicus_Bearded Tit", "Merops apiaster_Bee-eater", "Cygnus columbianus_Bewick's Swan", "Botaurus stellaris_Bittern", "Oenanthe hispanica_Black-eared Wheatear", "Chroicocephalus ridibundus_Black-headed Gull", "Podiceps nigricollis_Black-necked Grebe", "Limosa limosa_Black-tailed Godwit", "Himantopus himantopus_Black-winged Stilt", "Lyrurus tetrix_Black Grouse", "Cepphus grylle_Black Guillemot", "Milvus migrans_Black Kite", "Phoenicurus ochruros_Black Redstart", "Chlidonias niger_Black Tern", "Turdus merula_Blackbird", "Sylvia atricapilla_Blackcap", "Spatula discors_Blue-winged Teal", "Cyanistes caeruleus_Blue Tit", "Luscinia svecica_Bluethroat", "Acrocephalus dumetorum_Blyth's Reed Warbler", "Fringilla montifringilla_Brambling", "Branta bernicla_Brent Goose", "Pyrrhula pyrrhula_Bullfinch", "Buteo buteo_Buzzard", "Branta canadensis_Canada Goose", "Tetrao urogallus_Capercaillie", "Corvus corone_Carrion Crow", "Larus cachinnans_Caspian Gull", "Bubulcus ibis_Cattle Egret", "Cettia cetti_Cetti's Warbler", "Fringilla coelebs_Chaffinch", "Phylloscopus collybita_Chiffchaff", "Pyrrhocorax pyrrhocorax_Chough", "Emberiza cirlus_Cirl Bunting", "Motacilla citreola_Citrine Wagtail", "Periparus ater_Coal Tit", "Streptopelia decaocto_Collared Dove", "Glareola pratincola_Collared Pratincole", "Loxia curvirostra_Common Crossbill", "Larus canus_Common Gull", "Acanthis flammea_Common Redpoll", "Carpodacus erythrinus_Common Rosefinch", "Actitis hypoleucos_Common Sandpiper", "Melanitta nigra_Common Scoter", "Sterna hirundo_Common Tern", "Fulica atra_Coot", "Phalacrocorax carbo_Cormorant", "Emberiza calandra_Corn Bunting", "Crex crex_Corncrake", "Calonectris borealis_Cory's Shearwater", "Grus grus_Crane", "Lophophanes cristatus_Crested Tit", "Cuculus canorus_Cuckoo", "Calidris ferruginea_Curlew Sandpiper", "Numenius arquata_Curlew", "Sylvia undata_Dartford Warbler", "Cinclus cinclus_Dipper", "Charadrius morinellus_Dotterel", "Calidris alpina_Dunlin", "Prunella modularis_Dunnock", "Phylloscopus fuscatus_Dusky Warbler", "Alopochen aegyptiaca_Egyptian Goose", "Somateria mollissima_Eider", "Bubo bubo_Eurasian Eagle-Owl", "Turdus pilaris_Fieldfare", "Regulus ignicapilla_Firecrest", "Fulmarus glacialis_Fulmar", "Mareca strepera_Gadwall", "Morus bassanus_Gannet", "Sylvia borin_Garden Warbler", "Spatula querquedula_Garganey", "Larus hyperboreus_Glaucous Gull", "Plegadis falcinellus_Glossy Ibis", "Regulus regulus_Goldcrest", "Aquila chrysaetos_Golden Eagle", "Oriolus oriolus_Golden Oriole", "Pluvialis apricaria_Golden Plover", "Bucephala clangula_Goldeneye", "Carduelis carduelis_Goldfinch", "Mergus merganser_Goosander", "Accipiter gentilis_Goshawk", "Locustella naevia_Grasshopper Warbler", "Larus marinus_Great Black-backed Gull", "Podiceps cristatus_Great Crested Grebe", "Lanius excubitor_Great Grey Shrike", "Gavia immer_Great Northern Diver", "Stercorarius skua_Great Skua", "Dendrocopos major_Great Spotted Woodpecker", "Parus major_Great Tit", "Ardea alba_Great White Egret", "Anas carolinensis_Green-winged Teal", "Tringa ochropus_Green Sandpiper", "Picus viridis_Green Woodpecker", "Chloris chloris_Greenfinch", "Phylloscopus trochiloides_Greenish Warbler", "Tringa nebularia_Greenshank", "Ardea cinerea_Grey Heron", "Perdix perdix_Grey Partridge", "Phalaropus fulicarius_Grey Phalarope", "Pluvialis squatarola_Grey Plover", "Motacilla cinerea_Grey Wagtail", "Anser anser_Greylag Goose", "Uria aalge_Guillemot", "Gelochelidon nilotica_Gull-billed Tern", "Coccothraustes coccothraustes_Hawfinch", "Larus argentatus_Herring Gull", "Falco subbuteo_Hobby", "Pernis apivorus_Honey-buzzard", "Upupa epops_Hoopoe", "Delichon urbicum_House Martin", "Passer domesticus_House Sparrow", "Human_Human", "Phylloscopus ibericus_Iberian Chiffchaff", "Hippolais icterina_Icterine Warbler", "Lymnocryptes minimus_Jack Snipe", "Coloeus monedula_Jackdaw", "Garrulus glandarius_Jay", "Charadrius alexandrinus_Kentish Plover", "Falco tinnunculus_Kestrel", "Alcedo atthis_Kingfisher", "Rissa tridactyla_Kittiwake", "Calidris canutus_Knot", "Calcarius lapponicus_Lapland Bunting", "Vanellus vanellus_Lapwing", "Larus fuscus_Lesser Black-backed Gull", "Acanthis cabaret_Lesser Redpoll", "Dryobates minor_Lesser Spotted Woodpecker", "Sylvia curruca_Lesser Whitethroat", "Linaria cannabina_Linnet", "Ixobrychus minutus_Little Bittern", "Emberiza pusilla_Little Bunting", "Egretta garzetta_Little Egret", "Tachybaptus ruficollis_Little Grebe", "Hydrocoloeus minutus_Little Gull", "Athene noctua_Little Owl", "Charadrius dubius_Little Ringed Plover", "Calidris minuta_Little Stint", "Sternula albifrons_Little Tern", "Asio otus_Long-eared Owl", "Clangula hyemalis_Long-tailed Duck", "Stercorarius longicaudus_Long-tailed Skua", "Aegithalos caudatus_Long-tailed Tit", "Pica pica_Magpie", "Anas platyrhynchos_Mallard", "Aix galericulata_Mandarin Duck", "Puffinus puffinus_Manx Shearwater", "Circus aeruginosus_Marsh Harrier", "Poecile palustris_Marsh Tit", "Anthus pratensis_Meadow Pipit", "Ichthyaetus melanocephalus_Mediterranean Gull", "Hippolais polyglotta_Melodious Warbler", "Falco columbarius_Merlin", "Turdus viscivorus_Mistle Thrush", "Circus pygargus_Montagu's Harrier", "Gallinula chloropus_Moorhen", "Cygnus olor_Mute Swan", "Nycticorax nycticorax_Night Heron", "Luscinia megarhynchos_Nightingale", "Caprimulgus europaeus_Nightjar", "No Call_No Call", "Sitta europaea_Nuthatch", "Anthus hodgsoni_Olive-backed Pipit", "Emberiza hortulana_Ortolan Bunting", "Pandion haliaetus_Osprey", "Haematopus ostralegus_Oystercatcher", "Syrrhaptes paradoxus_Pallas's Sandgrouse", "Phylloscopus proregulus_Pallas's Warbler", "Loxia pytyopsittacus_Parrot Crossbill", "Calidris melanotos_Pectoral Sandpiper", "Remiz pendulinus_Penduline Tit", "Falco peregrinus_Peregrine", "Phasianus colchicus_Pheasant", "Ficedula hypoleuca_Pied Flycatcher", "Motacilla alba_Pied Wagtail", "Anser brachyrhynchus_Pink-footed Goose", "Anas acuta_Pintail", "Aythya ferina_Pochard", "Lagopus muta_Ptarmigan", "Ardea purpurea_Purple Heron", "Calidris maritima_Purple Sandpiper", "Coturnix coturnix_Quail", "Phylloscopus schwarzi_Radde's Warbler", "Corvus corax_Raven", "Alca torda_Razorbill", "Lanius collurio_Red-backed Shrike", "Ficedula parva_Red-breasted Flycatcher", "Mergus serrator_Red-breasted Merganser", "Netta rufina_Red-crested Pochard", "Tarsiger cyanurus_Red-flanked Bluetail", "Alectoris rufa_Red-legged Partridge", "Podiceps grisegena_Red-necked Grebe", "Caprimulgus ruficollis_Red-necked Nightjar", "Phalaropus lobatus_Red-necked Phalarope", "Cecropis daurica_Red-rumped Swallow", "Gavia stellata_Red-throated Diver", "Lagopus lagopus_Red Grouse", "Milvus milvus_Red Kite", "Tringa totanus_Redshank", "Phoenicurus phoenicurus_Redstart", "Turdus iliacus_Redwing", "Emberiza schoeniclus_Reed Bunting", "Acrocephalus scirpaceus_Reed Warbler", "Anthus richardi_Richard's Pipit", "Larus delawarensis_Ring-billed Gull", "Psittacula krameri_Ring-necked Parakeet", "Turdus torquatus_Ring Ouzel", "Charadrius hiaticula_Ringed Plover", "Erithacus rubecula_Robin", "Columba livia_Rock Dove", "Anthus petrosus_Rock Pipit", "Corvus frugilegus_Rook", "Pastor roseus_Rose-coloured Starling", "Sterna dougallii_Roseate Tern", "Buteo lagopus_Rough-legged Buzzard", "Oxyura jamaicensis_Ruddy Duck", "Tadorna ferruginea_Ruddy Shelduck", "Calidris pugnax_Ruff", "Xema sabini_Sabine's Gull", "Riparia riparia_Sand Martin", "Calidris alba_Sanderling", "Thalasseus sandvicensis_Sandwich Tern", "Locustella luscinioides_Savi's Warbler", "Aythya marila_Scaup", "Loxia scotica_Scottish Crossbill", "Acrocephalus schoenobaenus_Sedge Warbler", "Calidris pusilla_Semipalmated Sandpiper", "Serinus serinus_Serin", "Tadorna tadorna_Shelduck", "Eremophila alpestris_Shore Lark", "Asio flammeus_Short-eared Owl", "Calandrella brachydactyla_Short-toed Lark", "Spatula clypeata_Shoveler", "Spinus spinus_Siskin", "Alauda arvensis_Skylark", "Podiceps auritus_Slavonian Grebe", "Gallinago gallinago_Snipe", "Plectrophenax nivalis_Snow Bunting", "Anser caerulescens_Snow Goose", "Turdus philomelos_Song Thrush", "Accipiter nisus_Sparrowhawk", "Platalea leucorodia_Spoonbill", "Porzana porzana_Spotted Crake", "Muscicapa striata_Spotted Flycatcher", "Tringa erythropus_Spotted Redshank", "Actitis macularius_Spotted Sandpiper", "Sturnus vulgaris_Starling", "Columba oenas_Stock Dove", "Burhinus oedicnemus_Stone-curlew", "Saxicola rubicola_Stonechat", "Hydrobates pelagicus_Storm Petrel", "Sylvia cantillans_Subalpine Warbler", "Hirundo rustica_Swallow", "Apus apus_Swift", "Anser fabalis_Taiga Bean Goose", "Strix aluco_Tawny Owl", "Anas crecca_Teal", "Calidris temminckii_Temminck's Stint", "Anthus trivialis_Tree Pipit", "Passer montanus_Tree Sparrow", "Certhia familiaris_Treecreeper", "Aythya fuligula_Tufted Duck", "Anser serrirostris_Tundra Bean Goose", "Arenaria interpres_Turnstone", "Streptopelia turtur_Turtle Dove", "Linaria flavirostris_Twite", "Loxia leucoptera_Two-barred Crossbill", "Anthus spinoletta_Water Pipit", "Rallus aquaticus_Water Rail", "Bombycilla garrulus_Waxwing", "Oenanthe oenanthe_Wheatear", "Numenius phaeopus_Whimbrel", "Saxicola rubetra_Whinchat", "Anser albifrons_White-fronted Goose", "Calidris fuscicollis_White-rumped Sandpiper", "Haliaeetus albicilla_White-tailed Eagle", "Chlidonias leucopterus_White-winged Black Tern", "Ciconia ciconia_White Stork", "Sylvia communis_Whitethroat", "Cygnus cygnus_Whooper Swan", "Mareca penelope_Wigeon", "Poecile montanus_Willow Tit", "Phylloscopus trochilus_Willow Warbler", "Tringa glareola_Wood Sandpiper", "Phylloscopus sibilatrix_Wood Warbler", "Scolopax rusticola_Woodcock", "Lullula arborea_Woodlark", "Columba palumbus_Woodpigeon", "Troglodytes troglodytes_Wren", "Jynx torquilla_Wryneck", "Phylloscopus inornatus_Yellow-browed Warbler", "Larus michahellis_Yellow-legged Gull", "Motacilla flava_Yellow Wagtail", "Emberiza citrinella_Yellowhammer", "animals_animals", "vehicles_vehicles"];
-//let appPath;
-/// Get  path to USerData
-// ipcRenderer.send('path', {})
-// ipcRenderer.on('path', (event, arg) => {
-//     appPath = arg.appPath
-// })
+
 let currentPrediction;
-let appPath = remote.app.getPath('userData');
-let version = remote.app.getVersion()
+let appPath;
+
+// Get the modules loaded in preload.js
+
+const fs = window.module.fs;
+const WaveSurfer = window.module.WaveSurfer;
+const SpectrogramPlugin = window.module.SpectrogramPlugin;
+const SpecTimeline = window.module.SpecTimeline;
+const Regions = window.module.Regions;
+const colormap = window.module.colormap;
+const AudioBufferSlice = window.module.AudioBufferSlice;
+const p = window.module.p;
+const SunCalc = window.module.SunCalc;
+const uuidv4 = window.module.uuidv4;
+const gzip = window.module.gzip;
+const ungzip = window.module.ungzip;
+
+/// Set up communication channel between UI and worker window
+
+let worker;
+
+const establishMessageChannel =
+    new Promise((resolve, reject) => {
+        window.onmessage = (event) => {
+            // event.source === window means the message is coming from the preload
+            // script, as opposed to from an <iframe> or other source.
+            if (event.source === window && event.data === 'provide-worker-channel') {
+                [worker] = event.ports;
+                worker.postMessage('fire it up');
+                // Once we have the port, we can communicate directly with the worker
+                // process.
+                worker.onmessage = e => resolve(e.data);
+            }
+        }
+    }).then((value) => {
+        console.log(value);
+    }, reason => {
+        console.log(reason);
+    })
+
+
+window.onload = async (e) => {
+    establishMessageChannel.then((success) => {
+        worker.postMessage({action: 'load-model', useWhitelist: true})
+        worker.addEventListener('message', function (e) {
+            console.log('worker message arrived: ', e);
+            const args = e.data;
+            const event = args.event;
+            switch (event) {
+                case 'model-ready':
+                    onModelReady(args);
+                    break;
+                case 'prediction-done':
+                    onPredictionDone(args);
+                    break;
+                case 'progress':
+                    onProgress(args);
+                    break;
+                case 'prediction-ongoing':
+                    onPredictionOngoing(args);
+                    break;
+                case 'worker-loaded-audio':
+                    onWorkerLoadedAudio(args);
+                    break;
+            }
+        })
+    })
+};
+
+
+window.electron.getPath()
+    .then((appDataPath) => {
+        appPath = appDataPath;
+    })
+    .catch(e => {
+        console.log('Error getting app path:', e)
+    });
+let version;
+let diagnostics = {}
+
+window.electron.getVersion()
+    .then((appVersion) => {
+        version = appVersion;
+        console.log('App version: ', appVersion)
+        diagnostics['Chirpity Version'] = version;
+    })
+    .catch(e => {
+        console.log('Error getting app version:', e)
+    });
+
 let modelReady = false, fileLoaded = false, currentFile, fileList, resultHistory = {};
 let region, AUDACITY_LABELS, wavesurfer;
 let summary = {};
@@ -41,7 +110,7 @@ const resultTable = $('#resultTableBody')
 const summaryTable = $('#modalBody');
 const feedbackTable = $('#feedbackModalBody');
 let activeRow;
-let predictions = {}, correctedSpecies, speciesListItems, action, clickedNode, lastIndex,
+let predictions = {}, correctedSpecies, speciesListItems, clickedNode,
     clickedIndex, speciesName, speciesFilter, speciesHide, speciesExclude, subRows, scrolled, currentFileDuration;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
@@ -66,11 +135,8 @@ let restore = false;
 
 // Timers
 let t0_warmup, t1_warmup, t0_analysis, t1_analysis
-let diagnostics = {}
-diagnostics['Chirpity Version'] = version;
 
-const si = require('systeminformation');
-const {models} = require("@tensorflow/tfjs");
+const si = window.module.si;
 
 // promises style - new since version 3
 si.graphics()
@@ -103,7 +169,7 @@ si.mem()
         diagnostics[key] = `${data.total / Math.pow(1024, 3).toFixed(0)}GB`;
     })
     .catch(error => console.error(error));
-
+console.table(diagnostics);
 
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
 
@@ -179,7 +245,7 @@ async function loadAudioFile(filePath, OriginalCtime) {
     // set file creation time
     try {
         ctime = fs.statSync(filePath).mtime;
-        ipcRenderer.send('file-load-request', {message: filePath});
+        worker.postMessage({acton: 'file-load-request', message: filePath});
     } catch (e) {
         const supported_files = ['.mp3', '.wav', '.mpga', '.ogg', '.flac', '.aac', '.mpeg', '.mp4'];
         const dir = p.parse(filePath).dir;
@@ -200,7 +266,7 @@ async function loadAudioFile(filePath, OriginalCtime) {
         } else {
             if (file) filePath = file;
             if (OriginalCtime) ctime = OriginalCtime;
-            ipcRenderer.send('file-load-request', {message: filePath});
+            worker.postMessage({acton: 'file-load-request', message: filePath});
         }
     }
 
@@ -428,36 +494,48 @@ function zoomSpecOut() {
     adjustSpecDims(true)
 }
 
-
 async function showOpenDialog() {
-    ipcRenderer.send('openFiles');
+    const dialogConfig = {
+        filters: [{
+            name: 'Audio Files',
+            extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4']
+        }],
+        properties: ['openFile', 'multiSelections']
+    };
+    const files = await window.electron.openDialog('showOpenDialog', dialogConfig);
+    onOpenFiles(files);
 }
 
-ipcRenderer.on('openFiles', async (event, arg) => {
+async function onOpenFiles(args) {
     // Store the file list and Load First audio file
-    fileList = arg.filePaths
+    fileList = args.filePaths;
     await loadAudioFile(fileList[0]);
     currentFile = fileList[0];
-})
+}
 
-ipcRenderer.on('load-results', async (event, arg) => {
-    console.log("result file received: " + arg.file)
-    if (arg.file !== '.') {
-        await loadChirp(arg.file);
+async function omLoadResults(args) {
+    console.log("result file received: " + args.file)
+    if (args.file !== '.') {
+        await loadChirp(args.file);
     }
-})
+}
 
-ipcRenderer.on('mac-files', async (event, arg) => {
-    console.log("files received: " + arg.files);
-    await loadChirp(arg.files);
-})
+async function onMacFiles(args) {
+    console.log("files received: " + args.files);
+    await loadChirp(args.files);
+}
 
+/**
+ *
+ *
+ * @returns {Promise<void>}
+ */
 async function showSaveDialog() {
     // Show file dialog to save Audacity label file
-    ipcRenderer.send('saveFile', {'currentFile': currentFile, 'labels': AUDACITY_LABELS});
-    ipcRenderer.on('safeFile', (event, arg) => {
-        console.log(arg.message)
-    })
+    //ipcRenderer.send('saveFile', {'currentFile': currentFile, 'labels': AUDACITY_LABELS});
+    //ipcRenderer.on('safeFile', (event, arg) => {
+    console.log(arg.message)
+    //})
 }
 
 // Worker listeners
@@ -478,7 +556,7 @@ speciesExclude = document.querySelectorAll('speciesExclude');
 analyzeLink.addEventListener('click', async () => {
     analyseReset();
     resetResults();
-    ipcRenderer.send('analyze', {confidence: config.minConfidence, fileStart: fileStart});
+    worker.postMessage({action: 'analyze', confidence: config.minConfidence, fileStart: fileStart});
 });
 
 const analyzeSelectionLink = document.getElementById('analyzeSelection');
@@ -487,9 +565,12 @@ analyzeSelectionLink.addEventListener('click', async () => {
     analyseReset();
     const start = region.start + bufferBegin;
     let end = region.end + bufferBegin;
-    if (start - end < 0.5) { region.end = region.start + 0.5; end = start + 0.5 }
+    if (start - end < 0.5) {
+        region.end = region.start + 0.5;
+        end = start + 0.5
+    }
     // Add current buffer's beginning offset to region start / end tags
-    ipcRenderer.send('analyze', {confidence: 0.1, start: start, end: end, fileStart: fileStart});
+    worker.postMessage({action: 'analyze', confidence: 0.1, start: start, end: end, fileStart: fileStart});
     summary = {};
     summary['suppressed'] = []
 });
@@ -813,7 +894,7 @@ async function loadChirp(file) {
             if (key === 'source' || key === 'ctime') continue;
             await renderResult(value, key, false);
         }
-        ipcRenderer.send('prediction-done', {'labels': {}});
+        worker.postMessage({action: 'prediction-done', labels: {}});
         completeDiv.show();
     } else {
         currentFile = file;
@@ -891,18 +972,16 @@ window.onload = function () {
                 'longitude': -0.4,
                 'nocmig': false
             }
-            const {v4: uuidv4} = require('uuid');
             config.UUID = uuidv4();
             updatePrefs();
             return
         }
         config = JSON.parse(data)
         t0_warmup = Date.now();
-        ipcRenderer.send('load-model', {useWhitelist: config.useWhitelist})
+        worker.postMessage({action: 'load-model', useWhitelist: config.useWhitelist})
 
         // Check for keys
         if (!('UUID' in config)) {
-            const {v4: uuidv4} = require('uuid');
             config.UUID = uuidv4();
         }
         if (!('latitude' in config)) {
@@ -1125,7 +1204,7 @@ $(document).on('click', '#useWhitelist', function () {
         config.useWhitelist = true;
         $('#useWhitelist .tick').show()
     }
-    ipcRenderer.send('load-model', {useWhitelist: config.useWhitelist});
+    worker.postMessage({action: 'load-model', useWhitelist: config.useWhitelist});
     updatePrefs();
 })
 
@@ -1209,7 +1288,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     Escape: function () {
         console.log('Operation aborted');
         controller.abort();
-        ipcRenderer.send('abort', {'abort': true});
+        worker.postMessage({action: 'abort', abort: true});
         alert('Operation cancelled');
 
     }
@@ -1332,8 +1411,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
 
 
 // Electron Message handling
-
-ipcRenderer.on('model-ready', async (event, args) => {
+function onModelReady(args) {
     modelReady = true;
     const warmupText = document.getElementById('warmup');
     warmupText.classList.add('d-none');
@@ -1344,50 +1422,51 @@ ipcRenderer.on('model-ready', async (event, args) => {
     t1_warmup = Date.now();
     diagnostics['Warm Up'] = ((t1_warmup - t0_warmup) / 1000).toFixed(2) + ' seconds';
     diagnostics['Tensorflow Backend'] = args.backend;
-})
+}
 
-ipcRenderer.on('update-error', async (event, args) => {
-    console.error('update error' + args.error)
-})
 
-ipcRenderer.on('update-not-available', async (event, args) => {
-    console.log('update not available ' + args.message)
-})
+// worker.onmessage('update-error', async (event, args) => {
+//     console.error('update error' + args.error)
+// })
+//
+// worker.onmessage('update-not-available', async (event, args) => {
+//     console.log('update not available ' + args.message)
+// })
+//
+// worker.onmessage('update-available', async (event, args) => {
+//     console.log('update available ' + args.message)
+// })
+//
+// worker.onmessage('update-downloaded', async (event, args) => {
+//     console.log('update downloaded' + args.releaseNotes)
+// })
 
-ipcRenderer.on('update-available', async (event, args) => {
-    console.log('update available ' + args.message)
-})
-
-ipcRenderer.on('update-downloaded', async (event, args) => {
-    console.log('update downloaded' + args.releaseNotes)
-})
-
-ipcRenderer.on('worker-loaded', async (event, args) => {
+function onWorkerLoaded(args) {
     console.log('UI received worker-loaded: ' + args.message)
     workerHasLoadedFile = true;
     if (modelReady) enableMenuItem(['analyze']);
-    if (!loadSpectrogram) {
+    if (config.spectrogram) {
         hideAll();
         showElement(['controlsWrapper']);
         hideElement(['transport-controls']);
         const filename = arg.message.replace(/^.*[\\\/]/, '')
         $('#filename').html('<span class="material-icons">description</span> ' + filename);
     }
-})
+}
 
-ipcRenderer.on('progress', async (event, arg) => {
-    let progress = (arg.progress * 100).toFixed(1);
+function onProgress(args) {
+    let progress = (args.progress * 100).toFixed(1);
     progressBar.width(progress + '%');
     progressBar.attr('aria-valuenow', progress);
     progressBar.html(progress + '%');
-});
+}
 
-ipcRenderer.on('prediction-done', async (event, arg) => {
+async function onPredictionDone(args) {
     if (!seenTheDarkness && config.nocmig && !region) {
         alert(`Nocmig mode is enabled, but all timestamps in this file were during daylight hours. Any detections will have been suppressed.\n\nDisable Nocmig mode and re-run the analysis to see them.`)
     }
     scrolled = false;
-    AUDACITY_LABELS = arg.labels;
+    AUDACITY_LABELS = args.labels;
     progressDiv.hide();
     progressBar.width(0 + '%');
     progressBar.attr('aria-valuenow', 0);
@@ -1563,7 +1642,7 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
     t1_analysis = Date.now();
     diagnostics['Analysis Duration'] = ((t1_analysis - t0_analysis) / 1000).toFixed(2) + ' seconds';
     diagnostics['Analysis Rate'] = (currentFileDuration / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
-});
+}
 
 function matchSpecies(e, mode) {
     const spinner = e.target.parentNode.firstChild.classList;
@@ -1655,7 +1734,7 @@ async function renderResult(result, index, selection) {
                                     </td></tr>`);
                 // Abort
                 console.log("Aborting as reached daytime");
-                await ipcRenderer.send('abort', {'sendlabels': true});
+                worker.postMessage({action: 'abort', sendLabels: true});
                 return
             }
         }
@@ -1670,7 +1749,7 @@ async function renderResult(result, index, selection) {
         }
         if (result.cname in summary) {
             if (result)
-            summary[result.cname] += 1
+                summary[result.cname] += 1
         } else {
             summary[result.cname] = 1
         }
@@ -1753,9 +1832,9 @@ async function renderResult(result, index, selection) {
     if (!config.spectrogram) $('.specFeature').hide();
 }
 
-ipcRenderer.on('prediction-ongoing', async (event, arg) => {
-    await renderResult(arg.result, arg.index, arg.selection)
-});
+async function onPredictionOngoing(args) {
+    await renderResult(args.result, args.index, args.selection)
+}
 
 $(document).on('click', '.material-icons', function (e) {
     $(this).toggleClass("down");
@@ -1769,19 +1848,19 @@ function getSpeciesIndex(e) {
 }
 
 $(document).on('click', '.download', function (e) {
-    action = 'save';
+    mode = 'save';
     getSpeciesIndex(e);
-    sendFile(action, predictions[clickedIndex])
+    sendFile(mode, predictions[clickedIndex])
     e.stopImmediatePropagation();
 });
 $(document).on('click', '.feedback', function (e) {
 
     let index = e.target.parentNode.id;
     e.target.parentNode.onclick = null;
-    let action;
-    (e.target.classList.contains('text-success')) ? action = 'correct' : action = 'incorrect';
+    let mode;
+    (e.target.classList.contains('text-success')) ? mode = 'correct' : mode = 'incorrect';
     getSpeciesIndex(e);
-    if (action === 'incorrect') {
+    if (mode === 'incorrect') {
         findSpecies();
     } else if (confirm('Submit feedback?')) {
         predictions[clickedIndex].filename = predictions[clickedIndex].cname.replace(/\s+/g, '_') +
@@ -1824,7 +1903,7 @@ $('#feedbackModal').on('hidden.bs.modal', function (e) {
 })
 
 
-function sendFile(action, result) {
+function sendFile(mode, result) {
     let start, end, filename;
     if (result) {
         start = result.start;
@@ -1864,9 +1943,10 @@ function sendFile(action, result) {
             'version': version
         };
     }
-    if (action === 'save') {
-        ipcRenderer.send('save', {
-            'start': start, 'end': end, 'filepath': filename, 'metadata': metadata
+    if (mode === 'save') {
+        worker.postMessage({
+            action: 'save',
+            start: start, end: end, filepath: filename, metadata: metadata
         })
     } else {
         if (!config.seenThanks) {
@@ -1874,8 +1954,9 @@ function sendFile(action, result) {
             config.seenThanks = true;
             updatePrefs()
         }
-        ipcRenderer.send('post', {
-            'start': start, 'end': end, 'filepath': filename, 'metadata': metadata, 'action': action
+        worker.postMessage({
+            action: 'post',
+            start: start, end: end, filepath: filename, metadata: metadata, mode: mode
         })
     }
 }
@@ -1900,9 +1981,9 @@ function iconizeScore(score) {
 }
 
 // File menu handling
-
-$('#open').on('click', function () {
-    showOpenDialog();
+const open = document.getElementById('open');
+open.addEventListener('click', function () {
+    const file = showOpenDialog();
 });
 
 $('#saveDetections').on('click', function () {
@@ -1957,7 +2038,9 @@ nocmigButton.addEventListener('click', function (e) {
     updatePrefs();
 })
 
-$('#diagnostics').on('click', function () {
+const diagnosticMenu = document.getElementById('diagnostics')
+diagnosticMenu.addEventListener('click', function () {
+    console.log('diagnostics clicked');
     let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
     for (const [key, value] of Object.entries(diagnostics)) {
         diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
@@ -1965,7 +2048,6 @@ $('#diagnostics').on('click', function () {
     diagnosticTable += "</table>";
     $('#diagnosticsModalBody').html(diagnosticTable);
     $('#diagnosticsModal').modal({show: true});
-
 });
 
 // Transport controls handling
