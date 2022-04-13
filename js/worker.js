@@ -1,7 +1,78 @@
-const {app, ipcRenderer} = require('electron');
+const {ipcRenderer} = require('electron');
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
-//let appPath = '../256x384_model/';
 let appPath = '../24000_v9/';
+
+const doWork = (input) => {
+    // Something cpu-intensive.
+    return input * 2
+}
+// We might get multiple clients, for instance if there are multiple windows,
+// or if the main window reloads.
+let UI;
+ipcRenderer.on('new-client', (event) => {
+    [UI] = event.ports;
+    UI.onmessage = async (e) => {
+        const args = e.data;
+        const action = args.action;
+        switch (action) {
+            case 'load-model':
+                spawnWorker(args.useWhitelist)
+                break;
+            case 'file-load-request':
+                const currentFile = args.message;
+                console.log('Worker received audio ' + args.message);
+                controller = new AbortController();
+                signal = controller.signal;
+                await loadAudioFile(currentFile);
+                break;
+            case 'analyse':
+                console.log(`Worker received message: ${args.confidence}, start: ${args.start},  
+                    end: ${args.end},  fstart: ${args.fileStart}`);
+                console.log(audioBuffer.duration);
+
+                minConfidence = args.confidence;
+                const fileStart = args.fileStart;
+                const bufferLength = audioBuffer.length;
+                selection = false;
+                let start, end;
+                if (args.start === undefined) {
+                    start = 0;
+                    end = bufferLength;
+                } else {
+                    start = args.start * sampleRate;
+                    end = args.end * sampleRate;
+                    selection = true;
+
+                }
+                predicting = true;
+                await doPrediction(start, end, fileStart)
+                break;
+            case 'save':
+                console.log("file save requested")
+                await saveMP3(args.start, args.end, args.filepath, args.metadata);
+                break;
+            case 'post':
+                await postMP3(args.start, args.end, args.filepath, args.metadata, args.mode)
+                break;
+            case 'abort':
+                console.log("abort received")
+                if (controller) {
+                    controller.abort()
+                }
+                if (predicting) {
+                    //restart the worker
+                    predictWorker.terminate()
+                    spawnWorker(useWhitelist)
+                }
+                if (args.sendLabels) {
+                    UI.postMessage({event: 'prediction-done', labels: AUDACITY});
+                }
+                break;
+            default:
+                UI.postMessage('Worker communication lines open')
+        }
+    }
+})
 
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
@@ -19,36 +90,6 @@ let controller = new AbortController();
 let signal = controller.signal;
 let useWhitelist = true;
 
-ipcRenderer.on('file-load-request', async (event, arg) => {
-    const currentFile = arg.message;
-    console.log('Worker received audio ' + arg.message);
-    controller = new AbortController();
-    signal = controller.signal;
-    await loadAudioFile(currentFile);
-});
-
-ipcRenderer.on('analyze', async (event, arg) => {
-    console.log(`Worker received message: ${arg.confidence}, start: ${arg.start},  
-                    end: ${arg.end},  fstart: ${arg.fileStart}`);
-    console.log(audioBuffer.duration);
-
-    minConfidence = arg.confidence;
-    const fileStart = arg.fileStart;
-    const bufferLength = audioBuffer.length;
-    selection = false;
-    let start, end;
-    if (arg.start === undefined) {
-        start = 0;
-        end = bufferLength;
-    } else {
-        start = arg.start * sampleRate;
-        end = arg.end * sampleRate;
-        selection = true;
-
-    }
-    predicting = true;
-    await doPrediction(start, end, fileStart)
-});
 
 function sendMessageToWorker(chunkStart, chunks, fileStart, lastKey) {
     const objData = {
@@ -117,7 +158,7 @@ const loadAudioFile = (filePath) =>
                     // use resampled.getChannelData(x) to get an Float32Array for channel x.
                     audioBuffer = resampled;
                     console.log('Rendering completed successfully');
-                    ipcRenderer.send('worker-loaded', {message: filePath});
+                    UI.postMessage({event:'worker-loaded-audio',message: filePath});
                 })
             } else {
                 throw new DOMException('Rendering cancelled at user request', "AbortError")
@@ -131,37 +172,6 @@ const loadAudioFile = (filePath) =>
             }
         })
 
-
-ipcRenderer.on('save', async (event, arg) => {
-    console.log("file save requested")
-    await saveMP3(arg.start, arg.end, arg.filepath, arg.metadata)
-})
-
-ipcRenderer.on('load-model', async (event, arg) => {
-    //console.log("model-loading, using whitelist: " + arg.useWhitelist)
-    useWhitelist = arg.useWhitelist;
-    spawnWorker(useWhitelist)
-})
-
-ipcRenderer.on('post', async (event, arg) => {
-    await postMP3(arg.start, arg.end, arg.filepath, arg.metadata, arg.action)
-})
-
-ipcRenderer.on('abort', (event, arg) => {
-    console.log("abort received")
-    if (controller) {
-        controller.abort()
-    }
-    if (predicting) {
-        //restart the worker
-        predictWorker.terminate()
-        spawnWorker(useWhitelist)
-    }
-    if (arg.sendlabels) {
-        ipcRenderer.send('prediction-done', {'labels': AUDACITY});
-    }
-})
-
 function downloadMp3(buffer, filepath, metadata) {
     const MP3Blob = analyzeAudioBuffer(buffer, metadata);
     const anchor = document.createElement('a');
@@ -174,14 +184,14 @@ function downloadMp3(buffer, filepath, metadata) {
     window.URL.revokeObjectURL(url);
 }
 
-function uploadMp3(buffer, filepath, metadata, action) {
+function uploadMp3(buffer, filepath, metadata, mode) {
     const MP3Blob = analyzeAudioBuffer(buffer, metadata);
 // Populate a form with the file (blob) and filename
     var formData = new FormData();
     //const timestamp = Date.now()
     formData.append("thefile", MP3Blob, metadata.filename);
     // Was the prediction a correct one?
-    formData.append("Chirpity_assessment", action);
+    formData.append("Chirpity_assessment", mode);
 // post form data
     const xhr = new XMLHttpRequest();
     xhr.responseType = 'text';
@@ -345,12 +355,12 @@ async function saveMP3(start, end, filepath, metadata) {
 }
 
 
-async function postMP3(start, end, filepath, metadata, action) {
+async function postMP3(start, end, filepath, metadata, mode) {
     AudioBufferSlice(audioBuffer, start, end, async function (error, slicedAudioBuffer) {
         if (error) {
             console.error(error);
         } else {
-            uploadMp3(slicedAudioBuffer, filepath, metadata, action)
+            uploadMp3(slicedAudioBuffer, filepath, metadata, mode)
         }
     })
 }
@@ -363,18 +373,18 @@ function spawnWorker(useWhitelist) {
     predictWorker.postMessage(['load', appPath, useWhitelist, BATCH_SIZE])
 
     predictWorker.onmessage = (e) => {
-        runPredictions(e)
+        parsePredictions(e)
     }
 }
 
-function runPredictions(e) {
+function parsePredictions(e) {
     const response = e.data;
     if (response['message'] === 'model-ready') {
         chunkLength = response['chunkLength'];
         sampleRate = response['sampleRate'];
         const backend = response['backend'];
         console.log(backend);
-        ipcRenderer.send('model-ready', {message: 'ready', backend: backend})
+        UI.postMessage({event: 'model-ready', message: 'ready', backend: backend})
     } else if (response['message'] === 'prediction') {
         const lastKey = response['end'];
         //t1 = performance.now();
@@ -384,11 +394,11 @@ function runPredictions(e) {
             const position = parseFloat(prediction[0]);
             const result = prediction[1];
             const audacity = prediction[2];
-            ipcRenderer.send('progress', {'progress': (position / lastKey)});
+            UI.postMessage({event:'progress', progress: (position / lastKey)});
             //console.log('Prediction received from worker', result);
             if (result.score > minConfidence) {
                 index++;
-                ipcRenderer.send('prediction-ongoing', {result, 'index': index, 'selection': selection});
+                UI.postMessage({event:'prediction-ongoing', result:result, index: index, selection: selection});
                 AUDACITY.push(audacity);
                 RESULTS.push(result);
             }
@@ -398,16 +408,12 @@ function runPredictions(e) {
                 console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
                 if (RESULTS.length === 0) {
                     const result = "No detections found.";
-                    ipcRenderer.send('prediction-ongoing', {result, 'index': 1, 'selection': selection});
+                    UI.postMessage({event: 'prediction-ongoing', result:result, index: 1, selection: selection});
                 }
-                ipcRenderer.send('progress', {'progress': 1});
-                ipcRenderer.send('prediction-done', {'labels': AUDACITY});
+                UI.postMessage({event:'progress',progress: 1});
+                UI.postMessage({event:'prediction-done',labels: AUDACITY});
                 predicting = false;
             }
         })
     }
 }
-
-
-
-
