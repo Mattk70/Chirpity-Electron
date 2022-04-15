@@ -163,6 +163,8 @@ span[id^="filename_"] {
 }
 
 #controlsWrapper .row, #transport-controls {
+    min-width: 850px;
+    white-space: nowrap;
     height: 40px;
     z-index: 6;
 }
@@ -251,7 +253,7 @@ region.wavesurfer-region[data-region-highlight] {
 :not(input):not(textarea)::after,
 :not(input):not(textarea)::before {
     user-select: none;
-    cursor: default;
+    /*cursor: default; */
 }
 
 /* Menu Dropdown on Hover */

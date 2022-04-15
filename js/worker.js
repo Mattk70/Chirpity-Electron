@@ -2,10 +2,6 @@ const {ipcRenderer} = require('electron');
 const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 let appPath = '../24000_v9/';
 
-const doWork = (input) => {
-    // Something cpu-intensive.
-    return input * 2
-}
 // We might get multiple clients, for instance if there are multiple windows,
 // or if the main window reloads.
 let UI;
@@ -14,6 +10,7 @@ ipcRenderer.on('new-client', (event) => {
     UI.onmessage = async (e) => {
         const args = e.data;
         const action = args.action;
+        console.log('message received ', action)
         switch (action) {
             case 'load-model':
                 spawnWorker(args.useWhitelist)
@@ -25,7 +22,7 @@ ipcRenderer.on('new-client', (event) => {
                 signal = controller.signal;
                 await loadAudioFile(currentFile);
                 break;
-            case 'analyse':
+            case 'analyze':
                 console.log(`Worker received message: ${args.confidence}, start: ${args.start},  
                     end: ${args.end},  fstart: ${args.fileStart}`);
                 console.log(audioBuffer.duration);
@@ -158,7 +155,7 @@ const loadAudioFile = (filePath) =>
                     // use resampled.getChannelData(x) to get an Float32Array for channel x.
                     audioBuffer = resampled;
                     console.log('Rendering completed successfully');
-                    UI.postMessage({event:'worker-loaded-audio',message: filePath});
+                    UI.postMessage({event: 'worker-loaded-audio', message: filePath});
                 })
             } else {
                 throw new DOMException('Rendering cancelled at user request', "AbortError")
@@ -394,11 +391,11 @@ function parsePredictions(e) {
             const position = parseFloat(prediction[0]);
             const result = prediction[1];
             const audacity = prediction[2];
-            UI.postMessage({event:'progress', progress: (position / lastKey)});
+            UI.postMessage({event: 'progress', progress: (position / lastKey)});
             //console.log('Prediction received from worker', result);
             if (result.score > minConfidence) {
                 index++;
-                UI.postMessage({event:'prediction-ongoing', result:result, index: index, selection: selection});
+                UI.postMessage({event: 'prediction-ongoing', result: result, index: index, selection: selection});
                 AUDACITY.push(audacity);
                 RESULTS.push(result);
             }
@@ -408,10 +405,10 @@ function parsePredictions(e) {
                 console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
                 if (RESULTS.length === 0) {
                     const result = "No detections found.";
-                    UI.postMessage({event: 'prediction-ongoing', result:result, index: 1, selection: selection});
+                    UI.postMessage({event: 'prediction-ongoing', result: result, index: 1, selection: selection});
                 }
-                UI.postMessage({event:'progress',progress: 1});
-                UI.postMessage({event:'prediction-done',labels: AUDACITY});
+                UI.postMessage({event: 'progress', progress: 1});
+                UI.postMessage({event: 'prediction-done', labels: AUDACITY});
                 predicting = false;
             }
         })

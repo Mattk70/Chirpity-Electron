@@ -97,7 +97,7 @@ async function createWorker() {
 
 // This method will be called when Electron has finished
 app.whenReady().then(async () => {
-    ipcMain.handle('getPath', () => app.getPath("appData"));
+    ipcMain.handle('getPath', () => app.getPath("userData"));
     ipcMain.handle('getVersion', () => app.getVersion());
     await createWorker();
     createWindow();
@@ -119,7 +119,17 @@ app.whenReady().then(async () => {
             // Now the main window and the worker can communicate with each other
             // without going through the main process!
         }
-    })
+    });
+    ipcMain.on('file-to-load', (event) => {
+        // THe UI has asked for it, so now is a good time to ask the UI to load a results file if needed:
+        if (event.senderFrame === mainWindow.webContents.mainFrame) {
+            const args = sharedObject.prop1;
+            if (args.length > 1 || (process.platform === 'darwin' && args.length > 0)) {
+                console.log('Asking UI to load a file')
+                event.senderFrame.postMessage('load-results', {file: args[args.length - 1]});
+            }
+        }
+    });
 
     if (process.platform === 'darwin') {
         //const appIcon = new Tray('./img/icon/icon.png')
@@ -134,13 +144,10 @@ app.whenReady().then(async () => {
         }
     })
 
-    // if (files.length > 0) {
-    mainWindow.webContents.send('load-results', {file: 'test'});
-    // }
 
     mainWindow.webContents.on('new-window', function (e, url) {
         e.preventDefault();
-        require('electron').shell.openExternal(url).then(r => console.log(r));
+        require('electron').shell.openExternal(url); // .then(r => console.log(r));
     });
 
     workerWindow.webContents.on('crashed', (e) => {
@@ -209,9 +216,9 @@ ipcMain.handle('dialog', (event, method, params) => {
     dialog[method](mainWindow, params);
 });
 
-ipcMain.handle('openFiles', async(event) => {
+ipcMain.handle('openFiles', async (event) => {
     // Show file dialog to select audio file
-    const result = await dialog.showOpenDialog(mainWindow,{
+    const result = await dialog.showOpenDialog(mainWindow, {
         filters: [{
             name: 'Audio Files',
             extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4']
