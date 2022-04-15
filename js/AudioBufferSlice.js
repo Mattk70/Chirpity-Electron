@@ -1,4 +1,4 @@
-const audioContext = new (window.AudioContext || window.webkitAudioContext);
+const audioContext = new window.AudioContext;
 
 function AudioBufferSlice(buffer, begin, end, callback) {
     if (!(this instanceof AudioBufferSlice)) {

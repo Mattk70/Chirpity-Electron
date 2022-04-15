@@ -30,7 +30,7 @@
             aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
     </button>
-    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <div class="collapse navbar-collapse justify-content-between" id="navbarSupportedContent">
         <ul class="navbar-nav mr-auto">
             <li class="nav-item dropdown active">
                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown"
@@ -146,7 +146,7 @@
                 </div>
             </li>
         </ul>
-        <img class="" src="img/logo/chirpity_logo2.png" alt="Chirpity Birdcalls: Identifying birds by sound"
+        <img src="img/logo/chirpity_logo2.png" alt="Chirpity Birdcalls: Identifying birds by sound"
              height="50px"/>
     </div>
 </nav>
@@ -211,13 +211,13 @@
             <div class="modal-content">
                 <div class="modal-header justify-content-center">
                     <h5 class="modal-title" id="helpModalLabel">Help</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div id="helpModalBody" class="modal-body"></div>
                 <div class="modal-footer justify-content-center">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -241,8 +241,8 @@
     <div class="" id="dummy" style="width: 100%"></div>
 
     <!-- Controls view -->
-    <div class="container-fluid p-1 bg-dark text-white d-none justify-content-between" id="controlsWrapper">
-        <div class="row w-100">
+    <div class="container-fluid p-1 bg-dark text-white d-none" id="controlsWrapper">
+        <div class="row w-100 justify-content-between">
 
             <div id="filename" class="align-bottom p-2 pl-3"></div>
             <div id="transport-controls" class="d-flex offset-5">
@@ -260,50 +260,51 @@
                         <i class="material-icons-two-tone zoom align-middle">zoom_out</i>
                     </button>
                 </div>
-            </div>
-            <div class="col-sm">
-                <div class="progressDiv float-sm-right" style="width: 20%;display: none"> Working...<br>
-                    <div class="progress" style="width: 100%">
-                        <div class="progress-bar progress-bar-striped active" role="progressbar"
-                             aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width:0">
-                            0%
+                <div class="float-end">
+                    <div class="progressDiv" style="display: none"> Working...<br>
+                        <div class="progress" style="width: 100%">
+                            <div class="progress-bar progress-bar-striped active" role="progressbar"
+                                 aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width:0">
+                                0%
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="complete float-sm-right" style="display: none">
+                <div class="complete" style="display: none">
                     <!-- Button trigger modal -->
                     <button type="button" class="btn btn-primary align-bottom" data-toggle="modal"
                             data-target="#exampleModal">
                         Show Summary
                     </button>
                 </div>
+                <div class="float-end">
+                        <span title="Toggle Nocmig mode" id="nocmigMode"
+                              class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">dark_mode</span>
+                </div>
             </div>
-            <div class="align-bottom">
-                <span title="Toggle Nocmig mode" id="nocmigMode"
-                      class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">dark_mode</span>
-            </div>
+
         </div>
     </div>
 
     <!-- Result table -->
     <div class="d-none p-0 border-0 overflow-auto tableFixHead" id="resultTableContainer">
         <table id='results' class="table table-hover">
-            <thead class="thead-dark">
+            <thead class="bg-dark text-white">
             <tr>
-                <th scope="col">#</th>
-                <th scope="col" class="timestamp">Time</th>
-                <th scope="col">Position</th>
-                <th scope="col">Common name</th>
-                <th scope="col">Scientific name</th>
-                <th scope="col" class="text-center">Confidence
-                    <span id="confidenceFilter" class="material-icons-two-tone text-secondary align-bottom pointer">filter_list</span>
+                <th>#</th>
+                <th class="timestamp">Time</th>
+                <th>Position</th>
+                <th>Common name</th>
+                <th>Scientific name</th>
+                <th class="text-center">Confidence<span id="confidenceFilter"
+                                                        class="material-icons-two-tone text-secondary align-bottom pointer">filter_list</span>
                 </th>
-                <th scope="col" class="text-center">Other IDs</th>
-                <th scope="col" class="specFeature text-center">Play</th>
-                <th scope="col" class="text-center">XC</th>
-                <th scope="col" class="specFeature text-center">Save</th>
-                <th scope="col" class="text-center speciesExclude d-none">Exclude</th>
-                <th scope="col" class="specFeature text-center">Feedback</th>
+                <th class="text-center">Other IDs</th>
+                <th class="specFeature text-center">Play</th>
+                <th class="text-center">XC</th>
+                <th class="specFeature text-center">Save</th>
+                <th class="text-center speciesExclude d-none">Exclude</th>
+                <th class="specFeature text-center">Feedback</th>
             </tr>
             </thead>
             <tbody class="text-dark" id="resultTableBody">
@@ -318,6 +319,11 @@
 <div class="d-flex fixed-bottom p-2 bg-primary text-white justify-content-center" id="footer">
     <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span></small>
 </div>
+<script src="node_modules/wavesurfer.js/dist/wavesurfer.min.js"></script>
+<script src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js"></script>
+<script src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js"></script>
+<script src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.regions.min.js"></script>
+<script src="./js/AudioBufferSlice.js"></script>
 <script src="./js/ui.js"></script>
 </body>
 </html>

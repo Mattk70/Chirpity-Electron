@@ -1,12 +1,6 @@
 const {contextBridge, ipcRenderer} = require("electron");
 const fs = require('fs');
-const WaveSurfer = require("wavesurfer.js");
-const SpectrogramPlugin = require('wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js');
-const SpecTimeline = require('wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js');
-const Regions = require('wavesurfer.js/dist/plugin/wavesurfer.regions.min.js');
 const colormap = require("colormap");
-
-const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 const p = require('path');
 const SunCalc = require('suncalc2');
 const {v4: uuidv4} = require("uuid");
@@ -23,11 +17,19 @@ const windowLoaded = new Promise(resolve => {
 
 // We request that the main process sends us a channel we can use to
 // communicate with the worker.
-ipcRenderer.send('request-worker-channel')
+ipcRenderer.send('request-worker-channel');
+// now see if we have files to load
+ipcRenderer.send('file-to-load');
 
-ipcRenderer.once('provide-worker-channel', async(event) => {
+ipcRenderer.once('load-results', async (event, args) => {
     // make sure our ui is ready to receive the message
-    await windowLoaded
+    await windowLoaded;
+    console.log('Posting file to UI');
+    window.postMessage({args: args}, '*')
+})
+ipcRenderer.once('provide-worker-channel', async (event) => {
+    // make sure our ui is ready to receive the message
+    await windowLoaded;
     // Once we receive the reply, we can take the port...
     const [port] = event.ports
 
@@ -48,12 +50,7 @@ contextBridge.exposeInMainWorld('electron', {
 
 contextBridge.exposeInMainWorld('module', {
     fs: fs,
-    WaveSurfer: WaveSurfer,
-    SpectrogramPlugin: SpectrogramPlugin,
-    SpecTimeline: SpecTimeline,
-    Regions: Regions,
     colormap: colormap,
-    AudioBufferSlice: AudioBufferSlice,
     p: p,
     SunCalc: SunCalc,
     uuidv4: uuidv4,

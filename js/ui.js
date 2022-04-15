@@ -6,13 +6,9 @@ let appPath;
 
 // Get the modules loaded in preload.js
 
+
 const fs = window.module.fs;
-const WaveSurfer = window.module.WaveSurfer;
-const SpectrogramPlugin = window.module.SpectrogramPlugin;
-const SpecTimeline = window.module.SpecTimeline;
-const Regions = window.module.Regions;
 const colormap = window.module.colormap;
-const AudioBufferSlice = window.module.AudioBufferSlice;
 const p = window.module.p;
 const SunCalc = window.module.SunCalc;
 const uuidv4 = window.module.uuidv4;
@@ -28,12 +24,18 @@ const establishMessageChannel =
         window.onmessage = (event) => {
             // event.source === window means the message is coming from the preload
             // script, as opposed to from an <iframe> or other source.
-            if (event.source === window && event.data === 'provide-worker-channel') {
-                [worker] = event.ports;
-                worker.postMessage('fire it up');
-                // Once we have the port, we can communicate directly with the worker
-                // process.
-                worker.onmessage = e => resolve(e.data);
+            if (event.source === window) {
+                if (event.data === 'provide-worker-channel') {
+                    [worker] = event.ports;
+                    worker.postMessage('fire it up');
+                    // Once we have the port, we can communicate directly with the worker
+                    // process.
+                    worker.onmessage = e => {
+                        resolve(e.data);
+                    }
+                } else if (event.data.args) {
+                    onLoadResults(event.data.args)
+                }
             }
         }
     }).then((value) => {
@@ -42,38 +44,9 @@ const establishMessageChannel =
         console.log(reason);
     })
 
-
-window.onload = async (e) => {
-    establishMessageChannel.then((success) => {
-        worker.postMessage({action: 'load-model', useWhitelist: true})
-        worker.addEventListener('message', function (e) {
-            console.log('worker message arrived: ', e);
-            const args = e.data;
-            const event = args.event;
-            switch (event) {
-                case 'model-ready':
-                    onModelReady(args);
-                    break;
-                case 'prediction-done':
-                    onPredictionDone(args);
-                    break;
-                case 'progress':
-                    onProgress(args);
-                    break;
-                case 'prediction-ongoing':
-                    onPredictionOngoing(args);
-                    break;
-                case 'worker-loaded-audio':
-                    onWorkerLoadedAudio(args);
-                    break;
-            }
-        })
-    })
-};
-
-
 window.electron.getPath()
     .then((appDataPath) => {
+        console.log(appDataPath)
         appPath = appDataPath;
     })
     .catch(e => {
@@ -199,13 +172,14 @@ const fetchAudioFile = (filePath) =>
                 offlineSource.buffer = buffer;
                 offlineSource.connect(offlineCtx.destination);
                 offlineSource.start();
-                offlineCtx.startRendering().then(function (resampled) {
-                    console.log('Rendering completed successfully');
-                    // `resampled` contains an AudioBuffer resampled at 24000Hz.
-                    // use resampled.getChannelData(x) to get an Float32Array for channel x.
-                    currentBuffer = resampled;
-                    loadBufferSegment(resampled, bufferBegin)
-                }).then(() => {
+                offlineCtx.startRendering()
+                    .then(function (resampled) {
+                        console.log('Rendering completed successfully');
+                        // `resampled` contains an AudioBuffer resampled at 24000Hz.
+                        // use resampled.getChannelData(x) to get an Float32Array for channel x.
+                        currentBuffer = resampled;
+                        loadBufferSegment(resampled, bufferBegin)
+                    }).then(() => {
                     if (restore) showTheResults();
                 })
             } else {
@@ -245,7 +219,7 @@ async function loadAudioFile(filePath, OriginalCtime) {
     // set file creation time
     try {
         ctime = fs.statSync(filePath).mtime;
-        worker.postMessage({acton: 'file-load-request', message: filePath});
+        worker.postMessage({action: 'file-load-request', message: filePath});
     } catch (e) {
         const supported_files = ['.mp3', '.wav', '.mpga', '.ogg', '.flac', '.aac', '.mpeg', '.mp4'];
         const dir = p.parse(filePath).dir;
@@ -266,7 +240,7 @@ async function loadAudioFile(filePath, OriginalCtime) {
         } else {
             if (file) filePath = file;
             if (OriginalCtime) ctime = OriginalCtime;
-            worker.postMessage({acton: 'file-load-request', message: filePath});
+            worker.postMessage({action: 'file-load-request', message: filePath});
         }
     }
 
@@ -398,7 +372,7 @@ function initSpec(args) {
         responsive: true,
         height: 512,
         plugins: [
-            Regions.create({
+            WaveSurfer.regions.create({
                 regionsMinLength: 0.5,
                 dragSelection: true,
                 slop: 5,
@@ -410,7 +384,7 @@ function initSpec(args) {
         initSpectrogram()
     }
     if (config.timeline) {
-        wavesurfer.addPlugin(SpecTimeline.create({
+        wavesurfer.addPlugin(WaveSurfer.timeline.create({
             container: '#timeline',
             formatTimeCallback: formatTimeCallback,
             timeInterval: timeInterval,
@@ -503,7 +477,7 @@ async function showOpenDialog() {
         properties: ['openFile', 'multiSelections']
     };
     const files = await window.electron.openDialog('showOpenDialog', dialogConfig);
-    onOpenFiles(files);
+    if (!files.canceled) await onOpenFiles(files);
 }
 
 async function onOpenFiles(args) {
@@ -513,16 +487,9 @@ async function onOpenFiles(args) {
     currentFile = fileList[0];
 }
 
-async function omLoadResults(args) {
+async function onLoadResults(args) {
     console.log("result file received: " + args.file)
-    if (args.file !== '.') {
-        await loadChirp(args.file);
-    }
-}
-
-async function onMacFiles(args) {
-    console.log("files received: " + args.files);
-    await loadChirp(args.files);
+    await loadChirp(args.file);
 }
 
 /**
@@ -565,7 +532,7 @@ analyzeSelectionLink.addEventListener('click', async () => {
     analyseReset();
     const start = region.start + bufferBegin;
     let end = region.end + bufferBegin;
-    if (start - end < 0.5) {
+    if (end - start < 0.5) {
         region.end = region.start + 0.5;
         end = start + 0.5
     }
@@ -884,7 +851,8 @@ async function loadChirp(file) {
         restore = true;
         const data = fs.readFileSync(file);
         await ungzip(data).then(buffer => {
-            savedPredictions = JSON.parse(buffer.toString());
+            buffer = new TextDecoder().decode(buffer);
+            savedPredictions = JSON.parse(buffer);
             currentFile = savedPredictions['source'];
             ctime = Date.parse(savedPredictions['ctime']);
         })
@@ -955,32 +923,32 @@ function saveDetections() {
 
 /////////////////////////  Window Handlers ////////////////////////////
 
-window.onload = function () {
-    // Load preferences and options
+window.onload = async (e) => {
+    // Set config defaults
+    config = {
+        'spectrogram': true,
+        'colormap': 'inferno',
+        'timeline': true,
+        'minConfidence': 0.45,
+        'timeOfDay': false,
+        'useWhitelist': true,
+        'latitude': 51.9,
+        'longitude': -0.4,
+        'nocmig': false
+    }
+    config.UUID = uuidv4();
+    // Load preferences and override defaults
     fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
         if (err) {
             console.log('JSON parse error ' + err);
-            // If file read error, use defaults
-            config = {
-                'spectrogram': true,
-                'colormap': 'inferno',
-                'timeline': true,
-                'minConfidence': 0.45,
-                'timeOfDay': false,
-                'useWhitelist': true,
-                'latitude': 51.9,
-                'longitude': -0.4,
-                'nocmig': false
-            }
+            // If file read error, use defaults, set new UUID
             config.UUID = uuidv4();
             updatePrefs();
             return
         }
         config = JSON.parse(data)
-        t0_warmup = Date.now();
-        worker.postMessage({action: 'load-model', useWhitelist: config.useWhitelist})
 
-        // Check for keys
+        // Check for keys - in case updates have added new ones
         if (!('UUID' in config)) {
             config.UUID = uuidv4();
         }
@@ -1017,6 +985,32 @@ window.onload = function () {
             nocmigButton.classList.add('active')
         }
         showElement([config.colormap + 'span'], true)
+    })
+    // establish the message channel
+    establishMessageChannel.then((success) => {
+        t0_warmup = Date.now();
+        worker.postMessage({action: 'load-model', useWhitelist: true})
+        worker.addEventListener('message', function (e) {
+            const args = e.data;
+            const event = args.event;
+            switch (event) {
+                case 'model-ready':
+                    onModelReady(args);
+                    break;
+                case 'prediction-done':
+                    onPredictionDone(args);
+                    break;
+                case 'progress':
+                    onProgress(args);
+                    break;
+                case 'prediction-ongoing':
+                    onPredictionOngoing(args);
+                    break;
+                case 'worker-loaded-audio':
+                    onWorkerLoadedAudio(args);
+                    break;
+            }
+        })
     })
     // Set footer year
     $('#year').text(new Date().getFullYear());
@@ -1167,7 +1161,7 @@ function initSpectrogram() {
         fftSamples = 512;
     }
     if (wavesurfer.spectrogram) wavesurfer.destroyPlugin('spectrogram');
-    wavesurfer.addPlugin(SpectrogramPlugin.create({
+    wavesurfer.addPlugin(WaveSurfer.spectrogram.create({
         wavesurfer: wavesurfer,
         container: "#spectrogram",
         scrollParent: true,
@@ -1204,7 +1198,10 @@ $(document).on('click', '#useWhitelist', function () {
         config.useWhitelist = true;
         $('#useWhitelist .tick').show()
     }
+
     worker.postMessage({action: 'load-model', useWhitelist: config.useWhitelist});
+    const warmupText = document.getElementById('warmup');
+    warmupText.classList.remove('d-none');
     updatePrefs();
 })
 
@@ -1216,7 +1213,7 @@ $(document).on('click', '.timeline', function () {
         updatePrefs();
     } else {
         config.timeline = true;
-        wavesurfer.addPlugin(SpecTimeline.create({
+        wavesurfer.addPlugin(WaveSurfer.timeline.create({
             wavesurfer: wavesurfer,
             container: "#timeline",
             formatTimeCallback: formatTimeCallback,
@@ -1441,15 +1438,15 @@ function onModelReady(args) {
 //     console.log('update downloaded' + args.releaseNotes)
 // })
 
-function onWorkerLoaded(args) {
-    console.log('UI received worker-loaded: ' + args.message)
+function onWorkerLoadedAudio(args) {
+    console.log('UI received worker-loaded-audio: ' + args.message)
     workerHasLoadedFile = true;
     if (modelReady) enableMenuItem(['analyze']);
-    if (config.spectrogram) {
+    if (!config.spectrogram) {
         hideAll();
         showElement(['controlsWrapper']);
         hideElement(['transport-controls']);
-        const filename = arg.message.replace(/^.*[\\\/]/, '')
+        const filename = args.message.replace(/^.*[\\\/]/, '')
         $('#filename').html('<span class="material-icons">description</span> ' + filename);
     }
 }
@@ -1545,14 +1542,14 @@ async function onPredictionDone(args) {
         e.target.parentNode.previousElementSibling.children[1].classList.remove('text-success');
         if (targetClass.contains('text-danger')) {
             targetClass.remove('text-danger')
-            const setDelay = setTimeout(matchSpecies, 1, e, 'unhide');
+            setTimeout(matchSpecies, 1, e, 'unhide');
         } else {
             targetClass.add('text-danger');
             speciesName.forEach(function (el) {
                 const classes = el.parentNode.classList;
                 if (!classes.contains('hidden')) classes.remove('d-none')
             })
-            const setDelay = setTimeout(matchSpecies, 1, e, 'hide');
+            setTimeout(matchSpecies, 1, e, 'hide');
         }
         tableRows[0].scrollIntoView({
             behavior: 'smooth',
@@ -1568,10 +1565,10 @@ async function onPredictionDone(args) {
         targetClass.add('d-none');
         if (targetClass.contains('text-danger')) {
             targetClass.remove('text-danger')
-            const setDelay = setTimeout(matchSpecies, 1, e, 'unexclude');
+            setTimeout(matchSpecies, 1, e, 'unexclude');
         } else {
             targetClass.add('text-danger');
-            const setDelay = setTimeout(matchSpecies, 1, e, 'exclude');
+            setTimeout(matchSpecies, 1, e, 'exclude');
         }
         e.stopImmediatePropagation();
     });
@@ -1836,7 +1833,7 @@ async function onPredictionOngoing(args) {
     await renderResult(args.result, args.index, args.selection)
 }
 
-$(document).on('click', '.material-icons', function (e) {
+$(document).on('click', '.material-icons', function () {
     $(this).toggleClass("down");
 })
 
@@ -2040,7 +2037,6 @@ nocmigButton.addEventListener('click', function (e) {
 
 const diagnosticMenu = document.getElementById('diagnostics')
 diagnosticMenu.addEventListener('click', function () {
-    console.log('diagnostics clicked');
     let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
     for (const [key, value] of Object.entries(diagnostics)) {
         diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
