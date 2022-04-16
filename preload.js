@@ -43,6 +43,7 @@ ipcRenderer.once('provide-worker-channel', async (event) => {
 
 
 contextBridge.exposeInMainWorld('electron', {
+    saveFile: (args) => ipcRenderer.invoke('saveFile', args),
     openDialog: (method, config) => ipcRenderer.invoke('openFiles', method, config),
     getPath: () => ipcRenderer.invoke('getPath'),
     getVersion: () => ipcRenderer.invoke('getVersion')

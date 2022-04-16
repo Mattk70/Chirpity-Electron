@@ -227,7 +227,7 @@ ipcMain.handle('openFiles', async (event) => {
     });
     return result;
 })
-ipcMain.on('saveFile', (event, arg) => {
+ipcMain.handle('saveFile', (event, arg) => {
     // Show file dialog to select audio file
     let currentFile = arg.currentFile.substr(0, arg.currentFile.lastIndexOf(".")) + ".txt";
     dialog.showSaveDialog({
