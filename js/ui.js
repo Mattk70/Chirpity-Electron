@@ -43,16 +43,13 @@ const establishMessageChannel =
         console.log(reason);
     })
 
-let appPath;
 
-window.electron.getPath()
-    .then((appDataPath) => {
-        appPath = appDataPath;
-        console.log('App Path: ', appDataPath)
-    })
-    .catch(e => {
-        console.log('Error getting app version:', e)
-    });
+async function getPath(){
+    const pathPromise = window.electron.getPath();
+    const appPath = await pathPromise;
+    return appPath;
+}
+
 
 let version;
 let diagnostics = {}
@@ -924,10 +921,10 @@ function saveDetections() {
 }
 
 /////////////////////////  Window Handlers ////////////////////////////
-
+let appPath;
 window.onload = async (e) => {
     // Set config defaults
-    await appPath;
+
     config = {
         'spectrogram': true,
         'colormap': 'inferno',
@@ -941,6 +938,7 @@ window.onload = async (e) => {
     }
     config.UUID = uuidv4();
     // Load preferences and override defaults
+    appPath = await getPath();
     fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
         if (err) {
             console.log('JSON parse error ' + err);
