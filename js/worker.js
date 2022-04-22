@@ -73,7 +73,7 @@ ipcRenderer.on('new-client', (event) => {
 
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
-const BATCH_SIZE = 3;
+const BATCH_SIZE = 12;
 console.log(appPath);
 
 let audioBuffer;
@@ -86,6 +86,43 @@ let selection = false;
 let controller = new AbortController();
 let signal = controller.signal;
 let useWhitelist = true;
+
+// function processAudio(){
+//     console.log('Processing audio')
+// }
+//
+// function onEncoderError(e){
+//     console.log('Encoder error: ', e);
+// }
+
+// async function fetchAudioStream(filePath) {
+//     let data = [];
+//     const fd = await fs.promises.open(filePath);
+//     const readStream = fd.createReadStream();
+//     const ad = new AudioDecoder({
+//         output: processAudio,
+//         error: onEncoderError,
+//     })
+//     ad.configure({ codec: 'mp4a.40.2', sampleRate: 24000, numberOfChannels: 1 });
+//
+//     readStream.on('data', chunk => {
+//         console.log('---------------------------------');
+//         console.log(chunk);
+//         data.push(chunk);
+//         ad.decode(chunk)
+//         console.log('---------------------------------');
+//     });
+//
+//     readStream.on('open', () => {
+//         console.log('Stream opened...');
+//     });
+//
+//     readStream.on('end', () => {
+//         console.log('Stream Closed...');
+//     });
+//     return data
+// }
+
 
 
 function sendMessageToWorker(chunkStart, chunks, fileStart, lastKey) {
@@ -151,7 +188,7 @@ const loadAudioFile = (filePath) =>
                 offlineSource.connect(offlineCtx.destination);
                 offlineSource.start();
                 offlineCtx.startRendering().then(function (resampled) {
-                    // `resampled` contains an AudioBuffer resampled at 48000Hz.
+                    // `resampled` contains an AudioBuffer resampled at 24000Hz.
                     // use resampled.getChannelData(x) to get an Float32Array for channel x.
                     audioBuffer = resampled;
                     console.log('Rendering completed successfully');
@@ -167,6 +204,7 @@ const loadAudioFile = (filePath) =>
                 // We know it's been canceled!
                 console.log('Worker fetch aborted')
             }
+            else {console.log("Another error", e)}
         })
 
 function downloadMp3(buffer, filepath, metadata) {

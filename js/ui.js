@@ -7,6 +7,7 @@ let currentPrediction;
 
 
 const fs = window.module.fs;
+const fopen = window.module.fopen;
 const colormap = window.module.colormap;
 const p = window.module.p;
 const SunCalc = window.module.SunCalc;
@@ -44,7 +45,7 @@ const establishMessageChannel =
     })
 
 
-async function getPath(){
+async function getPath() {
     const pathPromise = window.electron.getPath();
     const appPath = await pathPromise;
     return appPath;
@@ -69,7 +70,7 @@ let region, AUDACITY_LABELS, wavesurfer;
 let summary = {};
 summary['suppressed'] = [];
 let fileStart, bufferStartTime, ctime;
-let startPosition; //
+let startPosition;
 let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
 // set up some DOM element caches
 let bodyElement = $('body');
@@ -77,10 +78,13 @@ let dummyElement, specElement, waveElement, specCanvasElement, specWaveElement;
 let waveCanvasElement, waveWaveElement, resultTableElement = $('#resultTableContainer');
 let contentWrapperElement = $('#contentWrapper');
 let controlsWrapperElement = $('#controlsWrapper');
-let completeDiv = $('.complete');
+let completeDiv = $('#complete');
 const resultTable = $('#resultTableBody')
 const summaryTable = $('#summaryModalBody');
 const feedbackTable = $('#feedbackModalBody');
+let progressDiv = $('#progressDiv');
+let progressBar = $('.progress .progress-bar');
+
 let activeRow;
 let predictions = {}, correctedSpecies, speciesListItems, clickedNode,
     clickedIndex, speciesName, speciesFilter, speciesHide, speciesExclude, subRows, scrolled, currentFileDuration;
@@ -118,7 +122,7 @@ si.graphics()
         data.controllers.forEach(gpu => {
             const key = `GPU[${count}]`;
             const vram = key + ' memory';
-            diagnostics[key] = gpu.model;
+            diagnostics[key] = gpu.name || gpu.vendor || gpu.model;
             diagnostics[vram] = `${gpu.vram}MB`;
             count += 1;
         })
@@ -512,7 +516,6 @@ function analyseReset() {
         el.classList.add('d-none');
     })
     completeDiv.hide();
-    progressDiv.show();
     // Diagnostics
     t0_analysis = Date.now();
 }
@@ -522,6 +525,7 @@ const analyzeLink = document.getElementById('analyze');
 speciesExclude = document.querySelectorAll('speciesExclude');
 analyzeLink.addEventListener('click', async () => {
     analyseReset();
+    progressDiv.show();
     resetResults();
     worker.postMessage({action: 'analyze', confidence: config.minConfidence, fileStart: fileStart});
 });
@@ -530,6 +534,7 @@ const analyzeSelectionLink = document.getElementById('analyzeSelection');
 
 analyzeSelectionLink.addEventListener('click', async () => {
     analyseReset();
+    progressDiv.show();
     const start = region.start + bufferBegin;
     let end = region.end + bufferBegin;
     if (end - start < 0.5) {
@@ -586,10 +591,6 @@ function hideAll() {
     hideElement(['loadFileHint', 'loadFileHintText', 'loadFileHintSpinner', 'loadFileHintLog',
         'timeline', 'waveform', 'spectrogram', 'dummy', 'controlsWrapper', 'resultTableContainer']);
 }
-
-let progressDiv = $('.progressDiv');
-
-let progressBar = $('.progress .progress-bar');
 
 
 function createRegion(start, end, label) {
