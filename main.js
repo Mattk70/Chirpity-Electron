@@ -58,7 +58,7 @@ function createWindow() {
     mainWindow.loadFile('index.html')
 
     // Open the DevTools. Comment out for release
-    mainWindow.webContents.openDevTools()
+    //mainWindow.webContents.openDevTools()
 
     mainWindow.once('ready-to-show', () => {
         mainWindow.show()
@@ -74,7 +74,7 @@ function createWindow() {
 async function createWorker() {
     // hidden worker
     workerWindow = new BrowserWindow({
-        show: true,
+        show: false,
         height: 800,
         width: 1200,
         webPreferences: {
@@ -99,6 +99,7 @@ async function createWorker() {
 app.whenReady().then(async () => {
     ipcMain.handle('getPath', () => app.getPath("userData"));
     ipcMain.handle('getVersion', () => app.getVersion());
+
     await createWorker();
     createWindow();
     // We'll be sending one end of this channel to the main world of the
@@ -124,8 +125,8 @@ app.whenReady().then(async () => {
         // THe UI has asked for it, so now is a good time to ask the UI to load a results file if needed:
         if (event.senderFrame === mainWindow.webContents.mainFrame) {
             const args = sharedObject.prop1;
-            if (args.length > 1 || (process.platform === 'darwin' && args.length > 0)) {
-                console.log('Asking UI to load a file')
+            if (args.length > 2 || (process.platform === 'darwin' && args.length > 0)) {
+                console.log('Asking UI to load a file', args)
                 event.senderFrame.postMessage('load-results', {file: args[args.length - 1]});
             }
         }
@@ -150,8 +151,9 @@ app.whenReady().then(async () => {
         require('electron').shell.openExternal(url); // .then(r => console.log(r));
     });
 
-    workerWindow.webContents.on('crashed', (e) => {
+    workerWindow.webContents.on('render-process-gone', (e, details) => {
         console.log(e);
+        console.log(details);
         const dialogOpts = {
             type: 'warning',
             title: 'File too large',
