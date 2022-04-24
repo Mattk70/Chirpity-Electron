@@ -6,6 +6,7 @@ let currentPrediction;
 // Get the modules loaded in preload.js
 
 
+
 const fs = window.module.fs;
 const fopen = window.module.fopen;
 const colormap = window.module.colormap;
@@ -27,7 +28,7 @@ const establishMessageChannel =
             if (event.source === window) {
                 if (event.data === 'provide-worker-channel') {
                     [worker] = event.ports;
-                    worker.postMessage('fire it up');
+                    worker.postMessage({action: 'fire it up'});
                     // Once we have the port, we can communicate directly with the worker
                     // process.
                     worker.onmessage = e => {
@@ -94,6 +95,7 @@ let workerHasLoadedFile = false;
 // Set default Options
 let config;
 const sampleRate = 24000;
+const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
 let controller = new AbortController();
 let signal = controller.signal;
 let restore = false;
@@ -147,59 +149,7 @@ si.mem()
     .catch(error => console.error(error));
 console.table(diagnostics);
 
-const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
 
-const fetchAudioFile = (filePath) =>
-    fetch(filePath, {signal})
-        .then((res => res.arrayBuffer()))
-        .then((arrayBuffer) => audioCtx.decodeAudioData(arrayBuffer))
-        .then((buffer) => {
-            if (!controller.signal.aborted) {
-                let source = audioCtx.createBufferSource();
-                source.buffer = buffer;
-                currentFileDuration = source.buffer.duration;
-                // Diagnostics
-                diagnostics['Audio Duration'] = currentFileDuration.toFixed(2) + ' seconds';
-                if (currentFileDuration < 20) windowLength = currentFileDuration;
-
-                fileStart = new Date(ctime - (currentFileDuration * 1000));
-                let astro = SunCalc.getTimes(fileStart, config.latitude, config.longitude);
-                dusk = astro.dusk;
-                dawn = astro.dawn;
-                if (config.nocmig && ctime < dusk && fileStart > dawn) {
-                    alert(`All timestamps in this file are during daylight hours. \n\nNocmig mode will be disabled.`)
-                    $('#timecode').click();
-                }
-                const offlineCtx = new OfflineAudioContext(1, sampleRate * currentFileDuration, sampleRate);
-                const offlineSource = offlineCtx.createBufferSource();
-                offlineSource.buffer = buffer;
-                offlineSource.connect(offlineCtx.destination);
-                offlineSource.start();
-                offlineCtx.startRendering()
-                    .then(function (resampled) {
-                        console.log('Rendering completed successfully');
-                        // `resampled` contains an AudioBuffer resampled at 24000Hz.
-                        // use resampled.getChannelData(x) to get an Float32Array for channel x.
-                        currentBuffer = resampled;
-                        loadBufferSegment(resampled, bufferBegin)
-                    }).then(() => {
-                    if (restore) showTheResults();
-                })
-            } else {
-                throw new DOMException('Rendering cancelled at user request', "AbortError")
-            }
-        })
-        .catch(function (e) {
-            console.log("Error with decoding audio data " + e.message);
-            if (e.name === "AbortError") {
-                // We know it's been canceled!
-                console.warn('Fetch aborted: sending message to worker')
-                hideAll();
-                disableMenuItem(['analyze', 'analyzeSelection'])
-                showElement(['loadFileHint']);
-                showElement(['loadFileHintText'], false);
-            }
-        })
 
 function resetResults() {
     summary = {};
@@ -256,41 +206,15 @@ async function loadAudioFile(filePath, OriginalCtime) {
     bufferBegin = 0;
     windowLength = 20;
     if (config.spectrogram) {
-        controller = new AbortController();
-        signal = controller.signal;
-        await fetchAudioFile(filePath);
+        // controller = new AbortController();
+        // signal = controller.signal;
+        //await fetchAudioFile(filePath);
     } else {
         // remove the file hint stuff
         hideAll();
         // Show controls
         showElement(['controlsWrapper']);
         $('.specFeature').hide()
-    }
-    if (!controller.signal.aborted) {
-        fileLoaded = true;
-        completeDiv.hide();
-        //const filename = filePath.replace(/^.*[\\\/]/, '')
-        let filenameElement = document.getElementById('filename');
-        filenameElement.innerHTML = '';
-
-        //
-        let count = 0
-        let appendstr = '<div id="fileContainer" class="bg-dark text-nowrap pr-3">';
-        fileList.forEach(item => {
-            if (count === 0) {
-                if (fileList.length > 1) {
-                    appendstr += '<span class="revealFiles visible pointer" id="filename_' + count + '">'
-                    appendstr += '<span class="material-icons-two-tone pointer">library_music</span>'
-                } else {
-                    appendstr += '<span class="material-icons-two-tone align-bottom">audio_file</span>'
-                }
-            } else {
-                appendstr += '<span class="openFiles pointer" id="filename_' + count + '"><span class="material-icons-two-tone align-bottom">audio_file</span>'
-            }
-            appendstr += item.replace(/^.*[\\\/]/, "") + '<br></span>';
-            count += 1;
-        })
-        filenameElement.innerHTML += appendstr + '</div>';
     }
 }
 
@@ -1442,15 +1366,48 @@ function onModelReady(args) {
 
 function onWorkerLoadedAudio(args) {
     console.log('UI received worker-loaded-audio: ' + args.message)
+    currentBuffer = new AudioBuffer({length: args.length, numberOfChannels: 1, sampleRate: 24000});
+    currentBuffer.copyToChannel(args.contents, 0);
     workerHasLoadedFile = true;
-    if (modelReady) enableMenuItem(['analyze']);
-    if (!config.spectrogram) {
-        hideAll();
-        showElement(['controlsWrapper']);
-        hideElement(['transport-controls']);
-        const filename = args.message.replace(/^.*[\\\/]/, '')
-        $('#filename').html('<span class="material-icons">description</span> ' + filename);
+    currentFileDuration = currentBuffer.duration;
+    // Diagnostics
+    diagnostics['Audio Duration'] = currentFileDuration.toFixed(2) + ' seconds';
+    if (currentFileDuration < 20) windowLength = currentFileDuration;
+
+    fileStart = new Date(ctime - (currentFileDuration * 1000));
+    let astro = SunCalc.getTimes(fileStart, config.latitude, config.longitude);
+    dusk = astro.dusk;
+    dawn = astro.dawn;
+    if (config.nocmig && ctime < dusk && fileStart > dawn) {
+        alert(`All timestamps in this file are during daylight hours. \n\nNocmig mode will be disabled.`)
+        $('#timecode').click();
     }
+    if (modelReady) enableMenuItem(['analyze']);
+    fileLoaded = true;
+    completeDiv.hide();
+    //const filename = filePath.replace(/^.*[\\\/]/, '')
+    let filenameElement = document.getElementById('filename');
+    filenameElement.innerHTML = '';
+
+    //
+    let count = 0
+    let appendstr = '<div id="fileContainer" class="bg-dark text-nowrap pr-3">';
+    fileList.forEach(item => {
+        if (count === 0) {
+            if (fileList.length > 1) {
+                appendstr += '<span class="revealFiles visible pointer" id="filename_' + count + '">'
+                appendstr += '<span class="material-icons-two-tone pointer">library_music</span>'
+            } else {
+                appendstr += '<span class="material-icons-two-tone align-bottom">audio_file</span>'
+            }
+        } else {
+            appendstr += '<span class="openFiles pointer" id="filename_' + count + '"><span class="material-icons-two-tone align-bottom">audio_file</span>'
+        }
+        appendstr += item.replace(/^.*[\\\/]/, "") + '<br></span>';
+        count += 1;
+    })
+    filenameElement.innerHTML += appendstr + '</div>';
+    loadBufferSegment(currentBuffer, bufferBegin)
 }
 
 function onProgress(args) {

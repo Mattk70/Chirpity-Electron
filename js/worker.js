@@ -5,6 +5,7 @@ let appPath = '../24000_v9/';
 // We might get multiple clients, for instance if there are multiple windows,
 // or if the main window reloads.
 let UI;
+
 ipcRenderer.on('new-client', (event) => {
     [UI] = event.ports;
     UI.onmessage = async (e) => {
@@ -124,7 +125,6 @@ let useWhitelist = true;
 // }
 
 
-
 function sendMessageToWorker(chunkStart, chunks, fileStart, lastKey) {
     const objData = {
         message: 'predict',
@@ -173,9 +173,9 @@ async function doPrediction(start, end, fileStart) {
 // TODO: extract and modularise fetch Audio functions across worker and ui
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
 
-const loadAudioFile = (filePath) =>
+const loadAudioFile = filePath =>
     fetch(filePath, {signal})
-        .then((res => res.arrayBuffer()))
+        .then((res) => res.arrayBuffer())
         .then((arrayBuffer) => audioCtx.decodeAudioData(arrayBuffer))
         .then((buffer) => {
             if (!controller.signal.aborted) {
@@ -187,12 +187,17 @@ const loadAudioFile = (filePath) =>
                 offlineSource.buffer = buffer;
                 offlineSource.connect(offlineCtx.destination);
                 offlineSource.start();
-                offlineCtx.startRendering().then(function (resampled) {
+                offlineCtx.startRendering().then(async function (resampled) {
                     // `resampled` contains an AudioBuffer resampled at 24000Hz.
                     // use resampled.getChannelData(x) to get an Float32Array for channel x.
-                    audioBuffer = resampled;
-                    console.log('Rendering completed successfully');
-                    UI.postMessage({event: 'worker-loaded-audio', message: filePath});
+                    const length = resampled.length;
+                    const myArray = resampled.getChannelData(0);
+                    UI.postMessage({
+                        event: 'worker-loaded-audio',
+                        message: filePath,
+                        length: length,
+                        contents: myArray
+                    })
                 })
             } else {
                 throw new DOMException('Rendering cancelled at user request', "AbortError")
@@ -203,8 +208,9 @@ const loadAudioFile = (filePath) =>
             if (e.name === "AbortError") {
                 // We know it's been canceled!
                 console.log('Worker fetch aborted')
+            } else {
+                console.log("Another error", e)
             }
-            else {console.log("Another error", e)}
         })
 
 function downloadMp3(buffer, filepath, metadata) {
