@@ -274,9 +274,6 @@ async function runPredictions(e) {
             chunkLength: myModel.chunkLength,
             backend: tf.getBackend()
         });
-
-        console.log('number of tensors: '
-            + tf.memory().numTensors);
     } else if (modelRequest === 'predict') {
         let t0 = performance.now();
         let response = {};
