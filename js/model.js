@@ -123,7 +123,7 @@ class Model {
     }
 
 
-    async predictChunk(chunks, fileStart, lastKey) {
+    async predictChunk(chunks, fileStart) {
         let batched_results = [];
         let result;
         let audacity;
@@ -286,14 +286,14 @@ async function runPredictions(e) {
         }
 
         const fileStart = e.data.fileStart;
-        const lastKey = e.data.lastKey;
+
         //const postTime = e.data.t0;
         //console.log(`sending message to model.js took: ${t0 - postTime} milliseconds`)
-        await myModel.predictChunk(chunks, fileStart, lastKey)
+        await myModel.predictChunk(chunks, fileStart)
         response['message'] = 'prediction';
         response['result'] = myModel.result;
         response['time'] = performance.now();
-        response['end'] = lastKey;
+
         response['fileStart'] = fileStart;
         // add a chunk to the start
         response['start'] = i + myModel.chunkLength;

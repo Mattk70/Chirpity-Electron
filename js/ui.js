@@ -6,7 +6,6 @@ let currentPrediction;
 // Get the modules loaded in preload.js
 
 
-
 const fs = window.module.fs;
 const fopen = window.module.fopen;
 const colormap = window.module.colormap;
@@ -150,7 +149,6 @@ si.mem()
 console.table(diagnostics);
 
 
-
 function resetResults() {
     summary = {};
     summaryTable.empty();
@@ -172,7 +170,7 @@ async function loadAudioFile(filePath, OriginalCtime) {
     // set file creation time
     try {
         ctime = fs.statSync(filePath).mtime;
-        worker.postMessage({action: 'file-load-request', message: filePath});
+        worker.postMessage({action: 'file-load-request', filePath: filePath});
     } catch (e) {
         const supported_files = ['.mp3', '.wav', '.mpga', '.ogg', '.flac', '.aac', '.mpeg', '.mp4'];
         const dir = p.parse(filePath).dir;
@@ -193,7 +191,7 @@ async function loadAudioFile(filePath, OriginalCtime) {
         } else {
             if (file) filePath = file;
             if (OriginalCtime) ctime = OriginalCtime;
-            worker.postMessage({action: 'file-load-request', message: filePath});
+            worker.postMessage({action: 'file-load-request', filePath: filePath});
         }
     }
 
@@ -1218,7 +1216,13 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     ,
     Home: function () {
         if (currentBuffer) {
-            loadBufferSegment(currentBuffer, 0)
+            bufferBegin = 0;
+            worker.postMessage({
+                action: 'update-buffer',
+                position: 0,
+                start: 0,
+                end: windowLength
+            });
             wavesurfer.seekAndCenter(0);
             wavesurfer.pause()
         }
@@ -1226,7 +1230,14 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     ,
     End: function () {
         if (currentBuffer) {
-            loadBufferSegment(currentBuffer, currentBuffer.duration - windowLength)
+            bufferBegin = currentFileDuration - windowLength;
+            worker.postMessage({
+                action: 'update-buffer',
+                position: 1,
+                start: bufferBegin,
+                end: currentFileDuration
+            });
+            //loadBufferSegment(currentBuffer, currentBuffer.duration - windowLength)
             wavesurfer.seekAndCenter(1);
             wavesurfer.pause()
         }
@@ -1235,11 +1246,18 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     PageUp: function () {
         if (wavesurfer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
-            bufferBegin -= windowLength
+            bufferBegin = Math.max(0, bufferBegin - windowLength);
+
             // Set new date for timeline
-            const playhead = bufferBegin + wavesurfer.getCurrentTime()
-            loadBufferSegment(currentBuffer, bufferBegin)
-            playhead <= 0 ? wavesurfer.seekAndCenter(0) : wavesurfer.seekAndCenter(position);
+            // const playhead = bufferBegin + wavesurfer.getCurrentTime()
+            //loadBufferSegment(currentBuffer, bufferBegin)
+            worker.postMessage({
+                action: 'update-buffer',
+                position: position,
+                start: bufferBegin,
+                end: bufferBegin + windowLength
+            });
+            //playhead <= 0 ? wavesurfer.seekAndCenter(0) : wavesurfer.seekAndCenter(position);
             wavesurfer.pause()
         }
     }
@@ -1247,11 +1265,17 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     PageDown: function () {
         if (wavesurfer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
-            bufferBegin += windowLength
+            bufferBegin = Math.min(bufferBegin + windowLength, currentFileDuration - windowLength);
             // Set new date for timeline
-            const playhead = bufferBegin + wavesurfer.getCurrentTime()
-            loadBufferSegment(currentBuffer, bufferBegin)
-            playhead >= currentBuffer.duration ? wavesurfer.seekAndCenter(1) : wavesurfer.seekAndCenter(position);
+            //const playhead = bufferBegin + wavesurfer.getCurrentTime()
+            //loadBufferSegment(currentBuffer, bufferBegin)
+            worker.postMessage({
+                action: 'update-buffer',
+                position: position,
+                start: bufferBegin,
+                end: bufferBegin + windowLength
+            });
+            //playhead >= currentBuffer.duration ? wavesurfer.seekAndCenter(1) : wavesurfer.seekAndCenter(position);
             wavesurfer.pause()
         }
     }
@@ -1261,7 +1285,13 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             wavesurfer.skipBackward(0.1);
             const position = wavesurfer.getCurrentTime();
             if (position < 0.1 && bufferBegin > 0) {
-                loadBufferSegment(currentBuffer, bufferBegin -= 0.1)
+                bufferBegin -= 0.1;
+                worker.postMessage({
+                    action: 'update-buffer',
+                    position: position,
+                    start: bufferBegin,
+                    end: bufferBegin + windowLength
+                });
                 wavesurfer.seekAndCenter(0);
                 wavesurfer.pause()
             }
@@ -1273,7 +1303,14 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             wavesurfer.skipForward(0.1);
             const position = wavesurfer.getCurrentTime();
             if (position > windowLength - 0.1) {
-                loadBufferSegment(currentBuffer, bufferBegin += 0.1)
+                bufferBegin = Math.min(currentFileDuration - windowLength, bufferBegin += 0.1)
+                worker.postMessage({
+                    action: 'update-buffer',
+                    filePath: currentFile,
+                    position: position,
+                    start: bufferBegin,
+                    end: bufferBegin + windowLength
+                });
                 wavesurfer.seekAndCenter(1);
                 wavesurfer.pause()
             }
@@ -1369,7 +1406,12 @@ function onWorkerLoadedAudio(args) {
     currentBuffer = new AudioBuffer({length: args.length, numberOfChannels: 1, sampleRate: 24000});
     currentBuffer.copyToChannel(args.contents, 0);
     workerHasLoadedFile = true;
-    currentFileDuration = currentBuffer.duration;
+    currentFileDuration = args.sourceDuration;
+    if (config.timeOfDay) {
+        bufferStartTime = new Date(fileStart.getTime() + (bufferBegin * 1000))
+    } else {
+        bufferStartTime = new Date(zero.getTime() + (bufferBegin * 1000))
+    }
     // Diagnostics
     diagnostics['Audio Duration'] = currentFileDuration.toFixed(2) + ' seconds';
     if (currentFileDuration < 20) windowLength = currentFileDuration;
@@ -1407,7 +1449,16 @@ function onWorkerLoadedAudio(args) {
         count += 1;
     })
     filenameElement.innerHTML += appendstr + '</div>';
-    loadBufferSegment(currentBuffer, bufferBegin)
+    if (!wavesurfer) {
+        initSpec({
+            'audio': currentBuffer,
+            'backend': 'WebAudio',
+            'alpha': 0,
+        });
+    } else {
+        wavesurfer.clearRegions();
+        updateSpec(currentBuffer)
+    }
 }
 
 function onProgress(args) {
