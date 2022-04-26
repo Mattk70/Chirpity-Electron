@@ -124,6 +124,8 @@
     "suncalc2": "^1.8.1",
     "systeminformation": "^5.11.9",
     "uuid": "^8.3.2",
-    "wavesurfer.js": "^6.0.4"
+    "wavesurfer.js": "^6.0.4",
+    "music-metadata": "^7.12.3",
+    "wavefile-reader": "^1.1.1"
   }
 }
