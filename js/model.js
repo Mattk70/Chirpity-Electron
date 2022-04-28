@@ -165,7 +165,7 @@ class Model {
                 batch[currentKeys[0]] = ({'index': top3[j], 'score': top3scores[j], 'end': currentKeys[1]});
             }
             // done with the keys_batch, so reset it
-            console.log('batch: ', batch)
+            //console.log('batch: ', batch)
             this.keys_batch = [];
             // Try this method of adjusting results
             for (let [key, item] of Object.entries(batch)) {
@@ -246,7 +246,7 @@ class Model {
                 batched_results.push([key, result, audacity]);
             }
             this.result = batched_results;
-            console.log("result: ", this.result)
+            //console.log("result: ", this.result)
             return {readyToSend: true, result: this.result}
         })
     }
@@ -254,6 +254,7 @@ class Model {
 
 module.exports = Model;
 let myModel;
+let oldStart = -846000;
 onmessage = async function (e) {
     await runPredictions(e)
 }
@@ -279,6 +280,7 @@ async function runPredictions(e) {
         let response = {};
         let chunks = {};
         let i = e.data.chunkStart;
+
         for (let j = 0; j < e.data.numberOfChunks; j++) {
             let key = 'chunk' + j;
             chunks[i] = e.data[key];
