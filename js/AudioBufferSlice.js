@@ -66,7 +66,7 @@ const appendBuffer = (buffer1, buffer2, context) => {
 };
 
 
-const withWaveHeader = (data, numberOfChannels, sampleRate) => {
+const withWaveHeader = (data, numberOfChannels, bitsPerSample, sampleRate) => {
   const header = new ArrayBuffer(44);
 
   const d = new DataView(header);
@@ -91,9 +91,9 @@ const withWaveHeader = (data, numberOfChannels, sampleRate) => {
   d.setUint16(20, 1, true);
   d.setUint16(22, numberOfChannels, true);
   d.setUint32(24, sampleRate, true);
-  d.setUint32(28, sampleRate * 1 * 2);
-  d.setUint16(32, numberOfChannels * 2);
-  d.setUint16(34, 16, true);
+  d.setUint32(28, (sampleRate * bitsPerSample * numberOfChannels) / 8);
+  d.setUint16(32, (bitsPerSample * numberOfChannels) / 8);
+  d.setUint16(34, bitsPerSample, true);
 
   d.setUint8(36, "d".charCodeAt(0));
   d.setUint8(37, "a".charCodeAt(0));

@@ -4,7 +4,26 @@ let appPath = '../24000_v9/';
 const fs = require('fs');
 //const mm = require('music-metadata');
 const wavefileReader = require('wavefile-reader');
+const lamejs = require("lamejstmp");
+const ID3Writer = require('browser-id3-writer');
+//const {withWaveHeader} = require("./js/AudioBufferSlice");
+//const {appendBuffer} = require("./js/AudioBufferSlice");
+const BATCH_SIZE = 12;
+console.log(appPath);
 
+let readStream;
+
+let sourceMetadata = {};
+let workingFilePath;
+let fileStart, chunkStart, chunkLength, minConfidence, index, preDict, AUDACITY, RESULTS, predictionStart, currentBuffer;
+let t0, t1;
+let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
+
+let predictWorker, predicting = false;
+let selection = false;
+let controller = new AbortController();
+let signal = controller.signal;
+let useWhitelist = true;
 // We might get multiple clients, for instance if there are multiple windows,
 // or if the main window reloads.
 let UI;
@@ -26,27 +45,23 @@ ipcRenderer.on('new-client', (event) => {
                 await loadAudioFile(args);
                 break;
             case 'update-buffer':
-                console.log('Worker update buffer request');
                 await fetchAudioStream(args);
                 break;
             case 'analyze':
-                console.log(`Worker received message: ${args.confidence}, start: ${args.start},  
-                    end: ${args.end},  fstart: ${args.fileStart}`);
+                console.log(`Worker received message: ${args.confidence}, start: ${args.start}, end: ${args.end},  fstart ${fileStart}`);
                 minConfidence = args.confidence;
-                const fileStart = args.fileStart;
                 selection = false;
                 let start, end;
                 if (args.start === undefined) {
                     start = 0;
-                    end = sourceMetadata.duration * sampleRate;
+                    end = sourceMetadata.duration;
                 } else {
-                    start = args.start * sampleRate;
-                    end = args.end * sampleRate;
+                    start = args.start;
+                    end = args.end;
                     selection = true;
-
                 }
                 predicting = true;
-                await doPrediction(start, end, fileStart)
+                await doPrediction(start, end)
                 break;
             case 'save':
                 console.log("file save requested")
@@ -75,24 +90,6 @@ ipcRenderer.on('new-client', (event) => {
     }
 })
 
-const lamejs = require("lamejstmp");
-const ID3Writer = require('browser-id3-writer');
-const {withWaveHeader} = require("./js/AudioBufferSlice");
-const {appendBuffer} = require("./js/AudioBufferSlice");
-const BATCH_SIZE = 12;
-console.log(appPath);
-
-let sourceMetadata = {};
-let workingFilePath;
-let chunkLength, minConfidence, index, end, AUDACITY, RESULTS, predictionStart;
-let t0, t1;
-let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
-let lastChunkPosition;
-let predictWorker, predicting = false;
-let selection = false;
-let controller = new AbortController();
-let signal = controller.signal;
-let useWhitelist = true;
 
 function getDuration(src) {
     return new Promise(function (resolve) {
@@ -104,35 +101,78 @@ function getDuration(src) {
     });
 }
 
-function toArrayBuffer(buf) {
-    const ab = new ArrayBuffer(buf.length);
-    const view = new Uint8Array(ab);
-    for (let i = 0; i < buf.length; ++i) {
-        view[i] = buf[i];
-    }
-    return ab;
+//
+// function toArrayBuffer(buf) {
+//     const ab = new ArrayBuffer(buf.length);
+//     const view = new Uint8Array(ab);
+//     for (let i = 0; i < buf.length; ++i) {
+//         view[i] = buf[i];
+//     }
+//     return ab;
+// }
+
+
+const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
+
+async function loadAudioFile(args) {
+    workingFilePath = args.filePath;
+    // reset source
+    sourceMetadata = {}
+    //open a handle
+    const fd = await fs.promises.open(workingFilePath, 'r');
+    readStream = fd.createReadStream();
+    sourceMetadata.duration = await getDuration(workingFilePath);
+    fs.stat(workingFilePath, (error, stats) => {
+        if (error) console.log("Stat error: ", error)
+        else {
+            sourceMetadata.stat = stats;
+            fileStart = new Date(sourceMetadata.stat.mtime - (sourceMetadata.duration * 1000));
+        }
+    });
+    readStream.on('data', async chunk => {
+        let wav = new wavefileReader.WaveFileReader();
+        wav.fromBuffer(chunk);
+        // Extract Header
+        let headerEnd;
+        wav.signature.subChunks.forEach(el => {
+            if (el['chunkId'] === 'data') {
+                headerEnd = el.chunkData.start - 1;
+            }
+        })
+
+        // Update relevant file properties
+        sourceMetadata.head = wav.head + 1;
+        sourceMetadata.header = chunk.slice(0, headerEnd);
+        sourceMetadata.bytesPerSec = wav.fmt.byteRate;
+        sourceMetadata.numChannels = wav.fmt.numChannels;
+        sourceMetadata.sampleRate = wav.fmt.sampleRate;
+        sourceMetadata.bitsPerSample = wav.fmt.bitsPerSample
+        readStream.close()
+        await fetchAudioStream({start: 0, end: 20})
+    })
 }
 
 async function fetchAudioStream(args) {
     // Ensure max and min are within range
-    const delta = args.end - args.start;
     args.start = Math.max(0, args.start);
     args.end = Math.min(sourceMetadata.duration, args.end);
-    args.end = Math.max(args.end, delta);
-    const byteStart = Math.round(args.start * sourceMetadata.bytesPerSec);
-    const byteEnd = Math.round(args.end * sourceMetadata.bytesPerSec);
+    let byteStart = Math.round(args.start * sourceMetadata.bytesPerSec);
+    let byteEnd = Math.round(args.end * sourceMetadata.bytesPerSec);
+    //clear the header
+    byteStart += sourceMetadata.head;
+    byteEnd += sourceMetadata.head;
+
+    //byteEnd += sourceMetadata.headerSize;
     const fd = await fs.promises.open(workingFilePath, 'r');
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
-    const highWaterMark = args.predicting ? sourceMetadata.sampleRate * sourceMetadata.numChannels * BATCH_SIZE * 3 :
-        delta * 1024 * 1024;
+    const highWaterMark = args.predicting ? sourceMetadata.bytesPerSec * BATCH_SIZE * 3 : byteEnd - byteStart + 1;
     const readStream = fd.createReadStream({start: byteStart, end: byteEnd, highWaterMark: highWaterMark});
-    let dataReceived = 0;
+    chunkStart = args.start * sampleRate;
     readStream.on('data', async chunk => {
-        dataReceived++;
-        const arrayBuffer = toArrayBuffer(chunk)
-        const audioBufferChunk = args.start === 0 && dataReceived === 1 ?
-            await audioCtx.decodeAudioData(arrayBuffer) :
-            await audioCtx.decodeAudioData(withWaveHeader(arrayBuffer, sourceMetadata.numChannels, sourceMetadata.sampleRate));
+        // Ensure data is processed in order
+        readStream.pause();
+        chunk = Buffer.concat([sourceMetadata.header, chunk]);
+        const audioBufferChunk = await audioCtx.decodeAudioData(chunk.buffer);
         const source = audioCtx.createBufferSource();
         source.buffer = audioBufferChunk;
         const duration = source.buffer.duration;
@@ -142,34 +182,43 @@ async function fetchAudioStream(args) {
         offlineSource.buffer = buffer;
         offlineSource.connect(offlineCtx.destination);
         offlineSource.start();
-        offlineCtx.startRendering().then(async function (resampled) {
+        offlineCtx.startRendering().then(resampled => {
             // `resampled` contains an AudioBuffer resampled at 24000Hz.
             // use resampled.getChannelData(x) to get an Float32Array for channel x.
             const length = resampled.length;
+            currentBuffer = resampled;
             const myArray = resampled.getChannelData(0);
-            // Are we updating the UI
-            if (!args.predicting) {
+            // Are we predicting
+            if (args.predicting) {
+                feedChunksToModel(myArray, args.increment, chunkStart);
+                chunkStart += 3 * BATCH_SIZE * sampleRate;
+
+                // Or updating the UI
+            } else {
                 UI.postMessage({
                     event: 'worker-loaded-audio',
+                    fileStart: fileStart,
                     sourceDuration: sourceMetadata.duration,
                     sourceOffset: args.start,
                     message: workingFilePath,
                     position: args.position,
                     length: length,
-                    contents: myArray
+                    contents: myArray,
+                    play: args.play,
+                    region: args.region
                 })
-                // Or predicting?
-            } else {
-                //do something with 2MB chunks of data
-                console.log('got a chunk', myArray)
-                feedChunksToModel(myArray, args.increment, args.fileStart)
             }
-        });
+            // Now the async stuff is done
+            readStream.resume();
+        })
+    })
+    readStream.on('end', function () {
+        readStream.close()
     })
 }
 
 
-function sendMessageToWorker(chunkStart, chunks, fileStart) {
+async function sendMessageToWorker(chunkStart, chunks) {
     const objData = {
         message: 'predict',
         chunkStart: chunkStart,
@@ -184,62 +233,31 @@ function sendMessageToWorker(chunkStart, chunks, fileStart) {
     predictWorker.postMessage(objData, chunkBuffers);
 }
 
-async function doPrediction(start, end, fileStart) {
+async function doPrediction(start, end) {
     AUDACITY = [];
     RESULTS = [];
     predictionStart = new Date();
-    let increment;
     index = 0;
-    lastChunkPosition = 0;
-    end - start < chunkLength ? increment = end - start : increment = chunkLength;
-    await fetchAudioStream({start: start, end: end, predicting: true, increment: increment, fileStart: fileStart})
+    const samples = (end - start) * sampleRate
+    const increment = samples < chunkLength ? samples : chunkLength;
+    await fetchAudioStream({start: start, end: end, predicting: true, increment: increment})
 }
 
-function feedChunksToModel(channelData, increment, fileStart) {
+async function feedChunksToModel(channelData, increment) {
     let chunks = [];
-    let i;
-    for (i = 0; i < channelData.length; i += increment) {
+    for (let i = 0; i < channelData.length; i += increment) {
         let chunk = channelData.slice(i, i + increment);
         // Batch predictions
         chunks.push(chunk);
-        lastChunkPosition += i;
         if (chunks.length === BATCH_SIZE) {
-
-            const chunkStart = lastChunkPosition + i - ((chunks.length - 1) * increment);
-            sendMessageToWorker(chunkStart, chunks, fileStart);
+            await sendMessageToWorker(chunkStart, chunks);
             chunks = [];
         }
     }
-    //clear up remainder less than BATCH_SIZE, by *padding the batch*
-    if (chunks.length > 0) {
-        const chunkStart = lastChunkPosition + i - ((chunks.length) * increment);
-        sendMessageToWorker(chunkStart, chunks, fileStart);
-    }
+    //clear up remainder less than BATCH_SIZE
+    if (chunks.length > 0) await sendMessageToWorker(chunkStart, chunks);
 }
 
-// TODO: extract and modularise fetch Audio functions across worker and ui
-const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
-
-async function loadAudioFile(args) {
-    workingFilePath = args.filePath;
-    // reset source
-    sourceMetadata = {}
-    //open a handle
-    const fd = await fs.promises.open(workingFilePath, 'r');
-    const readStream = fd.createReadStream();
-    sourceMetadata.duration = await getDuration(workingFilePath);
-    sourceMetadata.stat = fs.statSync(workingFilePath);
-    readStream.on('data', async chunk => {
-        let wav = new wavefileReader.WaveFileReader();
-        wav.fromBuffer(chunk);
-        // Update relevant file properties
-        sourceMetadata.bytesPerSec = wav.fmt.byteRate;
-        sourceMetadata.numChannels = wav.fmt.numChannels;
-        sourceMetadata.sampleRate = wav.fmt.sampleRate;
-        readStream.close()
-        await fetchAudioStream({start: 0, end: 20})
-    })
-}
 
 function downloadMp3(buffer, filePath, metadata) {
     const MP3Blob = analyzeAudioBuffer(buffer, metadata);
@@ -455,7 +473,7 @@ function parsePredictions(e) {
         console.log(backend);
         UI.postMessage({event: 'model-ready', message: 'ready', backend: backend})
     } else if (response['message'] === 'prediction') {
-        const lastKey = response['end'];
+        readStream.resume();
         //t1 = performance.now();
         //console.log(`post from worker took: ${t1 - response['time']} milliseconds`)
         //console.log(`post to receive took: ${t1 - t0} milliseconds`)
@@ -463,7 +481,7 @@ function parsePredictions(e) {
             const position = parseFloat(prediction[0]);
             const result = prediction[1];
             const audacity = prediction[2];
-            UI.postMessage({event: 'progress', progress: (position / lastKey)});
+            UI.postMessage({event: 'progress', progress: (position / sourceMetadata.duration)});
             //console.log('Prediction received from worker', result);
             if (result.score > minConfidence) {
                 index++;
@@ -472,7 +490,8 @@ function parsePredictions(e) {
                 RESULTS.push(result);
             }
             //console.log(`Position is ${position}, end is ${lastKey}`)
-            if (position >= lastKey) {
+            const theEnd = selection ? currentBuffer.duration : sourceMetadata.duration;
+            if (position.toFixed(0) >= (theEnd.toFixed(0) - 3)) {
                 console.log('Prediction done');
                 console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
                 if (RESULTS.length === 0) {

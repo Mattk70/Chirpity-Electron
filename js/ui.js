@@ -267,13 +267,16 @@ function loadBufferSegment(buffer, begin, saveRegion) {
     })
 }
 
-function updateSpec(buffer) {
+function updateSpec(buffer, play) {
+    updateElementCache();
     wavesurfer.loadDecodedBuffer(buffer);
+    waveCanvasElement.width('100%');
     specCanvasElement.width('100%');
     $('.spec-labels').width('55px');
+    if (play) wavesurfer.play()
 }
 
-function initSpec(args) {
+function initWavesurfer(args) {
     // Show spec and timecode containers
     hideAll();
     showElement(['dummy', 'timeline', 'waveform', 'spectrogram'], false);
@@ -293,7 +296,8 @@ function initSpec(args) {
         cursorWidth: 2,
         skipLength: 0.1,
         partialRender: true,
-        scrollParent: true,
+        scrollParent: false,
+        fillParent: true,
         responsive: true,
         height: 512,
         plugins: [
@@ -341,9 +345,17 @@ function initSpec(args) {
     });
 
     wavesurfer.on('finish', function () {
-        if (currentBuffer.duration > bufferBegin + windowLength) {
+        if (currentFileDuration > bufferBegin + windowLength) {
             bufferBegin += windowLength;
-            loadBufferSegment(currentBuffer, bufferBegin);
+            worker.postMessage({
+                action: 'update-buffer',
+                filePath: currentFile,
+                position: 0,
+                start: bufferBegin,
+                end: bufferBegin + windowLength,
+                play: true
+            });
+            //loadBufferSegment(currentBuffer, bufferBegin);
             wavesurfer.play()
         }
     })
@@ -366,31 +378,26 @@ function updateElementCache() {
     specWaveElement = $('#spectrogram wave')
 }
 
-function zoomSpecIn() {
-    if (windowLength < 1.5) return;
-    updateElementCache()
-    windowLength /= 2;
-    bufferBegin = bufferBegin + wavesurfer.getCurrentTime() - (windowLength / 2)
-    initSpectrogram();
-    loadBufferSegment(currentBuffer, bufferBegin, false);
-    wavesurfer.seekAndCenter(0.5)
-    adjustSpecDims(true)
-
-}
-
-function zoomSpecOut() {
-    if (windowLength > 100) return;
-    updateElementCache()
-    windowLength *= 2;
-    if (windowLength > currentFileDuration) {
-        windowLength = currentFileDuration
+function zoomSpec(direction) {
+    let position = wavesurfer.getCurrentTime();
+    if (direction === 'in') {
+        if (windowLength < 1.5) return
+        windowLength /= 2
+    } else {
+        if (windowLength > 100) return
+        windowLength *= 2;
     }
-    // Centre on playhead
-    bufferBegin = bufferBegin + wavesurfer.getCurrentTime() - (windowLength / 2)
-    initSpectrogram();
-    loadBufferSegment(currentBuffer, bufferBegin, false);
-    wavesurfer.seekAndCenter(0.5)
-    adjustSpecDims(true)
+    // Center zoom on playhead
+    bufferBegin = Math.max(0, (bufferBegin + position) - windowLength / 2)
+    direction === 'in' ? position /= 2 : position *= 2;
+    console.log("waqve time:", bufferBegin, position)
+    worker.postMessage({
+        action: 'update-buffer',
+        filePath: currentFile,
+        position: position,
+        start: bufferBegin,
+        end: bufferBegin + windowLength
+    })
 }
 
 async function showOpenDialog() {
@@ -550,9 +557,15 @@ function loadResultRegion(paramlist) {
     let [start, end, label] = paramlist;
     start = parseFloat(start);
     end = parseFloat(end);
-    bufferBegin = start - (windowLength / 2) + 1.5
-    loadBufferSegment(currentBuffer, bufferBegin)
-    createRegion(start - bufferBegin, end - bufferBegin, label)
+    bufferBegin = Math.max(0, start - (windowLength / 2) + 1.5)
+    //loadBufferSegment(currentBuffer, bufferBegin)
+    worker.postMessage({
+        action: 'update-buffer',
+        position: 0,
+        start: bufferBegin,
+        end: bufferBegin + windowLength,
+        region: {start: start - bufferBegin, end: end - bufferBegin, label: label}
+    });
 }
 
 function adjustSpecDims(redraw) {
@@ -1088,9 +1101,10 @@ function initSpectrogram() {
     wavesurfer.addPlugin(WaveSurfer.spectrogram.create({
         wavesurfer: wavesurfer,
         container: "#spectrogram",
-        scrollParent: true,
+        scrollParent: false,
+        fillParent: true,
         windowFunc: 'hamming',
-        minPxPerSec: 10,
+        minPxPerSec: 1,
         normalize: true,
         hideScrollbar: true,
         labels: true,
@@ -1249,7 +1263,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             bufferBegin = Math.max(0, bufferBegin - windowLength);
 
             // Set new date for timeline
-            // const playhead = bufferBegin + wavesurfer.getCurrentTime()
+            // const playhead = bufferBegin + wavesurfe=r.getCurrentTime()
             //loadBufferSegment(currentBuffer, bufferBegin)
             worker.postMessage({
                 action: 'update-buffer',
@@ -1323,25 +1337,25 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     ,
     Equal: function () {
         if (wavesurfer) {
-            zoomSpecIn()
+            zoomSpec('in')
         }
     }
     ,
     NumpadAdd: function () {
         if (wavesurfer) {
-            zoomSpecIn()
+            zoomSpec('in')
         }
     }
     ,
     Minus: function () {
         if (wavesurfer) {
-            zoomSpecOut()
+            zoomSpec('out')
         }
     }
     ,
     NumpadSubtract: function () {
         if (wavesurfer) {
-            zoomSpecOut()
+            zoomSpec('out')
         }
     }
     ,
@@ -1405,8 +1419,10 @@ function onWorkerLoadedAudio(args) {
     console.log('UI received worker-loaded-audio: ' + args.message)
     currentBuffer = new AudioBuffer({length: args.length, numberOfChannels: 1, sampleRate: 24000});
     currentBuffer.copyToChannel(args.contents, 0);
+    windowLength = currentBuffer.duration;
     workerHasLoadedFile = true;
     currentFileDuration = args.sourceDuration;
+    fileStart = args.fileStart;
     if (config.timeOfDay) {
         bufferStartTime = new Date(fileStart.getTime() + (bufferBegin * 1000))
     } else {
@@ -1416,7 +1432,7 @@ function onWorkerLoadedAudio(args) {
     diagnostics['Audio Duration'] = currentFileDuration.toFixed(2) + ' seconds';
     if (currentFileDuration < 20) windowLength = currentFileDuration;
 
-    fileStart = new Date(ctime - (currentFileDuration * 1000));
+
     let astro = SunCalc.getTimes(fileStart, config.latitude, config.longitude);
     dusk = astro.dusk;
     dawn = astro.dawn;
@@ -1450,14 +1466,17 @@ function onWorkerLoadedAudio(args) {
     })
     filenameElement.innerHTML += appendstr + '</div>';
     if (!wavesurfer) {
-        initSpec({
+        initWavesurfer({
             'audio': currentBuffer,
             'backend': 'WebAudio',
             'alpha': 0,
         });
     } else {
         wavesurfer.clearRegions();
-        updateSpec(currentBuffer)
+        updateSpec(currentBuffer, args.play)
+        if (args.region) {
+            createRegion(args.region.start, args.region.end, args.region.label)
+        }
     }
 }
 
@@ -2068,10 +2087,10 @@ $('#playToggle').on('mousedown', function () {
 });
 
 $('#zoomIn').on('click', function () {
-    zoomSpecIn();
+    zoomSpec('in');
 });
 
 $('#zoomOut').on('click', function () {
-    zoomSpecOut();
+    zoomSpec('out');
 });
 
