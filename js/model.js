@@ -113,9 +113,9 @@ class Model {
     }
 
     async warmUp(batchSize) {
-        this.batchSize = batchSize;
+        this.batchSize = parseInt(batchSize);
         let warmupResult;
-        warmupResult = this.model.predict(tf.zeros([batchSize, this.inputShape[1], this.inputShape[2], this.inputShape[3]]));
+        warmupResult = this.model.predict(tf.zeros([this.batchSize, this.inputShape[1], this.inputShape[2], this.inputShape[3]]));
 
         warmupResult.dataSync();
         warmupResult.dispose();
@@ -254,7 +254,6 @@ class Model {
 
 module.exports = Model;
 let myModel;
-let oldStart = -846000;
 onmessage = async function (e) {
     await runPredictions(e)
 }
@@ -265,7 +264,7 @@ async function runPredictions(e) {
         const appPath = e.data[1];
         const useWhitelist = e.data[2];
         const batch = e.data[3];
-        console.log('model received load instruction. Using whitelist:' + e.data[2])
+        console.log(`model received load instruction. Using whitelist: ${useWhitelist}, batch size ${batch}`)
         myModel = new Model(appPath, useWhitelist);
         await myModel.loadModel();
         await myModel.warmUp(batch);

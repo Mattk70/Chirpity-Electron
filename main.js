@@ -29,6 +29,7 @@ let files = [];
 //})
 
 
+
 let mainWindow;
 let workerWindow;
 

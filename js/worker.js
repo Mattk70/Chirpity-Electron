@@ -1,21 +1,19 @@
 const {ipcRenderer} = require('electron');
-const AudioBufferSlice = require('./js/AudioBufferSlice.js');
+//const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 let appPath = '../24000_v9/';
 const fs = require('fs');
-//const mm = require('music-metadata');
 const wavefileReader = require('wavefile-reader');
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
-//const {withWaveHeader} = require("./js/AudioBufferSlice");
-//const {appendBuffer} = require("./js/AudioBufferSlice");
-const BATCH_SIZE = 12;
+let BATCH_SIZE = 12;
 console.log(appPath);
 
 let readStream;
 
 let sourceMetadata = {};
 let workingFilePath;
-let fileStart, chunkStart, chunkLength, minConfidence, index, preDict, AUDACITY, RESULTS, predictionStart, currentBuffer;
+let fileStart, chunkStart, chunkLength, minConfidence, index, AUDACITY, RESULTS, predictionStart,
+    currentBuffer, feedbackBuffer;
 let t0, t1;
 let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
 
@@ -36,7 +34,9 @@ ipcRenderer.on('new-client', (event) => {
         console.log('message received ', action)
         switch (action) {
             case 'load-model':
-                spawnWorker(args.useWhitelist)
+                BATCH_SIZE = args.batchSize;
+                if (predictWorker) predictWorker.terminate();
+                spawnWorker(args.useWhitelist, BATCH_SIZE);
                 break;
             case 'file-load-request':
                 console.log('Worker received audio ' + args.filePath);
@@ -78,7 +78,7 @@ ipcRenderer.on('new-client', (event) => {
                 if (predicting) {
                     //restart the worker
                     predictWorker.terminate()
-                    spawnWorker(useWhitelist)
+                    spawnWorker(useWhitelist, BATCH_SIZE)
                 }
                 if (args.sendLabels) {
                     UI.postMessage({event: 'prediction-done', labels: AUDACITY});
@@ -111,7 +111,6 @@ function getDuration(src) {
 //     return ab;
 // }
 
-
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
 
 async function loadAudioFile(args) {
@@ -119,8 +118,8 @@ async function loadAudioFile(args) {
     // reset source
     sourceMetadata = {}
     //open a handle
-    const fd = await fs.promises.open(workingFilePath, 'r');
-    readStream = fd.createReadStream();
+    //const fd = await fs.promises.open(workingFilePath, 'r');
+    readStream = fs.createReadStream(workingFilePath);
     sourceMetadata.duration = await getDuration(workingFilePath);
     fs.stat(workingFilePath, (error, stats) => {
         if (error) console.log("Stat error: ", error)
@@ -156,19 +155,23 @@ async function fetchAudioStream(args) {
     // Ensure max and min are within range
     args.start = Math.max(0, args.start);
     args.end = Math.min(sourceMetadata.duration, args.end);
-    let byteStart = Math.round(args.start * sourceMetadata.bytesPerSec);
-    let byteEnd = Math.round(args.end * sourceMetadata.bytesPerSec);
+    let bytesPerSample = sourceMetadata.bitsPerSample / 8;
+    // Ensure we have a range with valid samples 16bit = 2 bytes, 24bit = 3 bytes
+    let byteStart = Math.round(args.start / bytesPerSample) * bytesPerSample * sourceMetadata.bytesPerSec;
+    let byteEnd = Math.round(args.end / bytesPerSample) * bytesPerSample * sourceMetadata.bytesPerSec;
     //clear the header
     byteStart += sourceMetadata.head;
     byteEnd += sourceMetadata.head;
 
-    //byteEnd += sourceMetadata.headerSize;
-    const fd = await fs.promises.open(workingFilePath, 'r');
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
     const highWaterMark = args.predicting ? sourceMetadata.bytesPerSec * BATCH_SIZE * 3 : byteEnd - byteStart + 1;
-    const readStream = fd.createReadStream({start: byteStart, end: byteEnd, highWaterMark: highWaterMark});
+    const readStream = fs.createReadStream(workingFilePath, {
+        start: byteStart,
+        end: byteEnd,
+        highWaterMark: highWaterMark
+    });
     chunkStart = args.start * sampleRate;
-    readStream.on('data', async chunk => {
+    await readStream.on('data', async chunk => {
         // Ensure data is processed in order
         readStream.pause();
         chunk = Buffer.concat([sourceMetadata.header, chunk]);
@@ -186,14 +189,15 @@ async function fetchAudioStream(args) {
             // `resampled` contains an AudioBuffer resampled at 24000Hz.
             // use resampled.getChannelData(x) to get an Float32Array for channel x.
             const length = resampled.length;
-            currentBuffer = resampled;
             const myArray = resampled.getChannelData(0);
             // Are we predicting
             if (args.predicting) {
                 feedChunksToModel(myArray, args.increment, chunkStart);
                 chunkStart += 3 * BATCH_SIZE * sampleRate;
-
-                // Or updating the UI
+                // Now the async stuff is done ==>
+                readStream.resume();
+            } else if (args.post) {
+                uploadMp3(resampled, args.filepath, args.metadata, args.mode)
             } else {
                 UI.postMessage({
                     event: 'worker-loaded-audio',
@@ -207,9 +211,11 @@ async function fetchAudioStream(args) {
                     play: args.play,
                     region: args.region
                 })
+                currentBuffer = resampled;
+                readStream.close()
             }
-            // Now the async stuff is done
-            readStream.resume();
+
+
         })
     })
     readStream.on('end', function () {
@@ -266,7 +272,7 @@ function downloadMp3(buffer, filePath, metadata) {
     anchor.style = 'display: none';
     const url = window.URL.createObjectURL(MP3Blob);
     anchor.href = url;
-    anchor.download = filepath;
+    anchor.download = filePath;
     anchor.click();
     window.URL.revokeObjectURL(url);
 }
@@ -432,33 +438,20 @@ function bufferToMp3(metadata, channels, sampleRate, left, right = null) {
 }
 
 async function saveMP3(start, end, filepath, metadata) {
-    AudioBufferSlice(audioBuffer, start, end, async function (error, slicedAudioBuffer) {
-        if (error) {
-            console.error(error);
-        } else {
-            downloadMp3(slicedAudioBuffer, filepath, metadata)
-        }
-    })
+    downloadMp3(currentBuffer, filepath, metadata)
 }
 
 
 async function postMP3(start, end, filepath, metadata, mode) {
-    AudioBufferSlice(audioBuffer, start, end, async function (error, slicedAudioBuffer) {
-        if (error) {
-            console.error(error);
-        } else {
-            uploadMp3(slicedAudioBuffer, filepath, metadata, mode)
-        }
-    })
+    await fetchAudioStream({start: start, end: end, post: true, filepath: filepath, metadata: metadata, mode: mode});
 }
 
 
 /// Workers  From the MDN example
-function spawnWorker(useWhitelist) {
+function spawnWorker(useWhitelist, batchSize) {
     console.log('spawning worker')
     predictWorker = new Worker('./js/model.js');
-    predictWorker.postMessage(['load', appPath, useWhitelist, BATCH_SIZE])
-
+    predictWorker.postMessage(['load', appPath, useWhitelist, batchSize])
     predictWorker.onmessage = (e) => {
         parsePredictions(e)
     }

@@ -27,7 +27,7 @@ const establishMessageChannel =
             if (event.source === window) {
                 if (event.data === 'provide-worker-channel') {
                     [worker] = event.ports;
-                    worker.postMessage({action: 'fire it up'});
+                    worker.postMessage({action: 'create message port'});
                     // Once we have the port, we can communicate directly with the worker
                     // process.
                     worker.onmessage = e => {
@@ -122,9 +122,9 @@ si.graphics()
         //console.log(data)
         data.controllers.forEach(gpu => {
             const key = `GPU[${count}]`;
-            const vram = key + ' memory';
+            const vram = key + ' Memory';
             diagnostics[key] = gpu.name || gpu.vendor || gpu.model;
-            diagnostics[vram] = `${gpu.vram}MB`;
+            diagnostics[vram] = `${gpu.vram} MB`;
             count += 1;
         })
     })
@@ -143,7 +143,7 @@ si.mem()
     .then(data => {
         //console.log(data)
         const key = 'System Memory';
-        diagnostics[key] = `${data.total / Math.pow(1024, 3).toFixed(0)}GB`;
+        diagnostics[key] = `${(data.total / (1024 * 1024 * 1000)).toFixed(0)} GB`;
     })
     .catch(error => console.error(error));
 console.table(diagnostics);
@@ -216,13 +216,13 @@ async function loadAudioFile(filePath, OriginalCtime) {
     }
 }
 
-$(document).on("click", ".openFiles", function (e) {
-    const openFiles = $('.openFiles')
-    openFiles.removeClass('visible')
-    this.classList.add('visible')
+$(document).on("click", ".openFiles", async function (e) {
+    e.target.classList.add('revealFiles');
+    e.target.classList.remove('openFiles');
+    const openFiles = $('.openFiles');
+    openFiles.removeClass('visible');
     if (openFiles.length > 1) this.firstChild.innerHTML = "library_music"
-    this.classList.remove('openFiles')
-    this.classList.add('revealFiles')
+        await loadAudioFile(e.target.id)
     e.stopImmediatePropagation()
 });
 
@@ -480,7 +480,7 @@ analyzeSelectionLink.addEventListener('click', async () => {
 // Menu bar functions
 
 function exitApplication() {
-    remote.app.quit()
+    window.close()
 }
 
 function enableMenuItem(id_list) {
@@ -498,6 +498,7 @@ function disableMenuItem(id_list) {
 function showElement(id_list, makeFlex = true, empty = false) {
     id_list.forEach(id => {
         const thisElement = $('#' + id);
+        //thisElement.show();
         thisElement.removeClass('d-none');
         if (makeFlex) thisElement.addClass('d-flex');
         if (empty) {
@@ -512,6 +513,7 @@ function hideElement(id_list) {
         const thisElement = $('#' + id);
         thisElement.removeClass('d-flex');
         thisElement.addClass('d-none');
+
     })
 }
 
@@ -870,7 +872,8 @@ window.onload = async (e) => {
         'useWhitelist': true,
         'latitude': 51.9,
         'longitude': -0.4,
-        'nocmig': false
+        'nocmig': false,
+        'batchSize': 1
     }
     config.UUID = uuidv4();
     // Load preferences and override defaults
@@ -889,6 +892,9 @@ window.onload = async (e) => {
         if (!('UUID' in config)) {
             config.UUID = uuidv4();
         }
+        if (!('batchSize' in config)) {
+            config.batchSize = 1;
+        }
         if (!('latitude' in config)) {
             config.latitude = 51.9
         }
@@ -904,6 +910,8 @@ window.onload = async (e) => {
         updatePrefs()
 
         // Set UI option state
+        $('#' + config.batchSize).click();
+
         if (!config.useWhitelist) {
             $('#useWhitelist .tick').hide()
         }
@@ -922,11 +930,11 @@ window.onload = async (e) => {
             nocmigButton.classList.add('active')
         }
         showElement([config.colormap + 'span'], true)
+
     })
     // establish the message channel
     establishMessageChannel.then((success) => {
         t0_warmup = Date.now();
-        worker.postMessage({action: 'load-model', useWhitelist: true})
         worker.addEventListener('message', function (e) {
             const args = e.data;
             const event = args.event;
@@ -1137,7 +1145,7 @@ $(document).on('click', '#useWhitelist', function () {
         $('#useWhitelist .tick').show()
     }
 
-    worker.postMessage({action: 'load-model', useWhitelist: config.useWhitelist});
+    worker.postMessage({action: 'load-model', useWhitelist: config.useWhitelist, batchSize: config.batchSize});
     const warmupText = document.getElementById('warmup');
     warmupText.classList.remove('d-none');
     updatePrefs();
@@ -1416,6 +1424,7 @@ function onModelReady(args) {
 // })
 
 function onWorkerLoadedAudio(args) {
+    completeDiv.hide();
     console.log('UI received worker-loaded-audio: ' + args.message)
     currentBuffer = new AudioBuffer({length: args.length, numberOfChannels: 1, sampleRate: 24000});
     currentBuffer.copyToChannel(args.contents, 0);
@@ -1442,24 +1451,24 @@ function onWorkerLoadedAudio(args) {
     }
     if (modelReady) enableMenuItem(['analyze']);
     fileLoaded = true;
-    completeDiv.hide();
+
     //const filename = filePath.replace(/^.*[\\\/]/, '')
     let filenameElement = document.getElementById('filename');
     filenameElement.innerHTML = '';
 
     //
     let count = 0
-    let appendstr = '<div id="fileContainer" class="bg-dark text-nowrap pr-3">';
+    let appendstr = '<div id="fileContainer" class="d-inline-block  bg-dark text-nowrap pe-3">';
     fileList.forEach(item => {
         if (count === 0) {
             if (fileList.length > 1) {
-                appendstr += '<span class="revealFiles visible pointer" id="filename_' + count + '">'
-                appendstr += '<span class="material-icons-two-tone pointer">library_music</span>'
+                appendstr += `<span class="revealFiles visible pointer" id="${item}">`;
+                appendstr += '<span class="material-icons-two-tone pointer">library_music</span>';
             } else {
-                appendstr += '<span class="material-icons-two-tone align-bottom">audio_file</span>'
+                appendstr += '<span class="material-icons-two-tone align-bottom">audio_file</span>';
             }
         } else {
-            appendstr += '<span class="openFiles pointer" id="filename_' + count + '"><span class="material-icons-two-tone align-bottom">audio_file</span>'
+            appendstr += `<span class="openFiles pointer" id="${item}"><span class="material-icons-two-tone align-bottom">audio_file</span>`;
         }
         appendstr += item.replace(/^.*[\\\/]/, "") + '<br></span>';
         count += 1;
@@ -1809,9 +1818,9 @@ async function renderResult(result, index, selection) {
         let excluded;
         result.excluded ? excluded = 'strikethrough' : excluded = '';
         tr += `<tr name="${start},${end},${result.cname}${confidence}" class='border-top border-secondary top-row ${excluded} ${result.dayNight}'>
-            <th scope='row'>${index}</th><td class='timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
-            <td >${UI_position}</td><td class='cname'>${result.cname}</td>
-            <td><i>${result.sname}</i></td><td class='text-center'>${iconizeScore(result.score)}</td>
+            <th scope='row'>${index}</th><td class='flex-fill timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
+            <td >${UI_position}</td><td class='flex-fill cname'>${result.cname}</td>
+            <td><i>${result.sname}</i></td><td class='flex-fill text-center'>${iconizeScore(result.score)}</td>
             <td class='text-center'><span id='${index}' title="Click for additional detections" class='material-icons rotate pointer d-none'>${icon_text}</span></td>
             <td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
             <td class='text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
@@ -2039,9 +2048,9 @@ $('#keyboard').on('click', function () {
     });
 });
 
-$('#options').on('click', function () {
-    $('#helpModalLabel').text('Options Help');
-    $('#helpModalBody').load('Help/options.html', function () {
+$('#settings').on('click', function () {
+    $('#helpModalLabel').text('Settings Help');
+    $('#helpModalBody').load('Help/settings.html', function () {
         const help = new bootstrap.Modal(document.getElementById('helpModal'));
         help.show()
     });
@@ -2094,3 +2103,31 @@ $('#zoomOut').on('click', function () {
     zoomSpec('out');
 });
 
+// Set batch size
+$('.batch').on('click', function (e) {
+    const batchSize = e.target.id || config.batchSize;
+    worker.postMessage({action: 'load-model', useWhitelist: config.useWhitelist, batchSize: batchSize});
+    $('.batch span').addClass('d-none');
+    e.target.lastChild.classList.remove('d-none');
+    config.batchSize = e.target.id || config.batchSize;
+    updatePrefs();
+});
+
+// Drag file to app window to open
+document.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+})
+
+document.addEventListener('drop', async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    let filelist = []
+    console.log(event);
+    for (const f of event.dataTransfer.files) {
+        // Using the path attribute to get absolute file path
+        console.log(f)
+        filelist.push(f.path);
+    }
+    await onOpenFiles({filePaths: filelist})
+});
