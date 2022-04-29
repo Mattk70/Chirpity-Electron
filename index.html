@@ -66,9 +66,9 @@
                 </div>
             </li>
             <li class="nav-item dropdown active">
-                <a class="nav-link dropdown-toggle" href="#" id="OptionsDropdown" role="button" data-toggle="dropdown"
+                <a class="nav-link dropdown-toggle" href="#" id="SettingsDropdown" role="button" data-toggle="dropdown"
                    aria-haspopup="true" aria-expanded="false">
-                    Options
+                    Settings
                 </a>
                 <div class="dropdown-menu top-level" aria-labelledby="navbarDropdown">
                     <ul class="nav navbar-nav">
@@ -80,6 +80,37 @@
                                 <li><a class="dropdown-item" href="#" id="useWhitelist">Use Whitelist
                                     <span class='material-icons tick'>done</span>
                                 </a></li>
+                                <li>
+                                    <div class="dropdown-submenu" aria-labelledby="navbarDropdown">
+                                        <ul class="nav navbar-nav">
+                                            <li class="dropdown-submenu">
+                                                <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
+                                                   aria-haspopup="true" aria-expanded="false"> <span
+                                                        class="nav-label">Batch Size</span><span
+                                                        class="material-icons-two-tone arrow">navigate_next</span></a>
+                                                <ul class="dropdown-menu">
+                                                    <li><a class="dropdown-item batch" href="#" id="1">1 <span
+                                                            class='material-icons tick'>done</span>
+                                                    </a></li>
+                                                    <li><a class="dropdown-item batch" href="#" id="2">2 <span
+                                                            class='material-icons tick d-none'>done</span></a></li>
+                                                    <li><a class="dropdown-item batch" href="#" id="3">3 <span
+                                                            class='material-icons tick d-none'>done</span></a></li>
+                                                    <li><a class="dropdown-item batch" href="#" id="4">4 <span
+                                                            class='material-icons tick d-none'>done</span></a></li>
+                                                    <li><a class="dropdown-item batch" href="#" id="6">6 <span
+                                                            class='material-icons tick d-none'>done</span></a></li>
+                                                    <li><a class="dropdown-item batch" href="#" id="8">8 <span
+                                                            class='material-icons tick d-none'>done</span></a></li>
+                                                    <li><a class="dropdown-item batch" href="#" id="12">12 <span
+                                                            class='material-icons tick d-none'>done</span></a></li>
+                                                </ul>
+                                            </li>
+                                        </ul>
+
+
+                                    </div>
+                                </li>
                             </ul>
                         </li>
 
@@ -140,7 +171,7 @@
                 </a>
                 <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
                     <a class="dropdown-item" id="usage" href="#">Usage</a>
-                    <a class="dropdown-item" id="options" href="#">Options</a>
+                    <a class="dropdown-item" id="settings" href="#">Settings</a>
                     <a class="dropdown-item" id="keyboard" href="#">Keyboard Shortcuts</a>
                     <a class="dropdown-item" id="diagnostics" href="#">Diagnostics</a>
                 </div>
@@ -264,7 +295,7 @@
             </div>
         </div>
 
-        <div id="complete" class="col-3 pe-2" style="display: none;">
+        <div id="complete" class="col-3 pe-2" style="display:none">
             <!-- Button trigger modal -->
             <button type="button" class="float-end text-nowrap btn btn-primary align-bottom" data-bs-toggle="modal"
                     data-bs-target="#summaryModal">
@@ -277,7 +308,7 @@
         </div>
     </div>
     <!-- Result table -->
-    <div class="d-none p-0 border-0 overflow-auto" id="resultTableContainer">
+    <div class="flex-column overflow-auto d-none p-0 border-0" id="resultTableContainer">
         <table id='results' class="table table-hover">
             <thead class="bg-dark text-white">
             <tr>
