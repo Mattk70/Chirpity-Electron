@@ -12,20 +12,18 @@ let readStream;
 
 let sourceMetadata = {};
 let workingFilePath;
-let fileStart, chunkStart, chunkLength, minConfidence, index, AUDACITY, RESULTS, predictionStart,
+let fileStart, chunkStart, chunkLength, minConfidence, index = 0, AUDACITY = [], RESULTS = [], predictionStart,
     currentBuffer, feedbackBuffer;
 let t0, t1;
 let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
 
-let predictWorker, predicting = false;
+let predictWorker, predicting = false, predictionDone = false, aborted = false;
 let selection = false;
-let controller = new AbortController();
-let signal = controller.signal;
 let useWhitelist = true;
 // We might get multiple clients, for instance if there are multiple windows,
 // or if the main window reloads.
 let UI;
-
+let FILE_QUEUE = [];
 ipcRenderer.on('new-client', (event) => {
     [UI] = event.ports;
     UI.onmessage = async (e) => {
@@ -34,34 +32,39 @@ ipcRenderer.on('new-client', (event) => {
         console.log('message received ', action)
         switch (action) {
             case 'load-model':
+                UI.postMessage({event: 'spawning'});
                 BATCH_SIZE = args.batchSize;
                 if (predictWorker) predictWorker.terminate();
                 spawnWorker(args.useWhitelist, BATCH_SIZE);
                 break;
             case 'file-load-request':
+                index = 0;
                 console.log('Worker received audio ' + args.filePath);
-                controller = new AbortController();
-                signal = controller.signal;
                 await loadAudioFile(args);
+
                 break;
             case 'update-buffer':
                 await fetchAudioStream(args);
                 break;
             case 'analyze':
                 console.log(`Worker received message: ${args.confidence}, start: ${args.start}, end: ${args.end},  fstart ${fileStart}`);
-                minConfidence = args.confidence;
-                selection = false;
-                let start, end;
-                if (args.start === undefined) {
-                    start = 0;
-                    end = sourceMetadata.duration;
-                } else {
-                    start = args.start;
-                    end = args.end;
-                    selection = true;
+                if (predicting) FILE_QUEUE.push(args.filePath);
+                else {
+                    predicting = true;
+                    minConfidence = args.confidence;
+                    selection = false;
+                    let start, end;
+                    if (args.start === undefined) {
+                        start = 0;
+                        end = sourceMetadata.duration;
+                    } else {
+                        start = args.start;
+                        end = args.end;
+                        selection = true;
+                    }
+                    await loadAudioFile(args);
+                    setTimeout(doPrediction, 250, start, end);
                 }
-                predicting = true;
-                await doPrediction(start, end)
                 break;
             case 'save':
                 console.log("file save requested")
@@ -71,17 +74,18 @@ ipcRenderer.on('new-client', (event) => {
                 await postMP3(args.start, args.end, args.filepath, args.metadata, args.mode)
                 break;
             case 'abort':
+                aborted = true;
+                FILE_QUEUE = [];
                 console.log("abort received")
-                if (controller) {
-                    controller.abort()
-                }
                 if (predicting) {
                     //restart the worker
+                    UI.postMessage({event: 'spawning'});
                     predictWorker.terminate()
                     spawnWorker(useWhitelist, BATCH_SIZE)
+                    predicting = false;
                 }
                 if (args.sendLabels) {
-                    UI.postMessage({event: 'prediction-done', labels: AUDACITY});
+                    UI.postMessage({event: 'prediction-done', labels: AUDACITY, batchInProgress: false});
                 }
                 break;
             default:
@@ -147,7 +151,7 @@ async function loadAudioFile(args) {
         sourceMetadata.sampleRate = wav.fmt.sampleRate;
         sourceMetadata.bitsPerSample = wav.fmt.bitsPerSample
         readStream.close()
-        await fetchAudioStream({start: 0, end: 20})
+        await fetchAudioStream({file: workingFilePath, start: 0, end: 20})
     })
 }
 
@@ -209,7 +213,8 @@ async function fetchAudioStream(args) {
                     length: length,
                     contents: myArray,
                     play: args.play,
-                    region: args.region
+                    region: args.region,
+                    preserveResults: args.preserveResults
                 })
                 currentBuffer = resampled;
                 readStream.close()
@@ -236,17 +241,23 @@ async function sendMessageToWorker(chunkStart, chunks) {
         objData['chunk' + i] = chunks[i];
         chunkBuffers.push(objData['chunk' + i].buffer)
     }
+    predictWorker.postMessage('resume');
     predictWorker.postMessage(objData, chunkBuffers);
 }
 
 async function doPrediction(start, end) {
-    AUDACITY = [];
-    RESULTS = [];
+    aborted = false;
+    predictionDone = false;
     predictionStart = new Date();
-    index = 0;
+    if (!predicting) {
+        index = 0;
+        AUDACITY = [];
+        RESULTS = [];
+    }
+    predicting = true;
     const samples = (end - start) * sampleRate
     const increment = samples < chunkLength ? samples : chunkLength;
-    await fetchAudioStream({start: start, end: end, predicting: true, increment: increment})
+    await fetchAudioStream({file: workingFilePath, start: start, end: end, predicting: true, increment: increment})
 }
 
 async function feedChunksToModel(channelData, increment) {
@@ -443,7 +454,15 @@ async function saveMP3(start, end, filepath, metadata) {
 
 
 async function postMP3(start, end, filepath, metadata, mode) {
-    await fetchAudioStream({start: start, end: end, post: true, filepath: filepath, metadata: metadata, mode: mode});
+    await fetchAudioStream({
+        file: workingFilePath,
+        start: start,
+        end: end,
+        post: true,
+        filepath: filepath,
+        metadata: metadata,
+        mode: mode
+    });
 }
 
 
@@ -457,7 +476,7 @@ function spawnWorker(useWhitelist, batchSize) {
     }
 }
 
-function parsePredictions(e) {
+async function parsePredictions(e) {
     const response = e.data;
     if (response['message'] === 'model-ready') {
         chunkLength = response['chunkLength'];
@@ -465,7 +484,7 @@ function parsePredictions(e) {
         const backend = response['backend'];
         console.log(backend);
         UI.postMessage({event: 'model-ready', message: 'ready', backend: backend})
-    } else if (response['message'] === 'prediction') {
+    } else if (response['message'] === 'prediction' && !aborted) {
         readStream.resume();
         //t1 = performance.now();
         //console.log(`post from worker took: ${t1 - response['time']} milliseconds`)
@@ -478,7 +497,13 @@ function parsePredictions(e) {
             //console.log('Prediction received from worker', result);
             if (result.score > minConfidence) {
                 index++;
-                UI.postMessage({event: 'prediction-ongoing', result: result, index: index, selection: selection});
+                UI.postMessage({
+                    event: 'prediction-ongoing',
+                    result: result,
+                    index: index,
+                    selection: selection,
+                    file: workingFilePath
+                });
                 AUDACITY.push(audacity);
                 RESULTS.push(result);
             }
@@ -492,9 +517,18 @@ function parsePredictions(e) {
                     UI.postMessage({event: 'prediction-ongoing', result: result, index: 1, selection: selection});
                 }
                 UI.postMessage({event: 'progress', progress: 1});
-                UI.postMessage({event: 'prediction-done', labels: AUDACITY});
-                predicting = false;
+                UI.postMessage({event: 'prediction-done', labels: AUDACITY, batchInProgress: FILE_QUEUE.length});
+                predictionDone = true;
             }
         })
+    }
+    if (predictionDone) {
+        if (FILE_QUEUE.length) {
+            sourceMetadata = {};
+            await loadAudioFile({filePath: FILE_QUEUE.shift()});
+            setTimeout(doPrediction, 250, 0, sourceMetadata.duration);
+        } else {
+            predicting = false;
+        }
     }
 }

@@ -257,6 +257,7 @@ let myModel;
 onmessage = async function (e) {
     await runPredictions(e)
 }
+let suspended = false;
 
 async function runPredictions(e) {
     const modelRequest = e.data.message || e.data[0];
@@ -274,7 +275,7 @@ async function runPredictions(e) {
             chunkLength: myModel.chunkLength,
             backend: tf.getBackend()
         });
-    } else if (modelRequest === 'predict') {
+    } else if (modelRequest === 'predict' && !suspended) {
         let t0 = performance.now();
         let response = {};
         let chunks = {};
