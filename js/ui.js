@@ -65,11 +65,11 @@ window.electron.getVersion()
         console.log('Error getting app version:', e)
     });
 
-let modelReady = false, fileLoaded = false, currentFile, fileList, resultHistory = {};
-let region, AUDACITY_LABELS, wavesurfer;
+let modelReady = false, fileLoaded = false, currentFile, resultHistory = {};
+let region, AUDACITY_LABELS = [], wavesurfer;
 let summary = {};
 summary['suppressed'] = [];
-let fileStart, bufferStartTime, ctime;
+let fileList = [], fileStart, bufferStartTime, fileEnd;
 let startPosition;
 let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
 // set up some DOM element caches
@@ -159,17 +159,18 @@ function resetResults() {
     shownDaylightBanner = false;
 }
 
-async function loadAudioFile(filePath, OriginalCtime) {
+async function loadAudioFile(args) {
+    let filePath = args.filePath, originalFileEnd = args.originalFileEnd, preserveResults = args.preserveResults;
     workerHasLoadedFile = false;
-    resetResults();
+    if (!preserveResults) resetResults();
     // Hide load hint and show spinnner
-    if (wavesurfer) {
-        wavesurfer.destroy();
-        wavesurfer = undefined;
-    }
+    // if (wavesurfer) {
+    //     wavesurfer.destroy();
+    //     wavesurfer = undefined;
+    // }
     // set file creation time
     try {
-        ctime = fs.statSync(filePath).mtime;
+        fileEnd = fs.statSync(filePath).mtime;
         worker.postMessage({action: 'file-load-request', filePath: filePath});
     } catch (e) {
         const supported_files = ['.mp3', '.wav', '.mpga', '.ogg', '.flac', '.aac', '.mpeg', '.mp4'];
@@ -179,40 +180,19 @@ async function loadAudioFile(filePath, OriginalCtime) {
         supported_files.some(ext => {
             try {
                 file = p.join(dir, name + ext);
-                ctime = fs.statSync(file).mtime;
+                fileEnd = fs.statSync(file).mtime;
             } catch (e) {
                 // Try the next extension
             }
-            return ctime;
+            return fileEnd;
         })
-        if (!ctime) {
+        if (!fileEnd) {
             alert("Unable to load source file with any supported file extension: " + filePath)
-            return;
         } else {
             if (file) filePath = file;
-            if (OriginalCtime) ctime = OriginalCtime;
-            worker.postMessage({action: 'file-load-request', filePath: filePath});
+            if (originalFileEnd) fileEnd = originalFileEnd;
+            worker.postMessage({action: 'file-load-request', filePath: filePath, preserveResults: preserveResults});
         }
-    }
-
-    hideAll();
-    disableMenuItem(['analyzeSelection', 'analyze'])
-    showElement(['loadFileHint', 'loadFileHintSpinner', 'loadFileHintLog']);
-
-
-    // Reset the buffer playhead and zoom:
-    bufferBegin = 0;
-    windowLength = 20;
-    if (config.spectrogram) {
-        // controller = new AbortController();
-        // signal = controller.signal;
-        //await fetchAudioFile(filePath);
-    } else {
-        // remove the file hint stuff
-        hideAll();
-        // Show controls
-        showElement(['controlsWrapper']);
-        $('.specFeature').hide()
     }
 }
 
@@ -222,7 +202,7 @@ $(document).on("click", ".openFiles", async function (e) {
     const openFiles = $('.openFiles');
     openFiles.removeClass('visible');
     if (openFiles.length > 1) this.firstChild.innerHTML = "library_music"
-        await loadAudioFile(e.target.id)
+    await loadAudioFile({filePath: e.target.id, preserveResults: true})
     e.stopImmediatePropagation()
 });
 
@@ -341,7 +321,9 @@ function initWavesurfer(args) {
     wavesurfer.on('region-created', function (e) {
         region = e
         enableMenuItem(['exportMP3']);
-        if (modelReady) enableMenuItem(['analyzeSelection']);
+        if (modelReady) {
+            enableMenuItem(['analyzeSelection']);
+        }
     });
 
     wavesurfer.on('finish', function () {
@@ -409,14 +391,61 @@ async function showOpenDialog() {
         properties: ['openFile', 'multiSelections']
     };
     const files = await window.electron.openDialog('showOpenDialog', dialogConfig);
-    if (!files.canceled) await onOpenFiles(files);
+    if (!files.canceled) await onOpenFiles({filePaths: files.filePaths});
 }
 
 async function onOpenFiles(args) {
     // Store the file list and Load First audio file
+    completeDiv.hide();
     fileList = args.filePaths;
-    await loadAudioFile(fileList[0]);
+    // Sort file by time created (the oldest first):
+    if (fileList.length > 1) {
+        if (modelReady) analyzeAllLink.classList.remove('disabled');
+        fileList = fileList.map(fileName => ({
+            name: fileName,
+            time: fs.statSync(fileName).mtime.getTime(),
+        }))
+            .sort((a, b) => a.time - b.time)
+            .map(file => file.name);
+    } else {
+        analyzeAllLink.classList.add('disabled');
+    }
+    let count = 0;
+    let filenameElement = document.getElementById('filename');
+    filenameElement.innerHTML = '';
+
+    let appendstr = '<div id="fileContainer" class="d-inline-block  bg-dark text-nowrap pe-3">';
+    fileList.forEach(item => {
+        if (count === 0) {
+            if (fileList.length > 1) {
+                appendstr += `<span class="revealFiles visible pointer" id="${item}">`;
+                appendstr += '<span class="material-icons-two-tone pointer">library_music</span>';
+            } else {
+                appendstr += '<span class="material-icons-two-tone align-bottom">audio_file</span>';
+            }
+        } else {
+            appendstr += `<span class="openFiles pointer" id="${item}"><span class="material-icons-two-tone align-bottom">audio_file</span>`;
+        }
+        appendstr += item.replace(/^.*[\\\/]/, "") + '<br></span>';
+        count += 1;
+    })
+    filenameElement.innerHTML += appendstr + '</div>';
+
+    await loadAudioFile({filePath: fileList[0]});
     currentFile = fileList[0];
+
+    //hideAll();
+    disableMenuItem(['analyzeSelection', 'analyze'])
+    //showElement(['loadFileHint', 'loadFileHintSpinner', 'loadFileHintLog']);
+
+    // Reset the buffer playhead and zoom:
+    bufferBegin = 0;
+    windowLength = 20;
+    if (!config.spectrogram) {
+        // Show controls
+        showElement(['controlsWrapper']);
+        $('.specFeature').hide()
+    }
 }
 
 async function onLoadResults(args) {
@@ -453,10 +482,21 @@ function analyseReset() {
 const analyzeLink = document.getElementById('analyze');
 speciesExclude = document.querySelectorAll('speciesExclude');
 analyzeLink.addEventListener('click', async () => {
+    AUDACITY_LABELS = [];
     analyseReset();
     progressDiv.show();
     resetResults();
-    worker.postMessage({action: 'analyze', confidence: config.minConfidence, fileStart: fileStart});
+    worker.postMessage({action: 'analyze', confidence: config.minConfidence, filePath: currentFile});
+});
+
+const analyzeAllLink = document.getElementById('analyzeAll');
+analyzeAllLink.addEventListener('click', async () => {
+    AUDACITY_LABELS = [];
+    analyseReset();
+    fileList.forEach(file => {
+        worker.postMessage({action: 'analyze', confidence: config.minConfidence, filePath: file});
+    })
+    progressDiv.show();
 });
 
 const analyzeSelectionLink = document.getElementById('analyzeSelection');
@@ -471,7 +511,7 @@ analyzeSelectionLink.addEventListener('click', async () => {
         end = start + 0.5
     }
     // Add current buffer's beginning offset to region start / end tags
-    worker.postMessage({action: 'analyze', confidence: 0.1, start: start, end: end, fileStart: fileStart});
+    worker.postMessage({action: 'analyze', confidence: 0.1, start: start, end: end, filePath: currentFile});
     summary = {};
     summary['suppressed'] = []
 });
@@ -556,13 +596,14 @@ function loadResultRegion(paramlist) {
     // Accepts global start and end timecodes from model detections
     // Need to find and centre a view of the detection in the spectrogram
     // 3 second detections
-    let [start, end, label] = paramlist;
+    let [file, start, end, label] = paramlist;
     start = parseFloat(start);
     end = parseFloat(end);
     bufferBegin = Math.max(0, start - (windowLength / 2) + 1.5)
     //loadBufferSegment(currentBuffer, bufferBegin)
     worker.postMessage({
         action: 'update-buffer',
+        file: file,
         position: 0,
         start: bufferBegin,
         end: bufferBegin + windowLength,
@@ -768,7 +809,7 @@ function updatePrefs() {
 //////////// Save Detections  ////////////
 function saveChirp() {
     predictions['source'] = currentFile;
-    predictions['ctime'] = ctime;  // Preserve creation date
+    predictions['fileEnd'] = fileEnd;  // Preserve creation date
     let content = JSON.stringify(predictions);
     const folder = p.parse(currentFile).dir;
     const source = p.parse(currentFile).name;
@@ -792,19 +833,19 @@ async function loadChirp(file) {
             buffer = new TextDecoder().decode(buffer);
             savedPredictions = JSON.parse(buffer);
             currentFile = savedPredictions['source'];
-            ctime = Date.parse(savedPredictions['ctime']);
+            fileEnd = Date.parse(savedPredictions['fileEnd']);
         })
         fileList = [currentFile];
-        await loadAudioFile(currentFile, ctime);
+        await loadAudioFile({filePath: currentFile, originalFileEnd: fileEnd});
         for (const [key, value] of Object.entries(savedPredictions)) {
-            if (key === 'source' || key === 'ctime') continue;
-            await renderResult(value, key, false);
+            if (key === 'source' || key === 'fileEnd') continue;
+            await renderResult({result: value, index: key, selection: false});
         }
         await onPredictionDone({labels: {}});
     } else {
         currentFile = file;
         fileList = [currentFile];
-        await loadAudioFile(currentFile, ctime);
+        await loadAudioFile({filePath: currentFile, originalFileEnd: fileEnd});
     }
 }
 
@@ -845,7 +886,7 @@ function saveDetections() {
         }
         // Convert predictions to csv string buffer
         for (const [key, value] of Object.entries(predictions)) {
-            if (key === 'source' || key === 'ctime') continue;
+            if (key === 'source' || key === 'fileEnd') continue;
             if ((config.nocmig && value.dayNight === 'daytime') || value.excluded) {
                 continue
             }
@@ -860,7 +901,7 @@ function saveDetections() {
 
 /////////////////////////  Window Handlers ////////////////////////////
 let appPath;
-window.onload = async (e) => {
+window.onload = async () => {
     // Set config defaults
 
     config = {
@@ -949,7 +990,10 @@ window.onload = async (e) => {
                     onProgress(args);
                     break;
                 case 'prediction-ongoing':
-                    onPredictionOngoing(args);
+                    renderResult(args);
+                    break;
+                case 're-spawning':
+                    warmUp();
                     break;
                 case 'worker-loaded-audio':
                     onWorkerLoadedAudio(args);
@@ -1092,7 +1136,7 @@ $(document).on('click', '#loadSpectrogram', function () {
             $('.speccolor .timeline').removeClass('disabled');
             showElement(['dummy', 'timeline', 'waveform', 'spectrogram'], false);
         } else {
-            loadAudioFile(currentFile);
+            loadAudioFile({filePath: currentFile});
         }
         updatePrefs();
     }
@@ -1144,10 +1188,7 @@ $(document).on('click', '#useWhitelist', function () {
         config.useWhitelist = true;
         $('#useWhitelist .tick').show()
     }
-
     worker.postMessage({action: 'load-model', useWhitelist: config.useWhitelist, batchSize: config.batchSize});
-    const warmupText = document.getElementById('warmup');
-    warmupText.classList.remove('d-none');
     updatePrefs();
 })
 
@@ -1231,7 +1272,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     Escape: function () {
         console.log('Operation aborted');
         controller.abort();
-        worker.postMessage({action: 'abort', abort: true});
+        worker.postMessage({action: 'abort'});
         alert('Operation cancelled');
 
     }
@@ -1393,12 +1434,19 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
 
 
 // Electron Message handling
+const warmupText = document.getElementById('warmup');
+
+function warmUp() {
+    disableMenuItem(['analyzeLink', 'analyzeAllLink', 'analyseSelectionLink']);
+    warmupText.classList.remove('d-none');
+}
+
 function onModelReady(args) {
     modelReady = true;
-    const warmupText = document.getElementById('warmup');
     warmupText.classList.add('d-none');
     if (workerHasLoadedFile) {
         enableMenuItem(['analyze'])
+        if (fileList.length > 1) analyzeAllLink.classList.remove('disabled');
     }
     if (region) enableMenuItem(['analyzeSelection'])
     t1_warmup = Date.now();
@@ -1424,7 +1472,7 @@ function onModelReady(args) {
 // })
 
 function onWorkerLoadedAudio(args) {
-    completeDiv.hide();
+    if (args.preserveResults) completeDiv.hide();
     console.log('UI received worker-loaded-audio: ' + args.message)
     currentBuffer = new AudioBuffer({length: args.length, numberOfChannels: 1, sampleRate: 24000});
     currentBuffer.copyToChannel(args.contents, 0);
@@ -1445,35 +1493,13 @@ function onWorkerLoadedAudio(args) {
     let astro = SunCalc.getTimes(fileStart, config.latitude, config.longitude);
     dusk = astro.dusk;
     dawn = astro.dawn;
-    if (config.nocmig && ctime < dusk && fileStart > dawn) {
+    if (config.nocmig && fileEnd < dusk && fileStart > dawn) {
         alert(`All timestamps in this file are during daylight hours. \n\nNocmig mode will be disabled.`)
         $('#timecode').click();
     }
     if (modelReady) enableMenuItem(['analyze']);
     fileLoaded = true;
 
-    //const filename = filePath.replace(/^.*[\\\/]/, '')
-    let filenameElement = document.getElementById('filename');
-    filenameElement.innerHTML = '';
-
-    //
-    let count = 0
-    let appendstr = '<div id="fileContainer" class="d-inline-block  bg-dark text-nowrap pe-3">';
-    fileList.forEach(item => {
-        if (count === 0) {
-            if (fileList.length > 1) {
-                appendstr += `<span class="revealFiles visible pointer" id="${item}">`;
-                appendstr += '<span class="material-icons-two-tone pointer">library_music</span>';
-            } else {
-                appendstr += '<span class="material-icons-two-tone align-bottom">audio_file</span>';
-            }
-        } else {
-            appendstr += `<span class="openFiles pointer" id="${item}"><span class="material-icons-two-tone align-bottom">audio_file</span>`;
-        }
-        appendstr += item.replace(/^.*[\\\/]/, "") + '<br></span>';
-        count += 1;
-    })
-    filenameElement.innerHTML += appendstr + '</div>';
     if (!wavesurfer) {
         initWavesurfer({
             'audio': currentBuffer,
@@ -1497,16 +1523,22 @@ function onProgress(args) {
 }
 
 async function onPredictionDone(args) {
+    AUDACITY_LABELS.push(args.labels);
+    // Defer further processing until batch complete
+    if (args.batchInProgress) return;
+
     if (!seenTheDarkness && config.nocmig && !region) {
         alert(`Nocmig mode is enabled, but all timestamps in this file were during daylight hours. Any detections will have been suppressed.\n\nDisable Nocmig mode and re-run the analysis to see them.`)
     }
     scrolled = false;
-    AUDACITY_LABELS = args.labels;
+
+
     progressDiv.hide();
     progressBar.width(0 + '%');
     progressBar.attr('aria-valuenow', 0);
     progressBar.html(0 + '%');
     completeDiv.show();
+
     if (AUDACITY_LABELS.length > 0) {
         enableMenuItem(['saveLabels', 'saveDetections']);
         $('.download').removeClass('disabled');
@@ -1514,8 +1546,6 @@ async function onPredictionDone(args) {
         disableMenuItem(['saveLabels', 'saveDetections']);
     }
     analyzeLink.disabled = false;
-    // Save the results for this file to the history
-    resultHistory[currentFile] = resultTable[0].innerHTML
     console.table(summary);
     // Sort summary by count
     let sortable = [];
@@ -1720,7 +1750,9 @@ function matchSpecies(e, mode) {
     targetClass.remove('d-none');
 }
 
-async function renderResult(result, index, selection) {
+async function renderResult(args) {
+    const result = args.result, selection = args.selection, file = args.file;
+    let index = args.index;
     result.timestamp = new Date(result.timestamp);
     result.position = new Date(result.position);
     // Datetime wrangling for Nocmig mode
@@ -1761,16 +1793,6 @@ async function renderResult(result, index, selection) {
             if (!seenTheDarkness && result.dayNight === 'daytime') {
                 // Not dark yet
                 return
-            } else if (seenTheDarkness && result.dayNight === 'daytime') {
-                // Show the twilight start bar
-                resultTable.append(`<tr class="bg-dark text-white"><td colspan="20" class="text-center">
-                                        Start of civil twilight
-                                        <span class="material-icons-two-tone text-warning align-bottom">wb_twilight</span>
-                                    </td></tr>`);
-                // Abort
-                console.log("Aborting as reached daytime");
-                worker.postMessage({action: 'abort', sendLabels: true});
-                return
             }
         }
         // Show the twilight bar even if nocmig mode off - cue to change of table row colour
@@ -1781,6 +1803,11 @@ async function renderResult(result, index, selection) {
                                         <span class="material-icons-two-tone text-warning align-bottom">wb_twilight</span>
                                     </td></tr>`);
             shownDaylightBanner = true;
+            if (config.nocmig) {
+                // Abort
+                console.log("Aborting as reached daytime");
+                worker.postMessage({action: 'abort', sendLabels: true});
+            }
         }
         if (result.cname in summary) {
             if (result)
@@ -1788,9 +1815,7 @@ async function renderResult(result, index, selection) {
         } else {
             summary[result.cname] = 1
         }
-
         if (result.suppressed === 'text-danger') summary['suppressed'].push(result.cname);
-
         const start = result.start, end = result.end;
         let icon_text;
         let feedback_icons;
@@ -1817,7 +1842,7 @@ async function renderResult(result, index, selection) {
         config.timeOfDay ? showTimeOfDay = '' : showTimeOfDay = 'd-none';
         let excluded;
         result.excluded ? excluded = 'strikethrough' : excluded = '';
-        tr += `<tr name="${start},${end},${result.cname}${confidence}" class='border-top border-secondary top-row ${excluded} ${result.dayNight}'>
+        tr += `<tr name="${file},${start},${end},${result.cname}${confidence}" class='border-top border-secondary top-row ${excluded} ${result.dayNight}'>
             <th scope='row'>${index}</th><td class='flex-fill timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
             <td >${UI_position}</td><td class='flex-fill cname'>${result.cname}</td>
             <td><i>${result.sname}</i></td><td class='flex-fill text-center'>${iconizeScore(result.score)}</td>
@@ -1831,7 +1856,7 @@ async function renderResult(result, index, selection) {
             <td id="${index}" class='specFeature text-center'>${feedback_icons}</td>
         </tr>`;
         if (result.score2 > 0.2) {
-            tr += `<tr name="${start},${end},${result.cname}${confidence}" id='subrow${index}' class='subrow d-none'>
+            tr += `<tr name="${file},${start},${end},${result.cname}${confidence}" id='subrow${index}' class='subrow d-none'>
                 <th scope='row'>${index}</th><td> </td><td> </td><td class='cname2'>${result.cname2}</td>
                 <td><i>${result.sname2}</i></td><td class='text-center'>${iconizeScore(result.score2)}</td>
                 <td> </td><td class='specFeature'> </td>
@@ -1842,7 +1867,7 @@ async function renderResult(result, index, selection) {
                 <td class='specFeature'> </td>
                </tr>`;
             if (result.score3 > 0.2) {
-                tr += `<tr name="${start},${end},${result.cname}${confidence}" id='subsubrow${index}' class='subrow d-none'>
+                tr += `<tr name="${file},${start},${end},${result.cname}${confidence}" id='subsubrow${index}' class='subrow d-none'>
                     <th scope='row'>${index}</th><td> </td><td> </td><td class='cname3'>${result.cname3}</td>
                     <td><i>${result.sname3}</i></td><td class='text-center'>${iconizeScore(result.score3)}</td>
                     <td> </td><td class='specFeature'> </td>
@@ -1865,10 +1890,6 @@ async function renderResult(result, index, selection) {
         document.getElementById(index).classList.remove('d-none')
     }
     if (!config.spectrogram) $('.specFeature').hide();
-}
-
-async function onPredictionOngoing(args) {
-    await renderResult(args.result, args.index, args.selection)
 }
 
 $(document).on('click', '.material-icons', function () {
