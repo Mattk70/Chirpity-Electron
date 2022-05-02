@@ -2,6 +2,7 @@ html, body {
     height: 100%;
     padding-top: 0px;
     padding-bottom: 18px;
+    min-width: 700px;
     overflow: hidden;
     transition: background 1.5s linear;
 }
@@ -148,7 +149,6 @@ span[id^="filename_"] {
 .filename {
     margin-left: auto;
     margin-right: auto;
-    z-index: 10;
 }
 
 .pointer {
