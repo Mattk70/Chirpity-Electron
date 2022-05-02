@@ -13,7 +13,6 @@ let metadata = {};
 let fileStart, chunkStart, chunkLength, minConfidence, index = 0, AUDACITY = [], RESULTS = [], predictionStart;
 let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
 let predictWorker, predicting = false, predictionDone = false, aborted = false;
-let selection = false;
 let useWhitelist = true;
 // We might get multiple clients, for instance if there are multiple windows,
 // or if the main window reloads.
@@ -75,7 +74,7 @@ ipcRenderer.on('new-client', (event) => {
                         selection = true;
                     }
                     //await loadAudioFile(args);
-                    await doPrediction({start: start, end: end, file: args.filePath});
+                    await doPrediction({start: start, end: end, file: args.filePath, selection: selection});
                 }
                 break;
             case 'save':
@@ -83,7 +82,7 @@ ipcRenderer.on('new-client', (event) => {
                 await saveMP3(args.file, args.start, args.end, args.filename, args.metadata);
                 break;
             case 'post':
-                await postMP3(args.start, args.end, args.filepath, args.metadata, args.mode)
+                await postMP3(args)
                 break;
             case 'abort':
                 onAbort(args);
@@ -191,7 +190,7 @@ const getMetadata = async (file) => {
 }
 
 async function getPredictBuffers(args) {
-    let start = args.start, end = args.end;
+    let start = args.start, end = args.end, selection = args.selection
     const file = args.file
     // Ensure max and min are within range
     start = Math.max(0, start);
@@ -231,7 +230,7 @@ async function getPredictBuffers(args) {
             const myArray = resampled.getChannelData(0);
             const samples = (end - start) * sampleRate;
             const increment = samples < chunkLength ? samples : chunkLength;
-            feedChunksToModel(myArray, increment, chunkStart, file, fileDuration);
+            feedChunksToModel(myArray, increment, chunkStart, file, fileDuration, selection);
             chunkStart += 3 * BATCH_SIZE * sampleRate;
             // Now the async stuff is done ==>
             readStream.resume();
@@ -293,14 +292,15 @@ const fetchAudioBuffer = (args) => {
     });
 }
 
-async function sendMessageToWorker(chunkStart, chunks, file, duration) {
+async function sendMessageToWorker(chunkStart, chunks, file, duration, selection) {
     const objData = {
         message: 'predict',
         chunkStart: chunkStart,
         numberOfChunks: chunks.length,
         fileStart: fileStart,
         file: file,
-        duration: duration
+        duration: duration,
+        selection: selection
     }
     let chunkBuffers = [];
     for (let i = 0; i < chunks.length; i++) {
@@ -311,7 +311,7 @@ async function sendMessageToWorker(chunkStart, chunks, file, duration) {
 }
 
 async function doPrediction(args) {
-    const start = args.start, end = args.end, file = args.file;
+    const start = args.start, end = args.end, file = args.file, selection = args.selection;
     aborted = false;
     predictionDone = false;
     predictionStart = new Date();
@@ -321,23 +321,23 @@ async function doPrediction(args) {
         RESULTS = [];
     }
     predicting = true;
-    await getPredictBuffers({file: file, start: start, end: end});
+    await getPredictBuffers({file: file, start: start, end: end, selection: selection});
     UI.postMessage({event: 'update-audio-duration', value: metadata[file].duration});
 }
 
-async function feedChunksToModel(channelData, increment, chunkStart, file, duration) {
+async function feedChunksToModel(channelData, increment, chunkStart, file, duration, selection) {
     let chunks = [];
     for (let i = 0; i < channelData.length; i += increment) {
         let chunk = channelData.slice(i, i + increment);
         // Batch predictions
         chunks.push(chunk);
         if (chunks.length === BATCH_SIZE) {
-            await sendMessageToWorker(chunkStart, chunks, file, duration);
+            await sendMessageToWorker(chunkStart, chunks, file, duration, selection);
             chunks = [];
         }
     }
     //clear up remainder less than BATCH_SIZE
-    if (chunks.length > 0) await sendMessageToWorker(chunkStart, chunks, file, duration);
+    if (chunks.length > 0) await sendMessageToWorker(chunkStart, chunks, file, duration, selection);
 }
 
 
@@ -353,12 +353,12 @@ function downloadMp3(buffer, filePath, metadata) {
     window.URL.revokeObjectURL(url);
 }
 
-function uploadMp3(buffer, filepath, metadata, mode) {
+function uploadMp3(buffer, defaultName, metadata, mode) {
     const MP3Blob = analyzeAudioBuffer(buffer, metadata);
 // Populate a form with the file (blob) and filename
     var formData = new FormData();
     //const timestamp = Date.now()
-    formData.append("thefile", MP3Blob, metadata.filename);
+    formData.append("thefile", MP3Blob, defaultName);
     // Was the prediction a correct one?
     formData.append("Chirpity_assessment", mode);
 // post form data
@@ -519,10 +519,10 @@ async function saveMP3(file, start, end, filename, metadata) {
 }
 
 
-async function postMP3(start, end, filepath, metadata, mode) {
-    const file = args.file;
-    const buffer = await fetchAudioBuffer({start: start, end: end});
-    uploadMp3(buffer, file, metadata[file], mode)
+async function postMP3(args) {
+    const file = args.file, defaultName = args.defaultName, start = args.start , end = args.end, metadata = args.metadata, mode = args.mode;
+    const buffer = await fetchAudioBuffer({file: file, start: start, end: end});
+    uploadMp3(buffer, defaultName, metadata, mode)
 }
 
 
