@@ -2038,7 +2038,7 @@ function sendFile(mode, result) {
         }
         worker.postMessage({
             action: 'post',
-            start: start, end: end, filepath: filename, metadata: metadata, mode: mode
+            start: start, file: currentFile, end: end, defaultName: filename, metadata: metadata, mode: mode
         })
     }
 }

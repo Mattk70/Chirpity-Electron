@@ -305,6 +305,7 @@ async function runPredictions(e) {
             file:       e.data.file,
             endpoint:   e.data.duration,
             fileStart:  fileStart,
+            selection:  e.data.selection,
             // add a chunk to the start
             start:      i + myModel.chunkLength,
         }
