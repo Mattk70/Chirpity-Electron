@@ -8,15 +8,10 @@ const ID3Writer = require('browser-id3-writer');
 let BATCH_SIZE = 12;
 console.log(appPath);
 
-let readStream;
 
-let sourceMetadata = {};
-let workingFilePath;
-let fileStart, chunkStart, chunkLength, minConfidence, index = 0, AUDACITY = [], RESULTS = [], predictionStart,
-    currentBuffer, feedbackBuffer;
-let t0, t1;
+let metadata = {};
+let fileStart, chunkStart, chunkLength, minConfidence, index = 0, AUDACITY = [], RESULTS = [], predictionStart;
 let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
-
 let predictWorker, predicting = false, predictionDone = false, aborted = false;
 let selection = false;
 let useWhitelist = true;
@@ -39,54 +34,59 @@ ipcRenderer.on('new-client', (event) => {
                 break;
             case 'file-load-request':
                 index = 0;
+                if (predicting) onAbort(args);
                 console.log('Worker received audio ' + args.filePath);
                 await loadAudioFile(args);
 
                 break;
             case 'update-buffer':
-                await fetchAudioStream(args);
+                const buffer = await fetchAudioBuffer(args);
+                const length = buffer.length;
+                const myArray = buffer.getChannelData(0);
+                UI.postMessage({
+                    event: 'worker-loaded-audio',
+                    fileStart: fileStart,
+                    sourceDuration: metadata[args.file].duration,
+                    sourceOffset: 0,
+                    file: args.file,
+                    position: args.position,
+                    length: length,
+                    contents: myArray,
+                    region: args.region
+                })
+
                 break;
             case 'analyze':
                 console.log(`Worker received message: ${args.confidence}, start: ${args.start}, end: ${args.end},  fstart ${fileStart}`);
-                if (predicting) FILE_QUEUE.push(args.filePath);
-                else {
+                if (predicting) {
+                    FILE_QUEUE.push(args.filePath);
+                    console.log(`Adding ${args.filePath} to the queue.`)
+                } else {
                     predicting = true;
                     minConfidence = args.confidence;
                     selection = false;
                     let start, end;
                     if (args.start === undefined) {
-                        start = 0;
-                        end = sourceMetadata.duration;
+                        start = null;
+                        end = Infinity;
                     } else {
                         start = args.start;
                         end = args.end;
                         selection = true;
                     }
-                    await loadAudioFile(args);
-                    setTimeout(doPrediction, 250, start, end);
+                    //await loadAudioFile(args);
+                    await doPrediction({start: start, end: end, file: args.filePath});
                 }
                 break;
             case 'save':
                 console.log("file save requested")
-                await saveMP3(args.start, args.end, args.filepath, args.metadata);
+                await saveMP3(args.file, args.start, args.end, args.filename, args.metadata);
                 break;
             case 'post':
                 await postMP3(args.start, args.end, args.filepath, args.metadata, args.mode)
                 break;
             case 'abort':
-                aborted = true;
-                FILE_QUEUE = [];
-                console.log("abort received")
-                if (predicting) {
-                    //restart the worker
-                    UI.postMessage({event: 'spawning'});
-                    predictWorker.terminate()
-                    spawnWorker(useWhitelist, BATCH_SIZE)
-                    predicting = false;
-                }
-                if (args.sendLabels) {
-                    UI.postMessage({event: 'prediction-done', labels: AUDACITY, batchInProgress: false});
-                }
+                onAbort(args);
                 break;
             default:
                 UI.postMessage('Worker communication lines open')
@@ -94,11 +94,27 @@ ipcRenderer.on('new-client', (event) => {
     }
 })
 
+function onAbort(args) {
+    aborted = true;
+    FILE_QUEUE = [];
+    index = 0;
+    console.log("abort received")
+    if (predicting) {
+        //restart the worker
+        UI.postMessage({event: 'spawning'});
+        predictWorker.terminate()
+        spawnWorker(useWhitelist, BATCH_SIZE)
+        predicting = false;
+    }
+    if (args.sendLabels) {
+        UI.postMessage({event: 'prediction-done', labels: AUDACITY, batchInProgress: false});
+    }
+}
 
-function getDuration(src) {
+const getDuration = (src) => {
     return new Promise(function (resolve) {
         const audio = new Audio();
-        audio.addEventListener("loadedmetadata", function (e) {
+        audio.addEventListener("loadedmetadata", function () {
             resolve(audio.duration);
         });
         audio.src = src;
@@ -118,67 +134,89 @@ function getDuration(src) {
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
 
 async function loadAudioFile(args) {
-    workingFilePath = args.filePath;
-    // reset source
-    sourceMetadata = {}
-    //open a handle
-    //const fd = await fs.promises.open(workingFilePath, 'r');
-    readStream = fs.createReadStream(workingFilePath);
-    sourceMetadata.duration = await getDuration(workingFilePath);
-    fs.stat(workingFilePath, (error, stats) => {
-        if (error) console.log("Stat error: ", error)
-        else {
-            sourceMetadata.stat = stats;
-            fileStart = new Date(sourceMetadata.stat.mtime - (sourceMetadata.duration * 1000));
-        }
-    });
-    readStream.on('data', async chunk => {
-        let wav = new wavefileReader.WaveFileReader();
-        wav.fromBuffer(chunk);
-        // Extract Header
-        let headerEnd;
-        wav.signature.subChunks.forEach(el => {
-            if (el['chunkId'] === 'data') {
-                headerEnd = el.chunkData.start - 1;
-            }
-        })
-
-        // Update relevant file properties
-        sourceMetadata.head = wav.head + 1;
-        sourceMetadata.header = chunk.slice(0, headerEnd);
-        sourceMetadata.bytesPerSec = wav.fmt.byteRate;
-        sourceMetadata.numChannels = wav.fmt.numChannels;
-        sourceMetadata.sampleRate = wav.fmt.sampleRate;
-        sourceMetadata.bitsPerSample = wav.fmt.bitsPerSample
-        readStream.close()
-        await fetchAudioStream({file: workingFilePath, start: 0, end: 20})
+    const file = args.filePath;
+    if (!metadata[file]) {
+        metadata[file] = await getMetadata(file)
+    }
+    const buffer = await fetchAudioBuffer({file: file, start: 0, end: 20, position: 0})
+    const length = buffer.length;
+    const myArray = buffer.getChannelData(0);
+    UI.postMessage({
+        event: 'worker-loaded-audio',
+        fileStart: fileStart,
+        sourceDuration: metadata[file].duration,
+        sourceOffset: 0,
+        file: file,
+        position: 0,
+        length: length,
+        contents: myArray,
     })
 }
 
-async function fetchAudioStream(args) {
-    // Ensure max and min are within range
-    args.start = Math.max(0, args.start);
-    args.end = Math.min(sourceMetadata.duration, args.end);
-    let bytesPerSample = sourceMetadata.bitsPerSample / 8;
-    // Ensure we have a range with valid samples 16bit = 2 bytes, 24bit = 3 bytes
-    let byteStart = Math.round(args.start / bytesPerSample) * bytesPerSample * sourceMetadata.bytesPerSec;
-    let byteEnd = Math.round(args.end / bytesPerSample) * bytesPerSample * sourceMetadata.bytesPerSec;
-    //clear the header
-    byteStart += sourceMetadata.head;
-    byteEnd += sourceMetadata.head;
 
+const getMetadata = async (file) => {
+    metadata[file] = {};
+    metadata[file].duration = await getDuration(file);
+    return new Promise((resolve) => {
+        const readStream = fs.createReadStream(file);
+        fs.stat(file, (error, stats) => {
+            if (error) console.log("Stat error: ", error)
+            else {
+                metadata[file].stat = stats;
+                fileStart = new Date(metadata[file].stat.mtime - (metadata[file].duration * 1000));
+            }
+        });
+        readStream.on('data', async chunk => {
+            let wav = new wavefileReader.WaveFileReader();
+            wav.fromBuffer(chunk);
+            // Extract Header
+            let headerEnd;
+            wav.signature.subChunks.forEach(el => {
+                if (el['chunkId'] === 'data') {
+                    headerEnd = el.chunkData.start;
+                }
+            })
+            // Update relevant file properties
+            metadata[file].head = headerEnd;
+            metadata[file].header = chunk.slice(0, headerEnd);
+            metadata[file].bytesPerSec = wav.fmt.byteRate;
+            metadata[file].numChannels = wav.fmt.numChannels;
+            metadata[file].sampleRate = wav.fmt.sampleRate;
+            metadata[file].bitsPerSample = wav.fmt.bitsPerSample
+            metadata[file].fileStart = fileStart;
+            readStream.close()
+            resolve(metadata[file]);
+        })
+    })
+}
+
+async function getPredictBuffers(args) {
+    let start = args.start, end = args.end;
+    const file = args.file
+    // Ensure max and min are within range
+    start = Math.max(0, start);
+    // Handle no end supplied
+    end = Math.min(metadata[file].duration, end);
+    let bytesPerSample = metadata[file].bitsPerSample / 8;
+    // Ensure we have a range with valid samples 16bit = 2 bytes, 24bit = 3 bytes
+    let byteStart = Math.round(start / bytesPerSample) * bytesPerSample * metadata[file].bytesPerSec;
+    let byteEnd = Math.round(end / bytesPerSample) * bytesPerSample * metadata[file].bytesPerSec;
+    //clear the header
+    byteStart += metadata[file].head;
+    byteEnd += metadata[file].head;
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
-    const highWaterMark = args.predicting ? sourceMetadata.bytesPerSec * BATCH_SIZE * 3 : byteEnd - byteStart + 1;
-    const readStream = fs.createReadStream(workingFilePath, {
+    const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * 3;
+    const readStream = fs.createReadStream(file, {
         start: byteStart,
         end: byteEnd,
         highWaterMark: highWaterMark
     });
-    chunkStart = args.start * sampleRate;
+    chunkStart = start * sampleRate;
+    const fileDuration = end - start;
     await readStream.on('data', async chunk => {
         // Ensure data is processed in order
         readStream.pause();
-        chunk = Buffer.concat([sourceMetadata.header, chunk]);
+        chunk = Buffer.concat([metadata[file].header, chunk]);
         const audioBufferChunk = await audioCtx.decodeAudioData(chunk.buffer);
         const source = audioCtx.createBufferSource();
         source.buffer = audioBufferChunk;
@@ -190,37 +228,13 @@ async function fetchAudioStream(args) {
         offlineSource.connect(offlineCtx.destination);
         offlineSource.start();
         offlineCtx.startRendering().then(resampled => {
-            // `resampled` contains an AudioBuffer resampled at 24000Hz.
-            // use resampled.getChannelData(x) to get an Float32Array for channel x.
-            const length = resampled.length;
             const myArray = resampled.getChannelData(0);
-            // Are we predicting
-            if (args.predicting) {
-                feedChunksToModel(myArray, args.increment, chunkStart);
-                chunkStart += 3 * BATCH_SIZE * sampleRate;
-                // Now the async stuff is done ==>
-                readStream.resume();
-            } else if (args.post) {
-                uploadMp3(resampled, args.filepath, args.metadata, args.mode)
-            } else {
-                UI.postMessage({
-                    event: 'worker-loaded-audio',
-                    fileStart: fileStart,
-                    sourceDuration: sourceMetadata.duration,
-                    sourceOffset: args.start,
-                    message: workingFilePath,
-                    position: args.position,
-                    length: length,
-                    contents: myArray,
-                    play: args.play,
-                    region: args.region,
-                    preserveResults: args.preserveResults
-                })
-                currentBuffer = resampled;
-                readStream.close()
-            }
-
-
+            const samples = (end - start) * sampleRate;
+            const increment = samples < chunkLength ? samples : chunkLength;
+            feedChunksToModel(myArray, increment, chunkStart, file, fileDuration);
+            chunkStart += 3 * BATCH_SIZE * sampleRate;
+            // Now the async stuff is done ==>
+            readStream.resume();
         })
     })
     readStream.on('end', function () {
@@ -229,23 +243,75 @@ async function fetchAudioStream(args) {
 }
 
 
-async function sendMessageToWorker(chunkStart, chunks) {
+const fetchAudioBuffer = (args) => {
+    return new Promise((resolve) => {
+        let start = args.start, end = args.end, file = args.file
+        // Ensure max and min are within range
+        start = Math.max(0, start);
+        // Handle no end supplied
+        end = Math.min(metadata[file].duration, end);
+        let bytesPerSample = metadata[file].bitsPerSample / 8;
+        // Ensure we have a range with valid samples 16bit = 2 bytes, 24bit = 3 bytes
+        let byteStart = Math.round(start * bytesPerSample) / bytesPerSample * metadata[file].bytesPerSec;
+        let byteEnd = Math.round(end * bytesPerSample) / bytesPerSample * metadata[file].bytesPerSec;
+        //clear the header
+        byteStart += metadata[file].head;
+        byteEnd += metadata[file].head;
+        //if (isNaN(byteEnd)) byteEnd = Infinity;
+        // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
+        const highWaterMark = byteEnd - byteStart + 1;
+        const readStream = fs.createReadStream(file, {
+            start: byteStart,
+            end: byteEnd,
+            highWaterMark: highWaterMark
+        });
+        readStream.on('data', async chunk => {
+            // Ensure data is processed in order
+            readStream.pause();
+            chunk = Buffer.concat([metadata[file].header, chunk]);
+            const audioBufferChunk = await audioCtx.decodeAudioData(chunk.buffer);
+            const source = audioCtx.createBufferSource();
+            source.buffer = audioBufferChunk;
+            const duration = source.buffer.duration;
+            const buffer = source.buffer;
+            const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
+            const offlineSource = offlineCtx.createBufferSource();
+            offlineSource.buffer = buffer;
+            offlineSource.connect(offlineCtx.destination);
+            offlineSource.start();
+            offlineCtx.startRendering().then(resampled => {
+                // `resampled` contains an AudioBuffer resampled at 24000Hz.
+                // use resampled.getChannelData(x) to get an Float32Array for channel x.
+                //readStream.close();
+                readStream.resume();
+                resolve(resampled);
+            })
+        })
+        readStream.on('end', function () {
+            readStream.close()
+        })
+    });
+}
+
+async function sendMessageToWorker(chunkStart, chunks, file, duration) {
     const objData = {
         message: 'predict',
         chunkStart: chunkStart,
         numberOfChunks: chunks.length,
         fileStart: fileStart,
+        file: file,
+        duration: duration
     }
     let chunkBuffers = [];
     for (let i = 0; i < chunks.length; i++) {
         objData['chunk' + i] = chunks[i];
         chunkBuffers.push(objData['chunk' + i].buffer)
     }
-    predictWorker.postMessage('resume');
     predictWorker.postMessage(objData, chunkBuffers);
 }
 
-async function doPrediction(start, end) {
+async function doPrediction(args) {
+    const start = args.start, end = args.end, file = args.file;
     aborted = false;
     predictionDone = false;
     predictionStart = new Date();
@@ -255,24 +321,23 @@ async function doPrediction(start, end) {
         RESULTS = [];
     }
     predicting = true;
-    const samples = (end - start) * sampleRate
-    const increment = samples < chunkLength ? samples : chunkLength;
-    await fetchAudioStream({file: workingFilePath, start: start, end: end, predicting: true, increment: increment})
+    await getPredictBuffers({file: file, start: start, end: end});
+    UI.postMessage({event: 'update-audio-duration', value: metadata[file].duration});
 }
 
-async function feedChunksToModel(channelData, increment) {
+async function feedChunksToModel(channelData, increment, chunkStart, file, duration) {
     let chunks = [];
     for (let i = 0; i < channelData.length; i += increment) {
         let chunk = channelData.slice(i, i + increment);
         // Batch predictions
         chunks.push(chunk);
         if (chunks.length === BATCH_SIZE) {
-            await sendMessageToWorker(chunkStart, chunks);
+            await sendMessageToWorker(chunkStart, chunks, file, duration);
             chunks = [];
         }
     }
     //clear up remainder less than BATCH_SIZE
-    if (chunks.length > 0) await sendMessageToWorker(chunkStart, chunks);
+    if (chunks.length > 0) await sendMessageToWorker(chunkStart, chunks, file, duration);
 }
 
 
@@ -385,7 +450,7 @@ function bufferToMp3(metadata, channels, sampleRate, left, right = null) {
     var remaining = left.length;
     var samplesPerFrame = 1152;
     if (metadata) {
-        const ID3content = JSON.stringify(metadata)
+        //const ID3content = JSON.stringify(metadata)
         // Add metadata
         const writer = new ID3Writer(Buffer.alloc(0));
         writer.setFrame('TPE1', [metadata['cname']])  // Artist Name
@@ -426,14 +491,14 @@ function bufferToMp3(metadata, channels, sampleRate, left, right = null) {
         buffer.push(writer.arrayBuffer)
     }
     for (let i = 0; remaining >= samplesPerFrame; i += samplesPerFrame) {
-
+        let mp3buf
         if (!right) {
             var mono = left.subarray(i, i + samplesPerFrame);
-            var mp3buf = mp3enc.encodeBuffer(mono);
+            mp3buf = mp3enc.encodeBuffer(mono);
         } else {
             var leftChunk = left.subarray(i, i + samplesPerFrame);
             var rightChunk = right.subarray(i, i + samplesPerFrame);
-            var mp3buf = mp3enc.encodeBuffer(leftChunk, rightChunk);
+            mp3buf = mp3enc.encodeBuffer(leftChunk, rightChunk);
         }
         if (mp3buf.length > 0) {
             buffer.push(mp3buf);//new Int8Array(mp3buf));
@@ -448,21 +513,16 @@ function bufferToMp3(metadata, channels, sampleRate, left, right = null) {
 
 }
 
-async function saveMP3(start, end, filepath, metadata) {
-    downloadMp3(currentBuffer, filepath, metadata)
+async function saveMP3(file, start, end, filename, metadata) {
+    const buffer = await fetchAudioBuffer({file: file, start: start, end: end})
+    downloadMp3(buffer, filename, metadata)
 }
 
 
 async function postMP3(start, end, filepath, metadata, mode) {
-    await fetchAudioStream({
-        file: workingFilePath,
-        start: start,
-        end: end,
-        post: true,
-        filepath: filepath,
-        metadata: metadata,
-        mode: mode
-    });
+    const file = args.file;
+    const buffer = await fetchAudioBuffer({start: start, end: end});
+    uploadMp3(buffer, file, metadata[file], mode)
 }
 
 
@@ -478,6 +538,7 @@ function spawnWorker(useWhitelist, batchSize) {
 
 async function parsePredictions(e) {
     const response = e.data;
+    const file = response.file;
     if (response['message'] === 'model-ready') {
         chunkLength = response['chunkLength'];
         sampleRate = response['sampleRate'];
@@ -485,7 +546,7 @@ async function parsePredictions(e) {
         console.log(backend);
         UI.postMessage({event: 'model-ready', message: 'ready', backend: backend})
     } else if (response['message'] === 'prediction' && !aborted) {
-        readStream.resume();
+
         //t1 = performance.now();
         //console.log(`post from worker took: ${t1 - response['time']} milliseconds`)
         //console.log(`post to receive took: ${t1 - t0} milliseconds`)
@@ -493,40 +554,49 @@ async function parsePredictions(e) {
             const position = parseFloat(prediction[0]);
             const result = prediction[1];
             const audacity = prediction[2];
-            UI.postMessage({event: 'progress', progress: (position / sourceMetadata.duration)});
+            UI.postMessage({event: 'progress', progress: (position / metadata[file].duration)});
             //console.log('Prediction received from worker', result);
             if (result.score > minConfidence) {
                 index++;
                 UI.postMessage({
                     event: 'prediction-ongoing',
+                    file: file,
                     result: result,
                     index: index,
                     selection: selection,
-                    file: workingFilePath
                 });
                 AUDACITY.push(audacity);
                 RESULTS.push(result);
             }
-            //console.log(`Position is ${position}, end is ${lastKey}`)
-            const theEnd = selection ? currentBuffer.duration : sourceMetadata.duration;
-            if (position.toFixed(0) >= (theEnd.toFixed(0) - 3)) {
+            if (position.toFixed(0) >= (response.endpoint.toFixed(0) - 4)) {
                 console.log('Prediction done');
                 console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
                 if (RESULTS.length === 0) {
                     const result = "No detections found.";
-                    UI.postMessage({event: 'prediction-ongoing', result: result, index: 1, selection: selection});
+                    UI.postMessage({
+                        event: 'prediction-ongoing',
+                        file: file,
+                        result: result,
+                        index: 1,
+                        selection: selection
+                    });
                 }
                 UI.postMessage({event: 'progress', progress: 1});
-                UI.postMessage({event: 'prediction-done', labels: AUDACITY, batchInProgress: FILE_QUEUE.length});
+                UI.postMessage({
+                    event: 'prediction-done',
+                    labels: AUDACITY,
+                    batchInProgress: FILE_QUEUE.length,
+                    duration: metadata[file].duration
+                });
                 predictionDone = true;
             }
         })
     }
     if (predictionDone) {
         if (FILE_QUEUE.length) {
-            sourceMetadata = {};
-            await loadAudioFile({filePath: FILE_QUEUE.shift()});
-            setTimeout(doPrediction, 250, 0, sourceMetadata.duration);
+            const file = FILE_QUEUE.shift()
+            const metadata = await getMetadata(file);
+            await doPrediction({start: 0, end: metadata.duration, file: file});
         } else {
             predicting = false;
         }

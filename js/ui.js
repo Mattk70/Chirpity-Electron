@@ -66,6 +66,7 @@ window.electron.getVersion()
     });
 
 let modelReady = false, fileLoaded = false, currentFile, resultHistory = {};
+let PREDICTING = false;
 let region, AUDACITY_LABELS = [], wavesurfer;
 let summary = {};
 summary['suppressed'] = [];
@@ -84,7 +85,8 @@ const summaryTable = $('#summaryModalBody');
 const feedbackTable = $('#feedbackModalBody');
 let progressDiv = $('#progressDiv');
 let progressBar = $('.progress .progress-bar');
-
+const fileNumber = document.getElementById('fileNumber');
+let batchFileCount = 1, batchInProgress = false;
 let activeRow;
 let predictions = {}, correctedSpecies, speciesListItems, clickedNode,
     clickedIndex, speciesName, speciesFilter, speciesHide, speciesExclude, subRows, scrolled, currentFileDuration;
@@ -157,12 +159,16 @@ function resetResults() {
     predictions = {};
     seenTheDarkness = false;
     shownDaylightBanner = false;
+    progressDiv.hide();
+    progressBar.width(0 + '%');
+    progressBar.attr('aria-valuenow', 0);
+    progressBar.html(0 + '%');
 }
 
 async function loadAudioFile(args) {
-    let filePath = args.filePath, originalFileEnd = args.originalFileEnd, preserveResults = args.preserveResults;
-    workerHasLoadedFile = false;
-    if (!preserveResults) resetResults();
+    let filePath = args.filePath, originalFileEnd = args.originalFileEnd,
+        workerHasLoadedFile = false;
+
     // Hide load hint and show spinnner
     // if (wavesurfer) {
     //     wavesurfer.destroy();
@@ -171,7 +177,7 @@ async function loadAudioFile(args) {
     // set file creation time
     try {
         fileEnd = fs.statSync(filePath).mtime;
-        worker.postMessage({action: 'file-load-request', filePath: filePath});
+        worker.postMessage({action: 'file-load-request', filePath: filePath, position: 0});
     } catch (e) {
         const supported_files = ['.mp3', '.wav', '.mpga', '.ogg', '.flac', '.aac', '.mpeg', '.mp4'];
         const dir = p.parse(filePath).dir;
@@ -191,7 +197,12 @@ async function loadAudioFile(args) {
         } else {
             if (file) filePath = file;
             if (originalFileEnd) fileEnd = originalFileEnd;
-            worker.postMessage({action: 'file-load-request', filePath: filePath, preserveResults: preserveResults});
+            worker.postMessage({
+                action: 'file-load-request',
+                filePath: filePath,
+                preserveResults: preserveResults,
+                position: 0
+            });
         }
     }
 }
@@ -202,13 +213,14 @@ $(document).on("click", ".openFiles", async function (e) {
     const openFiles = $('.openFiles');
     openFiles.removeClass('visible');
     if (openFiles.length > 1) this.firstChild.innerHTML = "library_music"
-    await loadAudioFile({filePath: e.target.id, preserveResults: true})
+    if (!PREDICTING) await loadAudioFile({filePath: e.target.id, preserveResults: true})
     e.stopImmediatePropagation()
 });
 
 $(document).on("click", ".revealFiles", function (e) {
     this.classList.remove('revealFiles')
     this.classList.add('openFiles')
+
     this.firstChild.innerHTML = "audio_file"
     const openFiles = $('.openFiles');
     openFiles.addClass('visible');
@@ -331,13 +343,12 @@ function initWavesurfer(args) {
             bufferBegin += windowLength;
             worker.postMessage({
                 action: 'update-buffer',
-                filePath: currentFile,
+                file: currentFile,
                 position: 0,
                 start: bufferBegin,
                 end: bufferBegin + windowLength,
                 play: true
             });
-            //loadBufferSegment(currentBuffer, bufferBegin);
             wavesurfer.play()
         }
     })
@@ -361,21 +372,24 @@ function updateElementCache() {
 }
 
 function zoomSpec(direction) {
-    let position = wavesurfer.getCurrentTime();
+    let offsetSeconds = wavesurfer.getCurrentTime()
+    let position = offsetSeconds / windowLength;
+    let timeNow = bufferBegin + offsetSeconds;
     if (direction === 'in') {
-        if (windowLength < 1.5) return
-        windowLength /= 2
+        if (windowLength < 1.5) return;
+        windowLength /= 2;
+        bufferBegin = bufferBegin + (windowLength * position);
     } else {
         if (windowLength > 100) return
-        windowLength *= 2;
+        windowLength = Math.min(currentFileDuration, windowLength * 2);
+        bufferBegin = Math.max(bufferBegin - windowLength, 0);
+        // Keep playhead at same time in file
+        position = (timeNow - bufferBegin) / windowLength;
     }
-    // Center zoom on playhead
-    bufferBegin = Math.max(0, (bufferBegin + position) - windowLength / 2)
-    direction === 'in' ? position /= 2 : position *= 2;
-    console.log("waqve time:", bufferBegin, position)
+
     worker.postMessage({
         action: 'update-buffer',
-        filePath: currentFile,
+        file: currentFile,
         position: position,
         start: bufferBegin,
         end: bufferBegin + windowLength
@@ -395,9 +409,11 @@ async function showOpenDialog() {
 }
 
 async function onOpenFiles(args) {
-    // Store the file list and Load First audio file
+    resetResults();
     completeDiv.hide();
+    // Store the file list and Load First audio file
     fileList = args.filePaths;
+
     // Sort file by time created (the oldest first):
     if (fileList.length > 1) {
         if (modelReady) analyzeAllLink.classList.remove('disabled');
@@ -414,7 +430,7 @@ async function onOpenFiles(args) {
     let filenameElement = document.getElementById('filename');
     filenameElement.innerHTML = '';
 
-    let appendstr = '<div id="fileContainer" class="d-inline-block  bg-dark text-nowrap pe-3">';
+    let appendstr = '<div id="fileContainer" class="d-inline-block position-absolute overflow-auto bg-dark text-nowrap pe-3">';
     fileList.forEach(item => {
         if (count === 0) {
             if (fileList.length > 1) {
@@ -430,7 +446,6 @@ async function onOpenFiles(args) {
         count += 1;
     })
     filenameElement.innerHTML += appendstr + '</div>';
-
     await loadAudioFile({filePath: fileList[0]});
     currentFile = fileList[0];
 
@@ -469,11 +484,15 @@ async function showSaveDialog() {
 
 // Worker listeners
 function analyseReset() {
+    PREDICTING = true;
+    delete diagnostics['Audio Duration'];
+    AUDACITY_LABELS = [];
     // hide exclude x in the table
     speciesExclude.forEach(el => {
         el.classList.add('d-none');
     })
     completeDiv.hide();
+    progressDiv.show();
     // Diagnostics
     t0_analysis = Date.now();
 }
@@ -482,26 +501,26 @@ function analyseReset() {
 const analyzeLink = document.getElementById('analyze');
 speciesExclude = document.querySelectorAll('speciesExclude');
 analyzeLink.addEventListener('click', async () => {
-    AUDACITY_LABELS = [];
     analyseReset();
-    progressDiv.show();
     resetResults();
     worker.postMessage({action: 'analyze', confidence: config.minConfidence, filePath: currentFile});
 });
 
 const analyzeAllLink = document.getElementById('analyzeAll');
 analyzeAllLink.addEventListener('click', async () => {
-    AUDACITY_LABELS = [];
     analyseReset();
+    resetResults();
     fileList.forEach(file => {
         worker.postMessage({action: 'analyze', confidence: config.minConfidence, filePath: file});
     })
-    progressDiv.show();
+    batchFileCount = 1;
+    batchInProgress = true;
+    fileNumber.innerText = `(File 1 of ${fileList.length})`;
 });
 
 const analyzeSelectionLink = document.getElementById('analyzeSelection');
-
 analyzeSelectionLink.addEventListener('click', async () => {
+        delete diagnostics['Audio Duration'];
     analyseReset();
     progressDiv.show();
     const start = region.start + bufferBegin;
@@ -597,14 +616,16 @@ function loadResultRegion(paramlist) {
     // Need to find and centre a view of the detection in the spectrogram
     // 3 second detections
     let [file, start, end, label] = paramlist;
+    // Let the UI know what file's being loaded
+    currentFile = file;
     start = parseFloat(start);
     end = parseFloat(end);
     bufferBegin = Math.max(0, start - (windowLength / 2) + 1.5)
-    //loadBufferSegment(currentBuffer, bufferBegin)
+
     worker.postMessage({
         action: 'update-buffer',
         file: file,
-        position: 0,
+        position: wavesurfer.getCurrentTime() / windowLength,
         start: bufferBegin,
         end: bufferBegin + windowLength,
         region: {start: start - bufferBegin, end: end - bufferBegin, label: label}
@@ -992,7 +1013,12 @@ window.onload = async () => {
                 case 'prediction-ongoing':
                     renderResult(args);
                     break;
-                case 're-spawning':
+                case 'update-audio-duration':
+                    diagnostics['Audio Duration'] ?
+                        diagnostics['Audio Duration'] += args.value :
+                        diagnostics['Audio Duration'] = args.value;
+                    break;
+                case 'spawning':
                     warmUp();
                     break;
                 case 'worker-loaded-audio':
@@ -1283,6 +1309,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             worker.postMessage({
                 action: 'update-buffer',
                 position: 0,
+                file: currentFile,
                 start: 0,
                 end: windowLength
             });
@@ -1296,11 +1323,11 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             bufferBegin = currentFileDuration - windowLength;
             worker.postMessage({
                 action: 'update-buffer',
+                file: currentFile,
                 position: 1,
                 start: bufferBegin,
                 end: currentFileDuration
             });
-            //loadBufferSegment(currentBuffer, currentBuffer.duration - windowLength)
             wavesurfer.seekAndCenter(1);
             wavesurfer.pause()
         }
@@ -1310,17 +1337,13 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         if (wavesurfer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
             bufferBegin = Math.max(0, bufferBegin - windowLength);
-
-            // Set new date for timeline
-            // const playhead = bufferBegin + wavesurfe=r.getCurrentTime()
-            //loadBufferSegment(currentBuffer, bufferBegin)
             worker.postMessage({
                 action: 'update-buffer',
+                file: currentFile,
                 position: position,
                 start: bufferBegin,
                 end: bufferBegin + windowLength
             });
-            //playhead <= 0 ? wavesurfer.seekAndCenter(0) : wavesurfer.seekAndCenter(position);
             wavesurfer.pause()
         }
     }
@@ -1329,16 +1352,13 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         if (wavesurfer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
             bufferBegin = Math.min(bufferBegin + windowLength, currentFileDuration - windowLength);
-            // Set new date for timeline
-            //const playhead = bufferBegin + wavesurfer.getCurrentTime()
-            //loadBufferSegment(currentBuffer, bufferBegin)
             worker.postMessage({
                 action: 'update-buffer',
+                file: currentFile,
                 position: position,
                 start: bufferBegin,
                 end: bufferBegin + windowLength
             });
-            //playhead >= currentBuffer.duration ? wavesurfer.seekAndCenter(1) : wavesurfer.seekAndCenter(position);
             wavesurfer.pause()
         }
     }
@@ -1346,16 +1366,16 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     ArrowLeft: function () {
         if (wavesurfer) {
             wavesurfer.skipBackward(0.1);
-            const position = wavesurfer.getCurrentTime();
-            if (position < 0.1 && bufferBegin > 0) {
-                bufferBegin -= 0.1;
+            const position = wavesurfer.getCurrentTime() / windowLength;
+            if (wavesurfer.getCurrentTime() < 0.1 && bufferBegin > 0) {
+                bufferBegin -= 0.5;
                 worker.postMessage({
                     action: 'update-buffer',
+                    file: currentFile,
                     position: position,
                     start: bufferBegin,
                     end: bufferBegin + windowLength
                 });
-                wavesurfer.seekAndCenter(0);
                 wavesurfer.pause()
             }
         }
@@ -1364,17 +1384,16 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     ArrowRight: function () {
         if (wavesurfer) {
             wavesurfer.skipForward(0.1);
-            const position = wavesurfer.getCurrentTime();
-            if (position > windowLength - 0.1) {
-                bufferBegin = Math.min(currentFileDuration - windowLength, bufferBegin += 0.1)
+            const position = wavesurfer.getCurrentTime() / windowLength;
+            if (wavesurfer.getCurrentTime() > windowLength - 0.1) {
+                bufferBegin = Math.min(currentFileDuration - windowLength, bufferBegin += 0.5)
                 worker.postMessage({
                     action: 'update-buffer',
-                    filePath: currentFile,
+                    file: currentFile,
                     position: position,
                     start: bufferBegin,
                     end: bufferBegin + windowLength
                 });
-                wavesurfer.seekAndCenter(1);
                 wavesurfer.pause()
             }
         }
@@ -1437,7 +1456,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
 const warmupText = document.getElementById('warmup');
 
 function warmUp() {
-    disableMenuItem(['analyzeLink', 'analyzeAllLink', 'analyseSelectionLink']);
+    disableMenuItem(['analyze', 'analyzeAll', 'analyseSelection']);
     warmupText.classList.remove('d-none');
 }
 
@@ -1473,10 +1492,11 @@ function onModelReady(args) {
 
 function onWorkerLoadedAudio(args) {
     if (args.preserveResults) completeDiv.hide();
-    console.log('UI received worker-loaded-audio: ' + args.message)
+    console.log('UI received worker-loaded-audio: ' + args.file)
     currentBuffer = new AudioBuffer({length: args.length, numberOfChannels: 1, sampleRate: 24000});
     currentBuffer.copyToChannel(args.contents, 0);
     windowLength = currentBuffer.duration;
+
     workerHasLoadedFile = true;
     currentFileDuration = args.sourceDuration;
     fileStart = args.fileStart;
@@ -1485,11 +1505,8 @@ function onWorkerLoadedAudio(args) {
     } else {
         bufferStartTime = new Date(zero.getTime() + (bufferBegin * 1000))
     }
-    // Diagnostics
-    diagnostics['Audio Duration'] = currentFileDuration.toFixed(2) + ' seconds';
+
     if (currentFileDuration < 20) windowLength = currentFileDuration;
-
-
     let astro = SunCalc.getTimes(fileStart, config.latitude, config.longitude);
     dusk = astro.dusk;
     dawn = astro.dawn;
@@ -1509,6 +1526,7 @@ function onWorkerLoadedAudio(args) {
     } else {
         wavesurfer.clearRegions();
         updateSpec(currentBuffer, args.play)
+        wavesurfer.seekTo(args.position);
         if (args.region) {
             createRegion(args.region.start, args.region.end, args.region.label)
         }
@@ -1516,6 +1534,7 @@ function onWorkerLoadedAudio(args) {
 }
 
 function onProgress(args) {
+    progressDiv.show();
     let progress = (args.progress * 100).toFixed(1);
     progressBar.width(progress + '%');
     progressBar.attr('aria-valuenow', progress);
@@ -1525,7 +1544,13 @@ function onProgress(args) {
 async function onPredictionDone(args) {
     AUDACITY_LABELS.push(args.labels);
     // Defer further processing until batch complete
-    if (args.batchInProgress) return;
+    if (args.batchInProgress) {
+        batchFileCount++;
+        fileNumber.innerText = `(File ${batchFileCount} of ${fileList.length})`;
+        return;
+    } else{
+        PREDICTING = false;
+    }
 
     if (!seenTheDarkness && config.nocmig && !region) {
         alert(`Nocmig mode is enabled, but all timestamps in this file were during daylight hours. Any detections will have been suppressed.\n\nDisable Nocmig mode and re-run the analysis to see them.`)
@@ -1706,7 +1731,7 @@ async function onPredictionDone(args) {
     // Diagnostics:
     t1_analysis = Date.now();
     diagnostics['Analysis Duration'] = ((t1_analysis - t0_analysis) / 1000).toFixed(2) + ' seconds';
-    diagnostics['Analysis Rate'] = (currentFileDuration / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
+    diagnostics['Analysis Rate'] = (diagnostics['Audio Duration'] / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
 }
 
 function matchSpecies(e, mode) {
@@ -2003,7 +2028,7 @@ function sendFile(mode, result) {
     if (mode === 'save') {
         worker.postMessage({
             action: 'save',
-            start: start, end: end, filepath: filename, metadata: metadata
+            start: start, file: currentFile, end: end, filename: filename, metadata: metadata
         })
     } else {
         if (!config.seenThanks) {
@@ -2101,7 +2126,11 @@ nocmigButton.addEventListener('click', function (e) {
 const diagnosticMenu = document.getElementById('diagnostics')
 diagnosticMenu.addEventListener('click', function () {
     let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
-    for (const [key, value] of Object.entries(diagnostics)) {
+    for (let [key, value] of Object.entries(diagnostics)) {
+        if (key === 'Audio Duration') {
+            if (value < 3600){ value = new Date(value * 1000).toISOString().substring(14, 19)}
+            else{value = new Date(value * 1000).toISOString().substring(11, 19)}
+        }
         diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
     }
     diagnosticTable += "</table>";
@@ -2144,7 +2173,6 @@ document.addEventListener('drop', async (event) => {
     event.preventDefault();
     event.stopPropagation();
     let filelist = []
-    console.log(event);
     for (const f of event.dataTransfer.files) {
         // Using the path attribute to get absolute file path
         console.log(f)

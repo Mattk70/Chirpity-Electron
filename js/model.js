@@ -255,7 +255,13 @@ class Model {
 module.exports = Model;
 let myModel;
 onmessage = async function (e) {
-    await runPredictions(e)
+    try {
+        await runPredictions(e)
+    }
+        // If worker was respawned
+    catch (e) {
+        process.stdout.write(".");
+    }
 }
 let suspended = false;
 
@@ -292,13 +298,16 @@ async function runPredictions(e) {
         //const postTime = e.data.t0;
         //console.log(`sending message to model.js took: ${t0 - postTime} milliseconds`)
         await myModel.predictChunk(chunks, fileStart)
-        response['message'] = 'prediction';
-        response['result'] = myModel.result;
-        response['time'] = performance.now();
-
-        response['fileStart'] = fileStart;
-        // add a chunk to the start
-        response['start'] = i + myModel.chunkLength;
+        response = {
+            message:    'prediction',
+            result:     myModel.result,
+            time:       performance.now(),
+            file:       e.data.file,
+            endpoint:   e.data.duration,
+            fileStart:  fileStart,
+            // add a chunk to the start
+            start:      i + myModel.chunkLength,
+        }
         postMessage(response);
         let t1 = performance.now();
         console.log(`receive to post took: ${t1 - t0} milliseconds`)
