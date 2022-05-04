@@ -213,7 +213,9 @@ $(document).on("click", ".openFiles", async function (e) {
     const openFiles = $('.openFiles');
     openFiles.removeClass('visible');
     if (openFiles.length > 1) this.firstChild.innerHTML = "library_music"
-    if (!PREDICTING) await loadAudioFile({filePath: e.target.id, preserveResults: true})
+    if (!PREDICTING) {
+        await loadAudioFile({filePath: e.target.id, preserveResults: true})
+    }
     e.stopImmediatePropagation()
 });
 
@@ -378,15 +380,17 @@ function zoomSpec(direction) {
     if (direction === 'in') {
         if (windowLength < 1.5) return;
         windowLength /= 2;
-        bufferBegin = bufferBegin + (windowLength * position);
+        bufferBegin += windowLength * position;
     } else {
-        if (windowLength > 100) return
+        if (windowLength > 100 || windowLength === currentFileDuration) return
+        bufferBegin -= windowLength*position;
         windowLength = Math.min(currentFileDuration, windowLength * 2);
-        bufferBegin = Math.max(bufferBegin - windowLength, 0);
+
+        if (bufferBegin < 0) bufferBegin = 0 ;
+        else if (bufferBegin + windowLength > currentFileDuration)  bufferBegin = currentFileDuration - windowLength
+    }
         // Keep playhead at same time in file
         position = (timeNow - bufferBegin) / windowLength;
-    }
-
     worker.postMessage({
         action: 'update-buffer',
         file: currentFile,
@@ -503,7 +507,7 @@ speciesExclude = document.querySelectorAll('speciesExclude');
 analyzeLink.addEventListener('click', async () => {
     analyseReset();
     resetResults();
-    worker.postMessage({action: 'analyze', confidence: config.minConfidence, filePath: currentFile});
+    worker.postMessage({action: 'analyze', confidence: config.minConfidence, filePath: currentFile, selection: false});
 });
 
 const analyzeAllLink = document.getElementById('analyzeAll');
@@ -511,7 +515,7 @@ analyzeAllLink.addEventListener('click', async () => {
     analyseReset();
     resetResults();
     fileList.forEach(file => {
-        worker.postMessage({action: 'analyze', confidence: config.minConfidence, filePath: file});
+        worker.postMessage({action: 'analyze', confidence: config.minConfidence, filePath: file,  selection: false});
     })
     batchFileCount = 1;
     batchInProgress = true;
@@ -530,7 +534,7 @@ analyzeSelectionLink.addEventListener('click', async () => {
         end = start + 0.5
     }
     // Add current buffer's beginning offset to region start / end tags
-    worker.postMessage({action: 'analyze', confidence: 0.1, start: start, end: end, filePath: currentFile});
+    worker.postMessage({action: 'analyze', confidence: 0.1, start: start, end: end, filePath: currentFile, selection: true});
     summary = {};
     summary['suppressed'] = []
 });
@@ -1495,9 +1499,9 @@ function onWorkerLoadedAudio(args) {
     console.log('UI received worker-loaded-audio: ' + args.file)
     currentBuffer = new AudioBuffer({length: args.length, numberOfChannels: 1, sampleRate: 24000});
     currentBuffer.copyToChannel(args.contents, 0);
-    windowLength = currentBuffer.duration;
 
     workerHasLoadedFile = true;
+    currentFile = args.file;
     currentFileDuration = args.sourceDuration;
     fileStart = args.fileStart;
     if (config.timeOfDay) {
@@ -1506,7 +1510,7 @@ function onWorkerLoadedAudio(args) {
         bufferStartTime = new Date(zero.getTime() + (bufferBegin * 1000))
     }
 
-    if (currentFileDuration < 20) windowLength = currentFileDuration;
+    if (windowLength > currentFileDuration) windowLength = currentFileDuration;
     let astro = SunCalc.getTimes(fileStart, config.latitude, config.longitude);
     dusk = astro.dusk;
     dawn = astro.dawn;

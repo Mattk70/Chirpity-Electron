@@ -10,12 +10,114 @@ console.log(appPath);
 
 
 let metadata = {};
-let fileStart, chunkStart, chunkLength, minConfidence, index = 0, AUDACITY = [], RESULTS = [], predictionStart;
+let chunkStart, chunkLength, minConfidence, index = 0, AUDACITY = [], RESULTS = [], predictionStart;
 let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
 let predictWorker, predicting = false, predictionDone = false, aborted = false;
 let useWhitelist = true;
 // We might get multiple clients, for instance if there are multiple windows,
 // or if the main window reloads.
+const isDevMode = true;
+
+// Set up the audio context:
+const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
+const myAudio = document.querySelector('audio');
+const audioMediaElement = audioCtx.createMediaElementSource(
+    /** @type {HTMLAudioElement} */ myAudio
+);
+
+const workletString = `
+class PcmAudioWorkletProcessorWorklet extends AudioWorkletProcessor {
+    process(inputs, outputs, parameters) {
+        if (inputs.length === 0) {
+            throw new Error('PcmAudioWorkletProcessorWorklet has no inputs');
+        }
+        const input = inputs[0];
+        if (input.length === 0) {
+            // This input has no channels, so stop processing
+            return false;
+        }
+        const firstChannelSamples = input[0];
+        // Send the input, and transfer ownership of the buffers
+        this.port.postMessage(firstChannelSamples, [firstChannelSamples.buffer]);
+        return true;
+    }
+}
+registerProcessor('pcm-audio-worklet-processor', PcmAudioWorkletProcessorWorklet);
+`;
+const startWorklet = async (args) => {
+    const processorPath = isDevMode ? './js/audio-worklet.js' : `${global.__dirname}/js/audio-worklet.js`;
+    const processorSource = fs.readFileSync(processorPath);
+    const processorBlob = new Blob([workletString], {type: 'text/javascript'});
+    const processorURL = URL.createObjectURL(processorBlob);
+    await audioCtx.audioWorklet.addModule(processorURL);
+    //await audioCtx.audioWorklet.addModule('audio-worklet.js')
+    const converterNode = new AudioWorkletNode(audioCtx, 'pcm-audio-worklet-processor');
+    // connect the processor with the source
+    converterNode.connect(audioCtx.destination)
+    converterNode.port.onmessage = (ev) => prepareForModel(args);
+}
+
+
+/**
+ *
+ * Objects of these types are designed to hold small audio snippets,
+ * typically less than 45 s. For longer sounds, objects implementing
+ * the MediaElementAudioSourceNode are more suitable.
+ * The buffer contains data in the following format:
+ * non-interleaved IEEE754 32-bit linear PCM (LPCM)
+ * with a nominal range between -1 and +1, that is, a 32-bit floating point buffer,
+ * with each sample between -1.0 and 1.0.
+ * @param {ArrayBufferLike|Float32Array} data
+ */
+const convertFloatToAudioBuffer = (data) => {
+    const sampleRate = 24000 | audioCtx.sampleRate
+    const channels = 1;
+    const sampleLength = sampleRate * 3 | data.length; // 1sec = sampleRate * 1
+    const audioBuffer = audioCtx.createBuffer(channels, sampleLength, sampleRate); // Empty Audio
+    audioBuffer.copyToChannel(new Float32Array(data), 0); // depending on your processing this could be already a float32array
+    return audioBuffer;
+}
+const streamDestination = audioCtx.createMediaStreamDestination();
+/**
+ * Note this is a minimum example it plays only the first sound
+ * it uses the main audio context if it would use a
+ * streamDestination = context.createMediaStreamDestination();
+ *
+ * @param {ArrayBufferLike|Float32Array} data
+ * @param {number} start
+ * @param {number} end
+ * @param {number} fileDuration
+ * @param {Path|string} file
+ * @param {Boolean} selection
+ *
+ */
+const prepareForModel = (args) => {
+    let data = args.data, start = args.start, end = args.end, file = args.file, selection = args.selection;
+    const fileDuration = end - start;
+    const audioBufferSourceNode = audioCtx.createBufferSource();
+    const chunkStart = start * sampleRate;
+
+    audioBufferSourceNode.buffer = convertFloatToAudioBuffer(data);
+    audioBufferSourceNode.connect(streamDestination);
+
+    // here you will need a hugh enqueue algo that is out of scope for this answer
+    start = Math.max(audioCtx.currentTime, start);
+    source.start(start);
+    start += buffer.duration;
+    audioBufferSourceNode.start(start);
+    const samples = (end - start) * sampleRate;
+    const increment = samples < chunkLength ? samples : chunkLength;
+    feedChunksToModel(data, increment, chunkStart, file, fileDuration, selection);
+}
+
+async function convertFileToBuffers(args) {
+    myAudio.src = args.file;
+    // Here is your raw arrayBuffer ev.data
+
+
+}
+
+
 let UI;
 let FILE_QUEUE = [];
 ipcRenderer.on('new-client', (event) => {
@@ -44,7 +146,7 @@ ipcRenderer.on('new-client', (event) => {
                 const myArray = buffer.getChannelData(0);
                 UI.postMessage({
                     event: 'worker-loaded-audio',
-                    fileStart: fileStart,
+                    fileStart: metadata[args.file].fileStart,
                     sourceDuration: metadata[args.file].duration,
                     sourceOffset: 0,
                     file: args.file,
@@ -56,14 +158,15 @@ ipcRenderer.on('new-client', (event) => {
 
                 break;
             case 'analyze':
-                console.log(`Worker received message: ${args.confidence}, start: ${args.start}, end: ${args.end},  fstart ${fileStart}`);
+                console.log(`Worker received message: ${args.confidence}, start: ${args.start}, end: ${args.end}`);
                 if (predicting) {
                     FILE_QUEUE.push(args.filePath);
                     console.log(`Adding ${args.filePath} to the queue.`)
                 } else {
+                    index = 0;
                     predicting = true;
                     minConfidence = args.confidence;
-                    selection = false;
+                    let selection = false;
                     let start, end;
                     if (args.start === undefined) {
                         start = null;
@@ -73,8 +176,7 @@ ipcRenderer.on('new-client', (event) => {
                         end = args.end;
                         selection = true;
                     }
-                    //await loadAudioFile(args);
-                    await doPrediction({start: start, end: end, file: args.filePath, selection: selection});
+                    await doPrediction({start: start, end: end, file: args.filePath, selection: args.selection});
                 }
                 break;
             case 'save':
@@ -120,40 +222,34 @@ const getDuration = (src) => {
     });
 }
 
-//
-// function toArrayBuffer(buf) {
-//     const ab = new ArrayBuffer(buf.length);
-//     const view = new Uint8Array(ab);
-//     for (let i = 0; i < buf.length; ++i) {
-//         view[i] = buf[i];
-//     }
-//     return ab;
-// }
-
-const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
-
 async function loadAudioFile(args) {
     const file = args.filePath;
-    if (!metadata[file]) {
-        metadata[file] = await getMetadata(file)
+    if (file.endsWith('.wav')) {
+        if (!metadata[file]) {
+            metadata[file] = await getMetadata(file)
+        }
+
+        const buffer = await fetchAudioBuffer({file: file, start: 0, end: 20, position: 0})
+        const length = buffer.length;
+        const myArray = buffer.getChannelData(0);
+        UI.postMessage({
+            event: 'worker-loaded-audio',
+            fileStart: metadata[file].fileStart,
+            sourceDuration: metadata[file].duration,
+            sourceOffset: 0,
+            file: file,
+            position: 0,
+            length: length,
+            contents: myArray,
+        })
+    } else {
+        await convertFileToBuffers({file: file})
     }
-    const buffer = await fetchAudioBuffer({file: file, start: 0, end: 20, position: 0})
-    const length = buffer.length;
-    const myArray = buffer.getChannelData(0);
-    UI.postMessage({
-        event: 'worker-loaded-audio',
-        fileStart: fileStart,
-        sourceDuration: metadata[file].duration,
-        sourceOffset: 0,
-        file: file,
-        position: 0,
-        length: length,
-        contents: myArray,
-    })
 }
 
 
 const getMetadata = async (file) => {
+    let fileStart;
     metadata[file] = {};
     metadata[file].duration = await getDuration(file);
     return new Promise((resolve) => {
@@ -192,14 +288,18 @@ const getMetadata = async (file) => {
 async function getPredictBuffers(args) {
     let start = args.start, end = args.end, selection = args.selection
     const file = args.file
+    if (!file.endsWith('.wav')) {
+        convertFileToBuffers(args)
+        return
+    }
     // Ensure max and min are within range
     start = Math.max(0, start);
     // Handle no end supplied
     end = Math.min(metadata[file].duration, end);
     let bytesPerSample = metadata[file].bitsPerSample / 8;
     // Ensure we have a range with valid samples 16bit = 2 bytes, 24bit = 3 bytes
-    let byteStart = Math.round(start / bytesPerSample) * bytesPerSample * metadata[file].bytesPerSec;
-    let byteEnd = Math.round(end / bytesPerSample) * bytesPerSample * metadata[file].bytesPerSec;
+    let byteStart = Math.round(start * bytesPerSample) / bytesPerSample * metadata[file].bytesPerSec;
+    let byteEnd = Math.round(end * bytesPerSample) / bytesPerSample * metadata[file].bytesPerSec;
     //clear the header
     byteStart += metadata[file].head;
     byteEnd += metadata[file].head;
@@ -258,7 +358,7 @@ const fetchAudioBuffer = (args) => {
         byteEnd += metadata[file].head;
         //if (isNaN(byteEnd)) byteEnd = Infinity;
         // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
-        const highWaterMark = byteEnd - byteStart + 1;
+        const highWaterMark = byteEnd - byteStart;
         const readStream = fs.createReadStream(file, {
             start: byteStart,
             end: byteEnd,
@@ -297,7 +397,7 @@ async function sendMessageToWorker(chunkStart, chunks, file, duration, selection
         message: 'predict',
         chunkStart: chunkStart,
         numberOfChunks: chunks.length,
-        fileStart: fileStart,
+        fileStart: metadata[file].fileStart,
         file: file,
         duration: duration,
         selection: selection
@@ -520,7 +620,8 @@ async function saveMP3(file, start, end, filename, metadata) {
 
 
 async function postMP3(args) {
-    const file = args.file, defaultName = args.defaultName, start = args.start , end = args.end, metadata = args.metadata, mode = args.mode;
+    const file = args.file, defaultName = args.defaultName, start = args.start, end = args.end,
+        metadata = args.metadata, mode = args.mode;
     const buffer = await fetchAudioBuffer({file: file, start: start, end: end});
     uploadMp3(buffer, defaultName, metadata, mode)
 }
@@ -563,12 +664,13 @@ async function parsePredictions(e) {
                     file: file,
                     result: result,
                     index: index,
-                    selection: selection,
+                    selection: response['selection'],
                 });
                 AUDACITY.push(audacity);
                 RESULTS.push(result);
             }
-            if (position.toFixed(0) >= (response.endpoint.toFixed(0) - 4)) {
+            // 3.5 seconds remove because position is the beginning of a 3-second chunk and the min fragment is 0.5 seconds
+            if (position.toFixed(0) >= (response.endpoint.toFixed(0) - 3.5)) {
                 console.log('Prediction done');
                 console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
                 if (RESULTS.length === 0) {
@@ -578,7 +680,7 @@ async function parsePredictions(e) {
                         file: file,
                         result: result,
                         index: 1,
-                        selection: selection
+                        selection: response['selection']
                     });
                 }
                 UI.postMessage({event: 'progress', progress: 1});
