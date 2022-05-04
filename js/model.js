@@ -301,7 +301,7 @@ async function runPredictions(e) {
         response = {
             message:    'prediction',
             result:     myModel.result,
-            time:       performance.now(),
+            // time:       performance.now(),
             file:       e.data.file,
             endpoint:   e.data.duration,
             fileStart:  fileStart,
