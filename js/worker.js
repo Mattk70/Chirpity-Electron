@@ -26,35 +26,44 @@ const audioMediaElement = audioCtx.createMediaElementSource(
 );
 
 const workletString = `
-class PcmAudioWorkletProcessorWorklet extends AudioWorkletProcessor {
-    process(inputs, outputs, parameters) {
-        if (inputs.length === 0) {
-            throw new Error('PcmAudioWorkletProcessorWorklet has no inputs');
-        }
-        const input = inputs[0];
-        if (input.length === 0) {
-            // This input has no channels, so stop processing
-            return false;
-        }
-        const firstChannelSamples = input[0];
-        // Send the input, and transfer ownership of the buffers
-        this.port.postMessage(firstChannelSamples, [firstChannelSamples.buffer]);
-        return true;
-    }
+class ConverterWorkletProcessor extends AudioWorkletProcessor {
+  constructor (options) {
+    super()
+    console.log(options.numberOfInputs)
+
+  }
+  // @ts-ignore 
+  process(inputs, output, parameters) {
+      /**
+      * @type {Float32Array} length 128 Float32Array(128)
+      * non-interleaved IEEE754 32-bit linear PCM 
+      * with a nominal range between -1 and +1, 
+      * with each sample between -1.0 and 1.0.
+      * the sample rate depends on the audioContext and is variable
+      */
+      const inputChannel = inputs[0][0];  //inputChannel Float32Array(128)
+      this.port.postMessage(inputChannel)  // float32Array sent as byte[512] 
+      return true; // always do this!
+  }
 }
-registerProcessor('pcm-audio-worklet-processor', PcmAudioWorkletProcessorWorklet);
+registerProcessor('pcm-audio-worklet-processor', ConverterWorkletProcessor);
 `;
-const startWorklet = async (args) => {
-    const processorPath = isDevMode ? './js/audio-worklet.js' : `${global.__dirname}/js/audio-worklet.js`;
-    const processorSource = fs.readFileSync(processorPath);
-    const processorBlob = new Blob([workletString], {type: 'text/javascript'});
-    const processorURL = URL.createObjectURL(processorBlob);
+
+const processorBlob = new Blob([workletString], {type: 'text/javascript'});
+const processorURL = URL.createObjectURL(processorBlob);
+
+console.log("Worklet started");
+
+
+const startWorklet = async () => {
     await audioCtx.audioWorklet.addModule(processorURL);
-    //await audioCtx.audioWorklet.addModule('audio-worklet.js')
+    //const processorPath = isDevMode ? './js/audio-worklet.js' : `${global.__dirname}/js/audio-worklet.js`;
+    //const processorSource = fs.readFileSync(processorPath);
     const converterNode = new AudioWorkletNode(audioCtx, 'pcm-audio-worklet-processor');
     // connect the processor with the source
-    converterNode.connect(audioCtx.destination)
-    converterNode.port.onmessage = (ev) => prepareForModel(args);
+    audioMediaElement.connect(converterNode);
+    converterNode.port.onmessage = (ev) => prepareForModel(ev);
+    converterNode.connect(audioCtx.destination);
 }
 
 
@@ -78,26 +87,14 @@ const convertFloatToAudioBuffer = (data) => {
     return audioBuffer;
 }
 const streamDestination = audioCtx.createMediaStreamDestination();
-/**
- * Note this is a minimum example it plays only the first sound
- * it uses the main audio context if it would use a
- * streamDestination = context.createMediaStreamDestination();
- *
- * @param {ArrayBufferLike|Float32Array} data
- * @param {number} start
- * @param {number} end
- * @param {number} fileDuration
- * @param {Path|string} file
- * @param {Boolean} selection
- *
- */
-const prepareForModel = (args) => {
-    let data = args.data, start = args.start, end = args.end, file = args.file, selection = args.selection;
-    const fileDuration = end - start;
-    const audioBufferSourceNode = audioCtx.createBufferSource();
-    const chunkStart = start * sampleRate;
 
-    audioBufferSourceNode.buffer = convertFloatToAudioBuffer(data);
+const prepareForModel = (ev) => {
+    //let start = args.start, end = args.end, file = args.file, selection = args.selection;
+    //const fileDuration = end - start;
+    const audioBufferSourceNode = audioCtx.createBufferSource();
+    // const chunkStart = start * sampleRate;
+
+    audioBufferSourceNode.buffer = convertFloatToAudioBuffer(ev.data);
     audioBufferSourceNode.connect(streamDestination);
 
     // here you will need a hugh enqueue algo that is out of scope for this answer
@@ -112,6 +109,11 @@ const prepareForModel = (args) => {
 
 async function convertFileToBuffers(args) {
     myAudio.src = args.file;
+    let keyExists = args.file in metadata;
+    if (!keyExists) metadata[args.file] = {};
+    metadata[args.file].duration = await getDuration(args.file)
+    startWorklet()
+
     // Here is your raw arrayBuffer ev.data
 
 
@@ -148,7 +150,7 @@ ipcRenderer.on('new-client', (event) => {
                     event: 'worker-loaded-audio',
                     fileStart: metadata[args.file].fileStart,
                     sourceDuration: metadata[args.file].duration,
-                    sourceOffset: 0,
+                    bufferBegin: args.start,
                     file: args.file,
                     position: args.position,
                     length: length,
@@ -236,7 +238,7 @@ async function loadAudioFile(args) {
             event: 'worker-loaded-audio',
             fileStart: metadata[file].fileStart,
             sourceDuration: metadata[file].duration,
-            sourceOffset: 0,
+            bufferBegin: 0,
             file: file,
             position: 0,
             length: length,
@@ -273,7 +275,7 @@ const getMetadata = async (file) => {
             })
             // Update relevant file properties
             metadata[file].head = headerEnd;
-            metadata[file].header = chunk.slice(0, headerEnd);
+            metadata[file].header = chunk.slice(0, headerEnd)
             metadata[file].bytesPerSec = wav.fmt.byteRate;
             metadata[file].numChannels = wav.fmt.numChannels;
             metadata[file].sampleRate = wav.fmt.sampleRate;
@@ -285,24 +287,40 @@ const getMetadata = async (file) => {
     })
 }
 
+function convertTimeToBytes(time, key) {
+    const bytesPerSample = metadata[key].bitsPerSample / 8;
+    // get the nearest sample start - they can be 2,3 or 4 bytes representations. Then add the header offest
+    return (Math.round((time * metadata[key].bytesPerSec) / bytesPerSample) * bytesPerSample) + metadata[key].head;
+}
+
+async function setupCtx(chunk, file) {
+    chunk = Buffer.concat([metadata[file].header, chunk]);
+    const audioBufferChunk = await audioCtx.decodeAudioData(chunk.buffer);
+    const source = audioCtx.createBufferSource();
+    source.buffer = audioBufferChunk;
+    const duration = source.buffer.duration;
+    const buffer = source.buffer;
+    const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
+    const offlineSource = offlineCtx.createBufferSource();
+    offlineSource.buffer = buffer;
+    offlineSource.connect(offlineCtx.destination);
+    offlineSource.start();
+    return offlineCtx;
+}
+
 async function getPredictBuffers(args) {
     let start = args.start, end = args.end, selection = args.selection
     const file = args.file
     if (!file.endsWith('.wav')) {
-        convertFileToBuffers(args)
+        await convertFileToBuffers(args)
         return
     }
     // Ensure max and min are within range
     start = Math.max(0, start);
     // Handle no end supplied
     end = Math.min(metadata[file].duration, end);
-    let bytesPerSample = metadata[file].bitsPerSample / 8;
-    // Ensure we have a range with valid samples 16bit = 2 bytes, 24bit = 3 bytes
-    let byteStart = Math.round(start * bytesPerSample) / bytesPerSample * metadata[file].bytesPerSec;
-    let byteEnd = Math.round(end * bytesPerSample) / bytesPerSample * metadata[file].bytesPerSec;
-    //clear the header
-    byteStart += metadata[file].head;
-    byteEnd += metadata[file].head;
+    const byteStart = convertTimeToBytes(start, file);
+    const byteEnd = convertTimeToBytes(end, file);
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
     const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * 3;
     const readStream = fs.createReadStream(file, {
@@ -315,17 +333,7 @@ async function getPredictBuffers(args) {
     await readStream.on('data', async chunk => {
         // Ensure data is processed in order
         readStream.pause();
-        chunk = Buffer.concat([metadata[file].header, chunk]);
-        const audioBufferChunk = await audioCtx.decodeAudioData(chunk.buffer);
-        const source = audioCtx.createBufferSource();
-        source.buffer = audioBufferChunk;
-        const duration = source.buffer.duration;
-        const buffer = source.buffer;
-        const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
-        const offlineSource = offlineCtx.createBufferSource();
-        offlineSource.buffer = buffer;
-        offlineSource.connect(offlineCtx.destination);
-        offlineSource.start();
+        const offlineCtx = await setupCtx(chunk, file);
         offlineCtx.startRendering().then(resampled => {
             const myArray = resampled.getChannelData(0);
             const samples = (end - start) * sampleRate;
@@ -341,7 +349,6 @@ async function getPredictBuffers(args) {
     })
 }
 
-
 const fetchAudioBuffer = (args) => {
     return new Promise((resolve) => {
         let start = args.start, end = args.end, file = args.file
@@ -349,16 +356,11 @@ const fetchAudioBuffer = (args) => {
         start = Math.max(0, start);
         // Handle no end supplied
         end = Math.min(metadata[file].duration, end);
-        let bytesPerSample = metadata[file].bitsPerSample / 8;
-        // Ensure we have a range with valid samples 16bit = 2 bytes, 24bit = 3 bytes
-        let byteStart = Math.round(start * bytesPerSample) / bytesPerSample * metadata[file].bytesPerSec;
-        let byteEnd = Math.round(end * bytesPerSample) / bytesPerSample * metadata[file].bytesPerSec;
-        //clear the header
-        byteStart += metadata[file].head;
-        byteEnd += metadata[file].head;
+        const byteStart = convertTimeToBytes(start, file);
+        const byteEnd = convertTimeToBytes(end, file);
         //if (isNaN(byteEnd)) byteEnd = Infinity;
         // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
-        const highWaterMark = byteEnd - byteStart;
+        const highWaterMark = byteEnd - byteStart + 1;
         const readStream = fs.createReadStream(file, {
             start: byteStart,
             end: byteEnd,
@@ -367,17 +369,8 @@ const fetchAudioBuffer = (args) => {
         readStream.on('data', async chunk => {
             // Ensure data is processed in order
             readStream.pause();
-            chunk = Buffer.concat([metadata[file].header, chunk]);
-            const audioBufferChunk = await audioCtx.decodeAudioData(chunk.buffer);
-            const source = audioCtx.createBufferSource();
-            source.buffer = audioBufferChunk;
-            const duration = source.buffer.duration;
-            const buffer = source.buffer;
-            const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
-            const offlineSource = offlineCtx.createBufferSource();
-            offlineSource.buffer = buffer;
-            offlineSource.connect(offlineCtx.destination);
-            offlineSource.start();
+            const offlineCtx = await setupCtx(chunk, file);
+
             offlineCtx.startRendering().then(resampled => {
                 // `resampled` contains an AudioBuffer resampled at 24000Hz.
                 // use resampled.getChannelData(x) to get an Float32Array for channel x.
@@ -386,6 +379,7 @@ const fetchAudioBuffer = (args) => {
                 resolve(resampled);
             })
         })
+
         readStream.on('end', function () {
             readStream.close()
         })
