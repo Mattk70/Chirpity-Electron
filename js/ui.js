@@ -7,7 +7,6 @@ let currentPrediction;
 
 
 const fs = window.module.fs;
-const fopen = window.module.fopen;
 const colormap = window.module.colormap;
 const p = window.module.p;
 const SunCalc = window.module.SunCalc;
@@ -71,7 +70,7 @@ let region, AUDACITY_LABELS = [], wavesurfer;
 let summary = {};
 summary['suppressed'] = [];
 let fileList = [], fileStart, bufferStartTime, fileEnd;
-let startPosition;
+
 let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
 // set up some DOM element caches
 let bodyElement = $('body');
@@ -97,9 +96,7 @@ let workerHasLoadedFile = false;
 let config;
 const sampleRate = 24000;
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
-let controller = new AbortController();
-let signal = controller.signal;
-let restore = false;
+
 
 //////// Collect Diagnostics Information ////////
 // Diagnostics keys:
@@ -230,37 +227,6 @@ $(document).on("click", ".revealFiles", function (e) {
 });
 
 
-function loadBufferSegment(buffer, begin, saveRegion) {
-    if (begin < 0) begin = 0;
-    if (begin + windowLength > buffer.duration) {
-        begin = Math.max(0, buffer.duration - windowLength);
-    }
-    bufferBegin = begin;
-    if (config.timeOfDay) {
-        bufferStartTime = new Date(fileStart.getTime() + (bufferBegin * 1000))
-    } else {
-        bufferStartTime = new Date(zero.getTime() + (bufferBegin * 1000))
-    }
-    AudioBufferSlice(buffer, begin, begin + windowLength, function (error, slicedAudioBuffer) {
-        if (error) {
-            console.log(error);
-        } else {
-            if (!wavesurfer) {
-                initSpec({
-                    'audio': slicedAudioBuffer,
-                    'backend': 'WebAudio',
-                    'alpha': 0,
-                });
-            } else {
-                if (!saveRegion) {
-                    wavesurfer.clearRegions();
-                }
-                updateSpec(slicedAudioBuffer)
-            }
-        }
-    })
-}
-
 function updateSpec(buffer, play) {
     updateElementCache();
     wavesurfer.loadDecodedBuffer(buffer);
@@ -383,14 +349,14 @@ function zoomSpec(direction) {
         bufferBegin += windowLength * position;
     } else {
         if (windowLength > 100 || windowLength === currentFileDuration) return
-        bufferBegin -= windowLength*position;
+        bufferBegin -= windowLength * position;
         windowLength = Math.min(currentFileDuration, windowLength * 2);
 
-        if (bufferBegin < 0) bufferBegin = 0 ;
-        else if (bufferBegin + windowLength > currentFileDuration)  bufferBegin = currentFileDuration - windowLength
+        if (bufferBegin < 0) bufferBegin = 0;
+        else if (bufferBegin + windowLength > currentFileDuration) bufferBegin = currentFileDuration - windowLength
     }
-        // Keep playhead at same time in file
-        position = (timeNow - bufferBegin) / windowLength;
+    // Keep playhead at same time in file
+    position = (timeNow - bufferBegin) / windowLength;
     worker.postMessage({
         action: 'update-buffer',
         file: currentFile,
@@ -515,7 +481,7 @@ analyzeAllLink.addEventListener('click', async () => {
     analyseReset();
     resetResults();
     fileList.forEach(file => {
-        worker.postMessage({action: 'analyze', confidence: config.minConfidence, filePath: file,  selection: false});
+        worker.postMessage({action: 'analyze', confidence: config.minConfidence, filePath: file, selection: false});
     })
     batchFileCount = 1;
     batchInProgress = true;
@@ -524,7 +490,7 @@ analyzeAllLink.addEventListener('click', async () => {
 
 const analyzeSelectionLink = document.getElementById('analyzeSelection');
 analyzeSelectionLink.addEventListener('click', async () => {
-        delete diagnostics['Audio Duration'];
+    delete diagnostics['Audio Duration'];
     analyseReset();
     progressDiv.show();
     const start = region.start + bufferBegin;
@@ -534,7 +500,14 @@ analyzeSelectionLink.addEventListener('click', async () => {
         end = start + 0.5
     }
     // Add current buffer's beginning offset to region start / end tags
-    worker.postMessage({action: 'analyze', confidence: 0.1, start: start, end: end, filePath: currentFile, selection: true});
+    worker.postMessage({
+        action: 'analyze',
+        confidence: 0.1,
+        start: start,
+        end: end,
+        filePath: currentFile,
+        selection: true
+    });
     summary = {};
     summary['suppressed'] = []
 });
@@ -852,7 +825,6 @@ let savedPredictions;
 
 async function loadChirp(file) {
     if (file.endsWith('chirp')) {
-        restore = true;
         const data = fs.readFileSync(file);
         await ungzip(data).then(buffer => {
             buffer = new TextDecoder().decode(buffer);
@@ -872,12 +844,6 @@ async function loadChirp(file) {
         fileList = [currentFile];
         await loadAudioFile({filePath: currentFile, originalFileEnd: fileEnd});
     }
-}
-
-function showTheResults() {
-    const resultTableContainer = document.getElementById('resultTableContainer');
-    resultTableContainer.classList.remove('d-none');
-    restore = false;
 }
 
 function saveDetections() {
@@ -1259,8 +1225,15 @@ $(document).on('click', '#timeOfDay', function () {
     })
     $('#timecode .tick').hide();
     $('#timeOfDay .tick').show();
-    startPosition = fileStart;
-    if (fileLoaded) loadBufferSegment(currentBuffer, bufferBegin);
+    if (fileLoaded) {
+        worker.postMessage({
+            action: 'update-buffer',
+            file: currentFile,
+            position: wavesurfer.getCurrentTime() / windowLength,
+            start: bufferBegin,
+            end: bufferBegin + windowLength
+        });
+    }
     updatePrefs();
 })
 $(document).on('click', '#timecode', function () {
@@ -1271,12 +1244,17 @@ $(document).on('click', '#timecode', function () {
     timefields.forEach(time => {
         time.classList.add('d-none');
     })
-
     $('#timeOfDay .tick').hide();
     $('#timecode .tick').show();
-    //start at zero. UTC for DST handling
-    startPosition = zero;
-    if (fileLoaded) loadBufferSegment(currentBuffer, bufferBegin);
+    if (fileLoaded) {
+        worker.postMessage({
+            action: 'update-buffer',
+            file: currentFile,
+            position: wavesurfer.getCurrentTime() / windowLength,
+            start: bufferBegin,
+            end: bufferBegin + windowLength
+        });
+    }
     updatePrefs();
 })
 
@@ -1301,7 +1279,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     },
     Escape: function () {
         console.log('Operation aborted');
-        controller.abort();
+
         worker.postMessage({action: 'abort'});
         alert('Operation cancelled');
 
@@ -1502,6 +1480,7 @@ function onWorkerLoadedAudio(args) {
 
     workerHasLoadedFile = true;
     currentFile = args.file;
+    bufferBegin = args.bufferBegin;
     currentFileDuration = args.sourceDuration;
     fileStart = args.fileStart;
     if (config.timeOfDay) {
@@ -1552,7 +1531,7 @@ async function onPredictionDone(args) {
         batchFileCount++;
         fileNumber.innerText = `(File ${batchFileCount} of ${fileList.length})`;
         return;
-    } else{
+    } else {
         PREDICTING = false;
     }
 
@@ -2132,8 +2111,11 @@ diagnosticMenu.addEventListener('click', function () {
     let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
     for (let [key, value] of Object.entries(diagnostics)) {
         if (key === 'Audio Duration') {
-            if (value < 3600){ value = new Date(value * 1000).toISOString().substring(14, 19)}
-            else{value = new Date(value * 1000).toISOString().substring(11, 19)}
+            if (value < 3600) {
+                value = new Date(value * 1000).toISOString().substring(14, 19)
+            } else {
+                value = new Date(value * 1000).toISOString().substring(11, 19)
+            }
         }
         diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
     }

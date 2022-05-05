@@ -80,7 +80,7 @@ async function createWorker() {
         width: 1200,
         webPreferences: {
             nodeIntegration: true,
-            nodeIntegrationInWorker: true,
+            nodeIntegrationInWorker: false,
             contextIsolation: false,
             backgroundThrottling: false
         }
