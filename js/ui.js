@@ -80,7 +80,7 @@ gpuInfo().then(function (data) {
         count += 1;
     })
 }).catch(err => {
-    console.log('GPU info missing: ' +  err.message)
+    console.log('GPU info missing: ' + err.message)
 })
 
 
@@ -181,11 +181,11 @@ async function loadAudioFile(filePath, OriginalCtime) {
         if (!ctime) {
             alert("Unable to load source file with any supported file extension: " + filePath)
             return;
-        }
-        else {
+        } else {
             if (file) filePath = file;
             if (OriginalCtime) ctime = OriginalCtime;
-            ipcRenderer.send('file-load-request', {message: filePath});}
+            ipcRenderer.send('file-load-request', {message: filePath});
+        }
     }
 
     hideAll();
@@ -557,7 +557,7 @@ function adjustSpecDims(redraw) {
         $(this).height(Math.min(bodyElement.height() * 0.4, 512))
     })
     if (wavesurfer) {
-
+        initSpectrogram(Math.min(bodyElement.height() * 0.4, 512));
         specElement.css('z-index', 0);
         resultTableElement.height(contentWrapperElement.height()
             - dummyElement.height()
@@ -806,32 +806,32 @@ window.onload = function () {
             const {v4: uuidv4} = require('uuid');
             config.UUID = uuidv4();
             updatePrefs();
-            return
+
+        } else {
+            console.log(data);
+            config = JSON.parse(data)
+
+            // Check for keys
+            if (!('UUID' in config)) {
+                const {v4: uuidv4} = require('uuid');
+                config.UUID = uuidv4();
+            }
+            if (!('latitude' in config)) {
+                config.latitude = 51.9
+            }
+            if (!('longitude' in config)) {
+                config.longitude = -0.4
+            }
+            if (!('nocmig' in config)) {
+                config.nocmig = false;
+            }
+            if (!('useWhitelist' in config)) {
+                config.useWhitelist = true;
+            }
+            updatePrefs()
         }
-        config = JSON.parse(data)
-        //console.log('Successfully loaded UUID: ' + config.UUID)
         t0_warmup = Date.now();
         ipcRenderer.send('load-model', {useWhitelist: config.useWhitelist})
-
-        // Check for keys
-        if (!('UUID' in config)) {
-            const {v4: uuidv4} = require('uuid');
-            config.UUID = uuidv4();
-        }
-        if (!('latitude' in config)) {
-            config.latitude = 51.9
-        }
-        if (!('longitude' in config)) {
-            config.longitude = -0.4
-        }
-        if (!('nocmig' in config)) {
-            config.nocmig = false;
-        }
-        if (!('useWhitelist' in config)) {
-            config.useWhitelist = true;
-        }
-        updatePrefs()
-
         // Set UI option state
         if (!config.useWhitelist) {
             $('#useWhitelist .tick').hide()
@@ -852,6 +852,7 @@ window.onload = function () {
         }
         showElement([config.colormap + 'span'], true)
     })
+
     // Set footer year
     $('#year').text(new Date().getFullYear());
     // Populate feedback modal
@@ -993,12 +994,15 @@ $(document).on('click', '#loadSpectrogram', function () {
     }
 })
 
-function initSpectrogram() {
+function initSpectrogram(height) {
     let fftSamples;
     if (windowLength < 2) {
         fftSamples = 256;
     } else {
         fftSamples = 512;
+    }
+    if (!height) {
+        height = fftSamples / 2
     }
     if (wavesurfer.spectrogram) wavesurfer.destroyPlugin('spectrogram');
     wavesurfer.addPlugin(SpectrogramPlugin.create({
@@ -1010,6 +1014,7 @@ function initSpectrogram() {
         normalize: true,
         hideScrollbar: true,
         labels: true,
+        height: height,
         fftSamples: fftSamples,
         colorMap: colormap({
             colormap: config.colormap, nshades: 256, format: 'float'

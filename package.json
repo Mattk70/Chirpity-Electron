@@ -1,6 +1,6 @@
 {
   "name": "chirpity",
-  "version": "0.4.0",
+  "version": "0.6.1",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
@@ -103,7 +103,7 @@
     "suncalc2": "^1.8.1",
     "update-electron-app": "^2.0.1",
     "uuid": "^8.3.2",
-    "wavesurfer.js": "^6.0.4"
+    "wavesurfer.js": "^6.2.0"
   }
 }
 
