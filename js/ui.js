@@ -622,9 +622,9 @@ function adjustSpecDims(redraw) {
             - controlsWrapperElement.height()
             - $('#timeline').height()
             - 55);
-        if (redraw && wavesurfer != null) {
-            wavesurfer.drawBuffer();
-        }
+        // if (redraw && wavesurfer != null) {
+        //     wavesurfer.drawBuffer();
+        // }
         specCanvasElement.width('100%');
         $('.spec-labels').width('55px')
     } else {
