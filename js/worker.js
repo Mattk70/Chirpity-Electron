@@ -5,7 +5,7 @@ let appPath = '../24000_v9/';
 
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
-const BATCH_SIZE = 12;
+const BATCH_SIZE = 1;
 console.log(appPath);
 
 let audioBuffer;
