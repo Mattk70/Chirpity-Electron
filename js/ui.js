@@ -615,7 +615,7 @@ function adjustSpecDims(redraw) {
         $(this).height(Math.min(bodyElement.height() * 0.4, 512))
     })
     if (wavesurfer) {
-
+        initSpectrogram(Math.min(bodyElement.height() * 0.4, 512));
         specElement.css('z-index', 0);
         resultTableElement.height(contentWrapperElement.height()
             - dummyElement.height()
@@ -1138,13 +1138,14 @@ $(document).on('click', '#loadSpectrogram', function () {
     }
 })
 
-function initSpectrogram() {
+function initSpectrogram(height) {
     let fftSamples;
     if (windowLength < 2) {
         fftSamples = 256;
     } else {
         fftSamples = 512;
     }
+    if (!height) { height = fftSamples / 2}
     if (wavesurfer.spectrogram) wavesurfer.destroyPlugin('spectrogram');
     wavesurfer.addPlugin(WaveSurfer.spectrogram.create({
         wavesurfer: wavesurfer,
@@ -1156,6 +1157,7 @@ function initSpectrogram() {
         normalize: true,
         hideScrollbar: true,
         labels: true,
+        height: height,
         fftSamples: fftSamples,
         colorMap: colormap({
             colormap: config.colormap, nshades: 256, format: 'float'
