@@ -445,11 +445,6 @@ async function onLoadResults(args) {
  */
 async function showSaveDialog() {
     await window.electron.saveFile({'currentFile': currentFile, 'labels': AUDACITY_LABELS});
-    // Show file dialog to save Audacity label file
-    //ipcRenderer.send('saveFile', {'currentFile': currentFile, 'labels': AUDACITY_LABELS});
-    //ipcRenderer.on('safeFile', (event, arg) => {
-    //console.log(arg.message)
-    //})
 }
 
 // Worker listeners
@@ -471,21 +466,12 @@ function analyseReset() {
 const analyzeLink = document.getElementById('analyze');
 speciesExclude = document.querySelectorAll('speciesExclude');
 analyzeLink.addEventListener('click', async () => {
-    analyseReset();
-    resetResults();
-    worker.postMessage({action: 'analyze', confidence: config.minConfidence, filePath: currentFile, selection: false});
+    postAnalyzeMessage({confidence: config.minConfidence, resetResults: true, files: [currentFile], selection: false});
 });
 
 const analyzeAllLink = document.getElementById('analyzeAll');
 analyzeAllLink.addEventListener('click', async () => {
-    analyseReset();
-    resetResults();
-    fileList.forEach(file => {
-        worker.postMessage({action: 'analyze', confidence: config.minConfidence, filePath: file, selection: false});
-    })
-    batchFileCount = 1;
-    batchInProgress = true;
-    fileNumber.innerText = `(File 1 of ${fileList.length})`;
+    postAnalyzeMessage({confidence: config.minConfidence, resetResults: true, files: fileList, selection: false});
 });
 
 const analyzeSelectionLink = document.getElementById('analyzeSelection');
@@ -499,18 +485,45 @@ analyzeSelectionLink.addEventListener('click', async () => {
         region.end = region.start + 0.5;
         end = start + 0.5
     }
-    // Add current buffer's beginning offset to region start / end tags
-    worker.postMessage({
-        action: 'analyze',
+    postAnalyzeMessage({
         confidence: 0.1,
+        resetResults: false,
+        files: [currentFile],
         start: start,
         end: end,
-        filePath: currentFile,
         selection: true
     });
     summary = {};
     summary['suppressed'] = []
 });
+
+function postAnalyzeMessage(args) {
+    analyseReset();
+    if (args.resetResults) {
+        resetResults();
+    } else {
+        progressDiv.show();
+        delete diagnostics['Audio Duration'];
+    }
+    args.files.forEach(file => {
+        worker.postMessage({
+            action: 'analyze',
+            confidence: args.confidence,
+            start: args.start,
+            end: args.end,
+            nocmig: config.nocmig,
+            lat: config.latitude,
+            lon: config.longitude,
+            filePath: file,
+            selection: args.selection
+        });
+    })
+    if (args.files.length > 1) {
+        batchFileCount = 1;
+        batchInProgress = true;
+        fileNumber.innerText = `(File 1 of ${fileList.length})`;
+    }
+}
 
 
 // Menu bar functions
@@ -910,6 +923,7 @@ window.onload = async () => {
     config.UUID = uuidv4();
     // Load preferences and override defaults
     appPath = await getPath();
+    worker.postMessage({action: 'load-db', path: appPath})
     fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
         if (err) {
             console.log('JSON parse error ' + err);
@@ -990,6 +1004,11 @@ window.onload = async () => {
                     break;
                 case 'spawning':
                     warmUp();
+                    break;
+                case 'promptToSave':
+                    if (confirm("Save results to your archive?")){
+                        worker.postMessage({action: 'save2db'})
+                    };
                     break;
                 case 'worker-loaded-audio':
                     onWorkerLoadedAudio(args);
@@ -1145,7 +1164,9 @@ function initSpectrogram(height) {
     } else {
         fftSamples = 512;
     }
-    if (!height) { height = fftSamples / 2}
+    if (!height) {
+        height = fftSamples / 2
+    }
     if (wavesurfer.spectrogram) wavesurfer.destroyPlugin('spectrogram');
     wavesurfer.addPlugin(WaveSurfer.spectrogram.create({
         wavesurfer: wavesurfer,
@@ -1486,15 +1507,17 @@ function onWorkerLoadedAudio(args) {
     currentFileDuration = args.sourceDuration;
     fileStart = args.fileStart;
     if (config.timeOfDay) {
-        bufferStartTime = new Date(fileStart.getTime() + (bufferBegin * 1000))
+        bufferStartTime = new Date(fileStart + (bufferBegin * 1000))
     } else {
         bufferStartTime = new Date(zero.getTime() + (bufferBegin * 1000))
     }
 
     if (windowLength > currentFileDuration) windowLength = currentFileDuration;
     let astro = SunCalc.getTimes(fileStart, config.latitude, config.longitude);
-    dusk = astro.dusk;
-    dawn = astro.dawn;
+    dusk = astro.dusk.getTime();
+    // calculate dawn for following day
+    let astro2 = SunCalc.getTimes(fileStart + 8.64e+7, config.latitude, config.longitude);
+    dawn = astro2.dawn.getTime();
     if (config.nocmig && fileEnd < dusk && fileStart > dawn) {
         alert(`All timestamps in this file are during daylight hours. \n\nNocmig mode will be disabled.`)
         $('#timecode').click();

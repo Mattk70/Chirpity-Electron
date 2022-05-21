@@ -229,24 +229,27 @@ class Model {
                     end: end,
                     timestamp: myModel._timestampFromSeconds(key, fileStart),
                     position: myModel._timestampFromSeconds(key, 0),
+                    id_1: item.index[0],
+                    id_2: item.index[1],
+                    id_3: item.index[2],
                     sname: this.labels[item.index[0]].split('_')[0],
                     cname: this.labels[item.index[0]].split('_')[1],
-                    score: item.score[0],
+                    score: Math.round(item.score[0] * 1000) / 1000,
                     sname2: this.labels[item.index[1]].split('_')[0],
                     cname2: this.labels[item.index[1]].split('_')[1],
-                    score2: item.score[1],
+                    score2: Math.round(item.score[1] * 1000) / 1000,
                     sname3: this.labels[item.index[2]].split('_')[0],
                     cname3: this.labels[item.index[2]].split('_')[1],
-                    score3: item.score[2],
+                    score3: Math.round(item.score[2] * 1000) / 1000,
                     suppressed: suppressed
                 });
                 audacity = ({
                     timestamp: key + '\t' + end,
                     cname: this.labels[item.index[0]].split('_')[1],
-                    score: item.score[0]
+                    score: Math.round(item.score[0] * 1000) / 1000,
                 })
                 //prepare summary
-                console.log(key, item.index[0], this.labels[item.index[0]], item.score[0]);
+                console.log(key, item.index[0], this.labels[item.index[0]], Math.round(item.score[0] * 1000) / 1000);
                 batched_results.push([key, result, audacity]);
             }
             this.result = batched_results;

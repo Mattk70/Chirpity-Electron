@@ -93,7 +93,6 @@ async function createWorker() {
     });
     workerWindow.webContents.openDevTools();
     console.log("worker created");
-
 }
 
 // This method will be called when Electron has finished
