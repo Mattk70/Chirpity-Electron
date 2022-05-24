@@ -41,9 +41,16 @@ function createDB(file) {
     db.serialize(() => {
         db.run(`CREATE TABLE species
                 (
-                    birdID INTEGER PRIMARY KEY,
-                    sname  TEXT,
-                    cname  TEXT
+                    id    INTEGER PRIMARY KEY,
+                    sname TEXT,
+                    cname TEXT
+                )`, function (createResult) {
+            if (createResult) throw createResult;
+        });
+        db.run(`CREATE TABLE files
+                (
+                    name TEXT,
+                    UNIQUE (name)
                 )`, function (createResult) {
             if (createResult) throw createResult;
         });
@@ -55,21 +62,21 @@ function createDB(file) {
         stmt.finalize();
         db.run(`CREATE TABLE records
                 (
-                    dateTime   INTEGER PRIMARY KEY,
-                    birdID1    INTEGER,
-                    birdID2    INTEGER,
-                    birdID3    INTEGER,
-                    conf1      REAL,
-                    conf2      REAL,
-                    conf3      REAL,
-                    sourceFile TEXT,
-                    position   INTEGER
+                    dateTime INTEGER PRIMARY KEY,
+                    birdID1  INTEGER,
+                    birdID2  INTEGER,
+                    birdID3  INTEGER,
+                    conf1    REAL,
+                    conf2    REAL,
+                    conf3    REAL,
+                    fileID   INTEGER,
+                    position INTEGER
                 )`, function (createResult) {
             if (createResult) throw createResult;
         });
     });
     console.log("database initialized");
-    db.each("SELECT birdID AS id, sname, cname FROM species", (err, row) => {
+    db.each("SELECT id, sname, cname FROM species", (err, row) => {
         console.log(`ID: ${row.id}, Scientific name: ${row.sname}, Common Name: ${row.cname}`);
     });
     return db;
@@ -249,8 +256,12 @@ ipcRenderer.on('new-client', (event) => {
                     FILE_QUEUE.push(args.filePath);
                     console.log(`Adding ${args.filePath} to the queue.`)
                 } else {
-                    index = 0;
                     predicting = true;
+                    if (!args.selection) {
+                        index = 0;
+                        AUDACITY = [];
+                        RESULTS = [];
+                    }
                     minConfidence = args.confidence;
                     //let selection = false;
                     let start, end;
@@ -283,6 +294,9 @@ ipcRenderer.on('new-client', (event) => {
                 break;
             case 'abort':
                 onAbort(args);
+                break;
+            case 'chart-request':
+                onChartRequest(args);
                 break;
             default:
                 UI.postMessage('Worker communication lines open')
@@ -513,7 +527,7 @@ async function doPrediction(args) {
     aborted = false;
     predictionDone = false;
     predictionStart = new Date();
-    if (!predicting) {
+    if (!FILE_QUEUE.length || !selection) {
         index = 0;
         AUDACITY = [];
         RESULTS = [];
@@ -746,10 +760,10 @@ async function parsePredictions(e) {
         UI.postMessage({event: 'model-ready', message: 'ready', backend: backend})
     } else if (response['message'] === 'prediction' && !aborted) {
         // add filename to result for db purposes
-        response['result'].file = file;
         response['result'].forEach(prediction => {
             const position = parseFloat(prediction[0]);
             const result = prediction[1];
+            result.file = file;
             const audacity = prediction[2];
             UI.postMessage({event: 'progress', progress: (position / metadata[file].duration)});
             //console.log('Prediction received from worker', result);
@@ -798,7 +812,7 @@ async function parsePredictions(e) {
             await doPrediction({start: start, end: end, file: file, selection: false});
 
         } else {
-            UI.postMessage({event: 'promptToSave'})
+            if (RESULTS.length) UI.postMessage({event: 'promptToSave'})
             predicting = false;
         }
     }
@@ -813,7 +827,8 @@ async function setStartEnd(file) {
         const fileEnd = metadata.fileStart + (metadata.duration * 1000);
         fileEnd >= metadata.dawn ? end = (metadata.dawn - metadata.fileStart) / 1000 : end = metadata.duration;
         // In case it's all in the daytime and just a single file
-        if (metadata.fileStart > metadata.dawn && fileEnd < metadata.dusk && !batchInProgress) {
+
+        if (metadata.fileStart > metadata.dawn && fileEnd < metadata.dusk && !FILE_QUEUE.length) {
             start = 0;
             end = metadata.duration;
         }
@@ -826,7 +841,9 @@ async function setStartEnd(file) {
 
 function onSave2DB() {
     db.serialize(() => {
+        const fileStmt = db.prepare("SELECT rowid FROM files where name = (?)");
         const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?)");
+        const newFileStmt = db.prepare("INSERT INTO files VALUES (?)")
         for (let i = 0; i < RESULTS.length; i++) {
             const dateTime = new Date(RESULTS[i].timestamp).getTime();
             const birdID1 = RESULTS[i].id_1;
@@ -835,13 +852,58 @@ function onSave2DB() {
             const conf1 = RESULTS[i].score;
             const conf2 = RESULTS[i].score2;
             const conf3 = RESULTS[i].score3;
-            const sourceFile = RESULTS[i].file;
             const position = new Date(RESULTS[i].position).getTime();
-            stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, sourceFile, position);
+            const file = RESULTS[i].file;
+            newFileStmt.run(file, (err) => {
+                fileStmt.get(file, (err, row) => {
+                    if (err) console.log(err);
+                    stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, row.rowid, position);
+                });
+            });
         }
-        stmt.finalize();
-        db.each("SELECT records.dateTime as dateTime, species.sname as sname, species.cname as cname FROM records INNER JOIN species on species.birdID = records.birdID1", (err, row) => {
+        //stmt.finalize();
+        db.each("SELECT DATETIME(records.dateTime/1000, 'unixepoch', 'localtime') as dateTime, species.sname as sname, species.cname as cname FROM records INNER JOIN species on species.id = records.birdID1", (err, row) => {
             console.log(`Time of Day: ${row.dateTime}, Scientific name: ${row.sname}, Common Name: ${row.cname}`);
         });
     });
 }
+
+function onChartRequest(args) {
+    db.serialize(() => {
+        const chartStmt = db.prepare(`
+            SELECT STRFTIME('%Y', DATETIME(records.dateTime / 1000, 'unixepoch', 'localtime')) as Year, 
+                   STRFTIME('%m', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Month, 
+                   COUNT(*) AS count
+            FROM records INNER JOIN species
+            ON species.id = records.birdID1
+            WHERE species.cname = (?)
+            GROUP BY Month;`);
+        let results = {};
+        let payload = '';
+        chartStmt.all(args.species, (err, rows) => {
+            for (let i = 0; i < rows.length; i++) {
+                const year = rows[i].Year;
+                const month = rows[i].Month;
+                const count = rows[i].count;
+                if (!(year in results)) {
+                    results[year] = new Array(12).fill(0);
+                }
+                results[year][parseInt(month) - 1] = count;
+            }
+
+            UI.postMessage({event: 'chart-data', species: args.species, results: results})
+        })
+    })
+}
+
+
+/**
+ * SQL SPECIES QUERIES
+ * Earliest Spring records: (Jan - June): SELECT species.cname as CommonName, STRFTIME('%Y', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Year, STRFTIME('%m', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Month,DATETIME(min(records.dateTime)/1000, 'unixepoch', 'localtime') as date from records inner join species on species.id = records.birdID1 where species.cname = 'Robin' AND Month < '07' GROUP BY Year;
+ * Latest Spring Records (Jan - June): SELECT species.cname as CommonName, STRFTIME('%Y', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Year, STRFTIME('%m', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Month,DATETIME(max(records.dateTime)/1000, 'unixepoch', 'localtime') as date from records inner join species on species.id = records.birdID1 where species.cname = 'Robin' AND Month < '07' GROUP BY Year;
+ * Latest Autumn Records (July - December): SELECT species.cname as CommonName, STRFTIME('%Y', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Year, STRFTIME('%m', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Month,DATETIME(max(records.dateTime)/1000, 'unixepoch', 'localtime') as date from records inner join species on species.id = records.birdID1 where species.cname = 'Robin' AND Month > '06' GROUP BY Year;
+ * Earliest Autumn records (July - December): SELECT species.cname as CommonName, STRFTIME('%Y', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Year, STRFTIME('%m', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Month,DATETIME(min(records.dateTime)/1000, 'unixepoch', 'localtime') as date from records inner join species on species.id = records.birdID1 where species.cname = 'Robin' AND Month > '06' GROUP BY Year;
+ * Species monthly daily counts, grouped by day and month and year (i.e. will print daily totals for month in specific year: select species.cname as CommonName, STRFTIME('%Y', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Year, STRFTIME('%m', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Month, STRFTIME('%d', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Day, COUNT(records.dateTime) as count from records inner join species on species.id = records.birdID1 where species.cname = 'Robin' GROUP BY Day;
+ * Annual Spring totals: SELECT species.cname as CommonName, STRFTIME('%Y', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Year, STRFTIME('%m', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Month, COUNT(*) as Count from records inner join species on species.id = records.birdID1 where species.cname = 'Robin' AND Month < '07' GROUP BY Year;
+ * Annual Autumn totals: SELECT species.cname as CommonName, STRFTIME('%Y', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Year, STRFTIME('%m', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Month, COUNT(*) as Count from records inner join species on species.id = records.birdID1 where species.cname = 'Robin' AND Month > '06' GROUP BY Year;
+ */

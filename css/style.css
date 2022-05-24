@@ -184,42 +184,48 @@ div#contentWrapper {
     font-size: 22px;
 }
 
-#myInput {
-  background-image: url('searchicon.png'); /* Add a search icon to input */
-  background-position: 10px 12px; /* Position the search icon */
-  background-repeat: no-repeat; /* Do not repeat the icon image */
-  width: 100%; /* Full-width */
-  font-size: 16px; /* Increase font-size */
-  padding: 12px 20px 12px 40px; /* Add some padding */
-  border: 1px solid #ddd; /* Add a grey border */
-  margin-bottom: 12px; /* Add some space below the input */
+#myInput, #searchInput {
+    background-image: url('searchicon.png'); /* Add a search icon to input */
+    background-position: 10px 12px; /* Position the search icon */
+    background-repeat: no-repeat; /* Do not repeat the icon image */
+    width: 100%; /* Full-width */
+    font-size: 16px; /* Increase font-size */
+    padding: 12px 20px 12px 40px; /* Add some padding */
+    border: 1px solid #ddd; /* Add a grey border */
+    margin-bottom: 12px; /* Add some space below the input */
 }
 
 
-#myUL {
-  /* Remove default list styling */
-  list-style-type: none;
-  padding: 0;
-  margin: 0;
+#myUL, #searchUL {
+    /* Remove default list styling */
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    max-height: 320px;
+    overflow: auto;
 }
 
 #feedbackModalBody {
     max-height: 320px;
 }
 
-#myUL li a {
-  border: 1px solid #ddd; /* Add a border to all links */
-  margin-top: -1px; /* Prevent double borders */
-  background-color: #f6f6f6; /* Grey background color */
-  padding: 12px; /* Add some padding */
-  text-decoration: none; /* Remove default text underline */
-  font-size: 18px; /* Increase the font-size */
-  color: black; /* Add a black text color */
-  display: block; /* Make it into a block element to fill the whole list */
+#myUL li a, #searchUL li a {
+    border: 1px solid #ddd; /* Add a border to all links */
+    margin-top: -1px; /* Prevent double borders */
+    background-color: #f6f6f6; /* Grey background color */
+    padding: 12px; /* Add some padding */
+    text-decoration: none; /* Remove default text underline */
+    font-size: 18px; /* Increase the font-size */
+    color: black; /* Add a black text color */
+    display: block; /* Make it into a block element to fill the whole list */
 }
 
-#myUL li a:hover:not(.header) {
-  background-color: #eee; /* Add a hover effect to all links, except for headers */
+#searchUL li a {
+    max-width: 300px;
+}
+
+#myULli a:hover:not(.header), #searchUL li a:hover:not(.header) {
+    background-color: #eee; /* Add a hover effect to all links, except for headers */
 }
 
 region.wavesurfer-region:before {
@@ -232,19 +238,19 @@ region.wavesurfer-region:before {
 }
 
 region.wavesurfer-region[data-region-highlight] {
-  border: 1px solid rgb(86, 180, 239);
-  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.05) inset, 2px 0px 8px rgba(266, 255, 236, 0.6);
+    border: 1px solid rgb(86, 180, 239);
+    box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.05) inset, 2px 0px 8px rgba(266, 255, 236, 0.6);
 }
 
 .nighttime {
-    background-color: rgba(0,0,72,0.2);
+    background-color: rgba(0, 0, 72, 0.2);
 }
 
 .daytime {
     background-color: rgba(86, 180, 239, 0.2);
 }
 
-.strikethrough{
+.strikethrough {
     text-decoration: line-through;
 }
 
@@ -259,6 +265,55 @@ region.wavesurfer-region[data-region-highlight] {
 /* Menu Dropdown on Hover */
 .dropdown:hover .dropdown-menu.top-level {
     display: block;
-    margin-top: 0; // remove the gap so it doesn't close
- }
+    margin-top: 0;
+/ / remove the gap so it doesn 't close
+}
 
+.chart-outer {
+    height: 520px;
+    margin: 0em 1em 1em;
+    width: 75%;
+    display: flex;
+
+
+}
+
+#container {
+    margin: 0em 1em 1em;
+    height: 520px;
+    width: 65%;
+    display: flex;
+    order: 1;
+}
+
+.highcharts-data-table table {
+    margin: 0em 1em 1em;
+    display: block;
+    max-width: 280px;
+    overflow: auto;
+}
+
+
+.highcharts-data-table caption {
+    display: none;
+}
+
+.highcharts-data-table th {
+    font-weight: 600;
+    padding: 0.5em;
+}
+
+.highcharts-data-table td,
+.highcharts-data-table th,
+.highcharts-data-table caption {
+    padding: 0.5em;
+}
+
+.highcharts-data-table thead tr,
+.highcharts-data-table tr:nth-child(even) {
+    background: #f8f8f8;
+}
+
+.highcharts-data-table tr:hover {
+    background: #f1f7ff;
+}

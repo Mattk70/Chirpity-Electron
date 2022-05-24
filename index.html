@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <!--meta http-equiv="Content-Security-Policy" content="script-src 'self'  'unsafe-inline'; worker-src  'self' 'unsafe-inline' 'unsafe-eval' "-->
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' ;">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' https:">
 
     <!-- Bootstrap & CSS-->
     <script src="./node_modules/jquery/dist/jquery.min.js"></script>
@@ -48,6 +48,12 @@
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="#" id="exit">Exit</a>
                 </div>
+            </li>
+            <li class="nav-item dropdown active">
+                <a class="nav-link dropdown-toggle" href="#" id="navbarRecords" role="button" data-toggle="dropdown"
+                   aria-haspopup="true" aria-expanded="false">
+                    Records
+                </a>
             </li>
             <li class="nav-item dropdown active">
                 <a class="nav-link dropdown-toggle" href="#" id="navbarAnalysis" role="button" data-toggle="dropdown"
@@ -333,6 +339,15 @@
             </tbody>
         </table>
     </div>
+    <!-- Records container -->
+    <div class="d-none overflow-auto p-2" id="recordsContainer">
+        <div>
+            <div class="" id="speciesSearch"></div>
+        </div>
+        <div class="chart-outer">
+            <div id="container"></div>
+        </div>
+    </div>
 
 </div>
 
@@ -344,7 +359,150 @@
 <script src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js"></script>
 <script src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js"></script>
 <script src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.regions.min.js"></script>
-<script src="./js/AudioBufferSlice.js"></script>
+<script src="https://code.highcharts.com/highcharts.js"></script>
+<script src="https://code.highcharts.com/modules/series-label.js"></script>
+<script src="https://code.highcharts.com/modules/exporting.js"></script>
+<script src="https://code.highcharts.com/modules/export-data.js"></script>
+<script src="https://code.highcharts.com/modules/accessibility.js"></script>
+<script>
+    function myFunction(prefix) {
+        // Declare variables
+        var input, filter, ul, li, a, i, txtValue;
+        input = document.getElementById(prefix + 'Input');
+        filter = input.value.toUpperCase();
+        ul = document.getElementById(prefix + "UL");
+        li = ul.getElementsByTagName('li');
+
+        // Loop through all list items, and hide those who don't match the search query
+        for (i = 0; i < li.length; i++) {
+            a = li[i].getElementsByTagName("a")[0];
+            txtValue = a.textContent || a.innerText;
+            if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                li[i].style.display = "";
+            } else {
+                li[i].style.display = "none";
+            }
+        }
+    }
+</script>
+<script>
+    Highcharts.chart('container', {
+        chart: {
+            type: 'spline'
+        },
+        title: {
+            text: 'Monthly Counts for Redwing'
+        },
+        xAxis: {
+            categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+            accessibility: {
+                description: 'Months of the year'
+            }
+        },
+        yAxis: {
+            title: {
+                text: 'Count'
+            },
+        },
+        tooltip: {
+            crosshairs: true,
+            shared: true
+        },
+        plotOptions: {
+            spline: {
+                marker: {
+                    radius: 4,
+
+                    lineWidth: 1
+                }
+            }
+        },
+        series: [{
+            name: '2019',
+            marker: {
+                symbol: 'cross'
+            },
+            data: [5, 8, 1000, 2456, 908, 0, 0, 0, 0, 7, 2549, 0]
+
+        },{
+            name: '2019',
+            marker: {
+                symbol: 'cross'
+            },
+            data: [5, 8, 1000, 2456, 908, 0, 0, 0, 0, 7, 2549, 0]
+
+        },{
+            name: '2019',
+            marker: {
+                symbol: 'cross'
+            },
+            data: [5, 8, 1000, 2456, 908, 0, 0, 0, 0, 7, 2549, 0]
+
+        },{
+            name: '2019',
+            marker: {
+                symbol: 'cross'
+            },
+            data: [5, 8, 1000, 2456, 908, 0, 0, 0, 0, 7, 2549, 0]
+
+        },{
+            name: '2019',
+            marker: {
+                symbol: 'cross'
+            },
+            data: [5, 8, 1000, 2456, 908, 0, 0, 0, 0, 7, 2549, 0]
+
+        },{
+            name: '2019',
+            marker: {
+                symbol: 'cross'
+            },
+            data: [5, 8, 1000, 2456, 908, 0, 0, 0, 0, 7, 2549, 0]
+
+        },{
+            name: '2019',
+            marker: {
+                symbol: 'cross'
+            },
+            data: [5, 8, 1000, 2456, 908, 0, 0, 0, 0, 7, 2549, 0]
+
+        }, {
+            name: '2020',
+            marker: {
+                symbol: 'circle'
+            },
+            data: [100, 8, 1000, 2456, 908, 500, 0, 0, 0, 7, 2549, 0]
+
+        }, {
+            name: '2021',
+            marker: {
+                symbol: 'square'
+            },
+            data: [5, 8, 1000, 2456, 908, 0, 0, 4000, 0, 7, 2549, 0]
+
+        }, {
+            name: '2022',
+            marker: {
+                symbol: 'diamond'
+            },
+            data: [0, 0, 8, 1000, 2456, 908, 0, 0, 0, 0, 7, 2549]
+        }],
+        exporting: {
+            showTable: true,
+            csv: {
+                columnHeaderFormatter: function (item, key) {
+                    if (!item || item instanceof Highcharts.Axis) {
+                        return ''
+                    } else {
+                        return item.name;
+                    }
+                }
+            }
+        }
+    });
+</script>
+
 <script src="./js/ui.js"></script>
 </body>
 </html>

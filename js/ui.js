@@ -82,12 +82,13 @@ let completeDiv = $('#complete');
 const resultTable = $('#resultTableBody')
 const summaryTable = $('#summaryModalBody');
 const feedbackTable = $('#feedbackModalBody');
+const speciesSearchForm = $('#speciesSearch');
 let progressDiv = $('#progressDiv');
 let progressBar = $('.progress .progress-bar');
 const fileNumber = document.getElementById('fileNumber');
 let batchFileCount = 1, batchInProgress = false;
 let activeRow;
-let predictions = {}, correctedSpecies, speciesListItems, clickedNode,
+let predictions = {}, correctedSpecies, speciesListItems, searchListItems, clickedNode,
     clickedIndex, speciesName, speciesFilter, speciesHide, speciesExclude, subRows, scrolled, currentFileDuration;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
@@ -449,6 +450,7 @@ async function showSaveDialog() {
 
 // Worker listeners
 function analyseReset() {
+    fileNumber.innerText = '';
     PREDICTING = true;
     delete diagnostics['Audio Duration'];
     AUDACITY_LABELS = [];
@@ -569,8 +571,15 @@ function hideElement(id_list) {
 function hideAll() {
     // File hint div,  Waveform, timeline and spec, controls and result table
     hideElement(['loadFileHint', 'loadFileHintText', 'loadFileHintSpinner', 'loadFileHintLog',
-        'timeline', 'waveform', 'spectrogram', 'dummy', 'controlsWrapper', 'resultTableContainer']);
+        'timeline', 'waveform', 'spectrogram', 'dummy', 'controlsWrapper', 'resultTableContainer', 'recordsContainer']);
 }
+
+const recordsLink = document.getElementById('navbarRecords');
+recordsLink.addEventListener('click', async () => {
+    hideAll();
+    showElement(['recordsContainer']);
+    //postAnalyzeMessage({confidence: config.minConfidence, resetResults: true, files: fileList, selection: false});
+});
 
 
 function createRegion(start, end, label) {
@@ -1006,12 +1015,16 @@ window.onload = async () => {
                     warmUp();
                     break;
                 case 'promptToSave':
-                    if (confirm("Save results to your archive?")){
+                    if (confirm("Save results to your archive?")) {
                         worker.postMessage({action: 'save2db'})
-                    };
+                    }
+                    ;
                     break;
                 case 'worker-loaded-audio':
                     onWorkerLoadedAudio(args);
+                    break;
+                case 'chart-data':
+                    onChartData(args);
                     break;
             }
         })
@@ -1019,48 +1032,39 @@ window.onload = async () => {
     // Set footer year
     $('#year').text(new Date().getFullYear());
     // Populate feedback modal
-    let feedbackHTML = `
-        <script>
-        function myFunction() {
-          // Declare variables
-          var input, filter, ul, li, a, i, txtValue;
-          input = document.getElementById('myInput');
-          filter = input.value.toUpperCase();
-          ul = document.getElementById("myUL");
-          li = ul.getElementsByTagName('li');
-        
-          // Loop through all list items, and hide those who don't match the search query
-          for (i = 0; i < li.length; i++) {
-            a = li[i].getElementsByTagName("a")[0];
-            txtValue = a.textContent || a.innerText;
-            if (txtValue.toUpperCase().indexOf(filter) > -1) {
-              li[i].style.display = "";
-            } else {
-              li[i].style.display = "none";
-            }
-          }
-        }
-        </script>
-        
-        <p>What sound do you think this is?</p>
-        <input type="text" id="myInput" onkeyup="myFunction()" placeholder="Search for a species...">
-        <ul id="myUL">
+    feedbackTable.append(generateBirdList('my'));
+    speciesSearchForm.append(generateBirdList('search'));
+    //Cache list elements
+    speciesListItems = $('#myUL li span');
+    searchListItems = $('#searchUL li span');
+};
+
+function generateBirdList(prefix) {
+    let listHTML = '';
+    if (prefix === 'my') {
+        listHTML += "<p>What sound do you think this is?</p>"
+    }
+    listHTML +=
+        `<input type="text" id="${prefix}Input" onkeyup="myFunction('${prefix}')" placeholder="Search for a species...">
+        <ul id="${prefix}UL">`;
+    if (prefix === 'my') {
+        listHTML += `
             <li><a href="#">Animal<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
             <li><a href="#">Ambient Noise<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
             <li><a href="#">Human<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
             <li><a href="#">Vehicle<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>`;
+    }
+
     const excluded = new Set(['human', 'vehicles', 'animals', 'No call']);
     for (const item in labels) {
         const [sname, cname] = labels[item].split('_');
         if (!excluded.has(cname)) {
-            feedbackHTML += `<li><a href="#">${cname} - ${sname}<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>`;
+            listHTML += `<li><a href="#">${cname} - ${sname}<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>`;
         }
     }
-    feedbackHTML += '</ul>';
-    feedbackTable.append(feedbackHTML);
-    //Cache list elements
-    speciesListItems = $('#myUL li span');
-};
+    listHTML += '</ul>';
+    return listHTML;
+}
 
 // Feedback list handler
 $(document).on('click', '#myUL li', function (e) {
@@ -1070,7 +1074,85 @@ $(document).on('click', '#myUL li', function (e) {
     speciesListItems.addClass('d-none');
     e.target.closest('a').childNodes[1].classList.remove('d-none');
 })
+// Search list handler
+$(document).on('click', '#searchUL li', function (e) {
+    let graphSpecies = formatFilename(e.target.innerText);
+    const regex = /done$/;
+    graphSpecies = graphSpecies.replace(regex, '').split('~')[0].replace(/_/g, ' ');
+    worker.postMessage({action: 'chart-request', species: graphSpecies})
+    searchListItems.addClass('d-none');
+    e.target.closest('a').childNodes[1].classList.remove('d-none');
+})
 
+
+function onChartData(args) {
+    const elements = document.getElementsByClassName('highcharts-data-table');
+    while (elements.length > 0) {
+        elements[0].parentNode.removeChild(elements[0]);
+    }
+    const results = args.results;
+    let payload = `{
+        "chart": {
+            "type": "spline"
+        },
+        "title": {
+            "text": "Monthly Counts for ${args.species}"
+        },
+        "xAxis": {
+            "categories": ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+            "accessibility": {
+                "description": "Months of the year"
+            }
+        },
+        "yAxis": {
+            "title": {
+                "text": "Count"
+            }
+        },
+        "tooltip": {
+            "crosshairs": true,
+            "shared": true
+        },
+        "plotOptions": {
+            "spline": {
+                "marker": {
+                    "radius": 4,
+
+                    "lineWidth": 1
+                }
+            }
+        }, "series": [`;
+    for (const key in results) {
+        payload += `
+        {
+            "name": "${key}",
+            "marker": {
+                "symbol": "diamond"
+            },
+            "data": [${results[key]}]
+        },`;
+    }
+    // Lose the last comma
+    payload = payload.slice(0, -1);
+    payload += `],
+        "exporting": {
+            "showTable": true
+        }
+     }`;
+
+    payload = JSON.parse(payload);
+    payload.exporting.csv = {
+                columnHeaderFormatter: function (item, key) {
+                    if (!item || item instanceof Highcharts.Axis) {
+                        return ''
+                    } else {
+                        return item.name;
+                    }
+                }
+            };
+    Highcharts.chart('container', payload);
+}
 
 const waitForFinalEvent = (function () {
     var timers = {};
@@ -1559,12 +1641,7 @@ async function onPredictionDone(args) {
     } else {
         PREDICTING = false;
     }
-
-    if (!seenTheDarkness && config.nocmig && !region) {
-        alert(`Nocmig mode is enabled, but all timestamps in this file were during daylight hours. Any detections will have been suppressed.\n\nDisable Nocmig mode and re-run the analysis to see them.`)
-    }
     scrolled = false;
-
 
     progressDiv.hide();
     progressBar.width(0 + '%');
