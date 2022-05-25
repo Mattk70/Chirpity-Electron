@@ -343,6 +343,31 @@
     <div class="d-none overflow-auto p-2" id="recordsContainer">
         <div>
             <div class="" id="speciesSearch"></div>
+            <table id='dataRecords' class="table table-hover border border-dark
+">
+            <tbody class="text-dark" id="recordsTableBody">
+            <tr>
+                <th>Earliest Spring Record</th>
+                <td id="earliestSpring"></td>
+            </tr>
+            <tr>
+                <th>Latest Spring Record</th>
+                <td id="latestSpring"></td>
+            </tr>
+            <tr>
+                <th>Earliest Autumn Record</th>
+                <td id="earliestAutumn"></td>
+            </tr>
+            <tr>
+                <th>Latest Autumn Record</th>
+                <td id="latestAutumn"></td>
+            </tr>
+            <tr>
+                <th>Most Calls in 24 hours</th>
+                <td id="mostDetections"></td>
+            </tr>
+            </tbody>
+        </table>
         </div>
         <div class="chart-outer">
             <div id="container"></div>
@@ -385,123 +410,7 @@
         }
     }
 </script>
-<script>
-    Highcharts.chart('container', {
-        chart: {
-            type: 'spline'
-        },
-        title: {
-            text: 'Monthly Counts for Redwing'
-        },
-        xAxis: {
-            categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-            accessibility: {
-                description: 'Months of the year'
-            }
-        },
-        yAxis: {
-            title: {
-                text: 'Count'
-            },
-        },
-        tooltip: {
-            crosshairs: true,
-            shared: true
-        },
-        plotOptions: {
-            spline: {
-                marker: {
-                    radius: 4,
 
-                    lineWidth: 1
-                }
-            }
-        },
-        series: [{
-            name: '2019',
-            marker: {
-                symbol: 'cross'
-            },
-            data: [5, 8, 1000, 2456, 908, 0, 0, 0, 0, 7, 2549, 0]
-
-        },{
-            name: '2019',
-            marker: {
-                symbol: 'cross'
-            },
-            data: [5, 8, 1000, 2456, 908, 0, 0, 0, 0, 7, 2549, 0]
-
-        },{
-            name: '2019',
-            marker: {
-                symbol: 'cross'
-            },
-            data: [5, 8, 1000, 2456, 908, 0, 0, 0, 0, 7, 2549, 0]
-
-        },{
-            name: '2019',
-            marker: {
-                symbol: 'cross'
-            },
-            data: [5, 8, 1000, 2456, 908, 0, 0, 0, 0, 7, 2549, 0]
-
-        },{
-            name: '2019',
-            marker: {
-                symbol: 'cross'
-            },
-            data: [5, 8, 1000, 2456, 908, 0, 0, 0, 0, 7, 2549, 0]
-
-        },{
-            name: '2019',
-            marker: {
-                symbol: 'cross'
-            },
-            data: [5, 8, 1000, 2456, 908, 0, 0, 0, 0, 7, 2549, 0]
-
-        },{
-            name: '2019',
-            marker: {
-                symbol: 'cross'
-            },
-            data: [5, 8, 1000, 2456, 908, 0, 0, 0, 0, 7, 2549, 0]
-
-        }, {
-            name: '2020',
-            marker: {
-                symbol: 'circle'
-            },
-            data: [100, 8, 1000, 2456, 908, 500, 0, 0, 0, 7, 2549, 0]
-
-        }, {
-            name: '2021',
-            marker: {
-                symbol: 'square'
-            },
-            data: [5, 8, 1000, 2456, 908, 0, 0, 4000, 0, 7, 2549, 0]
-
-        }, {
-            name: '2022',
-            marker: {
-                symbol: 'diamond'
-            },
-            data: [0, 0, 8, 1000, 2456, 908, 0, 0, 0, 0, 7, 2549]
-        }],
-        exporting: {
-            showTable: true,
-            csv: {
-                columnHeaderFormatter: function (item, key) {
-                    if (!item || item instanceof Highcharts.Axis) {
-                        return ''
-                    } else {
-                        return item.name;
-                    }
-                }
-            }
-        }
-    });
-</script>
 
 <script src="./js/ui.js"></script>
 </body>

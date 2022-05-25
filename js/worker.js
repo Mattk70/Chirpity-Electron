@@ -862,36 +862,105 @@ function onSave2DB() {
             });
         }
         //stmt.finalize();
-        db.each("SELECT DATETIME(records.dateTime/1000, 'unixepoch', 'localtime') as dateTime, species.sname as sname, species.cname as cname FROM records INNER JOIN species on species.id = records.birdID1", (err, row) => {
-            console.log(`Time of Day: ${row.dateTime}, Scientific name: ${row.sname}, Common Name: ${row.cname}`);
-        });
+        // db.each("SELECT DATETIME(records.dateTime/1000, 'unixepoch', 'localtime') as dateTime, species.sname as sname, species.cname as cname FROM records INNER JOIN species on species.id = records.birdID1", (err, row) => {
+        //     console.log(`Time of Day: ${row.dateTime}, Scientific name: ${row.sname}, Common Name: ${row.cname}`);
+        // });
     });
 }
 
 function onChartRequest(args) {
     db.serialize(() => {
+        const earliestSpring = db.prepare(`
+            SELECT MIN(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) as date
+            from records inner join species
+            on species.id = records.birdID1
+            where species.cname = (?)
+              AND STRFTIME('%m'
+                , DATETIME(records.dateTime/1000
+                , 'unixepoch'
+                , 'localtime'))
+                < '07'`);
+        const earliestAutumn = db.prepare(`
+            SELECT MIN(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) as date
+            from records inner join species
+            on species.id = records.birdID1
+            where species.cname = (?)
+              AND STRFTIME('%m'
+                , DATETIME(records.dateTime/1000
+                , 'unixepoch'
+                , 'localtime'))
+                > '06'`);
+        const latestSpring = db.prepare(`
+            SELECT MAX(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) as date
+            from records inner join species
+            on species.id = records.birdID1
+            where species.cname = (?)
+              AND STRFTIME('%m'
+                , DATETIME(records.dateTime/1000
+                , 'unixepoch'
+                , 'localtime'))
+                < '07'`);
+        const latestAutumn = db.prepare(`
+            SELECT MAX(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) as date
+            from records inner join species
+            on species.id = records.birdID1
+            where species.cname = (?)
+              AND STRFTIME('%m'
+                , DATETIME(records.dateTime/1000
+                , 'unixepoch'
+                , 'localtime'))
+                > '06'`);
+        const mostDetections = db.prepare(`
+            SELECT count(*) as count, 
+            DATE(dateTime/1000, 'unixepoch', 'localtime') as date  
+            FROM records INNER JOIN species on species.id = records.birdID1 
+            WHERE species.cname = (?) 
+            GROUP BY STRFTIME('%Y', DATETIME(dateTime/1000, 'unixepoch', 'localtime')), 
+                STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')), 
+                STRFTIME('%d', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) 
+            ORDER BY count DESC LIMIT 1`);
         const chartStmt = db.prepare(`
             SELECT STRFTIME('%Y', DATETIME(records.dateTime / 1000, 'unixepoch', 'localtime')) as Year, 
-                   STRFTIME('%m', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Month, 
+                   STRFTIME('%W', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Week, 
                    COUNT(*) AS count
             FROM records INNER JOIN species
             ON species.id = records.birdID1
             WHERE species.cname = (?)
-            GROUP BY Month;`);
+            GROUP BY Year, Week;`);
         let results = {};
-        let payload = '';
-        chartStmt.all(args.species, (err, rows) => {
-            for (let i = 0; i < rows.length; i++) {
-                const year = rows[i].Year;
-                const month = rows[i].Month;
-                const count = rows[i].count;
-                if (!(year in results)) {
-                    results[year] = new Array(12).fill(0);
-                }
-                results[year][parseInt(month) - 1] = count;
-            }
-
-            UI.postMessage({event: 'chart-data', species: args.species, results: results})
+        let dataRecords = {};
+        earliestSpring.get(args.species, (err, row) => {
+            dataRecords.earliestSpring = row.date;
+            latestSpring.get(args.species, (err, row) => {
+                dataRecords.latestSpring = row.date;
+                earliestAutumn.get(args.species, (err, row) => {
+                    dataRecords.earliestAutumn = row.date;
+                    latestAutumn.get(args.species, (err, row) => {
+                        dataRecords.latestAutumn = row.date;
+                        mostDetections.get(args.species, (err, row) => {
+                            row ? dataRecords.mostDetections = [row.count, row.date] :
+                                dataRecords.mostDetections = ['N/A', 'Not detected'];
+                            chartStmt.all(args.species, (err, rows) => {
+                                for (let i = 0; i < rows.length; i++) {
+                                    const year = rows[i].Year;
+                                    const week = rows[i].Week;
+                                    const count = rows[i].count;
+                                    if (!(year in results)) {
+                                        results[year] = new Array(52).fill(0);
+                                    }
+                                    results[year][parseInt(week) - 1] = count;
+                                }
+                                UI.postMessage({
+                                    event: 'chart-data',
+                                    species: args.species,
+                                    results: results,
+                                    records: dataRecords
+                                })
+                            })
+                        })
+                    })
+                })
+            })
         })
     })
 }
