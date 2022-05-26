@@ -1165,10 +1165,7 @@ function onChartData(args) {
     };
     //chartOptions.plotOptions = {spline: {marker: {radius: 4, lineWidth: 1}}};
     chartOptions.series = [];
-    for (const key in results) {
-        chartOptions.series.push({name: 'Total for ' + key, marker: 'diamond', type: 'column', data: results[key]});
-    }
-    chartOptions.series.push({
+        chartOptions.series.push({
         name: 'Average Hourly Calls (All Years)',
         marker: 'diamond',
         yAxis: 1,
@@ -1183,6 +1180,9 @@ function onChartData(args) {
             ]
         }
     });
+    for (const key in results) {
+        chartOptions.series.push({name: 'Total for ' + key, marker: 'diamond', type: 'column', data: results[key]});
+    }
     chartOptions.exporting = {};
     chartOptions.exporting.csv = {
         columnHeaderFormatter: function (item, key) {

@@ -948,7 +948,7 @@ function onChartRequest(args) {
             GROUP BY year, week;`);
         const rateStmt = db.prepare(`
             SELECT STRFTIME('%W', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS week,
-            COUNT(*) / (files.duration / 3600) AS rate
+            ROUND(COUNT(*) / (files.duration / 3600), 3) AS rate
             FROM records
                      INNER JOIN species on species.id = birdid1
                      INNER JOIN files on files.rowid = records.fileid
