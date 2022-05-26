@@ -49,7 +49,8 @@ function createDB(file) {
         });
         db.run(`CREATE TABLE files
                 (
-                    name TEXT,
+                    name     TEXT,
+                    duration REAL,
                     UNIQUE (name)
                 )`, function (createResult) {
             if (createResult) throw createResult;
@@ -527,7 +528,7 @@ async function doPrediction(args) {
     aborted = false;
     predictionDone = false;
     predictionStart = new Date();
-    if (!FILE_QUEUE.length || !selection) {
+    if (!args.preserveResults && !selection) {
         index = 0;
         AUDACITY = [];
         RESULTS = [];
@@ -809,7 +810,7 @@ async function parsePredictions(e) {
         if (FILE_QUEUE.length) {
             const file = FILE_QUEUE.shift()
             let [start, end] = await setStartEnd(file);
-            await doPrediction({start: start, end: end, file: file, selection: false});
+            await doPrediction({start: start, end: end, file: file, selection: false, preserveResults: true});
 
         } else {
             if (RESULTS.length) UI.postMessage({event: 'promptToSave'})
@@ -839,12 +840,15 @@ async function setStartEnd(file) {
     return [start, end];
 }
 
-function onSave2DB() {
-    db.serialize(() => {
-        const fileStmt = db.prepare("SELECT rowid FROM files where name = (?)");
-        const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?)");
-        const newFileStmt = db.prepare("INSERT INTO files VALUES (?)")
+let t1, t0;
+
+async function onSave2DB() {
+    t0 = performance.now();
+    await db.serialize(() => {
         for (let i = 0; i < RESULTS.length; i++) {
+            const fileStmt = db.prepare("SELECT rowid FROM files where name = (?)");
+            const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?)");
+            const newFileStmt = db.prepare("INSERT INTO files VALUES (?,?)")
             const dateTime = new Date(RESULTS[i].timestamp).getTime();
             const birdID1 = RESULTS[i].id_1;
             const birdID2 = RESULTS[i].id_2;
@@ -854,18 +858,24 @@ function onSave2DB() {
             const conf3 = RESULTS[i].score3;
             const position = new Date(RESULTS[i].position).getTime();
             const file = RESULTS[i].file;
-            newFileStmt.run(file, (err) => {
+            const fileDuration = metadata[file].duration;
+            newFileStmt.run(file, fileDuration, () => {
                 fileStmt.get(file, (err, row) => {
                     if (err) console.log(err);
                     stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, row.rowid, position);
+                    newFileStmt.finalize();
+                    stmt.finalize();
+                    fileStmt.finalize();
                 });
             });
         }
-        //stmt.finalize();
+
         // db.each("SELECT DATETIME(records.dateTime/1000, 'unixepoch', 'localtime') as dateTime, species.sname as sname, species.cname as cname FROM records INNER JOIN species on species.id = records.birdID1", (err, row) => {
         //     console.log(`Time of Day: ${row.dateTime}, Scientific name: ${row.sname}, Common Name: ${row.cname}`);
         // });
     });
+    t1 = performance.now()
+    console.log(`database work took ${(t1 - t0) / 1000} seconds`)
 }
 
 function onChartRequest(args) {
@@ -912,22 +922,40 @@ function onChartRequest(args) {
                 > '06'`);
         const mostDetections = db.prepare(`
             SELECT count(*) as count, 
-            DATE(dateTime/1000, 'unixepoch', 'localtime') as date  
-            FROM records INNER JOIN species on species.id = records.birdID1 
-            WHERE species.cname = (?) 
-            GROUP BY STRFTIME('%Y', DATETIME(dateTime/1000, 'unixepoch', 'localtime')), 
-                STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')), 
-                STRFTIME('%d', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) 
-            ORDER BY count DESC LIMIT 1`);
-        const chartStmt = db.prepare(`
-            SELECT STRFTIME('%Y', DATETIME(records.dateTime / 1000, 'unixepoch', 'localtime')) as Year, 
-                   STRFTIME('%W', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Week, 
-                   COUNT(*) AS count
+            DATE(dateTime/1000, 'unixepoch', 'localtime') as date
             FROM records INNER JOIN species
-            ON species.id = records.birdID1
+            on species.id = records.birdID1
             WHERE species.cname = (?)
-            GROUP BY Year, Week;`);
+            GROUP BY STRFTIME('%Y', DATETIME(dateTime/1000, 'unixepoch', 'localtime')),
+                STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')),
+                STRFTIME('%d', DATETIME(dateTime/1000, 'unixepoch', 'localtime'))
+            ORDER BY count DESC LIMIT 1`);
+        // const totalsStmt = db.prepare(`
+        //     SELECT STRFTIME('%Y', DATETIME(records.dateTime / 1000, 'unixepoch', 'localtime')) as year,
+        //            STRFTIME('%W', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as week,
+        //            COUNT(*) AS count
+        //     FROM records
+        //     INNER JOIN species ON species.id = records.birdID1
+        //     WHERE species.cname = (?)
+        //     GROUP BY year, week;`);
+        const chartStmt = db.prepare(`
+            SELECT STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS year, 
+            STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS week, 
+            count(*) as count
+            FROM records
+            INNER JOIN species on species.id = birdid1
+            WHERE species.cname = (?)
+            GROUP BY year, week;`);
+        const rateStmt = db.prepare(`
+            SELECT STRFTIME('%W', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS week,
+            COUNT(*) / (files.duration / 3600) AS rate
+            FROM records
+                     INNER JOIN species on species.id = birdid1
+                     INNER JOIN files on files.rowid = records.fileid
+            WHERE species.cname = (?)
+            GROUP BY week;`);
         let results = {};
+        let rate = new Array(52).fill(0);
         let dataRecords = {};
         earliestSpring.get(args.species, (err, row) => {
             dataRecords.earliestSpring = row.date;
@@ -940,21 +968,29 @@ function onChartRequest(args) {
                         mostDetections.get(args.species, (err, row) => {
                             row ? dataRecords.mostDetections = [row.count, row.date] :
                                 dataRecords.mostDetections = ['N/A', 'Not detected'];
-                            chartStmt.all(args.species, (err, rows) => {
+                            rateStmt.all(args.species, (err, rows) => {
                                 for (let i = 0; i < rows.length; i++) {
-                                    const year = rows[i].Year;
-                                    const week = rows[i].Week;
-                                    const count = rows[i].count;
-                                    if (!(year in results)) {
-                                        results[year] = new Array(52).fill(0);
-                                    }
-                                    results[year][parseInt(week) - 1] = count;
+                                    const week = rows[i].week;
+                                    rate[parseInt(week) - 1] = rows[i].rate;
                                 }
-                                UI.postMessage({
-                                    event: 'chart-data',
-                                    species: args.species,
-                                    results: results,
-                                    records: dataRecords
+                                chartStmt.all(args.species, (err, rows) => {
+                                    for (let i = 0; i < rows.length; i++) {
+                                        const year = rows[i].year;
+                                        const week = rows[i].week;
+                                        const count = rows[i].count;
+                                        const rate = rows[i].rate;
+                                        if (!(year in results)) {
+                                            results[year] = new Array(52).fill(0);
+                                        }
+                                        results[year][parseInt(week) - 1] = count;
+                                    }
+                                    UI.postMessage({
+                                        event: 'chart-data',
+                                        species: args.species,
+                                        results: results,
+                                        rate: rate,
+                                        records: dataRecords
+                                    })
                                 })
                             })
                         })
