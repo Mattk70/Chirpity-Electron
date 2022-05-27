@@ -945,10 +945,11 @@ function onChartRequest(args) {
             FROM records
             INNER JOIN species on species.id = birdid1
             WHERE species.cname = (?)
-            GROUP BY year, week;`);
+            GROUP BY year, week
+ORDER BY year DESC;`);
         const rateStmt = db.prepare(`
             SELECT STRFTIME('%W', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS week,
-            ROUND(COUNT(*) / (files.duration / 3600), 3) AS rate
+            ROUND(COUNT(*) / (files.duration / 3600), 2) AS rate
             FROM records
                      INNER JOIN species on species.id = birdid1
                      INNER JOIN files on files.rowid = records.fileid
