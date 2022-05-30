@@ -1111,13 +1111,14 @@ $(document).on('focus', '#searchInput', function () {
 $(document).on('blur', '#searchInput', function () {
     document.addEventListener('keydown', handleKeyDown, true);
 })
-
+let t0;
 $(document).on('click', '#searchUL li', function (e) {
     let graphSpecies = formatFilename(e.target.innerText);
 
     const regex = /done$/;
     graphSpecies = graphSpecies.replace(regex, '').split('~')[0].replace(/_/g, ' ');
     document.getElementById('searchInput').value = graphSpecies;
+    t0 = Date.now();
     worker.postMessage({action: 'chart-request', species: graphSpecies})
     searchListItems.addClass('d-none');
     //e.target.closest('a').childNodes[1].classList.remove('d-none');
@@ -1125,6 +1126,9 @@ $(document).on('click', '#searchUL li', function (e) {
 
 
 function onChartData(args) {
+    const genTime = Date.now() - t0;
+    const genTimeElement = document.getElementById('genTime')
+    genTimeElement.innerText = (genTime / 1000).toFixed(1) + ' seconds';
     showElement(['dataRecords'], false);
     const elements = document.getElementsByClassName('highcharts-data-table');
     while (elements.length > 0) {
@@ -1180,7 +1184,6 @@ function onChartData(args) {
             }, '<b>Week ' + this.x + '</b>');
         }
     };
-    //chartOptions.plotOptions = {spline: {marker: {radius: 4, lineWidth: 1}}};
     chartOptions.series = [];
     chartOptions.series.push({
         name: 'Average hourly (all years)',
