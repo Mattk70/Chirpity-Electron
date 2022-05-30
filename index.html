@@ -349,8 +349,8 @@
     <div class="d-none overflow-auto p-2" id="recordsContainer">
         <div>
             <div class="" id="speciesSearch"></div>
-            <table id='dataRecords' class="table table-hover border border-dark d-none">
-            <tbody class="text-dark" id="recordsTableBody">
+            <table id='dataRecords' class="table border border-dark d-none">
+            <tbody id="recordsTableBody">
             <tr>
                 <th>Earliest Spring Record</th>
                 <td id="earliestSpring"></td>
@@ -370,6 +370,10 @@
             <tr>
                 <th>Most Calls in 24 hours</th>
                 <td id="mostDetections"></td>
+            </tr>
+            <tr class="fst-italic text-sm-start">
+                <th>Data generated in:</th>
+                <td id="genTime"></td>
             </tr>
             </tbody>
         </table>

@@ -321,3 +321,6 @@ region.wavesurfer-region[data-region-highlight] {
 .highcharts-data-table tr:hover {
     background: #f1f7ff;
 }
+.highcharts-background {
+    opacity: 0.75;
+}
