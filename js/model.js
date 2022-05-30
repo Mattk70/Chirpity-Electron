@@ -180,7 +180,8 @@ class Model {
                     if (suppressed_IDs.includes(item.index[i])) {
                         item.score[i] = item.score[i] ** 3;
                     } else if (enhanced_IDs.includes(item.index[i])) {
-                        item.score[i] = Math.pow(item.score[i], 0.35);
+                        //item.score[i] = Math.pow(item.score[i], 0.35);
+                        item.score[i] = Math.pow(item.score[i], 0.5);
                     }
                 }
                 let suppressed = false;
@@ -249,7 +250,7 @@ class Model {
                     score: Math.round(item.score[0] * 1000) / 1000,
                 })
                 //prepare summary
-                console.log(key, item.index[0], this.labels[item.index[0]], Math.round(item.score[0] * 1000) / 1000);
+                //console.log(key, item.index[0], this.labels[item.index[0]], Math.round(item.score[0] * 1000) / 1000);
                 batched_results.push([key, result, audacity]);
             }
             this.result = batched_results;
@@ -302,7 +303,6 @@ async function runPredictions(e) {
 
         const fileStart = e.data.fileStart;
 
-        //const postTime = e.data.t0;
         //console.log(`sending message to model.js took: ${t0 - postTime} milliseconds`)
         await myModel.predictChunk(chunks, fileStart)
         response = {

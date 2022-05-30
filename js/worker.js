@@ -1,5 +1,4 @@
 const {ipcRenderer} = require('electron');
-//const AudioBufferSlice = require('./js/AudioBufferSlice.js');
 let appPath = '../24000_v9/';
 const fs = require('fs');
 const wavefileReader = require('wavefile-reader');
@@ -11,28 +10,13 @@ console.log(appPath);
 const labels = ["Tachymarptis melba_Alpine Swift", "Ambient Noise_Ambient Noise", "Pluvialis dominica_American Golden Plover", "Mareca americana_American Wigeon", "Animal_Animal", "Acrocephalus paludicola_Aquatic Warbler", "Acanthis hornemanni_Arctic Redpoll", "Stercorarius parasiticus_Arctic Skua", "Sterna paradisaea_Arctic Tern", "Phylloscopus borealis_Arctic Warbler", "Recurvirostra avosetta_Avocet", "Porzana pusilla_Baillon's Crake", "Limosa lapponica_Bar-tailed Godwit", "Tyto alba_Barn Owl", "Branta leucopsis_Barnacle Goose", "Sylvia nisoria_Barred Warbler", "Panurus biarmicus_Bearded Tit", "Merops apiaster_Bee-eater", "Cygnus columbianus_Bewick's Swan", "Botaurus stellaris_Bittern", "Oenanthe hispanica_Black-eared Wheatear", "Chroicocephalus ridibundus_Black-headed Gull", "Podiceps nigricollis_Black-necked Grebe", "Limosa limosa_Black-tailed Godwit", "Himantopus himantopus_Black-winged Stilt", "Lyrurus tetrix_Black Grouse", "Cepphus grylle_Black Guillemot", "Milvus migrans_Black Kite", "Phoenicurus ochruros_Black Redstart", "Chlidonias niger_Black Tern", "Turdus merula_Blackbird", "Sylvia atricapilla_Blackcap", "Spatula discors_Blue-winged Teal", "Cyanistes caeruleus_Blue Tit", "Luscinia svecica_Bluethroat", "Acrocephalus dumetorum_Blyth's Reed Warbler", "Fringilla montifringilla_Brambling", "Branta bernicla_Brent Goose", "Pyrrhula pyrrhula_Bullfinch", "Buteo buteo_Buzzard", "Branta canadensis_Canada Goose", "Tetrao urogallus_Capercaillie", "Corvus corone_Carrion/Hooded Crow", "Larus cachinnans_Caspian Gull", "Bubulcus ibis_Cattle Egret", "Cettia cetti_Cetti's Warbler", "Fringilla coelebs_Chaffinch", "Phylloscopus collybita_Chiffchaff", "Pyrrhocorax pyrrhocorax_Chough", "Emberiza cirlus_Cirl Bunting", "Motacilla citreola_Citrine Wagtail", "Periparus ater_Coal Tit", "Streptopelia decaocto_Collared Dove", "Glareola pratincola_Collared Pratincole", "Loxia curvirostra_Common Crossbill", "Larus canus_Common Gull", "Acanthis flammea_Common Redpoll", "Carpodacus erythrinus_Common Rosefinch", "Actitis hypoleucos_Common Sandpiper", "Melanitta nigra_Common Scoter", "Sterna hirundo_Common Tern", "Fulica atra_Coot", "Phalacrocorax carbo_Cormorant", "Emberiza calandra_Corn Bunting", "Crex crex_Corncrake", "Calonectris borealis_Cory's Shearwater", "Grus grus_Crane", "Lophophanes cristatus_Crested Tit", "Cuculus canorus_Cuckoo", "Calidris ferruginea_Curlew Sandpiper", "Numenius arquata_Curlew", "Sylvia undata_Dartford Warbler", "Cinclus cinclus_Dipper", "Charadrius morinellus_Dotterel", "Calidris alpina_Dunlin", "Prunella modularis_Dunnock", "Phylloscopus fuscatus_Dusky Warbler", "Alopochen aegyptiaca_Egyptian Goose", "Somateria mollissima_Eider", "Bubo bubo_Eurasian Eagle-Owl", "Turdus pilaris_Fieldfare", "Regulus ignicapilla_Firecrest", "Fulmarus glacialis_Fulmar", "Mareca strepera_Gadwall", "Morus bassanus_Gannet", "Sylvia borin_Garden Warbler", "Spatula querquedula_Garganey", "Larus hyperboreus_Glaucous Gull", "Plegadis falcinellus_Glossy Ibis", "Regulus regulus_Goldcrest", "Aquila chrysaetos_Golden Eagle", "Oriolus oriolus_Golden Oriole", "Pluvialis apricaria_Golden Plover", "Bucephala clangula_Goldeneye", "Carduelis carduelis_Goldfinch", "Mergus merganser_Goosander", "Accipiter gentilis_Goshawk", "Locustella naevia_Grasshopper Warbler", "Larus marinus_Great Black-backed Gull", "Podiceps cristatus_Great Crested Grebe", "Lanius excubitor_Great Grey Shrike", "Gavia immer_Great Northern Diver", "Stercorarius skua_Great Skua", "Dendrocopos major_Great Spotted Woodpecker", "Parus major_Great Tit", "Ardea alba_Great White Egret", "Anas carolinensis_Green-winged Teal", "Tringa ochropus_Green Sandpiper", "Picus viridis_Green Woodpecker", "Chloris chloris_Greenfinch", "Phylloscopus trochiloides_Greenish Warbler", "Tringa nebularia_Greenshank", "Ardea cinerea_Grey Heron", "Perdix perdix_Grey Partridge", "Phalaropus fulicarius_Grey Phalarope", "Pluvialis squatarola_Grey Plover", "Motacilla cinerea_Grey Wagtail", "Anser anser_Greylag Goose", "Uria aalge_Guillemot", "Gelochelidon nilotica_Gull-billed Tern", "Coccothraustes coccothraustes_Hawfinch", "Larus argentatus_Herring Gull", "Falco subbuteo_Hobby", "Pernis apivorus_Honey-buzzard", "Upupa epops_Hoopoe", "Delichon urbicum_House Martin", "Passer domesticus_House Sparrow", "Human_Human", "Phylloscopus ibericus_Iberian Chiffchaff", "Hippolais icterina_Icterine Warbler", "Lymnocryptes minimus_Jack Snipe", "Coloeus monedula_Jackdaw", "Garrulus glandarius_Jay", "Charadrius alexandrinus_Kentish Plover", "Falco tinnunculus_Kestrel", "Alcedo atthis_Kingfisher", "Rissa tridactyla_Kittiwake", "Calidris canutus_Knot", "Calcarius lapponicus_Lapland Bunting", "Vanellus vanellus_Lapwing", "Larus fuscus_Lesser Black-backed Gull", "Acanthis cabaret_Lesser Redpoll", "Dryobates minor_Lesser Spotted Woodpecker", "Sylvia curruca_Lesser Whitethroat", "Linaria cannabina_Linnet", "Ixobrychus minutus_Little Bittern", "Emberiza pusilla_Little Bunting", "Egretta garzetta_Little Egret", "Tachybaptus ruficollis_Little Grebe", "Hydrocoloeus minutus_Little Gull", "Athene noctua_Little Owl", "Charadrius dubius_Little Ringed Plover", "Calidris minuta_Little Stint", "Sternula albifrons_Little Tern", "Asio otus_Long-eared Owl", "Clangula hyemalis_Long-tailed Duck", "Stercorarius longicaudus_Long-tailed Skua", "Aegithalos caudatus_Long-tailed Tit", "Pica pica_Magpie", "Anas platyrhynchos_Mallard", "Aix galericulata_Mandarin Duck", "Puffinus puffinus_Manx Shearwater", "Circus aeruginosus_Marsh Harrier", "Poecile palustris_Marsh Tit", "Anthus pratensis_Meadow Pipit", "Ichthyaetus melanocephalus_Mediterranean Gull", "Hippolais polyglotta_Melodious Warbler", "Falco columbarius_Merlin", "Turdus viscivorus_Mistle Thrush", "Circus pygargus_Montagu's Harrier", "Gallinula chloropus_Moorhen", "Cygnus olor_Mute Swan", "Nycticorax nycticorax_Night Heron", "Luscinia megarhynchos_Nightingale", "Caprimulgus europaeus_Nightjar", "Sitta europaea_Nuthatch", "Anthus hodgsoni_Olive-backed Pipit", "Emberiza hortulana_Ortolan Bunting", "Pandion haliaetus_Osprey", "Haematopus ostralegus_Oystercatcher", "Syrrhaptes paradoxus_Pallas's Sandgrouse", "Phylloscopus proregulus_Pallas's Warbler", "Loxia pytyopsittacus_Parrot Crossbill", "Calidris melanotos_Pectoral Sandpiper", "Remiz pendulinus_Penduline Tit", "Falco peregrinus_Peregrine", "Phasianus colchicus_Pheasant", "Ficedula hypoleuca_Pied Flycatcher", "Motacilla alba_Pied Wagtail", "Anser brachyrhynchus_Pink-footed Goose", "Anas acuta_Pintail", "Aythya ferina_Pochard", "Lagopus muta_Ptarmigan", "Ardea purpurea_Purple Heron", "Calidris maritima_Purple Sandpiper", "Coturnix coturnix_Quail", "Phylloscopus schwarzi_Radde's Warbler", "Corvus corax_Raven", "Alca torda_Razorbill", "Lanius collurio_Red-backed Shrike", "Ficedula parva_Red-breasted Flycatcher", "Mergus serrator_Red-breasted Merganser", "Netta rufina_Red-crested Pochard", "Tarsiger cyanurus_Red-flanked Bluetail", "Alectoris rufa_Red-legged Partridge", "Podiceps grisegena_Red-necked Grebe", "Caprimulgus ruficollis_Red-necked Nightjar", "Phalaropus lobatus_Red-necked Phalarope", "Cecropis daurica_Red-rumped Swallow", "Gavia stellata_Red-throated Diver", "Lagopus lagopus_Red Grouse", "Milvus milvus_Red Kite", "Tringa totanus_Redshank", "Phoenicurus phoenicurus_Redstart", "Turdus iliacus_Redwing", "Emberiza schoeniclus_Reed Bunting", "Acrocephalus scirpaceus_Reed Warbler", "Anthus richardi_Richard's Pipit", "Larus delawarensis_Ring-billed Gull", "Psittacula krameri_Ring-necked Parakeet", "Turdus torquatus_Ring Ouzel", "Charadrius hiaticula_Ringed Plover", "Erithacus rubecula_Robin", "Columba livia_Rock Dove", "Anthus petrosus_Rock Pipit", "Corvus frugilegus_Rook", "Pastor roseus_Rose-coloured Starling", "Sterna dougallii_Roseate Tern", "Buteo lagopus_Rough-legged Buzzard", "Oxyura jamaicensis_Ruddy Duck", "Tadorna ferruginea_Ruddy Shelduck", "Calidris pugnax_Ruff", "Xema sabini_Sabine's Gull", "Riparia riparia_Sand Martin", "Calidris alba_Sanderling", "Thalasseus sandvicensis_Sandwich Tern", "Locustella luscinioides_Savi's Warbler", "Aythya marila_Scaup", "Loxia scotica_Scottish Crossbill", "Acrocephalus schoenobaenus_Sedge Warbler", "Calidris pusilla_Semipalmated Sandpiper", "Serinus serinus_Serin", "Tadorna tadorna_Shelduck", "Eremophila alpestris_Shore Lark", "Asio flammeus_Short-eared Owl", "Calandrella brachydactyla_Short-toed Lark", "Spatula clypeata_Shoveler", "Spinus spinus_Siskin", "Alauda arvensis_Skylark", "Podiceps auritus_Slavonian Grebe", "Gallinago gallinago_Snipe", "Plectrophenax nivalis_Snow Bunting", "Anser caerulescens_Snow Goose", "Turdus philomelos_Song Thrush", "Accipiter nisus_Sparrowhawk", "Platalea leucorodia_Spoonbill", "Porzana porzana_Spotted Crake", "Muscicapa striata_Spotted Flycatcher", "Tringa erythropus_Spotted Redshank", "Actitis macularius_Spotted Sandpiper", "Sturnus vulgaris_Starling", "Columba oenas_Stock Dove", "Burhinus oedicnemus_Stone-curlew", "Saxicola rubicola_Stonechat", "Hydrobates pelagicus_Storm Petrel", "Sylvia cantillans_Subalpine Warbler", "Hirundo rustica_Swallow", "Apus apus_Swift", "Anser fabalis_Taiga Bean Goose", "Strix aluco_Tawny Owl", "Anas crecca_Teal", "Calidris temminckii_Temminck's Stint", "Anthus trivialis_Tree Pipit", "Passer montanus_Tree Sparrow", "Certhia familiaris_Treecreeper", "Aythya fuligula_Tufted Duck", "Anser serrirostris_Tundra Bean Goose", "Arenaria interpres_Turnstone", "Streptopelia turtur_Turtle Dove", "Linaria flavirostris_Twite", "Loxia leucoptera_Two-barred Crossbill", "Vehicle_Vehicle", "Anthus spinoletta_Water Pipit", "Rallus aquaticus_Water Rail", "Bombycilla garrulus_Waxwing", "Oenanthe oenanthe_Wheatear", "Numenius phaeopus_Whimbrel", "Saxicola rubetra_Whinchat", "Anser albifrons_White-fronted Goose", "Calidris fuscicollis_White-rumped Sandpiper", "Haliaeetus albicilla_White-tailed Eagle", "Chlidonias leucopterus_White-winged Black Tern", "Ciconia ciconia_White Stork", "Sylvia communis_Whitethroat", "Cygnus cygnus_Whooper Swan", "Mareca penelope_Wigeon", "Poecile montanus_Willow Tit", "Phylloscopus trochilus_Willow Warbler", "Tringa glareola_Wood Sandpiper", "Phylloscopus sibilatrix_Wood Warbler", "Scolopax rusticola_Woodcock", "Lullula arborea_Woodlark", "Columba palumbus_Woodpigeon", "Troglodytes troglodytes_Wren", "Jynx torquilla_Wryneck", "Phylloscopus inornatus_Yellow-browed Warbler", "Larus michahellis_Yellow-legged Gull", "Motacilla flava_Yellow Wagtail", "Emberiza citrinella_Yellowhammer"];
 const sqlite3 = require('sqlite3').verbose();
 const SunCalc = require('suncalc2');
+const ffmpeg = require('fluent-ffmpeg');
+const {utimes} = require('utimes');
+const file_cache = 'file_cache';
+
 let db, nocmig, latitude, longitude;
 
-
-// function loadDB(path) {
-//     const file = p.join(path, 'archive.sqlite');
-//     const db = new sqlite3.Database(dbFile);
-//     db.serialize(() => {
-//         db.run("CREATE TABLE (info TEXT)");
-//
-//         const stmt = db.prepare("INSERT INTO lorem VALUES (?)");
-//         for (let i = 0; i < 10; i++) {
-//             stmt.run("Ipsum " + i);
-//         }
-//         stmt.finalize();
-//
-//         db.each("SELECT rowid AS id, info FROM lorem", (err, row) => {
-//             console.log(row.id + ": " + row.info);
-//         });
-//     });
-//     db.close();
-// }
-
+let proxiedFileCache = {};
 
 function createDB(file) {
     console.log("creating database file");
@@ -52,6 +36,15 @@ function createDB(file) {
                     name     TEXT,
                     duration REAL,
                     UNIQUE (name)
+                )`, function (createResult) {
+            if (createResult) throw createResult;
+        });
+        db.run(`CREATE TABLE duration
+                (
+                    day      INTEGER,
+                    duration INTEGER,
+                    fileID   INTEGER,
+                    UNIQUE (day, fileID)
                 )`, function (createResult) {
             if (createResult) throw createResult;
         });
@@ -77,9 +70,6 @@ function createDB(file) {
         });
     });
     console.log("database initialized");
-    db.each("SELECT id, sname, cname FROM species", (err, row) => {
-        console.log(`ID: ${row.id}, Scientific name: ${row.sname}, Common Name: ${row.cname}`);
-    });
     return db;
 }
 
@@ -87,6 +77,7 @@ function loadDB(path) {
     const file = p.join(path, 'archive.sqlite');
     if (!fs.existsSync(file)) {
         db = createDB(file)
+
     } else {
         db = new sqlite3.Database(file);
     }
@@ -106,108 +97,33 @@ const isDevMode = true;
 
 // Set up the audio context:
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
-const myAudio = document.querySelector('audio');
-const audioMediaElement = audioCtx.createMediaElementSource(
-    /** @type {HTMLAudioElement} */ myAudio
-);
-
-const workletString = `
-class ConverterWorkletProcessor extends AudioWorkletProcessor {
-  constructor (options) {
-    super()
-    console.log(options.numberOfInputs)
-
-  }
-  // @ts-ignore 
-  process(inputs, output, parameters) {
-      /**
-      * @type {Float32Array} length 128 Float32Array(128)
-      * non-interleaved IEEE754 32-bit linear PCM 
-      * with a nominal range between -1 and +1, 
-      * with each sample between -1.0 and 1.0.
-      * the sample rate depends on the audioContext and is variable
-      */
-      const inputChannel = inputs[0][0];  //inputChannel Float32Array(128)
-      this.port.postMessage(inputChannel)  // float32Array sent as byte[512] 
-      return true; // always do this!
-  }
-}
-registerProcessor('pcm-audio-worklet-processor', ConverterWorkletProcessor);
-`;
-
-const processorBlob = new Blob([workletString], {type: 'text/javascript'});
-const processorURL = URL.createObjectURL(processorBlob);
-
-console.log("Worklet started");
-
-
-const startWorklet = async () => {
-    await audioCtx.audioWorklet.addModule(processorURL);
-    //const processorPath = isDevMode ? './js/audio-worklet.js' : `${global.__dirname}/js/audio-worklet.js`;
-    //const processorSource = fs.readFileSync(processorPath);
-    const converterNode = new AudioWorkletNode(audioCtx, 'pcm-audio-worklet-processor');
-    // connect the processor with the source
-    audioMediaElement.connect(converterNode);
-    converterNode.port.onmessage = (ev) => prepareForModel(ev);
-    converterNode.connect(audioCtx.destination);
-}
-
-
-/**
- *
- * Objects of these types are designed to hold small audio snippets,
- * typically less than 45 s. For longer sounds, objects implementing
- * the MediaElementAudioSourceNode are more suitable.
- * The buffer contains data in the following format:
- * non-interleaved IEEE754 32-bit linear PCM (LPCM)
- * with a nominal range between -1 and +1, that is, a 32-bit floating point buffer,
- * with each sample between -1.0 and 1.0.
- * @param {ArrayBufferLike|Float32Array} data
- */
-const convertFloatToAudioBuffer = (data) => {
-    const sampleRate = 24000 | audioCtx.sampleRate
-    const channels = 1;
-    const sampleLength = sampleRate * 3 | data.length; // 1sec = sampleRate * 1
-    const audioBuffer = audioCtx.createBuffer(channels, sampleLength, sampleRate); // Empty Audio
-    audioBuffer.copyToChannel(new Float32Array(data), 0); // depending on your processing this could be already a float32array
-    return audioBuffer;
-}
-const streamDestination = audioCtx.createMediaStreamDestination();
-
-const prepareForModel = (ev) => {
-    //let start = args.start, end = args.end, file = args.file, selection = args.selection;
-    //const fileDuration = end - start;
-    const audioBufferSourceNode = audioCtx.createBufferSource();
-    // const chunkStart = start * sampleRate;
-
-    audioBufferSourceNode.buffer = convertFloatToAudioBuffer(ev.data);
-    audioBufferSourceNode.connect(streamDestination);
-
-    // here you will need a hugh enqueue algo that is out of scope for this answer
-    start = Math.max(audioCtx.currentTime, start);
-    source.start(start);
-    start += buffer.duration;
-    audioBufferSourceNode.start(start);
-    const samples = (end - start) * sampleRate;
-    const increment = samples < chunkLength ? samples : chunkLength;
-    feedChunksToModel(data, increment, chunkStart, file, fileDuration, selection);
-}
-
-async function convertFileToBuffers(args) {
-    myAudio.src = args.file;
-    let keyExists = args.file in metadata;
-    if (!keyExists) metadata[args.file] = {};
-    metadata[args.file].duration = await getDuration(args.file)
-    startWorklet()
-
-    // Here is your raw arrayBuffer ev.data
-
-
-}
-
 
 let UI;
 let FILE_QUEUE = [];
+
+const clearCache = () => {
+    return new Promise((resolve) => {
+        // clear & recreate file cache folder
+        proxiedFileCache = {}
+        fs.rmSync(file_cache, {recursive: true, force: true});
+        fs.mkdir(file_cache, (err, path) => {
+            resolve(path);
+        })
+    })
+}
+
+const isDuplicate = (file) => {
+    return new Promise((resolve) => {
+        const stmt = db.prepare("SELECT * FROM files WHERE name = (?)");
+        stmt.get(file, (err, row) => {
+            if (row) {
+
+                resolve(true)
+            } else resolve(false)
+        })
+    })
+}
+
 ipcRenderer.on('new-client', (event) => {
     [UI] = event.ports;
     UI.onmessage = async (e) => {
@@ -217,11 +133,14 @@ ipcRenderer.on('new-client', (event) => {
         switch (action) {
             case 'load-model':
                 UI.postMessage({event: 'spawning'});
+                await clearCache();
                 BATCH_SIZE = args.batchSize;
                 if (predictWorker) predictWorker.terminate();
                 spawnWorker(args.useWhitelist, BATCH_SIZE);
                 break;
             case 'load-db':
+                latitude = args.lat;
+                longitude = args.lon;
                 loadDB(args.path)
                 break;
             case 'file-load-request':
@@ -235,12 +154,13 @@ ipcRenderer.on('new-client', (event) => {
                 const buffer = await fetchAudioBuffer(args);
                 const length = buffer.length;
                 const myArray = buffer.getChannelData(0);
+                const file = args.file;
                 UI.postMessage({
                     event: 'worker-loaded-audio',
-                    fileStart: metadata[args.file].fileStart,
-                    sourceDuration: metadata[args.file].duration,
+                    fileStart: metadata[file].fileStart,
+                    sourceDuration: metadata[file].duration,
                     bufferBegin: args.start,
-                    file: args.file,
+                    file: file,
                     position: args.position,
                     length: length,
                     contents: myArray,
@@ -253,34 +173,42 @@ ipcRenderer.on('new-client', (event) => {
                 latitude = args.lat;
                 longitude = args.lon;
                 nocmig = args.nocmig;
-                if (predicting) {
+                const skip = await isDuplicate(args.filePath);
+                if (skip) {
+                    console.log(`Skipping ${args.filePath} as it has already been processed`);
+                    // When in batch mode the 'prediction-done' event simply increments
+                    // the counter for the file being processed
+                    UI.postMessage({
+                        event: 'prediction-done',
+                        batchInProgress: true,
+                    });
+                    //if (FILE_QUEUE.length) await processNextFile();
+                } else {
                     FILE_QUEUE.push(args.filePath);
                     console.log(`Adding ${args.filePath} to the queue.`)
-                } else {
-                    predicting = true;
-                    if (!args.selection) {
-                        index = 0;
-                        AUDACITY = [];
-                        RESULTS = [];
-                    }
-                    minConfidence = args.confidence;
-                    //let selection = false;
-                    let start, end;
-                    if (args.start) {
-                        start = args.start;
-                        end = args.end
+                    if (predicting) {
+
+
                     } else {
-                        [start, end] = await setStartEnd(args.filePath)
+                        predicting = true;
+                        if (!args.selection) {
+                            index = 0;
+                            AUDACITY = [];
+                            RESULTS = [];
+                        }
+                        minConfidence = args.confidence;
+                        await processNextFile();
+                        // //let selection = false;
+                        // let start, end;
+                        // if (args.start) {
+                        //     start = args.start;
+                        //     end = args.end
+                        // } else {
+                        //     [start, end] = await setStartEnd(args.filePath)
+                        // }
+                        // await doPrediction({start: start, end: end, file: args.filePath, selection: args.selection});
+                        // }
                     }
-                    // if (args.start === undefined) {
-                    //     start = null;
-                    //     end = Infinity;
-                    // } else {
-                    //     start = args.start;
-                    //     end = args.end;
-                    //     selection = true;
-                    // }
-                    await doPrediction({start: start, end: end, file: args.filePath, selection: args.selection});
                 }
                 break;
             case 'save':
@@ -291,7 +219,7 @@ ipcRenderer.on('new-client', (event) => {
                 await postMP3(args)
                 break;
             case 'save2db':
-                onSave2DB()
+                onSave2DB();
                 break;
             case 'abort':
                 onAbort(args);
@@ -324,6 +252,8 @@ function onAbort(args) {
 }
 
 const getDuration = (src) => {
+    // Use proxy
+    src = proxiedFileCache[src];
     return new Promise(function (resolve) {
         const audio = new Audio();
         audio.addEventListener("loadedmetadata", function () {
@@ -333,55 +263,126 @@ const getDuration = (src) => {
     });
 }
 
-async function loadAudioFile(args) {
-    const file = args.filePath;
-    if (file.endsWith('.wav')) {
-        if (!metadata[file]) {
-            metadata[file] = await getMetadata(file)
-        }
+const convertFileFormat = (file, destination, size, error, progressing, finish) => {
+    return new Promise(function (resolve) {
+        ffmpeg(file)
+            .on('error', (err) => {
+                console.log('An error occurred: ' + err.message);
+                if (error) {
+                    error(err.message);
+                }
+            })
+            .on('progress', (progress) => {
+                // UI.postMessage({
+                //     event: 'progress',
+                //     text: "Decompressing file.",
+                //     progress: progress.targetSize / size
+                // });
+                console.log('Processing: ' + progress.targetSize + ' KB converted');
+                if (progressing) {
+                    progressing(progress.targetSize);
+                }
+            })
+            .on('end', () => {
+                // UI.postMessage({
+                //     event: 'progress',
+                //     text: "Decompressing file.",
+                //     progress: 1
+                // });
+                if (finish) {
+                    resolve(destination)
+                }
+            })
+            .save(destination);
+    });
+}
 
-        const buffer = await fetchAudioBuffer({file: file, start: 0, end: 20, position: 0})
-        const length = buffer.length;
-        const myArray = buffer.getChannelData(0);
-        UI.postMessage({
-            event: 'worker-loaded-audio',
-            fileStart: metadata[file].fileStart,
-            sourceDuration: metadata[file].duration,
-            bufferBegin: 0,
-            file: file,
-            position: 0,
-            length: length,
-            contents: myArray,
-        })
+async function formatCheck(file) {
+    if (proxiedFileCache[file]) return;
+    if (!file.endsWith('.wav')) {
+        const destination = p.join(file_cache, p.basename(file) + ".wav");
+        proxiedFileCache[file] = destination;
+        const statsObj = fs.statSync(file);
+        const mtime = statsObj.mtime;
+        file = await convertFileFormat(file, destination, statsObj.size, function (errorMessage) {
+        }, null, function () {
+            file = destination;
+            console.log("success");
+        });
+        await utimes(file, mtime.getTime());
     } else {
-        await convertFileToBuffers({file: file})
+        proxiedFileCache[file] = file;
     }
 }
 
+async function loadAudioFile(args) {
+    // reset file cache
+    await clearCache();
+
+    let file = args.filePath;
+    await formatCheck(file);
+    if (!metadata[file]) {
+        metadata[file] = await getMetadata(file)
+    }
+    const buffer = await fetchAudioBuffer({file: file, start: 0, end: 20, position: 0})
+    const length = buffer.length;
+    const myArray = buffer.getChannelData(0);
+    UI.postMessage({
+        event: 'worker-loaded-audio',
+        fileStart: metadata[file].fileStart,
+        sourceDuration: metadata[file].duration,
+        bufferBegin: 0,
+        file: file,
+        position: 0,
+        length: length,
+        contents: myArray,
+    })
+
+}
+
+function addDays(date, days) {
+    let result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+}
 
 const getMetadata = async (file) => {
     let fileStart;
+    const proxyFile = proxiedFileCache[file]
     metadata[file] = {};
-    metadata[file].duration = await getDuration(file);
-    return new Promise((resolve) => {
-        const readStream = fs.createReadStream(file);
-        fs.stat(file, (error, stats) => {
-            if (error) console.log("Stat error: ", error)
-            else {
-                metadata[file].stat = stats;
-                fileStart = new Date(metadata[file].stat.mtime - (metadata[file].duration * 1000)).getTime();
-                let astro = SunCalc.getTimes(fileStart, latitude, longitude);
-                metadata[file].dusk = astro.dusk.getTime();
-                // If file starts after dark, dawn is next day
-                if (fileStart > astro.dusk.getTime()) {
-                    astro = SunCalc.getTimes(fileStart + 8.47e+7, latitude, longitude);
-                    metadata[file].dawn = astro.dawn.getTime();
-                } else {
-                    metadata[file].dawn = astro.dawn.getTime();
-                }
 
-            }
-        });
+    return new Promise(async (resolve) => {
+        metadata[file].duration = await getDuration(file);
+        const readStream = fs.createReadStream(proxyFile);
+        metadata[file].stat = fs.statSync(file);
+        const fileEnd = new Date(metadata[file].stat.mtime);
+        fileStart = new Date(metadata[file].stat.mtime - (metadata[file].duration * 1000))
+        // split  the duration of this file across any dates it spans
+        metadata[file].dateDuration = {}
+        const key = new Date(fileStart);
+        key.setHours(0, 0, 0, 0);
+        const keyCopy = addDays(key, 0).getTime();
+        if (fileStart.getDate() === fileEnd.getDate()) {
+            metadata[file].dateDuration[keyCopy] = metadata[file].duration;
+        } else {
+            const key2 = addDays(key, 1);
+
+            const key2Copy = addDays(key2, 0).getTime();
+            metadata[file].dateDuration[keyCopy] = (key2Copy - fileStart) / 1000;
+            metadata[file].dateDuration[key2Copy] = metadata[file].duration - metadata[file].dateDuration[keyCopy];
+        }
+
+        fileStart = new Date(metadata[file].stat.mtime - (metadata[file].duration * 1000)).getTime();
+        let astro = SunCalc.getTimes(fileStart, latitude, longitude);
+        metadata[file].dusk = astro.dusk.getTime();
+        // If file starts after dark, dawn is next day
+        if (fileStart > astro.dusk.getTime()) {
+            astro = SunCalc.getTimes(fileStart + 8.47e+7, latitude, longitude);
+            metadata[file].dawn = astro.dawn.getTime();
+        } else {
+            metadata[file].dawn = astro.dawn.getTime();
+        }
+
         readStream.on('data', async chunk => {
             let wav = new wavefileReader.WaveFileReader();
             wav.fromBuffer(chunk);
@@ -430,19 +431,16 @@ async function setupCtx(chunk, file) {
 async function getPredictBuffers(args) {
     let start = args.start, end = args.end, selection = args.selection
     const file = args.file
-    if (!file.endsWith('.wav')) {
-        //await convertFileToBuffers(args)
-        return
-    }
     // Ensure max and min are within range
     start = Math.max(0, start);
     // Handle no end supplied
+    const proxyFile = proxiedFileCache[file]
     end > 0 ? end = Math.min(metadata[file].duration, end) : end = metadata[file].duration;
     const byteStart = convertTimeToBytes(start, file);
     const byteEnd = convertTimeToBytes(end, file);
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
     const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * 3;
-    const readStream = fs.createReadStream(file, {
+    const readStream = fs.createReadStream(proxyFile, {
         start: byteStart,
         end: byteEnd,
         highWaterMark: highWaterMark
@@ -470,7 +468,8 @@ async function getPredictBuffers(args) {
 
 const fetchAudioBuffer = (args) => {
     return new Promise((resolve) => {
-        let start = args.start, end = args.end, file = args.file
+        let start = args.start, end = args.end, file = args.file;
+        const proxyFile = proxiedFileCache[file]
         // Ensure max and min are within range
         start = Math.max(0, start);
         // Handle no end supplied
@@ -480,7 +479,7 @@ const fetchAudioBuffer = (args) => {
         //if (isNaN(byteEnd)) byteEnd = Infinity;
         // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
         const highWaterMark = byteEnd - byteStart + 1;
-        const readStream = fs.createReadStream(file, {
+        const readStream = fs.createReadStream(proxyFile, {
             start: byteStart,
             end: byteEnd,
             highWaterMark: highWaterMark
@@ -783,7 +782,7 @@ async function parsePredictions(e) {
             // 3.5 seconds subtracted because position is the beginning of a 3-second chunk and
             // the min fragment length is 0.5 seconds
             if (position.toFixed(0) >= (response.endpoint.toFixed(0) - 3.5)) {
-                console.log('Prediction done');
+                console.log(`Prediction done ${FILE_QUEUE.length} files to go`);
                 console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
                 if (RESULTS.length === 0) {
                     const result = "No detections found.";
@@ -796,26 +795,35 @@ async function parsePredictions(e) {
                     });
                 }
                 UI.postMessage({event: 'progress', progress: 1});
-                UI.postMessage({
-                    event: 'prediction-done',
-                    labels: AUDACITY,
-                    batchInProgress: FILE_QUEUE.length,
-                    duration: metadata[file].duration
-                });
+                if (!predictionDone) {
+                    UI.postMessage({
+                        event: 'prediction-done',
+                        labels: AUDACITY,
+                        batchInProgress: FILE_QUEUE.length,
+                    });
+                }
                 predictionDone = true;
             }
         })
     }
     if (predictionDone) {
-        if (FILE_QUEUE.length) {
-            const file = FILE_QUEUE.shift()
-            let [start, end] = await setStartEnd(file);
-            await doPrediction({start: start, end: end, file: file, selection: false, preserveResults: true});
+        await processNextFile();
+    }
+}
 
+async function processNextFile() {
+    if (FILE_QUEUE.length) {
+        let file = FILE_QUEUE.shift()
+        await formatCheck(file);
+        let [start, end] = await setStartEnd(file);
+        if (start === 0 && end === 0) {
+            // Nothing to do for this file
+            await processNextFile();
         } else {
-            if (RESULTS.length) UI.postMessage({event: 'promptToSave'})
-            predicting = false;
+            await doPrediction({start: start, end: end, file: file, selection: false, preserveResults: true});
         }
+    } else {
+        predicting = false;
     }
 }
 
@@ -823,16 +831,31 @@ async function setStartEnd(file) {
     const metadata = await getMetadata(file);
     let start, end;
     if (nocmig) {
-        metadata.fileStart < metadata.dawn || metadata.fileStart > metadata.dusk ?
-            start = 0 : start = (metadata.dusk - metadata.fileStart) / 1000;
         const fileEnd = metadata.fileStart + (metadata.duration * 1000);
-        fileEnd >= metadata.dawn ? end = (metadata.dawn - metadata.fileStart) / 1000 : end = metadata.duration;
-        // In case it's all in the daytime and just a single file
-
-        if (metadata.fileStart > metadata.dawn && fileEnd < metadata.dusk && !FILE_QUEUE.length) {
+        // If it's dark at the file start, start at 0 ...otherwise start at dusk
+        if (metadata.fileStart < metadata.dawn || metadata.fileStart > metadata.dusk) {
             start = 0;
-            end = metadata.duration;
+        } else {
+            // not dark at start, is it still light at the end?
+            if (fileEnd <= metadata.dusk) {
+                // If we loaded multiple files
+                if (FILE_QUEUE.length || Object.keys(proxiedFileCache).length > 1) {
+                    // skip to next file
+
+                    return [0, 0];
+                } else {
+                    // In case it's all in the daytime and just a single file - temporarily disable nocmig mode
+                    return [0, metadata.duration];
+                }
+            } else {
+                // So, it *is* dark by the end of the file
+                start = (metadata.dusk - metadata.fileStart) / 1000;
+            }
         }
+        // Now set the end
+        metadata.fileStart < metadata.dawn && fileEnd >= metadata.dawn ?
+            end = (metadata.dawn - metadata.fileStart) / 1000 :
+            end = metadata.duration;
     } else {
         start = 0;
         end = metadata.duration;
@@ -842,163 +865,197 @@ async function setStartEnd(file) {
 
 let t1, t0;
 
-async function onSave2DB() {
-    t0 = performance.now();
-    await db.serialize(() => {
-        for (let i = 0; i < RESULTS.length; i++) {
-            const fileStmt = db.prepare("SELECT rowid FROM files where name = (?)");
-            const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?)");
-            const newFileStmt = db.prepare("INSERT INTO files VALUES (?,?)")
-            const dateTime = new Date(RESULTS[i].timestamp).getTime();
-            const birdID1 = RESULTS[i].id_1;
-            const birdID2 = RESULTS[i].id_2;
-            const birdID3 = RESULTS[i].id_3;
-            const conf1 = RESULTS[i].score;
-            const conf2 = RESULTS[i].score2;
-            const conf3 = RESULTS[i].score3;
-            const position = new Date(RESULTS[i].position).getTime();
-            const file = RESULTS[i].file;
-            const fileDuration = metadata[file].duration;
-            newFileStmt.run(file, fileDuration, () => {
-                fileStmt.get(file, (err, row) => {
-                    if (err) console.log(err);
-                    stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, row.rowid, position);
-                    newFileStmt.finalize();
-                    stmt.finalize();
-                    fileStmt.finalize();
-                });
-            });
-        }
-
-        // db.each("SELECT DATETIME(records.dateTime/1000, 'unixepoch', 'localtime') as dateTime, species.sname as sname, species.cname as cname FROM records INNER JOIN species on species.id = records.birdID1", (err, row) => {
-        //     console.log(`Time of Day: ${row.dateTime}, Scientific name: ${row.sname}, Common Name: ${row.cname}`);
-        // });
-    });
-    t1 = performance.now()
-    console.log(`database work took ${(t1 - t0) / 1000} seconds`)
+const updateFileTables = (file) => {
+    return new Promise(function (resolve) {
+        const newFileStmt = db.prepare("INSERT INTO files VALUES (?,?)");
+        const selectStmt = db.prepare('SELECT rowid FROM files WHERE name = (?)');
+        const durationStmt = db.prepare("INSERT OR REPLACE INTO duration VALUES (?,?,?)");
+        newFileStmt.run(file, metadata[file].duration, (err, row) => {
+            for (const [date, duration] of Object.entries(metadata[file].dateDuration)) {
+                selectStmt.get(file, (err, row) => {
+                    const fileid = row.rowid;
+                    console.log('file table updated')
+                    resolve(fileid);
+                    durationStmt.run(date, Math.round(duration).toFixed(0), fileid);
+                })
+            }
+        })
+    })
 }
 
-function onChartRequest(args) {
-    db.serialize(() => {
-        const earliestSpring = db.prepare(`
-            SELECT MIN(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) as date
-            from records inner join species
-            on species.id = records.birdID1
-            where species.cname = (?)
-              AND STRFTIME('%m'
-                , DATETIME(records.dateTime/1000
-                , 'unixepoch'
-                , 'localtime'))
-                < '07'`);
-        const earliestAutumn = db.prepare(`
-            SELECT MIN(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) as date
-            from records inner join species
-            on species.id = records.birdID1
-            where species.cname = (?)
-              AND STRFTIME('%m'
-                , DATETIME(records.dateTime/1000
-                , 'unixepoch'
-                , 'localtime'))
-                > '06'`);
-        const latestSpring = db.prepare(`
-            SELECT MAX(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) as date
-            from records inner join species
-            on species.id = records.birdID1
-            where species.cname = (?)
-              AND STRFTIME('%m'
-                , DATETIME(records.dateTime/1000
-                , 'unixepoch'
-                , 'localtime'))
-                < '07'`);
-        const latestAutumn = db.prepare(`
-            SELECT MAX(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) as date
-            from records inner join species
-            on species.id = records.birdID1
-            where species.cname = (?)
-              AND STRFTIME('%m'
-                , DATETIME(records.dateTime/1000
-                , 'unixepoch'
-                , 'localtime'))
-                > '06'`);
-        const mostDetections = db.prepare(`
+const onSave2DB = async () => {
+    t0 = performance.now();
+    const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?)");
+    let filemap = {}
+    for (let i = 0; i < RESULTS.length; i++) {
+        const dateTime = new Date(RESULTS[i].timestamp).getTime();
+        const birdID1 = RESULTS[i].id_1;
+        const birdID2 = RESULTS[i].id_2;
+        const birdID3 = RESULTS[i].id_3;
+        const conf1 = RESULTS[i].score;
+        const conf2 = RESULTS[i].score2;
+        const conf3 = RESULTS[i].score3;
+        const position = new Date(RESULTS[i].position).getTime();
+        const file = RESULTS[i].file;
+        if (!filemap[file]) filemap[file] = await updateFileTables(file);
+        stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, filemap[file], position, (err, row) => {
+            UI.postMessage({event: 'progress', text: "Updating Database.", progress: i / RESULTS.length});
+            if (i === (RESULTS.length - 1)) {
+                console.log(`Update complete, ${i + 1} records added in ${((performance.now() - t0) / 1000).toFixed(1)} seconds`)
+                UI.postMessage({event: 'progress', progress: 1});
+            }
+        });
+
+    }
+    // newFileStmt.finalize();
+    // stmt.finalize();
+    // fileStmt.finalize();
+}
+
+const getSeasonRecords = (species, season) => {
+    const seasonMonth = {'spring': "< '07'", 'autumn': " > '06'"}
+    return new Promise(function (resolve, reject) {
+        const stmt = db.prepare(`
+            SELECT MAX(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS maxDate,
+                   MIN(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS minDate
+            FROM records
+                     INNER JOIN species ON species.id = records.birdID1
+            WHERE species.cname = (?)
+              AND STRFTIME('%m', DATETIME(records.dateTime / 1000, 'unixepoch', 'localtime')) ${seasonMonth[season]}`);
+        stmt.get(species, (err, row) => {
+            if (err) {
+                reject(err)
+            } else {
+                resolve(row)
+            }
+        })
+    })
+}
+
+const getMostCalls = (species) => {
+    return new Promise(function (resolve, reject) {
+        db.get(`
             SELECT count(*) as count, 
             DATE(dateTime/1000, 'unixepoch', 'localtime') as date
             FROM records INNER JOIN species
             on species.id = records.birdID1
-            WHERE species.cname = (?)
+            WHERE species.cname = '${species}'
             GROUP BY STRFTIME('%Y', DATETIME(dateTime/1000, 'unixepoch', 'localtime')),
                 STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')),
                 STRFTIME('%d', DATETIME(dateTime/1000, 'unixepoch', 'localtime'))
-            ORDER BY count DESC LIMIT 1`);
-        // const totalsStmt = db.prepare(`
-        //     SELECT STRFTIME('%Y', DATETIME(records.dateTime / 1000, 'unixepoch', 'localtime')) as year,
-        //            STRFTIME('%W', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as week,
-        //            COUNT(*) AS count
-        //     FROM records
-        //     INNER JOIN species ON species.id = records.birdID1
-        //     WHERE species.cname = (?)
-        //     GROUP BY year, week;`);
-        const chartStmt = db.prepare(`
-            SELECT STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS year, 
+            ORDER BY count DESC LIMIT 1`, (err, row) => {
+            if (err) {
+                reject(err)
+            } else {
+                resolve(row)
+            }
+        })
+    })
+}
+
+const getChartTotals = (species) => {
+    return new Promise(function (resolve, reject) {
+        db.all(`SELECT STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS year, 
             STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS week, 
             count(*) as count
-            FROM records
-            INNER JOIN species on species.id = birdid1
-            WHERE species.cname = (?)
-            GROUP BY year, week
-ORDER BY year DESC;`);
-        const rateStmt = db.prepare(`
-            SELECT STRFTIME('%W', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS week,
-            ROUND(COUNT(*) / (files.duration / 3600), 2) AS rate
-            FROM records
-                     INNER JOIN species on species.id = birdid1
-                     INNER JOIN files on files.rowid = records.fileid
-            WHERE species.cname = (?)
-            GROUP BY week;`);
-        let results = {};
-        let rate = new Array(52).fill(0);
-        let dataRecords = {};
-        earliestSpring.get(args.species, (err, row) => {
-            dataRecords.earliestSpring = row.date;
-            latestSpring.get(args.species, (err, row) => {
-                dataRecords.latestSpring = row.date;
-                earliestAutumn.get(args.species, (err, row) => {
-                    dataRecords.earliestAutumn = row.date;
-                    latestAutumn.get(args.species, (err, row) => {
-                        dataRecords.latestAutumn = row.date;
-                        mostDetections.get(args.species, (err, row) => {
-                            row ? dataRecords.mostDetections = [row.count, row.date] :
-                                dataRecords.mostDetections = ['N/A', 'Not detected'];
-                            rateStmt.all(args.species, (err, rows) => {
-                                for (let i = 0; i < rows.length; i++) {
-                                    const week = rows[i].week;
-                                    rate[parseInt(week) - 1] = rows[i].rate;
-                                }
-                                chartStmt.all(args.species, (err, rows) => {
-                                    for (let i = 0; i < rows.length; i++) {
-                                        const year = rows[i].year;
-                                        const week = rows[i].week;
-                                        const count = rows[i].count;
-                                        const rate = rows[i].rate;
-                                        if (!(year in results)) {
-                                            results[year] = new Array(52).fill(0);
-                                        }
-                                        results[year][parseInt(week) - 1] = count;
-                                    }
-                                    UI.postMessage({
-                                        event: 'chart-data',
-                                        species: args.species,
-                                        results: results,
-                                        rate: rate,
-                                        records: dataRecords
-                                    })
-                                })
-                            })
-                        })
-                    })
-                })
-            })
+        FROM records
+            INNER JOIN species
+        on species.id = birdid1
+        WHERE species.cname = '${species}'
+        GROUP BY year, week
+        ORDER BY year DESC;`, (err, rows) => {
+            if (err) {
+                reject(err)
+            } else {
+                resolve(rows)
+            }
         })
+    })
+}
+
+const getRate = (species) => {
+    return new Promise(function (resolve, reject) {
+        db.all(`SELECT a.week                                                           as week,
+               ROUND(CAST(a.calls AS REAL) / (CAST(SUM(a.duration) AS REAL) / 3600), 2) as rate
+        FROM (SELECT STRFTIME('%W', DATE(dateTime/1000, 'unixepoch', 'localtime')) AS week,
+                     COUNT(*)                                                      AS calls,
+                     duration
+              FROM records
+                       INNER JOIN species ON species.id = records.birdid1
+                       INNER JOIN duration
+                                  ON STRFTIME('%W', DATE(duration.day/1000, 'unixepoch', 'localtime'))
+                                      = STRFTIME('%W', Date(records.dateTime/1000, 'unixepoch', 'localtime'))
+
+              WHERE species.cname = '${species}'
+              GROUP BY week, duration) a
+        GROUP BY week;`, (err, rows) => {
+            if (err) {
+                reject(err)
+            } else {
+                resolve(rows)
+            }
+        })
+    })
+}
+
+async function onChartRequest(args) {
+    const dataRecords = {}, results = {};
+    await getSeasonRecords(args.species, 'spring')
+        .then((result) => {
+            dataRecords.earliestSpring = result[0];
+            dataRecords.latestSpring = result[1];
+        }).catch((message) => {
+            console.log(message)
+        })
+
+    await getSeasonRecords(args.species, 'autumn')
+        .then((result) => {
+            dataRecords.earliestAutumn = result[0];
+            dataRecords.latestAutumn = result[1];
+        }).catch((message) => {
+            console.log(message)
+        })
+
+    await getMostCalls(args.species)
+        .then((row) => {
+            row ? dataRecords.mostDetections = [row.count, row.date] :
+                dataRecords.mostDetections = ['N/A', 'Not detected'];
+        }).catch((message) => {
+            console.log(message)
+        })
+
+    await getChartTotals(args.species)
+        .then((rows) => {
+            for (let i = 0; i < rows.length; i++) {
+                const year = rows[i].year;
+                const week = rows[i].week;
+                const count = rows[i].count;
+                if (!(year in results)) {
+                    results[year] = new Array(52).fill(0);
+                }
+                results[year][parseInt(week) - 1] = count;
+            }
+        }).catch((message) => {
+            console.log(message)
+        })
+
+    let rate = new Array(52).fill(0);
+    await getRate(args.species)
+        .then((rows) => {
+           for (let i = 0; i < rows.length; i++) {
+                const week = rows[i].week;
+                rate[parseInt(week) - 1] = rows[i].rate;
+            }
+        }).catch((message) => {
+            console.log(message)
+        })
+
+    UI.postMessage({
+        event: 'chart-data',
+        species: args.species,
+        results: results,
+        rate: rate,
+        records: dataRecords
     })
 }
 

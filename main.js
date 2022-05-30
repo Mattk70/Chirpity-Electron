@@ -156,12 +156,8 @@ app.whenReady().then(async () => {
         console.log(details);
         const dialogOpts = {
             type: 'warning',
-            title: 'File too large',
-            detail: 'The file loaded was too long. Currently, Chirpity is limited to analysing files with the following limits:\n' +
-                'Sample Rate     Maximum Duration\n' +
-                '48000Hz            3 hours 6 minutes and 20 seconds\n' +
-                '44100Hz            3 hours 22 minutes and 49 seconds\n' +
-                '24000Hz            6 hours 12 minutes 40 seconds'
+            title: 'Crash report',
+            detail: e
         }
 
         dialog.showMessageBox(dialogOpts).then((returnValue) => {
@@ -200,6 +196,7 @@ app.on('open-file', (event, path) => {
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
+
         app.quit()
     }
 })

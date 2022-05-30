@@ -54,6 +54,12 @@
                    aria-haspopup="true" aria-expanded="false">
                     Records
                 </a>
+                <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
+                    <a class="dropdown-item" href="#" id="save2db">Save Records</a>
+                    <a class="dropdown-item" href="#" id="charts">View charts</a>
+                    <a class="dropdown-item" href="#" id="explore">Explore records</a>
+                    <a class="dropdown-item" href="#" id="manage">Manage Records</a>
+                </div>
             </li>
             <li class="nav-item dropdown active">
                 <a class="nav-link dropdown-toggle" href="#" id="navbarAnalysis" role="button" data-toggle="dropdown"
@@ -272,7 +278,7 @@
     <!-- Controls view -->
     <div class="container-fluid p-1 bg-dark text-white d-inline-flex" id="controlsWrapper" style="max-height: 50px">
 
-        <div id="filename" class="col-5 ps-1">
+        <div id="filename" class="col-5 ps-1 overflow-auto">
             <div id="fileContainer" class="bg-dark text-nowrap pe-3"></div>
         </div>
 
@@ -343,8 +349,7 @@
     <div class="d-none overflow-auto p-2" id="recordsContainer">
         <div>
             <div class="" id="speciesSearch"></div>
-            <table id='dataRecords' class="table table-hover border border-dark
-">
+            <table id='dataRecords' class="table table-hover border border-dark d-none">
             <tbody class="text-dark" id="recordsTableBody">
             <tr>
                 <th>Earliest Spring Record</th>
