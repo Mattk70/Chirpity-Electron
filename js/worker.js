@@ -1002,16 +1002,16 @@ async function onChartRequest(args) {
     const dataRecords = {}, results = {};
     await getSeasonRecords(args.species, 'spring')
         .then((result) => {
-            dataRecords.earliestSpring = result[0];
-            dataRecords.latestSpring = result[1];
+            dataRecords.earliestSpring = result['minDate'];
+            dataRecords.latestSpring = result['maxDate'];
         }).catch((message) => {
             console.log(message)
         })
 
     await getSeasonRecords(args.species, 'autumn')
         .then((result) => {
-            dataRecords.earliestAutumn = result[0];
-            dataRecords.latestAutumn = result[1];
+            dataRecords.earliestAutumn = result['minDate'];
+            dataRecords.latestAutumn = result['maxDate'];
         }).catch((message) => {
             console.log(message)
         })
