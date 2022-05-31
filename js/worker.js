@@ -995,7 +995,7 @@ const getRate = (species) => {
                 }
                 let rate = [];
                 for (let i = 0; i < calls.length; i++) {
-                    total[i] > 0 ? rate[i] = calls[i] / total[i] : rate[i] = 0;
+                    total[i] > 0 ? rate[i] = Math.round((calls[i] / total[i]) * 100) / 100 : rate[i] = 0;
                 }
                 if (err) {
                     reject(err)
