@@ -958,12 +958,12 @@ const getChartTotals = (species) => {
         db.all(`SELECT STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS year, 
             STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS week, 
             count(*) as count
-        FROM records
-            INNER JOIN species
-        on species.id = birdid1
-        WHERE species.cname = '${species}'
-        GROUP BY year, week
-        ORDER BY year DESC;`, (err, rows) => {
+                FROM records
+                    INNER JOIN species
+                on species.id = birdid1
+                WHERE species.cname = '${species}'
+                GROUP BY year, week
+                ORDER BY year DESC;`, (err, rows) => {
             if (err) {
                 reject(err)
             } else {
@@ -972,34 +972,45 @@ const getChartTotals = (species) => {
         })
     })
 }
+
 
 const getRate = (species) => {
-    return new Promise(function (resolve, reject) {
-        db.all(`SELECT a.week                                                           as week,
-               ROUND(CAST(a.calls AS REAL) / (CAST(SUM(a.duration) AS REAL) / 3600), 2) as rate
-        FROM (SELECT STRFTIME('%W', DATE(dateTime/1000, 'unixepoch', 'localtime')) AS week,
-                     COUNT(*)                                                      AS calls,
-                     duration
-              FROM records
-                       INNER JOIN species ON species.id = records.birdid1
-                       INNER JOIN duration
-                                  ON STRFTIME('%W', DATE(duration.day/1000, 'unixepoch', 'localtime'))
-                                      = STRFTIME('%W', Date(records.dateTime/1000, 'unixepoch', 'localtime'))
 
-              WHERE species.cname = '${species}'
-              GROUP BY week, duration) a
-        GROUP BY week;`, (err, rows) => {
-            if (err) {
-                reject(err)
-            } else {
-                resolve(rows)
+    return new Promise(function (resolve, reject) {
+        const calls = new Array(52).fill(0);
+        const total = new Array(52).fill(0);
+
+
+        db.all(`select STRFTIME('%W', DATE(dateTime / 1000, 'unixepoch', 'localtime')) as week, count(*) as calls
+                from records
+                         INNER JOIN species ON species.id = records.birdid1
+                WHERE species.cname = '${species}'
+                group by week;`, (err, rows) => {
+            for (let i = 0; i < rows.length; i++) {
+                calls[parseInt(rows[i].week) - 1] = rows[i].calls;
             }
+            db.all("select STRFTIME('%W', DATE(duration.day / 1000, 'unixepoch', 'localtime')) as week, cast(sum(duration) as real)/3600  as total from duration group by week;", (err, rows) => {
+                for (let i = 0; i < rows.length; i++) {
+                    total[parseInt(rows[i].week) - 1] = rows[i].total;
+                }
+                let rate = [];
+                for (let i = 0; i < calls.length; i++) {
+                    total[i] > 0 ? rate[i] = calls[i] / total[i] : rate[i] = 0;
+                }
+                if (err) {
+                    reject(err)
+                } else {
+                    resolve(rate)
+                }
+            })
         })
     })
 }
+
 
 async function onChartRequest(args) {
     const dataRecords = {}, results = {};
+    t0 = Date.now();
     await getSeasonRecords(args.species, 'spring')
         .then((result) => {
             dataRecords.earliestSpring = result['minDate'];
@@ -1016,6 +1027,8 @@ async function onChartRequest(args) {
             console.log(message)
         })
 
+    console.log(`Season chart generation took ${(Date.now() - t0) / 1000} seconds`)
+    t0 = Date.now();
     await getMostCalls(args.species)
         .then((row) => {
             row ? dataRecords.mostDetections = [row.count, row.date] :
@@ -1024,6 +1037,8 @@ async function onChartRequest(args) {
             console.log(message)
         })
 
+    console.log(`Most calls  chart generation took ${(Date.now() - t0) / 1000} seconds`)
+    t0 = Date.now();
     await getChartTotals(args.species)
         .then((rows) => {
             for (let i = 0; i < rows.length; i++) {
@@ -1039,17 +1054,12 @@ async function onChartRequest(args) {
             console.log(message)
         })
 
-    let rate = new Array(52).fill(0);
-    await getRate(args.species)
-        .then((rows) => {
-           for (let i = 0; i < rows.length; i++) {
-                const week = rows[i].week;
-                rate[parseInt(week) - 1] = rows[i].rate;
-            }
-        }).catch((message) => {
-            console.log(message)
-        })
+    console.log(`Chart series generation took ${(Date.now() - t0) / 1000} seconds`)
+    t0 = Date.now();
 
+    let rate = await getRate(args.species)
+    console.log(`Chart rate generation took ${(Date.now() - t0) / 1000} seconds`)
+    t0 = Date.now();
     UI.postMessage({
         event: 'chart-data',
         species: args.species,
