@@ -1000,7 +1000,7 @@ const getRate = (species) => {
                 if (err) {
                     reject(err)
                 } else {
-                    resolve(rate)
+                    resolve([total, rate])
                 }
             })
         })
@@ -1057,14 +1057,15 @@ async function onChartRequest(args) {
     console.log(`Chart series generation took ${(Date.now() - t0) / 1000} seconds`)
     t0 = Date.now();
 
-    let rate = await getRate(args.species)
+    let [total, rate] = await getRate(args.species)
     console.log(`Chart rate generation took ${(Date.now() - t0) / 1000} seconds`)
-    t0 = Date.now();
+
     UI.postMessage({
         event: 'chart-data',
         species: args.species,
         results: results,
         rate: rate,
+        total: total,
         records: dataRecords
     })
 }

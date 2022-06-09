@@ -7,7 +7,6 @@ const {v4: uuidv4} = require("uuid");
 const {gzip, ungzip} = require('node-gzip');
 const si = require('systeminformation');
 
-
 // We need to wait until the UI  is ready to receive the message before
 // sending the port. We create this promise in the preload, so it's guaranteed
 // to register the onload listener before the load event is fired.
