@@ -383,7 +383,7 @@ async function showOpenDialog() {
 
 async function onOpenFiles(args) {
     hideAll();
-    showElement(['controlsWrapper', 'timeline', 'waveform', 'spectrogram', 'dummy'])
+    showElement(['controlsWrapper', 'timeline', 'waveform', 'spectrogram', 'dummy'], false)
     resetResults();
     completeDiv.hide();
     // Store the file list and Load First audio file
