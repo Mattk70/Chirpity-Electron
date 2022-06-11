@@ -250,7 +250,7 @@ class Model {
                     score: Math.round(item.score[0] * 1000) / 1000,
                 })
                 //prepare summary
-                //console.log(key, item.index[0], this.labels[item.index[0]], Math.round(item.score[0] * 1000) / 1000);
+                console.log(key, item.index[0], this.labels[item.index[0]], Math.round(item.score[0] * 1000) / 1000);
                 batched_results.push([key, result, audacity]);
             }
             this.result = batched_results;
