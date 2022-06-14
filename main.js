@@ -1,4 +1,4 @@
-const {app, dialog, ipcMain, MessageChannelMain, BrowserWindow} = require('electron');
+const {app, session, dialog, ipcMain, MessageChannelMain, BrowserWindow} = require('electron');
 const fs = require("fs");
 const path = require('path')
 
@@ -27,7 +27,6 @@ let files = [];
 //        if (returnValue.response === 0) autoUpdater.quitAndInstall()
 //    })
 //})
-
 
 
 let mainWindow;
@@ -196,10 +195,16 @@ app.on('open-file', (event, path) => {
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
-
-        app.quit()
+        app.quit();
     }
 })
+
+// app.on('before-quit', async () =>
+// {
+//     console.log('before quit fired')
+//     workerWindow.webContents.postMessage('new-client', {action: 'clear-cache'})
+//     await session.defaultSession.clearStorageData();
+// })
 
 app.on('activate', () => {
     if (mainWindow === null) {
