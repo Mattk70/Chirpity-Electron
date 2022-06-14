@@ -117,7 +117,6 @@ const isDuplicate = (file) => {
         const stmt = db.prepare("SELECT * FROM files WHERE name = (?)");
         stmt.get(file, (err, row) => {
             if (row) {
-
                 resolve(true)
             } else resolve(false)
         })
@@ -131,6 +130,10 @@ ipcRenderer.on('new-client', (event) => {
         const action = args.action;
         console.log('message received ', action)
         switch (action) {
+            case 'clear-cache':
+                console.log('cache')
+                await clearCache();
+                break;
             case 'load-model':
                 UI.postMessage({event: 'spawning'});
                 await clearCache();
@@ -170,17 +173,41 @@ ipcRenderer.on('new-client', (event) => {
                 break;
             case 'analyze':
                 console.log(`Worker received message: ${args.confidence}, start: ${args.start}, end: ${args.end}`);
+                if (args.resetResults) {
+                    index = 0;
+                    AUDACITY = [];
+                    RESULTS = [];
+                }
                 latitude = args.lat;
                 longitude = args.lon;
                 nocmig = args.nocmig;
-                const skip = await isDuplicate(args.filePath);
-                if (skip) {
-                    console.log(`Skipping ${args.filePath} as it has already been processed`);
+                const isCached = await isDuplicate(args.filePath);
+                if (isCached) {
+                    // Pull the results from the database
+                    const results = await getCachedResults({file: args.filePath});
+                    //const results = await getCachedResults({species: 'Redwing'});
+                    UI.postMessage({event: 'update-audio-duration', value: results[0].duration});
+                    results.forEach(result => {
+                        //format dates
+                        result.timestamp = new Date(result.timestamp);
+                        result.position = new Date(result.position);
+                        index++;
+                        UI.postMessage({
+                            event: 'prediction-ongoing',
+                            file: result.file,
+                            result: result,
+                            index: index,
+                            selection: false,
+                        });
+                        //AUDACITY.push(audacity);
+                        RESULTS.push(result);
+                    })
+                    console.log(`Pulling results for ${args.filePath} from database`);
                     // When in batch mode the 'prediction-done' event simply increments
                     // the counter for the file being processed
                     UI.postMessage({
                         event: 'prediction-done',
-                        batchInProgress: true,
+                        batchInProgress: false,
                     });
                     //if (FILE_QUEUE.length) await processNextFile();
                 } else {
@@ -191,11 +218,6 @@ ipcRenderer.on('new-client', (event) => {
 
                     } else {
                         predicting = true;
-                        if (!args.selection) {
-                            index = 0;
-                            AUDACITY = [];
-                            RESULTS = [];
-                        }
                         minConfidence = args.confidence;
                         await processNextFile();
                         // //let selection = false;
@@ -279,6 +301,7 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
                 //     progress: progress.targetSize / size
                 // });
                 console.log('Processing: ' + progress.targetSize + ' KB converted');
+                UI.postMessage({event: 'progress', text: 'Decompressing file', progress: progress.targetSize/ 1073559.65 })
                 if (progressing) {
                     progressing(progress.targetSize);
                 }
@@ -289,6 +312,7 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
                 //     text: "Decompressing file.",
                 //     progress: 1
                 // });
+                UI.postMessage({event: 'progress', text: 'File decompressed', progress: 1.0 })
                 if (finish) {
                     resolve(destination)
                 }
@@ -466,10 +490,15 @@ async function getPredictBuffers(args) {
     })
 }
 
-const fetchAudioBuffer = (args) => {
+const fetchAudioBuffer = async (args) => {
+    let start = args.start, end = args.end, file = args.file;
+    let proxyFile;
+    if (!proxiedFileCache[file]) {
+        await formatCheck(file);
+        await getMetadata(file);
+    }
+    proxyFile = proxiedFileCache[file];
     return new Promise((resolve) => {
-        let start = args.start, end = args.end, file = args.file;
-        const proxyFile = proxiedFileCache[file]
         // Ensure max and min are within range
         start = Math.max(0, start);
         // Handle no end supplied
@@ -865,6 +894,39 @@ async function setStartEnd(file) {
 
 let t1, t0;
 
+const getCachedResults = (args) => {
+    let where;
+    if (args.file) where = `files.name =  '${args.file}'`;
+    if (args.species) where = `s1.cname =  '${args.species}'`;
+    return new Promise(function (resolve, reject) {
+        db.all(`SELECT dateTime AS timestamp, position AS position, 
+            s1.cname as cname, s2.cname as cname2, s3.cname as cname3, 
+            birdid1 as id_1, birdid2 as id_2, birdid3 as id_3, 
+            position / 1000 as
+                start, (position / 1000) + 3 as
+        end
+        ,  
+                conf1 as score, conf2 as score2, conf3 as score3, 
+                s1.sname as sname, s2.sname as sname2, s3.sname as sname3,
+                files.duration, 
+                files.name as file
+                FROM records 
+                LEFT JOIN species s1 on s1.id = birdid1 
+                LEFT JOIN species s2 on s2.id = birdid2 
+                LEFT JOIN species s3 on s3.id = birdid3 
+                INNER JOIN files on files.rowid = records.fileid 
+                WHERE
+        ${where}`, (err, rows) => {
+            if (err) {
+                reject(err)
+            } else {
+                resolve(rows)
+            }
+        })
+    })
+}
+
+
 const updateFileTables = (file) => {
     return new Promise(function (resolve) {
         const newFileStmt = db.prepare("INSERT INTO files VALUES (?,?)");
@@ -957,7 +1019,7 @@ const getChartTotals = (species) => {
     return new Promise(function (resolve, reject) {
         db.all(`SELECT STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS year, 
             STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS week, 
-            count(*) as count
+            COUNT(*) as count
                 FROM records
                     INNER JOIN species
                 on species.id = birdid1
@@ -991,7 +1053,8 @@ const getRate = (species) => {
             }
             db.all("select STRFTIME('%W', DATE(duration.day / 1000, 'unixepoch', 'localtime')) as week, cast(sum(duration) as real)/3600  as total from duration group by week;", (err, rows) => {
                 for (let i = 0; i < rows.length; i++) {
-                    total[parseInt(rows[i].week) - 1] = rows[i].total;
+                    // Round the total to 2 dp
+                    total[parseInt(rows[i].week) - 1] = Math.round(rows[i].total * 100) / 100;
                 }
                 let rate = [];
                 for (let i = 0; i < calls.length; i++) {
@@ -1069,15 +1132,3 @@ async function onChartRequest(args) {
         records: dataRecords
     })
 }
-
-
-/**
- * SQL SPECIES QUERIES
- * Earliest Spring records: (Jan - June): SELECT species.cname as CommonName, STRFTIME('%Y', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Year, STRFTIME('%m', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Month,DATETIME(min(records.dateTime)/1000, 'unixepoch', 'localtime') as date from records inner join species on species.id = records.birdID1 where species.cname = 'Robin' AND Month < '07' GROUP BY Year;
- * Latest Spring Records (Jan - June): SELECT species.cname as CommonName, STRFTIME('%Y', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Year, STRFTIME('%m', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Month,DATETIME(max(records.dateTime)/1000, 'unixepoch', 'localtime') as date from records inner join species on species.id = records.birdID1 where species.cname = 'Robin' AND Month < '07' GROUP BY Year;
- * Latest Autumn Records (July - December): SELECT species.cname as CommonName, STRFTIME('%Y', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Year, STRFTIME('%m', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Month,DATETIME(max(records.dateTime)/1000, 'unixepoch', 'localtime') as date from records inner join species on species.id = records.birdID1 where species.cname = 'Robin' AND Month > '06' GROUP BY Year;
- * Earliest Autumn records (July - December): SELECT species.cname as CommonName, STRFTIME('%Y', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Year, STRFTIME('%m', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Month,DATETIME(min(records.dateTime)/1000, 'unixepoch', 'localtime') as date from records inner join species on species.id = records.birdID1 where species.cname = 'Robin' AND Month > '06' GROUP BY Year;
- * Species monthly daily counts, grouped by day and month and year (i.e. will print daily totals for month in specific year: select species.cname as CommonName, STRFTIME('%Y', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Year, STRFTIME('%m', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Month, STRFTIME('%d', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Day, COUNT(records.dateTime) as count from records inner join species on species.id = records.birdID1 where species.cname = 'Robin' GROUP BY Day;
- * Annual Spring totals: SELECT species.cname as CommonName, STRFTIME('%Y', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Year, STRFTIME('%m', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Month, COUNT(*) as Count from records inner join species on species.id = records.birdID1 where species.cname = 'Robin' AND Month < '07' GROUP BY Year;
- * Annual Autumn totals: SELECT species.cname as CommonName, STRFTIME('%Y', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Year, STRFTIME('%m', DATETIME(records.dateTime/1000, 'unixepoch', 'localtime')) as Month, COUNT(*) as Count from records inner join species on species.id = records.birdID1 where species.cname = 'Robin' AND Month > '06' GROUP BY Year;
- */
