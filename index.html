@@ -14,6 +14,9 @@
     <script src="./node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
     <!-- Additional JavaScript & CSS -->
     <link rel="stylesheet" href="css/style.css"/>
+    <link rel="stylesheet" href="css/daterangepicker.css"/>
+    <script src="js/moment.min.js"></script>
+    <script src="js/daterangepicker.js"></script>
 
     <!-- App title -->
     <title>Chirpity Bird Call Detection</title>
@@ -347,40 +350,64 @@
     </div>
     <!-- Records container -->
     <div class="d-none overflow-auto p-2" id="recordsContainer">
-        <div>
-            <div class="" id="speciesSearch"></div>
-            <table id='dataRecords' class="table border border-dark d-none">
-            <tbody id="recordsTableBody">
-            <tr>
-                <th>Earliest Spring Record</th>
-                <td id="earliestSpring"></td>
-            </tr>
-            <tr>
-                <th>Latest Spring Record</th>
-                <td id="latestSpring"></td>
-            </tr>
-            <tr>
-                <th>Earliest Autumn Record</th>
-                <td id="earliestAutumn"></td>
-            </tr>
-            <tr>
-                <th>Latest Autumn Record</th>
-                <td id="latestAutumn"></td>
-            </tr>
-            <tr>
-                <th>Most Calls in 24 hours</th>
-                <td id="mostDetections"></td>
-            </tr>
-            <tr class="fst-italic text-sm-start">
-                <th>Data generated in:</th>
-                <td id="genTime"></td>
-            </tr>
-            </tbody>
-        </table>
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col">
+                    <div id="speciesSearch"></div>
+                    <table id='dataRecords' class="table border border-dark d-none">
+                        <tbody id="recordsTableBody">
+                        <tr>
+                            <th>Earliest Spring Record</th>
+                            <td id="earliestSpring"></td>
+                        </tr>
+                        <tr>
+                            <th>Latest Spring Record</th>
+                            <td id="latestSpring"></td>
+                        </tr>
+                        <tr>
+                            <th>Earliest Autumn Record</th>
+                            <td id="earliestAutumn"></td>
+                        </tr>
+                        <tr>
+                            <th>Latest Autumn Record</th>
+                            <td id="latestAutumn"></td>
+                        </tr>
+                        <tr>
+                            <th>Most Calls in 24 hours</th>
+                            <td id="mostDetections"></td>
+                        </tr>
+                        <tr class="fst-italic text-sm-start">
+                            <th>Data generated in:</th>
+                            <td id="genTime"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="col-9">
+                    <div class="row">
+                        <div style="font-size: 16px" class="col text-center pointer" id="reportrange"
+                             style="padding: 12px 20px 12px 40px; width: 100%">
+                            <i class="material-icons-two-tone align-bottom">date_range</i>&nbsp;
+                            <span>Apply a date filter</span> <i
+                                class="material-icons-two-tone align-bottom">expand_more</i>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col chart-outer p-2">
+                            <div id="chart-week"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="chart-outer">
-            <div id="chart-week"></div>
-        </div>
+
+
+        <script type="text/javascript">
+
+
+        </script>
+
+
     </div>
 
 </div>
@@ -398,6 +425,8 @@
 <script src="js/exporting.js"></script>
 <script src="js/export-data.js"></script>
 <script src="js/accessibility.js"></script>
+
+
 <script>
     function myFunction(prefix) {
         // Declare variables

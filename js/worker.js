@@ -14,7 +14,7 @@ const ffmpeg = require('fluent-ffmpeg');
 const {utimes} = require('utimes');
 const file_cache = 'file_cache';
 
-let db, nocmig, latitude, longitude;
+let db, nocmig, latitude, longitude, dateRange = {};
 
 let proxiedFileCache = {};
 
@@ -130,6 +130,9 @@ ipcRenderer.on('new-client', (event) => {
         const action = args.action;
         console.log('message received ', action)
         switch (action) {
+            case 'set-date-range':
+                dateRange = args.range;
+                break;
             case 'clear-cache':
                 console.log('cache')
                 await clearCache();
@@ -186,7 +189,7 @@ ipcRenderer.on('new-client', (event) => {
                     // Pull the results from the database
                     const results = await getCachedResults({file: args.filePath});
                     //const results = await getCachedResults({species: 'Redwing'});
-                    UI.postMessage({event: 'update-audio-duration', value: results[0].duration});
+                    UI.postMessage({event: 'update-audio-duration', value: metadata[args.filePath].duration});
                     results.forEach(result => {
                         //format dates
                         result.timestamp = new Date(result.timestamp);
@@ -301,7 +304,11 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
                 //     progress: progress.targetSize / size
                 // });
                 console.log('Processing: ' + progress.targetSize + ' KB converted');
-                UI.postMessage({event: 'progress', text: 'Decompressing file', progress: progress.targetSize/ 1073559.65 })
+                UI.postMessage({
+                    event: 'progress',
+                    text: 'Decompressing file',
+                    progress: progress.targetSize / 1073559.65
+                })
                 if (progressing) {
                     progressing(progress.targetSize);
                 }
@@ -312,7 +319,7 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
                 //     text: "Decompressing file.",
                 //     progress: 1
                 // });
-                UI.postMessage({event: 'progress', text: 'File decompressed', progress: 1.0 })
+                UI.postMessage({event: 'progress', text: 'File decompressed', progress: 1.0})
                 if (finish) {
                     resolve(destination)
                 }
@@ -904,8 +911,8 @@ const getCachedResults = (args) => {
             birdid1 as id_1, birdid2 as id_2, birdid3 as id_3, 
             position / 1000 as
                 start, (position / 1000) + 3 as
-        end
-        ,  
+                end
+                ,  
                 conf1 as score, conf2 as score2, conf3 as score3, 
                 s1.sname as sname, s2.sname as sname2, s3.sname as sname3,
                 files.duration, 
@@ -916,13 +923,14 @@ const getCachedResults = (args) => {
                 LEFT JOIN species s3 on s3.id = birdid3 
                 INNER JOIN files on files.rowid = records.fileid 
                 WHERE
-        ${where}`, (err, rows) => {
-            if (err) {
-                reject(err)
-            } else {
-                resolve(rows)
-            }
-        })
+                ${where}`,
+            (err, rows) => {
+                if (err) {
+                    reject(err)
+                } else {
+                    resolve(rows)
+                }
+            })
     })
 }
 
@@ -1016,20 +1024,51 @@ const getMostCalls = (species) => {
 }
 
 const getChartTotals = (species) => {
+    // Work out sensible aggregations from hours difference in daterange
+    const hours_diff = dateRange.start ?
+        Math.round((dateRange.end - dateRange.start) / (1000 * 60 * 60)) : 745;
+    console.log(hours_diff, "difference in hours")
+    const dateFilter = dateRange.start ? ` AND dateTime BETWEEN ${dateRange.start} AND ${dateRange.end} ` : '';
+    // default to group by Week
+    let dataPoints = Math.max(52, Math.round(hours_diff / 24 / 7));
+    let groupBy = "Year, Week";
+    let orderBy = 'Year'
+    let aggregation = 'Week';
+    let startDay = 0;
+    if (hours_diff <= 744) {
+        //31 days or less: group by Day
+        groupBy += ", Day";
+        orderBy = 'Year, Week';
+        dataPoints = Math.round(hours_diff / 24);
+        aggregation = 'Day';
+        const date = new Date(dateRange.start);
+        startDay = Math.floor((date - new Date(date.getFullYear(), 0, 0, 0,0,0)) / 1000 / 60 / 60 / 24);
+    }
+    if (hours_diff <= 72) {
+        // 3 days or less, group by Hour of Day
+        groupBy += ", Hour";
+        orderBy = 'Day, Hour';
+        dataPoints = hours_diff;
+        aggregation = 'Hour';
+    }
+
     return new Promise(function (resolve, reject) {
-        db.all(`SELECT STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS year, 
-            STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS week, 
+        db.all(`SELECT STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS Year, 
+            STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Week,
+            STRFTIME('%j', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Day, 
+            STRFTIME('%H', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Hour,    
             COUNT(*) as count
                 FROM records
                     INNER JOIN species
                 on species.id = birdid1
-                WHERE species.cname = '${species}'
-                GROUP BY year, week
-                ORDER BY year DESC;`, (err, rows) => {
+                WHERE species.cname = '${species}' ${dateFilter}
+                GROUP BY ${groupBy}
+                ORDER BY ${orderBy};`, (err, rows) => {
             if (err) {
                 reject(err)
             } else {
-                resolve(rows)
+
+                resolve([rows, dataPoints, aggregation, startDay])
             }
         })
     })
@@ -1102,33 +1141,50 @@ async function onChartRequest(args) {
 
     console.log(`Most calls  chart generation took ${(Date.now() - t0) / 1000} seconds`)
     t0 = Date.now();
-    await getChartTotals(args.species)
-        .then((rows) => {
+    const [dataPoints, aggregation] = await getChartTotals(args.species)
+        .then(([rows, dataPoints, aggregation, startDay]) => {
             for (let i = 0; i < rows.length; i++) {
-                const year = rows[i].year;
-                const week = rows[i].week;
+                const year = rows[i].Year;
+                const week = rows[i].Week;
+                const day = rows[i].Day;
+                const hour = rows[i].Hour;
                 const count = rows[i].count;
+                // stack years
                 if (!(year in results)) {
-                    results[year] = new Array(52).fill(0);
+                    results[year] = new Array(dataPoints).fill(0);
                 }
-                results[year][parseInt(week) - 1] = count;
+                if (aggregation === 'Week'){
+                    results[year][parseInt(week) - 1] = count;
+                } else if (aggregation === 'Day'){
+                    results[year][parseInt(day) - startDay] = count;
+                } else {
+                    const d = new Date(dateRange.start);
+                    const hoursOffset = d.getHours();
+                    const index = ((parseInt(day) - startDay) * 24) + (parseInt(hour) - hoursOffset);
+                    results[year][index] = count;
+                }
             }
+            return [dataPoints, aggregation]
         }).catch((message) => {
             console.log(message)
         })
 
     console.log(`Chart series generation took ${(Date.now() - t0) / 1000} seconds`)
     t0 = Date.now();
-
-    let [total, rate] = await getRate(args.species)
+    // If we have a years worth of data add total recording duration and rate
+    let total, rate;
+    if (dataPoints === 52) [total, rate] = await getRate(args.species)
     console.log(`Chart rate generation took ${(Date.now() - t0) / 1000} seconds`)
-
+    const pointStart = dateRange.start ? dateRange.start : Date.UTC(2020, 0,0,0,0,0);
     UI.postMessage({
         event: 'chart-data',
         species: args.species,
         results: results,
         rate: rate,
         total: total,
-        records: dataRecords
+        records: dataRecords,
+        dataPoints: dataPoints,
+        pointStart: pointStart,
+        aggregation: aggregation
     })
 }
