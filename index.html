@@ -5,16 +5,18 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <!--meta http-equiv="Content-Security-Policy" content="script-src 'self'  'unsafe-inline'; worker-src  'self' 'unsafe-inline' 'unsafe-eval' "-->
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' ;">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' https:">
 
     <!-- Bootstrap & CSS-->
-    <link rel="stylesheet" href="css/bootstrap.min.css"/>
-    <script>require('bootstrap');</script>
-
+    <script src="./node_modules/jquery/dist/jquery.min.js"></script>
+    <link rel="stylesheet" href="./node_modules/bootstrap/dist/css/bootstrap.min.css"/>
+    <script src="./node_modules/popper.js/dist/umd/popper.min.js"></script>
+    <script src="./node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
     <!-- Additional JavaScript & CSS -->
     <link rel="stylesheet" href="css/style.css"/>
-    <!--script src="js/chirpity.js"></script -->
-
+    <link rel="stylesheet" href="css/daterangepicker.css"/>
+    <script src="js/moment.min.js"></script>
+    <script src="js/daterangepicker.js"></script>
 
     <!-- App title -->
     <title>Chirpity Bird Call Detection</title>
@@ -27,11 +29,11 @@
 
 <nav class="pt-0 pb-0 navbar navbar-expand-sm navbar-dark bg-dark position-relative">
     <!--a class="navbar-brand" href="#">Chirpity</a -->
-    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
             aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
     </button>
-    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <div class="collapse navbar-collapse justify-content-between" id="navbarSupportedContent">
         <ul class="navbar-nav mr-auto">
             <li class="nav-item dropdown active">
                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown"
@@ -39,15 +41,27 @@
                     File
                 </a>
                 <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item" href="#" onclick="showOpenDialog();"><u>O</u>pen Audio File </a>
-                    <a class="dropdown-item disabled" onclick="saveDetections()" id="saveDetections" href="#">
+                    <a id="open" class="dropdown-item" href="#"><u>O</u>pen Audio File </a>
+                    <a class="dropdown-item disabled" id="saveDetections" href="#">
                         <u>S</u>ave Detections</a>
-                    <a class="dropdown-item disabled" onclick="showSaveDialog()" id="saveLabels" href="#">
+                    <a class="dropdown-item disabled" id="saveLabels" href="#">
                         Save <u>A</u>udacity Labels</a>
-                    <a class="dropdown-item disabled" onclick="sendFile('save')" id="exportMP3" href="#">
+                    <a class="dropdown-item disabled" id="exportMP3" href="#">
                         Export Selected Audio</a>
                     <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="#" onclick="exitApplication();">Exit</a>
+                    <a class="dropdown-item" href="#" id="exit">Exit</a>
+                </div>
+            </li>
+            <li class="nav-item dropdown active">
+                <a class="nav-link dropdown-toggle" href="#" id="navbarRecords" role="button" data-toggle="dropdown"
+                   aria-haspopup="true" aria-expanded="false">
+                    Records
+                </a>
+                <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
+                    <a class="dropdown-item" href="#" id="save2db">Save Records</a>
+                    <a class="dropdown-item" href="#" id="charts">View charts</a>
+                    <a class="dropdown-item" href="#" id="explore">Explore records</a>
+                    <a class="dropdown-item" href="#" id="manage">Manage Records</a>
                 </div>
             </li>
             <li class="nav-item dropdown active">
@@ -58,18 +72,18 @@
                 <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
                     <a class="dropdown-item text-danger" href="#" id="warmup">Model Warming up
                         <div class="spinner-grow spinner-grow-sm" role="status">
-                            <span class="sr-only">Loading...</span>
+                            <span class="visually-hidden">Loading...</span>
                         </div>
                     </a>
-                    <a class="dropdown-item disabled" href="#" id="analyze">Analyze entire
-                        file</a>
-                    <a class="dropdown-item disabled" href="#" id="analyzeSelection">Analyze selected interval</a>
+                    <a class="dropdown-item disabled" href="#" id="analyze">Analyze File</a>
+                    <a class="dropdown-item disabled" href="#" id="analyzeSelection">Analyze Selected Interval</a>
+                    <a class="dropdown-item disabled" href="#" id="analyzeAll">Analyze All Open Files</a>
                 </div>
             </li>
             <li class="nav-item dropdown active">
-                <a class="nav-link dropdown-toggle" href="#" id="OptionsDropdown" role="button" data-toggle="dropdown"
+                <a class="nav-link dropdown-toggle" href="#" id="SettingsDropdown" role="button" data-toggle="dropdown"
                    aria-haspopup="true" aria-expanded="false">
-                    Options
+                    Settings
                 </a>
                 <div class="dropdown-menu top-level" aria-labelledby="navbarDropdown">
                     <ul class="nav navbar-nav">
@@ -81,6 +95,37 @@
                                 <li><a class="dropdown-item" href="#" id="useWhitelist">Use Whitelist
                                     <span class='material-icons tick'>done</span>
                                 </a></li>
+                                <li>
+                                    <div class="dropdown-submenu" aria-labelledby="navbarDropdown">
+                                        <ul class="nav navbar-nav">
+                                            <li class="dropdown-submenu">
+                                                <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
+                                                   aria-haspopup="true" aria-expanded="false"> <span
+                                                        class="nav-label">Batch Size</span><span
+                                                        class="material-icons-two-tone arrow">navigate_next</span></a>
+                                                <ul class="dropdown-menu">
+                                                    <li><a class="dropdown-item batch" href="#" id="1">1 <span
+                                                            class='material-icons tick'>done</span>
+                                                    </a></li>
+                                                    <li><a class="dropdown-item batch" href="#" id="2">2 <span
+                                                            class='material-icons tick d-none'>done</span></a></li>
+                                                    <li><a class="dropdown-item batch" href="#" id="3">3 <span
+                                                            class='material-icons tick d-none'>done</span></a></li>
+                                                    <li><a class="dropdown-item batch" href="#" id="4">4 <span
+                                                            class='material-icons tick d-none'>done</span></a></li>
+                                                    <li><a class="dropdown-item batch" href="#" id="6">6 <span
+                                                            class='material-icons tick d-none'>done</span></a></li>
+                                                    <li><a class="dropdown-item batch" href="#" id="8">8 <span
+                                                            class='material-icons tick d-none'>done</span></a></li>
+                                                    <li><a class="dropdown-item batch" href="#" id="12">12 <span
+                                                            class='material-icons tick d-none'>done</span></a></li>
+                                                    <li><a class="dropdown-item batch" href="#" id="16">16 <span
+                                                            class='material-icons tick d-none'>done</span></a></li>
+                                                </ul>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </li>
                             </ul>
                         </li>
 
@@ -141,182 +186,250 @@
                 </a>
                 <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
                     <a class="dropdown-item" id="usage" href="#">Usage</a>
-                    <a class="dropdown-item" id="options" href="#">Options</a>
+                    <a class="dropdown-item" id="settings" href="#">Settings</a>
                     <a class="dropdown-item" id="keyboard" href="#">Keyboard Shortcuts</a>
                     <a class="dropdown-item" id="diagnostics" href="#">Diagnostics</a>
                 </div>
             </li>
         </ul>
-        <img class="" src="img/logo/chirpity_logo2.png" alt="Chirpity Birdcalls: Identifying birds by sound"
+        <img src="img/logo/chirpity_logo2.png" alt="Chirpity Birdcalls: Identifying birds by sound"
              height="50px"/>
     </div>
 </nav>
 
 <!-- Content wrapper -->
 <div class="flex-column h-100" id="contentWrapper">
-    <!-- Summary Modal -->
-    <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-        <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header justify-content-center">
-                    <h5 class="modal-title" id="exampleModalLabel">Detections Summary</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div id="modalBody" class="modal-body"></div>
-                <div class="modal-footer justify-content-center">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
     <!-- Feedback Modal -->
     <div class="modal fade" id="feedbackModal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
         <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header justify-content-center">
                     <h5 class="modal-title" id="feedbackModalLabel">Feedback</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div id="feedbackModalBody" class="modal-body"></div>
                 <div class="modal-footer justify-content-center">
-                    <button type="button" class="btn btn-primary" data-dismiss="modal">Send</button>
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Send</button>
                 </div>
             </div>
         </div>
     </div>
     <!-- Diagnostic Modal -->
-    <div class="modal fade" id="diagnosticsModal" tabindex="-1" aria-labelledby="diagnosticsModalLabel" aria-hidden="true">
+    <div class="modal fade" id="diagnosticsModal" tabindex="-1" aria-labelledby="diagnosticsModalLabel"
+         aria-hidden="true">
         <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header justify-content-center">
                     <h5 class="modal-title" id="diagnosticsModalLabel">Diagnostic Information</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
                     </button>
                 </div>
                 <div id="diagnosticsModalBody" class="modal-body"></div>
                 <div class="modal-footer justify-content-center">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
-    </div>    
+    </div>
     <!-- Help Modal -->
     <div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
         <div class="modal-dialog  modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header justify-content-center">
                     <h5 class="modal-title" id="helpModalLabel">Help</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div id="helpModalBody" class="modal-body"></div>
                 <div class="modal-footer justify-content-center">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
     </div>
     <!-- Load audio file hint -->
     <div class="d-flex h-100 flex-column text-dark align-items-center justify-content-center" id="loadFileHint">
-        <div class="row">
+        <div class="">
             <p class="lead align-content-center" id="loadFileHintText">Load an audio file for analysis by
-                selecting<br/> <i>File > Open Audio File</i> in the top menu.</p>
+                selecting <span class="fst-italic"> "File > Open Audio File" </span> in the top menu.</p>
         </div>
-        <div class="row">
+        <div class="">
             <div class="d-none spinner-border" role="status" id="loadFileHintSpinner"></div>
         </div>
-        <div class="row"><p class="d-none lead" id="loadFileHintLog"></p></div>
     </div>
 
     <!-- Spectrogram view -->
     <div class="" id="timeline"></div>
     <div class="inner" id="spectrogram"></div>
     <div class="inner" id="waveform"></div>
-    <div class="" id="dummy" style="width: 100%"></div>
+    <div class="w-100" id="dummy"></div>
 
     <!-- Controls view -->
-    <div class="container-fluid p-1 bg-dark text-white d-none justify-content-between" id="controlsWrapper">
-        <div class="row w-100">
+    <div class="container-fluid p-1 bg-dark text-white d-inline-flex" id="controlsWrapper" style="max-height: 50px">
 
-            <div id="filename" class="align-bottom p-2 pl-3"></div>
-            <div class="btn-group bg-dark specFeature offset-5" role="group" id="transport-controls">
-                <button class="btn btn-outline-secondary" onmousedown="wavesurfer.playPause();">
-                    <i class="material-icons">play_arrow</i><span class="align-bottom">Play / </span>
-                    <i class="material-icons">pause</i><span class="align-bottom">Pause</span>
-                </button>
-                <button class="btn btn-outline-secondary" onclick="zoomSpecIn();">
-                    <i class="material-icons-two-tone zoom">zoom_in</i>
-                </button>
-                <button class="btn btn-outline-secondary" onclick="zoomSpecOut();">
-                    <i class="material-icons-two-tone zoom">zoom_out</i>
-                </button>
+        <div id="filename" class="col-5 ps-1 overflow-auto">
+            <div id="fileContainer" class="bg-dark text-nowrap pe-3"></div>
+        </div>
 
-            </div>
+        <div class="col btn-group bg-dark ps-1 pe-1 text-nowrap specFeature" role="group">
+            <button id="playToggle" class="p-1 btn btn-outline-secondary">
+                <i class="material-icons">play_arrow</i><span class="align-middle d-none d-lg-inline">Play  </span> /
+                <i class="material-icons">pause</i><span class="align-middle d-none d-lg-inline-block">Pause</span>
+            </button>
+        </div>
 
-            <div class="col-sm">
-                <div class="progressDiv float-sm-right" style="width: 20%;display: none"> Working...<br>
-                    <div class="progress" style="width: 100%">
-                        <div class="progress-bar progress-bar-striped active" role="progressbar"
-                             aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width:0">
-                            0%
-                        </div>
-                        <small class="justify-content-center d-flex position-absolute w-100">60% complete</small>
-                    </div>
-                </div>
-                <div class="complete float-sm-right" style="display: none">
-                    <!-- Button trigger modal -->
-                    <button type="button" class="btn btn-primary align-bottom" data-toggle="modal"
-                            data-target="#exampleModal">
-                        Show Summary
-                    </button>
+        <div class="col btn-group bg-dark specFeature pe-2" role="group">
+            <button id="zoomIn" class="btn btn-outline-secondary">
+                <i class="material-icons-two-tone zoom align-middle">zoom_in</i>
+            </button>
+            <button id="zoomOut" class="btn btn-outline-secondary">
+                <i class="material-icons-two-tone zoom align-middle">zoom_out</i>
+            </button>
+        </div>
+        <div id="progressDiv" class="col-3" style="display:none"><span>Processing...</span><span id="fileNumber"></span><br>
+            <div class="progress w-100">
+                <div class="progress-bar progress-bar-striped active" role="progressbar" aria-valuenow="0"
+                     aria-valuemin="0"
+                     aria-valuemax="100" style="width: 0%;">0%
                 </div>
             </div>
-            <div class="align-bottom">
-                <span title="Toggle Nocmig mode" id="nocmigMode"
-                      class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">dark_mode</span>
+        </div>
+
+        <div id="complete" class="col-3 pe-2" style="display:none">
+            <!-- Button trigger modal -->
+            <button type="button" class="float-end text-nowrap btn btn-primary align-bottom"
+                    id="showSummary">
+                Show Summary
+            </button>
+        </div>
+        <div class="col pe-1">
+            <span title="Toggle Nocmig mode" id="nocmigMode"
+                  class=" float-end material-icons-two-tone btn btn-outline-secondary p-1 pointer">dark_mode</span>
+        </div>
+    </div>
+    <!-- Result table -->
+    <div class="d-none border-end border-4" id="resultTableContainer">
+        <div class="row g-1 h-100">
+            <div id='summaryTable' class="d-none col-auto h-100 overflow-auto">
+            </div>
+            <div class="col h-100 overflow-auto">
+                <table id='results' class="table table-hover">
+                    <thead class="bg-dark text-white">
+                    <tr>
+                        <th>#</th>
+                        <th class="timestamp">Time</th>
+                        <th>Position</th>
+                        <th>Species</th>
+                        <th class="text-center">Confidence<span id="confidenceFilter"
+                                                                class="material-icons-two-tone text-secondary align-bottom pointer">filter_list</span>
+                        </th>
+                        <th class="text-center">Other IDs</th>
+                        <th class="specFeature text-center">Play</th>
+                        <th class="text-center">XC</th>
+                        <th class="specFeature text-center">Save</th>
+                        <th class="text-center speciesExclude d-none">Exclude</th>
+                        <th class="specFeature text-center">Feedback</th>
+                    </tr>
+                    </thead>
+                    <tbody class="text-dark" id="resultTableBody">
+
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
-
-    <!-- Result table -->
-    <div class="d-none p-0 border-0 overflow-auto tableFixHead" id="resultTableContainer">
-        <table id='results' class="table table-hover">
-            <thead class="thead-dark">
-            <tr>
-                <th scope="col">#</th>
-                <th scope="col"  class="timestamp">Time</th>
-                <th scope="col">Position</th>
-                <th scope="col">Common name</th>
-                <th scope="col">Scientific name</th>
-                <th scope="col" class="text-center">Confidence
-                    <span id="confidenceFilter" class="material-icons-two-tone text-secondary align-bottom pointer">filter_list</span>
-                </th>
-                <th scope="col" class="text-center">Other IDs</th>
-                <th scope="col" class="specFeature text-center">Play</th>
-                <th scope="col" class="text-center">XC</th>
-                <th scope="col" class="specFeature text-center">Save</th>
-                <th scope="col" class="specFeature text-center">Exclude</th>
-                <th scope="col" class="specFeature text-center">Feedback</th>
-            </tr>
-            </thead>
-            <tbody class="text-dark" id="resultTableBody">
-
-            </tbody>
-        </table>
+    <!-- Records container -->
+    <div class="d-none overflow-auto p-2" id="recordsContainer">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col">
+                    <div id="speciesSearch"></div>
+                    <table id='dataRecords' class="table border border-dark d-none">
+                        <tbody id="recordsTableBody">
+                        <tr>
+                            <th>Earliest Spring Record</th>
+                            <td id="earliestSpring"></td>
+                        </tr>
+                        <tr>
+                            <th>Latest Spring Record</th>
+                            <td id="latestSpring"></td>
+                        </tr>
+                        <tr>
+                            <th>Earliest Autumn Record</th>
+                            <td id="earliestAutumn"></td>
+                        </tr>
+                        <tr>
+                            <th>Latest Autumn Record</th>
+                            <td id="latestAutumn"></td>
+                        </tr>
+                        <tr>
+                            <th>Most Calls in 24 hours</th>
+                            <td id="mostDetections"></td>
+                        </tr>
+                        <tr class="fst-italic text-sm-start">
+                            <th>Data generated in:</th>
+                            <td id="genTime"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="col-9">
+                    <div class="row">
+                        <div style="font-size: 16px" class="col text-center pointer" id="reportrange"
+                             style="padding: 12px 20px 12px 40px; width: 100%">
+                            <i class="material-icons-two-tone align-bottom">date_range</i>&nbsp;
+                            <span>Apply a date filter</span> <i
+                                class="material-icons-two-tone align-bottom">expand_more</i>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col chart-outer p-2">
+                            <div id="chart-week"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-
 </div>
 
 <!-- Footer -->
-<div class="d-flex fixed-bottom p-2 bg-primary text-white justify-content-center" id="footer">
+<footer class="p-1 bg-primary text-white" id="footer">
     <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span></small>
-</div>
-<script src="js/ui.js"></script>
+</footer>
+<script src="node_modules/wavesurfer.js/dist/wavesurfer.min.js"></script>
+<script src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js"></script>
+<script src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js"></script>
+<script src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.regions.min.js"></script>
+<script src="js/highcharts.js"></script>
+<script src="js/series-label.js"></script>
+<script src="js/exporting.js"></script>
+<script src="js/export-data.js"></script>
+<script src="js/accessibility.js"></script>
+
+
+<script>
+    function myFunction(prefix) {
+        // Declare variables
+        var input, filter, ul, li, a, i, txtValue;
+        input = document.getElementById(prefix + 'Input');
+        filter = input.value.toUpperCase();
+        ul = document.getElementById(prefix + "UL");
+        li = ul.getElementsByTagName('li');
+
+        // Loop through all list items, and hide those who don't match the search query
+        for (i = 0; i < li.length; i++) {
+            a = li[i].getElementsByTagName("a")[0];
+            txtValue = a.textContent || a.innerText;
+            if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                li[i].style.display = "";
+            } else {
+                li[i].style.display = "none";
+            }
+        }
+    }
+</script>
+
+
+<script src="./js/ui.js"></script>
 </body>
 </html>
