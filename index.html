@@ -199,21 +199,6 @@
 
 <!-- Content wrapper -->
 <div class="flex-column h-100" id="contentWrapper">
-    <!-- Summary Modal -->
-    <div class="modal fade" id="summaryModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-        <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header justify-content-center">
-                    <h5 class="modal-title" id="summaryModalLabel">Detections Summary</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div id="summaryModalBody" class="modal-body"></div>
-                <div class="modal-footer justify-content-center">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
     <!-- Feedback Modal -->
     <div class="modal fade" id="feedbackModal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
         <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
@@ -311,8 +296,8 @@
 
         <div id="complete" class="col-3 pe-2" style="display:none">
             <!-- Button trigger modal -->
-            <button type="button" class="float-end text-nowrap btn btn-primary align-bottom" data-bs-toggle="modal"
-                    data-bs-target="#summaryModal">
+            <button type="button" class="float-end text-nowrap btn btn-primary align-bottom"
+                    id="showSummary">
                 Show Summary
             </button>
         </div>
@@ -322,31 +307,35 @@
         </div>
     </div>
     <!-- Result table -->
-    <div class="flex-column overflow-auto d-none p-0 border-0" id="resultTableContainer">
-        <table id='results' class="table table-hover">
-            <thead class="bg-dark text-white">
-            <tr>
-                <th>#</th>
-                <th class="timestamp">Time</th>
-                <th>Position</th>
-                <!-- th>Common name</th>
-                <th>Scientific name</th -->
-                <th>Species</th>
-                <th class="text-center">Confidence<span id="confidenceFilter"
-                                                        class="material-icons-two-tone text-secondary align-bottom pointer">filter_list</span>
-                </th>
-                <th class="text-center">Other IDs</th>
-                <th class="specFeature text-center">Play</th>
-                <th class="text-center">XC</th>
-                <th class="specFeature text-center">Save</th>
-                <th class="text-center speciesExclude d-none">Exclude</th>
-                <th class="specFeature text-center">Feedback</th>
-            </tr>
-            </thead>
-            <tbody class="text-dark" id="resultTableBody">
+    <div class="d-none border-end border-4" id="resultTableContainer">
+        <div class="row g-1 h-100">
+            <div id='summaryTable' class="d-none col-auto h-100 overflow-auto">
+            </div>
+            <div class="col h-100 overflow-auto">
+                <table id='results' class="table table-hover">
+                    <thead class="bg-dark text-white">
+                    <tr>
+                        <th>#</th>
+                        <th class="timestamp">Time</th>
+                        <th>Position</th>
+                        <th>Species</th>
+                        <th class="text-center">Confidence<span id="confidenceFilter"
+                                                                class="material-icons-two-tone text-secondary align-bottom pointer">filter_list</span>
+                        </th>
+                        <th class="text-center">Other IDs</th>
+                        <th class="specFeature text-center">Play</th>
+                        <th class="text-center">XC</th>
+                        <th class="specFeature text-center">Save</th>
+                        <th class="text-center speciesExclude d-none">Exclude</th>
+                        <th class="specFeature text-center">Feedback</th>
+                    </tr>
+                    </thead>
+                    <tbody class="text-dark" id="resultTableBody">
 
-            </tbody>
-        </table>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
     <!-- Records container -->
     <div class="d-none overflow-auto p-2" id="recordsContainer">
@@ -400,22 +389,13 @@
                 </div>
             </div>
         </div>
-
-
-        <script type="text/javascript">
-
-
-        </script>
-
-
     </div>
-
 </div>
 
 <!-- Footer -->
-<div class="d-flex fixed-bottom p-2 bg-primary text-white justify-content-center" id="footer">
+<footer class="p-1 bg-primary text-white" id="footer">
     <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span></small>
-</div>
+</footer>
 <script src="node_modules/wavesurfer.js/dist/wavesurfer.min.js"></script>
 <script src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js"></script>
 <script src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js"></script>
