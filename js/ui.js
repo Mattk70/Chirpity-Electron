@@ -1,46 +1,95 @@
-const {ipcRenderer} = require('electron');
-//const {remote, dialog} = require('electron/remote');
-const remote = require('electron').remote;
-const fs = require('fs');
-const WaveSurfer = require("wavesurfer.js");
-const SpectrogramPlugin = require('wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js');
-const SpecTimeline = require('wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js');
-const Regions = require('wavesurfer.js/dist/plugin/wavesurfer.regions.min.js');
-const colormap = require("colormap");
-const $ = require('jquery');
-const AudioBufferSlice = require('./js/AudioBufferSlice.js');
-const p = require('path');
-const SunCalc = require('suncalc2');
-const {v4: uuidv4} = require("uuid");
-let dawn, dusk, seenTheDarkness = false, shownDaylightBanner = false;
+let firstDawn, dawn, dusk, seenTheDarkness = false, shownDaylightBanner = false;
 const labels = ["Tachymarptis melba_Alpine Swift", "Pluvialis dominica_American Golden Plover", "Mareca americana_American Wigeon", "Acrocephalus paludicola_Aquatic Warbler", "Acanthis hornemanni_Arctic Redpoll", "Stercorarius parasiticus_Arctic Skua", "Sterna paradisaea_Arctic Tern", "Phylloscopus borealis_Arctic Warbler", "Recurvirostra avosetta_Avocet", "Porzana pusilla_Baillon's Crake", "Limosa lapponica_Bar-tailed Godwit", "Tyto alba_Barn Owl", "Branta leucopsis_Barnacle Goose", "Sylvia nisoria_Barred Warbler", "Panurus biarmicus_Bearded Tit", "Merops apiaster_Bee-eater", "Cygnus columbianus_Bewick's Swan", "Botaurus stellaris_Bittern", "Oenanthe hispanica_Black-eared Wheatear", "Chroicocephalus ridibundus_Black-headed Gull", "Podiceps nigricollis_Black-necked Grebe", "Limosa limosa_Black-tailed Godwit", "Himantopus himantopus_Black-winged Stilt", "Lyrurus tetrix_Black Grouse", "Cepphus grylle_Black Guillemot", "Milvus migrans_Black Kite", "Phoenicurus ochruros_Black Redstart", "Chlidonias niger_Black Tern", "Turdus merula_Blackbird", "Sylvia atricapilla_Blackcap", "Spatula discors_Blue-winged Teal", "Cyanistes caeruleus_Blue Tit", "Luscinia svecica_Bluethroat", "Acrocephalus dumetorum_Blyth's Reed Warbler", "Fringilla montifringilla_Brambling", "Branta bernicla_Brent Goose", "Pyrrhula pyrrhula_Bullfinch", "Buteo buteo_Buzzard", "Branta canadensis_Canada Goose", "Tetrao urogallus_Capercaillie", "Corvus corone_Carrion Crow", "Larus cachinnans_Caspian Gull", "Bubulcus ibis_Cattle Egret", "Cettia cetti_Cetti's Warbler", "Fringilla coelebs_Chaffinch", "Phylloscopus collybita_Chiffchaff", "Pyrrhocorax pyrrhocorax_Chough", "Emberiza cirlus_Cirl Bunting", "Motacilla citreola_Citrine Wagtail", "Periparus ater_Coal Tit", "Streptopelia decaocto_Collared Dove", "Glareola pratincola_Collared Pratincole", "Loxia curvirostra_Common Crossbill", "Larus canus_Common Gull", "Acanthis flammea_Common Redpoll", "Carpodacus erythrinus_Common Rosefinch", "Actitis hypoleucos_Common Sandpiper", "Melanitta nigra_Common Scoter", "Sterna hirundo_Common Tern", "Fulica atra_Coot", "Phalacrocorax carbo_Cormorant", "Emberiza calandra_Corn Bunting", "Crex crex_Corncrake", "Calonectris borealis_Cory's Shearwater", "Grus grus_Crane", "Lophophanes cristatus_Crested Tit", "Cuculus canorus_Cuckoo", "Calidris ferruginea_Curlew Sandpiper", "Numenius arquata_Curlew", "Sylvia undata_Dartford Warbler", "Cinclus cinclus_Dipper", "Charadrius morinellus_Dotterel", "Calidris alpina_Dunlin", "Prunella modularis_Dunnock", "Phylloscopus fuscatus_Dusky Warbler", "Alopochen aegyptiaca_Egyptian Goose", "Somateria mollissima_Eider", "Bubo bubo_Eurasian Eagle-Owl", "Turdus pilaris_Fieldfare", "Regulus ignicapilla_Firecrest", "Fulmarus glacialis_Fulmar", "Mareca strepera_Gadwall", "Morus bassanus_Gannet", "Sylvia borin_Garden Warbler", "Spatula querquedula_Garganey", "Larus hyperboreus_Glaucous Gull", "Plegadis falcinellus_Glossy Ibis", "Regulus regulus_Goldcrest", "Aquila chrysaetos_Golden Eagle", "Oriolus oriolus_Golden Oriole", "Pluvialis apricaria_Golden Plover", "Bucephala clangula_Goldeneye", "Carduelis carduelis_Goldfinch", "Mergus merganser_Goosander", "Accipiter gentilis_Goshawk", "Locustella naevia_Grasshopper Warbler", "Larus marinus_Great Black-backed Gull", "Podiceps cristatus_Great Crested Grebe", "Lanius excubitor_Great Grey Shrike", "Gavia immer_Great Northern Diver", "Stercorarius skua_Great Skua", "Dendrocopos major_Great Spotted Woodpecker", "Parus major_Great Tit", "Ardea alba_Great White Egret", "Anas carolinensis_Green-winged Teal", "Tringa ochropus_Green Sandpiper", "Picus viridis_Green Woodpecker", "Chloris chloris_Greenfinch", "Phylloscopus trochiloides_Greenish Warbler", "Tringa nebularia_Greenshank", "Ardea cinerea_Grey Heron", "Perdix perdix_Grey Partridge", "Phalaropus fulicarius_Grey Phalarope", "Pluvialis squatarola_Grey Plover", "Motacilla cinerea_Grey Wagtail", "Anser anser_Greylag Goose", "Uria aalge_Guillemot", "Gelochelidon nilotica_Gull-billed Tern", "Coccothraustes coccothraustes_Hawfinch", "Larus argentatus_Herring Gull", "Falco subbuteo_Hobby", "Pernis apivorus_Honey-buzzard", "Upupa epops_Hoopoe", "Delichon urbicum_House Martin", "Passer domesticus_House Sparrow", "Human_Human", "Phylloscopus ibericus_Iberian Chiffchaff", "Hippolais icterina_Icterine Warbler", "Lymnocryptes minimus_Jack Snipe", "Coloeus monedula_Jackdaw", "Garrulus glandarius_Jay", "Charadrius alexandrinus_Kentish Plover", "Falco tinnunculus_Kestrel", "Alcedo atthis_Kingfisher", "Rissa tridactyla_Kittiwake", "Calidris canutus_Knot", "Calcarius lapponicus_Lapland Bunting", "Vanellus vanellus_Lapwing", "Larus fuscus_Lesser Black-backed Gull", "Acanthis cabaret_Lesser Redpoll", "Dryobates minor_Lesser Spotted Woodpecker", "Sylvia curruca_Lesser Whitethroat", "Linaria cannabina_Linnet", "Ixobrychus minutus_Little Bittern", "Emberiza pusilla_Little Bunting", "Egretta garzetta_Little Egret", "Tachybaptus ruficollis_Little Grebe", "Hydrocoloeus minutus_Little Gull", "Athene noctua_Little Owl", "Charadrius dubius_Little Ringed Plover", "Calidris minuta_Little Stint", "Sternula albifrons_Little Tern", "Asio otus_Long-eared Owl", "Clangula hyemalis_Long-tailed Duck", "Stercorarius longicaudus_Long-tailed Skua", "Aegithalos caudatus_Long-tailed Tit", "Pica pica_Magpie", "Anas platyrhynchos_Mallard", "Aix galericulata_Mandarin Duck", "Puffinus puffinus_Manx Shearwater", "Circus aeruginosus_Marsh Harrier", "Poecile palustris_Marsh Tit", "Anthus pratensis_Meadow Pipit", "Ichthyaetus melanocephalus_Mediterranean Gull", "Hippolais polyglotta_Melodious Warbler", "Falco columbarius_Merlin", "Turdus viscivorus_Mistle Thrush", "Circus pygargus_Montagu's Harrier", "Gallinula chloropus_Moorhen", "Cygnus olor_Mute Swan", "Nycticorax nycticorax_Night Heron", "Luscinia megarhynchos_Nightingale", "Caprimulgus europaeus_Nightjar", "No Call_No Call", "Sitta europaea_Nuthatch", "Anthus hodgsoni_Olive-backed Pipit", "Emberiza hortulana_Ortolan Bunting", "Pandion haliaetus_Osprey", "Haematopus ostralegus_Oystercatcher", "Syrrhaptes paradoxus_Pallas's Sandgrouse", "Phylloscopus proregulus_Pallas's Warbler", "Loxia pytyopsittacus_Parrot Crossbill", "Calidris melanotos_Pectoral Sandpiper", "Remiz pendulinus_Penduline Tit", "Falco peregrinus_Peregrine", "Phasianus colchicus_Pheasant", "Ficedula hypoleuca_Pied Flycatcher", "Motacilla alba_Pied Wagtail", "Anser brachyrhynchus_Pink-footed Goose", "Anas acuta_Pintail", "Aythya ferina_Pochard", "Lagopus muta_Ptarmigan", "Ardea purpurea_Purple Heron", "Calidris maritima_Purple Sandpiper", "Coturnix coturnix_Quail", "Phylloscopus schwarzi_Radde's Warbler", "Corvus corax_Raven", "Alca torda_Razorbill", "Lanius collurio_Red-backed Shrike", "Ficedula parva_Red-breasted Flycatcher", "Mergus serrator_Red-breasted Merganser", "Netta rufina_Red-crested Pochard", "Tarsiger cyanurus_Red-flanked Bluetail", "Alectoris rufa_Red-legged Partridge", "Podiceps grisegena_Red-necked Grebe", "Caprimulgus ruficollis_Red-necked Nightjar", "Phalaropus lobatus_Red-necked Phalarope", "Cecropis daurica_Red-rumped Swallow", "Gavia stellata_Red-throated Diver", "Lagopus lagopus_Red Grouse", "Milvus milvus_Red Kite", "Tringa totanus_Redshank", "Phoenicurus phoenicurus_Redstart", "Turdus iliacus_Redwing", "Emberiza schoeniclus_Reed Bunting", "Acrocephalus scirpaceus_Reed Warbler", "Anthus richardi_Richard's Pipit", "Larus delawarensis_Ring-billed Gull", "Psittacula krameri_Ring-necked Parakeet", "Turdus torquatus_Ring Ouzel", "Charadrius hiaticula_Ringed Plover", "Erithacus rubecula_Robin", "Columba livia_Rock Dove", "Anthus petrosus_Rock Pipit", "Corvus frugilegus_Rook", "Pastor roseus_Rose-coloured Starling", "Sterna dougallii_Roseate Tern", "Buteo lagopus_Rough-legged Buzzard", "Oxyura jamaicensis_Ruddy Duck", "Tadorna ferruginea_Ruddy Shelduck", "Calidris pugnax_Ruff", "Xema sabini_Sabine's Gull", "Riparia riparia_Sand Martin", "Calidris alba_Sanderling", "Thalasseus sandvicensis_Sandwich Tern", "Locustella luscinioides_Savi's Warbler", "Aythya marila_Scaup", "Loxia scotica_Scottish Crossbill", "Acrocephalus schoenobaenus_Sedge Warbler", "Calidris pusilla_Semipalmated Sandpiper", "Serinus serinus_Serin", "Tadorna tadorna_Shelduck", "Eremophila alpestris_Shore Lark", "Asio flammeus_Short-eared Owl", "Calandrella brachydactyla_Short-toed Lark", "Spatula clypeata_Shoveler", "Spinus spinus_Siskin", "Alauda arvensis_Skylark", "Podiceps auritus_Slavonian Grebe", "Gallinago gallinago_Snipe", "Plectrophenax nivalis_Snow Bunting", "Anser caerulescens_Snow Goose", "Turdus philomelos_Song Thrush", "Accipiter nisus_Sparrowhawk", "Platalea leucorodia_Spoonbill", "Porzana porzana_Spotted Crake", "Muscicapa striata_Spotted Flycatcher", "Tringa erythropus_Spotted Redshank", "Actitis macularius_Spotted Sandpiper", "Sturnus vulgaris_Starling", "Columba oenas_Stock Dove", "Burhinus oedicnemus_Stone-curlew", "Saxicola rubicola_Stonechat", "Hydrobates pelagicus_Storm Petrel", "Sylvia cantillans_Subalpine Warbler", "Hirundo rustica_Swallow", "Apus apus_Swift", "Anser fabalis_Taiga Bean Goose", "Strix aluco_Tawny Owl", "Anas crecca_Teal", "Calidris temminckii_Temminck's Stint", "Anthus trivialis_Tree Pipit", "Passer montanus_Tree Sparrow", "Certhia familiaris_Treecreeper", "Aythya fuligula_Tufted Duck", "Anser serrirostris_Tundra Bean Goose", "Arenaria interpres_Turnstone", "Streptopelia turtur_Turtle Dove", "Linaria flavirostris_Twite", "Loxia leucoptera_Two-barred Crossbill", "Anthus spinoletta_Water Pipit", "Rallus aquaticus_Water Rail", "Bombycilla garrulus_Waxwing", "Oenanthe oenanthe_Wheatear", "Numenius phaeopus_Whimbrel", "Saxicola rubetra_Whinchat", "Anser albifrons_White-fronted Goose", "Calidris fuscicollis_White-rumped Sandpiper", "Haliaeetus albicilla_White-tailed Eagle", "Chlidonias leucopterus_White-winged Black Tern", "Ciconia ciconia_White Stork", "Sylvia communis_Whitethroat", "Cygnus cygnus_Whooper Swan", "Mareca penelope_Wigeon", "Poecile montanus_Willow Tit", "Phylloscopus trochilus_Willow Warbler", "Tringa glareola_Wood Sandpiper", "Phylloscopus sibilatrix_Wood Warbler", "Scolopax rusticola_Woodcock", "Lullula arborea_Woodlark", "Columba palumbus_Woodpigeon", "Troglodytes troglodytes_Wren", "Jynx torquilla_Wryneck", "Phylloscopus inornatus_Yellow-browed Warbler", "Larus michahellis_Yellow-legged Gull", "Motacilla flava_Yellow Wagtail", "Emberiza citrinella_Yellowhammer", "animals_animals", "vehicles_vehicles"];
-//let appPath;
-/// Get  path to USerData
-// ipcRenderer.send('path', {})
-// ipcRenderer.on('path', (event, arg) => {
-//     appPath = arg.appPath
-// })
+
 let currentPrediction;
-let appPath = remote.app.getPath('userData');
-let version = remote.app.getVersion()
-let modelReady = false, fileLoaded = false, currentFile, fileList, resultHistory = {};
-let region, AUDACITY_LABELS, wavesurfer;
+
+// Get the modules loaded in preload.js
+
+
+const fs = window.module.fs;
+const colormap = window.module.colormap;
+const p = window.module.p;
+const SunCalc = window.module.SunCalc;
+const uuidv4 = window.module.uuidv4;
+const gzip = window.module.gzip;
+const ungzip = window.module.ungzip;
+
+/// Set up communication channel between UI and worker window
+
+let worker;
+
+const establishMessageChannel =
+    new Promise((resolve, reject) => {
+        window.onmessage = (event) => {
+            // event.source === window means the message is coming from the preload
+            // script, as opposed to from an <iframe> or other source.
+            if (event.source === window) {
+                if (event.data === 'provide-worker-channel') {
+                    [worker] = event.ports;
+                    worker.postMessage({action: 'create message port'});
+                    // Once we have the port, we can communicate directly with the worker
+                    // process.
+                    worker.onmessage = e => {
+                        resolve(e.data);
+                    }
+                } else if (event.data.args) {
+                    onLoadResults(event.data.args)
+                }
+            }
+        }
+    }).then((value) => {
+        console.log(value);
+    }, reason => {
+        console.log(reason);
+    })
+
+
+async function getPath() {
+    const pathPromise = window.electron.getPath();
+    const appPath = await pathPromise;
+    console.log('path is ', appPath)
+    return appPath;
+}
+
+
+let version;
+let diagnostics = {}
+
+window.electron.getVersion()
+    .then((appVersion) => {
+        version = appVersion;
+        console.log('App version: ', appVersion)
+        diagnostics['Chirpity Version'] = version;
+    })
+    .catch(e => {
+        console.log('Error getting app version:', e)
+    });
+
+let modelReady = false, fileLoaded = false, currentFile, resultHistory = {};
+let PREDICTING = false;
+let region, AUDACITY_LABELS = [], wavesurfer;
 let summary = {};
 summary['suppressed'] = [];
-let fileStart, startTime, ctime;
+let fileList = [], fileStart, bufferStartTime, fileEnd;
 
+let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
 // set up some DOM element caches
 let bodyElement = $('body');
 let dummyElement, specElement, waveElement, specCanvasElement, specWaveElement;
 let waveCanvasElement, waveWaveElement, resultTableElement = $('#resultTableContainer');
 let contentWrapperElement = $('#contentWrapper');
 let controlsWrapperElement = $('#controlsWrapper');
-let completeDiv = $('.complete');
+let completeDiv = $('#complete');
 const resultTable = $('#resultTableBody')
-const summaryTable = $('#modalBody');
+const summaryTable = $('#summaryTable');
 const feedbackTable = $('#feedbackModalBody');
+const speciesSearchForm = $('#speciesSearch');
+let progressDiv = $('#progressDiv');
+let progressBar = $('.progress .progress-bar');
+const fileNumber = document.getElementById('fileNumber');
+let batchFileCount = 0, batchInProgress = false;
 let activeRow;
-let predictions = {}, correctedSpecies, speciesListItems, action, clickedNode, lastIndex,
+let predictions = {}, correctedSpecies, speciesListItems, searchListItems, clickedNode,
     clickedIndex, speciesName, speciesFilter, speciesHide, speciesExclude, subRows, scrolled, currentFileDuration;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
@@ -48,9 +97,8 @@ let workerHasLoadedFile = false;
 // Set default Options
 let config;
 const sampleRate = 24000;
-let controller = new AbortController();
-let signal = controller.signal;
-let restore = false;
+const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
+
 
 //////// Collect Diagnostics Information ////////
 // Diagnostics keys:
@@ -65,79 +113,41 @@ let restore = false;
 
 // Timers
 let t0_warmup, t1_warmup, t0_analysis, t1_analysis
-let diagnostics = {}
-diagnostics['Chirpity Version'] = version;
-const gpuInfo = require('gpu-info');
-var os = require('os');
-diagnostics['CPU'] = os.cpus()[0].model;
-diagnostics['Cores'] = os.cpus().length;
-diagnostics['Memory'] = (os.totalmem() / Math.pow(1024, 3)).toFixed(0) + ' GB';
-gpuInfo().then(function (data) {
-    let count = 0
-    data.forEach(gpu => {
-        const key = 'GPU' + count;
-        diagnostics[key] = gpu.Caption;
-        count += 1;
+
+const si = window.module.si;
+
+// promises style - new since version 3
+si.graphics()
+    .then(data => {
+        let count = 0
+        //console.log(data)
+        data.controllers.forEach(gpu => {
+            const key = `GPU[${count}]`;
+            const vram = key + ' Memory';
+            diagnostics[key] = gpu.name || gpu.vendor || gpu.model;
+            diagnostics[vram] = `${gpu.vram} MB`;
+            count += 1;
+        })
     })
-}).catch(err => {
-    console.log('GPU info missing: ' + err.message)
-})
+    .catch(error => console.error(error));
 
+si.cpu()
+    .then(data => {
+        //console.log(data)
+        const key = 'CPU';
+        diagnostics[key] = `${data.manufacturer} ${data.brand}`;
+        diagnostics['Cores'] = `${data.cores}`;
+    })
+    .catch(error => console.error(error));
 
-const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
-
-const fetchAudioFile = (filePath) =>
-    fetch(filePath, {signal})
-        .then((res => res.arrayBuffer()))
-        .then((arrayBuffer) => audioCtx.decodeAudioData(arrayBuffer))
-        .then((buffer) => {
-            if (!controller.signal.aborted) {
-                let source = audioCtx.createBufferSource();
-                source.buffer = buffer;
-                currentFileDuration = source.buffer.duration;
-                // Diagnostics
-                diagnostics['Audio Duration'] = currentFileDuration.toFixed(2) + ' seconds';
-                if (currentFileDuration < 20) windowLength = currentFileDuration;
-                // set fileStart time
-                if (config.timeOfDay) {
-                    fileStart = new Date(ctime - (currentFileDuration * 1000));
-                    let astro = SunCalc.getTimes(fileStart, config.latitude, config.longitude);
-                    dusk = astro.dusk;
-                    dawn = astro.dawn;
-                } else {
-                    //fileStart = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
-                    fileStart = new Date(ctime - (currentFileDuration * 1000));
-                }
-
-                const offlineCtx = new OfflineAudioContext(1, sampleRate * currentFileDuration, sampleRate);
-                const offlineSource = offlineCtx.createBufferSource();
-                offlineSource.buffer = buffer;
-                offlineSource.connect(offlineCtx.destination);
-                offlineSource.start();
-                offlineCtx.startRendering().then(function (resampled) {
-                    console.log('Rendering completed successfully');
-                    // `resampled` contains an AudioBuffer resampled at 24000Hz.
-                    // use resampled.getChannelData(x) to get an Float32Array for channel x.
-                    currentBuffer = resampled;
-                    loadBufferSegment(resampled, bufferBegin)
-                }).then(() => {
-                    if (restore) showTheResults();
-                })
-            } else {
-                throw new DOMException('Rendering cancelled at user request', "AbortError")
-            }
-        })
-        .catch(function (e) {
-            console.log("Error with decoding audio data " + e.message);
-            if (e.name === "AbortError") {
-                // We know it's been canceled!
-                console.warn('Fetch aborted: sending message to worker')
-                hideAll();
-                disableMenuItem(['analyze', 'analyzeSelection'])
-                showElement(['loadFileHint']);
-                showElement(['loadFileHintText'], false);
-            }
-        })
+si.mem()
+    .then(data => {
+        //console.log(data)
+        const key = 'System Memory';
+        diagnostics[key] = `${(data.total / (1024 * 1024 * 1000)).toFixed(0)} GB`;
+    })
+    .catch(error => console.error(error));
+console.table(diagnostics);
 
 
 function resetResults() {
@@ -148,106 +158,70 @@ function resetResults() {
     predictions = {};
     seenTheDarkness = false;
     shownDaylightBanner = false;
+    progressDiv.hide();
+    progressBar.width(0 + '%');
+    progressBar.attr('aria-valuenow', 0);
+    progressBar.html(0 + '%');
 }
 
-async function loadAudioFile(filePath, OriginalCtime) {
-    ipcRenderer.send('file-load-request', {message: filePath});
-    workerHasLoadedFile = false;
-    resetResults();
-    summary['suppressed'] = [];
+async function loadAudioFile(args) {
+    let filePath = args.filePath, originalFileEnd = args.originalFileEnd,
+        workerHasLoadedFile = false;
+
     // Hide load hint and show spinnner
-    if (wavesurfer) {
-        wavesurfer.destroy();
-        wavesurfer = undefined;
-    }
+    // if (wavesurfer) {
+    //     wavesurfer.destroy();
+    //     wavesurfer = undefined;
+    // }
     // set file creation time
     try {
-        ctime = fs.statSync(filePath).mtime;
-        ipcRenderer.send('file-load-request', {message: filePath});
+        fileEnd = fs.statSync(filePath).mtime;
+        worker.postMessage({action: 'file-load-request', filePath: filePath, position: 0});
     } catch (e) {
-        const supported_files = ['.mp3', '.wav', '.mpga', '.ogg', '.flac', '.aac'];
+        const supported_files = ['.mp3', '.wav', '.mpga', '.ogg', '.flac', '.aac', '.mpeg', '.mp4'];
         const dir = p.parse(filePath).dir;
         const name = p.parse(filePath).name;
         let file;
         supported_files.some(ext => {
             try {
                 file = p.join(dir, name + ext);
-                ctime = fs.statSync(file).mtime;
+                fileEnd = fs.statSync(file).mtime;
             } catch (e) {
                 // Try the next extension
             }
-            return ctime;
+            return fileEnd;
         })
-        if (!ctime) {
+        if (!fileEnd) {
             alert("Unable to load source file with any supported file extension: " + filePath)
-            return;
         } else {
             if (file) filePath = file;
-            if (OriginalCtime) ctime = OriginalCtime;
-            ipcRenderer.send('file-load-request', {message: filePath});
+            if (originalFileEnd) fileEnd = originalFileEnd;
+            worker.postMessage({
+                action: 'file-load-request',
+                filePath: filePath,
+                preserveResults: preserveResults,
+                position: 0
+            });
         }
-    }
-
-    hideAll();
-    disableMenuItem(['analyzeSelection', 'analyze'])
-    showElement(['loadFileHint', 'loadFileHintSpinner', 'loadFileHintLog']);
-
-
-    // Reset the buffer playhead and zoom:
-    bufferBegin = 0;
-    windowLength = 20;
-    if (config.spectrogram) {
-        controller = new AbortController();
-        signal = controller.signal;
-        await fetchAudioFile(filePath);
-    } else {
-        // remove the file hint stuff
-        hideAll();
-        // Show controls
-        showElement(['controlsWrapper']);
-        $('.specFeature').hide()
-    }
-    if (!controller.signal.aborted) {
-        fileLoaded = true;
-        completeDiv.hide();
-        //const filename = filePath.replace(/^.*[\\\/]/, '')
-        let filenameElement = document.getElementById('filename');
-        filenameElement.innerHTML = '';
-
-        //
-        let count = 0
-        let appendstr = '<div id="fileContainer" class="bg-dark pr-3">';
-        fileList.forEach(item => {
-            if (count === 0) {
-                if (fileList.length > 1) {
-                    appendstr += '<span class="revealFiles visible pointer" id="filename_' + count + '">'
-                    appendstr += '<span class="material-icons-two-tone pointer">library_music</span>'
-                } else {
-                    appendstr += '<span class="material-icons-two-tone align-bottom">audio_file</span>'
-                }
-            } else {
-                appendstr += '<span class="openFiles pointer" id="filename_' + count + '"><span class="material-icons-two-tone align-bottom">audio_file</span>'
-            }
-            appendstr += item.replace(/^.*[\\\/]/, "") + '<br></span>';
-            count += 1;
-        })
-        filenameElement.innerHTML += appendstr + '</div>';
     }
 }
 
-$(document).on("click", ".openFiles", function (e) {
-    const openFiles = $('.openFiles')
-    openFiles.removeClass('visible')
-    this.classList.add('visible')
+$(document).on("click", ".openFiles", async function (e) {
+    e.target.classList.add('revealFiles');
+    e.target.classList.remove('openFiles');
+    const openFiles = $('.openFiles');
+    openFiles.removeClass('visible');
     if (openFiles.length > 1) this.firstChild.innerHTML = "library_music"
-    this.classList.remove('openFiles')
-    this.classList.add('revealFiles')
+    if (!PREDICTING) {
+        await loadAudioFile({filePath: e.target.id, preserveResults: true})
+    }
     e.stopImmediatePropagation()
 });
 
 $(document).on("click", ".revealFiles", function (e) {
     this.classList.remove('revealFiles')
     this.classList.add('openFiles')
+
     this.firstChild.innerHTML = "audio_file"
     const openFiles = $('.openFiles');
     openFiles.addClass('visible');
@@ -255,43 +229,16 @@ $(document).on("click", ".revealFiles", function (e) {
 });
 
 
-function loadBufferSegment(buffer, begin, saveRegion) {
-    if (begin < 0) begin = 0;
-    if (begin + windowLength > buffer.duration) {
-        begin = Math.max(0, buffer.duration - windowLength);
-    }
-    bufferBegin = begin;
-    startTime = new Date(fileStart.getTime() + (bufferBegin * 1000))
-    AudioBufferSlice(buffer, begin, begin + windowLength, function (error, slicedAudioBuffer) {
-        if (error) {
-            console.log(error);
-        } else {
-            if (!wavesurfer) {
-                initSpec({
-                    'audio': slicedAudioBuffer,
-                    'backend': 'WebAudio',
-                    'alpha': 0,
-                });
-            } else {
-                if (!saveRegion) {
-                    wavesurfer.clearRegions();
-                }
-                updateSpec(slicedAudioBuffer)
-            }
-        }
-    })
-}
-
-function updateSpec(buffer) {
-    // Show spec and timecode containers
-    //wavesurfer.timeline.params.offset = -bufferBegin;
+function updateSpec(buffer, play) {
+    updateElementCache();
     wavesurfer.loadDecodedBuffer(buffer);
+    waveCanvasElement.width('100%');
     specCanvasElement.width('100%');
     $('.spec-labels').width('55px');
-
+    if (play) wavesurfer.play()
 }
 
-function initSpec(args) {
+function initWavesurfer(args) {
     // Show spec and timecode containers
     hideAll();
     showElement(['dummy', 'timeline', 'waveform', 'spectrogram'], false);
@@ -311,24 +258,24 @@ function initSpec(args) {
         cursorWidth: 2,
         skipLength: 0.1,
         partialRender: true,
-        scrollParent: true,
+        scrollParent: false,
+        fillParent: true,
         responsive: true,
         height: 512,
-
         plugins: [
-            Regions.create({
-                dragSelection: {
-                    slop: 5,
-
-                },
+            WaveSurfer.regions.create({
+                regionsMinLength: 0.5,
+                dragSelection: true,
+                slop: 5,
                 color: "rgba(255, 255, 255, 0.2)"
-            })]
+            })
+        ]
     })
     if (config.spectrogram) {
         initSpectrogram()
     }
     if (config.timeline) {
-        wavesurfer.addPlugin(SpecTimeline.create({
+        wavesurfer.addPlugin(WaveSurfer.timeline.create({
             container: '#timeline',
             formatTimeCallback: formatTimeCallback,
             timeInterval: timeInterval,
@@ -354,15 +301,24 @@ function initSpec(args) {
     });
     // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
-        // console.log(wavesurfer.regions.list)
         region = e
-        enableMenuItem(['analyzeSelection', 'exportMP3']);
+        enableMenuItem(['exportMP3']);
+        if (modelReady) {
+            enableMenuItem(['analyzeSelection']);
+        }
     });
 
     wavesurfer.on('finish', function () {
-        if (currentBuffer.duration > bufferBegin + windowLength) {
+        if (currentFileDuration > bufferBegin + windowLength) {
             bufferBegin += windowLength;
-            loadBufferSegment(currentBuffer, bufferBegin);
+            worker.postMessage({
+                action: 'update-buffer',
+                file: currentFile,
+                position: 0,
+                start: bufferBegin,
+                end: bufferBegin + windowLength,
+                play: true
+            });
             wavesurfer.play()
         }
     })
@@ -385,96 +341,220 @@ function updateElementCache() {
     specWaveElement = $('#spectrogram wave')
 }
 
-function zoomSpecIn() {
-    if (windowLength < 1.5) return;
-    updateElementCache()
-    windowLength /= 2;
-    bufferBegin = bufferBegin + wavesurfer.getCurrentTime() - (windowLength / 2)
-    initSpectrogram();
-    loadBufferSegment(currentBuffer, bufferBegin, false);
-    wavesurfer.seekAndCenter(0.5)
-    adjustSpecDims(true)
+function zoomSpec(direction) {
+    let offsetSeconds = wavesurfer.getCurrentTime()
+    let position = offsetSeconds / windowLength;
+    let timeNow = bufferBegin + offsetSeconds;
+    if (direction === 'in') {
+        if (windowLength < 1.5) return;
+        windowLength /= 2;
+        bufferBegin += windowLength * position;
+    } else {
+        if (windowLength > 100 || windowLength === currentFileDuration) return
+        bufferBegin -= windowLength * position;
+        windowLength = Math.min(currentFileDuration, windowLength * 2);
 
-}
-
-function zoomSpecOut() {
-    if (windowLength > 100) return;
-    updateElementCache()
-    windowLength *= 2;
-    if (windowLength > currentFileDuration) {
-        windowLength = currentFileDuration
+        if (bufferBegin < 0) bufferBegin = 0;
+        else if (bufferBegin + windowLength > currentFileDuration) bufferBegin = currentFileDuration - windowLength
     }
-    // Centre on playhead
-    bufferBegin = bufferBegin + wavesurfer.getCurrentTime() - (windowLength / 2)
-    initSpectrogram();
-    loadBufferSegment(currentBuffer, bufferBegin, false);
-    wavesurfer.seekAndCenter(0.5)
-    adjustSpecDims(true)
-}
-
-
-async function showOpenDialog() {
-    ipcRenderer.send('openFiles');
-}
-
-ipcRenderer.on('openFiles', async (event, arg) => {
-    // Store the file list and Load First audio file
-    fileList = arg.filePaths
-    await loadAudioFile(fileList[0]);
-    currentFile = fileList[0];
-})
-
-ipcRenderer.on('load-results', async (event, arg) => {
-    console.log("file received: " + arg.file)
-    if (arg.file !== '.') {
-        await loadChirp(arg.file);
-    }
-})
-
-
-async function showSaveDialog() {
-    // Show file dialog to save Audacity label file
-    ipcRenderer.send('saveFile', {'currentFile': currentFile, 'labels': AUDACITY_LABELS});
-    ipcRenderer.on('safeFile', (event, arg) => {
-        console.log(arg.message)
+    // Keep playhead at same time in file
+    position = (timeNow - bufferBegin) / windowLength;
+    worker.postMessage({
+        action: 'update-buffer',
+        file: currentFile,
+        position: position,
+        start: bufferBegin,
+        end: bufferBegin + windowLength
     })
 }
 
-// Worker listeners
+async function showOpenDialog() {
+    const dialogConfig = {
+        filters: [{
+            name: 'Audio Files',
+            extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4']
+        }],
+        properties: ['openFile', 'multiSelections']
+    };
+    const files = await window.electron.openDialog('showOpenDialog', dialogConfig);
+    if (!files.canceled) await onOpenFiles({filePaths: files.filePaths});
+}
 
-const analyzeLink = document.getElementById('analyze');
-
-analyzeLink.addEventListener('click', async () => {
-    completeDiv.hide();
+async function onOpenFiles(args) {
+    hideAll();
+    showElement(['controlsWrapper', 'timeline', 'waveform', 'spectrogram', 'dummy'], false)
     resetResults();
+    completeDiv.hide();
+    // Store the file list and Load First audio file
+    fileList = args.filePaths;
+
+    // Sort file by time created (the oldest first):
+    if (fileList.length > 1) {
+        if (modelReady) analyzeAllLink.classList.remove('disabled');
+        fileList = fileList.map(fileName => ({
+            name: fileName,
+            time: fs.statSync(fileName).mtime.getTime(),
+        }))
+            .sort((a, b) => a.time - b.time)
+            .map(file => file.name);
+    } else {
+        analyzeAllLink.classList.add('disabled');
+    }
+    let count = 0;
+    let filenameElement = document.getElementById('filename');
+    filenameElement.innerHTML = '';
+
+    let appendstr = '<div id="fileContainer" class="d-inline-block position-absolute bg-dark text-nowrap pe-3">';
+    fileList.forEach(item => {
+        if (count === 0) {
+            if (fileList.length > 1) {
+                appendstr += `<span class="revealFiles visible pointer" id="${item}">`;
+                appendstr += '<span class="material-icons-two-tone pointer">library_music</span>';
+            } else {
+                appendstr += '<span class="material-icons-two-tone align-bottom">audio_file</span>';
+            }
+        } else {
+            appendstr += `<span class="openFiles pointer" id="${item}"><span class="material-icons-two-tone align-bottom">audio_file</span>`;
+        }
+        appendstr += item.replace(/^.*[\\\/]/, "") + '<br></span>';
+        count += 1;
+    })
+    filenameElement.innerHTML += appendstr + '</div>';
+    await loadAudioFile({filePath: fileList[0]});
+    currentFile = fileList[0];
+
+    disableMenuItem(['analyzeSelection', 'analyze', 'analyzeAll'])
+    // Reset the buffer playhead and zoom:
+    bufferBegin = 0;
+    windowLength = 20;
+    if (!config.spectrogram) {
+        // Show controls
+        showElement(['controlsWrapper']);
+        $('.specFeature').hide()
+    }
+}
+
+async function onLoadResults(args) {
+    console.log("result file received: " + args.file)
+    await loadChirp(args.file);
+}
+
+/**
+ *
+ *
+ * @returns {Promise<void>}
+ */
+async function showSaveDialog() {
+    await window.electron.saveFile({'currentFile': currentFile, 'labels': AUDACITY_LABELS});
+}
+
+// Worker listeners
+function analyseReset() {
+    fileNumber.innerText = '';
+    PREDICTING = true;
+    delete diagnostics['Audio Duration'];
+    AUDACITY_LABELS = [];
+    // hide exclude x in the table
+    speciesExclude.forEach(el => {
+        el.classList.add('d-none');
+    })
+    completeDiv.hide();
+    progressDiv.show();
     // Diagnostics
     t0_analysis = Date.now();
-    ipcRenderer.send('analyze', {confidence: config.minConfidence, fileStart: fileStart});
-    analyzeLink.disabled = true;
+}
+
+function isEmptyObject(obj) {
+    for (const i in obj) return false;
+    return true
+}
+
+function refreshResultsView() {
+    hideAll();
+    if (fileLoaded) {
+        showElement(['controlsWrapper', 'timeline', 'waveform', 'spectrogram', 'dummy'], false);
+        if (!isEmptyObject(predictions)) showElement(['resultTableContainer'], false);
+    } else {
+        showElement(['loadFileHint', 'loadFileHintText'], true);
+    }
+}
+
+const navbarAnalysis = document.getElementById('navbarAnalysis');
+navbarAnalysis.addEventListener('click', async () => {
+    refreshResultsView();
+});
+
+const analyzeLink = document.getElementById('analyze');
+speciesExclude = document.querySelectorAll('speciesExclude');
+analyzeLink.addEventListener('click', async () => {
+    refreshResultsView()
+    postAnalyzeMessage({confidence: config.minConfidence, resetResults: true, files: [currentFile], selection: false});
+});
+
+const analyzeAllLink = document.getElementById('analyzeAll');
+analyzeAllLink.addEventListener('click', async () => {
+    refreshResultsView();
+    postAnalyzeMessage({confidence: config.minConfidence, resetResults: true, files: fileList, selection: false});
 });
 
 const analyzeSelectionLink = document.getElementById('analyzeSelection');
-
 analyzeSelectionLink.addEventListener('click', async () => {
-    completeDiv.hide();
-    let start;
-    let end;
-    if (region.start) {
-        start = region.start + bufferBegin;
-        end = region.end + bufferBegin;
+    refreshResultsView();
+    delete diagnostics['Audio Duration'];
+    analyseReset();
+    progressDiv.show();
+    const start = region.start + bufferBegin;
+    let end = region.end + bufferBegin;
+    if (end - start < 0.5) {
+        region.end = region.start + 0.5;
+        end = start + 0.5
     }
-    // Add current buffer's beginning offset to region start / end tags
-    ipcRenderer.send('analyze', {confidence: 0.1, start: start, end: end, fileStart: fileStart});
+    postAnalyzeMessage({
+        confidence: 0.1,
+        resetResults: false,
+        files: [currentFile],
+        start: start,
+        end: end,
+        selection: true
+    });
     summary = {};
     summary['suppressed'] = []
-    analyzeLink.disabled = true;
 });
+
+function postAnalyzeMessage(args) {
+    analyseReset();
+    if (args.resetResults) {
+        resetResults();
+    } else {
+        progressDiv.show();
+        delete diagnostics['Audio Duration'];
+    }
+    args.files.forEach(file => {
+        worker.postMessage({
+            action: 'analyze',
+            confidence: args.confidence,
+            resetResults: args.resetResults,
+            start: args.start,
+            end: args.end,
+            nocmig: config.nocmig,
+            lat: config.latitude,
+            lon: config.longitude,
+            filePath: file,
+            selection: args.selection
+        });
+    })
+    if (args.files.length > 1) {
+        batchFileCount = 0;
+        batchInProgress = true;
+        fileNumber.innerText = `(File 1 of ${fileList.length})`;
+    }
+}
 
 
 // Menu bar functions
 
 function exitApplication() {
-    remote.app.quit()
+    window.close()
 }
 
 function enableMenuItem(id_list) {
@@ -492,6 +572,7 @@ function disableMenuItem(id_list) {
 function showElement(id_list, makeFlex = true, empty = false) {
     id_list.forEach(id => {
         const thisElement = $('#' + id);
+        //thisElement.show();
         thisElement.removeClass('d-none');
         if (makeFlex) thisElement.addClass('d-flex');
         if (empty) {
@@ -506,18 +587,26 @@ function hideElement(id_list) {
         const thisElement = $('#' + id);
         thisElement.removeClass('d-flex');
         thisElement.addClass('d-none');
+
     })
 }
 
 function hideAll() {
     // File hint div,  Waveform, timeline and spec, controls and result table
-    hideElement(['loadFileHint', 'loadFileHintText', 'loadFileHintSpinner', 'loadFileHintLog',
-        'timeline', 'waveform', 'spectrogram', 'dummy', 'controlsWrapper', 'resultTableContainer']);
+    hideElement(['loadFileHint', 'loadFileHintText', 'loadFileHintSpinner',
+        'timeline', 'waveform', 'spectrogram', 'dummy', 'controlsWrapper', 'resultTableContainer', 'recordsContainer']);
 }
 
-let progressDiv = $('.progressDiv');
+const save2dbLink = document.getElementById('save2db');
+save2dbLink.addEventListener('click', async () => {
+    worker.postMessage({action: 'save2db'})
+});
 
-let progressBar = $('.progress .progress-bar');
+const recordsLink = document.getElementById('charts');
+recordsLink.addEventListener('click', async () => {
+    hideAll();
+    showElement(['recordsContainer']);
+});
 
 
 function createRegion(start, end, label) {
@@ -535,35 +624,54 @@ function createRegion(start, end, label) {
     wavesurfer.seekAndCenter(progress);
 }
 
-function loadResultRegion(start, end, label, el) {
-    // Accepts global start and end timecodes from model detections
-    // Need to find and centre a view of the detection in the spectrogram
-    // 3 second detections
+const tbody = document.getElementById('resultTableBody')
+tbody.addEventListener('click', function (e) {
     if (activeRow) activeRow.classList.remove('table-active')
-    el.classList.add('table-active');
-    activeRow = el;
+    const row = e.target.closest('tr');
+    row.classList.add('table-active');
+    activeRow = row;
     activeRow.scrollIntoView({
         behavior: 'smooth',
         block: 'nearest'
     })
-    bufferBegin = start - (windowLength / 2) + 1.5
-    loadBufferSegment(currentBuffer, bufferBegin)
-    createRegion(start - bufferBegin, end - bufferBegin, label)
+    loadResultRegion(row.attributes[0].value.split('|'));
+})
+
+function loadResultRegion(paramlist) {
+    // Accepts global start and end timecodes from model detections
+    // Need to find and centre a view of the detection in the spectrogram
+    // 3 second detections
+    let [file, start, end, label] = paramlist;
+    // Let the UI know what file's being loaded
+    currentFile = file;
+    start = parseFloat(start);
+    end = parseFloat(end);
+    bufferBegin = Math.max(0, start - (windowLength / 2) + 1.5)
+
+    worker.postMessage({
+        action: 'update-buffer',
+        file: file,
+        position: wavesurfer.getCurrentTime() / windowLength,
+        start: bufferBegin,
+        end: bufferBegin + windowLength,
+        region: {start: start - bufferBegin, end: end - bufferBegin, label: label}
+    });
 }
 
 function adjustSpecDims(redraw) {
     $.each([dummyElement, waveWaveElement, specElement, specCanvasElement, waveCanvasElement], function () {
         // Expand up to 512px
-        $(this).height(Math.min(bodyElement.height() * 0.4, 512))
+        $(this).height(Math.min(contentWrapperElement.height() * 0.4, 512))
     })
-    if (wavesurfer) {
-        initSpectrogram(Math.min(bodyElement.height() * 0.4, 512));
+     if (wavesurfer) {
+        initSpectrogram(Math.min(contentWrapperElement.height() * 0.4, 512));
         specElement.css('z-index', 0);
         resultTableElement.height(contentWrapperElement.height()
             - dummyElement.height()
             - controlsWrapperElement.height()
             - $('#timeline').height()
-            - 55);
+            - 85
+           );
         if (redraw && wavesurfer != null) {
             wavesurfer.drawBuffer();
         }
@@ -610,10 +718,10 @@ document.querySelectorAll(".tableFixHead").forEach(el =>
 
 
 function formatTimeCallback(secs) {
-    secs = Number(secs);
-    const now = new Date(startTime.getTime() + (secs * 1000))
+    secs = secs.toFixed(2);
+    const now = new Date(bufferStartTime.getTime() + (secs * 1000))
     const milliSeconds = now.getMilliseconds();
-    const seconds = now.getSeconds();
+    let seconds = now.getSeconds();
     const minutes = now.getMinutes();
     const hours = now.getHours();
 
@@ -622,7 +730,12 @@ function formatTimeCallback(secs) {
     if (windowLength >= 5) {
         secondsStr = seconds.toString();
     } else {
-        secondsStr = seconds.toString() + '.' + Math.round(milliSeconds / 100).toString();
+        let fraction = Math.round(milliSeconds / 100);
+        if (fraction === 10) {
+            seconds += 1;
+            fraction = 0;
+        }
+        secondsStr = seconds.toString() + '.' + fraction.toString();
     }
     if (hours > 0 || minutes > 0 || config.timeOfDay) {
         if (seconds < 10) {
@@ -741,8 +854,50 @@ function updatePrefs() {
     }
 }
 
-//////////// Save Detections CSV ////////////
-function saveDetections() {
+//////////// Save Detections  ////////////
+function saveChirp() {
+    predictions['source'] = currentFile;
+    predictions['fileEnd'] = fileEnd;  // Preserve creation date
+    let content = JSON.stringify(predictions);
+    const folder = p.parse(currentFile).dir;
+    const source = p.parse(currentFile).name;
+    gzip(content).then(buffer => {
+        const chirpFile = p.join(folder, source + '.chirp');
+        fs.writeFile(chirpFile, buffer, function (err) {
+            if (err) throw err;
+        })
+    }).catch(e => {
+        console.log(e);
+    })
+}
+
+let savedPredictions;
+
+async function loadChirp(file) {
+    if (file.endsWith('chirp')) {
+        const data = fs.readFileSync(file);
+        await ungzip(data).then(buffer => {
+            buffer = new TextDecoder().decode(buffer);
+            savedPredictions = JSON.parse(buffer);
+            currentFile = savedPredictions['source'];
+            fileEnd = Date.parse(savedPredictions['fileEnd']);
+        })
+        fileList = [currentFile];
+        await loadAudioFile({filePath: currentFile, originalFileEnd: fileEnd});
+        for (const [key, value] of Object.entries(savedPredictions)) {
+            if (key === 'source' || key === 'fileEnd') continue;
+            await renderResult({result: value, index: key, selection: false});
+        }
+        await onPredictionDone({labels: {}});
+    } else {
+        currentFile = file;
+        fileList = [currentFile];
+        await loadAudioFile({filePath: currentFile, originalFileEnd: fileEnd});
+    }
+}
+
+async function saveDetections() {
+    saveChirp();
     const folder = p.parse(currentFile).dir;
     const source = p.parse(currentFile).name;
     const headings = 'Source File,Position,Time of Day,Common Name,Scientific Name,Confidence';
@@ -771,7 +926,8 @@ function saveDetections() {
             }
         }
         // Convert predictions to csv string buffer
-        for (const [, value] of Object.entries(predictions)) {
+        for (const [key, value] of Object.entries(predictions)) {
+            if (key === 'source' || key === 'fileEnd') continue;
             if ((config.nocmig && value.dayNight === 'daytime') || value.excluded) {
                 continue
             }
@@ -785,54 +941,60 @@ function saveDetections() {
 }
 
 /////////////////////////  Window Handlers ////////////////////////////
+let appPath;
+window.onload = async () => {
+    // Set config defaults
 
-window.onload = function () {
-    // Load preferences and options
+    config = {
+        'spectrogram': true,
+        'colormap': 'inferno',
+        'timeline': true,
+        'minConfidence': 0.45,
+        'timeOfDay': false,
+        'useWhitelist': true,
+        'latitude': 51.9,
+        'longitude': -0.4,
+        'nocmig': false,
+        'batchSize': 1
+    }
+    config.UUID = uuidv4();
+    // Load preferences and override defaults
+    appPath = await getPath();
+    worker.postMessage({action: 'load-db', path: appPath, lat: config.latitude, lon: config.longitude})
     fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
         if (err) {
             console.log('JSON parse error ' + err);
-            // If file read error, use defaults
-            config = {
-                'spectrogram': true,
-                'colormap': 'inferno',
-                'timeline': true,
-                'minConfidence': 0.45,
-                'timeOfDay': false,
-                'useWhitelist': true,
-                'latitude': 51.9,
-                'longitude': -0.4,
-                'nocmig': false
-            }
-            const {v4: uuidv4} = require('uuid');
+            // If file read error, use defaults, set new UUID
             config.UUID = uuidv4();
             updatePrefs();
-
-        } else {
-            console.log(data);
-            config = JSON.parse(data)
-
-            // Check for keys
-            if (!('UUID' in config)) {
-                const {v4: uuidv4} = require('uuid');
-                config.UUID = uuidv4();
-            }
-            if (!('latitude' in config)) {
-                config.latitude = 51.9
-            }
-            if (!('longitude' in config)) {
-                config.longitude = -0.4
-            }
-            if (!('nocmig' in config)) {
-                config.nocmig = false;
-            }
-            if (!('useWhitelist' in config)) {
-                config.useWhitelist = true;
-            }
-            updatePrefs()
+            return
         }
-        t0_warmup = Date.now();
-        ipcRenderer.send('load-model', {useWhitelist: config.useWhitelist})
+        config = JSON.parse(data)
+
+        // Check for keys - in case updates have added new ones
+        if (!('UUID' in config)) {
+            config.UUID = uuidv4();
+        }
+        if (!('batchSize' in config)) {
+            config.batchSize = 1;
+        }
+        if (!('latitude' in config)) {
+            config.latitude = 51.9
+        }
+        if (!('longitude' in config)) {
+            config.longitude = -0.4
+        }
+        if (!('nocmig' in config)) {
+            config.nocmig = false;
+        }
+        if (!('useWhitelist' in config)) {
+            config.useWhitelist = true;
+        }
+        updatePrefs()
+
         // Set UI option state
+        $('#' + config.batchSize).click();
+
         if (!config.useWhitelist) {
             $('#useWhitelist .tick').hide()
         }
@@ -851,53 +1013,93 @@ window.onload = function () {
             nocmigButton.classList.add('active')
         }
         showElement([config.colormap + 'span'], true)
-    })
 
+    })
+    // establish the message channel
+    establishMessageChannel.then((success) => {
+        t0_warmup = Date.now();
+        worker.addEventListener('message', function (e) {
+            const args = e.data;
+            const event = args.event;
+            switch (event) {
+                case 'model-ready':
+                    onModelReady(args);
+                    break;
+                case 'prediction-done':
+                    onPredictionDone(args);
+                    break;
+                case 'progress':
+                    onProgress(args);
+                    break;
+                case 'prediction-ongoing':
+                    renderResult(args);
+                    break;
+                case 'update-audio-duration':
+                    diagnostics['Audio Duration'] ?
+                        diagnostics['Audio Duration'] += args.value :
+                        diagnostics['Audio Duration'] = args.value;
+                    break;
+                case 'spawning':
+                    displayWarmUpMessage();
+                    break;
+                case 'promptToSave':
+                    if (confirm("Save results to your archive?")) {
+                        worker.postMessage({action: 'save2db'})
+                    }
+                    ;
+                    break;
+                case 'worker-loaded-audio':
+                    onWorkerLoadedAudio(args);
+                    break;
+                case 'chart-data':
+                    onChartData(args);
+                    break;
+                case 'generate-alert':
+                    alert(args.message)
+                    break;
+            }
+        })
+    })
     // Set footer year
     $('#year').text(new Date().getFullYear());
     // Populate feedback modal
-    let feedbackHTML = `
-        <script>
-        function myFunction() {
-          // Declare variables
-          var input, filter, ul, li, a, i, txtValue;
-          input = document.getElementById('myInput');
-          filter = input.value.toUpperCase();
-          ul = document.getElementById("myUL");
-          li = ul.getElementsByTagName('li');
-        
-          // Loop through all list items, and hide those who don't match the search query
-          for (i = 0; i < li.length; i++) {
-            a = li[i].getElementsByTagName("a")[0];
-            txtValue = a.textContent || a.innerText;
-            if (txtValue.toUpperCase().indexOf(filter) > -1) {
-              li[i].style.display = "";
-            } else {
-              li[i].style.display = "none";
-            }
-          }
-        }
-        </script>
-        
-        <p>What sound do you think this is?</p>
-        <input type="text" id="myInput" onkeyup="myFunction()" placeholder="Search for a species...">
-        <ul id="myUL">
+    feedbackTable.append(generateBirdList('my'));
+    speciesSearchForm.append(generateBirdList('search'));
+
+    //Cache list elements
+    speciesListItems = $('#myUL li span');
+    searchListItems = $('#searchUL');
+    searchListItems.addClass('d-none');
+
+};
+
+
+function generateBirdList(prefix) {
+    let listHTML = '';
+    if (prefix === 'my') {
+        listHTML += "<p>What sound do you think this is?</p>"
+    }
+    listHTML +=
+        `<input type="text" id="${prefix}Input" onkeyup="myFunction('${prefix}')" placeholder="Search for a species...">
+        <ul id="${prefix}UL">`;
+    if (prefix === 'my') {
+        listHTML += `
             <li><a href="#">Animal<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
             <li><a href="#">Ambient Noise<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
             <li><a href="#">Human<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
             <li><a href="#">Vehicle<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>`;
+    }
+
     const excluded = new Set(['human', 'vehicles', 'animals', 'No call']);
     for (const item in labels) {
         const [sname, cname] = labels[item].split('_');
         if (!excluded.has(cname)) {
-            feedbackHTML += `<li><a href="#">${cname} - ${sname}<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>`;
+            listHTML += `<li><a href="#">${cname} - ${sname}<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>`;
         }
     }
-    feedbackHTML += '</ul>';
-    feedbackTable.append(feedbackHTML);
-    //Cache list elements
-    speciesListItems = $('#myUL li span');
-};
+    listHTML += '</ul>';
+    return listHTML;
+}
 
 // Feedback list handler
 $(document).on('click', '#myUL li', function (e) {
@@ -907,6 +1109,218 @@ $(document).on('click', '#myUL li', function (e) {
     speciesListItems.addClass('d-none');
     e.target.closest('a').childNodes[1].classList.remove('d-none');
 })
+// Search list handler
+$(document).on('focus', '#searchInput', function () {
+    searchListItems.removeClass('d-none');
+    document.removeEventListener('keydown', handleKeyDown, true);
+})
+
+function hideSearchList() {
+    searchListItems.addClass('d-none')
+}
+
+$(document).on('blur', '#searchInput', function () {
+    document.addEventListener('keydown', handleKeyDown, true);
+    setTimeout(hideSearchList, 250);
+})
+let t0;
+let chartSpecies;
+
+$(document).on('click', '#searchUL li', function (e) {
+    let graphSpecies = formatFilename(e.target.innerText);
+    const regex = /done$/;
+    graphSpecies = graphSpecies.replace(regex, '').split('~')[0].replace(/_/g, ' ');
+    document.getElementById('searchInput').value = graphSpecies;
+    t0 = Date.now();
+    chartSpecies = graphSpecies;
+    worker.postMessage({action: 'chart-request', species: graphSpecies})
+    searchListItems.addClass('d-none');
+    //e.target.closest('a').childNodes[1].classList.remove('d-none');
+})
+
+function getDateOfISOWeek(w) {
+    const options = {month: 'long', day: 'numeric'};
+    const y = new Date().getFullYear();
+    const simple = new Date(y, 0, 1 + (w - 1) * 7);
+    const dow = simple.getDay();
+    const ISOweekStart = simple;
+    if (dow <= 4)
+        ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+    else
+        ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+    return ISOweekStart.toLocaleDateString('en-GB', options);
+}
+
+
+function onChartData(args) {
+    const genTime = Date.now() - t0;
+    const genTimeElement = document.getElementById('genTime')
+    genTimeElement.innerText = (genTime / 1000).toFixed(1) + ' seconds';
+    showElement(['dataRecords'], false);
+    const elements = document.getElementsByClassName('highcharts-data-table');
+    while (elements.length > 0) {
+        elements[0].parentNode.removeChild(elements[0]);
+    }
+    const records = args.records;
+    for (const [key, value] of Object.entries(records)) {
+        const element = document.getElementById(key);
+        if (value && value.constructor === Array) {
+            if (isNaN(value[0])) element.innerText = 'N/A';
+            else {
+                element.innerText = value[0].toString() + ' on ' +
+                    new Date(value[1]).toLocaleDateString(undefined, {dateStyle: "short"})
+            }
+        } else {
+            element.innerText = value ? new Date(value).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric"
+            }) : 'No Records';
+        }
+    }
+    const results = args.results;
+    const rate = args.rate;
+    const total = args.total;
+    const dataPoints = args.dataPoints;
+    const aggregation = args.aggregation;
+    const pointStart = args.pointStart;
+    const chartOptions = setChartOptions(args.species, total, rate, results, dataPoints, aggregation, pointStart);
+    Highcharts.chart('chart-week', chartOptions);
+}
+
+function setChartOptions(species, total, rate, results, dataPoints, aggregation, pointStart) {
+    let chartOptions = {};
+    const pointInterval = {Week: 7 * 24 * 36e5, Day: 24 * 36e5, Hour: 36e5};
+    chartOptions.colors = ["#004059", "#2B9179", "#AB41E8", "#E88E2A", "#E86235"];
+    chartOptions.chart = {
+        zoomType: 'x',
+        backgroundColor: {linearGradient: [0, 0, 0, 500], stops: [[0, "#dbe2ed"], [1, "#dddddd"]]}
+    }
+    chartOptions.credits = {text: 'Chart generated by Chirpity Nocmig', href: ''}
+    chartOptions.title = {text: `${species} Detections`};
+    // chartOptions.xAxis = {
+    //     title: {text: 'Week'},
+    //     accessibility: {description: 'Weeks of the year'},
+    // }
+    // Week number should start from 1 not 0....
+    //chartOptions.xAxis.categories = Array.from({length: dataPoints}, (_, i) => i + 1)
+    Highcharts.dateFormats.W = function (timestamp) {
+        let date = new Date(timestamp), day = date.getUTCDay() === 0 ? 7 : date.getUTCDay(), dayNumber;
+        date.setDate(date.getUTCDate() + 4 - day);
+        dayNumber = Math.floor((date.getTime() - new Date(date.getUTCFullYear(), 0, 1, -6)) / 86400000);
+        return 1 + Math.floor(dayNumber / 7);
+    };
+    const format = {Week: '{value:Week %W}', Day: '{value:%a %e %b}', Hour: '{value:%l%P}'}
+    chartOptions.xAxis = {
+        type: 'datetime',
+        tickInterval: pointInterval[aggregation], // one week
+        labels: {
+            format: format[aggregation],
+        }
+    };
+    chartOptions.yAxis = [
+        {
+            title: {text: 'Totals'},
+            accessibility: {description: 'Count of records'}
+        }];
+    chartOptions.series = [];
+
+    if (dataPoints === 52) {
+        chartOptions.yAxis.push({
+            title: {text: 'Hourly Detection Rate'},
+            accessibility: {description: 'Hourly rate of records'},
+            opposite: true
+        }, {
+            title: {text: 'Hours recorded'},
+            accessibility: {description: 'Total recording time in hours'},
+            opposite: true
+        });
+        chartOptions.series.push({
+            name: 'Hours of recordings',
+            marker: 'none',
+            yAxis: 2,
+            type: 'areaspline',
+            data: total,
+            pointInterval: pointInterval[aggregation],
+            pointStart: pointStart,
+            lineWidth: 0,
+            fillColor: {
+                linearGradient: [0, 0, 0, 300],
+                stops: [
+                    [0, Highcharts.getOptions().colors[1]],
+                    [1, Highcharts.color(Highcharts.getOptions().colors[1]).setOpacity(0.2).get('rgba')]
+                ]
+            }
+        });
+        chartOptions.series.push({
+            name: 'Average hourly call rate',
+            marker: 'none',
+            yAxis: 1,
+            type: 'areaspline',
+            data: rate,
+            lineWidth: 0,
+            pointInterval: pointInterval[aggregation],
+            pointStart: pointStart,
+            fillColor: {
+                linearGradient: [0, 0, 0, 300],
+                stops: [
+                    [0, Highcharts.getOptions().colors[0]],
+                    [1, Highcharts.color(Highcharts.getOptions().colors[0]).setOpacity(0.2).get('rgba')]
+                ]
+            }
+        });
+    }
+
+
+    for (const key in results
+        ) {
+        chartOptions.series.push({
+            name: `Total for ${aggregation} in ` + key,
+            //marker: 'diamond',
+            pointInterval: pointInterval[aggregation],
+            pointStart: pointStart,
+            type: 'column',
+            data: results[key]
+        });
+    }
+
+    chartOptions.tooltip = {
+        crosshairs: true, shared: true, formatter: function () {
+            const x = new Date(this.x)
+            if (aggregation === "Week") {
+                const oneJan = new Date(x.getFullYear(), 0, 1);
+                const numberOfDays = Math.floor((x - oneJan) / (24 * 60 * 60 * 1000));
+                const weekOfYear = Math.ceil((x.getDay() + 1 + numberOfDays) / 7);
+                return this.points.reduce(function (s, point) {
+                    return s + '<br/><span style="font-weight: bold;color: ' + point.series.color + '">&#9679; </span>' + point.series.name + ': ' +
+                        point.y;
+                }, `<b>${aggregation} ${weekOfYear} (${getDateOfISOWeek(weekOfYear)} - ${getDateOfISOWeek(weekOfYear + 1)})</b>`);
+            } else if (aggregation === 'Day') {
+                const period = moment(x).format('MMMM Do, YYYY');
+                return this.points.reduce(function (s, point) {
+                    return s + '<br/><span style="font-weight: bold;color: ' + point.series.color + '">&#9679; </span>' + point.series.name + ': ' +
+                        point.y;
+                }, `<b>${aggregation} ${period}</b>`);
+            } else {
+                const period = moment(x).format('MMM D, ha');
+                return this.points.reduce(function (s, point) {
+                    return s + '<br/><span style="font-weight: bold;color: ' + point.series.color + '">&#9679; </span> Count: ' +
+                        point.y;
+                }, `<b>${period}</b>`);
+            }
+        }
+    };
+    chartOptions.exporting = {};
+    chartOptions.exporting.csv = {
+        columnHeaderFormatter: function (item, key) {
+            if (!item || item instanceof Highcharts.Axis) {
+                return ''
+            } else {
+                return item.name;
+            }
+        }
+    };
+    return chartOptions;
+}
 
 
 const waitForFinalEvent = (function () {
@@ -926,7 +1340,7 @@ $(window).resize(function () {
     waitForFinalEvent(function () {
 
         WindowResize();
-    }, 500, 'id1');
+    }, 250, 'id1');
 });
 
 function WindowResize() {
@@ -978,7 +1392,6 @@ $(document).on('click', '#loadSpectrogram', function () {
         $('.specFeature').hide()
         hideElement(['dummy', 'timeline', 'waveform', 'spectrogram']);
         $('.speccolor .timeline').addClass('disabled');
-        //adjustSpecDims(true);
         updatePrefs();
     } else {
         config.spectrogram = true;
@@ -988,7 +1401,7 @@ $(document).on('click', '#loadSpectrogram', function () {
             $('.speccolor .timeline').removeClass('disabled');
             showElement(['dummy', 'timeline', 'waveform', 'spectrogram'], false);
         } else {
-            loadAudioFile(currentFile);
+            loadAudioFile({filePath: currentFile});
         }
         updatePrefs();
     }
@@ -1005,12 +1418,13 @@ function initSpectrogram(height) {
         height = fftSamples / 2
     }
     if (wavesurfer.spectrogram) wavesurfer.destroyPlugin('spectrogram');
-    wavesurfer.addPlugin(SpectrogramPlugin.create({
+    wavesurfer.addPlugin(WaveSurfer.spectrogram.create({
         wavesurfer: wavesurfer,
         container: "#spectrogram",
-        scrollParent: true,
+        scrollParent: false,
+        fillParent: true,
         windowFunc: 'hamming',
-        minPxPerSec: 10,
+        minPxPerSec: 1,
         normalize: true,
         hideScrollbar: true,
         labels: true,
@@ -1043,7 +1457,7 @@ $(document).on('click', '#useWhitelist', function () {
         config.useWhitelist = true;
         $('#useWhitelist .tick').show()
     }
-    ipcRenderer.send('load-model', {useWhitelist: config.useWhitelist});
+    worker.postMessage({action: 'load-model', useWhitelist: config.useWhitelist, batchSize: config.batchSize});
     updatePrefs();
 })
 
@@ -1055,7 +1469,7 @@ $(document).on('click', '.timeline', function () {
         updatePrefs();
     } else {
         config.timeline = true;
-        wavesurfer.addPlugin(SpecTimeline.create({
+        wavesurfer.addPlugin(WaveSurfer.timeline.create({
             wavesurfer: wavesurfer,
             container: "#timeline",
             formatTimeCallback: formatTimeCallback,
@@ -1084,8 +1498,15 @@ $(document).on('click', '#timeOfDay', function () {
     })
     $('#timecode .tick').hide();
     $('#timeOfDay .tick').show();
-    fileStart = new Date(ctime - (currentFileDuration * 1000));
-    if (fileLoaded) loadBufferSegment(currentBuffer, bufferBegin);
+    if (fileLoaded) {
+        worker.postMessage({
+            action: 'update-buffer',
+            file: currentFile,
+            position: wavesurfer.getCurrentTime() / windowLength,
+            start: bufferBegin,
+            end: bufferBegin + windowLength
+        });
+    }
     updatePrefs();
 })
 $(document).on('click', '#timecode', function () {
@@ -1096,12 +1517,17 @@ $(document).on('click', '#timecode', function () {
     timefields.forEach(time => {
         time.classList.add('d-none');
     })
-
     $('#timeOfDay .tick').hide();
     $('#timecode .tick').show();
-    //start at zero. UTC for DST handling
-    fileStart = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
-    if (fileLoaded) loadBufferSegment(currentBuffer, bufferBegin);
+    if (fileLoaded) {
+        worker.postMessage({
+            action: 'update-buffer',
+            file: currentFile,
+            position: wavesurfer.getCurrentTime() / windowLength,
+            start: bufferBegin,
+            end: bufferBegin + windowLength
+        });
+    }
     updatePrefs();
 })
 
@@ -1126,15 +1552,22 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     },
     Escape: function () {
         console.log('Operation aborted');
-        controller.abort();
-        ipcRenderer.send('abort', {'abort': true});
+
+        worker.postMessage({action: 'abort'});
         alert('Operation cancelled');
 
     }
     ,
     Home: function () {
         if (currentBuffer) {
-            loadBufferSegment(currentBuffer, 0)
+            bufferBegin = 0;
+            worker.postMessage({
+                action: 'update-buffer',
+                position: 0,
+                file: currentFile,
+                start: 0,
+                end: windowLength
+            });
             wavesurfer.seekAndCenter(0);
             wavesurfer.pause()
         }
@@ -1142,7 +1575,14 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     ,
     End: function () {
         if (currentBuffer) {
-            loadBufferSegment(currentBuffer, currentBuffer.duration - windowLength)
+            bufferBegin = currentFileDuration - windowLength;
+            worker.postMessage({
+                action: 'update-buffer',
+                file: currentFile,
+                position: 1,
+                start: bufferBegin,
+                end: currentFileDuration
+            });
             wavesurfer.seekAndCenter(1);
             wavesurfer.pause()
         }
@@ -1151,11 +1591,14 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     PageUp: function () {
         if (wavesurfer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
-            bufferBegin -= windowLength
-            // Set new date for timeline
-            const playhead = bufferBegin + wavesurfer.getCurrentTime()
-            loadBufferSegment(currentBuffer, bufferBegin)
-            playhead <= 0 ? wavesurfer.seekAndCenter(0) : wavesurfer.seekAndCenter(position);
+            bufferBegin = Math.max(0, bufferBegin - windowLength);
+            worker.postMessage({
+                action: 'update-buffer',
+                file: currentFile,
+                position: position,
+                start: bufferBegin,
+                end: bufferBegin + windowLength
+            });
             wavesurfer.pause()
         }
     }
@@ -1163,11 +1606,14 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     PageDown: function () {
         if (wavesurfer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
-            bufferBegin += windowLength
-            // Set new date for timeline
-            const playhead = bufferBegin + wavesurfer.getCurrentTime()
-            loadBufferSegment(currentBuffer, bufferBegin)
-            playhead >= currentBuffer.duration ? wavesurfer.seekAndCenter(1) : wavesurfer.seekAndCenter(position);
+            bufferBegin = Math.min(bufferBegin + windowLength, currentFileDuration - windowLength);
+            worker.postMessage({
+                action: 'update-buffer',
+                file: currentFile,
+                position: position,
+                start: bufferBegin,
+                end: bufferBegin + windowLength
+            });
             wavesurfer.pause()
         }
     }
@@ -1175,10 +1621,16 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     ArrowLeft: function () {
         if (wavesurfer) {
             wavesurfer.skipBackward(0.1);
-            const position = wavesurfer.getCurrentTime();
-            if (position < 0.1 && bufferBegin > 0) {
-                loadBufferSegment(currentBuffer, bufferBegin -= 0.1)
-                wavesurfer.seekAndCenter(0);
+            const position = wavesurfer.getCurrentTime() / windowLength;
+            if (wavesurfer.getCurrentTime() < 0.1 && bufferBegin > 0) {
+                bufferBegin -= 0.5;
+                worker.postMessage({
+                    action: 'update-buffer',
+                    file: currentFile,
+                    position: position,
+                    start: bufferBegin,
+                    end: bufferBegin + windowLength
+                });
                 wavesurfer.pause()
             }
         }
@@ -1187,10 +1639,16 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     ArrowRight: function () {
         if (wavesurfer) {
             wavesurfer.skipForward(0.1);
-            const position = wavesurfer.getCurrentTime();
-            if (position > windowLength - 0.1) {
-                loadBufferSegment(currentBuffer, bufferBegin += 0.1)
-                wavesurfer.seekAndCenter(1);
+            const position = wavesurfer.getCurrentTime() / windowLength;
+            if (wavesurfer.getCurrentTime() > windowLength - 0.1) {
+                bufferBegin = Math.min(currentFileDuration - windowLength, bufferBegin += 0.5)
+                worker.postMessage({
+                    action: 'update-buffer',
+                    file: currentFile,
+                    position: position,
+                    start: bufferBegin,
+                    end: bufferBegin + windowLength
+                });
                 wavesurfer.pause()
             }
         }
@@ -1202,25 +1660,25 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     ,
     Equal: function () {
         if (wavesurfer) {
-            zoomSpecIn()
+            zoomSpec('in')
         }
     }
     ,
     NumpadAdd: function () {
         if (wavesurfer) {
-            zoomSpecIn()
+            zoomSpec('in')
         }
     }
     ,
     Minus: function () {
         if (wavesurfer) {
-            zoomSpecOut()
+            zoomSpec('out')
         }
     }
     ,
     NumpadSubtract: function () {
         if (wavesurfer) {
-            zoomSpecOut()
+            zoomSpec('out')
         }
     }
     ,
@@ -1250,67 +1708,122 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
 
 
 // Electron Message handling
+const warmupText = document.getElementById('warmup');
 
-ipcRenderer.on('model-ready', async (event, args) => {
+function displayWarmUpMessage() {
+    disableMenuItem(['analyze', 'analyzeAll', 'analyseSelection']);
+    warmupText.classList.remove('d-none');
+}
+
+function onModelReady(args) {
     modelReady = true;
-    const warmupText = document.getElementById('warmup');
     warmupText.classList.add('d-none');
     if (workerHasLoadedFile) {
         enableMenuItem(['analyze'])
+        if (fileList.length > 1) analyzeAllLink.classList.remove('disabled');
     }
+    if (region) enableMenuItem(['analyzeSelection'])
     t1_warmup = Date.now();
     diagnostics['Warm Up'] = ((t1_warmup - t0_warmup) / 1000).toFixed(2) + ' seconds';
     diagnostics['Tensorflow Backend'] = args.backend;
-})
+}
 
-ipcRenderer.on('update-error', async (event, args) => {
-    console.error('update error' + args.error)
-})
 
-ipcRenderer.on('update-not-available', async (event, args) => {
-    console.log('update not available ' + args.message)
-})
+// worker.onmessage('update-error', async (event, args) => {
+//     console.error('update error' + args.error)
+// })
+//
+// worker.onmessage('update-not-available', async (event, args) => {
+//     console.log('update not available ' + args.message)
+// })
+//
+// worker.onmessage('update-available', async (event, args) => {
+//     console.log('update available ' + args.message)
+// })
+//
+// worker.onmessage('update-downloaded', async (event, args) => {
+//     console.log('update downloaded' + args.releaseNotes)
+// })
 
-ipcRenderer.on('update-available', async (event, args) => {
-    console.log('update available ' + args.message)
-})
+function onWorkerLoadedAudio(args) {
+    if (args.preserveResults) completeDiv.hide();
+    console.log('UI received worker-loaded-audio: ' + args.file)
+    currentBuffer = new AudioBuffer({length: args.length, numberOfChannels: 1, sampleRate: 24000});
+    currentBuffer.copyToChannel(args.contents, 0);
 
-ipcRenderer.on('update-downloaded', async (event, args) => {
-    console.log('update downloaded' + args.releaseNotes)
-})
-
-ipcRenderer.on('worker-loaded', async (event, args) => {
-    console.log('UI received worker-loaded: ' + args.message)
     workerHasLoadedFile = true;
-    if (modelReady) enableMenuItem(['analyze']);
-    if (!loadSpectrogram) {
-        hideAll();
-        showElement(['controlsWrapper']);
-        hideElement(['transport-controls']);
-        const filename = arg.message.replace(/^.*[\\\/]/, '')
-        $('#filename').html('<span class="material-icons">description</span> ' + filename);
+    currentFile = args.file;
+    bufferBegin = args.bufferBegin;
+    currentFileDuration = args.sourceDuration;
+    fileStart = args.fileStart;
+    if (config.timeOfDay) {
+        bufferStartTime = new Date(fileStart + (bufferBegin * 1000))
+    } else {
+        bufferStartTime = new Date(zero.getTime() + (bufferBegin * 1000))
     }
-})
 
-ipcRenderer.on('progress', async (event, arg) => {
+    if (windowLength > currentFileDuration) windowLength = currentFileDuration;
+    let astro = SunCalc.getTimes(fileStart, config.latitude, config.longitude);
+    dusk = astro.dusk.getTime();
+    firstDawn = astro.dawn.getTime();
+    // calculate dawn for following day
+    let astro2 = SunCalc.getTimes(fileStart + 8.64e+7, config.latitude, config.longitude);
+    dawn = astro2.dawn.getTime();
+    if (config.nocmig && fileEnd.getTime() < dusk && fileStart > firstDawn) {
+        alert(`All timestamps in this file are during daylight hours. \n\nNocmig mode will be disabled.`)
+        $('#timecode').click();
+    }
+    if (modelReady) {
+        enableMenuItem(['analyze']);
+        if (fileList.length > 1) analyzeAllLink.classList.remove('disabled');
+    }
+    fileLoaded = true;
+
+    if (!wavesurfer) {
+        initWavesurfer({
+            'audio': currentBuffer,
+            'backend': 'WebAudio',
+            'alpha': 0,
+        });
+    } else {
+        wavesurfer.clearRegions();
+        updateSpec(currentBuffer, args.play)
+        wavesurfer.seekTo(args.position);
+        if (args.region) {
+            createRegion(args.region.start, args.region.end, args.region.label)
+        }
+    }
+}
+
+function onProgress(args) {
     progressDiv.show();
-    let progress = (arg.progress * 100).toFixed(1);
+    if (args.text) fileNumber.innerText = args.text;
+    let progress = (args.progress * 100).toFixed(1);
     progressBar.width(progress + '%');
     progressBar.attr('aria-valuenow', progress);
     progressBar.html(progress + '%');
-});
+    if (parseFloat(progress) === 100.0) progressDiv.hide();
+}
 
-ipcRenderer.on('prediction-done', async (event, arg) => {
-    if (!seenTheDarkness && config.nocmig && !region) {
-        alert(`Nocmig mode is enabled, but all timestamps in this file were during daylight hours. Any detections will have been suppressed.\n\nDisable Nocmig mode and re-run the analysis to see them.`)
+async function onPredictionDone(args) {
+    AUDACITY_LABELS.push(args.labels);
+    // Defer further processing until batch complete
+    if (args.batchInProgress) {
+        progressDiv.show();
+        batchFileCount++;
+        fileNumber.innerText = `(File ${batchFileCount} of ${fileList.length})`;
+        return;
+    } else {
+        PREDICTING = false;
     }
     scrolled = false;
-    AUDACITY_LABELS = arg.labels;
+
     progressDiv.hide();
     progressBar.width(0 + '%');
     progressBar.attr('aria-valuenow', 0);
     progressBar.html(0 + '%');
     completeDiv.show();
+
     if (AUDACITY_LABELS.length > 0) {
         enableMenuItem(['saveLabels', 'saveDetections']);
         $('.download').removeClass('disabled');
@@ -1318,8 +1831,6 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
         disableMenuItem(['saveLabels', 'saveDetections']);
     }
     analyzeLink.disabled = false;
-    // Save the results for this file to the history
-    resultHistory[currentFile] = resultTable[0].innerHTML
     console.table(summary);
     // Sort summary by count
     let sortable = [];
@@ -1371,6 +1882,9 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
     speciesFilter = document.querySelectorAll('.speciesFilter');
     speciesHide = document.querySelectorAll('.speciesHide');
     speciesExclude = document.querySelectorAll('.speciesExclude');
+    speciesExclude.forEach(el => {
+        el.classList.remove('d-none');
+    })
     const tableRows = document.querySelectorAll('#results tr');
 
     $(document).on('click', '.speciesHide', function (e) {
@@ -1381,14 +1895,14 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
         e.target.parentNode.previousElementSibling.children[1].classList.remove('text-success');
         if (targetClass.contains('text-danger')) {
             targetClass.remove('text-danger')
-            const setDelay = setTimeout(matchSpecies, 1, e, 'unhide');
+            setTimeout(matchSpecies, 1, e, 'unhide');
         } else {
             targetClass.add('text-danger');
             speciesName.forEach(function (el) {
                 const classes = el.parentNode.classList;
                 if (!classes.contains('hidden')) classes.remove('d-none')
             })
-            const setDelay = setTimeout(matchSpecies, 1, e, 'hide');
+            setTimeout(matchSpecies, 1, e, 'hide');
         }
         tableRows[0].scrollIntoView({
             behavior: 'smooth',
@@ -1404,10 +1918,10 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
         targetClass.add('d-none');
         if (targetClass.contains('text-danger')) {
             targetClass.remove('text-danger')
-            const setDelay = setTimeout(matchSpecies, 1, e, 'unexclude');
+            setTimeout(matchSpecies, 1, e, 'unexclude');
         } else {
             targetClass.add('text-danger');
-            const setDelay = setTimeout(matchSpecies, 1, e, 'exclude');
+            setTimeout(matchSpecies, 1, e, 'exclude');
         }
         e.stopImmediatePropagation();
     });
@@ -1477,11 +1991,12 @@ ipcRenderer.on('prediction-done', async (event, arg) => {
     // Diagnostics:
     t1_analysis = Date.now();
     diagnostics['Analysis Duration'] = ((t1_analysis - t0_analysis) / 1000).toFixed(2) + ' seconds';
-    diagnostics['Analysis Rate'] = (currentFileDuration / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
-});
+    diagnostics['Analysis Rate'] = (diagnostics['Audio Duration'] / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
+}
 
 function matchSpecies(e, mode) {
     const spinner = e.target.parentNode.firstChild.classList;
+    const hideIcon = e.target.closest('tr').getElementsByClassName('speciesHide')[0];
     const targetClass = e.target.classList;
     let resultSpecies, currentRow;
     const tableContext = e.target.closest('table').id;
@@ -1494,14 +2009,21 @@ function matchSpecies(e, mode) {
     }
     resultSpecies.forEach(function (el) {
         const classes = el.parentNode.classList;
-        const excludeIcon = el.parentNode.getElementsByClassName('speciesExclude')[0]
+        const excludeIcon = el.parentNode.getElementsByClassName('speciesExclude')[0];
         const index = el.parentNode.firstElementChild.innerText;
-        if (el.innerText === e.target.id || tableContext === 'results') {
+        // Extract species common name from cell
+        const searchFor = el.innerHTML.split('\n')[0];
+        if (searchFor === e.target.id || tableContext === 'results') {
             if (mode === 'filter' || mode === 'unhide') {
                 classes.remove('d-none', 'hidden');
                 excludeIcon.classList.remove('text-danger');
             } else if (mode === 'exclude') {
+                if (tableContext !== 'results') {
+                    hideIcon.classList.add('text-danger');
+                    classes.add('d-none');
+                }
                 classes.add('strikethrough');
+                // add state to predictions
                 excludeIcon.classList.add('text-danger');
                 predictions[index].excluded = true;
             } else if (mode === 'unexclude') {
@@ -1513,16 +2035,17 @@ function matchSpecies(e, mode) {
     })
     spinner.add('d-none');
     targetClass.remove('d-none');
-
 }
 
-async function renderResult(result, index, selection) {
+async function renderResult(args) {
+    const result = args.result, selection = args.selection, file = args.file;
+    let index = args.index;
     result.timestamp = new Date(result.timestamp);
     result.position = new Date(result.position);
     // Datetime wrangling for Nocmig mode
     if (result !== "No detections found.") {
         let astro = SunCalc.getTimes(result.timestamp, config.latitude, config.longitude);
-        if (astro.dawn < result.timestamp && astro.dusk > result.timestamp) {
+        if (astro.dawn.setMilliseconds(0) < result.timestamp && astro.dusk.setMilliseconds(0) > result.timestamp) {
             result.dayNight = 'daytime';
         } else {
             result.dayNight = 'nighttime';
@@ -1531,39 +2054,29 @@ async function renderResult(result, index, selection) {
     }
     let tableRows;
     let tr = '';
-    if (!selection) {
-        if (index === 1) {
+    if (index === 1) {
+        if (!controlsWrapperElement.hasClass('d-none')) showElement(['resultTableContainer'], false);
+        if (!selection) {
             tableRows = document.querySelectorAll('#results tr');
             // Remove old results
             resultTable.empty();
             summaryTable.empty();
             tableRows[0].scrollIntoView({behavior: 'smooth', block: 'nearest'})
-        }
-    } else {
-        if (index === 1) {
+        } else {
             resultTable.append('<tr><td class="bg-dark text-white text-center" colspan="20"><b>Selection Analysis</b></td></tr>')
         }
     }
-    showElement(['resultTableContainer']);
     if (result === "No detections found.") {
         tr += "<tr><td>" + result + "</td></tr>";
     } else {
         if (config.nocmig && !region) {
-            // We want to skip results recorded before dark
-            // process results during the night
-            // abort entirely when dawn breaks
+            /*
+            * We want to skip results recorded before dark
+            * process results during the night
+            * abort entirely when dawn breaks
+            */
             if (!seenTheDarkness && result.dayNight === 'daytime') {
                 // Not dark yet
-                return
-            } else if (seenTheDarkness && result.dayNight === 'daytime') {
-                // Show the twilight start bar
-                resultTable.append(`<tr class="bg-dark text-white"><td colspan="20" class="text-center">
-                                        Start of civil twilight
-                                        <span class="material-icons-two-tone text-warning align-bottom">wb_twilight</span>
-                                    </td></tr>`);
-                // Abort
-                console.log("Aborting as reached daytime");
-                await ipcRenderer.send('abort', {'sendlabels': true});
                 return
             }
         }
@@ -1576,29 +2089,22 @@ async function renderResult(result, index, selection) {
                                     </td></tr>`);
             shownDaylightBanner = true;
         }
-
         if (result.cname in summary) {
-            summary[result.cname] += 1
+            if (result)
+                summary[result.cname] += 1
         } else {
             summary[result.cname] = 1
         }
-
         if (result.suppressed === 'text-danger') summary['suppressed'].push(result.cname);
-
         const start = result.start, end = result.end;
         let icon_text;
         let feedback_icons;
         let confidence = '';
         if (result.score < 0.65) {
-            confidence = ' ?';
+            confidence = '&#63;';
         }
-        //     feedback_icons = `<span class='material-icons-two-tone text-success feedback pointer'>thumb_up_alt</span>`;
-        // } else if (result.score < 0.85) {
         feedback_icons = `<span class='material-icons-two-tone text-success feedback pointer'>thumb_up_alt</span>
                               <span class='material-icons-two-tone text-danger feedback pointer'>thumb_down_alt</span>`;
-        // } else {
-        //     feedback_icons = "<span class='material-icons-two-tone text-danger feedback pointer'>thumb_down_alt</span>";
-        // }
         result.suppressed ? icon_text = `sync_problem` : icon_text = 'sync';
         result.date = result.timestamp;
         const UI_timestamp = result.timestamp.toString().split(' ')[4];
@@ -1614,41 +2120,43 @@ async function renderResult(result, index, selection) {
         predictions[index] = result;
         let showTimeOfDay;
         config.timeOfDay ? showTimeOfDay = '' : showTimeOfDay = 'd-none';
-        tr += `<tr onclick='loadResultRegion( ${start},${end} , &quot;${result.cname}${confidence}&quot, this)' class='border-top border-secondary top-row ${result.dayNight}'>
-                    <th scope='row'>${index}</th><td class='timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
-                    <td >${UI_position}</td><td class='cname'>${result.cname}</td>
-                    <td><i>${result.sname}</i></td><td class='text-center'>${iconizeScore(result.score)}</td>
-                    <td class='text-center'><span id='${index}' title="Click for additional detections" class='material-icons rotate pointer d-none'>${icon_text}</span></td>
-                    <td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
-                    <td class='text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
-                    <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
-                    <td class='specFeature text-center download'><span class='material-icons-outlined pointer'>file_download</span></td>
-                    <td class="text-center"><span class="spinner-border spinner-border-sm text-danger d-none" role="status"></span>
-                         <span class="material-icons-two-tone align-bottom speciesExclude pointer">clear</span></td>
-                    <td id="${index}" class='specFeature text-center'>${feedback_icons}</td>
-                   </tr>`;
+        let excluded;
+        result.excluded ? excluded = 'strikethrough' : excluded = '';
+        tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" class='border-top border-secondary top-row ${excluded} ${result.dayNight}'>
+            <th scope='row'>${index}</th><td class='flex-fill timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
+            <td>${UI_position}</td><td name="${result.cname}" class='flex-shrink-0 cname'>${result.cname}
+                <i>${result.sname}</i></td><td class='flex-fill text-center'>${iconizeScore(result.score)}</td>
+            <td class='text-center'><span id='${index}' title="Click for additional detections" class='material-icons rotate pointer d-none'>${icon_text}</span></td>
+            <td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
+            <td class='text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
+            <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
+            <td class='specFeature text-center download'><span class='material-icons-outlined pointer'>file_download</span></td>
+            <td class="text-center speciesExclude d-none"><span class="spinner-border spinner-border-sm text-danger d-none" role="status"></span>
+                 <span class="material-icons-two-tone align-bottom pointer">clear</span></td>
+            <td id="${index}" class='specFeature text-center'>${feedback_icons}</td>
+        </tr>`;
         if (result.score2 > 0.2) {
-            tr += `<tr id='subrow${index}' class='subrow d-none' onclick='loadResultRegion(${start},${end},&quot;${result.cname}${confidence}&quot;)'>
-                        <th scope='row'>${index}</th><td> </td><td> </td><td class='cname2'>${result.cname2}</td>
-                        <td><i>${result.sname2}</i></td><td class='text-center'>${iconizeScore(result.score2)}</td>
-                        <td> </td><td class='specFeature'> </td>
-                        <td><a href='https://xeno-canto.org/explore?query=${result.sname2}%20type:nocturnal' target=\"_blank\">
-                            <img src='img/logo/XC.png' alt='Search ${result.cname2} on Xeno Canto' title='${result.cname2} NFCs on Xeno Canto'></a> </td>
-                        <td class='specFeature'> </td>
-                        <td class='specFeature'> </td>
-                        <td class='specFeature'> </td>
-                       </tr>`;
+            tr += `<tr name="${file},${start},${end},${result.cname}${confidence}" id='subrow${index}' class='subrow d-none'>
+                <th scope='row'>${index}</th><td> </td><td> </td><td class='cname2'>${result.cname2}<br/>
+                    <i>${result.sname2}</i></td><td class='text-center'>${iconizeScore(result.score2)}</td>
+                <td> </td><td class='specFeature'> </td>
+                <td><a href='https://xeno-canto.org/explore?query=${result.sname2}%20type:nocturnal' target=\"_blank\">
+                    <img src='img/logo/XC.png' alt='Search ${result.cname2} on Xeno Canto' title='${result.cname2} NFCs on Xeno Canto'></a> </td>
+                <td class='specFeature'> </td>
+                <td class='specFeature speciesExclude d-none'> </td>
+                <td class='specFeature'> </td>
+               </tr>`;
             if (result.score3 > 0.2) {
-                tr += `<tr id='subsubrow${index}' class='subrow d-none' onclick='loadResultRegion(${start},${end},&quot;${result.cname}${confidence}&quot;)'>
-                        <th scope='row'>${index}</th><td> </td><td> </td><td class='cname3'>${result.cname3}</td>
-                        <td><i>${result.sname3}</i></td><td class='text-center'>${iconizeScore(result.score3)}</td>
-                        <td> </td><td class='specFeature'> </td>
-                        <td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:nocturnal' target=\"_blank\">
-                            <img src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>
-                        <td class='specFeature'> </td>
-                        <td class='specFeature'> </td>
-                        <td class='specFeature'> </td>
-                       </tr>`;
+                tr += `<tr name="${file},${start},${end},${result.cname}${confidence}" id='subsubrow${index}' class='subrow d-none'>
+                    <th scope='row'>${index}</th><td> </td><td> </td><td class='cname3'>${result.cname3}<br/>
+                        <i>${result.sname3}</i></td><td class='text-center'>${iconizeScore(result.score3)}</td>
+                    <td> </td><td class='specFeature'> </td>
+                    <td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:nocturnal' target=\"_blank\">
+                        <img src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>
+                    <td class='specFeature'> </td>
+                    <td class='specFeature speciesExclude d-none'> </td>
+                    <td class='specFeature'> </td>
+                   </tr>`;
             }
         }
     }
@@ -1664,11 +2172,7 @@ async function renderResult(result, index, selection) {
     if (!config.spectrogram) $('.specFeature').hide();
 }
 
-ipcRenderer.on('prediction-ongoing', async (event, arg) => {
-    await renderResult(arg.result, arg.index, arg.selection)
-});
-
-$(document).on('click', '.material-icons', function (e) {
+$(document).on('click', '.material-icons', function () {
     $(this).toggleClass("down");
 })
 
@@ -1679,20 +2183,30 @@ function getSpeciesIndex(e) {
     clickedIndex = clickedNode.parentNode.querySelector('th').innerText
 }
 
+
+const summaryButton = document.getElementById('showSummary');
+summaryButton.addEventListener('click', () => {
+    const summaryTable = document.getElementById('summaryTable')
+    summaryTable.classList.toggle('d-none')
+    summaryButton.innerText === 'Show Summary' ?
+        summaryButton.innerText = 'Hide Summary' :
+        summaryButton.innerText = 'Show Summary';
+});
+
 $(document).on('click', '.download', function (e) {
-    action = 'save';
+    mode = 'save';
     getSpeciesIndex(e);
-    sendFile(action, predictions[clickedIndex])
+    sendFile(mode, predictions[clickedIndex])
     e.stopImmediatePropagation();
 });
 $(document).on('click', '.feedback', function (e) {
 
     let index = e.target.parentNode.id;
     e.target.parentNode.onclick = null;
-    let action;
-    (e.target.classList.contains('text-success')) ? action = 'correct' : action = 'incorrect';
+    let mode;
+    (e.target.classList.contains('text-success')) ? mode = 'correct' : mode = 'incorrect';
     getSpeciesIndex(e);
-    if (action === 'incorrect') {
+    if (mode === 'incorrect') {
         findSpecies();
     } else if (confirm('Submit feedback?')) {
         predictions[clickedIndex].filename = predictions[clickedIndex].cname.replace(/\s+/g, '_') +
@@ -1707,7 +2221,7 @@ $(document).on('click', '.rotate', function (e) {
     const row1 = e.target.parentNode.parentNode.nextSibling;
     const row2 = row1.nextSibling;
     row1.classList.toggle('d-none')
-    if (!row2.classList.contains('top-row')) row2.classList.toggle('d-none')
+    if (row2 && !row2.classList.contains('top-row')) row2.classList.toggle('d-none')
     e.stopImmediatePropagation();
 })
 
@@ -1715,7 +2229,8 @@ $(document).on('click', '.rotate', function (e) {
 function findSpecies() {
     document.removeEventListener('keydown', handleKeyDown, true);
     speciesListItems.addClass('d-none');
-    $('#feedbackModal').modal();
+    const feedback = new bootstrap.Modal(document.getElementById('feedbackModal'));
+    feedback.show()
 }
 
 function formatFilename(filename) {
@@ -1735,7 +2250,7 @@ $('#feedbackModal').on('hidden.bs.modal', function (e) {
 })
 
 
-function sendFile(action, result) {
+function sendFile(mode, result) {
     let start, end, filename;
     if (result) {
         start = result.start;
@@ -1775,9 +2290,10 @@ function sendFile(action, result) {
             'version': version
         };
     }
-    if (action === 'save') {
-        ipcRenderer.send('save', {
-            'start': start, 'end': end, 'filepath': filename, 'metadata': metadata
+    if (mode === 'save') {
+        worker.postMessage({
+            action: 'save',
+            start: start, file: currentFile, end: end, filename: filename, metadata: metadata
         })
     } else {
         if (!config.seenThanks) {
@@ -1785,8 +2301,9 @@ function sendFile(action, result) {
             config.seenThanks = true;
             updatePrefs()
         }
-        ipcRenderer.send('post', {
-            'start': start, 'end': end, 'filepath': filename, 'metadata': metadata, 'action': action
+        worker.postMessage({
+            action: 'post',
+            start: start, file: currentFile, end: end, defaultName: filename, metadata: metadata, mode: mode
         })
     }
 }
@@ -1810,26 +2327,51 @@ function iconizeScore(score) {
     else return iconDict['high'].replace('--', tooltip)
 }
 
-// Help content handling
+// File menu handling
+const open = document.getElementById('open');
+open.addEventListener('click', function () {
+    const file = showOpenDialog();
+});
+
+$('#saveDetections').on('click', function () {
+    saveDetections();
+});
+
+$('#saveLabels').on('click', function () {
+    showSaveDialog();
+});
+
+$('#exportMP3').on('click', function () {
+    sendFile('save');
+});
+
+$('#exit').on('click', function () {
+    exitApplication();
+});
+
+// Help menu handling
 
 $('#keyboard').on('click', function () {
     $('#helpModalLabel').text('Keyboard shortcuts');
     $('#helpModalBody').load('Help/keyboard.html', function () {
-        $('#helpModal').modal({show: true});
+        const help = new bootstrap.Modal(document.getElementById('helpModal'));
+        help.show()
     });
 });
 
-$('#options').on('click', function () {
-    $('#helpModalLabel').text('Options Help');
-    $('#helpModalBody').load('Help/options.html', function () {
-        $('#helpModal').modal({show: true});
+$('#settings').on('click', function () {
+    $('#helpModalLabel').text('Settings Help');
+    $('#helpModalBody').load('Help/settings.html', function () {
+        const help = new bootstrap.Modal(document.getElementById('helpModal'));
+        help.show()
     });
 });
 
 $('#usage').on('click', function () {
     $('#helpModalLabel').text('Usage Guide');
     $('#helpModalBody').load('Help/usage.html', function () {
-        $('#helpModal').modal({show: true});
+        const help = new bootstrap.Modal(document.getElementById('helpModal'));
+        help.show()
     });
 });
 const nocmigButton = document.getElementById('nocmigMode');
@@ -1846,13 +2388,124 @@ nocmigButton.addEventListener('click', function (e) {
     updatePrefs();
 })
 
-$('#diagnostics').on('click', function () {
+const diagnosticMenu = document.getElementById('diagnostics')
+diagnosticMenu.addEventListener('click', function () {
     let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
-    for (const [key, value] of Object.entries(diagnostics)) {
+    for (let [key, value] of Object.entries(diagnostics)) {
+        if (key === 'Audio Duration') {
+            if (value < 3600) {
+                value = new Date(value * 1000).toISOString().substring(14, 19)
+            } else {
+                value = new Date(value * 1000).toISOString().substring(11, 19)
+            }
+        }
         diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
     }
     diagnosticTable += "</table>";
     $('#diagnosticsModalBody').html(diagnosticTable);
-    $('#diagnosticsModal').modal({show: true});
+    const testModal = new bootstrap.Modal(document.getElementById('diagnosticsModal'));
+    testModal.show();
+});
 
+// Transport controls handling
+
+$('#playToggle').on('mousedown', function () {
+    wavesurfer.playPause();
+});
+
+$('#zoomIn').on('click', function () {
+    zoomSpec('in');
+});
+
+$('#zoomOut').on('click', function () {
+    zoomSpec('out');
+});
+
+// Set batch size
+$('.batch').on('click', function (e) {
+    const batchSize = e.target.id || config.batchSize;
+    worker.postMessage({action: 'load-model', useWhitelist: config.useWhitelist, batchSize: batchSize});
+    $('.batch span').addClass('d-none');
+    e.target.lastChild.classList.remove('d-none');
+    config.batchSize = e.target.id || config.batchSize;
+    updatePrefs();
+});
+
+// Drag file to app window to open
+document.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+})
+
+document.addEventListener('drop', async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    let filelist = []
+    for (const f of event.dataTransfer.files) {
+        // Using the path attribute to get absolute file path
+        console.log(f)
+        filelist.push(f.path);
+    }
+    await onOpenFiles({filePaths: filelist})
+});
+
+////////// Date Picker ///////////////
+
+
+$(function () {
+    const reportRange = $('#reportrange');
+    var start = moment().startOf('day').add(12, 'hours').subtract(1, 'days');
+    var end = moment().startOf('day').add(12, 'hours');
+
+    function cb(start, end) {
+
+    }
+
+
+    reportRange.daterangepicker({
+        autoUpdateInput: false,
+        locale: {
+            cancelLabel: 'Clear'
+        },
+        timePicker: true,
+        timePicker24Hour: true,
+        timePickerIncrement: 60,
+        startDate: start,
+        endDate: end,
+        opens: "center",
+        ranges: {
+            'Last Night': [moment().startOf('day').add(12, 'hours').subtract(1, 'days'), moment().startOf('day').add(12, 'hours')],
+            'Previous Night': [moment().startOf('day').add(12, 'hours').subtract(2, 'days'), moment().subtract(1, 'days').startOf('day').add(12, 'hours')],
+            'Last 7 Nights': [moment().startOf('day').add(12, 'hours').subtract(6, 'days'), moment().startOf('day').add(12, 'hours')],
+            'Last 30 Nights': [moment().startOf('day').add(12, 'hours').subtract(29, 'days'), moment()],
+            'This Month': [moment().startOf('month'), moment().endOf('month')],
+            'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')],
+            'This Year': [moment().startOf('year'), moment().endOf('year')],
+            'Last Year': [moment().subtract(1, 'year').startOf('year'), moment().subtract(1, 'year').endOf('year')]
+        }
+    });
+    reportRange.on('apply.daterangepicker', function (ev, picker) {
+        $('#reportrange span').html(picker.startDate.format('MMMM D, YYYY') + ' - ' + picker.endDate.format('MMMM D, YYYY'));
+        $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
+        const dateRange = {'start': picker.startDate._d.getTime(), 'end': picker.endDate._d.getTime()};
+        if (worker) {
+            worker.postMessage({action: 'set-date-range', range: dateRange});
+            if (chartSpecies) {
+                t0 = Date.now();
+                worker.postMessage({action: 'chart-request', species: chartSpecies});
+            }
+        }
+    });
+
+    reportRange.on('cancel.daterangepicker', function (ev, picker) {
+        $('#reportrange span').html('Apply a date filter');
+        if (worker) {
+            worker.postMessage({action: 'set-date-range', range: {}});
+            if (chartSpecies) {
+                t0 = Date.now();
+                worker.postMessage({action: 'chart-request', species: chartSpecies});
+            }
+        }
+
+    });
 });

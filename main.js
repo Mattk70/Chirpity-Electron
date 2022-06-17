@@ -1,45 +1,49 @@
-const {app, dialog, autoUpdater, ipcMain, BrowserWindow, remote} = require('electron');
+const {app, session, dialog, ipcMain, MessageChannelMain, BrowserWindow} = require('electron');
 const fs = require("fs");
-require('update-electron-app')();
+const path = require('path')
+
+//require('update-electron-app')();
 global.sharedObject = {prop1: process.argv};
-
+let files = [];
 //Updater
-const server = 'https://chirpity-electron-releases.vercel.app';
-console.log('process platform ' + process.platform)
-console.log('app version  ' + app.getVersion())
-const url = `${server}/update/${process.platform}/${app.getVersion()}`
-
-autoUpdater.setFeedURL({url})
+//const server = 'https://chirpity-electron-releases.vercel.app';
+//console.log('process platform ' + process.platform)
+//console.log('app version  ' + app.getVersion())
+//const url = `${server}/update/${process.platform}/${app.getVersion()}`
+//
+//autoUpdater.setFeedURL({url})
 
 //Update handling
-autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName) => {
-    const dialogOpts = {
-        type: 'info',
-        buttons: ['Restart', 'Later'],
-        title: 'Application Update',
-        message: process.platform === 'win32' ? releaseNotes : releaseName,
-        detail: 'A new version has been downloaded. Restart the application to apply the updates.'
-    }
-
-    dialog.showMessageBox(dialogOpts).then((returnValue) => {
-        if (returnValue.response === 0) autoUpdater.quitAndInstall()
-    })
-})
+//autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName) => {
+//    const dialogOpts = {
+//        type: 'info',
+//        buttons: ['Restart', 'Later'],
+//        title: 'Application Update',
+//        message: process.platform === 'win32' ? releaseNotes : releaseName,
+//        detail: 'A new version has been downloaded. Restart the application to apply the updates.'
+//    }
+//
+//    dialog.showMessageBox(dialogOpts).then((returnValue) => {
+//        if (returnValue.response === 0) autoUpdater.quitAndInstall()
+//    })
+//})
 
 
 let mainWindow;
 let workerWindow;
 
+
 function createWindow() {
     // Create the browser window.
     mainWindow = new BrowserWindow({
         show: false,
+        title: "Chirpity Nocmig",
         width: 1280,
         height: 768,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
-            enableRemoteModule: true,
+            preload: path.join(__dirname, 'preload.js'),
+            nodeIntegration: false,
+            contextIsolation: true,
             backgroundThrottling: false
         }
     })
@@ -67,7 +71,7 @@ function createWindow() {
 }
 
 
-function createWorker() {
+async function createWorker() {
     // hidden worker
     workerWindow = new BrowserWindow({
         show: false,
@@ -75,43 +79,84 @@ function createWorker() {
         width: 1200,
         webPreferences: {
             nodeIntegration: true,
-            nodeIntegrationInWorker: true,
-            enableRemoteModule: false,
+            nodeIntegrationInWorker: false,
             contextIsolation: false,
             backgroundThrottling: false
         }
     });
     workerWindow.setIcon(__dirname + '/img/icon/icon.png');
-    workerWindow.loadFile('worker.html');
+    await workerWindow.loadFile('worker.html');
 
     workerWindow.on('closed', () => {
         workerWindow = null;
     });
-    //workerWindow.webContents.openDevTools();
+    workerWindow.webContents.openDevTools();
     console.log("worker created");
-
 }
 
 // This method will be called when Electron has finished
+app.whenReady().then(async () => {
+    ipcMain.handle('getPath', () => app.getPath("userData"));
+    ipcMain.handle('getVersion', () => app.getVersion());
 
-app.on('ready', () => {
-    createWorker();
+    await createWorker();
     createWindow();
-    mainWindow.webContents.on('new-window', function (e, url) {
-        e.preventDefault();
-        require('electron').shell.openExternal(url).then(r => console.log(r));
+    // We'll be sending one end of this channel to the main world of the
+    // context-isolated page.
+
+    // We can't use ipcMain.handle() here, because the reply needs to transfer a
+    // MessagePort.
+    ipcMain.on('request-worker-channel', (event) => {
+        // For security reasons, let's make sure only the frames we expect can
+        // access the worker.
+        if (event.senderFrame === mainWindow.webContents.mainFrame) {
+            // Create a new channel ...
+            const {port1, port2} = new MessageChannelMain()
+            // ... send one end to the worker ...
+            workerWindow.webContents.postMessage('new-client', null, [port1])
+            // ... and the other end to the UI window.
+            event.senderFrame.postMessage('provide-worker-channel', null, [port2])
+            // Now the main window and the worker can communicate with each other
+            // without going through the main process!
+        }
+    });
+    ipcMain.on('file-to-load', (event) => {
+        // THe UI has asked for it, so now is a good time to ask the UI to load a results file if needed:
+        if (event.senderFrame === mainWindow.webContents.mainFrame) {
+            const args = sharedObject.prop1;
+            if (args.length > 2 || (process.platform === 'darwin' && args.length > 0)) {
+                console.log('Asking UI to load a file', args)
+                event.senderFrame.postMessage('load-results', {file: args[args.length - 1]});
+            }
+        }
     });
 
-    workerWindow.webContents.on('crashed', (e) => {
+    if (process.platform === 'darwin') {
+        //const appIcon = new Tray('./img/icon/icon.png')
+        app.dock.setIcon(__dirname + '/img/icon/icon.png');
+        app.dock.bounce();
+    }
+
+    app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+            createWorker();
+            createWindow();
+        }
+    })
+
+
+    mainWindow.webContents.on('new-window', function (e, url) {
+        e.preventDefault();
+        require('electron').shell.openExternal(url); // .then(r => console.log(r));
+    });
+
+    workerWindow.webContents.on('render-process-gone', (e, details) => {
         console.log(e);
+        console.log(details);
         const dialogOpts = {
             type: 'warning',
-            title: 'File too large',
-            detail: 'The file loaded was too long. Currently, Chirpity is limited to analysing files with the following limits:\n' +
-                'Sample Rate     Maximum Duration\n' +
-                '48000Hz            3 hours 6 minutes and 20 seconds\n' +
-                '44100Hz            3 hours 22 minutes and 49 seconds\n' +
-                '24000Hz            6 hours 12 minutes 40 seconds'
+            title: 'Crash report',
+            detail: e
         }
 
         dialog.showMessageBox(dialogOpts).then((returnValue) => {
@@ -122,31 +167,44 @@ app.on('ready', () => {
         })
     });
 
-    setInterval(() => {
-        autoUpdater.checkForUpdates()
-    }, 6000000)
+//
+//    setInterval(() => {
+//        autoUpdater.checkForUpdates()
+//    }, 6000000)
 
-    autoUpdater.on('error', message => {
-        mainWindow.webContents.send('update-error', {error: message});
-        console.error('There was a problem updating the application')
-        console.error(message)
-    })
+//    autoUpdater.on('error', message => {
+//        mainWindow.webContents.send('update-error', {error: message});
+//        console.error('There was a problem updating the application')
+//        console.error(message)
+//    })
+//
+//    autoUpdater.on('update-not-available', message => {
+//        mainWindow.webContents.send('update-not-available', {message: 'update-not-available'});
+//    })
+//
+//    autoUpdater.on('update-available', message => {
+//        mainWindow.webContents.send('update-available', {message: 'update-available'});
+//    })
+});
 
-    autoUpdater.on('update-not-available', message => {
-        mainWindow.webContents.send('update-not-available', {message: 'update-not-available'});
-    })
 
-    autoUpdater.on('update-available', message => {
-        mainWindow.webContents.send('update-available', {message: 'update-available'});
-    })
+app.on('open-file', (event, path) => {
+    files.push(path);
 });
 
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
-        app.quit()
+        app.quit();
     }
 })
+
+// app.on('before-quit', async () =>
+// {
+//     console.log('before quit fired')
+//     workerWindow.webContents.postMessage('new-client', {action: 'clear-cache'})
+//     await session.defaultSession.clearStorageData();
+// })
 
 app.on('activate', () => {
     if (mainWindow === null) {
@@ -158,91 +216,22 @@ app.on('activate', () => {
     }
 });
 
-ipcMain.on('load-model', async (event, arg) => {
-    const useWhitelist = arg.useWhitelist;
-    console.log('Main received load-model, using whitelist: ' + arg.useWhitelist)
-    workerWindow.webContents.send('load-model', {useWhitelist: useWhitelist});
-    const args = sharedObject.prop1;
-    if (args.length > 1) {
-        mainWindow.webContents.send('load-results', {file: args[args.length - 1]});
-    }
+ipcMain.handle('dialog', (event, method, params) => {
+    dialog[method](mainWindow, params);
 });
 
-ipcMain.on('file-load-request', async (event, arg) => {
-    const currentFile = arg.message;
-    console.log('Main received file-load-request: ' + arg.message)
-    workerWindow.webContents.send('file-load-request', {message: currentFile});
-});
-
-ipcMain.on('worker-loaded', async (event, arg) => {
-    const currentFile = arg.message;
-    console.log('Main received worker-loaded: ' + arg.message)
-    mainWindow.webContents.send('worker-loaded', {message: currentFile});
-});
-
-ipcMain.on('analyze', async (event, arg) => {
-    console.log('Main received go signal: ' + arg.confidence)
-    workerWindow.webContents.send('analyze', arg);
-});
-
-ipcMain.on('prediction-ongoing', (event, arg) => {
-    const result = arg.result;
-    const index = arg.index
-    mainWindow.webContents.send('prediction-ongoing', arg);
-});
-
-ipcMain.on('prediction-done', (event, arg) => {
-    const labels = arg.labels;
-    mainWindow.webContents.send('prediction-done', {labels});
-});
-
-ipcMain.on('model-ready', (event, args) => {
-    console.log(args.backend);
-    mainWindow.webContents.send('model-ready', {backend: args.backend});
-});
-
-ipcMain.on('progress', (event, arg) => {
-    const progress = arg.progress;
-    mainWindow.webContents.send('progress', {progress});
-});
-
-ipcMain.on('save', (event, arg) => {
-    workerWindow.webContents.send('save', arg);
-});
-
-ipcMain.on('post', (event, arg) => {
-    workerWindow.webContents.send('post', arg);
-});
-
-ipcMain.on('abort', (event, arg) => {
-    const message = arg.abort || arg.sendlabels;
-    console.log('Main received abort: ' + arg)
-    workerWindow.webContents.send('abort', arg);
-});
-
-ipcMain.on('path', (event) => {
-    const appPath = app.getPath('userData')
-    mainWindow.webContents.send('path', {appPath});
-    workerWindow.webContents.send('path', {appPath});
-});
-
-ipcMain.on('openFiles', (event) => {
+ipcMain.handle('openFiles', async (event) => {
     // Show file dialog to select audio file
-    dialog.showOpenDialog({
+    const result = await dialog.showOpenDialog(mainWindow, {
         filters: [{
             name: 'Audio Files',
-            extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg']
+            extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4']
         }],
         properties: ['openFile', 'multiSelections']
-    }).then(result => {
-        if (!result.canceled) {
-            console.log('files', result.filePaths)
-            mainWindow.webContents.send('openFiles', {filePaths: result.filePaths});
-        }
-    })
+    });
+    return result;
 })
-
-ipcMain.on('saveFile', (event, arg) => {
+ipcMain.handle('saveFile', (event, arg) => {
     // Show file dialog to select audio file
     let currentFile = arg.currentFile.substr(0, arg.currentFile.lastIndexOf(".")) + ".txt";
     dialog.showSaveDialog({
