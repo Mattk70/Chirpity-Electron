@@ -81,7 +81,7 @@ let contentWrapperElement = $('#contentWrapper');
 let controlsWrapperElement = $('#controlsWrapper');
 let completeDiv = $('#complete');
 const resultTable = $('#resultTableBody')
-const summaryTable = $('#summaryModalBody');
+const summaryTable = $('#summaryTable');
 const feedbackTable = $('#feedbackModalBody');
 const speciesSearchForm = $('#speciesSearch');
 let progressDiv = $('#progressDiv');
@@ -661,19 +661,20 @@ function loadResultRegion(paramlist) {
 function adjustSpecDims(redraw) {
     $.each([dummyElement, waveWaveElement, specElement, specCanvasElement, waveCanvasElement], function () {
         // Expand up to 512px
-        $(this).height(Math.min(bodyElement.height() * 0.4, 512))
+        $(this).height(Math.min(contentWrapperElement.height() * 0.4, 512))
     })
-    if (wavesurfer) {
-        initSpectrogram(Math.min(bodyElement.height() * 0.4, 512));
+     if (wavesurfer) {
+        initSpectrogram(Math.min(contentWrapperElement.height() * 0.4, 512));
         specElement.css('z-index', 0);
         resultTableElement.height(contentWrapperElement.height()
             - dummyElement.height()
             - controlsWrapperElement.height()
             - $('#timeline').height()
-            - 55);
-        // if (redraw && wavesurfer != null) {
-        //     wavesurfer.drawBuffer();
-        // }
+            - 85
+           );
+        if (redraw && wavesurfer != null) {
+            wavesurfer.drawBuffer();
+        }
         specCanvasElement.width('100%');
         $('.spec-labels').width('55px')
     } else {
@@ -2011,7 +2012,7 @@ function matchSpecies(e, mode) {
         const excludeIcon = el.parentNode.getElementsByClassName('speciesExclude')[0];
         const index = el.parentNode.firstElementChild.innerText;
         // Extract species common name from cell
-        const searchFor = el.innerText.split('\n')[0];
+        const searchFor = el.innerHTML.split('\n')[0];
         if (searchFor === e.target.id || tableContext === 'results') {
             if (mode === 'filter' || mode === 'unhide') {
                 classes.remove('d-none', 'hidden');
@@ -2123,7 +2124,7 @@ async function renderResult(args) {
         result.excluded ? excluded = 'strikethrough' : excluded = '';
         tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" class='border-top border-secondary top-row ${excluded} ${result.dayNight}'>
             <th scope='row'>${index}</th><td class='flex-fill timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
-            <td>${UI_position}</td><td name="${result.cname}" class='flex-fill cname'>${result.cname}<br/>
+            <td>${UI_position}</td><td name="${result.cname}" class='flex-shrink-0 cname'>${result.cname}
                 <i>${result.sname}</i></td><td class='flex-fill text-center'>${iconizeScore(result.score)}</td>
             <td class='text-center'><span id='${index}' title="Click for additional detections" class='material-icons rotate pointer d-none'>${icon_text}</span></td>
             <td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
@@ -2181,6 +2182,16 @@ function getSpeciesIndex(e) {
     clickedNode = e.target.parentNode
     clickedIndex = clickedNode.parentNode.querySelector('th').innerText
 }
+
+
+const summaryButton = document.getElementById('showSummary');
+summaryButton.addEventListener('click', () => {
+    const summaryTable = document.getElementById('summaryTable')
+    summaryTable.classList.toggle('d-none')
+    summaryButton.innerText === 'Show Summary' ?
+        summaryButton.innerText = 'Hide Summary' :
+        summaryButton.innerText = 'Show Summary';
+});
 
 $(document).on('click', '.download', function (e) {
     mode = 'save';

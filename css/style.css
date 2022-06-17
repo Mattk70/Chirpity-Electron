@@ -1,7 +1,7 @@
 html, body {
     height: 100%;
     padding-top: 0px;
-    padding-bottom: 18px;
+    padding-bottom: 0px;
     min-width: 700px;
     overflow: hidden;
     transition: background 1.5s linear;
@@ -258,6 +258,10 @@ region.wavesurfer-region[data-region-highlight] {
     text-decoration: line-through;
 }
 
+.table {
+    margin-bottom: 0px;
+}
+
 /* Disable blue selection highlight in drag */
 :not(input):not(textarea),
 :not(input):not(textarea)::after,
@@ -321,6 +325,36 @@ region.wavesurfer-region[data-region-highlight] {
 .highcharts-data-table tr:hover {
     background: #f1f7ff;
 }
+
 .highcharts-background {
     opacity: 0.75;
+}
+
+
+/* Scrollbar */
+
+/* width */
+::-webkit-scrollbar {
+    width: 0.5em;
+    height: 0.5em;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+    border-radius: 0.25em;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+    background: slategray;
+    border-radius: 0.25em;
+}
+
+
+footer {
+  position: absolute;
+  bottom: 0;
+  height: 30px;
+  text-align: center;
+  width: 100%;
 }
