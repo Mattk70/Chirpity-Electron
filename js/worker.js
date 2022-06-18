@@ -222,7 +222,7 @@ ipcRenderer.on('new-client', (event) => {
                     } else {
                         predicting = true;
                         minConfidence = args.confidence;
-                        await processNextFile();
+                        await processNextFile(args);
                         // //let selection = false;
                         // let start, end;
                         // if (args.start) {
@@ -847,11 +847,11 @@ async function parsePredictions(e) {
     }
 }
 
-async function processNextFile() {
+async function processNextFile(args) {
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
         await formatCheck(file);
-        let [start, end] = await setStartEnd(file);
+        let [start, end] = args.start ? [args.start, args.end] : await setStartEnd(file);
         if (start === 0 && end === 0) {
             // Nothing to do for this file
             await processNextFile();

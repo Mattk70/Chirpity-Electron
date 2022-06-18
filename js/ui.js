@@ -670,7 +670,7 @@ function adjustSpecDims(redraw) {
             - dummyElement.height()
             - controlsWrapperElement.height()
             - $('#timeline').height()
-            - 85
+            - 94
            );
         if (redraw && wavesurfer != null) {
             wavesurfer.drawBuffer();
@@ -1080,8 +1080,8 @@ function generateBirdList(prefix) {
         listHTML += "<p>What sound do you think this is?</p>"
     }
     listHTML +=
-        `<input type="text" id="${prefix}Input" onkeyup="myFunction('${prefix}')" placeholder="Search for a species...">
-        <ul id="${prefix}UL">`;
+        `<input type="text" class="rounded-border" id="${prefix}Input" onkeyup="myFunction('${prefix}')" placeholder="Search for a species...">
+        <div class="rounded-border"><ul id="${prefix}UL">`;
     if (prefix === 'my') {
         listHTML += `
             <li><a href="#">Animal<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
@@ -1097,7 +1097,7 @@ function generateBirdList(prefix) {
             listHTML += `<li><a href="#">${cname} - ${sname}<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>`;
         }
     }
-    listHTML += '</ul>';
+    listHTML += '</ul></div>';
     return listHTML;
 }
 
@@ -1112,6 +1112,7 @@ $(document).on('click', '#myUL li', function (e) {
 // Search list handler
 $(document).on('focus', '#searchInput', function () {
     searchListItems.removeClass('d-none');
+    hideElement(['dataRecords']);
     document.removeEventListener('keydown', handleKeyDown, true);
 })
 
@@ -1236,7 +1237,7 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
         });
         chartOptions.series.push({
             name: 'Hours of recordings',
-            marker: 'none',
+            marker: {enabled: false},
             yAxis: 2,
             type: 'areaspline',
             data: total,
@@ -1253,7 +1254,7 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
         });
         chartOptions.series.push({
             name: 'Average hourly call rate',
-            marker: 'none',
+            marker: {enabled: false},
             yAxis: 1,
             type: 'areaspline',
             data: rate,
@@ -1275,7 +1276,6 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
         ) {
         chartOptions.series.push({
             name: `Total for ${aggregation} in ` + key,
-            //marker: 'diamond',
             pointInterval: pointInterval[aggregation],
             pointStart: pointStart,
             type: 'column',
@@ -1299,7 +1299,7 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
                 return this.points.reduce(function (s, point) {
                     return s + '<br/><span style="font-weight: bold;color: ' + point.series.color + '">&#9679; </span>' + point.series.name + ': ' +
                         point.y;
-                }, `<b>${aggregation} ${period}</b>`);
+                }, `<b>${period}</b>`);
             } else {
                 const period = moment(x).format('MMM D, ha');
                 return this.points.reduce(function (s, point) {
@@ -1850,10 +1850,10 @@ async function onPredictionDone(args) {
 
     let summaryHTML = `<table class="table table-striped table-dark table-hover p-1"><thead class="thead-dark">
             <tr>
-                <th scope="col"  class="text-center">Filter</th>
-                <th scope="col" class="text-center">Hide</th>
                 <th scope="col">Species</th>
-                <th scope="col" class="text-right">Count</th>
+                <th scope="col" class="text-end">Count</th>
+
+                <th scope="col" class="text-center">Hide</th>
                 <th scope="col" class="text-right">Exclude</th>
             </tr>
             </thead><tbody>`;
@@ -1864,13 +1864,13 @@ async function onPredictionDone(args) {
             title="Species suppression may have affected the count.\nRefer to the results table for details.">
             priority_high</span>` : suppression_warning = '';
         summaryHTML += `<tr>
-                        <td class="text-center"><span class="spinner-border spinner-border-sm text-success d-none" role="status"></span>
-                         <span id="${key}" class="material-icons-two-tone align-bottom speciesFilter pointer">filter_alt</span>
-                        </td>
+                        <td><span class="spinner-border spinner-border-sm text-success d-none" role="status"></span>
+                         <span id="${key}" class="speciesFilter pointer">${key}${suppression_warning}</span>
+                        </td>                       
+                        <td class="text-end">${value}</td>
                         <td class="text-center"><span class="spinner-border spinner-border-sm text-danger d-none" role="status"></span>
                          <span id="${key}" class="material-icons-two-tone align-bottom speciesHide pointer">filter_alt_off</span>
-                        </td>                        
-                        <td>${key}${suppression_warning}</td><td class="text-right"> ${value}</td>
+                        </td> 
                         <td class="text-center"><span class="spinner-border spinner-border-sm text-danger d-none" role="status"></span>
                          <span id="${key}" class="material-icons-two-tone align-bottom speciesExclude pointer">clear</span></td></tr>`;
     }
@@ -1892,7 +1892,7 @@ async function onPredictionDone(args) {
         spinner.remove('d-none');
         const targetClass = e.target.classList;
         targetClass.add('d-none');
-        e.target.parentNode.previousElementSibling.children[1].classList.remove('text-success');
+        e.target.parentNode.previousElementSibling.previousElementSibling.children[1].classList.remove('text-success');
         if (targetClass.contains('text-danger')) {
             targetClass.remove('text-danger')
             setTimeout(matchSpecies, 1, e, 'unhide');
@@ -1953,7 +1953,7 @@ async function onPredictionDone(args) {
     $(document).on('click', '.speciesFilter', function (e) {
         const spinner = e.target.parentNode.firstChild.classList;
         // Remove any exclusion from the species to filter
-        e.target.parentNode.nextElementSibling.children[1].classList.remove('text-danger');
+        e.target.parentNode.nextElementSibling.nextElementSibling.children[1].classList.remove('text-danger');
         const targetClass = e.target.classList;
         if (targetClass.contains('text-success')) {
             // Clicked on filtered species icon
@@ -1992,6 +1992,9 @@ async function onPredictionDone(args) {
     t1_analysis = Date.now();
     diagnostics['Analysis Duration'] = ((t1_analysis - t0_analysis) / 1000).toFixed(2) + ' seconds';
     diagnostics['Analysis Rate'] = (diagnostics['Audio Duration'] / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
+
+    //show summary table
+    summaryButton.click();
 }
 
 function matchSpecies(e, mode) {
@@ -2107,7 +2110,8 @@ async function renderResult(args) {
                               <span class='material-icons-two-tone text-danger feedback pointer'>thumb_down_alt</span>`;
         result.suppressed ? icon_text = `sync_problem` : icon_text = 'sync';
         result.date = result.timestamp;
-        const UI_timestamp = result.timestamp.toString().split(' ')[4];
+        const timestamp = result.timestamp.toString().split(' ');
+        const UI_timestamp = `${timestamp[2]} ${timestamp[1]} ${timestamp[3].substring(2)}<br/>${timestamp[4]}`;
         result.filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp + '.mp3';
         let spliceStart;
         result.position < 3600000 ? spliceStart = 14 : spliceStart = 11;
@@ -2123,9 +2127,9 @@ async function renderResult(args) {
         let excluded;
         result.excluded ? excluded = 'strikethrough' : excluded = '';
         tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" class='border-top border-secondary top-row ${excluded} ${result.dayNight}'>
-            <th scope='row'>${index}</th><td class='flex-fill timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
-            <td>${UI_position}</td><td name="${result.cname}" class='flex-shrink-0 cname'>${result.cname}
-                <i>${result.sname}</i></td><td class='flex-fill text-center'>${iconizeScore(result.score)}</td>
+            <th scope='row'>${index}</th><td class='text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
+            <td class="text-end">${UI_position}</td><td name="${result.cname}" class='flex-shrink-0 cname'>${result.cname}
+                <i>${result.sname}</i></td><td class='text-center'>${iconizeScore(result.score)}</td>
             <td class='text-center'><span id='${index}' title="Click for additional detections" class='material-icons rotate pointer d-none'>${icon_text}</span></td>
             <td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
             <td class='text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
@@ -2183,11 +2187,9 @@ function getSpeciesIndex(e) {
     clickedIndex = clickedNode.parentNode.querySelector('th').innerText
 }
 
-
 const summaryButton = document.getElementById('showSummary');
 summaryButton.addEventListener('click', () => {
-    const summaryTable = document.getElementById('summaryTable')
-    summaryTable.classList.toggle('d-none')
+    summaryTable.animate({width:'toggle'});
     summaryButton.innerText === 'Show Summary' ?
         summaryButton.innerText = 'Hide Summary' :
         summaryButton.innerText = 'Show Summary';

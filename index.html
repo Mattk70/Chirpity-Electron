@@ -308,71 +308,78 @@
     </div>
     <!-- Result table -->
     <div class="d-none border-end border-4" id="resultTableContainer">
-        <div class="row g-1 h-100">
-            <div id='summaryTable' class="d-none col-auto h-100 overflow-auto">
+        <div class="ps-1 row g-1 h-100">
+            <div class="col-auto h-100 overflow-auto">
+                <div class="rounded-border">
+                    <div id='summaryTable' style="display:none"></div>
+                </div>
             </div>
             <div class="col h-100 overflow-auto">
-                <table id='results' class="table table-hover">
-                    <thead class="bg-dark text-white">
-                    <tr>
-                        <th>#</th>
-                        <th class="timestamp">Time</th>
-                        <th>Position</th>
-                        <th>Species</th>
-                        <th class="text-center">Confidence<span id="confidenceFilter"
-                                                                class="material-icons-two-tone text-secondary align-bottom pointer">filter_list</span>
-                        </th>
-                        <th class="text-center">Other IDs</th>
-                        <th class="specFeature text-center">Play</th>
-                        <th class="text-center">XC</th>
-                        <th class="specFeature text-center">Save</th>
-                        <th class="text-center speciesExclude d-none">Exclude</th>
-                        <th class="specFeature text-center">Feedback</th>
-                    </tr>
-                    </thead>
-                    <tbody class="text-dark" id="resultTableBody">
+                <div class="rounded-border">
+                    <table id='results' class="table table-hover">
+                        <thead class="bg-dark text-white">
+                        <tr>
+                            <th>#</th>
+                            <th class="timestamp">Time</th>
+                            <th>Position</th>
+                            <th>Species</th>
+                            <th class="text-center">Confidence<span id="confidenceFilter"
+                                                                    class="material-icons-two-tone text-secondary align-bottom pointer">filter_list</span>
+                            </th>
+                            <th class="text-center">Other IDs</th>
+                            <th class="specFeature text-center">Play</th>
+                            <th class="text-center">XC</th>
+                            <th class="specFeature text-center">Save</th>
+                            <th class="text-center speciesExclude d-none">Exclude</th>
+                            <th class="specFeature text-center">Feedback</th>
+                        </tr>
+                        </thead>
+                        <tbody class="text-dark" id="resultTableBody">
 
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
     <!-- Records container -->
-    <div class="d-none overflow-auto p-2" id="recordsContainer">
+    <div class="d-none h-100 overflow-auto p-2" id="recordsContainer">
         <div class="container-fluid">
             <div class="row">
-                <div class="col">
+                <div class="col-sm-3" style="max-width: 320px">
                     <div id="speciesSearch"></div>
-                    <table id='dataRecords' class="table border border-dark d-none">
-                        <tbody id="recordsTableBody">
-                        <tr>
-                            <th>Earliest Spring Record</th>
-                            <td id="earliestSpring"></td>
-                        </tr>
-                        <tr>
-                            <th>Latest Spring Record</th>
-                            <td id="latestSpring"></td>
-                        </tr>
-                        <tr>
-                            <th>Earliest Autumn Record</th>
-                            <td id="earliestAutumn"></td>
-                        </tr>
-                        <tr>
-                            <th>Latest Autumn Record</th>
-                            <td id="latestAutumn"></td>
-                        </tr>
-                        <tr>
-                            <th>Most Calls in 24 hours</th>
-                            <td id="mostDetections"></td>
-                        </tr>
-                        <tr class="fst-italic text-sm-start">
-                            <th>Data generated in:</th>
-                            <td id="genTime"></td>
-                        </tr>
-                        </tbody>
-                    </table>
+                    <div id='dataRecords' class="border border-dark rounded-border d-none">
+                        <table class="table table-striped table-hover">
+                            <tbody id="recordsTableBody">
+                            <tr>
+                                <th>Earliest Spring Record</th>
+                                <td id="earliestSpring"></td>
+                            </tr>
+                            <tr>
+                                <th>Latest Spring Record</th>
+                                <td id="latestSpring"></td>
+                            </tr>
+                            <tr>
+                                <th>Earliest Autumn Record</th>
+                                <td id="earliestAutumn"></td>
+                            </tr>
+                            <tr>
+                                <th>Latest Autumn Record</th>
+                                <td id="latestAutumn"></td>
+                            </tr>
+                            <tr>
+                                <th>Most Calls in 24 hours</th>
+                                <td id="mostDetections"></td>
+                            </tr>
+                            <tr class="fst-italic text-sm-start">
+                                <th>Chart generated in:</th>
+                                <td id="genTime"></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <div class="col-9">
+                <div class="col-sm-9">
                     <div class="row">
                         <div style="font-size: 16px" class="col text-center pointer" id="reportrange"
                              style="padding: 12px 20px 12px 40px; width: 100%">
@@ -382,8 +389,8 @@
                         </div>
                     </div>
                     <div class="row">
-                        <div class="col chart-outer p-2">
-                            <div id="chart-week"></div>
+                        <div class="col chart-outer">
+                            <div class="border border-dark rounded-border" id="chart-week"></div>
                         </div>
                     </div>
                 </div>

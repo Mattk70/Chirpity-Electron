@@ -188,26 +188,24 @@ div#contentWrapper {
     background-image: url('searchicon.png'); /* Add a search icon to input */
     background-position: 10px 12px; /* Position the search icon */
     background-repeat: no-repeat; /* Do not repeat the icon image */
-    width: 100%; /* Full-width */
+    width: 100%; /* Fixed-width */
     font-size: 16px; /* Increase font-size */
     padding: 12px 20px 12px 40px; /* Add some padding */
     border: 1px solid #ddd; /* Add a grey border */
-    margin-bottom: 12px; /* Add some space below the input */
+    margin-bottom: 10px; /* Add some space below the input */
 }
-
 
 #myUL, #searchUL {
     /* Remove default list styling */
     list-style-type: none;
     padding: 0;
     margin: 0;
+    width: 320px;
     max-height: 320px;
     overflow: auto;
 }
 
-#searchUL {
-    position: absolute;
-}
+
 
 #feedbackModalBody {
     max-height: 320px;
@@ -217,7 +215,7 @@ div#contentWrapper {
     border: 1px solid #ddd; /* Add a border to all links */
     margin-top: -1px; /* Prevent double borders */
     background-color: #f6f6f6; /* Grey background color */
-    padding: 12px; /* Add some padding */
+    padding: 10px; /* Add some padding */
     text-decoration: none; /* Remove default text underline */
     font-size: 18px; /* Increase the font-size */
     color: black; /* Add a black text color */
@@ -280,10 +278,8 @@ region.wavesurfer-region[data-region-highlight] {
 .chart-outer {
     height: 520px;
     margin: 0em 1em 1em;
-    width: 95%;
+    width: 100%;
     display: flex;
-
-
 }
 
 #chart-week {
@@ -292,6 +288,7 @@ region.wavesurfer-region[data-region-highlight] {
     width: 100%;
     display: flex;
     order: 1;
+    margin-top: 30px;
 }
 
 .highcharts-data-table table {
@@ -358,3 +355,12 @@ footer {
   text-align: center;
   width: 100%;
 }
+
+/* round table borders*/
+
+.rounded-border{
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+
