@@ -308,12 +308,26 @@
     </div>
     <!-- Result table -->
     <div class="d-none border-end border-4" id="resultTableContainer">
+
         <div class="ps-1 row g-1 h-100">
             <div class="col-auto h-100 overflow-auto">
+                <!-- Summary table -->
                 <div class="rounded-border">
                     <div id='summaryTable' style="display:none"></div>
                 </div>
+                <!-- Explore Div -->
+                <div id="exploreWrapper" class="d-none">
+                    <div id="exploreSpeciesSearch"></div>
+                    <div style="font-size: 16px" class="col text-center pointer" id="exploreRange"
+                         style="padding: 12px 20px 12px 40px; width: 100%">
+                        <i class="material-icons-two-tone align-bottom">date_range</i>&nbsp;
+                        <span>Apply a date filter</span> <i
+                            class="material-icons-two-tone align-bottom">expand_more</i>
+                    </div>
+                </div>
             </div>
+
+            <!-- Results table -->
             <div class="col h-100 overflow-auto">
                 <div class="rounded-border">
                     <table id='results' class="table table-hover">
@@ -381,7 +395,7 @@
                 </div>
                 <div class="col-sm-9">
                     <div class="row">
-                        <div style="font-size: 16px" class="col text-center pointer" id="reportrange"
+                        <div style="font-size: 16px" class="col text-center pointer" id="reportRange"
                              style="padding: 12px 20px 12px 40px; width: 100%">
                             <i class="material-icons-two-tone align-bottom">date_range</i>&nbsp;
                             <span>Apply a date filter</span> <i

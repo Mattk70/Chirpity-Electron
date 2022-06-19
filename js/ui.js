@@ -84,13 +84,15 @@ const resultTable = $('#resultTableBody')
 const summaryTable = $('#summaryTable');
 const feedbackTable = $('#feedbackModalBody');
 const speciesSearchForm = $('#speciesSearch');
+const exploreSpeciesSearch = $('#exploreSpeciesSearch')
 let progressDiv = $('#progressDiv');
 let progressBar = $('.progress .progress-bar');
 const fileNumber = document.getElementById('fileNumber');
 let batchFileCount = 0, batchInProgress = false;
 let activeRow;
 let predictions = {}, correctedSpecies, speciesListItems, searchListItems, clickedNode,
-    clickedIndex, speciesName, speciesFilter, speciesHide, speciesExclude, subRows, scrolled, currentFileDuration;
+    clickedIndex, speciesName, speciesFilter, speciesHide, speciesExclude,
+    subRows, scrolled, currentFileDuration, exploreListItems;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
 let workerHasLoadedFile = false;
@@ -167,13 +169,6 @@ function resetResults() {
 async function loadAudioFile(args) {
     let filePath = args.filePath, originalFileEnd = args.originalFileEnd,
         workerHasLoadedFile = false;
-
-    // Hide load hint and show spinnner
-    // if (wavesurfer) {
-    //     wavesurfer.destroy();
-    //     wavesurfer = undefined;
-    // }
-    // set file creation time
     try {
         fileEnd = fs.statSync(filePath).mtime;
         worker.postMessage({action: 'file-load-request', filePath: filePath, position: 0});
@@ -602,10 +597,16 @@ save2dbLink.addEventListener('click', async () => {
     worker.postMessage({action: 'save2db'})
 });
 
-const recordsLink = document.getElementById('charts');
-recordsLink.addEventListener('click', async () => {
+const chartsLink = document.getElementById('charts');
+chartsLink.addEventListener('click', async () => {
     hideAll();
     showElement(['recordsContainer']);
+});
+
+const exploreLink = document.getElementById('explore');
+exploreLink.addEventListener('click', async () => {
+    hideAll();
+    showElement(['controlsWrapper', 'timeline', 'waveform', 'spectrogram', 'dummy', 'resultTableContainer', 'exploreWrapper'], false);
 });
 
 
@@ -663,7 +664,7 @@ function adjustSpecDims(redraw) {
         // Expand up to 512px
         $(this).height(Math.min(contentWrapperElement.height() * 0.4, 512))
     })
-     if (wavesurfer) {
+    if (wavesurfer) {
         initSpectrogram(Math.min(contentWrapperElement.height() * 0.4, 512));
         specElement.css('z-index', 0);
         resultTableElement.height(contentWrapperElement.height()
@@ -671,7 +672,7 @@ function adjustSpecDims(redraw) {
             - controlsWrapperElement.height()
             - $('#timeline').height()
             - 94
-           );
+        );
         if (redraw && wavesurfer != null) {
             wavesurfer.drawBuffer();
         }
@@ -1065,12 +1066,13 @@ window.onload = async () => {
     // Populate feedback modal
     feedbackTable.append(generateBirdList('my'));
     speciesSearchForm.append(generateBirdList('search'));
-
+    exploreSpeciesSearch.append(generateBirdList('explore'));
     //Cache list elements
     speciesListItems = $('#myUL li span');
     searchListItems = $('#searchUL');
     searchListItems.addClass('d-none');
-
+    exploreListItems = $('#exploreUL');
+    exploreListItems.addClass('d-none');
 };
 
 
@@ -1779,14 +1781,14 @@ function onWorkerLoadedAudio(args) {
     }
     fileLoaded = true;
 
-    if (!wavesurfer) {
+    if (!wavesurfer && config.spectrogram) {
         initWavesurfer({
             'audio': currentBuffer,
             'backend': 'WebAudio',
             'alpha': 0,
         });
     } else {
-        wavesurfer.clearRegions();
+        if (wavesurfer) wavesurfer.clearRegions();
         updateSpec(currentBuffer, args.play)
         wavesurfer.seekTo(args.position);
         if (args.region) {
@@ -2189,7 +2191,7 @@ function getSpeciesIndex(e) {
 
 const summaryButton = document.getElementById('showSummary');
 summaryButton.addEventListener('click', () => {
-    summaryTable.animate({width:'toggle'});
+    summaryTable.animate({width: 'toggle'});
     summaryButton.innerText === 'Show Summary' ?
         summaryButton.innerText = 'Hide Summary' :
         summaryButton.innerText = 'Show Summary';
@@ -2453,61 +2455,60 @@ document.addEventListener('drop', async (event) => {
 
 ////////// Date Picker ///////////////
 
-
 $(function () {
-    const reportRange = $('#reportrange');
-    var start = moment().startOf('day').add(12, 'hours').subtract(1, 'days');
-    var end = moment().startOf('day').add(12, 'hours');
-
-    function cb(start, end) {
-
-    }
-
-
-    reportRange.daterangepicker({
-        autoUpdateInput: false,
-        locale: {
-            cancelLabel: 'Clear'
-        },
-        timePicker: true,
-        timePicker24Hour: true,
-        timePickerIncrement: 60,
-        startDate: start,
-        endDate: end,
-        opens: "center",
-        ranges: {
-            'Last Night': [moment().startOf('day').add(12, 'hours').subtract(1, 'days'), moment().startOf('day').add(12, 'hours')],
-            'Previous Night': [moment().startOf('day').add(12, 'hours').subtract(2, 'days'), moment().subtract(1, 'days').startOf('day').add(12, 'hours')],
-            'Last 7 Nights': [moment().startOf('day').add(12, 'hours').subtract(6, 'days'), moment().startOf('day').add(12, 'hours')],
-            'Last 30 Nights': [moment().startOf('day').add(12, 'hours').subtract(29, 'days'), moment()],
-            'This Month': [moment().startOf('month'), moment().endOf('month')],
-            'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')],
-            'This Year': [moment().startOf('year'), moment().endOf('year')],
-            'Last Year': [moment().subtract(1, 'year').startOf('year'), moment().subtract(1, 'year').endOf('year')]
-        }
-    });
-    reportRange.on('apply.daterangepicker', function (ev, picker) {
-        $('#reportrange span').html(picker.startDate.format('MMMM D, YYYY') + ' - ' + picker.endDate.format('MMMM D, YYYY'));
-        $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
-        const dateRange = {'start': picker.startDate._d.getTime(), 'end': picker.endDate._d.getTime()};
-        if (worker) {
-            worker.postMessage({action: 'set-date-range', range: dateRange});
-            if (chartSpecies) {
-                t0 = Date.now();
-                worker.postMessage({action: 'chart-request', species: chartSpecies});
+    const start = moment().startOf('day').add(12, 'hours').subtract(1, 'days');
+    const end = moment().startOf('day').add(12, 'hours');
+    $('#reportRange, #exploreRange').each(function () {
+        $(this).daterangepicker({
+            autoUpdateInput: false,
+            locale: {
+                cancelLabel: 'Clear'
+            },
+            timePicker: true,
+            timePicker24Hour: true,
+            timePickerIncrement: 60,
+            startDate: start,
+            endDate: end,
+            opens: "center",
+            ranges: {
+                'Last Night': [moment().startOf('day').add(12, 'hours').subtract(1, 'days'), moment().startOf('day').add(12, 'hours')],
+                'Previous Night': [moment().startOf('day').add(12, 'hours').subtract(2, 'days'), moment().subtract(1, 'days').startOf('day').add(12, 'hours')],
+                'Last 7 Nights': [moment().startOf('day').add(12, 'hours').subtract(6, 'days'), moment().startOf('day').add(12, 'hours')],
+                'Last 30 Nights': [moment().startOf('day').add(12, 'hours').subtract(29, 'days'), moment()],
+                'This Month': [moment().startOf('month'), moment().endOf('month')],
+                'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')],
+                'This Year': [moment().startOf('year'), moment().endOf('year')],
+                'Last Year': [moment().subtract(1, 'year').startOf('year'), moment().subtract(1, 'year').endOf('year')]
             }
-        }
-    });
+        });
+        $(this).on('apply.daterangepicker', function (ev, picker) {
+            $(this).children('span').html(picker.startDate.format('MMMM D, YYYY') + ' - ' + picker.endDate.format('MMMM D, YYYY'));
+            $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
+            const dateRange = {'start': picker.startDate._d.getTime(), 'end': picker.endDate._d.getTime()};
+            if (worker) {
+                if (this.id === 'reportRange') {
+                    worker.postMessage({action: 'set-date-range', range: dateRange});
 
-    reportRange.on('cancel.daterangepicker', function (ev, picker) {
-        $('#reportrange span').html('Apply a date filter');
-        if (worker) {
-            worker.postMessage({action: 'set-date-range', range: {}});
-            if (chartSpecies) {
-                t0 = Date.now();
-                worker.postMessage({action: 'chart-request', species: chartSpecies});
+                    if (chartSpecies) {
+                        t0 = Date.now();
+                        worker.postMessage({action: 'chart-request', species: chartSpecies});
+                    }
+                }
             }
-        }
+        });
 
-    });
+        $(this).on('cancel.daterangepicker', function (ev, picker) {
+            $(this).children('span').html('Apply a date filter');
+            if (worker) {
+                if (this.id === 'reportRange') {
+                    worker.postMessage({action: 'set-date-range', range: {}});
+                    if (chartSpecies) {
+                        t0 = Date.now();
+                        worker.postMessage({action: 'chart-request', species: chartSpecies});
+                    }
+                }
+            }
+
+        });
+    })
 });
