@@ -14,7 +14,7 @@ const ffmpeg = require('fluent-ffmpeg');
 const {utimes} = require('utimes');
 const file_cache = 'file_cache';
 
-let db, nocmig, latitude, longitude, dateRange = {};
+let db, nocmig, latitude, longitude;
 
 let proxiedFileCache = {};
 
@@ -130,9 +130,6 @@ ipcRenderer.on('new-client', (event) => {
         const action = args.action;
         console.log('message received ', action)
         switch (action) {
-            case 'set-date-range':
-                dateRange = args.range;
-                break;
             case 'clear-cache':
                 console.log('cache')
                 await clearCache();
@@ -174,6 +171,34 @@ ipcRenderer.on('new-client', (event) => {
                 })
 
                 break;
+            case 'explore':
+                // reset results table
+                UI.postMessage({event: 'reset-results'});
+                const results = await getCachedResults({species: args.species, range: args.range});
+                index = 0;
+                results.forEach(result => {
+                    //format dates
+                    result.timestamp = new Date(result.timestamp);
+                    result.position = new Date(result.position);
+                    index++;
+                    UI.postMessage({
+                        event: 'prediction-ongoing',
+                        file: result.file,
+                        result: result,
+                        index: index,
+                        selection: false,
+                    });
+                    //AUDACITY.push(audacity);
+                    RESULTS.push(result);
+                })
+                console.log(`Pulling results for ${args.species} from database`);
+                // When in batch mode the 'prediction-done' event simply increments
+                // the counter for the file being processed
+                UI.postMessage({
+                    event: 'prediction-done',
+                    batchInProgress: false,
+                });
+                break;
             case 'analyze':
                 console.log(`Worker received message: ${args.confidence}, start: ${args.start}, end: ${args.end}`);
                 if (args.resetResults) {
@@ -185,10 +210,9 @@ ipcRenderer.on('new-client', (event) => {
                 longitude = args.lon;
                 nocmig = args.nocmig;
                 const isCached = await isDuplicate(args.filePath);
-                if (isCached) {
+                if (isCached && !args.selection) {
                     // Pull the results from the database
-                    const results = await getCachedResults({file: args.filePath});
-                    //const results = await getCachedResults({species: 'Redwing'});
+                    const results = await getCachedResults({file: args.filePath, range: {}});
                     UI.postMessage({event: 'update-audio-duration', value: metadata[args.filePath].duration});
                     results.forEach(result => {
                         //format dates
@@ -249,7 +273,7 @@ ipcRenderer.on('new-client', (event) => {
             case 'abort':
                 onAbort(args);
                 break;
-            case 'chart-request':
+            case 'chart':
                 onChartRequest(args);
                 break;
             default:
@@ -903,8 +927,10 @@ let t1, t0;
 
 const getCachedResults = (args) => {
     let where;
+    const dateRange = args.range;
     if (args.file) where = `files.name =  '${args.file}'`;
     if (args.species) where = `s1.cname =  '${args.species}'`;
+    const when = dateRange.start ? `AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}`: '';
     return new Promise(function (resolve, reject) {
         db.all(`SELECT dateTime AS timestamp, position AS position, 
             s1.cname as cname, s2.cname as cname2, s3.cname as cname3, 
@@ -923,7 +949,7 @@ const getCachedResults = (args) => {
                 LEFT JOIN species s3 on s3.id = birdid3 
                 INNER JOIN files on files.rowid = records.fileid 
                 WHERE
-                ${where}`,
+                ${where} ${when}`,
             (err, rows) => {
                 if (err) {
                     reject(err)
@@ -1023,7 +1049,9 @@ const getMostCalls = (species) => {
     })
 }
 
-const getChartTotals = (species) => {
+const getChartTotals = (args) => {
+    const species = args.species;
+    const dateRange = args.range;
     // Work out sensible aggregations from hours difference in daterange
     const hours_diff = dateRange.start ?
         Math.round((dateRange.end - dateRange.start) / (1000 * 60 * 60)) : 745;
@@ -1041,8 +1069,8 @@ const getChartTotals = (species) => {
         orderBy = 'Year, Week';
         dataPoints = Math.round(hours_diff / 24);
         aggregation = 'Day';
-        const date = new Date(dateRange.start);
-        startDay = Math.floor((date - new Date(date.getFullYear(), 0, 0, 0,0,0)) / 1000 / 60 / 60 / 24);
+        const date = dateRange.start ? new Date(dateRange.start) : Date.UTC(2020, 0, 0, 0, 0, 0);
+        startDay = Math.floor((date - new Date(date.getFullYear(), 0, 0, 0, 0, 0)) / 1000 / 60 / 60 / 24);
     }
     if (hours_diff <= 72) {
         // 3 days or less, group by Hour of Day
@@ -1111,6 +1139,7 @@ const getRate = (species) => {
 
 
 async function onChartRequest(args) {
+    const dateRange = args.range;
     const dataRecords = {}, results = {};
     t0 = Date.now();
     await getSeasonRecords(args.species, 'spring')
@@ -1141,7 +1170,7 @@ async function onChartRequest(args) {
 
     console.log(`Most calls  chart generation took ${(Date.now() - t0) / 1000} seconds`)
     t0 = Date.now();
-    const [dataPoints, aggregation] = await getChartTotals(args.species)
+    const [dataPoints, aggregation] = await getChartTotals(args)
         .then(([rows, dataPoints, aggregation, startDay]) => {
             for (let i = 0; i < rows.length; i++) {
                 const year = rows[i].Year;
@@ -1153,9 +1182,9 @@ async function onChartRequest(args) {
                 if (!(year in results)) {
                     results[year] = new Array(dataPoints).fill(0);
                 }
-                if (aggregation === 'Week'){
+                if (aggregation === 'Week') {
                     results[year][parseInt(week) - 1] = count;
-                } else if (aggregation === 'Day'){
+                } else if (aggregation === 'Day') {
                     results[year][parseInt(day) - startDay] = count;
                 } else {
                     const d = new Date(dateRange.start);
@@ -1175,7 +1204,7 @@ async function onChartRequest(args) {
     let total, rate;
     if (dataPoints === 52) [total, rate] = await getRate(args.species)
     console.log(`Chart rate generation took ${(Date.now() - t0) / 1000} seconds`)
-    const pointStart = dateRange.start ? dateRange.start : Date.UTC(2020, 0,0,0,0,0);
+    const pointStart = dateRange.start ? dateRange.start : Date.UTC(2020, 0, 0, 0, 0, 0);
     UI.postMessage({
         event: 'chart-data',
         species: args.species,

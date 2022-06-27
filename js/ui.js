@@ -1,11 +1,7 @@
 let firstDawn, dawn, dusk, seenTheDarkness = false, shownDaylightBanner = false;
 const labels = ["Tachymarptis melba_Alpine Swift", "Pluvialis dominica_American Golden Plover", "Mareca americana_American Wigeon", "Acrocephalus paludicola_Aquatic Warbler", "Acanthis hornemanni_Arctic Redpoll", "Stercorarius parasiticus_Arctic Skua", "Sterna paradisaea_Arctic Tern", "Phylloscopus borealis_Arctic Warbler", "Recurvirostra avosetta_Avocet", "Porzana pusilla_Baillon's Crake", "Limosa lapponica_Bar-tailed Godwit", "Tyto alba_Barn Owl", "Branta leucopsis_Barnacle Goose", "Sylvia nisoria_Barred Warbler", "Panurus biarmicus_Bearded Tit", "Merops apiaster_Bee-eater", "Cygnus columbianus_Bewick's Swan", "Botaurus stellaris_Bittern", "Oenanthe hispanica_Black-eared Wheatear", "Chroicocephalus ridibundus_Black-headed Gull", "Podiceps nigricollis_Black-necked Grebe", "Limosa limosa_Black-tailed Godwit", "Himantopus himantopus_Black-winged Stilt", "Lyrurus tetrix_Black Grouse", "Cepphus grylle_Black Guillemot", "Milvus migrans_Black Kite", "Phoenicurus ochruros_Black Redstart", "Chlidonias niger_Black Tern", "Turdus merula_Blackbird", "Sylvia atricapilla_Blackcap", "Spatula discors_Blue-winged Teal", "Cyanistes caeruleus_Blue Tit", "Luscinia svecica_Bluethroat", "Acrocephalus dumetorum_Blyth's Reed Warbler", "Fringilla montifringilla_Brambling", "Branta bernicla_Brent Goose", "Pyrrhula pyrrhula_Bullfinch", "Buteo buteo_Buzzard", "Branta canadensis_Canada Goose", "Tetrao urogallus_Capercaillie", "Corvus corone_Carrion Crow", "Larus cachinnans_Caspian Gull", "Bubulcus ibis_Cattle Egret", "Cettia cetti_Cetti's Warbler", "Fringilla coelebs_Chaffinch", "Phylloscopus collybita_Chiffchaff", "Pyrrhocorax pyrrhocorax_Chough", "Emberiza cirlus_Cirl Bunting", "Motacilla citreola_Citrine Wagtail", "Periparus ater_Coal Tit", "Streptopelia decaocto_Collared Dove", "Glareola pratincola_Collared Pratincole", "Loxia curvirostra_Common Crossbill", "Larus canus_Common Gull", "Acanthis flammea_Common Redpoll", "Carpodacus erythrinus_Common Rosefinch", "Actitis hypoleucos_Common Sandpiper", "Melanitta nigra_Common Scoter", "Sterna hirundo_Common Tern", "Fulica atra_Coot", "Phalacrocorax carbo_Cormorant", "Emberiza calandra_Corn Bunting", "Crex crex_Corncrake", "Calonectris borealis_Cory's Shearwater", "Grus grus_Crane", "Lophophanes cristatus_Crested Tit", "Cuculus canorus_Cuckoo", "Calidris ferruginea_Curlew Sandpiper", "Numenius arquata_Curlew", "Sylvia undata_Dartford Warbler", "Cinclus cinclus_Dipper", "Charadrius morinellus_Dotterel", "Calidris alpina_Dunlin", "Prunella modularis_Dunnock", "Phylloscopus fuscatus_Dusky Warbler", "Alopochen aegyptiaca_Egyptian Goose", "Somateria mollissima_Eider", "Bubo bubo_Eurasian Eagle-Owl", "Turdus pilaris_Fieldfare", "Regulus ignicapilla_Firecrest", "Fulmarus glacialis_Fulmar", "Mareca strepera_Gadwall", "Morus bassanus_Gannet", "Sylvia borin_Garden Warbler", "Spatula querquedula_Garganey", "Larus hyperboreus_Glaucous Gull", "Plegadis falcinellus_Glossy Ibis", "Regulus regulus_Goldcrest", "Aquila chrysaetos_Golden Eagle", "Oriolus oriolus_Golden Oriole", "Pluvialis apricaria_Golden Plover", "Bucephala clangula_Goldeneye", "Carduelis carduelis_Goldfinch", "Mergus merganser_Goosander", "Accipiter gentilis_Goshawk", "Locustella naevia_Grasshopper Warbler", "Larus marinus_Great Black-backed Gull", "Podiceps cristatus_Great Crested Grebe", "Lanius excubitor_Great Grey Shrike", "Gavia immer_Great Northern Diver", "Stercorarius skua_Great Skua", "Dendrocopos major_Great Spotted Woodpecker", "Parus major_Great Tit", "Ardea alba_Great White Egret", "Anas carolinensis_Green-winged Teal", "Tringa ochropus_Green Sandpiper", "Picus viridis_Green Woodpecker", "Chloris chloris_Greenfinch", "Phylloscopus trochiloides_Greenish Warbler", "Tringa nebularia_Greenshank", "Ardea cinerea_Grey Heron", "Perdix perdix_Grey Partridge", "Phalaropus fulicarius_Grey Phalarope", "Pluvialis squatarola_Grey Plover", "Motacilla cinerea_Grey Wagtail", "Anser anser_Greylag Goose", "Uria aalge_Guillemot", "Gelochelidon nilotica_Gull-billed Tern", "Coccothraustes coccothraustes_Hawfinch", "Larus argentatus_Herring Gull", "Falco subbuteo_Hobby", "Pernis apivorus_Honey-buzzard", "Upupa epops_Hoopoe", "Delichon urbicum_House Martin", "Passer domesticus_House Sparrow", "Human_Human", "Phylloscopus ibericus_Iberian Chiffchaff", "Hippolais icterina_Icterine Warbler", "Lymnocryptes minimus_Jack Snipe", "Coloeus monedula_Jackdaw", "Garrulus glandarius_Jay", "Charadrius alexandrinus_Kentish Plover", "Falco tinnunculus_Kestrel", "Alcedo atthis_Kingfisher", "Rissa tridactyla_Kittiwake", "Calidris canutus_Knot", "Calcarius lapponicus_Lapland Bunting", "Vanellus vanellus_Lapwing", "Larus fuscus_Lesser Black-backed Gull", "Acanthis cabaret_Lesser Redpoll", "Dryobates minor_Lesser Spotted Woodpecker", "Sylvia curruca_Lesser Whitethroat", "Linaria cannabina_Linnet", "Ixobrychus minutus_Little Bittern", "Emberiza pusilla_Little Bunting", "Egretta garzetta_Little Egret", "Tachybaptus ruficollis_Little Grebe", "Hydrocoloeus minutus_Little Gull", "Athene noctua_Little Owl", "Charadrius dubius_Little Ringed Plover", "Calidris minuta_Little Stint", "Sternula albifrons_Little Tern", "Asio otus_Long-eared Owl", "Clangula hyemalis_Long-tailed Duck", "Stercorarius longicaudus_Long-tailed Skua", "Aegithalos caudatus_Long-tailed Tit", "Pica pica_Magpie", "Anas platyrhynchos_Mallard", "Aix galericulata_Mandarin Duck", "Puffinus puffinus_Manx Shearwater", "Circus aeruginosus_Marsh Harrier", "Poecile palustris_Marsh Tit", "Anthus pratensis_Meadow Pipit", "Ichthyaetus melanocephalus_Mediterranean Gull", "Hippolais polyglotta_Melodious Warbler", "Falco columbarius_Merlin", "Turdus viscivorus_Mistle Thrush", "Circus pygargus_Montagu's Harrier", "Gallinula chloropus_Moorhen", "Cygnus olor_Mute Swan", "Nycticorax nycticorax_Night Heron", "Luscinia megarhynchos_Nightingale", "Caprimulgus europaeus_Nightjar", "No Call_No Call", "Sitta europaea_Nuthatch", "Anthus hodgsoni_Olive-backed Pipit", "Emberiza hortulana_Ortolan Bunting", "Pandion haliaetus_Osprey", "Haematopus ostralegus_Oystercatcher", "Syrrhaptes paradoxus_Pallas's Sandgrouse", "Phylloscopus proregulus_Pallas's Warbler", "Loxia pytyopsittacus_Parrot Crossbill", "Calidris melanotos_Pectoral Sandpiper", "Remiz pendulinus_Penduline Tit", "Falco peregrinus_Peregrine", "Phasianus colchicus_Pheasant", "Ficedula hypoleuca_Pied Flycatcher", "Motacilla alba_Pied Wagtail", "Anser brachyrhynchus_Pink-footed Goose", "Anas acuta_Pintail", "Aythya ferina_Pochard", "Lagopus muta_Ptarmigan", "Ardea purpurea_Purple Heron", "Calidris maritima_Purple Sandpiper", "Coturnix coturnix_Quail", "Phylloscopus schwarzi_Radde's Warbler", "Corvus corax_Raven", "Alca torda_Razorbill", "Lanius collurio_Red-backed Shrike", "Ficedula parva_Red-breasted Flycatcher", "Mergus serrator_Red-breasted Merganser", "Netta rufina_Red-crested Pochard", "Tarsiger cyanurus_Red-flanked Bluetail", "Alectoris rufa_Red-legged Partridge", "Podiceps grisegena_Red-necked Grebe", "Caprimulgus ruficollis_Red-necked Nightjar", "Phalaropus lobatus_Red-necked Phalarope", "Cecropis daurica_Red-rumped Swallow", "Gavia stellata_Red-throated Diver", "Lagopus lagopus_Red Grouse", "Milvus milvus_Red Kite", "Tringa totanus_Redshank", "Phoenicurus phoenicurus_Redstart", "Turdus iliacus_Redwing", "Emberiza schoeniclus_Reed Bunting", "Acrocephalus scirpaceus_Reed Warbler", "Anthus richardi_Richard's Pipit", "Larus delawarensis_Ring-billed Gull", "Psittacula krameri_Ring-necked Parakeet", "Turdus torquatus_Ring Ouzel", "Charadrius hiaticula_Ringed Plover", "Erithacus rubecula_Robin", "Columba livia_Rock Dove", "Anthus petrosus_Rock Pipit", "Corvus frugilegus_Rook", "Pastor roseus_Rose-coloured Starling", "Sterna dougallii_Roseate Tern", "Buteo lagopus_Rough-legged Buzzard", "Oxyura jamaicensis_Ruddy Duck", "Tadorna ferruginea_Ruddy Shelduck", "Calidris pugnax_Ruff", "Xema sabini_Sabine's Gull", "Riparia riparia_Sand Martin", "Calidris alba_Sanderling", "Thalasseus sandvicensis_Sandwich Tern", "Locustella luscinioides_Savi's Warbler", "Aythya marila_Scaup", "Loxia scotica_Scottish Crossbill", "Acrocephalus schoenobaenus_Sedge Warbler", "Calidris pusilla_Semipalmated Sandpiper", "Serinus serinus_Serin", "Tadorna tadorna_Shelduck", "Eremophila alpestris_Shore Lark", "Asio flammeus_Short-eared Owl", "Calandrella brachydactyla_Short-toed Lark", "Spatula clypeata_Shoveler", "Spinus spinus_Siskin", "Alauda arvensis_Skylark", "Podiceps auritus_Slavonian Grebe", "Gallinago gallinago_Snipe", "Plectrophenax nivalis_Snow Bunting", "Anser caerulescens_Snow Goose", "Turdus philomelos_Song Thrush", "Accipiter nisus_Sparrowhawk", "Platalea leucorodia_Spoonbill", "Porzana porzana_Spotted Crake", "Muscicapa striata_Spotted Flycatcher", "Tringa erythropus_Spotted Redshank", "Actitis macularius_Spotted Sandpiper", "Sturnus vulgaris_Starling", "Columba oenas_Stock Dove", "Burhinus oedicnemus_Stone-curlew", "Saxicola rubicola_Stonechat", "Hydrobates pelagicus_Storm Petrel", "Sylvia cantillans_Subalpine Warbler", "Hirundo rustica_Swallow", "Apus apus_Swift", "Anser fabalis_Taiga Bean Goose", "Strix aluco_Tawny Owl", "Anas crecca_Teal", "Calidris temminckii_Temminck's Stint", "Anthus trivialis_Tree Pipit", "Passer montanus_Tree Sparrow", "Certhia familiaris_Treecreeper", "Aythya fuligula_Tufted Duck", "Anser serrirostris_Tundra Bean Goose", "Arenaria interpres_Turnstone", "Streptopelia turtur_Turtle Dove", "Linaria flavirostris_Twite", "Loxia leucoptera_Two-barred Crossbill", "Anthus spinoletta_Water Pipit", "Rallus aquaticus_Water Rail", "Bombycilla garrulus_Waxwing", "Oenanthe oenanthe_Wheatear", "Numenius phaeopus_Whimbrel", "Saxicola rubetra_Whinchat", "Anser albifrons_White-fronted Goose", "Calidris fuscicollis_White-rumped Sandpiper", "Haliaeetus albicilla_White-tailed Eagle", "Chlidonias leucopterus_White-winged Black Tern", "Ciconia ciconia_White Stork", "Sylvia communis_Whitethroat", "Cygnus cygnus_Whooper Swan", "Mareca penelope_Wigeon", "Poecile montanus_Willow Tit", "Phylloscopus trochilus_Willow Warbler", "Tringa glareola_Wood Sandpiper", "Phylloscopus sibilatrix_Wood Warbler", "Scolopax rusticola_Woodcock", "Lullula arborea_Woodlark", "Columba palumbus_Woodpigeon", "Troglodytes troglodytes_Wren", "Jynx torquilla_Wryneck", "Phylloscopus inornatus_Yellow-browed Warbler", "Larus michahellis_Yellow-legged Gull", "Motacilla flava_Yellow Wagtail", "Emberiza citrinella_Yellowhammer", "animals_animals", "vehicles_vehicles"];
 
-let currentPrediction;
-
 // Get the modules loaded in preload.js
-
-
 const fs = window.module.fs;
 const colormap = window.module.colormap;
 const p = window.module.p;
@@ -75,27 +71,33 @@ let fileList = [], fileStart, bufferStartTime, fileEnd;
 let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
 // set up some DOM element caches
 let bodyElement = $('body');
-let dummyElement, specElement, waveElement, specCanvasElement, specWaveElement;
-let waveCanvasElement, waveWaveElement, resultTableElement = $('#resultTableContainer');
+let spectrogramWrapper = $('#spectrogramWrapper'), specElement, waveElement, specCanvasElement, specWaveElement;
+let waveCanvasElement, waveWaveElement,
+    resultTableElement = $('#resultTableContainer');
 let contentWrapperElement = $('#contentWrapper');
-let controlsWrapperElement = $('#controlsWrapper');
+let exploreWrapperElement = $('#exploreWrapper');
 let completeDiv = $('#complete');
 const resultTable = $('#resultTableBody')
 const summaryTable = $('#summaryTable');
 const feedbackTable = $('#feedbackModalBody');
-const speciesSearchForm = $('#speciesSearch');
+const chartSearchForm = $('#speciesSearch');
 const exploreSpeciesSearch = $('#exploreSpeciesSearch')
 let progressDiv = $('#progressDiv');
 let progressBar = $('.progress .progress-bar');
 const fileNumber = document.getElementById('fileNumber');
 let batchFileCount = 0, batchInProgress = false;
 let activeRow;
-let predictions = {}, correctedSpecies, speciesListItems, searchListItems, clickedNode,
+let predictions = {}, correctedSpecies, speciesListItems, clickedNode,
     clickedIndex, speciesName, speciesFilter, speciesHide, speciesExclude,
-    subRows, scrolled, currentFileDuration, exploreListItems;
+    subRows, scrolled, currentFileDuration;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
 let workerHasLoadedFile = false;
+
+// Set content container height
+contentWrapperElement.height(bodyElement.height() - 80);
+
+
 // Set default Options
 let config;
 const sampleRate = 24000;
@@ -234,11 +236,12 @@ function updateSpec(buffer, play) {
 }
 
 function initWavesurfer(args) {
-    // Show spec and timecode containers
-    hideAll();
-    showElement(['dummy', 'timeline', 'waveform', 'spectrogram'], false);
-
-    if (wavesurfer !== undefined) wavesurfer.pause();
+    if (args.reset) {
+        // Show spec and timecode containers
+        hideAll();
+        showElement(['spectrogramWrapper'], false);
+    }
+    if (wavesurfer) wavesurfer.pause();
     // Setup waveform and spec views
     wavesurfer = WaveSurfer.create({
         container: '#waveform',
@@ -256,7 +259,7 @@ function initWavesurfer(args) {
         scrollParent: false,
         fillParent: true,
         responsive: true,
-        height: 512,
+        height: args.height,
         plugins: [
             WaveSurfer.regions.create({
                 regionsMinLength: 0.5,
@@ -276,11 +279,11 @@ function initWavesurfer(args) {
             timeInterval: timeInterval,
             primaryLabelInterval: primaryLabelInterval,
             secondaryLabelInterval: secondaryLabelInterval,
-            primaryColor: 'black',
-            secondaryColor: 'grey',
-            primaryFontColor: 'black',
-            secondaryFontColor: 'grey'
-
+            primaryColor: 'white',
+            secondaryColor: 'white',
+            primaryFontColor: 'white',
+            secondaryFontColor: 'white',
+            fontSize: 14
         })).initPlugin('timeline');
     }
     wavesurfer.loadDecodedBuffer(args.audio);
@@ -377,7 +380,7 @@ async function showOpenDialog() {
 
 async function onOpenFiles(args) {
     hideAll();
-    showElement(['controlsWrapper', 'timeline', 'waveform', 'spectrogram', 'dummy'], false)
+    showElement(['spectrogramWrapper'], false)
     resetResults();
     completeDiv.hide();
     // Store the file list and Load First audio file
@@ -467,7 +470,7 @@ function isEmptyObject(obj) {
 function refreshResultsView() {
     hideAll();
     if (fileLoaded) {
-        showElement(['controlsWrapper', 'timeline', 'waveform', 'spectrogram', 'dummy'], false);
+        showElement(['spectrogramWrapper'], false);
         if (!isEmptyObject(predictions)) showElement(['resultTableContainer'], false);
     } else {
         showElement(['loadFileHint', 'loadFileHintText'], true);
@@ -588,8 +591,8 @@ function hideElement(id_list) {
 
 function hideAll() {
     // File hint div,  Waveform, timeline and spec, controls and result table
-    hideElement(['loadFileHint', 'loadFileHintText', 'loadFileHintSpinner',
-        'timeline', 'waveform', 'spectrogram', 'dummy', 'controlsWrapper', 'resultTableContainer', 'recordsContainer']);
+    hideElement(['loadFileHint', 'loadFileHintText', 'loadFileHintSpinner', 'exploreWrapper',
+        'spectrogramWrapper', 'resultTableContainer', 'recordsContainer']);
 }
 
 const save2dbLink = document.getElementById('save2db');
@@ -601,13 +604,16 @@ const chartsLink = document.getElementById('charts');
 chartsLink.addEventListener('click', async () => {
     hideAll();
     showElement(['recordsContainer']);
-    worker.postMessage({action: 'chart-request', species: undefined});
+    worker.postMessage({action: 'chart-request', species: undefined, range: {}});
 });
 
 const exploreLink = document.getElementById('explore');
 exploreLink.addEventListener('click', async () => {
     hideAll();
-    showElement(['controlsWrapper', 'timeline', 'waveform', 'spectrogram', 'dummy', 'resultTableContainer', 'exploreWrapper'], false);
+    showElement(['exploreWrapper'], false);
+    resultTableElement.height(contentWrapperElement.height()
+        - spectrogramWrapper.height()
+        - exploreWrapperElement.height());
 });
 
 
@@ -649,7 +655,9 @@ function loadResultRegion(paramlist) {
     start = parseFloat(start);
     end = parseFloat(end);
     bufferBegin = Math.max(0, start - (windowLength / 2) + 1.5)
-
+    if (!wavesurfer) {
+        adjustSpecDims(true)
+    }
     worker.postMessage({
         action: 'update-buffer',
         file: file,
@@ -661,30 +669,33 @@ function loadResultRegion(paramlist) {
 }
 
 function adjustSpecDims(redraw) {
-    $.each([dummyElement, waveWaveElement, specElement, specCanvasElement, waveCanvasElement], function () {
+    contentWrapperElement.height(bodyElement.height() - 80);
+    const contentHeight = contentWrapperElement.height();
+    const specHeight = Math.min(contentHeight * 0.4, 512);
+    if (currentFile) {
         // Expand up to 512px
-        $(this).height(Math.min(contentWrapperElement.height() * 0.4, 512))
-    })
-    if (wavesurfer) {
-        initSpectrogram(Math.min(contentWrapperElement.height() * 0.4, 512));
-        specElement.css('z-index', 0);
-        resultTableElement.height(contentWrapperElement.height()
-            - dummyElement.height()
-            - controlsWrapperElement.height()
-            - $('#timeline').height()
-            - 94
-        );
-        if (redraw && wavesurfer != null) {
-            wavesurfer.drawBuffer();
+        spectrogramWrapper.height(specHeight + 21 + 46.84);
+        if (!wavesurfer) {
+            initWavesurfer({
+                'audio': currentBuffer,
+                'backend': 'WebAudio',
+                'alpha': 0,
+                'height': specHeight,
+                'reset': false
+            });
         }
+        wavesurfer.setHeight(specHeight);
+        initSpectrogram(specHeight);
         specCanvasElement.width('100%');
+        specElement.css('z-index', 0);
         $('.spec-labels').width('55px')
-    } else {
-        resultTableElement.height(contentWrapperElement.height()
-            - controlsWrapperElement.height()
-
-            - 98);
     }
+    if (wavesurfer && redraw) wavesurfer.drawBuffer();
+
+    resultTableElement.height(contentHeight
+        - spectrogramWrapper.height()
+        - Math.max(exploreWrapperElement.height(), 0)
+    );
 }
 
 // Fix table head
@@ -1048,13 +1059,15 @@ window.onload = async () => {
                     if (confirm("Save results to your archive?")) {
                         worker.postMessage({action: 'save2db'})
                     }
-                    ;
                     break;
                 case 'worker-loaded-audio':
                     onWorkerLoadedAudio(args);
                     break;
                 case 'chart-data':
                     onChartData(args);
+                    break;
+                case 'reset-results':
+                    resetResults();
                     break;
                 case 'generate-alert':
                     alert(args.message)
@@ -1066,25 +1079,22 @@ window.onload = async () => {
     $('#year').text(new Date().getFullYear());
     // Populate feedback modal
     feedbackTable.append(generateBirdList('my'));
-    speciesSearchForm.append(generateBirdList('search'));
+    chartSearchForm.append(generateBirdList('chart'));
     exploreSpeciesSearch.append(generateBirdList('explore'));
     //Cache list elements
     speciesListItems = $('#myUL li span');
-    searchListItems = $('#searchUL');
-    searchListItems.addClass('d-none');
-    exploreListItems = $('#exploreUL');
-    exploreListItems.addClass('d-none');
 };
 
 
 function generateBirdList(prefix) {
-    let listHTML = '';
+    let listHTML = '', style = 'style="max-width: 320px"';
     if (prefix === 'my') {
-        listHTML += "<p>What sound do you think this is?</p>"
+        listHTML += "<p>What sound do you think this is?</p>";
+        style = '';
     }
     listHTML +=
-        `<input type="text" class="input rounded-border" id="${prefix}Input" onkeyup="myFunction('${prefix}')" placeholder="Search for a species...">
-        <div class="rounded-border"><ul id="${prefix}UL">`;
+        `<input type="text" class="input rounded-border" id="${prefix}Input" onkeyup="myFunction('${prefix}')" ${style} placeholder="Search for a species...">
+        <div style="overflow: auto;max-height: 320px; max-width: 300px;position:absolute"><div class="rounded-border"><ul id="${prefix}UL" class="bird-list d-none">`;
     if (prefix === 'my') {
         listHTML += `
             <li><a href="#">Animal<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
@@ -1100,7 +1110,7 @@ function generateBirdList(prefix) {
             listHTML += `<li><a href="#">${cname} - ${sname}<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>`;
         }
     }
-    listHTML += '</ul></div>';
+    listHTML += '</ul></div></div>';
     return listHTML;
 }
 
@@ -1112,35 +1122,73 @@ $(document).on('click', '#myUL li', function (e) {
     speciesListItems.addClass('d-none');
     e.target.closest('a').childNodes[1].classList.remove('d-none');
 })
-// Search list handler
-$(document).on('focus', '#searchInput', function () {
-    searchListItems.removeClass('d-none');
-    hideElement(['dataRecords']);
+// Search list handlers
+$(document).on('focus', '.species-selector', function () {
+    this.querySelector('ul').classList.remove('d-none');
+    if (this.id === "speciesSearch") hideElement(['dataRecords']);
     document.removeEventListener('keydown', handleKeyDown, true);
 })
 
-function hideSearchList() {
-    searchListItems.addClass('d-none')
+$(document).on('blur', '.species-selector', function () {
+    document.addEventListener('keydown', handleKeyDown, true);
+    // Use timeout to allow a click event on the list to fire
+    setTimeout(hideSearchList, 250, this);
+})
+//
+// // Explore list handler
+// $(document).on('focus', '#exploreInput', function () {
+//     exploreListItems.removeClass('d-none');
+//     document.removeEventListener('keydown', handleKeyDown, true);
+// })
+//
+// $(document).on('blur', '#exploreInput', function () {
+//     document.addEventListener('keydown', handleKeyDown, true);
+//     setTimeout(hideSearchList, 250, 'explore');
+// })
+//
+function hideSearchList(el) {
+    el.querySelector('ul').classList.add('d-none');
 }
 
-$(document).on('blur', '#searchInput', function () {
-    document.addEventListener('keydown', handleKeyDown, true);
-    setTimeout(hideSearchList, 250);
-})
-let t0;
-let chartSpecies;
 
-$(document).on('click', '#searchUL li', function (e) {
-    let graphSpecies = formatFilename(e.target.innerText);
+let t0;
+let chartSpecies, exploreSpecies;
+
+$(document).on('click', '.bird-list', function (e) {
+    let species = formatFilename(e.target.innerText);
+    let pickerEl = this.id.replace('UL', 'Range');
+    const context = pickerEl.replace('Range', '');
     const regex = /done$/;
-    graphSpecies = graphSpecies.replace(regex, '').split('~')[0].replace(/_/g, ' ');
-    document.getElementById('searchInput').value = graphSpecies;
+    species = species.replace(regex, '').split('~')[0].replace(/_/g, ' ');
+    const input = this.closest('.species-selector').querySelector('input');
+    input.value = species;
     t0 = Date.now();
-    chartSpecies = graphSpecies;
-    worker.postMessage({action: 'chart-request', species: graphSpecies})
-    searchListItems.addClass('d-none');
-    //e.target.closest('a').childNodes[1].classList.remove('d-none');
+    context === 'chart' ? chartSpecies = species : exploreSpecies = species;
+    const picker = $('#' + pickerEl).data('daterangepicker');
+    const start = picker.startDate._d.getTime();
+    const end = picker.endDate._d.getTime();
+    const dateRange = end !== start ? {'start': start, 'end': end} : {};
+    worker.postMessage({action: context, species: species, range: dateRange})
+    this.classList.add('d-none');
 })
+
+//
+//
+// $(document).on('click', '#exploreUL li', function (e) {
+//     let exploreSpecies = formatFilename(e.target.innerText);
+//     const regex = /done$/;
+//     exploreSpecies = exploreSpecies.replace(regex, '').split('~')[0].replace(/_/g, ' ');
+//     document.getElementById('exploreInput').value = exploreSpecies;
+//     t0 = Date.now();
+//     getSpecies = exploreSpecies;
+//     const picker = $('#exploreRange').data('daterangepicker');
+//     const start = picker.startDate._d.getTime();
+//     const end = picker.endDate._d.getTime();
+//     const dateRange = end !== start ? {'start': start, 'end': end} : {};
+//     worker.postMessage({action: 'get-cache', species: exploreSpecies, range: dateRange})
+//     exploreListItems.addClass('d-none');
+//     //e.target.closest('a').childNodes[1].classList.remove('d-none');
+// })
 
 function getDateOfISOWeek(w) {
     const options = {month: 'long', day: 'numeric'};
@@ -1160,7 +1208,7 @@ function onChartData(args) {
     const genTime = Date.now() - t0;
     const genTimeElement = document.getElementById('genTime')
     genTimeElement.innerText = (genTime / 1000).toFixed(1) + ' seconds';
-    showElement(['dataRecords'], false);
+    if (args.species) showElement(['dataRecords'], false);
     const elements = document.getElementsByClassName('highcharts-data-table');
     while (elements.length > 0) {
         elements[0].parentNode.removeChild(elements[0]);
@@ -1193,8 +1241,9 @@ function onChartData(args) {
 
 function setChartOptions(species, total, rate, results, dataPoints, aggregation, pointStart) {
     let chartOptions = {};
+    chartOptions.yAxis = [];
     const pointInterval = {Week: 7 * 24 * 36e5, Day: 24 * 36e5, Hour: 36e5};
-    chartOptions.colors = ["#004059", "#2B9179", "#AB41E8", "#E88E2A", "#E86235"];
+    chartOptions.colors = ["#003", "#2B9179", "#AB41E8", "#E88E2A", "#E86235"];
     chartOptions.chart = {
         zoomType: 'x',
         backgroundColor: {linearGradient: [0, 0, 0, 500], stops: [[0, "#dbe2ed"], [1, "#dddddd"]]}
@@ -1211,12 +1260,6 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
                 color: '#303030'
             }
         }
-    // chartOptions.xAxis = {
-    //     title: {text: 'Week'},
-    //     accessibility: {description: 'Weeks of the year'},
-    // }
-    // Week number should start from 1 not 0....
-    //chartOptions.xAxis.categories = Array.from({length: dataPoints}, (_, i) => i + 1)
     chartOptions.time = {useUTC: false}; // Use localtime for axes
     Highcharts.dateFormats.W = function (timestamp) {
         let date = new Date(timestamp), day = date.getUTCDay() === 0 ? 7 : date.getUTCDay(), dayNumber;
@@ -1232,13 +1275,43 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
             format: format[aggregation],
         }
     };
+
+    chartOptions.series = [];
+    if (aggregation === 'Week') {
+        chartOptions.series.push({
+            name: 'Hours of recordings',
+            marker: {enabled: false},
+            yAxis: 2,
+            type: 'areaspline',
+            data: total,
+            pointInterval: pointInterval[aggregation],
+            pointStart: pointStart,
+            lineWidth: 0,
+            fillColor: {
+                linearGradient: [0, 0, 0, 300],
+                stops: [
+                    [0, chartOptions.colors[0]],
+                    [1, Highcharts.color(chartOptions.colors[0]).setOpacity(0.2).get('rgba')]
+                ]
+            }
+        });
+    }
+    chartOptions.yAxis.push({
+        title: {
+            text: 'Hours recorded'
+        },
+        accessibility: {
+            description: 'Total recording time in hours'
+        },
+        opposite: true
+    });
     if (total && total.length) {
-        chartOptions.yAxis = [
-            {
+        chartOptions.yAxis.push(
+            [{
                 title: {text: 'Totals'},
                 accessibility: {description: 'Count of records'}
-            }];
-        chartOptions.series = [];
+            }]
+        );
         if (aggregation === 'Week') {
             chartOptions.yAxis.push({
                 title: {text: 'Hourly Detection Rate'},
@@ -1257,47 +1330,21 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
                 fillColor: {
                     linearGradient: [0, 0, 0, 300],
                     stops: [
-                        [0, Highcharts.getOptions().colors[0]],
-                        [1, Highcharts.color(Highcharts.getOptions().colors[0]).setOpacity(0.2).get('rgba')]
+                        [0, chartOptions.colors[1]],
+                        [1, Highcharts.color(chartOptions.colors[1]).setOpacity(0.2).get('rgba')]
                     ]
                 }
             });
         }
-        for (const key in results
-            ) {
-            chartOptions.series.push({
-                name: `Total for ${aggregation} in ` + key,
-                pointInterval: pointInterval[aggregation],
-                pointStart: pointStart,
-                type: 'column',
-                data: results[key]
-            });
-        }
-        chartOptions.yAxis.push({
-            title: {
-                text: 'Hours recorded'
-            },
-            accessibility: {
-                description: 'Total recording time in hours'
-            },
-            opposite: true
-        });
+    }
+    for (const key in results
+        ) {
         chartOptions.series.push({
-            name: 'Hours of recordings',
-            marker: {enabled: false},
-            yAxis: 2,
-            type: 'areaspline',
-            data: total,
+            name: `Total for ${aggregation} in ` + key,
             pointInterval: pointInterval[aggregation],
             pointStart: pointStart,
-            lineWidth: 0,
-            fillColor: {
-                linearGradient: [0, 0, 0, 300],
-                stops: [
-                    [0, Highcharts.getOptions().colors[1]],
-                    [1, Highcharts.color(Highcharts.getOptions().colors[1]).setOpacity(0.2).get('rgba')]
-                ]
-            }
+            type: 'column',
+            data: results[key]
         });
     }
 
@@ -1408,7 +1455,7 @@ $(document).on('click', '#loadSpectrogram', function () {
         config.spectrogram = false;
         $('#loadSpectrogram .tick').hide()
         $('.specFeature').hide()
-        hideElement(['dummy', 'timeline', 'waveform', 'spectrogram']);
+        hideElement(['spectrogramWrapper']);
         $('.speccolor .timeline').addClass('disabled');
         updatePrefs();
     } else {
@@ -1417,7 +1464,7 @@ $(document).on('click', '#loadSpectrogram', function () {
         $('.specFeature').show()
         if (wavesurfer && wavesurfer.isReady) {
             $('.speccolor .timeline').removeClass('disabled');
-            showElement(['dummy', 'timeline', 'waveform', 'spectrogram'], false);
+            showElement(['spectrogramWrapper'], false);
         } else {
             loadAudioFile({filePath: currentFile});
         }
@@ -1426,6 +1473,7 @@ $(document).on('click', '#loadSpectrogram', function () {
 })
 
 function initSpectrogram(height) {
+    showElement(['spectrogramWrapper'], false);
     let fftSamples;
     if (windowLength < 2) {
         fftSamples = 256;
@@ -1494,10 +1542,11 @@ $(document).on('click', '.timeline', function () {
             timeInterval: timeInterval,
             primaryLabelInterval: primaryLabelInterval,
             secondaryLabelInterval: secondaryLabelInterval,
-            primaryColor: 'black',
-            secondaryColor: 'grey',
-            primaryFontColor: 'black',
-            secondaryFontColor: 'grey'
+            primaryColor: 'white',
+            secondaryColor: 'white',
+            primaryFontColor: 'white',
+            secondaryFontColor: 'white',
+            fontSize: 14
         })).initPlugin('timeline');
         $('#loadTimeline .tick').show()
         // refresh caches
@@ -1763,7 +1812,7 @@ function onModelReady(args) {
 //     console.log('update downloaded' + args.releaseNotes)
 // })
 
-function onWorkerLoadedAudio(args) {
+async function onWorkerLoadedAudio(args) {
     if (args.preserveResults) completeDiv.hide();
     console.log('UI received worker-loaded-audio: ' + args.file)
     currentBuffer = new AudioBuffer({length: args.length, numberOfChannels: 1, sampleRate: 24000});
@@ -1787,6 +1836,7 @@ function onWorkerLoadedAudio(args) {
     // calculate dawn for following day
     let astro2 = SunCalc.getTimes(fileStart + 8.64e+7, config.latitude, config.longitude);
     dawn = astro2.dawn.getTime();
+    if (!fileEnd) fileEnd = new Date(fileStart + (currentFileDuration * 1000));
     if (config.nocmig && fileEnd.getTime() < dusk && fileStart > firstDawn) {
         alert(`All timestamps in this file are during daylight hours. \n\nNocmig mode will be disabled.`)
         $('#timecode').click();
@@ -2012,7 +2062,7 @@ async function onPredictionDone(args) {
     diagnostics['Analysis Rate'] = (diagnostics['Audio Duration'] / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
 
     //show summary table
-    summaryButton.click();
+    //summaryButton.click();
 }
 
 function matchSpecies(e, mode) {
@@ -2076,7 +2126,7 @@ async function renderResult(args) {
     let tableRows;
     let tr = '';
     if (index === 1) {
-        if (!controlsWrapperElement.hasClass('d-none')) showElement(['resultTableContainer'], false);
+        showElement(['resultTableContainer'], false);
         if (!selection) {
             tableRows = document.querySelectorAll('#results tr');
             // Remove old results
@@ -2148,17 +2198,17 @@ async function renderResult(args) {
             <th scope='row'>${index}</th><td class='text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-end">${UI_position}</td><td name="${result.cname}" class='flex-shrink-0 cname'>${result.cname}
                 <i>${result.sname}</i></td><td class='text-center'>${iconizeScore(result.score)}</td>
-            <td class='text-center'><span id='${index}' title="Click for additional detections" class='material-icons rotate pointer d-none'>${icon_text}</span></td>
+            <td class='text-center'><span id='${index}' title="Click for additional detections" class='material-icons-two-tone rotate pointer d-none'>${icon_text}</span></td>
             <td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
             <td class='text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
             <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
-            <td class='specFeature text-center download'><span class='material-icons-outlined pointer'>file_download</span></td>
+            <td class='specFeature text-center download'><span class='material-icons-two-tone pointer'>file_download</span></td>
             <td class="text-center speciesExclude d-none"><span class="spinner-border spinner-border-sm text-danger d-none" role="status"></span>
                  <span class="material-icons-two-tone align-bottom pointer">clear</span></td>
             <td id="${index}" class='specFeature text-center'>${feedback_icons}</td>
         </tr>`;
         if (result.score2 > 0.2) {
-            tr += `<tr name="${file},${start},${end},${result.cname}${confidence}" id='subrow${index}' class='subrow d-none'>
+            tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" id='subrow${index}' class='subrow d-none'>
                 <th scope='row'>${index}</th><td> </td><td> </td><td class='cname2'>${result.cname2}<br/>
                     <i>${result.sname2}</i></td><td class='text-center'>${iconizeScore(result.score2)}</td>
                 <td> </td><td class='specFeature'> </td>
@@ -2169,7 +2219,7 @@ async function renderResult(args) {
                 <td class='specFeature'> </td>
                </tr>`;
             if (result.score3 > 0.2) {
-                tr += `<tr name="${file},${start},${end},${result.cname}${confidence}" id='subsubrow${index}' class='subrow d-none'>
+                tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" id='subsubrow${index}' class='subrow d-none'>
                     <th scope='row'>${index}</th><td> </td><td> </td><td class='cname3'>${result.cname3}<br/>
                         <i>${result.sname3}</i></td><td class='text-center'>${iconizeScore(result.score3)}</td>
                     <td> </td><td class='specFeature'> </td>
@@ -2250,6 +2300,7 @@ function findSpecies() {
     document.removeEventListener('keydown', handleKeyDown, true);
     speciesListItems.addClass('d-none');
     const feedback = new bootstrap.Modal(document.getElementById('feedbackModal'));
+    document.getElementById('myUL').classList.remove('d-none');
     feedback.show()
 }
 
@@ -2330,13 +2381,13 @@ function sendFile(mode, result) {
 
 // create a dict mapping score to icon
 const iconDict = {
-    'guess': '<span class="material-icons text-secondary score border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
-    'low': '<span class="material-icons score text-danger border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
-    'medium': '<span class="material-icons score text-warning border border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
-    'high': '<span class="material-icons score text-success border border-secondary rounded" title="--%">signal_cellular_alt</span>',
-    //'low': '<span class="material-icons text-danger border border-secondary rounded" title="Low">signal_cellular_alt_1_bar</span>',
-    //'medium': '<span class="material-icons text-warning border border-secondary rounded" title="Medium">signal_cellular_alt_2_bar</span>',
-    //'high': '<span class="material-icons text-success border border-secondary rounded" title="High">signal_cellular_alt</span>',
+    'guess': '<span class="material-icons-two-tone text-secondary score border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
+    'low': '<span class="material-icons-two-tone score text-danger border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
+    'medium': '<span class="material-icons-two-tone score text-warning border border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
+    'high': '<span class="material-icons-two-tone score text-success border border-secondary rounded" title="--%">signal_cellular_alt</span>',
+    //'low': '<span class="material-icons-two-tone text-danger border border-secondary rounded" title="Low">signal_cellular_alt_1_bar</span>',
+    //'medium': '<span class="material-icons-two-tone text-warning border border-secondary rounded" title="Medium">signal_cellular_alt_2_bar</span>',
+    //'high': '<span class="material-icons-two-tone text-success border border-secondary rounded" title="High">signal_cellular_alt</span>',
 }
 
 function iconizeScore(score) {
@@ -2472,9 +2523,9 @@ document.addEventListener('drop', async (event) => {
 ////////// Date Picker ///////////////
 
 $(function () {
-    const start = moment().startOf('day').add(12, 'hours').subtract(1, 'days');
-    const end = moment().startOf('day').add(12, 'hours');
-    $('#reportRange, #exploreRange').each(function () {
+    const start = moment();
+    const end = start;
+    $('#chartRange, #exploreRange').each(function () {
         $(this).daterangepicker({
             autoUpdateInput: false,
             locale: {
@@ -2502,13 +2553,11 @@ $(function () {
             $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
             const dateRange = {'start': picker.startDate._d.getTime(), 'end': picker.endDate._d.getTime()};
             if (worker) {
-                if (this.id === 'reportRange') {
-                    worker.postMessage({action: 'set-date-range', range: dateRange});
-
-                    if (chartSpecies) {
-                        t0 = Date.now();
-                        worker.postMessage({action: 'chart-request', species: chartSpecies});
-                    }
+                if (this.id === 'chartRange' && chartSpecies) {
+                    t0 = Date.now();
+                    worker.postMessage({action: 'chart', species: chartSpecies, range: dateRange});
+                } else if (this.id === 'exploreRange' && exploreSpecies) {
+                    worker.postMessage({action: 'explore', species: exploreSpecies, range: dateRange});
                 }
             }
         });
@@ -2516,11 +2565,10 @@ $(function () {
         $(this).on('cancel.daterangepicker', function (ev, picker) {
             $(this).children('span').html('Apply a date filter');
             if (worker) {
-                if (this.id === 'reportRange') {
-                    worker.postMessage({action: 'set-date-range', range: {}});
+                if (this.id === 'chartRange') {
                     if (chartSpecies) {
                         t0 = Date.now();
-                        worker.postMessage({action: 'chart-request', species: chartSpecies});
+                        worker.postMessage({action: 'chart', species: chartSpecies, range: {}});
                     }
                 }
             }
