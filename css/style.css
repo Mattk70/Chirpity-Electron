@@ -12,15 +12,6 @@ html, body {
 }
 
 @font-face {
-    font-family: 'Material Icons';
-    font-style: normal;
-    font-weight: 400;
-    src: local('Material Icons'),
-    local('MaterialIcons-Regular'),
-    url(../fonts/MaterialIcons-Regular.woff2) format('woff2')
-}
-
-@font-face {
     font-family: 'Material Icons Two Tone';
     font-style: normal;
     font-weight: 400;
@@ -29,39 +20,12 @@ html, body {
     url(../fonts/MaterialIconsTwoTone-Regular.woff2) format('woff2')
 }
 
-@font-face {
-    font-family: 'Material Icons Outlined';
-    font-style: normal;
-    font-weight: 400;
-    src: local('Material Icons Outlined'),
-    local('MaterialIconsOutlined-Regular'),
-    url(../fonts/MaterialIconsOutlined-Regular.woff2) format('woff2')
-}
-
-.material-icons {
-    font-family: 'Material Icons';
-    font-weight: normal;
-    font-style: normal;
-    font-size: 28px; /* Preferred icon size */
-    display: inline-block;
-    line-height: 1;
-    text-transform: none;
-    letter-spacing: normal;
-    word-wrap: normal;
-    white-space: nowrap;
-    vertical-align: top;
-    direction: ltr;
-    padding-bottom: 0px;
-
-    /* Support for all WebKit browsers. */
-    -webkit-font-smoothing: antialiased;
-}
-
 .material-icons-two-tone {
     font-family: 'Material Icons Two Tone';
     font-weight: normal;
     font-style: normal;
     font-size: 28px; /* Preferred icon size */
+    font-display: block;
     display: inline-block;
     line-height: 1;
     text-transform: none;
@@ -71,25 +35,6 @@ html, body {
     vertical-align: top;
     direction: ltr;
     padding-bottom: 0px;
-    /* Support for all WebKit browsers. */
-    -webkit-font-smoothing: antialiased;
-}
-
-.material-icons-outlined {
-    font-family: 'Material Icons Outlined';
-    font-weight: normal;
-    font-style: normal;
-    font-size: 28px; /* Preferred icon size */
-    display: inline-block;
-    line-height: 1;
-    text-transform: none;
-    letter-spacing: normal;
-    word-wrap: normal;
-    white-space: nowrap;
-    vertical-align: top;
-    direction: ltr;
-    padding-bottom: 0px;
-
     /* Support for all WebKit browsers. */
     -webkit-font-smoothing: antialiased;
 }
@@ -192,17 +137,15 @@ div#contentWrapper {
     font-size: 16px; /* Increase font-size */
     padding: 12px 20px 12px 40px; /* Add some padding */
     border: 1px solid #ddd; /* Add a grey border */
-    margin-bottom: 10px; /* Add some space below the input */
+    margin-bottom: 3px; /* Add some space below the input */
 }
 
-#myUL, #searchUL {
+.bird-list {
     /* Remove default list styling */
     list-style-type: none;
     padding: 0;
     margin: 0;
-    width: 320px;
-    max-height: 320px;
-    overflow: auto;
+    z-index: 1000;
 }
 
 
@@ -211,7 +154,7 @@ div#contentWrapper {
     max-height: 320px;
 }
 
-#myUL li a, #searchUL li a {
+#myUL li a, #chartUL li a, #exploreUL li a {
     border: 1px solid #ddd; /* Add a border to all links */
     margin-top: -1px; /* Prevent double borders */
     background-color: #f6f6f6; /* Grey background color */
@@ -222,11 +165,11 @@ div#contentWrapper {
     display: block; /* Make it into a block element to fill the whole list */
 }
 
-#searchUL li a {
+#chartUL li a {
     max-width: 300px;
 }
 
-#myULli a:hover:not(.header), #searchUL li a:hover:not(.header) {
+#myULli a:hover:not(.header), #chartUL li a:hover:not(.header) {
     background-color: #eee; /* Add a hover effect to all links, except for headers */
 }
 
@@ -360,6 +303,7 @@ footer {
 
 .rounded-border{
     border-radius: 10px;
+    margin-top: 1px;
     overflow: hidden;
 }
 
