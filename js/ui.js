@@ -79,7 +79,7 @@ let exploreWrapperElement = $('#exploreWrapper');
 let completeDiv = $('#complete');
 const resultTable = $('#resultTableBody')
 const summaryTable = $('#summaryTable');
-const feedbackTable = $('#feedbackModalBody');
+const editTable = $('#amendSpecies');
 const chartSearchForm = $('#speciesSearch');
 const exploreSpeciesSearch = $('#exploreSpeciesSearch')
 let progressDiv = $('#progressDiv');
@@ -656,6 +656,7 @@ function loadResultRegion(paramlist) {
     end = parseFloat(end);
     bufferBegin = Math.max(0, start - (windowLength / 2) + 1.5)
     if (!wavesurfer) {
+        spectrogramWrapper.removeClass('d-none');
         adjustSpecDims(true)
     }
     worker.postMessage({
@@ -671,7 +672,7 @@ function loadResultRegion(paramlist) {
 function adjustSpecDims(redraw) {
     contentWrapperElement.height(bodyElement.height() - 80);
     const contentHeight = contentWrapperElement.height();
-    const specHeight = Math.min(contentHeight * 0.4, 512);
+    const specHeight = spectrogramWrapper.hasClass('d-none') ? 0 : Math.min(contentHeight * 0.4, 512);
     if (currentFile) {
         // Expand up to 512px
         spectrogramWrapper.height(specHeight + 21 + 46.84);
@@ -691,9 +692,8 @@ function adjustSpecDims(redraw) {
         $('.spec-labels').width('55px')
     }
     if (wavesurfer && redraw) wavesurfer.drawBuffer();
-
     resultTableElement.height(contentHeight
-        - spectrogramWrapper.height()
+        - specHeight
         - Math.max(exploreWrapperElement.height(), 0)
     );
 }
@@ -1077,119 +1077,146 @@ window.onload = async () => {
     })
     // Set footer year
     $('#year').text(new Date().getFullYear());
-    // Populate feedback modal
-    feedbackTable.append(generateBirdList('my'));
-    chartSearchForm.append(generateBirdList('chart'));
-    exploreSpeciesSearch.append(generateBirdList('explore'));
+    // Populate Edit modal
+    editTable.append(generateBirdList('edit'));
+    //chartSearchForm.append(generateBirdList('chart'));
+    //exploreSpeciesSearch.append(generateBirdList('explore'));
     //Cache list elements
-    speciesListItems = $('#myUL li span');
+    speciesListItems = $('#bird-list li span');
 };
 
 
 function generateBirdList(prefix) {
-    let listHTML = '', style = 'style="max-width: 320px"';
-    if (prefix === 'my') {
-        listHTML += "<p>What sound do you think this is?</p>";
-        style = '';
-    }
+    let listHTML = '', ulClass = 'request-bird';
+
+    // if (prefix === 'edit') {
+    //     inputStyle = '';
+    //     ulClass = '';
+    // }
     listHTML +=
-        `<input type="text" class="input rounded-border" id="${prefix}Input" onkeyup="myFunction('${prefix}')" ${style} placeholder="Search for a species...">
-        <div style="overflow: auto;max-height: 320px; max-width: 300px;position:absolute"><div class="rounded-border"><ul id="${prefix}UL" class="bird-list d-none">`;
-    if (prefix === 'my') {
+        `<div id="bird-list" class="d-none"><div class="rounded-border"><ul class="bird-list ${ulClass}">`;
+    if (prefix === 'edit') {
         listHTML += `
-            <li><a href="#">Animal<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
-            <li><a href="#">Ambient Noise<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
-            <li><a href="#">Human<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>
-            <li><a href="#">Vehicle<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>`;
+            <li><a href="#">Animal</a></li>
+            <li><a href="#">Ambient Noise</a></li>
+            <li><a href="#">Human</a></li>
+            <li><a href="#">Vehicle</a></li>`;
     }
 
     const excluded = new Set(['human', 'vehicles', 'animals', 'No call']);
     for (const item in labels) {
         const [sname, cname] = labels[item].split('_');
         if (!excluded.has(cname)) {
-            listHTML += `<li><a href="#">${cname} - ${sname}<span class="material-icons-two-tone submitted text-success d-none">done</span></a></li>`;
+            listHTML += `<li><a href="#">${cname} - ${sname}</a></li>`;
         }
     }
     listHTML += '</ul></div></div>';
     return listHTML;
 }
 
-// Feedback list handler
-$(document).on('click', '#myUL li', function (e) {
-    correctedSpecies = formatFilename(e.target.innerText);
-    const regex = /done$/;
-    correctedSpecies = correctedSpecies.replace(regex, '');
-    speciesListItems.addClass('d-none');
-    e.target.closest('a').childNodes[1].classList.remove('d-none');
-})
 // Search list handlers
-$(document).on('focus', '.species-selector', function () {
-    this.querySelector('ul').classList.remove('d-none');
+$(document).on('focus', '.input', function () {
+    const theList = document.querySelector('#bird-list')
+    const container = this.parentNode.querySelector('.bird-list-wrapper');
+    container.appendChild(theList);
+    if (container.classList.contains('editing')) container.querySelector('ul').classList.remove('request-bird');
     if (this.id === "speciesSearch") hideElement(['dataRecords']);
     document.removeEventListener('keydown', handleKeyDown, true);
 })
 
-$(document).on('blur', '.species-selector', function () {
+$(document).on('blur', '.input', function () {
     document.addEventListener('keydown', handleKeyDown, true);
     // Use timeout to allow a click event on the list to fire
-    setTimeout(hideSearchList, 250, this);
+    setTimeout(hideBirdList, 250, this.parentNode);
 })
-//
-// // Explore list handler
-// $(document).on('focus', '#exploreInput', function () {
-//     exploreListItems.removeClass('d-none');
-//     document.removeEventListener('keydown', handleKeyDown, true);
-// })
-//
-// $(document).on('blur', '#exploreInput', function () {
-//     document.addEventListener('keydown', handleKeyDown, true);
-//     setTimeout(hideSearchList, 250, 'explore');
-// })
-//
-function hideSearchList(el) {
-    el.querySelector('ul').classList.add('d-none');
+
+function hideBirdList(el) {
+    el.querySelector('#bird-list').classList.add('d-none');
 }
+
+// $(document).on('click', '.edit', function (e) {
+//     e.target.parentNode.onclick = null;
+//     const mode = e.target.classList.contains('text-success') ? 'correct' : 'incorrect';
+//     getSpeciesIndex(e);
+//     if (mode === 'incorrect') {
+//         findSpecies();
+//     } else if (confirm('Submit feedback?')) {
+//         predictions[clickedIndex].filename = predictions[clickedIndex].cname.replace(/\s+/g, '_') +
+//             '~' + predictions[clickedIndex].sname.replace(' ', '_') + '_' + Date.now().toString() + '.mp3';
+//         sendFile('correct', predictions[clickedIndex]);
+//         clickedNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>'
+//     }
+//     e.stopImmediatePropagation();
+//
+// });
+
+$(document).on('click', '.edit', function (e) {
+    const currentRow = e.target.closest('.table-active');
+    let cname = currentRow.querySelector('.cname');
+    cname.innerHTML = `<div id='edit' class="species-selector"><input type="text" class="input rounded-border" id="editInput" 
+                    placeholder="${cname.innerText}"><div class="editing bird-list-wrapper"></div></div>`;
+
+    //getSpeciesIndex(e);
+    //findSpecies();
+    //e.stopImmediatePropagation();
+
+});
+
+// Bird list filtering
+$(document).on('keyup', '.input', function (e) {
+    // Declare variables
+    const input = e.target;
+    const filter = input.value.toUpperCase();
+    const ul = input.parentNode.querySelector("ul");
+    const li = ul.getElementsByTagName('li');
+    const theList = document.querySelector('#bird-list')
+    theList.classList.remove('d-none');
+    // Loop through all list items, and hide those who don't match the search query
+    for (let i = 0; i < li.length; i++) {
+        const a = li[i].getElementsByTagName("a")[0];
+        const txtValue = a.textContent || a.innerText;
+        if (txtValue.toUpperCase().indexOf(filter) > -1) {
+            li[i].style.display = "";
+        } else {
+            li[i].style.display = "none";
+        }
+    }
+})
 
 
 let t0;
 let chartSpecies, exploreSpecies;
 
+function formatInputText(species) {
+    species = formatSpeciesName(species);
+    let [cname, latin] = species.split('~');
+    cname = cname.replace(/_/g, ' ',);
+    latin = latin.replace(/_/g, ' ');
+    const speciesLabel = `${cname} (${latin})`;
+    return [speciesLabel, cname];
+}
+
 $(document).on('click', '.bird-list', function (e) {
-    let species = formatFilename(e.target.innerText);
-    let pickerEl = this.id.replace('UL', 'Range');
-    const context = pickerEl.replace('Range', '');
-    const regex = /done$/;
-    species = species.replace(regex, '').split('~')[0].replace(/_/g, ' ');
+    const [speciesLabel,] = formatInputText(e.target.innerText)
     const input = this.closest('.species-selector').querySelector('input');
-    input.value = species;
+    input.value = speciesLabel;
+})
+
+$(document).on('click', '.request-bird', function (e) {
+    const [, cname] = formatInputText(e.target.innerText)
+    const context = this.closest('.bird-list-wrapper').classList[0];
+    let pickerEl = context + 'Range';
     t0 = Date.now();
-    context === 'chart' ? chartSpecies = species : exploreSpecies = species;
+    context === 'chart' ? chartSpecies = cname : exploreSpecies = cname;
     const picker = $('#' + pickerEl).data('daterangepicker');
     const start = picker.startDate._d.getTime();
     const end = picker.endDate._d.getTime();
     const dateRange = end !== start ? {'start': start, 'end': end} : {};
-    worker.postMessage({action: context, species: species, range: dateRange})
-    this.classList.add('d-none');
+    worker.postMessage({action: context, species: cname, range: dateRange})
 })
 
-//
-//
-// $(document).on('click', '#exploreUL li', function (e) {
-//     let exploreSpecies = formatFilename(e.target.innerText);
-//     const regex = /done$/;
-//     exploreSpecies = exploreSpecies.replace(regex, '').split('~')[0].replace(/_/g, ' ');
-//     document.getElementById('exploreInput').value = exploreSpecies;
-//     t0 = Date.now();
-//     getSpecies = exploreSpecies;
-//     const picker = $('#exploreRange').data('daterangepicker');
-//     const start = picker.startDate._d.getTime();
-//     const end = picker.endDate._d.getTime();
-//     const dateRange = end !== start ? {'start': start, 'end': end} : {};
-//     worker.postMessage({action: 'get-cache', species: exploreSpecies, range: dateRange})
-//     exploreListItems.addClass('d-none');
-//     //e.target.closest('a').childNodes[1].classList.remove('d-none');
-// })
 
+// Chart functions
 function getDateOfISOWeek(w) {
     const options = {month: 'long', day: 'numeric'};
     const y = new Date().getFullYear();
@@ -2174,8 +2201,8 @@ async function renderResult(args) {
         if (result.score < 0.65) {
             confidence = '&#63;';
         }
-        feedback_icons = `<span class='material-icons-two-tone text-success feedback pointer'>thumb_up_alt</span>
-                              <span class='material-icons-two-tone text-danger feedback pointer'>thumb_down_alt</span>`;
+        feedback_icons = `<!-- <span class='material-icons-two-tone feedback pointer'>comment</span>-->
+                              <span class='material-icons-two-tone edit pointer'>edit</span>`;
         result.suppressed ? icon_text = `sync_problem` : icon_text = 'sync';
         result.date = result.timestamp;
         const timestamp = result.timestamp.toString().split(' ');
@@ -2203,8 +2230,9 @@ async function renderResult(args) {
             <td class='text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
             <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
             <td class='specFeature text-center download'><span class='material-icons-two-tone pointer'>file_download</span></td>
-            <td class="text-center speciesExclude d-none"><span class="spinner-border spinner-border-sm text-danger d-none" role="status"></span>
-                 <span class="material-icons-two-tone align-bottom pointer">clear</span></td>
+<!--             <td class="text-center speciesExclude d-none"><span class="spinner-border spinner-border-sm text-danger d-none" role="status"></span>-->
+<!--                 <span class="material-icons-two-tone align-bottom pointer">clear</span></td>-->
+    <td></td>
             <td id="${index}" class='specFeature text-center'>${feedback_icons}</td>
         </tr>`;
         if (result.score2 > 0.2) {
@@ -2269,24 +2297,8 @@ $(document).on('click', '.download', function (e) {
     sendFile(mode, predictions[clickedIndex])
     e.stopImmediatePropagation();
 });
-$(document).on('click', '.feedback', function (e) {
 
-    let index = e.target.parentNode.id;
-    e.target.parentNode.onclick = null;
-    let mode;
-    (e.target.classList.contains('text-success')) ? mode = 'correct' : mode = 'incorrect';
-    getSpeciesIndex(e);
-    if (mode === 'incorrect') {
-        findSpecies();
-    } else if (confirm('Submit feedback?')) {
-        predictions[clickedIndex].filename = predictions[clickedIndex].cname.replace(/\s+/g, '_') +
-            '~' + predictions[clickedIndex].sname.replace(' ', '_') + '_' + Date.now().toString() + '.mp3';
-        sendFile('correct', predictions[clickedIndex]);
-        clickedNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>'
-    }
-    e.stopImmediatePropagation();
 
-});
 $(document).on('click', '.rotate', function (e) {
     const row1 = e.target.parentNode.parentNode.nextSibling;
     const row2 = row1.nextSibling;
@@ -2296,29 +2308,29 @@ $(document).on('click', '.rotate', function (e) {
 })
 
 
-function findSpecies() {
-    document.removeEventListener('keydown', handleKeyDown, true);
-    speciesListItems.addClass('d-none');
-    const feedback = new bootstrap.Modal(document.getElementById('feedbackModal'));
-    document.getElementById('myUL').classList.remove('d-none');
-    feedback.show()
-}
+// function findSpecies() {
+//     document.removeEventListener('keydown', handleKeyDown, true);
+//     speciesListItems.addClass('d-none');
+//     //const update = new bootstrap.Modal(document.getElementById('editModal'));
+//     document.getElementById('editUL').classList.remove('d-none');
+//     //update.show()
+// }
 
-function formatFilename(filename) {
+function formatSpeciesName(filename) {
     filename = filename.replace(' - ', '~').replace(/\s+/g, '_',);
     if (!filename.includes('~')) filename = filename + '~' + filename; // dummy latin
     return filename;
 }
 
-$('#feedbackModal').on('hidden.bs.modal', function (e) {
-    enableKeyDownEvent();
-    if (correctedSpecies) {
-        predictions[clickedIndex].filename = correctedSpecies + '_' + Date.now().toString() + '.mp3';
-        sendFile('incorrect', predictions[clickedIndex]);
-        correctedSpecies = undefined;
-        clickedNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>';
-    }
-})
+// $('#editModal').on('hidden.bs.modal', function (e) {
+//     enableKeyDownEvent();
+//     if (correctedSpecies) {
+//         predictions[clickedIndex].filename = correctedSpecies + '_' + Date.now().toString() + '.mp3';
+//         sendFile('incorrect', predictions[clickedIndex]);
+//         correctedSpecies = undefined;
+//         clickedNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>';
+//     }
+// })
 
 
 function sendFile(mode, result) {
