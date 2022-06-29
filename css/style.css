@@ -129,6 +129,14 @@ div#contentWrapper {
     font-size: 22px;
 }
 
+.species-selector{
+    position: relative;
+    z-index: 100;
+}
+
+#timeline{
+    z-index: 99;
+}
 .input {
     background-image: url('searchicon.png'); /* Add a search icon to input */
     background-position: 10px 12px; /* Position the search icon */
@@ -140,21 +148,23 @@ div#contentWrapper {
     margin-bottom: 3px; /* Add some space below the input */
 }
 
+
 .bird-list {
     /* Remove default list styling */
     list-style-type: none;
     padding: 0;
     margin: 0;
-    z-index: 1000;
+    width: 100%;
 }
 
-
-
-#feedbackModalBody {
+.bird-list-wrapper{
+    overflow: auto;
     max-height: 320px;
+    position:absolute;
+    width: 100%;
 }
 
-#myUL li a, #chartUL li a, #exploreUL li a {
+.bird-list li a {
     border: 1px solid #ddd; /* Add a border to all links */
     margin-top: -1px; /* Prevent double borders */
     background-color: #f6f6f6; /* Grey background color */
@@ -164,14 +174,18 @@ div#contentWrapper {
     color: black; /* Add a black text color */
     display: block; /* Make it into a block element to fill the whole list */
 }
-
-#chartUL li a {
-    max-width: 300px;
-}
-
-#myULli a:hover:not(.header), #chartUL li a:hover:not(.header) {
+.bird-list li a:hover:not(.header){
     background-color: #eee; /* Add a hover effect to all links, except for headers */
 }
+
+/* make dropdown stick to row */
+.table-active {
+    overflow: visible;
+    position: relative
+}
+
+
+
 
 region.wavesurfer-region:before {
     content: attr(data-region-label);
