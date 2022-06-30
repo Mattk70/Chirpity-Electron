@@ -79,9 +79,6 @@ let exploreWrapperElement = $('#exploreWrapper');
 let completeDiv = $('#complete');
 const resultTable = $('#resultTableBody')
 const summaryTable = $('#summaryTable');
-const editTable = $('#amendSpecies');
-const chartSearchForm = $('#speciesSearch');
-const exploreSpeciesSearch = $('#exploreSpeciesSearch')
 let progressDiv = $('#progressDiv');
 let progressBar = $('.progress .progress-bar');
 const fileNumber = document.getElementById('fileNumber');
@@ -634,7 +631,7 @@ function createRegion(start, end, label) {
 
 const tbody = document.getElementById('resultTableBody')
 tbody.addEventListener('click', function (e) {
-    if (activeRow) activeRow.classList.remove('table-active')
+    if (activeRow)  activeRow.classList.remove('table-active')
     const row = e.target.closest('tr');
     row.classList.add('table-active');
     activeRow = row;
@@ -643,6 +640,18 @@ tbody.addEventListener('click', function (e) {
         block: 'nearest'
     })
     loadResultRegion(row.attributes[0].value.split('|'));
+})
+
+tbody.addEventListener('dblclick', function (e) {
+    if (activeRow) activeRow.classList.remove('table-active')
+    const row = e.target.closest('tr');
+    row.classList.add('table-active');
+    activeRow = row;
+    activeRow.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest'
+    })
+    row.querySelector('.edit').click();
 })
 
 function loadResultRegion(paramlist) {
@@ -1077,8 +1086,8 @@ window.onload = async () => {
     })
     // Set footer year
     $('#year').text(new Date().getFullYear());
-    // Populate Edit modal
-    editTable.append(generateBirdList('edit'));
+    // Put the bird list in its parking lot
+    generateBirdList();
     //chartSearchForm.append(generateBirdList('chart'));
     //exploreSpeciesSearch.append(generateBirdList('explore'));
     //Cache list elements
@@ -1086,23 +1095,13 @@ window.onload = async () => {
 };
 
 
-function generateBirdList(prefix) {
-    let listHTML = '', ulClass = 'request-bird';
-
-    // if (prefix === 'edit') {
-    //     inputStyle = '';
-    //     ulClass = '';
-    // }
-    listHTML +=
-        `<div id="bird-list" class="d-none"><div class="rounded-border"><ul class="bird-list ${ulClass}">`;
-    if (prefix === 'edit') {
-        listHTML += `
+function generateBirdList() {
+    let listHTML = '<div id="bird-list" class="d-none"><div class="rounded-border"><ul class="bird-list request-bird">'
+    listHTML += `
             <li><a href="#">Animal</a></li>
             <li><a href="#">Ambient Noise</a></li>
             <li><a href="#">Human</a></li>
             <li><a href="#">Vehicle</a></li>`;
-    }
-
     const excluded = new Set(['human', 'vehicles', 'animals', 'No call']);
     for (const item in labels) {
         const [sname, cname] = labels[item].split('_');
@@ -1111,17 +1110,24 @@ function generateBirdList(prefix) {
         }
     }
     listHTML += '</ul></div></div>';
-    return listHTML;
+    birdListStore.innerHTML = listHTML;
 }
 
 // Search list handlers
+const birdListStore = document.getElementById('amendSpecies');
+
 $(document).on('focus', '.input', function () {
+    document.removeEventListener('keydown', handleKeyDown, true);
     const theList = document.querySelector('#bird-list')
     const container = this.parentNode.querySelector('.bird-list-wrapper');
     container.appendChild(theList);
-    if (container.classList.contains('editing')) container.querySelector('ul').classList.remove('request-bird');
+    if (container.classList.contains('editing')) {
+        container.querySelector('ul').classList.remove('request-bird');
+    } else {
+        container.querySelector('ul').classList.add('request-bird');
+    }
     if (this.id === "speciesSearch") hideElement(['dataRecords']);
-    document.removeEventListener('keydown', handleKeyDown, true);
+
 })
 
 $(document).on('blur', '.input', function () {
@@ -1131,7 +1137,14 @@ $(document).on('blur', '.input', function () {
 })
 
 function hideBirdList(el) {
-    el.querySelector('#bird-list').classList.add('d-none');
+    const list = el.querySelector('#bird-list');
+    const container = el.closest('.species-selector').querySelector('.bird-list-wrapper');
+    // Move the bird list back to its parking spot before updating the cname cell
+    if (list) birdListStore.appendChild(list);
+    if (container.classList.contains('editing')) {
+        const cnameCell = el.closest('.cname');
+        if (cnameCell) cnameCell.innerHTML = restoreSpecies;
+    }
 }
 
 // $(document).on('click', '.edit', function (e) {
@@ -1150,12 +1163,16 @@ function hideBirdList(el) {
 //
 // });
 
+let restoreSpecies;
+
 $(document).on('click', '.edit', function (e) {
     const currentRow = e.target.closest('.table-active');
     let cname = currentRow.querySelector('.cname');
+    // save the original species in case edit is aborted or doesn't change species
+    restoreSpecies = cname.innerHTML;
     cname.innerHTML = `<div id='edit' class="species-selector"><input type="text" class="input rounded-border" id="editInput" 
                     placeholder="${cname.innerText}"><div class="editing bird-list-wrapper"></div></div>`;
-
+    cname.querySelector('input').focus();
     //getSpeciesIndex(e);
     //findSpecies();
     //e.stopImmediatePropagation();
@@ -1164,8 +1181,11 @@ $(document).on('click', '.edit', function (e) {
 
 // Bird list filtering
 $(document).on('keyup', '.input', function (e) {
-    // Declare variables
     const input = e.target;
+    filterList(input)
+})
+
+function filterList(input) {
     const filter = input.value.toUpperCase();
     const ul = input.parentNode.querySelector("ul");
     const li = ul.getElementsByTagName('li');
@@ -1181,8 +1201,7 @@ $(document).on('keyup', '.input', function (e) {
             li[i].style.display = "none";
         }
     }
-})
-
+}
 
 let t0;
 let chartSpecies, exploreSpecies;
@@ -1200,7 +1219,38 @@ $(document).on('click', '.bird-list', function (e) {
     const [speciesLabel,] = formatInputText(e.target.innerText)
     const input = this.closest('.species-selector').querySelector('input');
     input.value = speciesLabel;
+    const container = this.closest('.species-selector').querySelector('.bird-list-wrapper');
+    if (container.classList.contains('editing')) {
+
+        let species = e.target.innerText;
+        let [cname, sname] = species.split(' - ');
+        // Handle animal, vehicle, etc.
+        if (!sname) sname = cname;
+        const cnameCell = this.closest('.cname');
+        // Move the bird list back to its parking spot before updating the cname cell
+        const theList = document.querySelector('#bird-list');
+        birdListStore.appendChild(theList);
+        cnameCell.innerHTML = `${cname} <i>${sname}</i>`;
+        // Make sure we update the restore species
+        restoreSpecies = cnameCell.innerHTML;
+        // Update the name attribute (it must be the first attribute in the tag. Todo: update to use title? attr)
+        cnameCell.attributes[0].value = cname;
+        // Update the row name attr so labels update on the region
+        const currentRow = cnameCell.offsetParent;
+        const nameAttr = currentRow.attributes[0].value.replace(/(.*\|).*/, '$1' + cname);
+        currentRow.attributes[0].value = nameAttr;
+        // Update the database. Note we have already defined cname
+        const [file, start, end,] = nameAttr.split('|');
+        updateRecordID(file, start, end, cname);
+
+        // reflect the change on the spectrogram by simulating a click
+        currentRow.click();
+    }
 })
+
+function updateRecordID(file, start, end, cname) {
+    // todo!
+}
 
 $(document).on('click', '.request-bird', function (e) {
     const [, cname] = formatInputText(e.target.innerText)
@@ -1370,8 +1420,8 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
             data: results[key]
         });
     }
-    if (hasResults){
-                chartOptions.yAxis.push(
+    if (hasResults) {
+        chartOptions.yAxis.push(
             {
                 title: {text: 'Detections'},
                 accessibility: {description: 'Count of records'}
