@@ -604,7 +604,7 @@ const chartsLink = document.getElementById('charts');
 chartsLink.addEventListener('click', async () => {
     hideAll();
     showElement(['recordsContainer']);
-    worker.postMessage({action: 'chart-request', species: undefined, range: {}});
+    worker.postMessage({action: 'chart', species: undefined, range: {}});
 });
 
 const exploreLink = document.getElementById('explore');
@@ -1279,14 +1279,14 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
     chartOptions.title = species ? {text: `${species} Detections`} : {text: 'Hours Recorded'};
     chartOptions.lang = {
         noData: "No Detections to Display"
-    },
-        chartOptions.noData = {
-            style: {
-                fontWeight: 'bold',
-                fontSize: '25px',
-                color: '#303030'
-            }
+    }
+    chartOptions.noData = {
+        style: {
+            fontWeight: 'bold',
+            fontSize: '25px',
+            color: '#303030'
         }
+    }
     chartOptions.time = {useUTC: false}; // Use localtime for axes
     Highcharts.dateFormats.W = function (timestamp) {
         let date = new Date(timestamp), day = date.getUTCDay() === 0 ? 7 : date.getUTCDay(), dayNumber;
@@ -1308,7 +1308,7 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
         chartOptions.series.push({
             name: 'Hours of recordings',
             marker: {enabled: false},
-            yAxis: 2,
+            yAxis: 0,
             type: 'areaspline',
             data: total,
             pointInterval: pointInterval[aggregation],
@@ -1322,23 +1322,17 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
                 ]
             }
         });
+        chartOptions.yAxis.push({
+            title: {
+                text: 'Hours recorded'
+            },
+            accessibility: {
+                description: 'Total recording time in hours'
+            },
+            opposite: true
+        });
     }
-    chartOptions.yAxis.push({
-        title: {
-            text: 'Hours recorded'
-        },
-        accessibility: {
-            description: 'Total recording time in hours'
-        },
-        opposite: true
-    });
-    if (total && total.length) {
-        chartOptions.yAxis.push(
-            [{
-                title: {text: 'Totals'},
-                accessibility: {description: 'Count of records'}
-            }]
-        );
+    if (rate && Math.max(...rate) > 0) {
         if (aggregation === 'Week') {
             chartOptions.yAxis.push({
                 title: {text: 'Hourly Detection Rate'},
@@ -1364,15 +1358,25 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
             });
         }
     }
-    for (const key in results
-        ) {
+    let hasResults = false;
+    for (const key in results) {
+        hasResults = true;
         chartOptions.series.push({
             name: `Total for ${aggregation} in ` + key,
             pointInterval: pointInterval[aggregation],
             pointStart: pointStart,
             type: 'column',
+            yAxis: chartOptions.yAxis.length,
             data: results[key]
         });
+    }
+    if (hasResults){
+                chartOptions.yAxis.push(
+            {
+                title: {text: 'Detections'},
+                accessibility: {description: 'Count of records'}
+            }
+        );
     }
 
     chartOptions.tooltip = {
