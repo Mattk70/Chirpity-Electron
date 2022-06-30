@@ -1139,6 +1139,7 @@ const getRate = (species) => {
 
 
 async function onChartRequest(args) {
+    console.log(`Getting chart for ${args.species} starting ${args.range[0]}`);
     const dateRange = args.range;
     const dataRecords = {}, results = {};
     t0 = Date.now();
