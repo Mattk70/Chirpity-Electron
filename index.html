@@ -26,179 +26,196 @@
 
 
 <!-- Navigation bar -->
-
-<nav class="pt-0 pb-0 navbar navbar-expand-sm navbar-dark bg-dark position-relative">
-    <!--a class="navbar-brand" href="#">Chirpity</a -->
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
-            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse justify-content-between" id="navbarSupportedContent">
-        <ul class="navbar-nav mr-auto">
-            <li class="nav-item dropdown active">
-                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown"
-                   aria-haspopup="true" aria-expanded="false">
-                    File
-                </a>
-                <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
-                    <a id="open" class="dropdown-item" href="#"><u>O</u>pen Audio File </a>
-                    <a class="dropdown-item disabled" id="saveDetections" href="#">
-                        <u>S</u>ave Detections</a>
-                    <a class="dropdown-item disabled" id="saveLabels" href="#">
-                        Save <u>A</u>udacity Labels</a>
-                    <a class="dropdown-item disabled" id="exportMP3" href="#">
-                        Export Selected Audio</a>
-                    <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="#" id="exit">Exit</a>
-                </div>
-            </li>
-            <li class="nav-item dropdown active">
-                <a class="nav-link dropdown-toggle" href="#" id="navbarRecords" role="button" data-toggle="dropdown"
-                   aria-haspopup="true" aria-expanded="false">
-                    Records
-                </a>
-                <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item" href="#" id="save2db">Save Records</a>
-                    <a class="dropdown-item" href="#" id="charts">View charts</a>
-                    <a class="dropdown-item" href="#" id="explore">Explore records</a>
-                    <a class="dropdown-item" href="#" id="manage">Manage Records</a>
-                </div>
-            </li>
-            <li class="nav-item dropdown active">
-                <a class="nav-link dropdown-toggle" href="#" id="navbarAnalysis" role="button" data-toggle="dropdown"
-                   aria-haspopup="true" aria-expanded="false">
-                    Analysis
-                </a>
-                <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item text-danger" href="#" id="warmup">Model Warming up
-                        <div class="spinner-grow spinner-grow-sm" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
+<div id="navPadding" class="position-absolute top-0 w-100">
+    <nav class="pt-0 pb-0 navbar navbar-expand-sm navbar-dark bg-dark position-relative">
+        <!--a class="navbar-brand" href="#">Chirpity</a -->
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse justify-content-between" id="navbarSupportedContent">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item dropdown active">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button"
+                       data-toggle="dropdown"
+                       aria-haspopup="true" aria-expanded="false">
+                        File
                     </a>
-                    <a class="dropdown-item disabled" href="#" id="analyze">Analyze File</a>
-                    <a class="dropdown-item disabled" href="#" id="analyzeSelection">Analyze Selected Interval</a>
-                    <a class="dropdown-item disabled" href="#" id="analyzeAll">Analyze All Open Files</a>
-                </div>
-            </li>
-            <li class="nav-item dropdown active">
-                <a class="nav-link dropdown-toggle" href="#" id="SettingsDropdown" role="button" data-toggle="dropdown"
-                   aria-haspopup="true" aria-expanded="false">
-                    Settings
-                </a>
-                <div class="dropdown-menu top-level" aria-labelledby="navbarDropdown">
-                    <ul class="nav navbar-nav">
-                        <li class="dropdown-submenu">
-                            <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
-                               aria-haspopup="true" aria-expanded="false"> <span
-                                    class="nav-label">Predictions</span><span class="material-icons-two-tone  arrow">navigate_next</span></a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="#" id="useWhitelist">Use Whitelist
-                                    <span class='material-icons-two-tone tick'>done</span>
-                                </a></li>
-                                <li>
-                                    <div class="dropdown-submenu" aria-labelledby="navbarDropdown">
-                                        <ul class="nav navbar-nav">
-                                            <li class="dropdown-submenu">
-                                                <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
-                                                   aria-haspopup="true" aria-expanded="false"> <span
-                                                        class="nav-label">Batch Size</span><span
-                                                        class="material-icons-two-tone  arrow">navigate_next</span></a>
-                                                <ul class="dropdown-menu">
-                                                    <li><a class="dropdown-item batch" href="#" id="1">1 <span
-                                                            class='material-icons-two-tone tick'>done</span>
-                                                    </a></li>
-                                                    <li><a class="dropdown-item batch" href="#" id="2">2 <span
-                                                            class='material-icons-two-tone tick d-none'>done</span></a></li>
-                                                    <li><a class="dropdown-item batch" href="#" id="3">3 <span
-                                                            class='material-icons-two-tone tick d-none'>done</span></a></li>
-                                                    <li><a class="dropdown-item batch" href="#" id="4">4 <span
-                                                            class='material-icons-two-tone tick d-none'>done</span></a></li>
-                                                    <li><a class="dropdown-item batch" href="#" id="6">6 <span
-                                                            class='material-icons-two-tone tick d-none'>done</span></a></li>
-                                                    <li><a class="dropdown-item batch" href="#" id="8">8 <span
-                                                            class='material-icons-two-tone tick d-none'>done</span></a></li>
-                                                    <li><a class="dropdown-item batch" href="#" id="12">12 <span
-                                                            class='material-icons-two-tone tick d-none'>done</span></a></li>
-                                                    <li><a class="dropdown-item batch" href="#" id="16">16 <span
-                                                            class='material-icons-two-tone tick d-none'>done</span></a></li>
-                                                </ul>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </li>
-                            </ul>
-                        </li>
+                    <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
+                        <a id="open" class="dropdown-item" href="#"><u>O</u>pen Audio File </a>
+                        <a class="dropdown-item disabled" id="saveDetections" href="#">
+                            <u>S</u>ave Detections</a>
+                        <a class="dropdown-item disabled" id="saveLabels" href="#">
+                            Save <u>A</u>udacity Labels</a>
+                        <a class="dropdown-item disabled" id="exportMP3" href="#">
+                            Export Selected Audio</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="#" id="exit">Exit</a>
+                    </div>
+                </li>
+                <li class="nav-item dropdown active">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarRecords" role="button" data-toggle="dropdown"
+                       aria-haspopup="true" aria-expanded="false">
+                        Records
+                    </a>
+                    <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
+                        <a class="dropdown-item" href="#" id="save2db">Save Records</a>
+                        <a class="dropdown-item" href="#" id="charts">View charts</a>
+                        <a class="dropdown-item" href="#" id="explore">Explore records</a>
+                        <a class="dropdown-item" href="#" id="manage">Manage Records</a>
+                    </div>
+                </li>
+                <li class="nav-item dropdown active">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarAnalysis" role="button"
+                       data-toggle="dropdown"
+                       aria-haspopup="true" aria-expanded="false">
+                        Analysis
+                    </a>
+                    <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
+                        <a class="dropdown-item text-danger" href="#" id="warmup">Model Warming up
+                            <div class="spinner-grow spinner-grow-sm" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </a>
+                        <a class="dropdown-item disabled" href="#" id="analyze">Analyze File</a>
+                        <a class="dropdown-item disabled" href="#" id="analyzeSelection">Analyze Selected Interval</a>
+                        <a class="dropdown-item disabled" href="#" id="analyzeAll">Analyze All Open Files</a>
+                    </div>
+                </li>
+                <li class="nav-item dropdown active">
+                    <a class="nav-link dropdown-toggle" href="#" id="SettingsDropdown" role="button"
+                       data-toggle="dropdown"
+                       aria-haspopup="true" aria-expanded="false">
+                        Settings
+                    </a>
+                    <div class="dropdown-menu top-level" aria-labelledby="navbarDropdown">
+                        <ul class="nav navbar-nav">
+                            <li class="dropdown-submenu">
+                                <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
+                                   aria-haspopup="true" aria-expanded="false"> <span
+                                        class="nav-label">Predictions</span><span
+                                        class="material-icons-two-tone  arrow">navigate_next</span></a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" id="useWhitelist">Use Whitelist
+                                        <span class='material-icons-two-tone tick'>done</span>
+                                    </a></li>
+                                    <li>
+                                        <div class="dropdown-submenu" aria-labelledby="navbarDropdown">
+                                            <ul class="nav navbar-nav">
+                                                <li class="dropdown-submenu">
+                                                    <a href="#" class="dropdown-item" data-toggle="dropdown"
+                                                       role="button"
+                                                       aria-haspopup="true" aria-expanded="false"> <span
+                                                            class="nav-label">Batch Size</span><span
+                                                            class="material-icons-two-tone  arrow">navigate_next</span></a>
+                                                    <ul class="dropdown-menu">
+                                                        <li><a class="dropdown-item batch" href="#" id="1">1 <span
+                                                                class='material-icons-two-tone tick'>done</span>
+                                                        </a></li>
+                                                        <li><a class="dropdown-item batch" href="#" id="2">2 <span
+                                                                class='material-icons-two-tone tick d-none'>done</span></a>
+                                                        </li>
+                                                        <li><a class="dropdown-item batch" href="#" id="3">3 <span
+                                                                class='material-icons-two-tone tick d-none'>done</span></a>
+                                                        </li>
+                                                        <li><a class="dropdown-item batch" href="#" id="4">4 <span
+                                                                class='material-icons-two-tone tick d-none'>done</span></a>
+                                                        </li>
+                                                        <li><a class="dropdown-item batch" href="#" id="6">6 <span
+                                                                class='material-icons-two-tone tick d-none'>done</span></a>
+                                                        </li>
+                                                        <li><a class="dropdown-item batch" href="#" id="8">8 <span
+                                                                class='material-icons-two-tone tick d-none'>done</span></a>
+                                                        </li>
+                                                        <li><a class="dropdown-item batch" href="#" id="12">12 <span
+                                                                class='material-icons-two-tone tick d-none'>done</span></a>
+                                                        </li>
+                                                        <li><a class="dropdown-item batch" href="#" id="16">16 <span
+                                                                class='material-icons-two-tone tick d-none'>done</span></a>
+                                                        </li>
+                                                    </ul>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </li>
 
-                        <li class="dropdown-submenu">
-                            <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
-                               aria-haspopup="true" aria-expanded="false"> <span
-                                    class="nav-label">Spectrogram</span><span class="material-icons-two-tone  arrow">navigate_next</span></a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="#" id="loadSpectrogram">Enable
-                                    <span class='material-icons-two-tone tick'>done</span>
-                                </a></li>
-                                <li>
-                                    <div class="dropdown-divider"></div>
-                                </li>
-                                <li>
-                                    <div class="dropdown-submenu" aria-labelledby="navbarDropdown">
-                                        <ul class="nav navbar-nav">
-                                            <li class="dropdown-submenu">
-                                                <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
-                                                   aria-haspopup="true" aria-expanded="false"> <span
-                                                        class="nav-label">Timeline</span><span
-                                                        class="material-icons-two-tone  arrow">navigate_next</span></a>
-                                                <ul class="dropdown-menu">
-                                                    <li><a class="dropdown-item timeline" href="#" id="loadTimeline">Enable
-                                                        <span class='material-icons-two-tone tick'>done</span>
-                                                    </a></li>
-                                                    <li>
-                                                        <div class="dropdown-divider"></div>
-                                                    </li>
-                                                    <li><a class="dropdown-item " href="#" id="timecode">Time Elapsed
-                                                        <span class='material-icons-two-tone tick'>done</span>
-                                                    </a></li>
-                                                    <li><a class="dropdown-item" href="#" id="timeOfDay">
-                                                        Time of Day <span class='material-icons-two-tone tick'>done</span>
-                                                    </a></li>
-                                                </ul>
-                                            </li>
-                                        </ul>
+                            <li class="dropdown-submenu">
+                                <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
+                                   aria-haspopup="true" aria-expanded="false"> <span
+                                        class="nav-label">Spectrogram</span><span
+                                        class="material-icons-two-tone  arrow">navigate_next</span></a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" id="loadSpectrogram">Enable
+                                        <span class='material-icons-two-tone tick'>done</span>
+                                    </a></li>
+                                    <li>
+                                        <div class="dropdown-divider"></div>
+                                    </li>
+                                    <li>
+                                        <div class="dropdown-submenu" aria-labelledby="navbarDropdown">
+                                            <ul class="nav navbar-nav">
+                                                <li class="dropdown-submenu">
+                                                    <a href="#" class="dropdown-item" data-toggle="dropdown"
+                                                       role="button"
+                                                       aria-haspopup="true" aria-expanded="false"> <span
+                                                            class="nav-label">Timeline</span><span
+                                                            class="material-icons-two-tone  arrow">navigate_next</span></a>
+                                                    <ul class="dropdown-menu">
+                                                        <li><a class="dropdown-item timeline" href="#"
+                                                               id="loadTimeline">Enable
+                                                            <span class='material-icons-two-tone tick'>done</span>
+                                                        </a></li>
+                                                        <li>
+                                                            <div class="dropdown-divider"></div>
+                                                        </li>
+                                                        <li><a class="dropdown-item " href="#" id="timecode">Time
+                                                            Elapsed
+                                                            <span class='material-icons-two-tone tick'>done</span>
+                                                        </a></li>
+                                                        <li><a class="dropdown-item" href="#" id="timeOfDay">
+                                                            Time of Day <span
+                                                                class='material-icons-two-tone tick'>done</span>
+                                                        </a></li>
+                                                    </ul>
+                                                </li>
+                                            </ul>
 
 
-                                    </div>
-                                </li>
-                                <li><a class="dropdown-item speccolor disabled" href="#" id="inferno">Colour
-                                    <span class='material-icons-two-tone tick d-none'>done</span>
-                                </a></li>
-                                <li><a class="dropdown-item speccolor disabled" href="#" id="greys">Grayscale
-                                    <span class='material-icons-two-tone tick d-none'>done</span>
-                                </a></li>
-                            </ul>
-                        </li>
-                    </ul>
-                </div>
-            </li>
-            <li class="nav-item dropdown active">
-                <a class="nav-link dropdown-toggle" href="#" id="help" role="button" data-toggle="dropdown"
-                   aria-haspopup="true" aria-expanded="false">
-                    Help
-                </a>
-                <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item" id="usage" href="#">Usage</a>
-                    <a class="dropdown-item" id="settings" href="#">Settings</a>
-                    <a class="dropdown-item" id="keyboard" href="#">Keyboard Shortcuts</a>
-                    <a class="dropdown-item" id="diagnostics" href="#">Diagnostics</a>
-                </div>
-            </li>
-        </ul>
-        <img src="img/logo/chirpity_logo2.png" alt="Chirpity Birdcalls: Identifying birds by sound"
-             height="50px"/>
-    </div>
-</nav>
-
+                                        </div>
+                                    </li>
+                                    <li><a class="dropdown-item speccolor disabled" href="#" id="inferno">Colour
+                                        <span class='material-icons-two-tone tick d-none'>done</span>
+                                    </a></li>
+                                    <li><a class="dropdown-item speccolor disabled" href="#" id="greys">Grayscale
+                                        <span class='material-icons-two-tone tick d-none'>done</span>
+                                    </a></li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+                <li class="nav-item dropdown active">
+                    <a class="nav-link dropdown-toggle" href="#" id="help" role="button" data-toggle="dropdown"
+                       aria-haspopup="true" aria-expanded="false">
+                        Help
+                    </a>
+                    <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
+                        <a class="dropdown-item" id="usage" href="#">Usage</a>
+                        <a class="dropdown-item" id="settings" href="#">Settings</a>
+                        <a class="dropdown-item" id="keyboard" href="#">Keyboard Shortcuts</a>
+                        <a class="dropdown-item" id="diagnostics" href="#">Diagnostics</a>
+                    </div>
+                </li>
+            </ul>
+            <img src="img/logo/chirpity_logo2.png" alt="Chirpity Birdcalls: Identifying birds by sound"
+                 height="50px"/>
+        </div>
+    </nav>
+</div>
 <!-- Content wrapper -->
-<div class="flex-column" id="contentWrapper">
+<div id="contentWrapper">
     <!-- DIV to Hold the bird list (its parking lot!) -->
     <div id="amendSpecies" class="d-none"></div>
 
@@ -356,7 +373,7 @@
     <div class="d-none h-100 overflow-auto p-2" id="recordsContainer">
         <div class="container-fluid">
             <div class="row">
-                <div class="species-selector set-species col-sm-3" >
+                <div class="species-selector set-species col-sm-3">
                     <div id="speciesSearch" class="species-selector set-species">
                         <input type="text" class="input rounded-border" placeholder="Search for a species...">
                         <div class="chart bird-list-wrapper"></div>
