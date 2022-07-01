@@ -265,7 +265,7 @@
     <!-- Explore Div -->
     <div id="exploreWrapper" class="p-2 row g-1 d-none">
         <div class="species-selector set-species col-sm-3" id="exploreSpeciesSearch">
-            <input type="text" class="input rounded-border" placeholder="Search for a species...">
+            <input type="text" class="input rounded-pill" placeholder="Search for a species...">
             <div class="explore bird-list-wrapper"></div>
         </div>
         <div class="col-sm-9 align-middle">
@@ -336,15 +336,15 @@
         <div class="ps-1 row g-1 h-100">
             <div class="col-auto h-100 overflow-auto">
                 <!-- Summary table -->
-                <div class="rounded-border">
+<!--                <div class="rounded-border">-->
                     <div id='summaryTable' style="display:none"></div>
-                </div>
+<!--                </div>-->
             </div>
             <!-- Results table -->
             <div class="col h-100 overflow-auto">
                 <div class="rounded-border">
                     <table id='results' class="table table-hover">
-                        <thead class="bg-dark text-white">
+                        <thead id="resultsHead">
                         <tr>
                             <th>#</th>
                             <th class="timestamp">Time</th>
@@ -358,7 +358,7 @@
                             <th class="text-center">XC</th>
                             <th class="specFeature text-center">Export</th>
                             <th class="text-center speciesExclude d-none">Notes</th>
-                            <th class="specFeature text-center">Amend</th>
+                            <th class="specFeature text-center">Edit</th>
                         </tr>
                         </thead>
                         <tbody class="text-dark" id="resultTableBody">
@@ -375,7 +375,7 @@
             <div class="row">
                 <div class="species-selector set-species col-sm-3">
                     <div id="speciesSearch" class="species-selector set-species">
-                        <input type="text" class="input rounded-border" placeholder="Search for a species...">
+                        <input type="text" class="input rounded-pill" placeholder="Search for a species...">
                         <div class="chart bird-list-wrapper"></div>
                     </div>
                     <div id='dataRecords' class="border border-dark rounded-border d-none">
@@ -420,7 +420,7 @@
                     </div>
                     <div class="row">
                         <div class="col chart-outer">
-                            <div class="border border-dark rounded-border" id="chart-week"></div>
+                            <div class="border border-dark rounded-3" id="chart-week"></div>
                         </div>
                     </div>
                 </div>

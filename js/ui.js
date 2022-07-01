@@ -74,7 +74,7 @@ let bodyElement = $('body');
 let spectrogramWrapper = $('#spectrogramWrapper'), specElement, waveElement, specCanvasElement, specWaveElement;
 let waveCanvasElement, waveWaveElement,
     resultTableElement = $('#resultTableContainer');
-resultTableElement.animate({scrollTop: '300px'}, 400, 'swing' );
+resultTableElement.animate({scrollTop: '300px'}, 400, 'swing');
 let contentWrapperElement = $('#contentWrapper');
 
 let completeDiv = $('#complete');
@@ -481,7 +481,7 @@ navbarAnalysis.addEventListener('click', async () => {
 });
 
 const analyzeLink = document.getElementById('analyze');
-speciesExclude = document.querySelectorAll('speciesExclude');
+//speciesExclude = document.querySelectorAll('speciesExclude');
 analyzeLink.addEventListener('click', async () => {
     refreshResultsView()
     postAnalyzeMessage({confidence: config.minConfidence, resetResults: true, files: [currentFile], selection: false});
@@ -693,7 +693,7 @@ function adjustSpecDims(redraw) {
     if (wavesurfer && redraw) wavesurfer.drawBuffer();
     const exploreWrapperElement = document.getElementById('exploreWrapper');
     const formOffset = exploreWrapperElement.offsetHeight;
-    const specWrapperElement =  document.getElementById('spectrogramWrapper');
+    const specWrapperElement = document.getElementById('spectrogramWrapper');
     const specOffset = specWrapperElement.offsetHeight;
     resultTableElement.height(contentHeight - specOffset - formOffset);
 }
@@ -1079,8 +1079,6 @@ window.onload = async () => {
     $('#year').text(new Date().getFullYear());
     // Put the bird list in its parking lot
     generateBirdList();
-    //chartSearchForm.append(generateBirdList('chart'));
-    //exploreSpeciesSearch.append(generateBirdList('explore'));
     //Cache list elements
     speciesListItems = $('#bird-list li span');
 };
@@ -1157,11 +1155,11 @@ function hideBirdList(el) {
 let restoreSpecies;
 
 $(document).on('click', '.edit', function (e) {
-    const currentRow = e.target.closest('.table-active');
+    const currentRow = e.target.closest('tr');
     let cname = currentRow.querySelector('.cname');
     // save the original species in case edit is aborted or doesn't change species
     restoreSpecies = cname.innerHTML;
-    cname.innerHTML = `<div id='edit' class="species-selector"><input type="text" class="input rounded-border" id="editInput" 
+    cname.innerHTML = `<div id='edit' class="species-selector"><input type="text" class="input rounded-pill" id="editInput" 
                     placeholder="${cname.innerText}"><div class="editing bird-list-wrapper"></div></div>`;
     cname.querySelector('input').focus();
     //getSpeciesIndex(e);
@@ -1212,7 +1210,6 @@ $(document).on('click', '.bird-list', function (e) {
     input.value = speciesLabel;
     const container = this.closest('.species-selector').querySelector('.bird-list-wrapper');
     if (container.classList.contains('editing')) {
-
         let species = e.target.innerText;
         let [cname, sname] = species.split(' - ');
         // Handle animal, vehicle, etc.
@@ -1221,23 +1218,40 @@ $(document).on('click', '.bird-list', function (e) {
         // Move the bird list back to its parking spot before updating the cname cell
         const theList = document.querySelector('#bird-list');
         birdListStore.appendChild(theList);
-        cnameCell.innerHTML = `${cname} <i>${sname}</i>`;
         // Make sure we update the restore species
         restoreSpecies = cnameCell.innerHTML;
-        // Update the name attribute (it must be the first attribute in the tag. Todo: update to use title? attr)
-        cnameCell.attributes[0].value = cname;
-        // Update the row name attr so labels update on the region
-        const currentRow = cnameCell.offsetParent;
-        const nameAttr = currentRow.attributes[0].value.replace(/(.*\|).*/, '$1' + cname);
-        currentRow.attributes[0].value = nameAttr;
-        // Update the database. Note we have already defined cname
-        const [file, start, end,] = nameAttr.split('|');
-        updateRecordID(file, start, end, cname);
-
-        // reflect the change on the spectrogram by simulating a click
-        currentRow.click();
+        cnameCell.innerHTML = `${cname} <i>${sname}</i>`;
+        // Are we batch editing here?
+        const context = cnameCell.closest('table').id;
+        context === 'results' ? editResult(cname, sname, cnameCell) : batchEditResult(cname, sname);
     }
 })
+
+function editResult(cname, sname, cell) {
+    // Update the name attribute (it must be the first attribute in the tag. Todo: update to use title? attr)
+    const [file, start, end, currentRow] = unpackNameAttr(cell, cname);
+    updateRecordID(file, start, end, cname);
+    // reflect the change on the spectrogram by simulating a click
+    currentRow.click();
+}
+
+function batchEditResult(cname, sname) {
+    speciesName.forEach(el => {
+        // Update the row name attr so labels update on the region
+        const [file, start, end, ,] = unpackNameAttr(el, cname);
+        updateRecordID(file, start, end, cname);
+        el.innerHTML = `${cname} <i>${sname}</i>`;
+    })
+}
+
+function unpackNameAttr(el, cname) {
+    const currentRow = el.closest("tr");
+    const nameAttr = currentRow.attributes[0].value.replace(/(.*\|).*/, '$1' + cname);
+    currentRow.attributes[0].value = nameAttr;
+    const [file, start, end,] = nameAttr.split('|');
+    return [file, start, end, currentRow]
+}
+
 
 function updateRecordID(file, start, end, cname) {
     // todo!
@@ -1988,66 +2002,60 @@ async function onPredictionDone(args) {
         summarySorted[item[0]] = item[1]
     })
 
-    let summaryHTML = `<table class="table table-striped table-dark table-hover p-1"><thead class="thead-dark">
+    let summaryHTML = `<table id="resultSummary" class="table table-striped table-dark table-hover p-1"><thead class="thead-dark">
             <tr>
                 <th scope="col">Species</th>
                 <th scope="col" class="text-end">Count</th>
 
-                <th scope="col" class="text-center">Hide</th>
-                <th scope="col" class="text-right">Exclude</th>
+                <th scope="col" class="text-center">Batch Edit</th>
             </tr>
             </thead><tbody>`;
-    let suppression_warning = '';
+
     for (const [key, value] of Object.entries(summarySorted)) {
-        (summary['suppressed'].indexOf(key) !== -1) ? suppression_warning = `
-            <span class="material-icons-two-tone"  style="font-size: 20px" 
-            title="Species suppression may have affected the count.\nRefer to the results table for details.">
-            priority_high</span>` : suppression_warning = '';
         summaryHTML += `<tr>
-                        <td><span class="spinner-border spinner-border-sm text-success d-none" role="status"></span>
-                         <span id="${key}" class="speciesFilter pointer">${key}${suppression_warning}</span>
+                        <td class="cname"><span class="spinner-border spinner-border-sm text-success d-none" role="status"></span>
+                         <span id="${key}" class="speciesFilter pointer">${key}</span>
                         </td>                       
                         <td class="text-end">${value}</td>
-                        <td class="text-center"><span class="spinner-border spinner-border-sm text-danger d-none" role="status"></span>
-                         <span id="${key}" class="material-icons-two-tone align-bottom speciesHide pointer">filter_alt_off</span>
-                        </td> 
-                        <td class="text-center"><span class="spinner-border spinner-border-sm text-danger d-none" role="status"></span>
-                         <span id="${key}" class="material-icons-two-tone align-bottom speciesExclude pointer">clear</span></td></tr>`;
+                        <td class="text-center edit"></span>
+                         <span id="${key}" class="material-icons-two-tone align-bottom pointer">edit</span>
+                        </td> `;
+
     }
     summaryHTML += '</tbody></table>';
     summaryTable.append(summaryHTML);
-    speciesName = document.querySelectorAll('.cname');
+    speciesName = document.querySelectorAll('#results .cname');
     subRows = document.querySelectorAll('.subrow')
     const materialIcons = document.querySelectorAll('.rotate')
     speciesFilter = document.querySelectorAll('.speciesFilter');
-    speciesHide = document.querySelectorAll('.speciesHide');
+    //speciesHide = document.querySelectorAll('.speciesHide');
     speciesExclude = document.querySelectorAll('.speciesExclude');
     speciesExclude.forEach(el => {
         el.classList.remove('d-none');
     })
-    const tableRows = document.querySelectorAll('#results tr');
+    const tableRows = document.querySelectorAll('#results > tbody > tr');
 
-    $(document).on('click', '.speciesHide', function (e) {
-        const spinner = e.target.parentNode.firstChild.classList;
-        spinner.remove('d-none');
-        const targetClass = e.target.classList;
-        targetClass.add('d-none');
-        e.target.parentNode.previousElementSibling.previousElementSibling.children[1].classList.remove('text-success');
-        if (targetClass.contains('text-danger')) {
-            targetClass.remove('text-danger')
-            setTimeout(matchSpecies, 1, e, 'unhide');
-        } else {
-            targetClass.add('text-danger');
-            speciesName.forEach(function (el) {
-                const classes = el.parentNode.classList;
-                if (!classes.contains('hidden')) classes.remove('d-none')
-            })
-            setTimeout(matchSpecies, 1, e, 'hide');
-        }
-        scrollResults(tableRows[0]);
-
-        e.stopImmediatePropagation();
-    });
+    // $(document).on('click', '.speciesHide', function (e) {
+    //     const spinner = e.target.parentNode.firstChild.classList;
+    //     spinner.remove('d-none');
+    //     const targetClass = e.target.classList;
+    //     targetClass.add('d-none');
+    //     e.target.parentNode.previousElementSibling.previousElementSibling.children[1].classList.remove('text-success');
+    //     if (targetClass.contains('text-danger')) {
+    //         targetClass.remove('text-danger')
+    //         setTimeout(matchSpecies, 1, e, 'unhide');
+    //     } else {
+    //         targetClass.add('text-danger');
+    //         speciesName.forEach(function (el) {
+    //             const classes = el.parentNode.classList;
+    //             if (!classes.contains('hidden')) classes.remove('d-none')
+    //         })
+    //         setTimeout(matchSpecies, 1, e, 'hide');
+    //     }
+    //     scrollResults(tableRows[0]);
+    //
+    //     e.stopImmediatePropagation();
+    // });
 
     $(document).on('click', '.speciesExclude', function (e) {
         const spinner = e.target.parentNode.firstChild.classList;
@@ -2064,7 +2072,7 @@ async function onPredictionDone(args) {
         e.stopImmediatePropagation();
     });
     let filterMode = null;
-    speciesName = document.querySelectorAll('.cname');
+
     $(document).on('click', '#confidenceFilter', function (e) {
         if (!filterMode) {
             filterMode = 'guess';
@@ -2089,9 +2097,9 @@ async function onPredictionDone(args) {
         e.stopImmediatePropagation();
     });
     $(document).on('click', '.speciesFilter', function (e) {
-        const spinner = e.target.parentNode.firstChild.classList;
+        const spinner = e.target.previousElementSibling.classList;
         // Remove any exclusion from the species to filter
-        e.target.parentNode.nextElementSibling.nextElementSibling.children[1].classList.remove('text-danger');
+        //e.target.parentNode.nextElementSibling.nextElementSibling.children[1].classList.remove('text-danger');
         const targetClass = e.target.classList;
         if (targetClass.contains('text-success')) {
             // Clicked on filtered species icon
@@ -2101,7 +2109,7 @@ async function onPredictionDone(args) {
                 if (!classes.contains('hidden')) classes.remove('d-none')
             })
         } else {
-            // Clicked on unfiltered species icon
+            // Clicked on unfiltered species name
             speciesFilter.forEach(function (el) {
                 el.classList.remove('text-success');
             })
@@ -2117,7 +2125,7 @@ async function onPredictionDone(args) {
             targetClass.add('d-none');
             spinner.remove('d-none');
             // Allow spinner to show
-            const setDelay = setTimeout(matchSpecies, 1, e, 'filter');
+            setTimeout(matchSpecies, 1, e, 'filter');
         }
         scrollResults(tableRows[0]);
         e.stopImmediatePropagation();
@@ -2136,12 +2144,13 @@ function scrollResults(row) {
     row.classList.add('table-active');
     activeRow = row;
     const container = row.closest('.overflow-auto')
-    container.scrollTop = row.offsetTop - container.offsetTop;
+    container.scrollTop = row.offsetTop - container.offsetTop - document.getElementById('resultsHead').offsetHeight;
 }
 
 function matchSpecies(e, mode) {
+
     const spinner = e.target.parentNode.firstChild.classList;
-    const hideIcon = e.target.closest('tr').getElementsByClassName('speciesHide')[0];
+    //const hideIcon = e.target.closest('tr').getElementsByClassName('speciesHide')[0];
     const targetClass = e.target.classList;
     let resultSpecies, currentRow;
     const tableContext = e.target.closest('table').id;
@@ -2164,7 +2173,7 @@ function matchSpecies(e, mode) {
                 //excludeIcon.classList.remove('text-danger');
             } else if (mode === 'exclude') {
                 if (tableContext !== 'results') {
-                    hideIcon.classList.add('text-danger');
+                    //hideIcon.classList.add('text-danger');
                     classes.add('d-none');
                 }
                 classes.add('strikethrough');
@@ -2197,16 +2206,15 @@ async function renderResult(args) {
             seenTheDarkness = true;
         }
     }
-    let tableRows;
     let tr = '';
     if (index === 1) {
         showElement(['resultTableContainer'], false);
         if (!selection) {
-            tableRows = document.querySelectorAll('#results tr');
+            const tableRows = document.querySelectorAll('#results > tbody > tr');
             // Remove old results
             resultTable.empty();
             summaryTable.empty();
-            scrollResults(tableRows[0]);
+            if (tableRows.length) scrollResults(tableRows[0]);
         } else {
             resultTable.append('<tr><td class="bg-dark text-white text-center" colspan="20"><b>Selection Analysis</b></td></tr>')
         }
@@ -2260,7 +2268,7 @@ async function renderResult(args) {
         const UI_position = new Date(result.position).toISOString().substring(spliceStart, 19);
         // Now we have formatted the fields, and skipped detections as required by nocmig mode, add result to predictions file
         if (selection) {
-            tableRows = document.querySelectorAll('#results tr.top-row');
+            const tableRows = document.querySelectorAll('#results > tbody > tr');
             index = tableRows.length + 1;
         }
         predictions[index] = result;
@@ -2309,7 +2317,7 @@ async function renderResult(args) {
     }
     resultTable.append(tr)
     if (selection) {
-        tableRows = document.querySelectorAll('#results tr.top-row');
+        const tableRows = document.querySelectorAll('#results > tbody > tr');
         scrollResults(tableRows[tableRows.length - 1])
 
     }
@@ -2461,7 +2469,7 @@ function iconizeScore(score) {
 // File menu handling
 const open = document.getElementById('open');
 open.addEventListener('click', function () {
-    const file = showOpenDialog();
+    showOpenDialog();
 });
 
 $('#saveDetections').on('click', function () {
@@ -2506,7 +2514,7 @@ $('#usage').on('click', function () {
     });
 });
 const nocmigButton = document.getElementById('nocmigMode');
-nocmigButton.addEventListener('click', function (e) {
+nocmigButton.addEventListener('click', function () {
     if (config.nocmig) {
         config.nocmig = false;
         $('#timecode').click();
@@ -2622,7 +2630,7 @@ $(function () {
             }
         });
 
-        $(this).on('cancel.daterangepicker', function (ev, picker) {
+        $(this).on('cancel.daterangepicker', function () {
             $(this).children('span').html('Apply a date filter');
             if (worker) {
                 if (this.id === 'chartRange') {

@@ -162,6 +162,7 @@ div#contentWrapper {
     max-height: 320px;
     position:absolute;
     width: 100%;
+    z-index: 10;
 }
 
 .bird-list li a {
@@ -185,7 +186,13 @@ div#contentWrapper {
 }
 
 
-
+#results>thead, #results>th {
+    position: sticky;
+    top:0;
+    color: white;
+    background-color: #1b1e21;
+    z-index: 10;
+}
 
 region.wavesurfer-region:before {
     content: attr(data-region-label);
@@ -313,7 +320,7 @@ footer {
   width: 100%;
 }
 
-/* round table borders*/
+/* round table borders
 
 .rounded-border{
     border-radius: 10px;
@@ -321,4 +328,4 @@ footer {
     overflow: hidden;
 }
 
-
+*/
