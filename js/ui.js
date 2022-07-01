@@ -74,8 +74,9 @@ let bodyElement = $('body');
 let spectrogramWrapper = $('#spectrogramWrapper'), specElement, waveElement, specCanvasElement, specWaveElement;
 let waveCanvasElement, waveWaveElement,
     resultTableElement = $('#resultTableContainer');
+resultTableElement.animate({scrollTop: '300px'}, 400, 'swing' );
 let contentWrapperElement = $('#contentWrapper');
-let exploreWrapperElement = $('#exploreWrapper');
+
 let completeDiv = $('#complete');
 const resultTable = $('#resultTableBody')
 const summaryTable = $('#summaryTable');
@@ -607,6 +608,7 @@ chartsLink.addEventListener('click', async () => {
 const exploreLink = document.getElementById('explore');
 exploreLink.addEventListener('click', async () => {
     hideAll();
+    let exploreWrapperElement = $('#exploreWrapper');
     showElement(['exploreWrapper'], false);
     resultTableElement.height(contentWrapperElement.height()
         - spectrogramWrapper.height()
@@ -631,26 +633,14 @@ function createRegion(start, end, label) {
 
 const tbody = document.getElementById('resultTableBody')
 tbody.addEventListener('click', function (e) {
-    if (activeRow)  activeRow.classList.remove('table-active')
+    if (activeRow) activeRow.classList.remove('table-active')
     const row = e.target.closest('tr');
-    row.classList.add('table-active');
-    activeRow = row;
-    activeRow.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest'
-    })
+    scrollResults(row);
     loadResultRegion(row.attributes[0].value.split('|'));
 })
 
 tbody.addEventListener('dblclick', function (e) {
-    if (activeRow) activeRow.classList.remove('table-active')
     const row = e.target.closest('tr');
-    row.classList.add('table-active');
-    activeRow = row;
-    activeRow.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest'
-    })
     row.querySelector('.edit').click();
 })
 
@@ -701,10 +691,11 @@ function adjustSpecDims(redraw) {
         $('.spec-labels').width('55px')
     }
     if (wavesurfer && redraw) wavesurfer.drawBuffer();
-    resultTableElement.height(contentHeight
-        - specHeight
-        - Math.max(exploreWrapperElement.height(), 0)
-    );
+    const exploreWrapperElement = document.getElementById('exploreWrapper');
+    const formOffset = exploreWrapperElement.offsetHeight;
+    const specWrapperElement =  document.getElementById('spectrogramWrapper');
+    const specOffset = specWrapperElement.offsetHeight;
+    resultTableElement.height(contentHeight - specOffset - formOffset);
 }
 
 // Fix table head
@@ -2053,10 +2044,8 @@ async function onPredictionDone(args) {
             })
             setTimeout(matchSpecies, 1, e, 'hide');
         }
-        tableRows[0].scrollIntoView({
-            behavior: 'smooth',
-            block: 'nearest'
-        })
+        scrollResults(tableRows[0]);
+
         e.stopImmediatePropagation();
     });
 
@@ -2130,10 +2119,7 @@ async function onPredictionDone(args) {
             // Allow spinner to show
             const setDelay = setTimeout(matchSpecies, 1, e, 'filter');
         }
-        tableRows[0].scrollIntoView({
-            behavior: 'smooth',
-            block: 'nearest'
-        })
+        scrollResults(tableRows[0]);
         e.stopImmediatePropagation();
     });
 
@@ -2144,6 +2130,13 @@ async function onPredictionDone(args) {
 
     //show summary table
     //summaryButton.click();
+}
+
+function scrollResults(row) {
+    row.classList.add('table-active');
+    activeRow = row;
+    const container = row.closest('.overflow-auto')
+    container.scrollTop = row.offsetTop - container.offsetTop;
 }
 
 function matchSpecies(e, mode) {
@@ -2161,14 +2154,14 @@ function matchSpecies(e, mode) {
     }
     resultSpecies.forEach(function (el) {
         const classes = el.parentNode.classList;
-        const excludeIcon = el.parentNode.getElementsByClassName('speciesExclude')[0];
+        //const excludeIcon = el.parentNode.getElementsByClassName('speciesExclude')[0];
         const index = el.parentNode.firstElementChild.innerText;
         // Extract species common name from cell
         const searchFor = el.innerHTML.split('\n')[0];
         if (searchFor === e.target.id || tableContext === 'results') {
             if (mode === 'filter' || mode === 'unhide') {
                 classes.remove('d-none', 'hidden');
-                excludeIcon.classList.remove('text-danger');
+                //excludeIcon.classList.remove('text-danger');
             } else if (mode === 'exclude') {
                 if (tableContext !== 'results') {
                     hideIcon.classList.add('text-danger');
@@ -2176,11 +2169,11 @@ function matchSpecies(e, mode) {
                 }
                 classes.add('strikethrough');
                 // add state to predictions
-                excludeIcon.classList.add('text-danger');
+                //excludeIcon.classList.add('text-danger');
                 predictions[index].excluded = true;
             } else if (mode === 'unexclude') {
                 classes.remove('strikethrough');
-                excludeIcon.classList.remove('text-danger');
+                //excludeIcon.classList.remove('text-danger');
                 predictions[index].excluded = false;
             } else classes.add('d-none', 'hidden'); // mode == hide
         } else if (mode === 'filter') classes.add('d-none');
@@ -2213,7 +2206,7 @@ async function renderResult(args) {
             // Remove old results
             resultTable.empty();
             summaryTable.empty();
-            tableRows[0].scrollIntoView({behavior: 'smooth', block: 'nearest'})
+            scrollResults(tableRows[0]);
         } else {
             resultTable.append('<tr><td class="bg-dark text-white text-center" colspan="20"><b>Selection Analysis</b></td></tr>')
         }
@@ -2317,7 +2310,8 @@ async function renderResult(args) {
     resultTable.append(tr)
     if (selection) {
         tableRows = document.querySelectorAll('#results tr.top-row');
-        tableRows[tableRows.length - 1].scrollIntoView({behavior: 'smooth', block: 'nearest'})
+        scrollResults(tableRows[tableRows.length - 1])
+
     }
     // Show the alternate detections toggle:
     if (result.score2 > 0.2) {

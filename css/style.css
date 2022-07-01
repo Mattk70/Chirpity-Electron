@@ -123,6 +123,9 @@ span[id^="filename_"] {
 div#contentWrapper {
     background: #dbe2ed url(../img/Redwing-flight.png);
     background-size: cover;
+    position: absolute;
+    top: 50px;
+    width: 100%;
 }
 
 .zoom {
@@ -303,7 +306,7 @@ region.wavesurfer-region[data-region-highlight] {
 
 
 footer {
-  position: absolute;
+  position: fixed;
   bottom: 0;
   height: 30px;
   text-align: center;
