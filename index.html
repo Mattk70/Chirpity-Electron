@@ -217,7 +217,8 @@
 <!-- Content wrapper -->
 <div id="contentWrapper">
     <!-- DIV to Hold the bird list (its parking lot!) -->
-    <div id="amendSpecies" class="d-none"></div>
+    <div id="allSpecies" class="d-none"></div>
+    <div id="seenSpecies" class="d-none"></div>
 
     <!-- Diagnostic Modal -->
     <div class="modal fade" id="diagnosticsModal" tabindex="-1" aria-labelledby="diagnosticsModalLabel"
@@ -373,7 +374,7 @@
     <div class="d-none h-100 overflow-auto p-2" id="recordsContainer">
         <div class="container-fluid">
             <div class="row">
-                <div class="species-selector set-species col-sm-3">
+                <div class="set-species col-sm-3">
                     <div id="speciesSearch" class="species-selector set-species">
                         <input type="text" class="input rounded-pill" placeholder="Search for a species...">
                         <div class="chart bird-list-wrapper"></div>

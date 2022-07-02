@@ -600,6 +600,7 @@ save2dbLink.addEventListener('click', async () => {
 
 const chartsLink = document.getElementById('charts');
 chartsLink.addEventListener('click', async () => {
+    worker.postMessage({action: 'get-detected-species'});
     hideAll();
     showElement(['recordsContainer']);
     worker.postMessage({action: 'chart', species: undefined, range: {}});
@@ -607,12 +608,10 @@ chartsLink.addEventListener('click', async () => {
 
 const exploreLink = document.getElementById('explore');
 exploreLink.addEventListener('click', async () => {
+    worker.postMessage({action: 'get-detected-species'});
     hideAll();
-    let exploreWrapperElement = $('#exploreWrapper');
-    showElement(['exploreWrapper'], false);
-    resultTableElement.height(contentWrapperElement.height()
-        - spectrogramWrapper.height()
-        - exploreWrapperElement.height());
+    showElement(['exploreWrapper', 'spectrogramWrapper'], false);
+    adjustSpecDims(true);
 });
 
 
@@ -635,8 +634,12 @@ const tbody = document.getElementById('resultTableBody')
 tbody.addEventListener('click', function (e) {
     if (activeRow) activeRow.classList.remove('table-active')
     const row = e.target.closest('tr');
-    scrollResults(row);
+    row.classList.add('table-active');
+    activeRow = row;
     loadResultRegion(row.attributes[0].value.split('|'));
+    // if (!onScreen(row)) {
+    //     scrollResults(row);
+    // }
 })
 
 tbody.addEventListener('dblclick', function (e) {
@@ -671,30 +674,35 @@ function loadResultRegion(paramlist) {
 function adjustSpecDims(redraw) {
     contentWrapperElement.height(bodyElement.height() - 80);
     const contentHeight = contentWrapperElement.height();
-    const specHeight = spectrogramWrapper.hasClass('d-none') ? 0 : Math.min(contentHeight * 0.4, 512);
-    if (currentFile) {
-        // Expand up to 512px
-        spectrogramWrapper.height(specHeight + 21 + 46.84);
-        if (!wavesurfer) {
-            initWavesurfer({
-                'audio': currentBuffer,
-                'backend': 'WebAudio',
-                'alpha': 0,
-                'height': specHeight,
-                'reset': false
-            });
-        }
-        wavesurfer.setHeight(specHeight);
-        initSpectrogram(specHeight);
-        specCanvasElement.width('100%');
-        specElement.css('z-index', 0);
-        $('.spec-labels').width('55px')
-    }
-    if (wavesurfer && redraw) wavesurfer.drawBuffer();
     const exploreWrapperElement = document.getElementById('exploreWrapper');
     const formOffset = exploreWrapperElement.offsetHeight;
     const specWrapperElement = document.getElementById('spectrogramWrapper');
-    const specOffset = specWrapperElement.offsetHeight;
+    let specOffset;
+    if (!spectrogramWrapper.hasClass('d-none')) {
+        const specHeight = Math.min(contentHeight * 0.4, 512);
+        specOffset = specWrapperElement.offsetHeight;
+        if (currentFile) {
+            // Expand up to 512px
+            spectrogramWrapper.height(specHeight + 21 + 46.84);
+            if (!wavesurfer) {
+                initWavesurfer({
+                    'audio': currentBuffer,
+                    'backend': 'WebAudio',
+                    'alpha': 0,
+                    'height': specHeight,
+                    'reset': false
+                });
+            }
+            wavesurfer.setHeight(specHeight);
+            initSpectrogram(specHeight);
+            specCanvasElement.width('100%');
+            specElement.css('z-index', 0);
+            $('.spec-labels').width('55px')
+        }
+        if (wavesurfer && redraw) wavesurfer.drawBuffer();
+    } else {
+        specOffset = 0
+    }
     resultTableElement.height(contentHeight - specOffset - formOffset);
 }
 
@@ -1038,6 +1046,9 @@ window.onload = async () => {
                 case 'model-ready':
                     onModelReady(args);
                     break;
+                case 'seen-species-list':
+                    generateBirdList('seenSpecies', args.list);
+                    break;
                 case 'prediction-done':
                     onPredictionDone(args);
                     break;
@@ -1078,42 +1089,52 @@ window.onload = async () => {
     // Set footer year
     $('#year').text(new Date().getFullYear());
     // Put the bird list in its parking lot
-    generateBirdList();
+    generateBirdList('allSpecies');
     //Cache list elements
     speciesListItems = $('#bird-list li span');
 };
 
 
-function generateBirdList() {
-    let listHTML = '<div id="bird-list" class="d-none"><div class="rounded-border"><ul class="bird-list request-bird">'
-    listHTML += `
+function generateBirdList(store, rows) {
+    let listHTML;
+    if (store === 'allSpecies') {
+        listHTML = `
+            <div class="bird-list all"><div class="rounded-border"><ul>
             <li><a href="#">Animal</a></li>
             <li><a href="#">Ambient Noise</a></li>
             <li><a href="#">Human</a></li>
             <li><a href="#">Vehicle</a></li>`;
-    const excluded = new Set(['human', 'vehicles', 'animals', 'No call']);
-    for (const item in labels) {
-        const [sname, cname] = labels[item].split('_');
-        if (!excluded.has(cname)) {
-            listHTML += `<li><a href="#">${cname} - ${sname}</a></li>`;
+        const excluded = new Set(['human', 'vehicles', 'animals', 'No call']);
+        for (const item in labels) {
+            const [sname, cname] = labels[item].split('_');
+            if (!excluded.has(cname)) {
+                listHTML += `<li><a href="#">${cname} - ${sname}</a></li>`;
+            }
+        }
+    } else {
+        listHTML = '<div class="bird-list seen"><div class="rounded-border"><ul class="request-bird">';
+        for (const item in rows) {
+            listHTML += `<li><a href="#">${rows[item].cname} - ${rows[item].sname}</a></li>`;
         }
     }
+    const parking = document.getElementById(store);
     listHTML += '</ul></div></div>';
-    birdListStore.innerHTML = listHTML;
+    parking.innerHTML = listHTML;
 }
 
 // Search list handlers
-const birdListStore = document.getElementById('amendSpecies');
+const fullListStore = document.getElementById('allSpecies');
+const seenListStore = document.getElementById('seenSpecies');
 
 $(document).on('focus', '.input', function () {
     document.removeEventListener('keydown', handleKeyDown, true);
-    const theList = document.querySelector('#bird-list')
-    const container = this.parentNode.querySelector('.bird-list-wrapper');
-    container.appendChild(theList);
+        const container = this.parentNode.querySelector('.bird-list-wrapper');
     if (container.classList.contains('editing')) {
-        container.querySelector('ul').classList.remove('request-bird');
+        const theList = document.querySelector('#allSpecies .bird-list')
+        container.appendChild(theList);
     } else {
-        container.querySelector('ul').classList.add('request-bird');
+        const theList = document.querySelector('#seenSpecies .bird-list')
+        container.appendChild(theList);
     }
     if (this.id === "speciesSearch") hideElement(['dataRecords']);
 
@@ -1126,13 +1147,15 @@ $(document).on('blur', '.input', function () {
 })
 
 function hideBirdList(el) {
-    const list = el.querySelector('#bird-list');
+    const list = el.querySelector('.bird-list');
     const container = el.closest('.species-selector').querySelector('.bird-list-wrapper');
     // Move the bird list back to its parking spot before updating the cname cell
-    if (list) birdListStore.appendChild(list);
     if (container.classList.contains('editing')) {
+        if (list) fullListStore.appendChild(list);
         const cnameCell = el.closest('.cname');
         if (cnameCell) cnameCell.innerHTML = restoreSpecies;
+    } else {
+        if (list) seenListStore.appendChild(list);
     }
 }
 
@@ -1178,7 +1201,7 @@ function filterList(input) {
     const filter = input.value.toUpperCase();
     const ul = input.parentNode.querySelector("ul");
     const li = ul.getElementsByTagName('li');
-    const theList = document.querySelector('#bird-list')
+    const theList = document.querySelector('.bird-list')
     theList.classList.remove('d-none');
     // Loop through all list items, and hide those who don't match the search query
     for (let i = 0; i < li.length; i++) {
@@ -1216,18 +1239,18 @@ $(document).on('click', '.bird-list', function (e) {
         if (!sname) sname = cname;
         const cnameCell = this.closest('.cname');
         // Move the bird list back to its parking spot before updating the cname cell
-        const theList = document.querySelector('#bird-list');
-        birdListStore.appendChild(theList);
+        const theList = document.querySelector('.bird-list.all');
+        fullListStore.appendChild(theList);
         // Make sure we update the restore species
         restoreSpecies = cnameCell.innerHTML;
-        cnameCell.innerHTML = `${cname} <i>${sname}</i>`;
         // Are we batch editing here?
         const context = cnameCell.closest('table').id;
-        context === 'results' ? editResult(cname, sname, cnameCell) : batchEditResult(cname, sname);
+        context === 'results' ? editResult(cname, sname, cnameCell) : batchEditResult(cname, sname, cnameCell);
     }
 })
 
 function editResult(cname, sname, cell) {
+    cell.innerHTML = `${cname} <i>${sname}</i>`;
     // Update the name attribute (it must be the first attribute in the tag. Todo: update to use title? attr)
     const [file, start, end, currentRow] = unpackNameAttr(cell, cname);
     updateRecordID(file, start, end, cname);
@@ -1235,7 +1258,9 @@ function editResult(cname, sname, cell) {
     currentRow.click();
 }
 
-function batchEditResult(cname, sname) {
+function batchEditResult(cname, sname, cell) {
+    cell.innerHTML = `<span class="spinner-border spinner-border-sm text-success d-none" role="status"></span>
+    <span id="${cname} ${sname}" class="speciesFilter pointer">${cname} <i>${sname}</i></span>`;
     speciesName.forEach(el => {
         // Update the row name attr so labels update on the region
         const [file, start, end, ,] = unpackNameAttr(el, cname);
@@ -2097,10 +2122,12 @@ async function onPredictionDone(args) {
         e.stopImmediatePropagation();
     });
     $(document).on('click', '.speciesFilter', function (e) {
-        const spinner = e.target.previousElementSibling.classList;
+        // Check if italic section was clicked
+        const target = e.target.tagName === 'i' ? e.target.parentNode : e.target;
+        const spinner = target.previousElementSibling.classList;
         // Remove any exclusion from the species to filter
         //e.target.parentNode.nextElementSibling.nextElementSibling.children[1].classList.remove('text-danger');
-        const targetClass = e.target.classList;
+        const targetClass = target.classList;
         if (targetClass.contains('text-success')) {
             // Clicked on filtered species icon
             targetClass.remove('text-success')
@@ -2127,7 +2154,8 @@ async function onPredictionDone(args) {
             // Allow spinner to show
             setTimeout(matchSpecies, 1, e, 'filter');
         }
-        scrollResults(tableRows[0]);
+        //scrollResults(tableRows[0]);
+        document.getElementById('results').scrollTop = 0;
         e.stopImmediatePropagation();
     });
 
@@ -2137,7 +2165,7 @@ async function onPredictionDone(args) {
     diagnostics['Analysis Rate'] = (diagnostics['Audio Duration'] / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
 
     //show summary table
-    //summaryButton.click();
+    if (summaryButton.innerText.indexOf('Show') !== -1) summaryButton.click();
 }
 
 function scrollResults(row) {
@@ -2161,13 +2189,15 @@ function matchSpecies(e, mode) {
     } else {
         resultSpecies = speciesName;
     }
+    // What are we looking for?
+    const lookup = e.target.innerText;
     resultSpecies.forEach(function (el) {
         const classes = el.parentNode.classList;
         //const excludeIcon = el.parentNode.getElementsByClassName('speciesExclude')[0];
         const index = el.parentNode.firstElementChild.innerText;
-        // Extract species common name from cell
-        const searchFor = el.innerHTML.split('\n')[0];
-        if (searchFor === e.target.id || tableContext === 'results') {
+        // Extract species name from cell
+        const searchFor = el.innerText;
+        if (searchFor === lookup || tableContext === 'results') {
             if (mode === 'filter' || mode === 'unhide') {
                 classes.remove('d-none', 'hidden');
                 //excludeIcon.classList.remove('text-danger');
@@ -2210,11 +2240,11 @@ async function renderResult(args) {
     if (index === 1) {
         showElement(['resultTableContainer'], false);
         if (!selection) {
-            const tableRows = document.querySelectorAll('#results > tbody > tr');
+            //const tableRows = document.querySelectorAll('#results > tbody > tr');
             // Remove old results
             resultTable.empty();
             summaryTable.empty();
-            if (tableRows.length) scrollResults(tableRows[0]);
+            //if (!onScreen(tableRows[0])) scrollResults(tableRows[0]);
         } else {
             resultTable.append('<tr><td class="bg-dark text-white text-center" colspan="20"><b>Selection Analysis</b></td></tr>')
         }
@@ -2242,11 +2272,12 @@ async function renderResult(args) {
                                     </td></tr>`);
             shownDaylightBanner = true;
         }
-        if (result.cname in summary) {
+        const key = `${result.cname} ${result.sname}`;
+        if (key in summary) {
             if (result)
-                summary[result.cname] += 1
+                summary[key] += 1
         } else {
-            summary[result.cname] = 1
+            summary[key] = 1
         }
         if (result.suppressed === 'text-danger') summary['suppressed'].push(result.cname);
         const start = result.start, end = result.end;
@@ -2298,7 +2329,6 @@ async function renderResult(args) {
                 <td><a href='https://xeno-canto.org/explore?query=${result.sname2}%20type:nocturnal' target=\"_blank\">
                     <img src='img/logo/XC.png' alt='Search ${result.cname2} on Xeno Canto' title='${result.cname2} NFCs on Xeno Canto'></a> </td>
                 <td class='specFeature'> </td>
-                <td class='specFeature speciesExclude d-none'> </td>
                 <td class='specFeature'> </td>
                </tr>`;
             if (result.score3 > 0.2) {
@@ -2309,7 +2339,6 @@ async function renderResult(args) {
                     <td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:nocturnal' target=\"_blank\">
                         <img src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>
                     <td class='specFeature'> </td>
-                    <td class='specFeature speciesExclude d-none'> </td>
                     <td class='specFeature'> </td>
                    </tr>`;
             }
@@ -2342,7 +2371,7 @@ function getSpeciesIndex(e) {
 const summaryButton = document.getElementById('showSummary');
 summaryButton.addEventListener('click', () => {
     summaryTable.animate({width: 'toggle'});
-    summaryButton.innerText === 'Show Summary' ?
+    summaryButton.innerText.indexOf('Show') !== -1 ?
         summaryButton.innerText = 'Hide Summary' :
         summaryButton.innerText = 'Show Summary';
 });
@@ -2644,3 +2673,14 @@ $(function () {
         });
     })
 });
+
+// Check if element is on the screen
+function onScreen(el) {
+    const resultTable = document.getElementById('results');
+    const ViewTop = resultTable.scrollTop;
+    const ViewBottom = resultTableElement.height();
+    const elemTop = el.offsetTop;
+    const elemBottom = elemTop + el.offsetHeight;
+
+    return ((elemBottom <= ViewBottom) && (elemTop >= ViewTop));
+}
