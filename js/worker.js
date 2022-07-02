@@ -130,6 +130,9 @@ ipcRenderer.on('new-client', (event) => {
         const action = args.action;
         console.log('message received ', action)
         switch (action) {
+            case 'get-detected-species':
+                getSpecies()
+                break;
             case 'clear-cache':
                 console.log('cache')
                 await clearCache();
@@ -929,8 +932,8 @@ const getCachedResults = (args) => {
     let where;
     const dateRange = args.range;
     if (args.file) where = `files.name =  '${args.file}'`;
-    if (args.species) where = `s1.cname =  '${args.species}'`;
-    const when = dateRange.start ? `AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}`: '';
+    if (args.species) where = `s1.cname =  '${args.species.replace("'", "''")}'`;
+    const when = dateRange.start ? `AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
     return new Promise(function (resolve, reject) {
         db.all(`SELECT dateTime AS timestamp, position AS position, 
             s1.cname as cname, s2.cname as cname2, s3.cname as cname3, 
@@ -949,7 +952,8 @@ const getCachedResults = (args) => {
                 LEFT JOIN species s3 on s3.id = birdid3 
                 INNER JOIN files on files.rowid = records.fileid 
                 WHERE
-                ${where} ${when}`,
+                ${where}
+                ${when}`,
             (err, rows) => {
                 if (err) {
                     reject(err)
@@ -1137,9 +1141,20 @@ const getRate = (species) => {
     })
 }
 
+const getSpecies = () => {
+    db.all('SELECT DISTINCT cname, sname FROM records INNER JOIN species ON birdid1 = id ORDER BY cname',
+        (err, rows) => {
+            if (err) console.log(err);
+            else {
+                UI.postMessage({event: 'seen-species-list', list: rows})
+            }
+        })
+}
 
 async function onChartRequest(args) {
     console.log(`Getting chart for ${args.species} starting ${args.range[0]}`);
+    // Escape apostrophes
+    if (args.species) args.species = args.species.replace("'", "''");
     const dateRange = args.range;
     const dataRecords = {}, results = {};
     t0 = Date.now();
@@ -1208,7 +1223,8 @@ async function onChartRequest(args) {
     const pointStart = dateRange.start ? dateRange.start : Date.UTC(2020, 0, 0, 0, 0, 0);
     UI.postMessage({
         event: 'chart-data',
-        species: args.species,
+        // Restore species name
+        species:  args.species ? args.species.replace("''", "'"):undefined,
         results: results,
         rate: rate,
         total: total,
