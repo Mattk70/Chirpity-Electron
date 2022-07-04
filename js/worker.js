@@ -1159,6 +1159,8 @@ const getSpecies = () => {
 
 const onUpdateComment = (args) => {
     let file = args.file, start = args.start, comment = args.comment;
+    // Sanitize input
+    comment = comment.replace("'", "''");
     if (!comment) comment = 'null';
     const dateTime = metadata[file].fileStart + (start * 1000);
     return new Promise(function (resolve, reject) {
