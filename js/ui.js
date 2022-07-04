@@ -2389,8 +2389,8 @@ function addNoteEvents() {
     })
 
     $(document).on('mouseleave', '.notes', function (e) {
-        const hasComment = e.target.querySelector('span.edit-comment');
-        if (hasComment !== null) return;
+        const hasComment = e.target.innerText === 'comment' ? true : false;
+        if (hasComment) return;
         this.innerHTML = '<span title="Add a note" class="material-icons-two-tone pointer add-comment d-none">add_comment</span>';
     })
 }
