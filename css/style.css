@@ -48,7 +48,7 @@ html, body {
     vertical-align: top;
 }
 
-.inner {
+#spectrogram {
     position: absolute;
     width: 100%;
 }
@@ -115,10 +115,6 @@ span[id^="filename_"] {
     z-index: 6;
 }
 
-#transport-controls {
-    position: absolute;
-    z-index: 7;
-}
 
 div#contentWrapper {
     background: #dbe2ed url(../img/Redwing-flight.png);
@@ -134,7 +130,6 @@ div#contentWrapper {
 
 .species-selector{
     position: relative;
-    z-index: 100;
 }
 
 .input {
@@ -191,7 +186,6 @@ ul {
     top:0;
     color: white;
     background-color: #1b1e21;
-    z-index: 10;
 }
 
 region.wavesurfer-region:before {
