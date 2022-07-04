@@ -1128,7 +1128,7 @@ const seenListStore = document.getElementById('seenSpecies');
 
 $(document).on('focus', '.input', function () {
     document.removeEventListener('keydown', handleKeyDown, true);
-        const container = this.parentNode.querySelector('.bird-list-wrapper');
+    const container = this.parentNode.querySelector('.bird-list-wrapper');
     if (container.classList.contains('editing')) {
         const theList = document.querySelector('#allSpecies .bird-list')
         container.appendChild(theList);
@@ -2287,9 +2287,6 @@ async function renderResult(args) {
         if (result.score < 0.65) {
             confidence = '&#63;';
         }
-        feedback_icons = `<!-- <span class='material-icons-two-tone feedback pointer'>comment</span>-->
-                              <span class='material-icons-two-tone edit pointer'>edit</span>`;
-        result.suppressed ? icon_text = `sync_problem` : icon_text = 'sync';
         result.date = result.timestamp;
         const timestamp = result.timestamp.toString().split(' ');
         const UI_timestamp = `${timestamp[2]} ${timestamp[1]} ${timestamp[3].substring(2)}<br/>${timestamp[4]}`;
@@ -2311,15 +2308,15 @@ async function renderResult(args) {
             <th scope='row'>${index}</th><td class='text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-end">${UI_position}</td><td name="${result.cname}" class='flex-shrink-0 cname'>${result.cname}
                 <i>${result.sname}</i></td><td class='text-center'>${iconizeScore(result.score)}</td>
-            <td class='text-center'><span id='${index}' title="Click for additional detections" class='material-icons-two-tone rotate pointer d-none'>${icon_text}</span></td>
+            <td class='text-center'><span id='${index}' title="Click for additional detections" class='material-icons-two-tone rotate pointer d-none'>sync</span></td>
             <td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
             <td class='text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
             <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
             <td class='specFeature text-center download'><span class='material-icons-two-tone pointer'>file_download</span></td>
 <!--             <td class="text-center speciesExclude d-none"><span class="spinner-border spinner-border-sm text-danger d-none" role="status"></span>-->
 <!--                 <span class="material-icons-two-tone align-bottom pointer">clear</span></td>-->
-    <td></td>
-            <td id="${index}" class='specFeature text-center'>${feedback_icons}</td>
+    <td class="notes"><span class='material-icons-two-tone pointer d-none add-comment'>add_comment</span></td>
+            <td id="${index}" class='specFeature text-center'><span title="Add a note" class='material-icons-two-tone edit pointer'>edit</span></td>
         </tr>`;
         if (result.score2 > 0.2) {
             tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" id='subrow${index}' class='subrow d-none'>
@@ -2357,9 +2354,50 @@ async function renderResult(args) {
     if (!config.spectrogram) $('.specFeature').hide();
 }
 
+// Comment handling
+
 $(document).on('click', '.material-icons', function () {
     $(this).toggleClass("down");
 })
+
+$(document).on('click', '.add-comment, .edit-comment', function (e) {
+    const note = e.target.title === "Add a note" ? '' : e.target.title;
+    $(document).off('mouseleave', '.notes');
+    $(document).off('mouseenter', '.notes');
+    document.removeEventListener('keydown', handleKeyDown, true);
+    this.parentNode.innerHTML = `<textarea class="h-100 rounded-3 comment-textarea" placeholder="Enter notes...">${note}</textarea>`;
+    document.addEventListener('keydown', function (e) {
+        if (e.code === 'Enter') {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const note = e.target.value;
+            if (note) {
+                e.target.parentNode.innerHTML = `<span title="${note}" class="material-icons-two-tone pointer edit-comment">comment</span>`;
+                // todo: update note in record db, handle note retrieval in explore records
+            } else {
+                // todo: remove note from record db
+                e.target.parentNode.innerHTML = '<span title="Add a note" class="material-icons-two-tone pointer add-comment">add_comment</span>';
+            }
+            addNoteEvents();
+            document.addEventListener('keydown', handleKeyDown, true);
+        }
+    })
+})
+
+function addNoteEvents() {
+    $(document).on('mouseenter', '.notes', function () {
+
+        $(this).children('span.add-comment').removeClass("d-none");
+    })
+
+    $(document).on('mouseleave', '.notes', function (e) {
+        const hasComment = e.target.querySelector('span.edit-comment');
+        if (hasComment !== null) return;
+        this.innerHTML = '<span title="Add a note" class="material-icons-two-tone pointer add-comment d-none">add_comment</span>';
+    })
+}
+
+addNoteEvents();
 
 // Results event handlers
 

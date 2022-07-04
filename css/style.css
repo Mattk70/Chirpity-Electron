@@ -149,7 +149,7 @@ div#contentWrapper {
 }
 
 
-.bird-list {
+ul {
     /* Remove default list styling */
     list-style-type: none;
     padding: 0;
@@ -159,7 +159,7 @@ div#contentWrapper {
 
 .bird-list-wrapper{
     overflow: auto;
-    max-height: 320px;
+    max-height: 250px;
     position:absolute;
     width: 100%;
     z-index: 10;
@@ -171,7 +171,7 @@ div#contentWrapper {
     background-color: #f6f6f6; /* Grey background color */
     padding: 10px; /* Add some padding */
     text-decoration: none; /* Remove default text underline */
-    font-size: 18px; /* Increase the font-size */
+    font-size: 14px; /* Increase the font-size */
     color: black; /* Add a black text color */
     display: block; /* Make it into a block element to fill the whole list */
 }
@@ -327,5 +327,10 @@ footer {
     margin-top: 1px;
     overflow: hidden;
 }
-
 */
+
+/* Flip comment icons */
+
+.add-comment, .edit-comment{
+    transform: scaleX(-1);
+}
