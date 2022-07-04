@@ -641,11 +641,11 @@ tbody.addEventListener('click', function (e) {
     //     scrollResults(row);
     // }
 })
-
-tbody.addEventListener('dblclick', function (e) {
-    const row = e.target.closest('tr');
-    row.querySelector('.edit').click();
-})
+//
+// tbody.addEventListener('dblclick', function (e) {
+//     const row = e.target.closest('tr');
+//     row.querySelector('.edit').click();
+// })
 
 function loadResultRegion(paramlist) {
     // Accepts global start and end timecodes from model detections
@@ -1178,18 +1178,21 @@ function hideBirdList(el) {
 let restoreSpecies;
 
 $(document).on('click', '.edit', function (e) {
+    editID(e)
+});
+$(document).on('dblclick', '.cname', function (e) {
+    editID(e)
+});
+
+function editID(e) {
+    e.stopImmediatePropagation();
     const currentRow = e.target.closest('tr');
     let cname = currentRow.querySelector('.cname');
     // save the original species in case edit is aborted or doesn't change species
     restoreSpecies = cname.innerHTML;
     cname.innerHTML = `<div id='edit' class="species-selector"><input type="text" class="input rounded-pill" id="editInput" 
                     placeholder="${cname.innerText}"><div class="editing bird-list-wrapper"></div></div>`;
-    cname.querySelector('input').focus();
-    //getSpeciesIndex(e);
-    //findSpecies();
-    //e.stopImmediatePropagation();
-
-});
+}
 
 // Bird list filtering
 $(document).on('keyup', '.input', function (e) {
@@ -1260,7 +1263,7 @@ function editResult(cname, sname, cell) {
 
 function batchEditResult(cname, sname, cell) {
     cell.innerHTML = `<span class="spinner-border spinner-border-sm text-success d-none" role="status"></span>
-    <span id="${cname} ${sname}" class="speciesFilter pointer">${cname} <i>${sname}</i></span>`;
+    <span id="${cname} ${sname}" class="pointer">${cname} <i>${sname}</i></span>`;
     speciesName.forEach(el => {
         // Update the row name attr so labels update on the region
         const [file, start, end, ,] = unpackNameAttr(el, cname);
@@ -1271,10 +1274,11 @@ function batchEditResult(cname, sname, cell) {
 
 function unpackNameAttr(el, cname) {
     const currentRow = el.closest("tr");
-    const nameAttr = currentRow.attributes[0].value.replace(/(.*\|).*/, '$1' + cname);
-    currentRow.attributes[0].value = nameAttr;
-    const [file, start, end,] = nameAttr.split('|');
-    return [file, start, end, currentRow]
+    const nameAttr = currentRow.attributes[0].value;
+    let [file, start, end, commonName] = nameAttr.split('|');
+    if (cname) commonName = cname;
+    currentRow.attributes[0].value = [file, start, end, commonName].join('|');
+    return [file, start, end, currentRow];
 }
 
 
@@ -2031,20 +2035,15 @@ async function onPredictionDone(args) {
             <tr>
                 <th scope="col">Species</th>
                 <th scope="col" class="text-end">Count</th>
-
-                <th scope="col" class="text-center">Batch Edit</th>
             </tr>
             </thead><tbody>`;
 
     for (const [key, value] of Object.entries(summarySorted)) {
-        summaryHTML += `<tr>
+        summaryHTML += `<tr class="speciesFilter">
                         <td class="cname"><span class="spinner-border spinner-border-sm text-success d-none" role="status"></span>
-                         <span id="${key}" class="speciesFilter pointer">${key}</span>
+                         <span class="pointer">${key}</span>
                         </td>                       
-                        <td class="text-end">${value}</td>
-                        <td class="text-center edit"></span>
-                         <span id="${key}" class="material-icons-two-tone align-bottom pointer">edit</span>
-                        </td> `;
+                        <td class="text-end">${value}</td>`;
 
     }
     summaryHTML += '</tbody></table>';
@@ -2123,8 +2122,9 @@ async function onPredictionDone(args) {
     });
     $(document).on('click', '.speciesFilter', function (e) {
         // Check if italic section was clicked
-        const target = e.target.tagName === 'i' ? e.target.parentNode : e.target;
-        const spinner = target.previousElementSibling.classList;
+        const target = this.querySelector('span.pointer')
+        const spinner = this.querySelector('span.spinner-border');
+        if (spinner === null) return;
         // Remove any exclusion from the species to filter
         //e.target.parentNode.nextElementSibling.nextElementSibling.children[1].classList.remove('text-danger');
         const targetClass = target.classList;
@@ -2144,15 +2144,11 @@ async function onPredictionDone(args) {
             subRows.forEach(function (el) {
                 el.classList.add('d-none');
             })
-            // Flip open icon back up
-            materialIcons.forEach(function (el) {
-                el.classList.remove('down');
-            })
             targetClass.add('text-success');
             targetClass.add('d-none');
-            spinner.remove('d-none');
+            spinner.classList.remove('d-none');
             // Allow spinner to show
-            setTimeout(matchSpecies, 1, e, 'filter');
+            setTimeout(matchSpecies, 1, this, target, spinner, 'filter');
         }
         //scrollResults(tableRows[0]);
         document.getElementById('results').scrollTop = 0;
@@ -2175,22 +2171,22 @@ function scrollResults(row) {
     container.scrollTop = row.offsetTop - container.offsetTop - document.getElementById('resultsHead').offsetHeight;
 }
 
-function matchSpecies(e, mode) {
+function matchSpecies(row, target, spinner, mode) {
 
-    const spinner = e.target.parentNode.firstChild.classList;
+    const spinnerClasses = spinner.classList;
     //const hideIcon = e.target.closest('tr').getElementsByClassName('speciesHide')[0];
-    const targetClass = e.target.classList;
+    const targetClass = target.classList;
     let resultSpecies, currentRow;
-    const tableContext = e.target.closest('table').id;
+    const tableContext = row.closest('table').id;
     if (tableContext === 'results') {
-        currentRow = e.target.closest('tr');
+        currentRow = spinner.closest('tr');
         currentRow.classList.add('strikethrough');
         resultSpecies = currentRow.querySelectorAll('td.cname');
     } else {
         resultSpecies = speciesName;
     }
     // What are we looking for?
-    const lookup = e.target.innerText;
+    const lookup = target.innerText;
     resultSpecies.forEach(function (el) {
         const classes = el.parentNode.classList;
         //const excludeIcon = el.parentNode.getElementsByClassName('speciesExclude')[0];
@@ -2217,7 +2213,7 @@ function matchSpecies(e, mode) {
             } else classes.add('d-none', 'hidden'); // mode == hide
         } else if (mode === 'filter') classes.add('d-none');
     })
-    spinner.add('d-none');
+    spinnerClasses.add('d-none');
     targetClass.remove('d-none');
 }
 
@@ -2283,6 +2279,9 @@ async function renderResult(args) {
         const start = result.start, end = result.end;
         let icon_text;
         let feedback_icons;
+        const comment = result.comment ?
+            `<span title="${result.comment}" class='material-icons-two-tone pointer edit-comment'>comment</span>` :
+            "<span title='Add a note' class='material-icons-two-tone pointer d-none add-comment'>add_comment</span>";
         let confidence = '';
         if (result.score < 0.65) {
             confidence = '&#63;';
@@ -2313,10 +2312,7 @@ async function renderResult(args) {
             <td class='text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
             <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
             <td class='specFeature text-center download'><span class='material-icons-two-tone pointer'>file_download</span></td>
-<!--             <td class="text-center speciesExclude d-none"><span class="spinner-border spinner-border-sm text-danger d-none" role="status"></span>-->
-<!--                 <span class="material-icons-two-tone align-bottom pointer">clear</span></td>-->
-    <td class="notes"><span class='material-icons-two-tone pointer d-none add-comment'>add_comment</span></td>
-            <td id="${index}" class='specFeature text-center'><span title="Add a note" class='material-icons-two-tone edit pointer'>edit</span></td>
+            <td class="notes text-end">${comment}</td>
         </tr>`;
         if (result.score2 > 0.2) {
             tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" id='subrow${index}' class='subrow d-none'>
@@ -2325,8 +2321,8 @@ async function renderResult(args) {
                 <td> </td><td class='specFeature'> </td>
                 <td><a href='https://xeno-canto.org/explore?query=${result.sname2}%20type:nocturnal' target=\"_blank\">
                     <img src='img/logo/XC.png' alt='Search ${result.cname2} on Xeno Canto' title='${result.cname2} NFCs on Xeno Canto'></a> </td>
-                <td class='specFeature'> </td>
-                <td class='specFeature'> </td>
+                <td> </td>
+                <td> </td>
                </tr>`;
             if (result.score3 > 0.2) {
                 tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" id='subsubrow${index}' class='subrow d-none'>
@@ -2335,8 +2331,8 @@ async function renderResult(args) {
                     <td> </td><td class='specFeature'> </td>
                     <td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:nocturnal' target=\"_blank\">
                         <img src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>
-                    <td class='specFeature'> </td>
-                    <td class='specFeature'> </td>
+                    <td> </td>
+                    <td> </td>
                    </tr>`;
             }
         }
@@ -2378,6 +2374,8 @@ $(document).on('click', '.add-comment, .edit-comment', function (e) {
                 // todo: remove note from record db
                 e.target.parentNode.innerHTML = '<span title="Add a note" class="material-icons-two-tone pointer add-comment">add_comment</span>';
             }
+            const [file, start, end, ] = unpackNameAttr(activeRow);
+            worker.postMessage({action: 'update-record-comment', file: file, start: start, comment: note});
             addNoteEvents();
             document.addEventListener('keydown', handleKeyDown, true);
         }
@@ -2721,4 +2719,27 @@ function onScreen(el) {
     const elemBottom = elemTop + el.offsetHeight;
 
     return ((elemBottom <= ViewBottom) && (elemTop >= ViewTop));
+}
+
+// Author:  Jacek Becela
+// Source:  http://gist.github.com/399624
+// License: MIT
+
+jQuery.fn.single_double_click = function (single_click_callback, double_click_callback, timeout) {
+    return this.each(function () {
+        let clicks = 0, self = this;
+        jQuery(this).click(function (event) {
+            clicks++;
+            if (clicks === 1) {
+                setTimeout(function () {
+                    if (clicks === 1) {
+                        single_click_callback.call(self, event);
+                    } else {
+                        double_click_callback.call(self, event);
+                    }
+                    clicks = 0;
+                }, timeout || 300);
+            }
+        });
+    });
 }

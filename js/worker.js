@@ -35,6 +35,7 @@ function createDB(file) {
                 (
                     name     TEXT,
                     duration REAL,
+                    filestart INTEGER,
                     UNIQUE (name)
                 )`, function (createResult) {
             if (createResult) throw createResult;
@@ -64,7 +65,8 @@ function createDB(file) {
                     conf2    REAL,
                     conf3    REAL,
                     fileID   INTEGER,
-                    position INTEGER
+                    position INTEGER,
+                    comment  TEXT
                 )`, function (createResult) {
             if (createResult) throw createResult;
         });
@@ -130,6 +132,9 @@ ipcRenderer.on('new-client', (event) => {
         const action = args.action;
         console.log('message received ', action)
         switch (action) {
+            case 'update-record-comment':
+                await onUpdateComment(args)
+                break;
             case 'get-detected-species':
                 getSpecies()
                 break;
@@ -945,7 +950,8 @@ const getCachedResults = (args) => {
                 conf1 as score, conf2 as score2, conf3 as score3, 
                 s1.sname as sname, s2.sname as sname2, s3.sname as sname3,
                 files.duration, 
-                files.name as file
+                files.name as file,
+                    comment
                 FROM records 
                 LEFT JOIN species s1 on s1.id = birdid1 
                 LEFT JOIN species s2 on s2.id = birdid2 
@@ -967,10 +973,10 @@ const getCachedResults = (args) => {
 
 const updateFileTables = (file) => {
     return new Promise(function (resolve) {
-        const newFileStmt = db.prepare("INSERT INTO files VALUES (?,?)");
+        const newFileStmt = db.prepare("INSERT INTO files VALUES (?,?,?)");
         const selectStmt = db.prepare('SELECT rowid FROM files WHERE name = (?)');
         const durationStmt = db.prepare("INSERT OR REPLACE INTO duration VALUES (?,?,?)");
-        newFileStmt.run(file, metadata[file].duration, (err, row) => {
+        newFileStmt.run(file, metadata[file].duration, metadata[file].fileStart, (err, row) => {
             for (const [date, duration] of Object.entries(metadata[file].dateDuration)) {
                 selectStmt.get(file, (err, row) => {
                     const fileid = row.rowid;
@@ -1149,6 +1155,21 @@ const getSpecies = () => {
                 UI.postMessage({event: 'seen-species-list', list: rows})
             }
         })
+}
+
+const onUpdateComment = (args) => {
+    let file = args.file, start = args.start, comment = args.comment;
+    if (!comment) comment = 'null';
+    const dateTime = metadata[file].fileStart + (start * 1000);
+    return new Promise(function (resolve, reject) {
+        db.get(`UPDATE records SET comment = '${comment}' WHERE datetime = '${dateTime}'`, (err, row) => {
+            if (err) {
+                reject(err)
+            } else {
+                resolve(row)
+            }
+        })
+    })
 }
 
 async function onChartRequest(args) {
