@@ -59,10 +59,9 @@
                         Records
                     </a>
                     <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
-                        <a class="dropdown-item" href="#" id="save2db">Save Records</a>
+                        <a class="dropdown-item disabled" href="#" id="save2db">Save Records</a>
                         <a class="dropdown-item" href="#" id="charts">View charts</a>
                         <a class="dropdown-item" href="#" id="explore">Explore records</a>
-                        <a class="dropdown-item" href="#" id="manage">Manage Records</a>
                     </div>
                 </li>
                 <li class="nav-item dropdown active">
@@ -265,7 +264,7 @@
 
     <!-- Explore Div -->
     <div id="exploreWrapper" class="p-2 row g-1 d-none">
-        <div class="species-selector set-species col-sm-3" id="exploreSpeciesSearch">
+        <div class="species-selector col-sm-3" id="exploreSpeciesSearch">
             <input type="text" class="input rounded-pill" placeholder="Search for a species...">
             <div class="explore bird-list-wrapper"></div>
         </div>
@@ -351,6 +350,7 @@
                             <th class="timestamp">Time</th>
                             <th>Position</th>
                             <th>Species</th>
+                            <th>Label</th>
                             <th class="text-center">Confidence<span id="confidenceFilter"
                                                                     class="material-icons-two-tone  text-secondary align-bottom pointer">filter_list</span>
                             </th>
@@ -373,8 +373,8 @@
     <div class="d-none h-100 overflow-auto p-2" id="recordsContainer">
         <div class="container-fluid">
             <div class="row">
-                <div class="set-species col-sm-3">
-                    <div id="speciesSearch" class="species-selector set-species">
+                <div class="col-sm-3">
+                    <div id="speciesSearch" class="species-selector">
                         <input type="text" class="input rounded-pill" placeholder="Search for a species...">
                         <div class="chart bird-list-wrapper"></div>
                     </div>

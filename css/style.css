@@ -53,6 +53,14 @@ html, body {
     width: 100%;
 }
 
+/*#fileNotLoaded {*/
+/*    position: relative;*/
+/*    font-size: calc(100% + 4vw);*/
+/*    z-index: 0;*/
+/*    width: 100%;*/
+/*    text-align: center;*/
+/*}*/
+
 .navbar-nav li:hover > ul.dropdown-menu {
     display: block;
 }
@@ -230,7 +238,7 @@ region.wavesurfer-region[data-region-highlight] {
 .dropdown:hover .dropdown-menu.top-level {
     display: block;
     margin-top: 0;
-/ / remove the gap so it doesn 't close
+/*remove the gap so it doesn't close*/
 }
 
 .chart-outer {
