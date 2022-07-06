@@ -33,8 +33,8 @@ function createDB(file) {
         });
         db.run(`CREATE TABLE files
                 (
-                    name     TEXT,
-                    duration REAL,
+                    name      TEXT,
+                    duration  REAL,
                     filestart INTEGER,
                     UNIQUE (name)
                 )`, function (createResult) {
@@ -66,6 +66,7 @@ function createDB(file) {
                     conf3    REAL,
                     fileID   INTEGER,
                     position INTEGER,
+                    label    TEXT,
                     comment  TEXT
                 )`, function (createResult) {
             if (createResult) throw createResult;
@@ -75,7 +76,7 @@ function createDB(file) {
     return db;
 }
 
-function loadDB(path) {
+async function loadDB(path) {
     const file = p.join(path, 'archive.sqlite');
     if (!fs.existsSync(file)) {
         db = createDB(file)
@@ -132,8 +133,8 @@ ipcRenderer.on('new-client', (event) => {
         const action = args.action;
         console.log('message received ', action)
         switch (action) {
-            case 'update-record-comment':
-                await onUpdateComment(args)
+            case 'update-record':
+                await onUpdateRecord(args)
                 break;
             case 'get-detected-species':
                 getSpecies()
@@ -152,7 +153,7 @@ ipcRenderer.on('new-client', (event) => {
             case 'load-db':
                 latitude = args.lat;
                 longitude = args.lon;
-                loadDB(args.path)
+                await loadDB(args.path)
                 break;
             case 'file-load-request':
                 index = 0;
@@ -412,7 +413,7 @@ function addDays(date, days) {
 const getMetadata = async (file) => {
     let fileStart;
     const proxyFile = proxiedFileCache[file]
-    metadata[file] = {};
+    if (!metadata[file]) metadata[file] = {};
 
     return new Promise(async (resolve) => {
         metadata[file].duration = await getDuration(file);
@@ -951,7 +952,8 @@ const getCachedResults = (args) => {
                 s1.sname as sname, s2.sname as sname2, s3.sname as sname3,
                 files.duration, 
                 files.name as file,
-                    comment
+                comment,
+                    label
                 FROM records 
                 LEFT JOIN species s1 on s1.id = birdid1 
                 LEFT JOIN species s2 on s2.id = birdid2 
@@ -991,7 +993,7 @@ const updateFileTables = (file) => {
 
 const onSave2DB = async () => {
     t0 = performance.now();
-    const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?)");
+    const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?,?)");
     let filemap = {}
     for (let i = 0; i < RESULTS.length; i++) {
         const dateTime = new Date(RESULTS[i].timestamp).getTime();
@@ -1004,7 +1006,7 @@ const onSave2DB = async () => {
         const position = new Date(RESULTS[i].position).getTime();
         const file = RESULTS[i].file;
         if (!filemap[file]) filemap[file] = await updateFileTables(file);
-        stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, filemap[file], position, (err, row) => {
+        stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, filemap[file], position, '', '', (err, row) => {
             UI.postMessage({event: 'progress', text: "Updating Database.", progress: i / RESULTS.length});
             if (i === (RESULTS.length - 1)) {
                 console.log(`Update complete, ${i + 1} records added in ${((performance.now() - t0) / 1000).toFixed(1)} seconds`)
@@ -1157,19 +1159,75 @@ const getSpecies = () => {
         })
 }
 
-const onUpdateComment = (args) => {
-    let file = args.file, start = args.start, comment = args.comment;
+const getFileStart = (file) => {
+    return new Promise(function (resolve, reject) {
+        db.get(`SELECT filestart
+                FROM files
+                WHERE name = '${file}'`, async (err, row) => {
+            if (err) {
+                reject(err)
+            } else {
+                if (row['filestart'] === null) {
+                    // This should only be needed while we catch up with the new files schema
+                    await getMetadata(file);
+                    db.get(`UPDATE files
+                            SET filestart = '${metadata[file].fileStart}'
+                            WHERE name = '${file}'`,
+                        (err, row) => {
+                            if (err) {
+                                console.log(err)
+                            } else {
+                                console.log(row)
+                                row = metadata[file].fileStart;
+                                resolve(row)
+                            }
+                        })
+
+                } else {
+                    resolve(row)
+                }
+            }
+        })
+    })
+}
+
+
+const getBirdID = (cname) => {
+    return new Promise(function (resolve, reject) {
+        db.get(`SELECT id
+                from species
+                where cname = '${cname}'`, (err, row) => {
+            err ? console.log(err) : resolve(row.id)
+        })
+    })
+}
+
+const onUpdateRecord = async (args) => {
+    let what = args.what, file = args.file, start = args.start, value = args.value;
     // Sanitize input
-    comment = comment.replace("'", "''");
-    if (!comment) comment = '';
+    if (!value) value = '';
+    if (what === 'ID') {
+        what = 'birdID1';
+        value = await getBirdID(value);
+    }
+    else {
+        value = value.replace("'", "''")
+    }
+    if (!metadata[file]) metadata[file] = {};
+    if (!metadata[file].fileStart) {
+        metadata[file].fileStart = await getFileStart(file);
+    }
     const dateTime = metadata[file].fileStart + (start * 1000);
     return new Promise(function (resolve, reject) {
-        db.get(`UPDATE records SET comment = '${comment}' WHERE datetime = '${dateTime}'`, (err, row) => {
+        db.get(`UPDATE records
+                SET ${what} = '${value}'
+                WHERE datetime = '${dateTime}'`, (err, row) => {
             if (err) {
                 reject(err)
             } else {
                 resolve(row)
             }
+            console.log(`Updated ${what}, setting ${dateTime} to ${value}`);
         })
     })
 }
@@ -1181,7 +1239,7 @@ async function onChartRequest(args) {
     const dateRange = args.range;
     const dataRecords = {}, results = {};
     t0 = Date.now();
-    await getSeasonRecords(args.species, 'spring')
+    await getSeasonRecords(args .species, 'spring')
         .then((result) => {
             dataRecords.earliestSpring = result['minDate'];
             dataRecords.latestSpring = result['maxDate'];
@@ -1247,7 +1305,7 @@ async function onChartRequest(args) {
     UI.postMessage({
         event: 'chart-data',
         // Restore species name
-        species:  args.species ? args.species.replace("''", "'"):undefined,
+        species: args.species ? args.species.replace("''", "'") : undefined,
         results: results,
         rate: rate,
         total: total,

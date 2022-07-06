@@ -65,7 +65,6 @@ let modelReady = false, fileLoaded = false, currentFile, resultHistory = {};
 let PREDICTING = false;
 let region, AUDACITY_LABELS = [], wavesurfer;
 let summary = {};
-summary['suppressed'] = [];
 let fileList = [], fileStart, bufferStartTime, fileEnd;
 
 let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
@@ -156,7 +155,6 @@ function resetResults() {
     summary = {};
     summaryTable.empty();
     resultTable.empty();
-    summary['suppressed'] = []
     predictions = {};
     seenTheDarkness = false;
     shownDaylightBanner = false;
@@ -450,10 +448,6 @@ function analyseReset() {
     PREDICTING = true;
     delete diagnostics['Audio Duration'];
     AUDACITY_LABELS = [];
-    // hide exclude x in the table
-    speciesExclude.forEach(el => {
-        el.classList.add('d-none');
-    })
     completeDiv.hide();
     progressDiv.show();
     // Diagnostics
@@ -514,7 +508,6 @@ analyzeSelectionLink.addEventListener('click', async () => {
         selection: true
     });
     summary = {};
-    summary['suppressed'] = []
 });
 
 function postAnalyzeMessage(args) {
@@ -1169,12 +1162,8 @@ function hideBirdList(el) {
 
 let restoreSpecies;
 
-$(document).on('click', '.edit', function (e) {
-    editID(e)
-});
-$(document).on('dblclick', '.cname', function (e) {
-    editID(e)
-});
+$(document).on('click', '.edit', editID);
+$(document).on('dblclick', '.cname', editID);
 
 function editID(e) {
     e.stopImmediatePropagation();
@@ -1187,12 +1176,10 @@ function editID(e) {
 }
 
 // Bird list filtering
-$(document).on('keyup', '.input', function (e) {
-    const input = e.target;
-    filterList(input)
-})
+$(document).on('keyup', '.input', filterList);
 
-function filterList(input) {
+function filterList(e) {
+    const input = e.target;
     const filter = input.value.toUpperCase();
     const ul = input.parentNode.querySelector("ul");
     const li = ul.getElementsByTagName('li');
@@ -1246,9 +1233,10 @@ $(document).on('click', '.bird-list', function (e) {
 
 function editResult(cname, sname, cell) {
     cell.innerHTML = `${cname} <i>${sname}</i>`;
-    // Update the name attribute (it must be the first attribute in the tag. Todo: update to use title? attr)
+    // Update the name attribute (it must be the first attribute in the tag.)
     const [file, start, end, currentRow] = unpackNameAttr(cell, cname);
     updateRecordID(file, start, end, cname);
+    updateSummary();
     // reflect the change on the spectrogram by simulating a click
     currentRow.click();
 }
@@ -1259,9 +1247,10 @@ function batchEditResult(cname, sname, cell) {
     speciesName.forEach(el => {
         // Update the row name attr so labels update on the region
         const [file, start, end, ,] = unpackNameAttr(el, cname);
-        updateRecordID(file, start, end, cname);
+        updateRecordID(file, start, end, cname, sname);
         el.innerHTML = `${cname} <i>${sname}</i>`;
     })
+    updateSummary();
 }
 
 function unpackNameAttr(el, cname) {
@@ -1275,7 +1264,8 @@ function unpackNameAttr(el, cname) {
 
 
 function updateRecordID(file, start, end, cname) {
-    // todo!
+    //Todo: send file snippet to me
+    worker.postMessage({action: 'update-record', file: file, start: start, what: 'ID', value: cname});
 }
 
 $(document).on('click', '.request-bird', function (e) {
@@ -1550,9 +1540,9 @@ function enableKeyDownEvent() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-
     enableKeyDownEvent();
-
+    addEvents('comment');
+    addEvents('label');
 });
 
 ///////////// Nav bar Option handlers //////////////
@@ -1980,6 +1970,57 @@ function onProgress(args) {
     if (parseFloat(progress) === 100.0) progressDiv.hide();
 }
 
+function updateSummary() {
+    summary = {};
+    speciesName = document.querySelectorAll('#results .cname');
+    speciesName.forEach(row => {
+        const key = row.innerHTML;
+        if (key in summary) {
+
+            summary[key] += 1
+        } else {
+            summary[key] = 1
+        }
+    })
+
+    console.table(summary);
+    // Sort summary by count
+    let sortable = [];
+    for (const bird in summary) {
+        sortable.push([bird, summary[bird]]);
+    }
+    sortable.sort(function (a, b) {
+        return a[1] - b[1];
+    });
+    //count down from most seen:
+    sortable = sortable.reverse();
+    // Recreate object
+    let summarySorted = {};
+    sortable.forEach(function (item) {
+        summarySorted[item[0]] = item[1]
+    })
+
+    let summaryHTML = `<table id="resultSummary" class="table table-striped table-dark table-hover p-1"><thead class="thead-dark">
+            <tr>
+                <th scope="col">Species</th>
+                <th scope="col" class="text-end">Count</th>
+                <th class="text-end w-25">Label</th>
+            </tr>
+            </thead><tbody>`;
+
+    for (const [key, value] of Object.entries(summarySorted)) {
+        summaryHTML += `<tr>
+                        <td class="cname speciesFilter"><span class="spinner-border spinner-border-sm text-success d-none" role="status"></span>
+                         <span class="pointer">${key}</span>
+                        </td>                       
+                        <td class="text-end">${value}</td>
+                        <td class="label">${tags['Remove Label']}</td>`;
+
+    }
+    summaryHTML += '</tbody></table>';
+    summaryTable.html(summaryHTML);
+}
+
 async function onPredictionDone(args) {
     AUDACITY_LABELS.push(args.labels);
     // Defer further processing until batch complete
@@ -2000,57 +2041,17 @@ async function onPredictionDone(args) {
     completeDiv.show();
 
     if (AUDACITY_LABELS.length > 0) {
-        enableMenuItem(['saveLabels', 'saveDetections']);
+        enableMenuItem(['saveLabels', 'saveDetections', 'save2db']);
         $('.download').removeClass('disabled');
     } else {
-        disableMenuItem(['saveLabels', 'saveDetections']);
+        disableMenuItem(['saveLabels', 'saveDetections', 'save2db']);
     }
     analyzeLink.disabled = false;
-    console.table(summary);
-    // Sort summary by count
-    let sortable = [];
-    for (const bird in summary) {
-        if (bird !== 'suppressed') sortable.push([bird, summary[bird]]);
-    }
-    sortable.sort(function (a, b) {
-        return a[1] - b[1];
-    });
-    //count down from most seen:
-    sortable = sortable.reverse();
-    // Recreate object
-    var summarySorted = {}
-    sortable.forEach(function (item) {
-        summarySorted[item[0]] = item[1]
-    })
-
-    let summaryHTML = `<table id="resultSummary" class="table table-striped table-dark table-hover p-1"><thead class="thead-dark">
-            <tr>
-                <th scope="col">Species</th>
-                <th scope="col" class="text-end">Count</th>
-                <th>Label</th>
-            </tr>
-            </thead><tbody>`;
-
-    for (const [key, value] of Object.entries(summarySorted)) {
-        summaryHTML += `<tr class="speciesFilter">
-                        <td class="cname"><span class="spinner-border spinner-border-sm text-success d-none" role="status"></span>
-                         <span class="pointer">${key}</span>
-                        </td>                       
-                        <td class="text-end">${value}</td>
-                        <td><span class="badge bg-dark rounded-pill">Nocmig</span></td>`;
-
-    }
-    summaryHTML += '</tbody></table>';
-    summaryTable.append(summaryHTML);
-    speciesName = document.querySelectorAll('#results .cname');
+    updateSummary();
     subRows = document.querySelectorAll('.subrow')
-    const materialIcons = document.querySelectorAll('.rotate')
+
     speciesFilter = document.querySelectorAll('.speciesFilter');
-    //speciesHide = document.querySelectorAll('.speciesHide');
-    speciesExclude = document.querySelectorAll('.speciesExclude');
-    speciesExclude.forEach(el => {
-        el.classList.remove('d-none');
-    })
+
     const tableRows = document.querySelectorAll('#results > tbody > tr');
 
     // $(document).on('click', '.speciesHide', function (e) {
@@ -2132,14 +2133,13 @@ async function onPredictionDone(args) {
         } else {
             // Clicked on unfiltered species name
             speciesFilter.forEach(function (el) {
-                el.classList.remove('text-success');
+                el.querySelector('span.pointer').classList.remove('text-success');
             })
             // Hide open subrows
             subRows.forEach(function (el) {
                 el.classList.add('d-none');
             })
-            targetClass.add('text-success');
-            targetClass.add('d-none');
+            targetClass.add('text-success', 'd-none');
             spinner.classList.remove('d-none');
             // Allow spinner to show
             setTimeout(matchSpecies, 1, this, target, spinner, 'filter');
@@ -2166,7 +2166,6 @@ function scrollResults(row) {
 }
 
 function matchSpecies(row, target, spinner, mode) {
-
     const spinnerClasses = spinner.classList;
     //const hideIcon = e.target.closest('tr').getElementsByClassName('speciesHide')[0];
     const targetClass = target.classList;
@@ -2183,27 +2182,11 @@ function matchSpecies(row, target, spinner, mode) {
     const lookup = target.innerText;
     resultSpecies.forEach(function (el) {
         const classes = el.parentNode.classList;
-        //const excludeIcon = el.parentNode.getElementsByClassName('speciesExclude')[0];
-        const index = el.parentNode.firstElementChild.innerText;
         // Extract species name from cell
         const searchFor = el.innerText;
         if (searchFor === lookup || tableContext === 'results') {
             if (mode === 'filter' || mode === 'unhide') {
                 classes.remove('d-none', 'hidden');
-                //excludeIcon.classList.remove('text-danger');
-            } else if (mode === 'exclude') {
-                if (tableContext !== 'results') {
-                    //hideIcon.classList.add('text-danger');
-                    classes.add('d-none');
-                }
-                classes.add('strikethrough');
-                // add state to predictions
-                //excludeIcon.classList.add('text-danger');
-                predictions[index].excluded = true;
-            } else if (mode === 'unexclude') {
-                classes.remove('strikethrough');
-                //excludeIcon.classList.remove('text-danger');
-                predictions[index].excluded = false;
             } else classes.add('d-none', 'hidden'); // mode == hide
         } else if (mode === 'filter') classes.add('d-none');
     })
@@ -2262,20 +2245,19 @@ async function renderResult(args) {
                                     </td></tr>`);
             shownDaylightBanner = true;
         }
-        const key = `${result.cname} ${result.sname}`;
+
+        const key = `${result.cname} <i>${result.sname}</i>`;
         if (key in summary) {
             if (result)
                 summary[key] += 1
         } else {
             summary[key] = 1
         }
-        if (result.suppressed === 'text-danger') summary['suppressed'].push(result.cname);
+
         const start = result.start, end = result.end;
-        let icon_text;
-        let feedback_icons;
         const comment = result.comment ?
             `<span title="${result.comment}" class='material-icons-two-tone pointer edit-comment'>comment</span>` :
-            "<span title='Add a note' class='material-icons-two-tone pointer d-none add-comment'>add_comment</span>";
+            "<span title='Add a comment' class='material-icons-two-tone pointer d-none add-comment'>add_comment</span>";
         let confidence = '';
         if (result.score < 0.65) {
             confidence = '&#63;';
@@ -2295,20 +2277,21 @@ async function renderResult(args) {
         predictions[index] = result;
         let showTimeOfDay;
         config.timeOfDay ? showTimeOfDay = '' : showTimeOfDay = 'd-none';
-        let excluded;
-        result.excluded ? excluded = 'strikethrough' : excluded = '';
-        tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" class='border-top border-secondary top-row ${excluded} ${result.dayNight}'>
+
+        const label = result.label ? tags[result.label] : tags['Remove Label'];
+
+        tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" class=' text-center border-top border-secondary top-row ${result.dayNight}'>
             <th scope='row'>${index}</th>
-            <td class='text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
+            <td class='text-start text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-end">${UI_position}</td>
-            <td name="${result.cname}" class='flex-shrink-0 cname'>${result.cname} <i>${result.sname}</i></td>
-            <td class="label"><span class="badge rounded-pill bg-secondary add-label d-none">Add Label</span></td>
-            <td class='text-center'>${iconizeScore(result.score)}</td>
-            <td class='text-center'><span id='${index}' title="Click for additional detections" class='material-icons-two-tone rotate pointer d-none'>sync</span></td>
-            <td class='specFeature text-center'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
-            <td class='text-center'><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
+            <td name="${result.cname}" class='text-start cname'>${result.cname} <i>${result.sname}</i></td>
+            <td class="label">${label}</td>
+            <td>${iconizeScore(result.score)}</td>
+            <td><span id='${index}' title="Click for additional detections" class='material-icons-two-tone rotate pointer d-none'>sync</span></td>
+            <td class='specFeature'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
+            <td><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
             <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
-            <td class='specFeature text-center download'><span class='material-icons-two-tone pointer'>file_download</span></td>
+            <td class='specFeature download'><span class='material-icons-two-tone pointer'>file_download</span></td>
             <td class="comment text-end">${comment}</td>
         </tr>`;
         if (result.score2 > 0.2) {
@@ -2368,52 +2351,84 @@ $(document).on('click', '.add-comment, .edit-comment', function (e) {
     $(document).off('mouseenter', '.comment');
     document.removeEventListener('keydown', handleKeyDown, true);
     this.parentNode.innerHTML = `<textarea class="h-100 rounded-3 comment-textarea" placeholder="Enter notes...">${note}</textarea>`;
-    document.addEventListener('keydown', function (e) {
-        if (e.code === 'Enter') {
-            e.preventDefault();
-            e.stopImmediatePropagation();
-            const note = e.target.value;
-            if (note) {
-                e.target.parentNode.innerHTML = `<span title="${note}" class="material-icons-two-tone pointer edit-comment">comment</span>`;
-            } else {
-                e.target.parentNode.innerHTML = `<span title="Add a note" class="material-icons-two-tone pointer add-comment">add_comment</span>`;
-            }
-            const [file, start, end,] = unpackNameAttr(activeRow);
-            worker.postMessage({action: 'update-record-comment', file: file, start: start, comment: note});
-            addEvents('comment');
-            document.addEventListener('keydown', handleKeyDown, true);
-        }
-    })
+    $('.comment-textarea').on('keydown', commentHandler);
 })
 
-$(document).on('click', '.add-label, .edit-label', function (e) {
+function commentHandler(e) {
+    if (e.code === 'Enter') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        const note = e.target.value;
+        if (note) {
+            e.target.parentNode.innerHTML = `<span title="${note}" class="material-icons-two-tone pointer edit-comment">comment</span>`;
+        } else {
+            e.target.parentNode.innerHTML = `<span title="Add a comment" class="material-icons-two-tone pointer add-comment">add_comment</span>`;
+        }
+        const [file, start, ,] = unpackNameAttr(activeRow);
+        worker.postMessage({action: 'update-record', file: file, start: start, what: 'comment', value: note});
+        addEvents('comment');
+        document.addEventListener('keydown', handleKeyDown, true);
+    }
+}
+
+
+$(document).on('click', '.add-label, .edit-label', labelHandler);
+
+function labelHandler(e) {
     $(document).off('mouseleave', '.label');
     $(document).off('mouseenter', '.label');
     const cell = e.target.closest('td');
     activeRow = cell.closest('tr');
-    cell.innerHTML = `<span class="badge bg-dark rounded-pill">Nocmig</span> 
-                                <span class="badge bg-success rounded-pill">Local</span>
-                                <span class="badge bg-secondary rounded-pill">Remove label</span>`;
-    cell.addEventListener('click', function (e) {
-        if (this.childElementCount < 2) return
-        e.stopImmediatePropagation();
-        const label = e.target.innerText;
-        const parent = e.target.parentNode;
-        if (label === 'Nocmig') {
-            parent.innerHTML = `<span class="badge rounded-pill bg-dark edit-label">Nocmig</span>`;
-            // todo: update label in record db, handle note retrieval in explore records
-        } else if (label === 'Local') {
-            // todo: remove label from record db
-            parent.innerHTML = '<span class="badge rounded-pill bg-success edit-label">Local</span>';
-        } else {
-            parent.innerHTML = '<span class="badge rounded-pill bg-secondary add-label">Add Label</span>';
-        }
-        const [file, start, end,] = unpackNameAttr(activeRow);
-        worker.postMessage({action: 'update-record-label', file: file, start: start, label: label});
-        addEvents('label');
+    cell.innerHTML = `<span class="badge bg-dark rounded-pill pointer">Nocmig</span> 
+                                <span class="badge bg-success rounded-pill pointer">Local</span>
+                                <span class="badge bg-secondary rounded-pill pointer">Remove Label</span>`;
+    cell.addEventListener('click', updateLabel)
+}
 
-    })
-})
+const tags = {
+    'Local': '<span class="badge bg-success rounded-pill edit-label pointer">Local</span>',
+    'Nocmig': '<span class="badge bg-dark rounded-pill edit-label pointer">Nocmig</span>',
+    // If remove label is clicked, we want to replace with *add* label
+    'Remove Label': '<span class="badge rounded-pill bg-secondary add-label pointer d-none">Add Label</span>'
+}
+
+function updateLabel(e) {
+    if (this.childElementCount < 2) return
+    e.stopImmediatePropagation();
+    let label = e.target.innerText;
+    // update the clicked badge
+    const parent = e.target.parentNode;
+    parent.innerHTML = tags[label];
+
+    // Update the label record(s) in the db
+    const context = parent.closest('table').id;
+    let file, start;
+    if (context === 'results') {
+        [file, start, ,] = unpackNameAttr(activeRow);
+        worker.postMessage({action: 'update-record', file: file, start: start, what: 'label', value: label});
+    } else {
+        // this is the summary table and a batch update is wanted
+        const searchSpecies = parent.parentNode.querySelector('.cname').innerText;
+        speciesName.forEach(el => {
+            const row = el.closest('tr');
+            const rowSpecies = row.querySelector('.cname').innerText;
+            if (rowSpecies === searchSpecies) {
+                // Update the species label in the results table
+                row.querySelector('.label').innerHTML = tags[label];
+                [file, start, ,] = unpackNameAttr(row);
+                const labelValue = label === 'Remove Label' ? '' : label;
+                worker.postMessage({
+                    action: 'update-record',
+                    file: file,
+                    start: start,
+                    what: 'label',
+                    value: labelValue
+                });
+            }
+        })
+    }
+    addEvents('label');
+}
 
 function addEvents(element) {
     $(document).on('mouseenter', '.' + element, function () {
@@ -2428,13 +2443,11 @@ function addEvents(element) {
 
         this.innerHTML = element === 'comment' ?
             `<span title="Add a ${element}" class="material-icons-two-tone pointer add-${element} d-none">add_${element}</span>` :
-            '<span class="badge rounded-pill bg-secondary add-label d-none">Add Label</span>';
+            tags['Remove Label'];
 
     })
 }
 
-addEvents('comment');
-addEvents('label');
 
 // Results event handlers
 
@@ -2557,9 +2570,6 @@ const iconDict = {
     'low': '<span class="material-icons-two-tone score text-danger border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
     'medium': '<span class="material-icons-two-tone score text-warning border border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
     'high': '<span class="material-icons-two-tone score text-success border border-secondary rounded" title="--%">signal_cellular_alt</span>',
-    //'low': '<span class="material-icons-two-tone text-danger border border-secondary rounded" title="Low">signal_cellular_alt_1_bar</span>',
-    //'medium': '<span class="material-icons-two-tone text-warning border border-secondary rounded" title="Medium">signal_cellular_alt_2_bar</span>',
-    //'high': '<span class="material-icons-two-tone text-success border border-secondary rounded" title="High">signal_cellular_alt</span>',
 }
 
 function iconizeScore(score) {
