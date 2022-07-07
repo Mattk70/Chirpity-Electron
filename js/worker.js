@@ -380,9 +380,6 @@ async function formatCheck(file) {
 }
 
 async function loadAudioFile(args) {
-    // reset file cache
-    await clearCache();
-
     let file = args.filePath;
     await formatCheck(file);
     if (!metadata[file]) {
@@ -937,7 +934,7 @@ let t1, t0;
 const getCachedResults = (args) => {
     let where;
     const dateRange = args.range;
-    if (args.file) where = `files.name =  '${args.file}'`;
+    if (args.file) where = `files.name =  '${args.file.replace("'", "''")}'`;
     if (args.species) where = `s1.cname =  '${args.species.replace("'", "''")}'`;
     const when = dateRange.start ? `AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
     return new Promise(function (resolve, reject) {

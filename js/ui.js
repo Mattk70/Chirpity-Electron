@@ -61,7 +61,7 @@ window.electron.getVersion()
         console.log('Error getting app version:', e)
     });
 
-let modelReady = false, fileLoaded = false, currentFile, resultHistory = {};
+let modelReady = false, fileLoaded = false, currentFile;
 let PREDICTING = false;
 let region, AUDACITY_LABELS = [], wavesurfer;
 let summary = {};
@@ -84,8 +84,8 @@ let progressBar = $('.progress .progress-bar');
 const fileNumber = document.getElementById('fileNumber');
 let batchFileCount = 0, batchInProgress = false;
 let activeRow;
-let predictions = {}, correctedSpecies, speciesListItems, clickedNode,
-    clickedIndex, speciesName, speciesFilter, speciesHide, speciesExclude,
+let predictions = {}, speciesListItems,
+    clickedIndex, speciesName, speciesFilter,
     subRows, scrolled, currentFileDuration;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
@@ -467,6 +467,7 @@ function refreshResultsView() {
     } else {
         showElement(['loadFileHint', 'loadFileHintText'], true);
     }
+    adjustSpecDims(true);
 }
 
 const navbarAnalysis = document.getElementById('navbarAnalysis');
@@ -1167,6 +1168,7 @@ $(document).on('dblclick', '.cname', editID);
 
 function editID(e) {
     e.stopImmediatePropagation();
+    getSpeciesIndex(e);
     const currentRow = e.target.closest('tr');
     let cname = currentRow.querySelector('.cname');
     // save the original species in case edit is aborted or doesn't change species
@@ -1266,6 +1268,9 @@ function unpackNameAttr(el, cname) {
 function updateRecordID(file, start, end, cname) {
     //Todo: send file snippet to me
     worker.postMessage({action: 'update-record', file: file, start: start, what: 'ID', value: cname});
+    predictions[clickedIndex].filename = predictions[clickedIndex].cname.replace(/\s+/g, '_') +
+             '_' + Date.now().toString() + '.mp3';
+    sendFile('incorrect', predictions[clickedIndex]);
 }
 
 $(document).on('click', '.request-bird', function (e) {
@@ -2452,8 +2457,8 @@ function addEvents(element) {
 // Results event handlers
 
 function getSpeciesIndex(e) {
-    clickedNode = e.target.parentNode
-    clickedIndex = clickedNode.parentNode.querySelector('th').innerText
+    const clickedNode = e.target.closest('tr');
+    clickedIndex = clickedNode.querySelector('th').innerText
 }
 
 const summaryButton = document.getElementById('showSummary');
