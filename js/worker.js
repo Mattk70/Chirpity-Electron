@@ -12,7 +12,8 @@ const sqlite3 = require('sqlite3').verbose();
 const SunCalc = require('suncalc2');
 const ffmpeg = require('fluent-ffmpeg');
 const {utimes} = require('utimes');
-const file_cache = 'file_cache';
+const file_cache = 'chirpity';
+let TEMP;
 
 let db, nocmig, latitude, longitude;
 
@@ -57,7 +58,7 @@ function createDB(file) {
         stmt.finalize();
         db.run(`CREATE TABLE records
                 (
-                    dateTime INTEGER PRIMARY KEY,
+                    dateTime INTEGER,
                     birdID1  INTEGER,
                     birdID2  INTEGER,
                     birdID3  INTEGER,
@@ -68,6 +69,7 @@ function createDB(file) {
                     position INTEGER,
                     label    TEXT,
                     comment  TEXT
+                    UNIQUE (dateTime, fileID)
                 )`, function (createResult) {
             if (createResult) throw createResult;
         });
@@ -108,8 +110,8 @@ const clearCache = () => {
     return new Promise((resolve) => {
         // clear & recreate file cache folder
         proxiedFileCache = {}
-        fs.rmSync(file_cache, {recursive: true, force: true});
-        fs.mkdir(file_cache, (err, path) => {
+        fs.rmSync(p.join(TEMP, file_cache), {recursive: true, force: true});
+        fs.mkdir(p.join(TEMP, file_cache), (err, path) => {
             resolve(path);
         })
     })
@@ -136,6 +138,9 @@ ipcRenderer.on('new-client', (event) => {
             case 'update-record':
                 await onUpdateRecord(args)
                 break;
+            case 'update-file-start':
+                await onUpdateFileStart(args)
+                break;
             case 'get-detected-species':
                 getSpecies()
                 break;
@@ -153,6 +158,7 @@ ipcRenderer.on('new-client', (event) => {
             case 'load-db':
                 latitude = args.lat;
                 longitude = args.lon;
+                TEMP = args.temp;
                 await loadDB(args.path)
                 break;
             case 'file-load-request':
@@ -364,7 +370,7 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
 async function formatCheck(file) {
     if (proxiedFileCache[file]) return;
     if (!file.endsWith('.wav')) {
-        const destination = p.join(file_cache, p.basename(file) + ".wav");
+        const destination = p.join(TEMP, file_cache, p.basename(file) + ".wav");
         proxiedFileCache[file] = destination;
         const statsObj = fs.statSync(file);
         const mtime = statsObj.mtime;
@@ -1199,6 +1205,42 @@ const getBirdID = (cname) => {
     })
 }
 
+const onUpdateFileStart = (args) => {
+    const file = args.file.replace("'", "''"), newfileStart = args.start;
+    return new Promise(function (resolve, reject) {
+        db.get(`SELECT rowid, filestart
+                from files
+                where name = '${file}'`, (err, row) => {
+            if (err) {
+                console.log(err)
+            } else {
+                if (row) {
+                    let rowID = row.rowid;
+                    let delta = row.filestart - newfileStart;
+                    db.get(`UPDATE files
+                            SET filestart = '${newfileStart}'
+                            where rowid = '${rowID}'`, (err, rows) => {
+                        if (err) {
+                            console.log(err)
+                        } else {
+                            let t0 = Date.now();
+                            db.get(`UPDATE records set dateTime = position + ${newfileStart} where 
+                                    fileid = ${rowID}`, (err, rowz) => {
+                                if (err) {
+                                    console.log(err)
+                                } else {
+                                    console.log(`Updating record times took ${Date.now() - t0} seconds`);
+                                    resolve(rowz)
+                                }
+                            })
+                        }
+                    })
+                }
+            }
+        })
+    })
+}
+
 const onUpdateRecord = async (args) => {
     let what = args.what, file = args.file, start = args.start, value = args.value;
     // Sanitize input
@@ -1206,8 +1248,7 @@ const onUpdateRecord = async (args) => {
     if (what === 'ID') {
         what = 'birdID1';
         value = await getBirdID(value);
-    }
-    else {
+    } else {
         value = value.replace("'", "''")
     }
     if (!metadata[file]) metadata[file] = {};
@@ -1236,7 +1277,7 @@ async function onChartRequest(args) {
     const dateRange = args.range;
     const dataRecords = {}, results = {};
     t0 = Date.now();
-    await getSeasonRecords(args .species, 'spring')
+    await getSeasonRecords(args.species, 'spring')
         .then((result) => {
             dataRecords.earliestSpring = result['minDate'];
             dataRecords.latestSpring = result['maxDate'];
