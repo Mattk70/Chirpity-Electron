@@ -40,11 +40,13 @@ const establishMessageChannel =
     })
 
 
-async function getPath() {
+async function getPaths() {
     const pathPromise = window.electron.getPath();
+    const tempPromise = window.electron.getTemp();
     const appPath = await pathPromise;
-    console.log('path is ', appPath)
-    return appPath;
+    const tempPath = await tempPromise;
+    console.log('path is ', appPath, 'temp is ', tempPath)
+    return [appPath, tempPath];
 }
 
 
@@ -410,7 +412,7 @@ async function onOpenFiles(args) {
         } else {
             appendstr += `<span class="openFiles pointer" id="${item}"><span class="material-icons-two-tone align-bottom">audio_file</span>`;
         }
-        appendstr += item.replace(/^.*[\\\/]/, "") + '<br></span>';
+        appendstr += item.replace(/^.*[\\\/]/, "") + '</span>';
         count += 1;
     })
     filenameElement.innerHTML += appendstr + '</div>';
@@ -948,7 +950,7 @@ async function saveDetections() {
 }
 
 /////////////////////////  Window Handlers ////////////////////////////
-let appPath;
+let appPath, tempPath;
 window.onload = async () => {
     // Set config defaults
 
@@ -966,8 +968,8 @@ window.onload = async () => {
     }
     config.UUID = uuidv4();
     // Load preferences and override defaults
-    appPath = await getPath();
-    worker.postMessage({action: 'load-db', path: appPath, lat: config.latitude, lon: config.longitude})
+    [appPath, tempPath] = await getPaths();
+    worker.postMessage({action: 'load-db', path: appPath, temp: tempPath, lat: config.latitude, lon: config.longitude})
     fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
         if (err) {
             console.log('JSON parse error ' + err);
@@ -1266,10 +1268,9 @@ function unpackNameAttr(el, cname) {
 
 
 function updateRecordID(file, start, end, cname) {
-    //Todo: send file snippet to me
     worker.postMessage({action: 'update-record', file: file, start: start, what: 'ID', value: cname});
     predictions[clickedIndex].filename = predictions[clickedIndex].cname.replace(/\s+/g, '_') +
-             '_' + Date.now().toString() + '.mp3';
+        '_' + Date.now().toString() + '.mp3';
     sendFile('incorrect', predictions[clickedIndex]);
 }
 
@@ -2710,6 +2711,28 @@ document.addEventListener('drop', async (event) => {
 ////////// Date Picker ///////////////
 
 $(function () {
+    $('#setFileStart').daterangepicker({
+        singleDatePicker: true,
+        showDropdowns: true,
+        // file start is undefined at this point
+        startDate: moment(fileStart),
+        minYear: 2015,
+        maxDate: moment(),
+        maxYear: parseInt(moment().format('YYYY')),
+        timePicker: true,
+        timePicker24Hour: true,
+        locale: {
+            applyLabel: 'Set Recording Start Time'
+        }
+    }, function (start, end, label) {
+        const newFileStart = start.toDate().getTime();
+        const delta = fileStart - newFileStart;
+        fileStart = newFileStart;
+        worker.postMessage({action: 'update-file-start', file: currentFile, start: fileStart});
+    });
+});
+
+$(function () {
     const start = moment();
     const end = start;
     $('#chartRange, #exploreRange').each(function () {
@@ -2773,27 +2796,4 @@ function onScreen(el) {
     const elemBottom = elemTop + el.offsetHeight;
 
     return ((elemBottom <= ViewBottom) && (elemTop >= ViewTop));
-}
-
-// Author:  Jacek Becela
-// Source:  http://gist.github.com/399624
-// License: MIT
-
-jQuery.fn.single_double_click = function (single_click_callback, double_click_callback, timeout) {
-    return this.each(function () {
-        let clicks = 0, self = this;
-        jQuery(this).click(function (event) {
-            clicks++;
-            if (clicks === 1) {
-                setTimeout(function () {
-                    if (clicks === 1) {
-                        single_click_callback.call(self, event);
-                    } else {
-                        double_click_callback.call(self, event);
-                    }
-                    clicks = 0;
-                }, timeout || 300);
-            }
-        });
-    });
 }
