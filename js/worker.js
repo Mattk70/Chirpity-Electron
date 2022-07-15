@@ -500,9 +500,10 @@ async function getPredictBuffers(args) {
     const file = args.file
     // Ensure max and min are within range
     start = Math.max(0, start);
-    // Handle no end supplied
+    // Handle no start / end supplied
     const proxyFile = proxiedFileCache[file]
     end > 0 ? end = Math.min(metadata[file].duration, end) : end = metadata[file].duration;
+    if (!start) start = 0;
     const byteStart = convertTimeToBytes(start, file);
     const byteEnd = convertTimeToBytes(end, file);
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
@@ -887,7 +888,7 @@ async function processNextFile(args) {
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
         await formatCheck(file);
-        let [start, end] = args.start ? [args.start, args.end] : await setStartEnd(file);
+        let [start, end] = args ? [args.start, args.end] : await setStartEnd(file);
         if (start === 0 && end === 0) {
             // Nothing to do for this file
             await processNextFile();
