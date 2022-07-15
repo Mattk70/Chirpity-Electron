@@ -84,7 +84,7 @@ const summaryTable = $('#summaryTable');
 let progressDiv = $('#progressDiv');
 let progressBar = $('.progress .progress-bar');
 const fileNumber = document.getElementById('fileNumber');
-let batchFileCount = 0, batchInProgress = false;
+let batchInProgress = false;
 let activeRow;
 let predictions = {}, speciesListItems,
     clickedIndex, speciesName, speciesFilter,
@@ -202,11 +202,11 @@ async function loadAudioFile(args) {
 }
 
 $(document).on("click", ".openFiles", async function (e) {
-    e.target.classList.add('revealFiles');
-    e.target.classList.remove('openFiles');
     const openFiles = $('.openFiles');
     openFiles.removeClass('visible');
-    if (openFiles.length > 1) this.firstChild.innerHTML = "library_music"
+    if (openFiles.length > 1) this.firstChild.innerHTML = "library_music";
+    e.target.classList.add('revealFiles');
+    e.target.classList.remove('openFiles');
     if (!PREDICTING) {
         await loadAudioFile({filePath: e.target.id, preserveResults: true})
     }
@@ -1840,6 +1840,8 @@ async function onWorkerLoadedAudio(args) {
     bufferBegin = args.bufferBegin;
     currentFileDuration = args.sourceDuration;
     fileStart = args.fileStart;
+    fileEnd = new Date(fileStart + (currentFileDuration * 1000));
+
     if (config.timeOfDay) {
         bufferStartTime = new Date(fileStart + (bufferBegin * 1000))
     } else {
@@ -1853,7 +1855,7 @@ async function onWorkerLoadedAudio(args) {
     // calculate dawn for following day
     let astro2 = SunCalc.getTimes(fileStart + 8.64e+7, config.latitude, config.longitude);
     dawn = astro2.dawn.getTime();
-    if (!fileEnd) fileEnd = new Date(fileStart + (currentFileDuration * 1000));
+
     if (config.nocmig && fileEnd.getTime() < dusk && fileStart > firstDawn) {
         alert(`All timestamps in this file are during daylight hours. \n\nNocmig mode will be disabled.`)
         $('#timecode').click();
@@ -1946,8 +1948,10 @@ async function onPredictionDone(args) {
     // Defer further processing until batch complete
     if (args.batchInProgress) {
         progressDiv.show();
-        batchFileCount++;
-        fileNumber.innerText = `(File ${batchFileCount} of ${fileList.length})`;
+        // The file we've completed is one less than the file we're going to be processing
+        // and the index is zero-based, so + 2 to get the file we're going to process
+        const count = fileList.indexOf(args.file) + 2;
+        fileNumber.innerText = `(File ${count} of ${fileList.length})`;
         return;
     } else {
         PREDICTING = false;
@@ -2281,13 +2285,13 @@ function updateLabel(e) {
     const parent = e.target.parentNode;
     parent.innerHTML = tags[label];
 
-    if (label === 'Remove Label') label = '';
     // Update the label record(s) in the db
     const context = parent.closest('table').id;
     let file, start;
     if (context === 'results') {
         [file, start, ,] = unpackNameAttr(activeRow);
-        worker.postMessage({action: 'update-record', file: file, start: start, what: 'label', value: label});
+        worker.postMessage({action: 'update-record', file: file, start: start, what: 'label',
+            value: label === 'Remove Label'? '' : label});
     } else {
         // this is the summary table and a batch update is wanted
         const searchSpecies = parent.parentNode.querySelector('.cname').innerText;

@@ -69,7 +69,7 @@ function createDB(file) {
                     position INTEGER,
                     label    TEXT,
                     comment  TEXT
-                    UNIQUE (dateTime, fileID)
+                        UNIQUE (dateTime, fileID)
                 )`, function (createResult) {
             if (createResult) throw createResult;
         });
@@ -122,6 +122,7 @@ const isDuplicate = (file) => {
         const stmt = db.prepare("SELECT * FROM files WHERE name = (?)");
         stmt.get(file, (err, row) => {
             if (row) {
+                metadata[row.name] = {fileStart: row.filestart, duration: row.duration}
                 resolve(true)
             } else resolve(false)
         })
@@ -315,9 +316,9 @@ function onAbort(args) {
     }
 }
 
-const getDuration = (src) => {
+const getDuration = async (src) => {
     // Use proxy
-    src = proxiedFileCache[src];
+    src = await formatCheck(src);
     return new Promise(function (resolve) {
         const audio = new Audio();
         audio.addEventListener("loadedmetadata", function () {
@@ -368,7 +369,7 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
 }
 
 async function formatCheck(file) {
-    if (proxiedFileCache[file]) return;
+    if (proxiedFileCache[file]) return proxiedFileCache[file];
     if (!file.endsWith('.wav')) {
         const destination = p.join(TEMP, file_cache, p.basename(file) + ".wav");
         proxiedFileCache[file] = destination;
@@ -383,6 +384,7 @@ async function formatCheck(file) {
     } else {
         proxiedFileCache[file] = file;
     }
+    return proxiedFileCache[file];
 }
 
 async function loadAudioFile(args) {
@@ -415,7 +417,7 @@ function addDays(date, days) {
 
 const getMetadata = async (file) => {
     let fileStart;
-    const proxyFile = proxiedFileCache[file]
+    const proxyFile = await formatCheck(file);
     if (!metadata[file]) metadata[file] = {};
 
     return new Promise(async (resolve) => {
@@ -423,9 +425,9 @@ const getMetadata = async (file) => {
         const readStream = fs.createReadStream(proxyFile);
         metadata[file].stat = fs.statSync(file);
         const fileEnd = new Date(metadata[file].stat.mtime);
-        fileStart = new Date(metadata[file].stat.mtime - (metadata[file].duration * 1000))
+        fileStart = new Date(metadata[file].stat.mtime - (metadata[file].duration * 1000));
         // split  the duration of this file across any dates it spans
-        metadata[file].dateDuration = {}
+        metadata[file].dateDuration = {};
         const key = new Date(fileStart);
         key.setHours(0, 0, 0, 0);
         const keyCopy = addDays(key, 0).getTime();
@@ -474,7 +476,8 @@ const getMetadata = async (file) => {
     })
 }
 
-function convertTimeToBytes(time, key) {
+const  convertTimeToBytes = async (time, key) => {
+    if (!metadata[key].bitsPerSample) await getMetadata(key);
     const bytesPerSample = metadata[key].bitsPerSample / 8;
     // get the nearest sample start - they can be 2,3 or 4 bytes representations. Then add the header offest
     return (Math.round((time * metadata[key].bytesPerSec) / bytesPerSample) * bytesPerSample) + metadata[key].head;
@@ -501,11 +504,11 @@ async function getPredictBuffers(args) {
     // Ensure max and min are within range
     start = Math.max(0, start);
     // Handle no start / end supplied
-    const proxyFile = proxiedFileCache[file]
+    const proxyFile = await formatCheck(file);
     end > 0 ? end = Math.min(metadata[file].duration, end) : end = metadata[file].duration;
     if (!start) start = 0;
-    const byteStart = convertTimeToBytes(start, file);
-    const byteEnd = convertTimeToBytes(end, file);
+    const byteStart = await convertTimeToBytes(start, file);
+    const byteEnd = await convertTimeToBytes(end, file);
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
     const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * 3;
     const readStream = fs.createReadStream(proxyFile, {
@@ -536,19 +539,19 @@ async function getPredictBuffers(args) {
 
 const fetchAudioBuffer = async (args) => {
     let start = args.start, end = args.end, file = args.file;
-    let proxyFile;
-    if (!proxiedFileCache[file]) {
-        await formatCheck(file);
-        await getMetadata(file);
-    }
-    proxyFile = proxiedFileCache[file];
-    return new Promise((resolve) => {
+
+    // if (!proxiedFileCache[file]) {
+    //     await formatCheck(file);
+    //     await getMetadata(file);
+    // }
+    const proxyFile = await formatCheck(file);
+    return new Promise(async (resolve) => {
         // Ensure max and min are within range
         start = Math.max(0, start);
         // Handle no end supplied
         end = Math.min(metadata[file].duration, end);
-        const byteStart = convertTimeToBytes(start, file);
-        const byteEnd = convertTimeToBytes(end, file);
+        const byteStart = await convertTimeToBytes(start, file);
+        const byteEnd = await convertTimeToBytes(end, file);
         //if (isNaN(byteEnd)) byteEnd = Infinity;
         // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
         const highWaterMark = byteEnd - byteStart + 1;
@@ -871,6 +874,7 @@ async function parsePredictions(e) {
                 if (!predictionDone) {
                     UI.postMessage({
                         event: 'prediction-done',
+                        file: file,
                         labels: AUDACITY,
                         batchInProgress: FILE_QUEUE.length,
                     });
@@ -977,7 +981,8 @@ const getCachedResults = (args) => {
 }
 
 
-const updateFileTables = (file) => {
+const updateFileTables = async (file) => {
+    if (!metadata[file].dateDuration) await getMetadata(file);
     return new Promise(function (resolve) {
         const newFileStmt = db.prepare("INSERT INTO files VALUES (?,?,?)");
         const selectStmt = db.prepare('SELECT rowid FROM files WHERE name = (?)');
@@ -997,6 +1002,7 @@ const updateFileTables = (file) => {
 
 const onSave2DB = async () => {
     t0 = performance.now();
+    db.run('BEGIN TRANSACTION');
     const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?,?)");
     let filemap = {}
     for (let i = 0; i < RESULTS.length; i++) {
@@ -1013,12 +1019,14 @@ const onSave2DB = async () => {
         stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, filemap[file], position, '', '', (err, row) => {
             UI.postMessage({event: 'progress', text: "Updating Database.", progress: i / RESULTS.length});
             if (i === (RESULTS.length - 1)) {
-                console.log(`Update complete, ${i + 1} records added in ${((performance.now() - t0) / 1000).toFixed(1)} seconds`)
-                UI.postMessage({event: 'progress', progress: 1});
+                db.run('COMMIT', (err, rows) => {
+                    console.log(`Update complete, ${i + 1} records added in ${((performance.now() - t0) / 1000).toFixed(5)} seconds`)
+                    UI.postMessage({event: 'progress', progress: 1});
+                });
             }
         });
-
     }
+
     // newFileStmt.finalize();
     // stmt.finalize();
     // fileStmt.finalize();
@@ -1217,7 +1225,6 @@ const onUpdateFileStart = (args) => {
             } else {
                 if (row) {
                     let rowID = row.rowid;
-                    let delta = row.filestart - newfileStart;
                     db.get(`UPDATE files
                             SET filestart = '${newfileStart}'
                             where rowid = '${rowID}'`, (err, rows) => {
@@ -1225,8 +1232,9 @@ const onUpdateFileStart = (args) => {
                             console.log(err)
                         } else {
                             let t0 = Date.now();
-                            db.get(`UPDATE records set dateTime = position + ${newfileStart} where 
-                                    fileid = ${rowID}`, (err, rowz) => {
+                            db.get(`UPDATE records
+                                    set dateTime = position + ${newfileStart}
+                                    where fileid = ${rowID}`, (err, rowz) => {
                                 if (err) {
                                     console.log(err)
                                 } else {
