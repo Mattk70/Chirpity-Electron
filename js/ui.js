@@ -536,7 +536,6 @@ function postAnalyzeMessage(args) {
         });
     })
     if (args.files.length > 1) {
-        batchFileCount = 0;
         batchInProgress = true;
         fileNumber.innerText = `(File 1 of ${fileList.length})`;
     }
@@ -863,91 +862,6 @@ function updatePrefs() {
     }
 }
 
-//////////// Save Detections  ////////////
-function saveChirp() {
-    predictions['source'] = currentFile;
-    predictions['fileEnd'] = fileEnd;  // Preserve creation date
-    let content = JSON.stringify(predictions);
-    const folder = p.parse(currentFile).dir;
-    const source = p.parse(currentFile).name;
-    gzip(content).then(buffer => {
-        const chirpFile = p.join(folder, source + '.chirp');
-        fs.writeFile(chirpFile, buffer, function (err) {
-            if (err) throw err;
-        })
-    }).catch(e => {
-        console.log(e);
-    })
-}
-
-let savedPredictions;
-
-async function loadChirp(file) {
-    if (file.endsWith('chirp')) {
-        const data = fs.readFileSync(file);
-        await ungzip(data).then(buffer => {
-            buffer = new TextDecoder().decode(buffer);
-            savedPredictions = JSON.parse(buffer);
-            currentFile = savedPredictions['source'];
-            fileEnd = Date.parse(savedPredictions['fileEnd']);
-        })
-        fileList = [currentFile];
-        await loadAudioFile({filePath: currentFile, originalFileEnd: fileEnd});
-        for (const [key, value] of Object.entries(savedPredictions)) {
-            if (key === 'source' || key === 'fileEnd') continue;
-            await renderResult({result: value, index: key, selection: false});
-        }
-        await onPredictionDone({labels: {}});
-    } else {
-        currentFile = file;
-        fileList = [currentFile];
-        await loadAudioFile({filePath: currentFile, originalFileEnd: fileEnd});
-    }
-}
-
-async function saveDetections() {
-    saveChirp();
-    const folder = p.parse(currentFile).dir;
-    const source = p.parse(currentFile).name;
-    const headings = 'Source File,Position,Time of Day,Common Name,Scientific Name,Confidence';
-    let detections_file = p.join(folder, 'Chirpity - detections.csv');
-    let detections_list = '';
-    // Check if file exists
-    let fileExists = true;
-    fs.access(detections_file, fs.F_OK, (err) => {
-        if (err) {
-            // It doesn't, so write headings
-            detections_list = headings + '\n';
-            console.log(err)
-            fileExists = false;
-        }
-        if (fileExists && !confirm('Append results to existing file?')) {
-            // loop through until a new file is found
-            let count = 0;
-            detections_list = headings + '\n';
-            while (fileExists) {
-                if (fs.existsSync(detections_file)) {
-                    count += 1;
-                    detections_file = p.join(folder, `Chirpity - detections (${count}).csv`);
-                } else {
-                    fileExists = false
-                }
-            }
-        }
-        // Convert predictions to csv string buffer
-        for (const [key, value] of Object.entries(predictions)) {
-            if (key === 'source' || key === 'fileEnd') continue;
-            if ((config.nocmig && value.dayNight === 'daytime') || value.excluded) {
-                continue
-            }
-            detections_list += `${source},${value.position},${value.timestamp},${value.cname},${value.sname},${value.score.toFixed(2)}\n`;
-        }
-        fs.appendFile(detections_file, detections_list, function (err) {
-            if (err) throw err;
-            alert('Saved file as: ' + detections_file);
-        })
-    })
-}
 
 /////////////////////////  Window Handlers ////////////////////////////
 let appPath, tempPath;
@@ -1711,12 +1625,12 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         if (e.ctrlKey) showOpenDialog();
     },
     KeyS: function (e) {
-        if (AUDACITY_LABELS.length > 0) {
-            if (e.ctrlKey) saveDetections();
+        if (AUDACITY_LABELS.length) {
+            if (e.ctrlKey) worker.postMessage({action: 'save2db'});
         }
     },
     KeyA: function (e) {
-        if (AUDACITY_LABELS.length > 0) {
+        if (AUDACITY_LABELS.length) {
             if (e.ctrlKey) showSaveDialog();
         }
     },
@@ -2046,56 +1960,17 @@ async function onPredictionDone(args) {
     progressBar.html(0 + '%');
     completeDiv.show();
 
-    if (AUDACITY_LABELS.length > 0) {
-        enableMenuItem(['saveLabels', 'saveDetections', 'save2db']);
+    if (AUDACITY_LABELS.length) {
+        enableMenuItem(['saveLabels', 'save2db']);
         $('.download').removeClass('disabled');
     } else {
-        disableMenuItem(['saveLabels', 'saveDetections', 'save2db']);
+        disableMenuItem(['saveLabels', 'save2db']);
     }
     analyzeLink.disabled = false;
     updateSummary();
     subRows = document.querySelectorAll('.subrow')
 
     speciesFilter = document.querySelectorAll('.speciesFilter');
-
-    const tableRows = document.querySelectorAll('#results > tbody > tr');
-
-    // $(document).on('click', '.speciesHide', function (e) {
-    //     const spinner = e.target.parentNode.firstChild.classList;
-    //     spinner.remove('d-none');
-    //     const targetClass = e.target.classList;
-    //     targetClass.add('d-none');
-    //     e.target.parentNode.previousElementSibling.previousElementSibling.children[1].classList.remove('text-success');
-    //     if (targetClass.contains('text-danger')) {
-    //         targetClass.remove('text-danger')
-    //         setTimeout(matchSpecies, 1, e, 'unhide');
-    //     } else {
-    //         targetClass.add('text-danger');
-    //         speciesName.forEach(function (el) {
-    //             const classes = el.parentNode.classList;
-    //             if (!classes.contains('hidden')) classes.remove('d-none')
-    //         })
-    //         setTimeout(matchSpecies, 1, e, 'hide');
-    //     }
-    //     scrollResults(tableRows[0]);
-    //
-    //     e.stopImmediatePropagation();
-    // });
-
-    $(document).on('click', '.speciesExclude', function (e) {
-        const spinner = e.target.parentNode.firstChild.classList;
-        spinner.remove('d-none');
-        const targetClass = e.target.classList;
-        targetClass.add('d-none');
-        if (targetClass.contains('text-danger')) {
-            targetClass.remove('text-danger')
-            setTimeout(matchSpecies, 1, e, 'unexclude');
-        } else {
-            targetClass.add('text-danger');
-            setTimeout(matchSpecies, 1, e, 'exclude');
-        }
-        e.stopImmediatePropagation();
-    });
     let filterMode = null;
 
     $(document).on('click', '#confidenceFilter', function (e) {
@@ -2406,6 +2281,7 @@ function updateLabel(e) {
     const parent = e.target.parentNode;
     parent.innerHTML = tags[label];
 
+    if (label === 'Remove Label') label = '';
     // Update the label record(s) in the db
     const context = parent.closest('table').id;
     let file, start;
@@ -2592,10 +2468,6 @@ open.addEventListener('click', function () {
     showOpenDialog();
 });
 
-$('#saveDetections').on('click', function () {
-    saveDetections();
-});
-
 $('#saveLabels').on('click', function () {
     showSaveDialog();
 });
@@ -2705,8 +2577,13 @@ document.addEventListener('drop', async (event) => {
         console.log(f)
         filelist.push(f.path);
     }
-    await onOpenFiles({filePaths: filelist})
+    if (filelist.length) await onOpenFiles({filePaths: filelist})
 });
+// Prevent drag for UI elements
+bodyElement.on('dragstart', e => {
+    e.preventDefault()
+})
+
 
 ////////// Date Picker ///////////////
 
@@ -2726,7 +2603,6 @@ $(function () {
         }
     }, function (start, end, label) {
         const newFileStart = start.toDate().getTime();
-        const delta = fileStart - newFileStart;
         fileStart = newFileStart;
         worker.postMessage({action: 'update-file-start', file: currentFile, start: fileStart});
     });
