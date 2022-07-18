@@ -263,16 +263,6 @@ ipcRenderer.on('new-client', (event) => {
                         predicting = true;
                         minConfidence = args.confidence;
                         await processNextFile(args);
-                        // //let selection = false;
-                        // let start, end;
-                        // if (args.start) {
-                        //     start = args.start;
-                        //     end = args.end
-                        // } else {
-                        //     [start, end] = await setStartEnd(args.filePath)
-                        // }
-                        // await doPrediction({start: start, end: end, file: args.filePath, selection: args.selection});
-                        // }
                     }
                 }
                 break;
@@ -317,8 +307,6 @@ function onAbort(args) {
 }
 
 const getDuration = async (src) => {
-    // Use proxy
-    src = await formatCheck(src);
     return new Promise(function (resolve) {
         const audio = new Audio();
         audio.addEventListener("loadedmetadata", function () {
@@ -338,11 +326,6 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
                 }
             })
             .on('progress', (progress) => {
-                // UI.postMessage({
-                //     event: 'progress',
-                //     text: "Decompressing file.",
-                //     progress: progress.targetSize / size
-                // });
                 console.log('Processing: ' + progress.targetSize + ' KB converted');
                 UI.postMessage({
                     event: 'progress',
@@ -354,11 +337,6 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
                 }
             })
             .on('end', () => {
-                // UI.postMessage({
-                //     event: 'progress',
-                //     text: "Decompressing file.",
-                //     progress: 1
-                // });
                 UI.postMessage({event: 'progress', text: 'File decompressed', progress: 1.0})
                 if (finish) {
                     resolve(destination)
@@ -368,31 +346,57 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
     });
 }
 
-async function formatCheck(file) {
+async function getFileHandle(file) {
     if (proxiedFileCache[file]) return proxiedFileCache[file];
+    proxiedFileCache[file] =  await fileLocated(file);
+    // Check for file or archived copy of it.
+    file = proxiedFileCache[file] ;
+    if (!file) return false;
     if (!file.endsWith('.wav')) {
         const destination = p.join(TEMP, file_cache, p.basename(file) + ".wav");
         proxiedFileCache[file] = destination;
         const statsObj = fs.statSync(file);
         const mtime = statsObj.mtime;
         file = await convertFileFormat(file, destination, statsObj.size, function (errorMessage) {
-        }, null, function () {
+        }, null, async function () {
             file = destination;
             console.log("success");
         });
+        // assign the original file save time to the file
         await utimes(file, mtime.getTime());
+
     } else {
         proxiedFileCache[file] = file;
     }
-    return proxiedFileCache[file];
+    await getMetadata(file);
+    return file;
+}
+
+/**
+ * Function to return path to file searching for new extensions if original file has been compressed.
+ * @param file
+ * @returns {Promise<*>}
+ */
+async function fileLocated(file) {
+    const supported_files = ['.mp3', '.m4a', '.wav', '.mpga', '.ogg', '.flac', '.aac', '.mpeg', '.mp4'];
+    const dir = p.parse(file).dir, name = p.parse(file).name;
+    let foundFile;
+    const matchingFileExt = supported_files.find(ext => {
+        foundFile = p.join(dir, name + ext);
+        return fs.existsSync(foundFile)
+    })
+    if (!matchingFileExt) {
+        UI.postMessage({
+            event: 'generate-alert',
+            message: `Unable to load source file with any supported file extension: ${file}`
+        })
+        return false;
+    }
+    return foundFile;
 }
 
 async function loadAudioFile(args) {
     let file = args.filePath;
-    await formatCheck(file);
-    if (!metadata[file]) {
-        metadata[file] = await getMetadata(file)
-    }
     const buffer = await fetchAudioBuffer({file: file, start: 0, end: 20, position: 0})
     const length = buffer.length;
     const myArray = buffer.getChannelData(0);
@@ -417,12 +421,13 @@ function addDays(date, days) {
 
 const getMetadata = async (file) => {
     let fileStart;
-    const proxyFile = await formatCheck(file);
+    // Get the wav version of the file
+    // file = await getFileHandle(file);
     if (!metadata[file]) metadata[file] = {};
 
     return new Promise(async (resolve) => {
         metadata[file].duration = await getDuration(file);
-        const readStream = fs.createReadStream(proxyFile);
+        const readStream = fs.createReadStream(file);
         metadata[file].stat = fs.statSync(file);
         const fileEnd = new Date(metadata[file].stat.mtime);
         fileStart = new Date(metadata[file].stat.mtime - (metadata[file].duration * 1000));
@@ -476,8 +481,8 @@ const getMetadata = async (file) => {
     })
 }
 
-const  convertTimeToBytes = async (time, key) => {
-    if (!metadata[key].bitsPerSample) await getMetadata(key);
+const convertTimeToBytes = async (time, key) => {
+    //if (!metadata[key].bitsPerSample) await getMetadata(key);
     const bytesPerSample = metadata[key].bitsPerSample / 8;
     // get the nearest sample start - they can be 2,3 or 4 bytes representations. Then add the header offest
     return (Math.round((time * metadata[key].bytesPerSec) / bytesPerSample) * bytesPerSample) + metadata[key].head;
@@ -500,18 +505,17 @@ async function setupCtx(chunk, file) {
 
 async function getPredictBuffers(args) {
     let start = args.start, end = args.end, selection = args.selection
-    const file = args.file
+    const file = await getFileHandle(args.file);
     // Ensure max and min are within range
     start = Math.max(0, start);
     // Handle no start / end supplied
-    const proxyFile = await formatCheck(file);
     end > 0 ? end = Math.min(metadata[file].duration, end) : end = metadata[file].duration;
     if (!start) start = 0;
     const byteStart = await convertTimeToBytes(start, file);
     const byteEnd = await convertTimeToBytes(end, file);
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
     const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * 3;
-    const readStream = fs.createReadStream(proxyFile, {
+    const readStream = fs.createReadStream(file, {
         start: byteStart,
         end: byteEnd,
         highWaterMark: highWaterMark
@@ -537,25 +541,27 @@ async function getPredictBuffers(args) {
     })
 }
 
+/**
+ *  Called when file first loaded, when result clicked and when saving or sending file snippets
+ * @param args
+ * @returns {Promise<unknown>}
+ */
 const fetchAudioBuffer = async (args) => {
-    let start = args.start, end = args.end, file = args.file;
-
-    // if (!proxiedFileCache[file]) {
-    //     await formatCheck(file);
-    //     await getMetadata(file);
-    // }
-    const proxyFile = await formatCheck(file);
+    let start = args.start, end = args.end;
+    const file = await getFileHandle(args.file);
+    if (!file) return;
     return new Promise(async (resolve) => {
         // Ensure max and min are within range
         start = Math.max(0, start);
         // Handle no end supplied
+        //if (!metadata[file]) await getMetadata(file);
         end = Math.min(metadata[file].duration, end);
         const byteStart = await convertTimeToBytes(start, file);
         const byteEnd = await convertTimeToBytes(end, file);
         //if (isNaN(byteEnd)) byteEnd = Infinity;
         // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
         const highWaterMark = byteEnd - byteStart + 1;
-        const readStream = fs.createReadStream(proxyFile, {
+        const readStream = fs.createReadStream(file, {
             start: byteStart,
             end: byteEnd,
             highWaterMark: highWaterMark
@@ -891,7 +897,7 @@ async function parsePredictions(e) {
 async function processNextFile(args) {
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
-        await formatCheck(file);
+        await getFileHandle(file);
         let [start, end] = args ? [args.start, args.end] : await setStartEnd(file);
         if (start === 0 && end === 0) {
             // Nothing to do for this file

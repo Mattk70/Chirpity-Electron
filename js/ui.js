@@ -167,13 +167,13 @@ function resetResults() {
 }
 
 async function loadAudioFile(args) {
-    let filePath = args.filePath, originalFileEnd = args.originalFileEnd,
-        workerHasLoadedFile = false;
+    let filePath = args.filePath, originalFileEnd = args.originalFileEnd;
+    workerHasLoadedFile = false;
     try {
         fileEnd = fs.statSync(filePath).mtime;
         worker.postMessage({action: 'file-load-request', filePath: filePath, position: 0});
     } catch (e) {
-        const supported_files = ['.mp3', '.wav', '.mpga', '.ogg', '.flac', '.aac', '.mpeg', '.mp4'];
+        const supported_files = ['.mp3', '.wav', '.mpga', '.ogg', '.flac', '.m4a','.aac', '.mpeg', '.mp4'];
         const dir = p.parse(filePath).dir;
         const name = p.parse(filePath).name;
         let file;
@@ -187,7 +187,7 @@ async function loadAudioFile(args) {
             return fileEnd;
         })
         if (!fileEnd) {
-            alert("Unable to load source file with any supported file extension: " + filePath)
+            alert("Unable 2 load source file with any supported file extension: " + filePath)
         } else {
             if (file) filePath = file;
             if (originalFileEnd) fileEnd = originalFileEnd;
@@ -230,6 +230,7 @@ function updateSpec(buffer, play) {
     waveCanvasElement.width('100%');
     specCanvasElement.width('100%');
     $('.spec-labels').width('55px');
+    adjustSpecDims(true);
     if (play) wavesurfer.play()
 }
 
@@ -260,7 +261,7 @@ function initWavesurfer(args) {
         height: args.height,
         plugins: [
             WaveSurfer.regions.create({
-                regionsMinLength: 0.5,
+                formatTimeCallback: formatRegionTooltip,
                 dragSelection: true,
                 slop: 5,
                 color: "rgba(255, 255, 255, 0.2)"
@@ -680,7 +681,7 @@ function adjustSpecDims(redraw) {
     if (!spectrogramWrapper.hasClass('d-none')) {
         // Expand up to 512px
         const specHeight = Math.min(contentHeight * 0.4, 512);
-        specOffset = specWrapperElement.offsetHeight;
+
         if (currentFile) {
             // give the wrapper space for the transport controls and element padding/margins
             spectrogramWrapper.height(specHeight + 21 + 46.84);
@@ -700,6 +701,7 @@ function adjustSpecDims(redraw) {
             $('.spec-labels').width('55px')
         }
         if (wavesurfer && redraw) wavesurfer.drawBuffer();
+        specOffset = specWrapperElement.offsetHeight;
     } else {
         specOffset = 0
     }
@@ -724,6 +726,16 @@ function adjustSpecDims(redraw) {
  * @param: pxPerSec
  */
 
+
+function formatRegionTooltip (start, end){
+    const length = end - start;
+    if (length === 3) {
+        return `${formatTimeCallback(start)} -  ${formatTimeCallback(end)}`;
+    } else if (length < 1) return `Region length: ${(length * 1000).toFixed(0)} ms`
+    else {
+        return `Region length: ${length.toFixed(3)} seconds`
+    }
+}
 
 function formatTimeCallback(secs) {
     secs = secs.toFixed(2);
@@ -1060,22 +1072,6 @@ function hideBirdList(el) {
         if (list) seenListStore.appendChild(list);
     }
 }
-
-// $(document).on('click', '.edit', function (e) {
-//     e.target.parentNode.onclick = null;
-//     const mode = e.target.classList.contains('text-success') ? 'correct' : 'incorrect';
-//     getSpeciesIndex(e);
-//     if (mode === 'incorrect') {
-//         findSpecies();
-//     } else if (confirm('Submit feedback?')) {
-//         predictions[clickedIndex].filename = predictions[clickedIndex].cname.replace(/\s+/g, '_') +
-//             '~' + predictions[clickedIndex].sname.replace(' ', '_') + '_' + Date.now().toString() + '.mp3';
-//         sendFile('correct', predictions[clickedIndex]);
-//         clickedNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>'
-//     }
-//     e.stopImmediatePropagation();
-//
-// });
 
 let restoreSpecies;
 
@@ -2339,7 +2335,7 @@ function addEvents(element) {
 
 function getSpeciesIndex(e) {
     const clickedNode = e.target.closest('tr');
-    clickedIndex = clickedNode.querySelector('th').innerText
+    clickedIndex = clickedNode.querySelector('th') ? clickedNode.querySelector('th').innerText: null;
 }
 
 const summaryButton = document.getElementById('showSummary');
@@ -2367,29 +2363,11 @@ $(document).on('click', '.rotate', function (e) {
 })
 
 
-// function findSpecies() {
-//     document.removeEventListener('keydown', handleKeyDown, true);
-//     speciesListItems.addClass('d-none');
-//     //const update = new bootstrap.Modal(document.getElementById('editModal'));
-//     document.getElementById('editUL').classList.remove('d-none');
-//     //update.show()
-// }
-
 function formatSpeciesName(filename) {
     filename = filename.replace(' - ', '~').replace(/\s+/g, '_',);
     if (!filename.includes('~')) filename = filename + '~' + filename; // dummy latin
     return filename;
 }
-
-// $('#editModal').on('hidden.bs.modal', function (e) {
-//     enableKeyDownEvent();
-//     if (correctedSpecies) {
-//         predictions[clickedIndex].filename = correctedSpecies + '_' + Date.now().toString() + '.mp3';
-//         sendFile('incorrect', predictions[clickedIndex]);
-//         correctedSpecies = undefined;
-//         clickedNode.innerHTML = 'Submitted <span class="material-icons-two-tone submitted text-success">done</span>';
-//     }
-// })
 
 
 function sendFile(mode, result) {
