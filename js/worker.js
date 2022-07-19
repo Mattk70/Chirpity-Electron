@@ -117,18 +117,6 @@ const clearCache = () => {
     })
 }
 
-const isDuplicate = (file) => {
-    return new Promise((resolve) => {
-        const stmt = db.prepare("SELECT * FROM files WHERE name = (?)");
-        stmt.get(file, (err, row) => {
-            if (row) {
-                metadata[row.name] = {fileStart: row.filestart, duration: row.duration}
-                resolve(true)
-            } else resolve(false)
-        })
-    })
-}
-
 ipcRenderer.on('new-client', (event) => {
     [UI] = event.ports;
     UI.onmessage = async (e) => {
@@ -210,10 +198,10 @@ ipcRenderer.on('new-client', (event) => {
                 latitude = args.lat;
                 longitude = args.lon;
                 nocmig = args.nocmig;
-                const isCached = await isDuplicate(args.filePath);
-                if (isCached && !args.selection) {
+                const cachedFile = await isDuplicate(args.filePath);
+                if (cachedFile && !args.selection) {
                     // Pull the results from the database
-                    const results = await getCachedResults({file: args.filePath, range: {}});
+                    const results = await getCachedResults({file: cachedFile, range: {}});
                     UI.postMessage({event: 'update-audio-duration', value: metadata[args.filePath].duration});
                     results.forEach(result => {
                         //format dates
@@ -331,33 +319,31 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
     });
 }
 
-async function getFileHandle(file) {
+async function getWorkingFile(file) {
     if (proxiedFileCache[file]) return proxiedFileCache[file];
-    proxiedFileCache[file] = await fileLocated(file);
+    proxiedFileCache[file] = await locateFile(file);
     // Check for file or archived copy of it.
     if (!proxiedFileCache[file]) {
         return false
     }
-    ;
-    file = proxiedFileCache[file];
-    if (!file.endsWith('.wav')) {
-        const destination = p.join(TEMP, file_cache, p.basename(file) + ".wav");
-        proxiedFileCache[file] = destination;
-        const statsObj = fs.statSync(file);
+    if (!proxiedFileCache[file].endsWith('.wav')) {
+        const workingFileName = proxiedFileCache[file].replace(/.*\/(.*)\..*/, "$1.wav");
+        const destination = p.join(TEMP, file_cache, workingFileName);
+        const statsObj = fs.statSync(proxiedFileCache[file]);
         const mtime = statsObj.mtime;
-        file = await convertFileFormat(file, destination, statsObj.size, function (errorMessage) {
-        }, null, async function () {
-            file = destination;
-            console.log("success");
-        });
-        // assign the original file save time to the file
-        await utimes(file, mtime.getTime());
 
-    } else {
-        proxiedFileCache[file] = file;
+        proxiedFileCache[file] = await convertFileFormat(proxiedFileCache[file], destination, statsObj.size,
+            function (errorMessage) {
+                console.log(errorMessage)
+            }, null, function () {
+                console.log("success");
+            });
+        // assign the original file save time to the proxy file
+        await utimes(proxiedFileCache[file], mtime.getTime());
+
     }
-    await getMetadata(file);
-    return file;
+    await getMetadata(proxiedFileCache[file]);
+    return proxiedFileCache[file];
 }
 
 /**
@@ -365,8 +351,8 @@ async function getFileHandle(file) {
  * @param file
  * @returns {Promise<*>}
  */
-async function fileLocated(file) {
-    const supported_files = ['.mp3', '.m4a', '.wav', '.mpga', '.ogg', '.flac', '.aac', '.mpeg', '.mp4'];
+async function locateFile(file) {
+    const supported_files = ['.wav', '.m4a', '.mp3', '.mpga', '.ogg', '.flac', '.aac', '.mpeg', '.mp4'];
     const dir = p.parse(file).dir, name = p.parse(file).name;
     let foundFile;
     const matchingFileExt = supported_files.find(ext => {
@@ -384,7 +370,7 @@ async function loadAudioFile(args) {
     const start = args.start || 0;
     const end = args.end || 20;
     const position = args.position || 0;
-    file = await getFileHandle(file);
+    file = await getWorkingFile(file);
     if (file) {
         const buffer = await fetchAudioBuffer({file: file, start: start, end: end, position: position});
         const length = buffer.length;
@@ -424,10 +410,10 @@ const getMetadata = async (file) => {
     return new Promise(async (resolve) => {
         // CHeck the database first, so we honour any manual update.
         const savedMeta = await getFileInfo(file);
-        metadata[file].duration = savedMeta ? savedMeta.duration : await getDuration(file);
+        metadata[file].duration = savedMeta && savedMeta.duration ? savedMeta.duration : await getDuration(file);
         if (savedMeta && savedMeta.filestart) {
-            fileStart = new Date (savedMeta.filestart);
-            fileEnd = new Date (fileStart.getTime() + (metadata[file].duration * 1000));
+            fileStart = new Date(savedMeta.filestart);
+            fileEnd = new Date(fileStart.getTime() + (metadata[file].duration * 1000));
         } else {
             metadata[file].stat = fs.statSync(file);
             fileEnd = new Date(metadata[file].stat.mtime);
@@ -487,7 +473,6 @@ const getMetadata = async (file) => {
 }
 
 const convertTimeToBytes = async (time, key) => {
-    //if (!metadata[key].bitsPerSample) await getMetadata(key);
     const bytesPerSample = metadata[key].bitsPerSample / 8;
     // get the nearest sample start - they can be 2,3 or 4 bytes representations. Then add the header offest
     return (Math.round((time * metadata[key].bytesPerSec) / bytesPerSample) * bytesPerSample) + metadata[key].head;
@@ -510,7 +495,7 @@ async function setupCtx(chunk, file) {
 
 async function getPredictBuffers(args) {
     let start = args.start, end = args.end, selection = args.selection
-    const file = await getFileHandle(args.file);
+    const file = await getWorkingFile(args.file);
     // Ensure max and min are within range
     start = Math.max(0, start);
     // Handle no start / end supplied
@@ -553,13 +538,12 @@ async function getPredictBuffers(args) {
  */
 const fetchAudioBuffer = async (args) => {
     let start = args.start, end = args.end;
-    const file = await getFileHandle(args.file);
+    const file = await getWorkingFile(args.file);
     if (!file) return;
     return new Promise(async (resolve) => {
         // Ensure max and min are within range
         start = Math.max(0, start);
         // Handle no end supplied
-        //if (!metadata[file]) await getMetadata(file);
         end = Math.min(metadata[file].duration, end);
         const byteStart = await convertTimeToBytes(start, file);
         const byteEnd = await convertTimeToBytes(end, file);
@@ -636,7 +620,7 @@ async function feedChunksToModel(channelData, increment, chunkStart, file, durat
         }
     }
     //clear up remainder less than BATCH_SIZE
-    if (chunks.length > 0) await sendMessageToWorker(chunkStart, chunks, file, duration, selection);
+    if (chunks.length) await sendMessageToWorker(chunkStart, chunks, file, duration, selection);
 }
 
 
@@ -831,14 +815,15 @@ function spawnWorker(useWhitelist, batchSize) {
     console.log('spawning worker')
     predictWorker = new Worker('./js/model.js');
     predictWorker.postMessage(['load', appPath, useWhitelist, batchSize])
-    predictWorker.onmessage = (e) => {
-        parsePredictions(e)
+    predictWorker.onmessage = async (e) => {
+        await parsePredictions(e)
     }
 }
 
 async function parsePredictions(e) {
     const response = e.data;
-    const file = response.file;
+    // Restore Original file path
+    const file = getKeyByValue(proxiedFileCache, response.file);
     if (response['message'] === 'model-ready') {
         chunkLength = response['chunkLength'];
         sampleRate = response['sampleRate'];
@@ -852,7 +837,7 @@ async function parsePredictions(e) {
             const result = prediction[1];
             result.file = file;
             const audacity = prediction[2];
-            UI.postMessage({event: 'progress', progress: (position / metadata[file].duration)});
+            UI.postMessage({event: 'progress', progress: (position / metadata[proxiedFileCache[file]].duration)});
             //console.log('Prediction received from worker', result);
             if (result.score > minConfidence) {
                 index++;
@@ -902,7 +887,7 @@ async function parsePredictions(e) {
 async function processNextFile(args) {
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
-        await getFileHandle(file);
+        file = await getWorkingFile(file);
         let [start, end] = args ? [args.start, args.end] : await setStartEnd(file);
         if (start === 0 && end === 0) {
             // Nothing to do for this file
@@ -991,6 +976,21 @@ const getCachedResults = (args) => {
     })
 }
 
+const isDuplicate = (file) => {
+    file = getKeyByValue(proxiedFileCache, file);
+    const baseName = file.replace(/^(.*)\..*$/g, '$1').replace("'", "''");
+    return new Promise((resolve) => {
+        db.get(`SELECT *
+                FROM files
+                WHERE name LIKE '${baseName}%'`, (err, row) => {
+            if (row) {
+                //metadata[row.name] = {fileStart: row.filestart, duration: row.duration}
+                resolve(row.name)
+            } else resolve(false)
+        })
+    })
+}
+
 function getKeyByValue(object, value) {
     return Object.keys(object).find(key => object[key] === value);
 }
@@ -998,7 +998,7 @@ function getKeyByValue(object, value) {
 const getFileInfo = async (file) => {
     file = getKeyByValue(proxiedFileCache, file);
     // look for file, ignore extension
-    const baseName = file.replace(/^(.*)\..*$/g, '$1');
+    const baseName = file.replace(/^(.*)\..*$/g, '$1').replace("'", "''");
     return new Promise(function (resolve, reject) {
         db.get(`SELECT *
                 FROM files
@@ -1012,7 +1012,7 @@ const getFileInfo = async (file) => {
 }
 
 const updateFileTables = async (file) => {
-    if (!metadata[file].dateDuration) await getMetadata(file);
+    //if (!metadata[file].dateDuration) await getMetadata(file);
     return new Promise(function (resolve) {
         const newFileStmt = db.prepare("INSERT INTO files VALUES (?,?,?)");
         const selectStmt = db.prepare('SELECT rowid FROM files WHERE name = (?)');
