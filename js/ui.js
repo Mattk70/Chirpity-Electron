@@ -171,7 +171,7 @@ async function loadAudioFile(args) {
     workerHasLoadedFile = false;
     try {
         fileEnd = fs.statSync(filePath).mtime;
-        worker.postMessage({action: 'file-load-request', filePath: filePath, position: 0});
+        worker.postMessage({action: 'file-load-request', file: filePath, position: 0});
     } catch (e) {
         const supported_files = ['.mp3', '.wav', '.mpga', '.ogg', '.flac', '.m4a','.aac', '.mpeg', '.mp4'];
         const dir = p.parse(filePath).dir;
@@ -193,7 +193,7 @@ async function loadAudioFile(args) {
             if (originalFileEnd) fileEnd = originalFileEnd;
             worker.postMessage({
                 action: 'file-load-request',
-                filePath: filePath,
+                file: filePath,
                 preserveResults: preserveResults,
                 position: 0
             });

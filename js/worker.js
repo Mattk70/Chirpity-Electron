@@ -165,27 +165,12 @@ ipcRenderer.on('new-client', (event) => {
             case 'file-load-request':
                 index = 0;
                 if (predicting) onAbort(args);
-                console.log('Worker received audio ' + args.filePath);
+                console.log('Worker received audio ' + args.file);
                 await loadAudioFile(args);
 
                 break;
             case 'update-buffer':
-                const buffer = await fetchAudioBuffer(args);
-                const length = buffer.length;
-                const myArray = buffer.getChannelData(0);
-                const file = args.file;
-                UI.postMessage({
-                    event: 'worker-loaded-audio',
-                    fileStart: metadata[file].fileStart,
-                    sourceDuration: metadata[file].duration,
-                    bufferBegin: args.start,
-                    file: file,
-                    position: args.position,
-                    length: length,
-                    contents: myArray,
-                    region: args.region
-                })
-
+                await loadAudioFile(args);
                 break;
             case 'explore':
                 // reset results table
@@ -348,10 +333,13 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
 
 async function getFileHandle(file) {
     if (proxiedFileCache[file]) return proxiedFileCache[file];
-    proxiedFileCache[file] =  await fileLocated(file);
+    proxiedFileCache[file] = await fileLocated(file);
     // Check for file or archived copy of it.
-    file = proxiedFileCache[file] ;
-    if (!file) return false;
+    if (!proxiedFileCache[file]) {
+        return false
+    }
+    ;
+    file = proxiedFileCache[file];
     if (!file.endsWith('.wav')) {
         const destination = p.join(TEMP, file_cache, p.basename(file) + ".wav");
         proxiedFileCache[file] = destination;
@@ -386,32 +374,40 @@ async function fileLocated(file) {
         return fs.existsSync(foundFile)
     })
     if (!matchingFileExt) {
-        UI.postMessage({
-            event: 'generate-alert',
-            message: `Unable to load source file with any supported file extension: ${file}`
-        })
         return false;
     }
     return foundFile;
 }
 
 async function loadAudioFile(args) {
-    let file = args.filePath;
-    const buffer = await fetchAudioBuffer({file: file, start: 0, end: 20, position: 0})
-    const length = buffer.length;
-    const myArray = buffer.getChannelData(0);
-    UI.postMessage({
-        event: 'worker-loaded-audio',
-        fileStart: metadata[file].fileStart,
-        sourceDuration: metadata[file].duration,
-        bufferBegin: 0,
-        file: file,
-        position: 0,
-        length: length,
-        contents: myArray,
-    })
-
+    let file = args.file;
+    const start = args.start || 0;
+    const end = args.end || 20;
+    const position = args.position || 0;
+    file = await getFileHandle(file);
+    if (file) {
+        const buffer = await fetchAudioBuffer({file: file, start: start, end: end, position: position});
+        const length = buffer.length;
+        const myArray = buffer.getChannelData(0);
+        UI.postMessage({
+            event: 'worker-loaded-audio',
+            fileStart: metadata[file].fileStart,
+            sourceDuration: metadata[file].duration,
+            bufferBegin: start,
+            file: file,
+            position: position,
+            length: length,
+            contents: myArray,
+            region: args.region
+        })
+    } else {
+        UI.postMessage({
+            event: 'generate-alert',
+            message: `Unable to load source file with any supported file extension: ${args.file}`
+        })
+    }
 }
+
 
 function addDays(date, days) {
     let result = new Date(date);
@@ -420,17 +416,24 @@ function addDays(date, days) {
 }
 
 const getMetadata = async (file) => {
-    let fileStart;
-    // Get the wav version of the file
-    // file = await getFileHandle(file);
-    if (!metadata[file]) metadata[file] = {};
+    // If we have it already, no need to do any more
+    if (metadata[file]) return;
 
+    let fileStart, fileEnd;
+    metadata[file] = {};
     return new Promise(async (resolve) => {
-        metadata[file].duration = await getDuration(file);
-        const readStream = fs.createReadStream(file);
-        metadata[file].stat = fs.statSync(file);
-        const fileEnd = new Date(metadata[file].stat.mtime);
-        fileStart = new Date(metadata[file].stat.mtime - (metadata[file].duration * 1000));
+        // CHeck the database first, so we honour any manual update.
+        const savedMeta = await getFileInfo(file);
+        metadata[file].duration = savedMeta ? savedMeta.duration : await getDuration(file);
+        if (savedMeta && savedMeta.filestart) {
+            fileStart = new Date (savedMeta.filestart);
+            fileEnd = new Date (fileStart.getTime() + (metadata[file].duration * 1000));
+        } else {
+            metadata[file].stat = fs.statSync(file);
+            fileEnd = new Date(metadata[file].stat.mtime);
+            fileStart = new Date(metadata[file].stat.mtime - (metadata[file].duration * 1000));
+        }
+
         // split  the duration of this file across any dates it spans
         metadata[file].dateDuration = {};
         const key = new Date(fileStart);
@@ -445,8 +448,9 @@ const getMetadata = async (file) => {
             metadata[file].dateDuration[keyCopy] = (key2Copy - fileStart) / 1000;
             metadata[file].dateDuration[key2Copy] = metadata[file].duration - metadata[file].dateDuration[keyCopy];
         }
-
-        fileStart = new Date(metadata[file].stat.mtime - (metadata[file].duration * 1000)).getTime();
+        // Now we have completed the date comparison above, we convert fileStart to millis
+        fileStart = fileStart.getTime();
+        // Add dawn and dusk for the file to the metadata
         let astro = SunCalc.getTimes(fileStart, latitude, longitude);
         metadata[file].dusk = astro.dusk.getTime();
         // If file starts after dark, dawn is next day
@@ -457,6 +461,7 @@ const getMetadata = async (file) => {
             metadata[file].dawn = astro.dawn.getTime();
         }
 
+        const readStream = fs.createReadStream(file);
         readStream.on('data', async chunk => {
             let wav = new wavefileReader.WaveFileReader();
             wav.fromBuffer(chunk);
@@ -986,6 +991,25 @@ const getCachedResults = (args) => {
     })
 }
 
+function getKeyByValue(object, value) {
+    return Object.keys(object).find(key => object[key] === value);
+}
+
+const getFileInfo = async (file) => {
+    file = getKeyByValue(proxiedFileCache, file);
+    // look for file, ignore extension
+    const baseName = file.replace(/^(.*)\..*$/g, '$1');
+    return new Promise(function (resolve, reject) {
+        db.get(`SELECT *
+                FROM files
+                WHERE name LIKE '${baseName}%'`, (err, row) => {
+            if (err) console.log('There was an error ', err)
+            else {
+                resolve(row)
+            }
+        })
+    })
+}
 
 const updateFileTables = async (file) => {
     if (!metadata[file].dateDuration) await getMetadata(file);
@@ -1032,10 +1056,6 @@ const onSave2DB = async () => {
             }
         });
     }
-
-    // newFileStmt.finalize();
-    // stmt.finalize();
-    // fileStmt.finalize();
 }
 
 const getSeasonRecords = (species, season) => {
