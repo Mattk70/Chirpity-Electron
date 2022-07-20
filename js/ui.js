@@ -173,7 +173,7 @@ async function loadAudioFile(args) {
         fileEnd = fs.statSync(filePath).mtime;
         worker.postMessage({action: 'file-load-request', file: filePath, position: 0});
     } catch (e) {
-        const supported_files = ['.mp3', '.wav', '.mpga', '.ogg', '.flac', '.m4a','.aac', '.mpeg', '.mp4'];
+        const supported_files = ['.mp3', '.wav', '.mpga', '.ogg', '.flac', '.m4a', '.aac', '.mpeg', '.mp4'];
         const dir = p.parse(filePath).dir;
         const name = p.parse(filePath).name;
         let file;
@@ -727,7 +727,7 @@ function adjustSpecDims(redraw) {
  */
 
 
-function formatRegionTooltip (start, end){
+function formatRegionTooltip(start, end) {
     const length = end - start;
     if (length === 3) {
         return `${formatTimeCallback(start)} -  ${formatTimeCallback(end)}`;
@@ -1073,7 +1073,7 @@ function hideBirdList(el) {
     }
 }
 
-let restoreSpecies;
+let restoreSpecies, currentID;
 
 $(document).on('click', '.edit', editID);
 $(document).on('dblclick', '.cname', editID);
@@ -1083,8 +1083,11 @@ function editID(e) {
     getSpeciesIndex(e);
     const currentRow = e.target.closest('tr');
     let cname = currentRow.querySelector('.cname');
-    // save the original species in case edit is aborted or doesn't change species
+    // save the original cell contents in case edit is aborted or doesn't change species
     restoreSpecies = cname.innerHTML;
+    // save the original species to use in batch edit search
+    const speciesTextContainer = cname.querySelector('span.pointer') || cname;
+    currentID = speciesTextContainer.innerHTML;
     cname.innerHTML = `<div id='edit' class="species-selector"><input type="text" class="input rounded-pill" id="editInput" 
                     placeholder="${cname.innerText}"><div class="editing bird-list-wrapper"></div></div>`;
 }
@@ -1149,7 +1152,7 @@ function editResult(cname, sname, cell) {
     cell.innerHTML = `${cname} <i>${sname}</i>`;
     // Update the name attribute (it must be the first attribute in the tag.)
     const [file, start, end, currentRow] = unpackNameAttr(cell, cname);
-    updateRecordID(file, start, end, cname);
+    updateRecordID(file, start, end, cname, sname);
     updateSummary();
     // reflect the change on the spectrogram by simulating a click
     currentRow.click();
@@ -1159,10 +1162,13 @@ function batchEditResult(cname, sname, cell) {
     cell.innerHTML = `<span class="spinner-border spinner-border-sm text-success d-none" role="status"></span>
     <span id="${cname} ${sname}" class="pointer">${cname} <i>${sname}</i></span>`;
     speciesName.forEach(el => {
-        // Update the row name attr so labels update on the region
-        const [file, start, end, ,] = unpackNameAttr(el, cname);
-        updateRecordID(file, start, end, cname, sname);
-        el.innerHTML = `${cname} <i>${sname}</i>`;
+        // Update matching row name attrs so labels update on the region
+        if (el.innerHTML === currentID) {
+            clickedIndex = el.closest('tr').querySelector('th').innerText;
+            const [file, start, end, ,] = unpackNameAttr(el, cname);
+            updateRecordID(file, start, end, cname, sname);
+            el.innerHTML = `${cname} <i>${sname}</i>`;
+        }
     })
     updateSummary();
 }
@@ -1177,10 +1183,10 @@ function unpackNameAttr(el, cname) {
 }
 
 
-function updateRecordID(file, start, end, cname) {
+function updateRecordID(file, start, end, cname, sname) {
     worker.postMessage({action: 'update-record', file: file, start: start, what: 'ID', value: cname});
-    predictions[clickedIndex].filename = predictions[clickedIndex].cname.replace(/\s+/g, '_') +
-        '_' + Date.now().toString() + '.mp3';
+    predictions[clickedIndex].filename =
+        `${cname.replace(/\s+/g, '_')}~${sname.replace(/\s+/g, '_')}~${Date.now().toString()}.mp3`;
     sendFile('incorrect', predictions[clickedIndex]);
 }
 
@@ -2286,8 +2292,10 @@ function updateLabel(e) {
     let file, start;
     if (context === 'results') {
         [file, start, ,] = unpackNameAttr(activeRow);
-        worker.postMessage({action: 'update-record', file: file, start: start, what: 'label',
-            value: label === 'Remove Label'? '' : label});
+        worker.postMessage({
+            action: 'update-record', file: file, start: start, what: 'label',
+            value: label === 'Remove Label' ? '' : label
+        });
     } else {
         // this is the summary table and a batch update is wanted
         const searchSpecies = parent.parentNode.querySelector('.cname').innerText;
@@ -2335,7 +2343,7 @@ function addEvents(element) {
 
 function getSpeciesIndex(e) {
     const clickedNode = e.target.closest('tr');
-    clickedIndex = clickedNode.querySelector('th') ? clickedNode.querySelector('th').innerText: null;
+    clickedIndex = clickedNode.querySelector('th') ? clickedNode.querySelector('th').innerText : null;
 }
 
 const summaryButton = document.getElementById('showSummary');

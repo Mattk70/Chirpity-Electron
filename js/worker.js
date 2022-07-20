@@ -401,7 +401,7 @@ function addDays(date, days) {
     return result;
 }
 
-const getMetadata = async (file) => {
+const getMetadata = (file) => {
     // If we have it already, no need to do any more
     if (metadata[file]) return;
 
@@ -1045,16 +1045,19 @@ const onSave2DB = async () => {
         const conf3 = RESULTS[i].score3;
         const position = new Date(RESULTS[i].position).getTime();
         const file = RESULTS[i].file;
+        const comment = RESULTS[i].comment;
+        const label = RESULTS[i].label;
         if (!filemap[file]) filemap[file] = await updateFileTables(file);
-        stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, filemap[file], position, '', '', (err, row) => {
-            UI.postMessage({event: 'progress', text: "Updating Database.", progress: i / RESULTS.length});
-            if (i === (RESULTS.length - 1)) {
-                db.run('COMMIT', (err, rows) => {
-                    console.log(`Update complete, ${i + 1} records added in ${((performance.now() - t0) / 1000).toFixed(5)} seconds`)
-                    UI.postMessage({event: 'progress', progress: 1});
-                });
-            }
-        });
+        stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, filemap[file], position, comment, label,
+            (err, row) => {
+                UI.postMessage({event: 'progress', text: "Updating Database.", progress: i / RESULTS.length});
+                if (i === (RESULTS.length - 1)) {
+                    db.run('COMMIT', (err, rows) => {
+                        console.log(`Update complete, ${i + 1} records added in ${((performance.now() - t0) / 1000).toFixed(5)} seconds`)
+                        UI.postMessage({event: 'progress', progress: 1});
+                    });
+                }
+            });
     }
 }
 
@@ -1229,17 +1232,6 @@ const getFileStart = (file) => {
     })
 }
 
-
-const getBirdID = (cname) => {
-    return new Promise(function (resolve, reject) {
-        db.get(`SELECT id
-                from species
-                where cname = '${cname}'`, (err, row) => {
-            err ? console.log(err) : resolve(row.id)
-        })
-    })
-}
-
 const onUpdateFileStart = (args) => {
     const file = args.file.replace("'", "''"), newfileStart = args.start;
     return new Promise(function (resolve, reject) {
@@ -1275,16 +1267,52 @@ const onUpdateFileStart = (args) => {
         })
     })
 }
+let speciesCache = {};
+
+const cacheSpecies = (cname) => {
+    cname = cname.replace("'", "''");
+    return new Promise((resolve, reject) => {
+        db.get(`SELECT *
+                FROM SPECIES
+                WHERE cname = '${cname}'`, (err, row) => {
+            if (err) reject(err)
+            else {
+                speciesCache[cname] = {id: row.id, cname: row.cname, sname: row.sname}
+                resolve(speciesCache)
+            }
+        })
+    })
+}
+
+const updateResults = async (args) => {
+    if (args.what === 'ID' && !speciesCache[args.value]) await cacheSpecies(args.value);
+    let obj = RESULTS.find(o => {
+        if (o.start === args.start && o.file === args.file) {
+            if (args.what === 'ID') {
+
+                const rec = speciesCache[args.value]
+                o.id_1 = rec.id;
+                o.cname = rec.cname;
+                o.sname = rec.sname;
+            } else if (args.what === 'comment') {
+                o.comment = args.value;
+            } else if (args.what === 'label') {
+                o.label = args.value;
+            }
+            return true // Stop the search
+        }
+    })
+}
 
 const onUpdateRecord = async (args) => {
+    args.start = parseFloat(args.start);
     let what = args.what, file = args.file, start = args.start, value = args.value;
     // Sanitize input
     if (!value) value = '';
+    await updateResults(args);
     if (what === 'ID') {
         what = 'birdID1';
-        value = await getBirdID(value);
-    } else {
-        value = value.replace("'", "''")
+        value = speciesCache[args.value].id; //await getBirdID(value);
     }
     if (!metadata[file]) metadata[file] = {};
     if (!metadata[file].fileStart) {
@@ -1299,8 +1327,8 @@ const onUpdateRecord = async (args) => {
                 reject(err)
             } else {
                 resolve(row)
+                if (row) console.log(`Updated ${what}, setting ${dateTime} to ${value}`);
             }
-            console.log(`Updated ${what}, setting ${dateTime} to ${value}`);
         })
     })
 }
