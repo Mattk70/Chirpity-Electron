@@ -433,7 +433,7 @@ async function onOpenFiles(args) {
 
 async function onLoadResults(args) {
     console.log("result file received: " + args.file)
-    await loadChirp(args.file);
+    //await loadChirp(args.file);
 }
 
 /**

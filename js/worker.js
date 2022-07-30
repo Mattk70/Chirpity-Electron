@@ -17,8 +17,6 @@ let TEMP;
 
 let db, nocmig, latitude, longitude;
 
-let proxiedFileCache = {};
-
 function createDB(file) {
     console.log("creating database file");
     fs.openSync(file, "w");
@@ -109,7 +107,6 @@ let FILE_QUEUE = [];
 const clearCache = () => {
     return new Promise((resolve) => {
         // clear & recreate file cache folder
-        proxiedFileCache = {}
         fs.rmSync(p.join(TEMP, file_cache), {recursive: true, force: true});
         fs.mkdir(p.join(TEMP, file_cache), (err, path) => {
             resolve(path);
@@ -319,31 +316,39 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
     });
 }
 
+/**
+ * getWorkingFile called by loadAudioFile, getPredictBuffers, fetchAudioBuffer and processNextFile
+ * purpose is to create a wav file from the source file. If the file *is* a wav file, it returns
+ * that file, else it checks for a temp wav file, if not found it calls convertFileFormat to extract
+ * and create a wav file in the users temp folder and returns that file's path. The flag for this file is set in the
+ * metadata object as metadata[file].proxy
+ *
+ * @param file: full path to source file
+ * @returns {Promise<boolean|*>}
+ */
 async function getWorkingFile(file) {
-    if (proxiedFileCache[file]) return proxiedFileCache[file];
-    proxiedFileCache[file] = await locateFile(file);
-    // Check for file or archived copy of it.
-    if (!proxiedFileCache[file]) {
-        return false
-    }
-    if (!proxiedFileCache[file].endsWith('.wav')) {
-        const workingFileName = proxiedFileCache[file].replace(/.*\/(.*)\..*/, "$1.wav");
+    if (metadata[file]) return metadata[file].proxy;
+    let proxy = file;
+    if (!file.endsWith('.wav')) {
+        const workingFileName = file.replace(/.*\/(.*)\..*/, "$1.wav");
         const destination = p.join(TEMP, file_cache, workingFileName);
-        const statsObj = fs.statSync(proxiedFileCache[file]);
-        const mtime = statsObj.mtime;
+        // get some metadata from the source file
+        const statsObj = fs.statSync(file);
+        const sourceMtime = statsObj.mtime;
+        //console.log(Date.UTC(sourceMtime));
 
-        proxiedFileCache[file] = await convertFileFormat(proxiedFileCache[file], destination, statsObj.size,
+        proxy = await convertFileFormat(file, destination, statsObj.size,
             function (errorMessage) {
                 console.log(errorMessage)
             }, null, function () {
                 console.log("success");
             });
-        // assign the original file save time to the proxy file
-        await utimes(proxiedFileCache[file], mtime.getTime());
+        // assign the source file's save time to the proxy file
+        await utimes(proxy, sourceMtime.getTime());
 
     }
-    await getMetadata(proxiedFileCache[file]);
-    return proxiedFileCache[file];
+    await getMetadata(file, proxy);
+    return proxy;
 }
 
 /**
@@ -370,7 +375,7 @@ async function loadAudioFile(args) {
     const start = args.start || 0;
     const end = args.end || 20;
     const position = args.position || 0;
-    file = await getWorkingFile(file);
+    await getWorkingFile(file);
     if (file) {
         const buffer = await fetchAudioBuffer({file: file, start: start, end: end, position: position});
         const length = buffer.length;
@@ -401,74 +406,86 @@ function addDays(date, days) {
     return result;
 }
 
-const getMetadata = (file) => {
-    // If we have it already, no need to do any more
-    if (metadata[file]) return;
-
-    let fileStart, fileEnd;
-    metadata[file] = {};
+/**
+ * Called by getWorkingFile, setStartEnd?, getFileStart?,
+ * Assigns file metadata to a metadata cache object. file is the key, and is the source file
+ * proxy if required if the source file is not a wav to populate the headers
+ * @param file
+ * @param proxy
+ * @returns {Promise<unknown>}
+ */
+const getMetadata = (file, proxy) => {
     return new Promise(async (resolve) => {
-        // CHeck the database first, so we honour any manual update.
-        const savedMeta = await getFileInfo(file);
-        metadata[file].duration = savedMeta && savedMeta.duration ? savedMeta.duration : await getDuration(file);
-        if (savedMeta && savedMeta.filestart) {
-            fileStart = new Date(savedMeta.filestart);
-            fileEnd = new Date(fileStart.getTime() + (metadata[file].duration * 1000));
+        if (metadata[file]) {
+            resolve(metadata[file])
         } else {
-            metadata[file].stat = fs.statSync(file);
-            fileEnd = new Date(metadata[file].stat.mtime);
-            fileStart = new Date(metadata[file].stat.mtime - (metadata[file].duration * 1000));
-        }
+            // If we have it already, no need to do any more
+            if (!proxy) proxy = file;
+            let fileStart, fileEnd;
+            metadata[file] = {proxy: proxy};
+            if (!proxy) proxy = file;
+            // CHeck the database first, so we honour any manual update.
+            const savedMeta = await getFileInfo(file);
+            metadata[file].duration = savedMeta && savedMeta.duration ? savedMeta.duration : await getDuration(file);
+            if (savedMeta && savedMeta.filestart) {
+                fileStart = new Date(savedMeta.filestart);
+                fileEnd = new Date(fileStart.getTime() + (metadata[file].duration * 1000));
+            } else {
+                metadata[file].stat = fs.statSync(file);
+                fileEnd = new Date(metadata[file].stat.mtime);
+                fileStart = new Date(metadata[file].stat.mtime - (metadata[file].duration * 1000));
+            }
 
-        // split  the duration of this file across any dates it spans
-        metadata[file].dateDuration = {};
-        const key = new Date(fileStart);
-        key.setHours(0, 0, 0, 0);
-        const keyCopy = addDays(key, 0).getTime();
-        if (fileStart.getDate() === fileEnd.getDate()) {
-            metadata[file].dateDuration[keyCopy] = metadata[file].duration;
-        } else {
-            const key2 = addDays(key, 1);
+            // split  the duration of this file across any dates it spans
+            metadata[file].dateDuration = {};
+            const key = new Date(fileStart);
+            key.setHours(0, 0, 0, 0);
+            const keyCopy = addDays(key, 0).getTime();
+            if (fileStart.getDate() === fileEnd.getDate()) {
+                metadata[file].dateDuration[keyCopy] = metadata[file].duration;
+            } else {
+                const key2 = addDays(key, 1);
 
-            const key2Copy = addDays(key2, 0).getTime();
-            metadata[file].dateDuration[keyCopy] = (key2Copy - fileStart) / 1000;
-            metadata[file].dateDuration[key2Copy] = metadata[file].duration - metadata[file].dateDuration[keyCopy];
-        }
-        // Now we have completed the date comparison above, we convert fileStart to millis
-        fileStart = fileStart.getTime();
-        // Add dawn and dusk for the file to the metadata
-        let astro = SunCalc.getTimes(fileStart, latitude, longitude);
-        metadata[file].dusk = astro.dusk.getTime();
-        // If file starts after dark, dawn is next day
-        if (fileStart > astro.dusk.getTime()) {
-            astro = SunCalc.getTimes(fileStart + 8.47e+7, latitude, longitude);
-            metadata[file].dawn = astro.dawn.getTime();
-        } else {
-            metadata[file].dawn = astro.dawn.getTime();
-        }
-
-        const readStream = fs.createReadStream(file);
-        readStream.on('data', async chunk => {
-            let wav = new wavefileReader.WaveFileReader();
-            wav.fromBuffer(chunk);
-            // Extract Header
-            let headerEnd;
-            wav.signature.subChunks.forEach(el => {
-                if (el['chunkId'] === 'data') {
-                    headerEnd = el.chunkData.start;
-                }
+                const key2Copy = addDays(key2, 0).getTime();
+                metadata[file].dateDuration[keyCopy] = (key2Copy - fileStart) / 1000;
+                metadata[file].dateDuration[key2Copy] = metadata[file].duration - metadata[file].dateDuration[keyCopy];
+            }
+            // Now we have completed the date comparison above, we convert fileStart to millis
+            fileStart = fileStart.getTime();
+            // Add dawn and dusk for the file to the metadata
+            let astro = SunCalc.getTimes(fileStart, latitude, longitude);
+            metadata[file].dusk = astro.dusk.getTime();
+            // If file starts after dark, dawn is next day
+            if (fileStart > astro.dusk.getTime()) {
+                astro = SunCalc.getTimes(fileStart + 8.47e+7, latitude, longitude);
+                metadata[file].dawn = astro.dawn.getTime();
+            } else {
+                metadata[file].dawn = astro.dawn.getTime();
+            }
+            // We use proxy here are the file *must* be a wav file
+            const readStream = fs.createReadStream(proxy);
+            readStream.on('data', async chunk => {
+                let wav = new wavefileReader.WaveFileReader();
+                wav.fromBuffer(chunk);
+                // Extract Header
+                let headerEnd;
+                wav.signature.subChunks.forEach(el => {
+                    if (el['chunkId'] === 'data') {
+                        headerEnd = el.chunkData.start;
+                    }
+                })
+                // Update relevant file properties
+                metadata[file].head = headerEnd;
+                metadata[file].header = chunk.slice(0, headerEnd)
+                metadata[file].bytesPerSec = wav.fmt.byteRate;
+                metadata[file].numChannels = wav.fmt.numChannels;
+                metadata[file].sampleRate = wav.fmt.sampleRate;
+                metadata[file].bitsPerSample = wav.fmt.bitsPerSample
+                metadata[file].fileStart = fileStart;
+                readStream.close()
+                resolve(metadata[file]);
             })
-            // Update relevant file properties
-            metadata[file].head = headerEnd;
-            metadata[file].header = chunk.slice(0, headerEnd)
-            metadata[file].bytesPerSec = wav.fmt.byteRate;
-            metadata[file].numChannels = wav.fmt.numChannels;
-            metadata[file].sampleRate = wav.fmt.sampleRate;
-            metadata[file].bitsPerSample = wav.fmt.bitsPerSample
-            metadata[file].fileStart = fileStart;
-            readStream.close()
-            resolve(metadata[file]);
-        })
+        }
     })
 }
 
@@ -494,8 +511,9 @@ async function setupCtx(chunk, file) {
 }
 
 async function getPredictBuffers(args) {
-    let start = args.start, end = args.end, selection = args.selection
-    const file = await getWorkingFile(args.file);
+    let start = args.start, end = args.end, selection = args.selection, file = args.file;
+    //const file = await getWorkingFile(args.file);
+
     // Ensure max and min are within range
     start = Math.max(0, start);
     // Handle no start / end supplied
@@ -505,7 +523,8 @@ async function getPredictBuffers(args) {
     const byteEnd = await convertTimeToBytes(end, file);
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
     const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * 3;
-    const readStream = fs.createReadStream(file, {
+    const proxy = metadata[file].proxy;
+    const readStream = fs.createReadStream(proxy, {
         start: byteStart,
         end: byteEnd,
         highWaterMark: highWaterMark
@@ -537,9 +556,8 @@ async function getPredictBuffers(args) {
  * @returns {Promise<unknown>}
  */
 const fetchAudioBuffer = async (args) => {
-    let start = args.start, end = args.end;
-    const file = await getWorkingFile(args.file);
-    if (!file) return;
+    let start = args.start, end = args.end, file = args.file;
+
     return new Promise(async (resolve) => {
         // Ensure max and min are within range
         start = Math.max(0, start);
@@ -550,7 +568,8 @@ const fetchAudioBuffer = async (args) => {
         //if (isNaN(byteEnd)) byteEnd = Infinity;
         // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
         const highWaterMark = byteEnd - byteStart + 1;
-        const readStream = fs.createReadStream(file, {
+        const proxy = metadata[file].proxy;
+        const readStream = fs.createReadStream(proxy, {
             start: byteStart,
             end: byteEnd,
             highWaterMark: highWaterMark
@@ -823,7 +842,7 @@ function spawnWorker(useWhitelist, batchSize) {
 async function parsePredictions(e) {
     const response = e.data;
     // Restore Original file path
-    const file = getKeyByValue(proxiedFileCache, response.file);
+    const file = response.file;
     if (response['message'] === 'model-ready') {
         chunkLength = response['chunkLength'];
         sampleRate = response['sampleRate'];
@@ -837,7 +856,7 @@ async function parsePredictions(e) {
             const result = prediction[1];
             result.file = file;
             const audacity = prediction[2];
-            UI.postMessage({event: 'progress', progress: (position / metadata[proxiedFileCache[file]].duration)});
+            UI.postMessage({event: 'progress', progress: (position / metadata[file].duration)});
             //console.log('Prediction received from worker', result);
             if (result.score > minConfidence) {
                 index++;
@@ -887,7 +906,7 @@ async function parsePredictions(e) {
 async function processNextFile(args) {
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
-        file = await getWorkingFile(file);
+        await getWorkingFile(file);
         let [start, end] = args ? [args.start, args.end] : await setStartEnd(file);
         if (start === 0 && end === 0) {
             // Nothing to do for this file
@@ -901,37 +920,37 @@ async function processNextFile(args) {
 }
 
 async function setStartEnd(file) {
-    const metadata = await getMetadata(file);
+    //const metadata = await getMetadata(file);
+    const meta = metadata[file];
     let start, end;
     if (nocmig) {
-        const fileEnd = metadata.fileStart + (metadata.duration * 1000);
+        const fileEnd = meta.fileStart + (meta.duration * 1000);
         // If it's dark at the file start, start at 0 ...otherwise start at dusk
-        if (metadata.fileStart < metadata.dawn || metadata.fileStart > metadata.dusk) {
+        if (meta.fileStart < meta.dawn || meta.fileStart > meta.dusk) {
             start = 0;
         } else {
             // not dark at start, is it still light at the end?
-            if (fileEnd <= metadata.dusk) {
+            if (fileEnd <= meta.dusk) {
                 // If we loaded multiple files
-                if (FILE_QUEUE.length || Object.keys(proxiedFileCache).length > 1) {
+                if (FILE_QUEUE.length) {
                     // skip to next file
-
                     return [0, 0];
                 } else {
                     // In case it's all in the daytime and just a single file - temporarily disable nocmig mode
-                    return [0, metadata.duration];
+                    return [0, meta.duration];
                 }
             } else {
                 // So, it *is* dark by the end of the file
-                start = (metadata.dusk - metadata.fileStart) / 1000;
+                start = (meta.dusk - meta.fileStart) / 1000;
             }
         }
         // Now set the end
-        metadata.fileStart < metadata.dawn && fileEnd >= metadata.dawn ?
-            end = (metadata.dawn - metadata.fileStart) / 1000 :
-            end = metadata.duration;
+        meta.fileStart < meta.dawn && fileEnd >= meta.dawn ?
+            end = (meta.dawn - meta.fileStart) / 1000 :
+            end = meta.duration;
     } else {
         start = 0;
-        end = metadata.duration;
+        end = meta.duration;
     }
     return [start, end];
 }
@@ -977,7 +996,6 @@ const getCachedResults = (args) => {
 }
 
 const isDuplicate = (file) => {
-    file = getKeyByValue(proxiedFileCache, file);
     const baseName = file.replace(/^(.*)\..*$/g, '$1').replace("'", "''");
     return new Promise((resolve) => {
         db.get(`SELECT *
@@ -996,7 +1014,6 @@ function getKeyByValue(object, value) {
 }
 
 const getFileInfo = async (file) => {
-    file = getKeyByValue(proxiedFileCache, file);
     // look for file, ignore extension
     const baseName = file.replace(/^(.*)\..*$/g, '$1').replace("'", "''");
     return new Promise(function (resolve, reject) {
@@ -1012,7 +1029,6 @@ const getFileInfo = async (file) => {
 }
 
 const updateFileTables = async (file) => {
-    //if (!metadata[file].dateDuration) await getMetadata(file);
     return new Promise(function (resolve) {
         const newFileStmt = db.prepare("INSERT INTO files VALUES (?,?,?)");
         const selectStmt = db.prepare('SELECT rowid FROM files WHERE name = (?)');
