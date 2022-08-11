@@ -188,6 +188,21 @@ class Model {
                 // If using the whitelist, we want to promote allowed IDs above any blocked IDs, so they will be visible
                 // if they meet the confidence threshold.
                 if (this.useWhitelist && blocked_IDs.indexOf(item.index[0]) !== -1) {
+                    // let temp_item = structuredClone(item);
+                    // let count = 0;
+                    // item.index.forEach(id => {
+                    //     if (blocked_IDs.indexOf(id) !== -1){
+                    //         // move detection to the end
+                    //         temp_item.index.push(item.index[count]);
+                    //         temp_item.index.shift();
+                    //         // Set score to zero to prevent ID showing
+                    //         temp_item.score.push(0.0);
+                    //         temp_item.score.shift();
+                    //     }
+                    //     count++;
+                    // })
+                    // item = structuredClone(temp_item);
+
                     // i.e. the top prediction is disallowed....
                     // Is it Ambient noise?
                     labels[item.index[0]].split('_')[1] === "Ambient Noise" ? suppressed = false : suppressed = 'text-danger'
@@ -250,7 +265,7 @@ class Model {
                     score: Math.round(item.score[0] * 1000) / 1000,
                 })
                 //prepare summary
-                console.log(key, item.index[0], this.labels[item.index[0]], Math.round(item.score[0] * 1000) / 1000);
+                console.log(key, item.index[0], this.labels[item.index[0]], Math.round(item.score[0] * 1000) / 1000, this.labels[item.index[1]], Math.round(item.score[1] * 1000) / 1000, this.labels[item.index[2]], Math.round(item.score[2] * 1000) / 1000);
                 batched_results.push([key, result, audacity]);
             }
             this.result = batched_results;
