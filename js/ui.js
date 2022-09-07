@@ -377,25 +377,26 @@ async function showOpenDialog() {
     if (!files.canceled) await onOpenFiles({filePaths: files.filePaths});
 }
 
-function updateFileName(files) {
-    let count = 0;
+function updateFileName(files, openfile) {
+
     let filenameElement = document.getElementById('filename');
     filenameElement.innerHTML = '';
 
     let appendstr = '<div id="fileContainer" class="d-inline-block position-absolute bg-dark text-nowrap pe-3">';
-    files.forEach(item => {
-        if (count === 0) {
-            if (files.length > 1) {
-                appendstr += `<span class="revealFiles visible pointer" id="${item}">`;
+                    if (files.length > 1){
                 appendstr += '<span class="material-icons-two-tone pointer">library_music</span>';
             } else {
                 appendstr += '<span class="material-icons-two-tone align-bottom">audio_file</span>';
             }
+    files.forEach(item => {
+            if (item === openfile) {
+                appendstr += `<span class="revealFiles visible pointer" id="${item}">`;
+
         } else {
-            appendstr += `<span class="openFiles pointer" id="${item}"><span class="material-icons-two-tone align-bottom">audio_file</span>`;
+            appendstr += `<span class="openFiles pointer" id="${item}">`;
         }
         appendstr += item.replace(/^.*[\\\/]/, "") + '</span>';
-        count += 1;
+
     })
     filenameElement.innerHTML += appendstr + '</div>';
 }
@@ -420,7 +421,7 @@ async function onOpenFiles(args) {
     } else {
         analyzeAllLink.classList.add('disabled');
     }
-    updateFileName(fileList);
+    updateFileName(fileList, fileList[0]);
     await loadAudioFile({filePath: fileList[0]});
     currentFile = fileList[0];
 
@@ -1642,7 +1643,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     },
     Escape: function () {
         console.log('Operation aborted');
-
+        PREDICTING = false;
         worker.postMessage({action: 'abort'});
         alert('Operation cancelled');
 
@@ -1841,7 +1842,7 @@ async function onWorkerLoadedAudio(args) {
     currentBuffer = new AudioBuffer({length: args.length, numberOfChannels: 1, sampleRate: 24000});
     currentBuffer.copyToChannel(args.contents, 0);
     // Show the current file name in the UI
-    updateFileName([args.file]);
+    updateFileName(fileList, args.file);
     workerHasLoadedFile = true;
     currentFile = args.file;
     bufferBegin = args.bufferBegin;
@@ -2179,7 +2180,7 @@ async function renderResult(args) {
             <td name="${result.cname}" class='text-start cname'>${result.cname} <i>${result.sname}</i></td>
             <td class="label">${label}</td>
             <td>${iconizeScore(result.score)}</td>
-            <td><span id='${index}' title="Click for additional detections" class='material-icons-two-tone rotate pointer d-none'>sync</span></td>
+            <td><span id='id${index}' title="Click for additional detections" class='material-icons-two-tone rotate pointer d-none'>sync</span></td>
             <td class='specFeature'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
             <td><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
             <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
@@ -2226,7 +2227,8 @@ async function renderResult(args) {
     }
     // Show the alternate detections toggle:
     if (result.score2 > 0.2) {
-        document.getElementById(index).classList.remove('d-none')
+        const id = `id${index}`;
+        document.getElementById(id).classList.remove('d-none')
     }
     if (!config.spectrogram) $('.specFeature').hide();
 }

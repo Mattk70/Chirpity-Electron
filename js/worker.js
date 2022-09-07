@@ -1,5 +1,5 @@
 const {ipcRenderer} = require('electron');
-let appPath = '../24000_v10/';
+let appPath = '../24000_B3_full/';
 const fs = require('fs');
 const wavefileReader = require('wavefile-reader');
 const lamejs = require("lamejstmp");
@@ -328,16 +328,19 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
  */
 async function getWorkingFile(file) {
     if (metadata[file]) return metadata[file].proxy;
+    // find the file
+    const source_file = await locateFile(file);
     let proxy = file;
-    if (!file.endsWith('.wav')) {
-        const workingFileName = file.replace(/.*\/(.*)\..*/, "$1.wav");
+
+    if (!source_file.endsWith('.wav')) {
+        const workingFileName = source_file.replace(/.*\/(.*)\..*/, "$1.wav");
         const destination = p.join(TEMP, file_cache, workingFileName);
         // get some metadata from the source file
-        const statsObj = fs.statSync(file);
+        const statsObj = fs.statSync(source_file);
         const sourceMtime = statsObj.mtime;
         //console.log(Date.UTC(sourceMtime));
 
-        proxy = await convertFileFormat(file, destination, statsObj.size,
+        proxy = await convertFileFormat(source_file, destination, statsObj.size,
             function (errorMessage) {
                 console.log(errorMessage)
             }, null, function () {
@@ -347,7 +350,7 @@ async function getWorkingFile(file) {
         await utimes(proxy, sourceMtime.getTime());
 
     }
-    await getMetadata(file, proxy);
+    await getMetadata(file, proxy, source_file);
     return proxy;
 }
 
@@ -410,20 +413,22 @@ function addDays(date, days) {
  * Called by getWorkingFile, setStartEnd?, getFileStart?,
  * Assigns file metadata to a metadata cache object. file is the key, and is the source file
  * proxy if required if the source file is not a wav to populate the headers
- * @param file
- * @param proxy
+ * @param file: the file name passed to the worker
+ * @param proxy: the wav file to use for predictions
+ * @param source_file: the file that exists ( will be different after compression)
  * @returns {Promise<unknown>}
  */
-const getMetadata = (file, proxy) => {
+const getMetadata = (file, proxy, source_file) => {
     return new Promise(async (resolve) => {
         if (metadata[file]) {
             resolve(metadata[file])
         } else {
             // If we have it already, no need to do any more
             if (!proxy) proxy = file;
+            if (!source_file) source_file = file;
             let fileStart, fileEnd;
             metadata[file] = {proxy: proxy};
-            if (!proxy) proxy = file;
+
             // CHeck the database first, so we honour any manual update.
             const savedMeta = await getFileInfo(file);
             metadata[file].duration = savedMeta && savedMeta.duration ? savedMeta.duration : await getDuration(file);
@@ -431,7 +436,7 @@ const getMetadata = (file, proxy) => {
                 fileStart = new Date(savedMeta.filestart);
                 fileEnd = new Date(fileStart.getTime() + (metadata[file].duration * 1000));
             } else {
-                metadata[file].stat = fs.statSync(file);
+                metadata[file].stat = fs.statSync(source_file);
                 fileEnd = new Date(metadata[file].stat.mtime);
                 fileStart = new Date(metadata[file].stat.mtime - (metadata[file].duration * 1000));
             }
@@ -557,7 +562,7 @@ async function getPredictBuffers(args) {
  */
 const fetchAudioBuffer = async (args) => {
     let start = args.start, end = args.end, file = args.file;
-
+    await getWorkingFile(file);
     return new Promise(async (resolve) => {
         // Ensure max and min are within range
         start = Math.max(0, start);
@@ -910,6 +915,12 @@ async function processNextFile(args) {
         let [start, end] = args ? [args.start, args.end] : await setStartEnd(file);
         if (start === 0 && end === 0) {
             // Nothing to do for this file
+            UI.postMessage({
+                event: 'prediction-done',
+                file: file,
+                labels: AUDACITY,
+                batchInProgress: FILE_QUEUE.length,
+            });
             await processNextFile();
         } else {
             await doPrediction({start: start, end: end, file: file, selection: false, preserveResults: true});
@@ -931,14 +942,8 @@ async function setStartEnd(file) {
         } else {
             // not dark at start, is it still light at the end?
             if (fileEnd <= meta.dusk) {
-                // If we loaded multiple files
-                if (FILE_QUEUE.length) {
-                    // skip to next file
-                    return [0, 0];
-                } else {
-                    // In case it's all in the daytime and just a single file - temporarily disable nocmig mode
-                    return [0, meta.duration];
-                }
+                // No? skip this file
+                return [0, 0];
             } else {
                 // So, it *is* dark by the end of the file
                 start = (meta.dusk - meta.fileStart) / 1000;
@@ -996,13 +1001,15 @@ const getCachedResults = (args) => {
 }
 
 const isDuplicate = (file) => {
+    //return false
+    //if (metadata[file]) return file
     const baseName = file.replace(/^(.*)\..*$/g, '$1').replace("'", "''");
     return new Promise((resolve) => {
         db.get(`SELECT *
                 FROM files
                 WHERE name LIKE '${baseName}%'`, (err, row) => {
             if (row) {
-                //metadata[row.name] = {fileStart: row.filestart, duration: row.duration}
+                metadata[row.name] = {fileStart: row.filestart, duration: row.duration}
                 resolve(row.name)
             } else resolve(false)
         })
@@ -1086,7 +1093,9 @@ const getSeasonRecords = (species, season) => {
             FROM records
                      INNER JOIN species ON species.id = records.birdID1
             WHERE species.cname = (?)
-              AND STRFTIME('%m', DATETIME(records.dateTime / 1000, 'unixepoch', 'localtime')) ${seasonMonth[season]}`);
+              AND STRFTIME('%m',
+                           DATETIME(records.dateTime / 1000, 'unixepoch', 'localtime'))
+                ${seasonMonth[season]}`);
         stmt.get(species, (err, row) => {
             if (err) {
                 reject(err)
