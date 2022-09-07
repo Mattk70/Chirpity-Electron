@@ -1,5 +1,5 @@
 const {ipcRenderer} = require('electron');
-let appPath = '../24000_v9/';
+let appPath = '../24000_B3_full/';
 const fs = require('fs');
 const wavefileReader = require('wavefile-reader');
 const lamejs = require("lamejstmp");
@@ -12,11 +12,10 @@ const sqlite3 = require('sqlite3').verbose();
 const SunCalc = require('suncalc2');
 const ffmpeg = require('fluent-ffmpeg');
 const {utimes} = require('utimes');
-const file_cache = 'file_cache';
+const file_cache = 'chirpity';
+let TEMP;
 
-let db, nocmig, latitude, longitude, dateRange = {};
-
-let proxiedFileCache = {};
+let db, nocmig, latitude, longitude;
 
 function createDB(file) {
     console.log("creating database file");
@@ -33,8 +32,9 @@ function createDB(file) {
         });
         db.run(`CREATE TABLE files
                 (
-                    name     TEXT,
-                    duration REAL,
+                    name      TEXT,
+                    duration  REAL,
+                    filestart INTEGER,
                     UNIQUE (name)
                 )`, function (createResult) {
             if (createResult) throw createResult;
@@ -56,7 +56,7 @@ function createDB(file) {
         stmt.finalize();
         db.run(`CREATE TABLE records
                 (
-                    dateTime INTEGER PRIMARY KEY,
+                    dateTime INTEGER,
                     birdID1  INTEGER,
                     birdID2  INTEGER,
                     birdID3  INTEGER,
@@ -64,7 +64,10 @@ function createDB(file) {
                     conf2    REAL,
                     conf3    REAL,
                     fileID   INTEGER,
-                    position INTEGER
+                    position INTEGER,
+                    label    TEXT,
+                    comment  TEXT
+                        UNIQUE (dateTime, fileID)
                 )`, function (createResult) {
             if (createResult) throw createResult;
         });
@@ -73,7 +76,7 @@ function createDB(file) {
     return db;
 }
 
-function loadDB(path) {
+async function loadDB(path) {
     const file = p.join(path, 'archive.sqlite');
     if (!fs.existsSync(file)) {
         db = createDB(file)
@@ -104,21 +107,9 @@ let FILE_QUEUE = [];
 const clearCache = () => {
     return new Promise((resolve) => {
         // clear & recreate file cache folder
-        proxiedFileCache = {}
-        fs.rmSync(file_cache, {recursive: true, force: true});
-        fs.mkdir(file_cache, (err, path) => {
+        fs.rmSync(p.join(TEMP, file_cache), {recursive: true, force: true});
+        fs.mkdir(p.join(TEMP, file_cache), (err, path) => {
             resolve(path);
-        })
-    })
-}
-
-const isDuplicate = (file) => {
-    return new Promise((resolve) => {
-        const stmt = db.prepare("SELECT * FROM files WHERE name = (?)");
-        stmt.get(file, (err, row) => {
-            if (row) {
-                resolve(true)
-            } else resolve(false)
         })
     })
 }
@@ -130,8 +121,14 @@ ipcRenderer.on('new-client', (event) => {
         const action = args.action;
         console.log('message received ', action)
         switch (action) {
-            case 'set-date-range':
-                dateRange = args.range;
+            case 'update-record':
+                await onUpdateRecord(args)
+                break;
+            case 'update-file-start':
+                await onUpdateFileStart(args)
+                break;
+            case 'get-detected-species':
+                getSpecies()
                 break;
             case 'clear-cache':
                 console.log('cache')
@@ -147,32 +144,46 @@ ipcRenderer.on('new-client', (event) => {
             case 'load-db':
                 latitude = args.lat;
                 longitude = args.lon;
-                loadDB(args.path)
+                TEMP = args.temp;
+                await loadDB(args.path)
                 break;
             case 'file-load-request':
                 index = 0;
                 if (predicting) onAbort(args);
-                console.log('Worker received audio ' + args.filePath);
+                console.log('Worker received audio ' + args.file);
                 await loadAudioFile(args);
 
                 break;
             case 'update-buffer':
-                const buffer = await fetchAudioBuffer(args);
-                const length = buffer.length;
-                const myArray = buffer.getChannelData(0);
-                const file = args.file;
-                UI.postMessage({
-                    event: 'worker-loaded-audio',
-                    fileStart: metadata[file].fileStart,
-                    sourceDuration: metadata[file].duration,
-                    bufferBegin: args.start,
-                    file: file,
-                    position: args.position,
-                    length: length,
-                    contents: myArray,
-                    region: args.region
+                await loadAudioFile(args);
+                break;
+            case 'explore':
+                // reset results table
+                UI.postMessage({event: 'reset-results'});
+                const results = await getCachedResults({species: args.species, range: args.range});
+                index = 0;
+                results.forEach(result => {
+                    //format dates
+                    result.timestamp = new Date(result.timestamp);
+                    result.position = new Date(result.position);
+                    index++;
+                    UI.postMessage({
+                        event: 'prediction-ongoing',
+                        file: result.file,
+                        result: result,
+                        index: index,
+                        selection: false,
+                    });
+                    //AUDACITY.push(audacity);
+                    RESULTS.push(result);
                 })
-
+                console.log(`Pulling results for ${args.species} from database`);
+                // When in batch mode the 'prediction-done' event simply increments
+                // the counter for the file being processed
+                UI.postMessage({
+                    event: 'prediction-done',
+                    batchInProgress: false,
+                });
                 break;
             case 'analyze':
                 console.log(`Worker received message: ${args.confidence}, start: ${args.start}, end: ${args.end}`);
@@ -184,11 +195,10 @@ ipcRenderer.on('new-client', (event) => {
                 latitude = args.lat;
                 longitude = args.lon;
                 nocmig = args.nocmig;
-                const isCached = await isDuplicate(args.filePath);
-                if (isCached) {
+                const cachedFile = await isDuplicate(args.filePath);
+                if (cachedFile && !args.selection) {
                     // Pull the results from the database
-                    const results = await getCachedResults({file: args.filePath});
-                    //const results = await getCachedResults({species: 'Redwing'});
+                    const results = await getCachedResults({file: cachedFile, range: {}});
                     UI.postMessage({event: 'update-audio-duration', value: metadata[args.filePath].duration});
                     results.forEach(result => {
                         //format dates
@@ -222,17 +232,7 @@ ipcRenderer.on('new-client', (event) => {
                     } else {
                         predicting = true;
                         minConfidence = args.confidence;
-                        await processNextFile();
-                        // //let selection = false;
-                        // let start, end;
-                        // if (args.start) {
-                        //     start = args.start;
-                        //     end = args.end
-                        // } else {
-                        //     [start, end] = await setStartEnd(args.filePath)
-                        // }
-                        // await doPrediction({start: start, end: end, file: args.filePath, selection: args.selection});
-                        // }
+                        await processNextFile(args);
                     }
                 }
                 break;
@@ -249,7 +249,7 @@ ipcRenderer.on('new-client', (event) => {
             case 'abort':
                 onAbort(args);
                 break;
-            case 'chart-request':
+            case 'chart':
                 onChartRequest(args);
                 break;
             default:
@@ -276,9 +276,7 @@ function onAbort(args) {
     }
 }
 
-const getDuration = (src) => {
-    // Use proxy
-    src = proxiedFileCache[src];
+const getDuration = async (src) => {
     return new Promise(function (resolve) {
         const audio = new Audio();
         audio.addEventListener("loadedmetadata", function () {
@@ -298,11 +296,6 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
                 }
             })
             .on('progress', (progress) => {
-                // UI.postMessage({
-                //     event: 'progress',
-                //     text: "Decompressing file.",
-                //     progress: progress.targetSize / size
-                // });
                 console.log('Processing: ' + progress.targetSize + ' KB converted');
                 UI.postMessage({
                     event: 'progress',
@@ -314,11 +307,6 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
                 }
             })
             .on('end', () => {
-                // UI.postMessage({
-                //     event: 'progress',
-                //     text: "Decompressing file.",
-                //     progress: 1
-                // });
                 UI.postMessage({event: 'progress', text: 'File decompressed', progress: 1.0})
                 if (finish) {
                     resolve(destination)
@@ -328,48 +316,92 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
     });
 }
 
-async function formatCheck(file) {
-    if (proxiedFileCache[file]) return;
-    if (!file.endsWith('.wav')) {
-        const destination = p.join(file_cache, p.basename(file) + ".wav");
-        proxiedFileCache[file] = destination;
-        const statsObj = fs.statSync(file);
-        const mtime = statsObj.mtime;
-        file = await convertFileFormat(file, destination, statsObj.size, function (errorMessage) {
-        }, null, function () {
-            file = destination;
-            console.log("success");
-        });
-        await utimes(file, mtime.getTime());
-    } else {
-        proxiedFileCache[file] = file;
+/**
+ * getWorkingFile called by loadAudioFile, getPredictBuffers, fetchAudioBuffer and processNextFile
+ * purpose is to create a wav file from the source file. If the file *is* a wav file, it returns
+ * that file, else it checks for a temp wav file, if not found it calls convertFileFormat to extract
+ * and create a wav file in the users temp folder and returns that file's path. The flag for this file is set in the
+ * metadata object as metadata[file].proxy
+ *
+ * @param file: full path to source file
+ * @returns {Promise<boolean|*>}
+ */
+async function getWorkingFile(file) {
+    if (metadata[file]) return metadata[file].proxy;
+    // find the file
+    const source_file = await locateFile(file);
+    let proxy = file;
+
+    if (!source_file.endsWith('.wav')) {
+        const workingFileName = source_file.replace(/.*\/(.*)\..*/, "$1.wav");
+        const destination = p.join(TEMP, file_cache, workingFileName);
+        // get some metadata from the source file
+        const statsObj = fs.statSync(source_file);
+        const sourceMtime = statsObj.mtime;
+        //console.log(Date.UTC(sourceMtime));
+
+        proxy = await convertFileFormat(source_file, destination, statsObj.size,
+            function (errorMessage) {
+                console.log(errorMessage)
+            }, null, function () {
+                console.log("success");
+            });
+        // assign the source file's save time to the proxy file
+        await utimes(proxy, sourceMtime.getTime());
+
     }
+    await getMetadata(file, proxy, source_file);
+    return proxy;
+}
+
+/**
+ * Function to return path to file searching for new extensions if original file has been compressed.
+ * @param file
+ * @returns {Promise<*>}
+ */
+async function locateFile(file) {
+    const supported_files = ['.wav', '.m4a', '.mp3', '.mpga', '.ogg', '.flac', '.aac', '.mpeg', '.mp4'];
+    const dir = p.parse(file).dir, name = p.parse(file).name;
+    let foundFile;
+    const matchingFileExt = supported_files.find(ext => {
+        foundFile = p.join(dir, name + ext);
+        return fs.existsSync(foundFile)
+    })
+    if (!matchingFileExt) {
+        return false;
+    }
+    return foundFile;
 }
 
 async function loadAudioFile(args) {
-    // reset file cache
-    await clearCache();
-
-    let file = args.filePath;
-    await formatCheck(file);
-    if (!metadata[file]) {
-        metadata[file] = await getMetadata(file)
+    let file = args.file;
+    const start = args.start || 0;
+    const end = args.end || 20;
+    const position = args.position || 0;
+    await getWorkingFile(file);
+    if (file) {
+        const buffer = await fetchAudioBuffer({file: file, start: start, end: end, position: position});
+        const length = buffer.length;
+        const myArray = buffer.getChannelData(0);
+        UI.postMessage({
+            event: 'worker-loaded-audio',
+            fileStart: metadata[file].fileStart,
+            sourceDuration: metadata[file].duration,
+            bufferBegin: start,
+            file: file,
+            position: position,
+            length: length,
+            contents: myArray,
+            region: args.region
+        })
+    } else {
+        UI.postMessage({
+            event: 'generate-alert',
+            message: `Unable to load source file with any supported file extension: ${args.file}`
+        })
     }
-    const buffer = await fetchAudioBuffer({file: file, start: 0, end: 20, position: 0})
-    const length = buffer.length;
-    const myArray = buffer.getChannelData(0);
-    UI.postMessage({
-        event: 'worker-loaded-audio',
-        fileStart: metadata[file].fileStart,
-        sourceDuration: metadata[file].duration,
-        bufferBegin: 0,
-        file: file,
-        position: 0,
-        length: length,
-        contents: myArray,
-    })
-
 }
+
 
 function addDays(date, days) {
     let result = new Date(date);
@@ -377,68 +409,92 @@ function addDays(date, days) {
     return result;
 }
 
-const getMetadata = async (file) => {
-    let fileStart;
-    const proxyFile = proxiedFileCache[file]
-    metadata[file] = {};
-
+/**
+ * Called by getWorkingFile, setStartEnd?, getFileStart?,
+ * Assigns file metadata to a metadata cache object. file is the key, and is the source file
+ * proxy if required if the source file is not a wav to populate the headers
+ * @param file: the file name passed to the worker
+ * @param proxy: the wav file to use for predictions
+ * @param source_file: the file that exists ( will be different after compression)
+ * @returns {Promise<unknown>}
+ */
+const getMetadata = (file, proxy, source_file) => {
     return new Promise(async (resolve) => {
-        metadata[file].duration = await getDuration(file);
-        const readStream = fs.createReadStream(proxyFile);
-        metadata[file].stat = fs.statSync(file);
-        const fileEnd = new Date(metadata[file].stat.mtime);
-        fileStart = new Date(metadata[file].stat.mtime - (metadata[file].duration * 1000))
-        // split  the duration of this file across any dates it spans
-        metadata[file].dateDuration = {}
-        const key = new Date(fileStart);
-        key.setHours(0, 0, 0, 0);
-        const keyCopy = addDays(key, 0).getTime();
-        if (fileStart.getDate() === fileEnd.getDate()) {
-            metadata[file].dateDuration[keyCopy] = metadata[file].duration;
+        if (metadata[file]) {
+            resolve(metadata[file])
         } else {
-            const key2 = addDays(key, 1);
+            // If we have it already, no need to do any more
+            if (!proxy) proxy = file;
+            if (!source_file) source_file = file;
+            let fileStart, fileEnd;
+            metadata[file] = {proxy: proxy};
 
-            const key2Copy = addDays(key2, 0).getTime();
-            metadata[file].dateDuration[keyCopy] = (key2Copy - fileStart) / 1000;
-            metadata[file].dateDuration[key2Copy] = metadata[file].duration - metadata[file].dateDuration[keyCopy];
-        }
+            // CHeck the database first, so we honour any manual update.
+            const savedMeta = await getFileInfo(file);
+            metadata[file].duration = savedMeta && savedMeta.duration ? savedMeta.duration : await getDuration(file);
+            if (savedMeta && savedMeta.filestart) {
+                fileStart = new Date(savedMeta.filestart);
+                fileEnd = new Date(fileStart.getTime() + (metadata[file].duration * 1000));
+            } else {
+                metadata[file].stat = fs.statSync(source_file);
+                fileEnd = new Date(metadata[file].stat.mtime);
+                fileStart = new Date(metadata[file].stat.mtime - (metadata[file].duration * 1000));
+            }
 
-        fileStart = new Date(metadata[file].stat.mtime - (metadata[file].duration * 1000)).getTime();
-        let astro = SunCalc.getTimes(fileStart, latitude, longitude);
-        metadata[file].dusk = astro.dusk.getTime();
-        // If file starts after dark, dawn is next day
-        if (fileStart > astro.dusk.getTime()) {
-            astro = SunCalc.getTimes(fileStart + 8.47e+7, latitude, longitude);
-            metadata[file].dawn = astro.dawn.getTime();
-        } else {
-            metadata[file].dawn = astro.dawn.getTime();
-        }
+            // split  the duration of this file across any dates it spans
+            metadata[file].dateDuration = {};
+            const key = new Date(fileStart);
+            key.setHours(0, 0, 0, 0);
+            const keyCopy = addDays(key, 0).getTime();
+            if (fileStart.getDate() === fileEnd.getDate()) {
+                metadata[file].dateDuration[keyCopy] = metadata[file].duration;
+            } else {
+                const key2 = addDays(key, 1);
 
-        readStream.on('data', async chunk => {
-            let wav = new wavefileReader.WaveFileReader();
-            wav.fromBuffer(chunk);
-            // Extract Header
-            let headerEnd;
-            wav.signature.subChunks.forEach(el => {
-                if (el['chunkId'] === 'data') {
-                    headerEnd = el.chunkData.start;
-                }
+                const key2Copy = addDays(key2, 0).getTime();
+                metadata[file].dateDuration[keyCopy] = (key2Copy - fileStart) / 1000;
+                metadata[file].dateDuration[key2Copy] = metadata[file].duration - metadata[file].dateDuration[keyCopy];
+            }
+            // Now we have completed the date comparison above, we convert fileStart to millis
+            fileStart = fileStart.getTime();
+            // Add dawn and dusk for the file to the metadata
+            let astro = SunCalc.getTimes(fileStart, latitude, longitude);
+            metadata[file].dusk = astro.dusk.getTime();
+            // If file starts after dark, dawn is next day
+            if (fileStart > astro.dusk.getTime()) {
+                astro = SunCalc.getTimes(fileStart + 8.47e+7, latitude, longitude);
+                metadata[file].dawn = astro.dawn.getTime();
+            } else {
+                metadata[file].dawn = astro.dawn.getTime();
+            }
+            // We use proxy here are the file *must* be a wav file
+            const readStream = fs.createReadStream(proxy);
+            readStream.on('data', async chunk => {
+                let wav = new wavefileReader.WaveFileReader();
+                wav.fromBuffer(chunk);
+                // Extract Header
+                let headerEnd;
+                wav.signature.subChunks.forEach(el => {
+                    if (el['chunkId'] === 'data') {
+                        headerEnd = el.chunkData.start;
+                    }
+                })
+                // Update relevant file properties
+                metadata[file].head = headerEnd;
+                metadata[file].header = chunk.slice(0, headerEnd)
+                metadata[file].bytesPerSec = wav.fmt.byteRate;
+                metadata[file].numChannels = wav.fmt.numChannels;
+                metadata[file].sampleRate = wav.fmt.sampleRate;
+                metadata[file].bitsPerSample = wav.fmt.bitsPerSample
+                metadata[file].fileStart = fileStart;
+                readStream.close()
+                resolve(metadata[file]);
             })
-            // Update relevant file properties
-            metadata[file].head = headerEnd;
-            metadata[file].header = chunk.slice(0, headerEnd)
-            metadata[file].bytesPerSec = wav.fmt.byteRate;
-            metadata[file].numChannels = wav.fmt.numChannels;
-            metadata[file].sampleRate = wav.fmt.sampleRate;
-            metadata[file].bitsPerSample = wav.fmt.bitsPerSample
-            metadata[file].fileStart = fileStart;
-            readStream.close()
-            resolve(metadata[file]);
-        })
+        }
     })
 }
 
-function convertTimeToBytes(time, key) {
+const convertTimeToBytes = async (time, key) => {
     const bytesPerSample = metadata[key].bitsPerSample / 8;
     // get the nearest sample start - they can be 2,3 or 4 bytes representations. Then add the header offest
     return (Math.round((time * metadata[key].bytesPerSec) / bytesPerSample) * bytesPerSample) + metadata[key].head;
@@ -460,18 +516,20 @@ async function setupCtx(chunk, file) {
 }
 
 async function getPredictBuffers(args) {
-    let start = args.start, end = args.end, selection = args.selection
-    const file = args.file
+    let start = args.start, end = args.end, selection = args.selection, file = args.file;
+    //const file = await getWorkingFile(args.file);
+
     // Ensure max and min are within range
     start = Math.max(0, start);
-    // Handle no end supplied
-    const proxyFile = proxiedFileCache[file]
+    // Handle no start / end supplied
     end > 0 ? end = Math.min(metadata[file].duration, end) : end = metadata[file].duration;
-    const byteStart = convertTimeToBytes(start, file);
-    const byteEnd = convertTimeToBytes(end, file);
+    if (!start) start = 0;
+    const byteStart = await convertTimeToBytes(start, file);
+    const byteEnd = await convertTimeToBytes(end, file);
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
     const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * 3;
-    const readStream = fs.createReadStream(proxyFile, {
+    const proxy = metadata[file].proxy;
+    const readStream = fs.createReadStream(proxy, {
         start: byteStart,
         end: byteEnd,
         highWaterMark: highWaterMark
@@ -497,25 +555,26 @@ async function getPredictBuffers(args) {
     })
 }
 
+/**
+ *  Called when file first loaded, when result clicked and when saving or sending file snippets
+ * @param args
+ * @returns {Promise<unknown>}
+ */
 const fetchAudioBuffer = async (args) => {
     let start = args.start, end = args.end, file = args.file;
-    let proxyFile;
-    if (!proxiedFileCache[file]) {
-        await formatCheck(file);
-        await getMetadata(file);
-    }
-    proxyFile = proxiedFileCache[file];
-    return new Promise((resolve) => {
+    await getWorkingFile(file);
+    return new Promise(async (resolve) => {
         // Ensure max and min are within range
         start = Math.max(0, start);
         // Handle no end supplied
         end = Math.min(metadata[file].duration, end);
-        const byteStart = convertTimeToBytes(start, file);
-        const byteEnd = convertTimeToBytes(end, file);
+        const byteStart = await convertTimeToBytes(start, file);
+        const byteEnd = await convertTimeToBytes(end, file);
         //if (isNaN(byteEnd)) byteEnd = Infinity;
         // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
         const highWaterMark = byteEnd - byteStart + 1;
-        const readStream = fs.createReadStream(proxyFile, {
+        const proxy = metadata[file].proxy;
+        const readStream = fs.createReadStream(proxy, {
             start: byteStart,
             end: byteEnd,
             highWaterMark: highWaterMark
@@ -585,7 +644,7 @@ async function feedChunksToModel(channelData, increment, chunkStart, file, durat
         }
     }
     //clear up remainder less than BATCH_SIZE
-    if (chunks.length > 0) await sendMessageToWorker(chunkStart, chunks, file, duration, selection);
+    if (chunks.length) await sendMessageToWorker(chunkStart, chunks, file, duration, selection);
 }
 
 
@@ -780,13 +839,14 @@ function spawnWorker(useWhitelist, batchSize) {
     console.log('spawning worker')
     predictWorker = new Worker('./js/model.js');
     predictWorker.postMessage(['load', appPath, useWhitelist, batchSize])
-    predictWorker.onmessage = (e) => {
-        parsePredictions(e)
+    predictWorker.onmessage = async (e) => {
+        await parsePredictions(e)
     }
 }
 
 async function parsePredictions(e) {
     const response = e.data;
+    // Restore Original file path
     const file = response.file;
     if (response['message'] === 'model-ready') {
         chunkLength = response['chunkLength'];
@@ -834,6 +894,7 @@ async function parsePredictions(e) {
                 if (!predictionDone) {
                     UI.postMessage({
                         event: 'prediction-done',
+                        file: file,
                         labels: AUDACITY,
                         batchInProgress: FILE_QUEUE.length,
                     });
@@ -847,13 +908,19 @@ async function parsePredictions(e) {
     }
 }
 
-async function processNextFile() {
+async function processNextFile(args) {
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
-        await formatCheck(file);
-        let [start, end] = await setStartEnd(file);
+        await getWorkingFile(file);
+        let [start, end] = args ? [args.start, args.end] : await setStartEnd(file);
         if (start === 0 && end === 0) {
             // Nothing to do for this file
+            UI.postMessage({
+                event: 'prediction-done',
+                file: file,
+                labels: AUDACITY,
+                batchInProgress: FILE_QUEUE.length,
+            });
             await processNextFile();
         } else {
             await doPrediction({start: start, end: end, file: file, selection: false, preserveResults: true});
@@ -864,37 +931,31 @@ async function processNextFile() {
 }
 
 async function setStartEnd(file) {
-    const metadata = await getMetadata(file);
+    //const metadata = await getMetadata(file);
+    const meta = metadata[file];
     let start, end;
     if (nocmig) {
-        const fileEnd = metadata.fileStart + (metadata.duration * 1000);
+        const fileEnd = meta.fileStart + (meta.duration * 1000);
         // If it's dark at the file start, start at 0 ...otherwise start at dusk
-        if (metadata.fileStart < metadata.dawn || metadata.fileStart > metadata.dusk) {
+        if (meta.fileStart < meta.dawn || meta.fileStart > meta.dusk) {
             start = 0;
         } else {
             // not dark at start, is it still light at the end?
-            if (fileEnd <= metadata.dusk) {
-                // If we loaded multiple files
-                if (FILE_QUEUE.length || Object.keys(proxiedFileCache).length > 1) {
-                    // skip to next file
-
-                    return [0, 0];
-                } else {
-                    // In case it's all in the daytime and just a single file - temporarily disable nocmig mode
-                    return [0, metadata.duration];
-                }
+            if (fileEnd <= meta.dusk) {
+                // No? skip this file
+                return [0, 0];
             } else {
                 // So, it *is* dark by the end of the file
-                start = (metadata.dusk - metadata.fileStart) / 1000;
+                start = (meta.dusk - meta.fileStart) / 1000;
             }
         }
         // Now set the end
-        metadata.fileStart < metadata.dawn && fileEnd >= metadata.dawn ?
-            end = (metadata.dawn - metadata.fileStart) / 1000 :
-            end = metadata.duration;
+        meta.fileStart < meta.dawn && fileEnd >= meta.dawn ?
+            end = (meta.dawn - meta.fileStart) / 1000 :
+            end = meta.duration;
     } else {
         start = 0;
-        end = metadata.duration;
+        end = meta.duration;
     }
     return [start, end];
 }
@@ -903,8 +964,10 @@ let t1, t0;
 
 const getCachedResults = (args) => {
     let where;
-    if (args.file) where = `files.name =  '${args.file}'`;
-    if (args.species) where = `s1.cname =  '${args.species}'`;
+    const dateRange = args.range;
+    if (args.file) where = `files.name =  '${args.file.replace("'", "''")}'`;
+    if (args.species) where = `s1.cname =  '${args.species.replace("'", "''")}'`;
+    const when = dateRange.start ? `AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
     return new Promise(function (resolve, reject) {
         db.all(`SELECT dateTime AS timestamp, position AS position, 
             s1.cname as cname, s2.cname as cname2, s3.cname as cname3, 
@@ -916,14 +979,17 @@ const getCachedResults = (args) => {
                 conf1 as score, conf2 as score2, conf3 as score3, 
                 s1.sname as sname, s2.sname as sname2, s3.sname as sname3,
                 files.duration, 
-                files.name as file
+                files.name as file,
+                comment,
+                    label
                 FROM records 
                 LEFT JOIN species s1 on s1.id = birdid1 
                 LEFT JOIN species s2 on s2.id = birdid2 
                 LEFT JOIN species s3 on s3.id = birdid3 
                 INNER JOIN files on files.rowid = records.fileid 
                 WHERE
-                ${where}`,
+                ${where}
+                ${when}`,
             (err, rows) => {
                 if (err) {
                     reject(err)
@@ -934,13 +1000,47 @@ const getCachedResults = (args) => {
     })
 }
 
+const isDuplicate = (file) => {
+    //return false
+    //if (metadata[file]) return file
+    const baseName = file.replace(/^(.*)\..*$/g, '$1').replace("'", "''");
+    return new Promise((resolve) => {
+        db.get(`SELECT *
+                FROM files
+                WHERE name LIKE '${baseName}%'`, (err, row) => {
+            if (row) {
+                metadata[row.name] = {fileStart: row.filestart, duration: row.duration}
+                resolve(row.name)
+            } else resolve(false)
+        })
+    })
+}
 
-const updateFileTables = (file) => {
+function getKeyByValue(object, value) {
+    return Object.keys(object).find(key => object[key] === value);
+}
+
+const getFileInfo = async (file) => {
+    // look for file, ignore extension
+    const baseName = file.replace(/^(.*)\..*$/g, '$1').replace("'", "''");
+    return new Promise(function (resolve, reject) {
+        db.get(`SELECT *
+                FROM files
+                WHERE name LIKE '${baseName}%'`, (err, row) => {
+            if (err) console.log('There was an error ', err)
+            else {
+                resolve(row)
+            }
+        })
+    })
+}
+
+const updateFileTables = async (file) => {
     return new Promise(function (resolve) {
-        const newFileStmt = db.prepare("INSERT INTO files VALUES (?,?)");
+        const newFileStmt = db.prepare("INSERT INTO files VALUES (?,?,?)");
         const selectStmt = db.prepare('SELECT rowid FROM files WHERE name = (?)');
         const durationStmt = db.prepare("INSERT OR REPLACE INTO duration VALUES (?,?,?)");
-        newFileStmt.run(file, metadata[file].duration, (err, row) => {
+        newFileStmt.run(file, metadata[file].duration, metadata[file].fileStart, (err, row) => {
             for (const [date, duration] of Object.entries(metadata[file].dateDuration)) {
                 selectStmt.get(file, (err, row) => {
                     const fileid = row.rowid;
@@ -955,7 +1055,8 @@ const updateFileTables = (file) => {
 
 const onSave2DB = async () => {
     t0 = performance.now();
-    const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?)");
+    db.run('BEGIN TRANSACTION');
+    const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?,?)");
     let filemap = {}
     for (let i = 0; i < RESULTS.length; i++) {
         const dateTime = new Date(RESULTS[i].timestamp).getTime();
@@ -967,19 +1068,20 @@ const onSave2DB = async () => {
         const conf3 = RESULTS[i].score3;
         const position = new Date(RESULTS[i].position).getTime();
         const file = RESULTS[i].file;
+        const comment = RESULTS[i].comment;
+        const label = RESULTS[i].label;
         if (!filemap[file]) filemap[file] = await updateFileTables(file);
-        stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, filemap[file], position, (err, row) => {
-            UI.postMessage({event: 'progress', text: "Updating Database.", progress: i / RESULTS.length});
-            if (i === (RESULTS.length - 1)) {
-                console.log(`Update complete, ${i + 1} records added in ${((performance.now() - t0) / 1000).toFixed(1)} seconds`)
-                UI.postMessage({event: 'progress', progress: 1});
-            }
-        });
-
+        stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, filemap[file], position, comment, label,
+            (err, row) => {
+                UI.postMessage({event: 'progress', text: "Updating Database.", progress: i / RESULTS.length});
+                if (i === (RESULTS.length - 1)) {
+                    db.run('COMMIT', (err, rows) => {
+                        console.log(`Update complete, ${i + 1} records added in ${((performance.now() - t0) / 1000).toFixed(5)} seconds`)
+                        UI.postMessage({event: 'progress', progress: 1});
+                    });
+                }
+            });
     }
-    // newFileStmt.finalize();
-    // stmt.finalize();
-    // fileStmt.finalize();
 }
 
 const getSeasonRecords = (species, season) => {
@@ -991,7 +1093,9 @@ const getSeasonRecords = (species, season) => {
             FROM records
                      INNER JOIN species ON species.id = records.birdID1
             WHERE species.cname = (?)
-              AND STRFTIME('%m', DATETIME(records.dateTime / 1000, 'unixepoch', 'localtime')) ${seasonMonth[season]}`);
+              AND STRFTIME('%m',
+                           DATETIME(records.dateTime / 1000, 'unixepoch', 'localtime'))
+                ${seasonMonth[season]}`);
         stmt.get(species, (err, row) => {
             if (err) {
                 reject(err)
@@ -1023,7 +1127,9 @@ const getMostCalls = (species) => {
     })
 }
 
-const getChartTotals = (species) => {
+const getChartTotals = (args) => {
+    const species = args.species;
+    const dateRange = args.range;
     // Work out sensible aggregations from hours difference in daterange
     const hours_diff = dateRange.start ?
         Math.round((dateRange.end - dateRange.start) / (1000 * 60 * 60)) : 745;
@@ -1041,8 +1147,8 @@ const getChartTotals = (species) => {
         orderBy = 'Year, Week';
         dataPoints = Math.round(hours_diff / 24);
         aggregation = 'Day';
-        const date = new Date(dateRange.start);
-        startDay = Math.floor((date - new Date(date.getFullYear(), 0, 0, 0,0,0)) / 1000 / 60 / 60 / 24);
+        const date = dateRange.start ? new Date(dateRange.start) : Date.UTC(2020, 0, 0, 0, 0, 0);
+        startDay = Math.floor((date - new Date(date.getFullYear(), 0, 0, 0, 0, 0)) / 1000 / 60 / 60 / 24);
     }
     if (hours_diff <= 72) {
         // 3 days or less, group by Hour of Day
@@ -1109,8 +1215,154 @@ const getRate = (species) => {
     })
 }
 
+const getSpecies = () => {
+    db.all('SELECT DISTINCT cname, sname FROM records INNER JOIN species ON birdid1 = id ORDER BY cname',
+        (err, rows) => {
+            if (err) console.log(err);
+            else {
+                UI.postMessage({event: 'seen-species-list', list: rows})
+            }
+        })
+}
+
+const getFileStart = (file) => {
+    return new Promise(function (resolve, reject) {
+        db.get(`SELECT filestart
+                FROM files
+                WHERE name = '${file}'`, async (err, row) => {
+            if (err) {
+                reject(err)
+            } else {
+                if (row['filestart'] === null) {
+                    // This should only be needed while we catch up with the new files schema
+                    await getMetadata(file);
+                    db.get(`UPDATE files
+                            SET filestart = '${metadata[file].fileStart}'
+                            WHERE name = '${file}'`,
+                        (err, row) => {
+                            if (err) {
+                                console.log(err)
+                            } else {
+                                console.log(row)
+                                row = metadata[file].fileStart;
+                                resolve(row)
+                            }
+                        })
+
+                } else {
+                    resolve(row)
+                }
+            }
+        })
+    })
+}
+
+const onUpdateFileStart = (args) => {
+    const file = args.file.replace("'", "''"), newfileStart = args.start;
+    return new Promise(function (resolve, reject) {
+        db.get(`SELECT rowid, filestart
+                from files
+                where name = '${file}'`, (err, row) => {
+            if (err) {
+                console.log(err)
+            } else {
+                if (row) {
+                    let rowID = row.rowid;
+                    db.get(`UPDATE files
+                            SET filestart = '${newfileStart}'
+                            where rowid = '${rowID}'`, (err, rows) => {
+                        if (err) {
+                            console.log(err)
+                        } else {
+                            let t0 = Date.now();
+                            db.get(`UPDATE records
+                                    set dateTime = position + ${newfileStart}
+                                    where fileid = ${rowID}`, (err, rowz) => {
+                                if (err) {
+                                    console.log(err)
+                                } else {
+                                    console.log(`Updating record times took ${Date.now() - t0} seconds`);
+                                    resolve(rowz)
+                                }
+                            })
+                        }
+                    })
+                }
+            }
+        })
+    })
+}
+let speciesCache = {};
+
+const cacheSpecies = (cname) => {
+    cname = cname.replace("'", "''");
+    return new Promise((resolve, reject) => {
+        db.get(`SELECT *
+                FROM SPECIES
+                WHERE cname = '${cname}'`, (err, row) => {
+            if (err) reject(err)
+            else {
+                speciesCache[cname] = {id: row.id, cname: row.cname, sname: row.sname}
+                resolve(speciesCache)
+            }
+        })
+    })
+}
+
+const updateResults = async (args) => {
+    if (args.what === 'ID' && !speciesCache[args.value]) await cacheSpecies(args.value);
+    let obj = RESULTS.find(o => {
+        if (o.start === args.start && o.file === args.file) {
+            if (args.what === 'ID') {
+
+                const rec = speciesCache[args.value]
+                o.id_1 = rec.id;
+                o.cname = rec.cname;
+                o.sname = rec.sname;
+            } else if (args.what === 'comment') {
+                o.comment = args.value;
+            } else if (args.what === 'label') {
+                o.label = args.value;
+            }
+            return true // Stop the search
+        }
+    })
+}
+
+const onUpdateRecord = async (args) => {
+    args.start = parseFloat(args.start);
+    let what = args.what, file = args.file, start = args.start, value = args.value;
+    // Sanitize input
+    if (!value) value = '';
+    await updateResults(args);
+    if (what === 'ID') {
+        what = 'birdID1';
+        value = speciesCache[args.value].id; //await getBirdID(value);
+    }
+    if (!metadata[file]) metadata[file] = {};
+    if (!metadata[file].fileStart) {
+        metadata[file].fileStart = await getFileStart(file);
+    }
+    const dateTime = metadata[file].fileStart + (start * 1000);
+    return new Promise(function (resolve, reject) {
+        db.get(`UPDATE records
+                SET ${what} = '${value}'
+                WHERE datetime = '${dateTime}'`, (err, row) => {
+            if (err) {
+                reject(err)
+            } else {
+                resolve(row)
+                if (row) console.log(`Updated ${what}, setting ${dateTime} to ${value}`);
+            }
+        })
+    })
+}
 
 async function onChartRequest(args) {
+    console.log(`Getting chart for ${args.species} starting ${args.range[0]}`);
+    // Escape apostrophes
+    if (args.species) args.species = args.species.replace("'", "''");
+    const dateRange = args.range;
     const dataRecords = {}, results = {};
     t0 = Date.now();
     await getSeasonRecords(args.species, 'spring')
@@ -1141,7 +1393,7 @@ async function onChartRequest(args) {
 
     console.log(`Most calls  chart generation took ${(Date.now() - t0) / 1000} seconds`)
     t0 = Date.now();
-    const [dataPoints, aggregation] = await getChartTotals(args.species)
+    const [dataPoints, aggregation] = await getChartTotals(args)
         .then(([rows, dataPoints, aggregation, startDay]) => {
             for (let i = 0; i < rows.length; i++) {
                 const year = rows[i].Year;
@@ -1153,9 +1405,9 @@ async function onChartRequest(args) {
                 if (!(year in results)) {
                     results[year] = new Array(dataPoints).fill(0);
                 }
-                if (aggregation === 'Week'){
+                if (aggregation === 'Week') {
                     results[year][parseInt(week) - 1] = count;
-                } else if (aggregation === 'Day'){
+                } else if (aggregation === 'Day') {
                     results[year][parseInt(day) - startDay] = count;
                 } else {
                     const d = new Date(dateRange.start);
@@ -1175,10 +1427,11 @@ async function onChartRequest(args) {
     let total, rate;
     if (dataPoints === 52) [total, rate] = await getRate(args.species)
     console.log(`Chart rate generation took ${(Date.now() - t0) / 1000} seconds`)
-    const pointStart = dateRange.start ? dateRange.start : Date.UTC(2020, 0,0,0,0,0);
+    const pointStart = dateRange.start ? dateRange.start : Date.UTC(2020, 0, 0, 0, 0, 0);
     UI.postMessage({
         event: 'chart-data',
-        species: args.species,
+        // Restore species name
+        species: args.species ? args.species.replace("''", "'") : undefined,
         results: results,
         rate: rate,
         total: total,

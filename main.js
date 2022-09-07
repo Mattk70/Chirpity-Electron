@@ -1,4 +1,4 @@
-const {app, session, dialog, ipcMain, MessageChannelMain, BrowserWindow} = require('electron');
+const {app, dialog, ipcMain, MessageChannelMain, BrowserWindow} = require('electron');
 const fs = require("fs");
 const path = require('path')
 
@@ -27,7 +27,17 @@ let files = [];
 //        if (returnValue.response === 0) autoUpdater.quitAndInstall()
 //    })
 //})
+process.stdin.resume();//so the program will not close instantly
 
+function exitHandler(options, exitCode) {
+    if (options.cleanup) console.log('clean');
+    else { console.log('no clean')}
+    if (exitCode || exitCode === 0) console.log(exitCode);
+    if (options.exit) process.exit();
+}
+
+//do something when app is closing
+process.on('exit', exitHandler.bind(null,{cleanup:false}));
 
 let mainWindow;
 let workerWindow;
@@ -96,7 +106,8 @@ async function createWorker() {
 
 // This method will be called when Electron has finished
 app.whenReady().then(async () => {
-    ipcMain.handle('getPath', () => app.getPath("userData"));
+    ipcMain.handle('getPath', (e) => app.getPath('userData'));
+    ipcMain.handle('getTemp', (e) => app.getPath('temp'));
     ipcMain.handle('getVersion', () => app.getVersion());
 
     await createWorker();
