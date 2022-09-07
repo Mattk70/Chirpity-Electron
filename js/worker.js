@@ -66,8 +66,8 @@ function createDB(file) {
                     fileID   INTEGER,
                     position INTEGER,
                     label    TEXT,
-                    comment  TEXT
-                        UNIQUE (dateTime, fileID)
+                    comment  TEXT,
+                    UNIQUE (dateTime, fileID)
                 )`, function (createResult) {
             if (createResult) throw createResult;
         });
