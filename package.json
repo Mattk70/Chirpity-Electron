@@ -14,12 +14,6 @@
   "build": {
     "fileAssociations": [
       {
-        "ext": "chirp",
-        "name": "Chirpity Results File",
-        "role": "Editor",
-        "perMachine": true
-      },
-      {
         "ext": "mp3",
         "name": "MP3 File",
         "role": "Editor",
@@ -81,7 +75,6 @@
             "aac",
             "mpga",
             "ogg",
-            "chirp",
             "mp4",
             "flac"
           ],

@@ -26,194 +26,209 @@
 
 
 <!-- Navigation bar -->
-
-<nav class="pt-0 pb-0 navbar navbar-expand-sm navbar-dark bg-dark position-relative">
-    <!--a class="navbar-brand" href="#">Chirpity</a -->
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
-            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse justify-content-between" id="navbarSupportedContent">
-        <ul class="navbar-nav mr-auto">
-            <li class="nav-item dropdown active">
-                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown"
-                   aria-haspopup="true" aria-expanded="false">
-                    File
-                </a>
-                <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
-                    <a id="open" class="dropdown-item" href="#"><u>O</u>pen Audio File </a>
-                    <a class="dropdown-item disabled" id="saveDetections" href="#">
-                        <u>S</u>ave Detections</a>
-                    <a class="dropdown-item disabled" id="saveLabels" href="#">
-                        Save <u>A</u>udacity Labels</a>
-                    <a class="dropdown-item disabled" id="exportMP3" href="#">
-                        Export Selected Audio</a>
-                    <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="#" id="exit">Exit</a>
-                </div>
-            </li>
-            <li class="nav-item dropdown active">
-                <a class="nav-link dropdown-toggle" href="#" id="navbarRecords" role="button" data-toggle="dropdown"
-                   aria-haspopup="true" aria-expanded="false">
-                    Records
-                </a>
-                <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item" href="#" id="save2db">Save Records</a>
-                    <a class="dropdown-item" href="#" id="charts">View charts</a>
-                    <a class="dropdown-item" href="#" id="explore">Explore records</a>
-                    <a class="dropdown-item" href="#" id="manage">Manage Records</a>
-                </div>
-            </li>
-            <li class="nav-item dropdown active">
-                <a class="nav-link dropdown-toggle" href="#" id="navbarAnalysis" role="button" data-toggle="dropdown"
-                   aria-haspopup="true" aria-expanded="false">
-                    Analysis
-                </a>
-                <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item text-danger" href="#" id="warmup">Model Warming up
-                        <div class="spinner-grow spinner-grow-sm" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
+<div id="navPadding" class="position-absolute top-0 w-100">
+    <nav class="pt-0 pb-0 navbar navbar-expand-sm navbar-dark bg-dark position-relative">
+        <!--a class="navbar-brand" href="#">Chirpity</a -->
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse justify-content-between" id="navbarSupportedContent">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item dropdown active">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button"
+                       data-toggle="dropdown"
+                       aria-haspopup="true" aria-expanded="false">
+                        File
                     </a>
-                    <a class="dropdown-item disabled" href="#" id="analyze">Analyze File</a>
-                    <a class="dropdown-item disabled" href="#" id="analyzeSelection">Analyze Selected Interval</a>
-                    <a class="dropdown-item disabled" href="#" id="analyzeAll">Analyze All Open Files</a>
-                </div>
-            </li>
-            <li class="nav-item dropdown active">
-                <a class="nav-link dropdown-toggle" href="#" id="SettingsDropdown" role="button" data-toggle="dropdown"
-                   aria-haspopup="true" aria-expanded="false">
-                    Settings
-                </a>
-                <div class="dropdown-menu top-level" aria-labelledby="navbarDropdown">
-                    <ul class="nav navbar-nav">
-                        <li class="dropdown-submenu">
-                            <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
-                               aria-haspopup="true" aria-expanded="false"> <span
-                                    class="nav-label">Predictions</span><span class="material-icons-two-tone arrow">navigate_next</span></a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="#" id="useWhitelist">Use Whitelist
-                                    <span class='material-icons tick'>done</span>
-                                </a></li>
-                                <li>
-                                    <div class="dropdown-submenu" aria-labelledby="navbarDropdown">
-                                        <ul class="nav navbar-nav">
-                                            <li class="dropdown-submenu">
-                                                <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
-                                                   aria-haspopup="true" aria-expanded="false"> <span
-                                                        class="nav-label">Batch Size</span><span
-                                                        class="material-icons-two-tone arrow">navigate_next</span></a>
-                                                <ul class="dropdown-menu">
-                                                    <li><a class="dropdown-item batch" href="#" id="1">1 <span
-                                                            class='material-icons tick'>done</span>
-                                                    </a></li>
-                                                    <li><a class="dropdown-item batch" href="#" id="2">2 <span
-                                                            class='material-icons tick d-none'>done</span></a></li>
-                                                    <li><a class="dropdown-item batch" href="#" id="3">3 <span
-                                                            class='material-icons tick d-none'>done</span></a></li>
-                                                    <li><a class="dropdown-item batch" href="#" id="4">4 <span
-                                                            class='material-icons tick d-none'>done</span></a></li>
-                                                    <li><a class="dropdown-item batch" href="#" id="6">6 <span
-                                                            class='material-icons tick d-none'>done</span></a></li>
-                                                    <li><a class="dropdown-item batch" href="#" id="8">8 <span
-                                                            class='material-icons tick d-none'>done</span></a></li>
-                                                    <li><a class="dropdown-item batch" href="#" id="12">12 <span
-                                                            class='material-icons tick d-none'>done</span></a></li>
-                                                    <li><a class="dropdown-item batch" href="#" id="16">16 <span
-                                                            class='material-icons tick d-none'>done</span></a></li>
-                                                </ul>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </li>
-                            </ul>
-                        </li>
+                    <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
+                        <a id="open" class="dropdown-item" href="#"><u>O</u>pen Audio File </a>
+                        <a class="dropdown-item disabled" id="saveLabels" href="#">
+                            Save <u>A</u>udacity Labels</a>
+                        <a class="dropdown-item disabled" id="exportMP3" href="#">
+                            Export Selected Audio</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="#" id="exit">Exit</a>
+                    </div>
+                </li>
+                <li class="nav-item dropdown active">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarRecords" role="button" data-toggle="dropdown"
+                       aria-haspopup="true" aria-expanded="false">
+                        Records
+                    </a>
+                    <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
+                        <a class="dropdown-item disabled" href="#" id="save2db">Save Records</a>
+                        <a class="dropdown-item" href="#" id="charts">View charts</a>
+                        <a class="dropdown-item" href="#" id="explore">Explore records</a>
+                    </div>
+                </li>
+                <li class="nav-item dropdown active">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarAnalysis" role="button"
+                       data-toggle="dropdown"
+                       aria-haspopup="true" aria-expanded="false">
+                        Analysis
+                    </a>
+                    <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
+                        <a class="dropdown-item text-danger" href="#" id="warmup">Model Warming up
+                            <div class="spinner-grow spinner-grow-sm" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </a>
+                        <a class="dropdown-item disabled" href="#" id="analyze">Analyze File</a>
+                        <a class="dropdown-item disabled" href="#" id="analyzeSelection">Analyze Selected Interval</a>
+                        <a class="dropdown-item disabled" href="#" id="analyzeAll">Analyze All Open Files</a>
+                    </div>
+                </li>
+                <li class="nav-item dropdown active">
+                    <a class="nav-link dropdown-toggle" href="#" id="SettingsDropdown" role="button"
+                       data-toggle="dropdown"
+                       aria-haspopup="true" aria-expanded="false">
+                        Settings
+                    </a>
+                    <div class="dropdown-menu top-level" aria-labelledby="navbarDropdown">
+                        <ul class="nav navbar-nav">
+                            <li class="dropdown-submenu">
+                                <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
+                                   aria-haspopup="true" aria-expanded="false"> <span
+                                        class="nav-label">Predictions</span><span
+                                        class="material-icons-two-tone  arrow">navigate_next</span></a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" id="useWhitelist">Use Whitelist
+                                        <span class='material-icons-two-tone tick'>done</span>
+                                    </a></li>
+                                    <li>
+                                        <div class="dropdown-submenu" aria-labelledby="navbarDropdown">
+                                            <ul class="nav navbar-nav">
+                                                <li class="dropdown-submenu">
+                                                    <a href="#" class="dropdown-item" data-toggle="dropdown"
+                                                       role="button"
+                                                       aria-haspopup="true" aria-expanded="false"> <span
+                                                            class="nav-label">Batch Size</span><span
+                                                            class="material-icons-two-tone  arrow">navigate_next</span></a>
+                                                    <ul class="dropdown-menu">
+                                                        <li><a class="dropdown-item batch" href="#" id="1">1 <span
+                                                                class='material-icons-two-tone tick'>done</span>
+                                                        </a></li>
+                                                        <li><a class="dropdown-item batch" href="#" id="2">2 <span
+                                                                class='material-icons-two-tone tick d-none'>done</span></a>
+                                                        </li>
+                                                        <li><a class="dropdown-item batch" href="#" id="3">3 <span
+                                                                class='material-icons-two-tone tick d-none'>done</span></a>
+                                                        </li>
+                                                        <li><a class="dropdown-item batch" href="#" id="4">4 <span
+                                                                class='material-icons-two-tone tick d-none'>done</span></a>
+                                                        </li>
+                                                        <li><a class="dropdown-item batch" href="#" id="6">6 <span
+                                                                class='material-icons-two-tone tick d-none'>done</span></a>
+                                                        </li>
+                                                        <li><a class="dropdown-item batch" href="#" id="8">8 <span
+                                                                class='material-icons-two-tone tick d-none'>done</span></a>
+                                                        </li>
+                                                        <li><a class="dropdown-item batch" href="#" id="12">12 <span
+                                                                class='material-icons-two-tone tick d-none'>done</span></a>
+                                                        </li>
+                                                        <li><a class="dropdown-item batch" href="#" id="16">16 <span
+                                                                class='material-icons-two-tone tick d-none'>done</span></a>
+                                                        </li>
+                                                        <li><a class="dropdown-item batch" href="#" id="24">24 <span
+                                                                class='material-icons-two-tone tick d-none'>done</span></a>
+                                                        </li>
+                                                        <li><a class="dropdown-item batch" href="#" id="32">32 <span
+                                                                class='material-icons-two-tone tick d-none'>done</span></a>
+                                                        </li>
+                                                        <li><a class="dropdown-item batch" href="#" id="64">64 <span
+                                                                class='material-icons-two-tone tick d-none'>done</span></a>
+                                                        </li>
+                                                        <li><a class="dropdown-item batch" href="#" id="96">96 <span
+                                                                class='material-icons-two-tone tick d-none'>done</span></a>
+                                                        </li>
+                                                    </ul>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </li>
 
-                        <li class="dropdown-submenu">
-                            <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
-                               aria-haspopup="true" aria-expanded="false"> <span
-                                    class="nav-label">Spectrogram</span><span class="material-icons-two-tone arrow">navigate_next</span></a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="#" id="loadSpectrogram">Enable
-                                    <span class='material-icons tick'>done</span>
-                                </a></li>
-                                <li>
-                                    <div class="dropdown-divider"></div>
-                                </li>
-                                <li>
-                                    <div class="dropdown-submenu" aria-labelledby="navbarDropdown">
-                                        <ul class="nav navbar-nav">
-                                            <li class="dropdown-submenu">
-                                                <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
-                                                   aria-haspopup="true" aria-expanded="false"> <span
-                                                        class="nav-label">Timeline</span><span
-                                                        class="material-icons-two-tone arrow">navigate_next</span></a>
-                                                <ul class="dropdown-menu">
-                                                    <li><a class="dropdown-item timeline" href="#" id="loadTimeline">Enable
-                                                        <span class='material-icons tick'>done</span>
-                                                    </a></li>
-                                                    <li>
-                                                        <div class="dropdown-divider"></div>
-                                                    </li>
-                                                    <li><a class="dropdown-item " href="#" id="timecode">Time Elapsed
-                                                        <span class='material-icons tick'>done</span>
-                                                    </a></li>
-                                                    <li><a class="dropdown-item" href="#" id="timeOfDay">
-                                                        Time of Day <span class='material-icons tick'>done</span>
-                                                    </a></li>
-                                                </ul>
-                                            </li>
-                                        </ul>
+                            <li class="dropdown-submenu">
+                                <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
+                                   aria-haspopup="true" aria-expanded="false"> <span
+                                        class="nav-label">Spectrogram</span><span
+                                        class="material-icons-two-tone  arrow">navigate_next</span></a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" id="loadSpectrogram">Enable
+                                        <span class='material-icons-two-tone tick'>done</span>
+                                    </a></li>
+                                    <li>
+                                        <div class="dropdown-divider"></div>
+                                    </li>
+                                    <li>
+                                        <div class="dropdown-submenu" aria-labelledby="navbarDropdown">
+                                            <ul class="nav navbar-nav">
+                                                <li class="dropdown-submenu">
+                                                    <a href="#" class="dropdown-item" data-toggle="dropdown"
+                                                       role="button"
+                                                       aria-haspopup="true" aria-expanded="false"> <span
+                                                            class="nav-label">Timeline</span><span
+                                                            class="material-icons-two-tone  arrow">navigate_next</span></a>
+                                                    <ul class="dropdown-menu">
+                                                        <li><a class="dropdown-item timeline" href="#"
+                                                               id="loadTimeline">Enable
+                                                            <span class='material-icons-two-tone tick'>done</span>
+                                                        </a></li>
+                                                        <li>
+                                                            <div class="dropdown-divider"></div>
+                                                        </li>
+                                                        <li><a class="dropdown-item " href="#" id="timecode">Time
+                                                            Elapsed
+                                                            <span class='material-icons-two-tone tick'>done</span>
+                                                        </a></li>
+                                                        <li><a class="dropdown-item" href="#" id="timeOfDay">
+                                                            Time of Day <span
+                                                                class='material-icons-two-tone tick'>done</span>
+                                                        </a></li>
+                                                    </ul>
+                                                </li>
+                                            </ul>
 
 
-                                    </div>
-                                </li>
-                                <li><a class="dropdown-item speccolor disabled" href="#" id="inferno">Colour
-                                    <span class='material-icons tick d-none'>done</span>
-                                </a></li>
-                                <li><a class="dropdown-item speccolor disabled" href="#" id="greys">Grayscale
-                                    <span class='material-icons tick d-none'>done</span>
-                                </a></li>
-                            </ul>
-                        </li>
-                    </ul>
-                </div>
-            </li>
-            <li class="nav-item dropdown active">
-                <a class="nav-link dropdown-toggle" href="#" id="help" role="button" data-toggle="dropdown"
-                   aria-haspopup="true" aria-expanded="false">
-                    Help
-                </a>
-                <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item" id="usage" href="#">Usage</a>
-                    <a class="dropdown-item" id="settings" href="#">Settings</a>
-                    <a class="dropdown-item" id="keyboard" href="#">Keyboard Shortcuts</a>
-                    <a class="dropdown-item" id="diagnostics" href="#">Diagnostics</a>
-                </div>
-            </li>
-        </ul>
-        <img src="img/logo/chirpity_logo2.png" alt="Chirpity Birdcalls: Identifying birds by sound"
-             height="50px"/>
-    </div>
-</nav>
-
-<!-- Content wrapper -->
-<div class="flex-column h-100" id="contentWrapper">
-    <!-- Feedback Modal -->
-    <div class="modal fade" id="feedbackModal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
-        <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header justify-content-center">
-                    <h5 class="modal-title" id="feedbackModalLabel">Feedback</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div id="feedbackModalBody" class="modal-body"></div>
-                <div class="modal-footer justify-content-center">
-                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Send</button>
-                </div>
-            </div>
+                                        </div>
+                                    </li>
+                                    <li><a class="dropdown-item speccolor disabled" href="#" id="inferno">Colour
+                                        <span class='material-icons-two-tone tick d-none'>done</span>
+                                    </a></li>
+                                    <li><a class="dropdown-item speccolor disabled" href="#" id="greys">Grayscale
+                                        <span class='material-icons-two-tone tick d-none'>done</span>
+                                    </a></li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+                <li class="nav-item dropdown active">
+                    <a class="nav-link dropdown-toggle" href="#" id="help" role="button" data-toggle="dropdown"
+                       aria-haspopup="true" aria-expanded="false">
+                        Help
+                    </a>
+                    <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
+                        <a class="dropdown-item" id="usage" href="#">Usage</a>
+                        <a class="dropdown-item" id="settings" href="#">Settings</a>
+                        <a class="dropdown-item" id="keyboard" href="#">Keyboard Shortcuts</a>
+                        <a class="dropdown-item" id="diagnostics" href="#">Diagnostics</a>
+                    </div>
+                </li>
+            </ul>
+            <img src="img/logo/chirpity_logo2.png" alt="Chirpity Birdcalls: Identifying birds by sound"
+                 height="50px"/>
         </div>
-    </div>
+    </nav>
+</div>
+<!-- Content wrapper -->
+<div id="contentWrapper">
+    <!-- DIV to Hold the bird list (its parking lot!) -->
+    <div id="allSpecies" class="d-none"></div>
+    <div id="seenSpecies" class="d-none"></div>
+
     <!-- Diagnostic Modal -->
     <div class="modal fade" id="diagnosticsModal" tabindex="-1" aria-labelledby="diagnosticsModalLabel"
          aria-hidden="true">
@@ -257,133 +272,161 @@
         </div>
     </div>
 
-    <!-- Spectrogram view -->
-    <div class="" id="timeline"></div>
-    <div class="inner" id="spectrogram"></div>
-    <div class="inner" id="waveform"></div>
-    <div class="w-100" id="dummy"></div>
-
-    <!-- Controls view -->
-    <div class="container-fluid p-1 bg-dark text-white d-inline-flex" id="controlsWrapper" style="max-height: 50px">
-
-        <div id="filename" class="col-5 ps-1 overflow-auto">
-            <div id="fileContainer" class="bg-dark text-nowrap pe-3"></div>
+    <!-- Explore Div -->
+    <div id="exploreWrapper" class="p-2 row g-1 d-none">
+        <div class="species-selector col-sm-3" id="exploreSpeciesSearch">
+            <input type="text" class="input rounded-pill" placeholder="Search for a species...">
+            <div class="explore bird-list-wrapper"></div>
         </div>
-
-        <div class="col btn-group bg-dark ps-1 pe-1 text-nowrap specFeature" role="group">
-            <button id="playToggle" class="p-1 btn btn-outline-secondary">
-                <i class="material-icons">play_arrow</i><span class="align-middle d-none d-lg-inline">Play  </span> /
-                <i class="material-icons">pause</i><span class="align-middle d-none d-lg-inline-block">Pause</span>
-            </button>
-        </div>
-
-        <div class="col btn-group bg-dark specFeature pe-2" role="group">
-            <button id="zoomIn" class="btn btn-outline-secondary">
-                <i class="material-icons-two-tone zoom align-middle">zoom_in</i>
-            </button>
-            <button id="zoomOut" class="btn btn-outline-secondary">
-                <i class="material-icons-two-tone zoom align-middle">zoom_out</i>
-            </button>
-        </div>
-        <div id="progressDiv" class="col-3" style="display:none"><span>Processing...</span><span id="fileNumber"></span><br>
-            <div class="progress w-100">
-                <div class="progress-bar progress-bar-striped active" role="progressbar" aria-valuenow="0"
-                     aria-valuemin="0"
-                     aria-valuemax="100" style="width: 0%;">0%
-                </div>
+        <div class="col-sm-9 align-middle">
+            <div class="text-center pointer" id="exploreRange"
+                 style="font-size: 16px;padding: 12px 20px 12px 40px; width: 100%">
+                <i class="material-icons-two-tone  align-bottom">date_range</i>&nbsp;
+                <span>Apply a date filter</span> <i
+                    class="material-icons-two-tone  align-bottom">expand_more</i>
             </div>
-        </div>
-
-        <div id="complete" class="col-3 pe-2" style="display:none">
-            <!-- Button trigger modal -->
-            <button type="button" class="float-end text-nowrap btn btn-primary align-bottom"
-                    id="showSummary">
-                Show Summary
-            </button>
-        </div>
-        <div class="col pe-1">
-            <span title="Toggle Nocmig mode" id="nocmigMode"
-                  class=" float-end material-icons-two-tone btn btn-outline-secondary p-1 pointer">dark_mode</span>
         </div>
     </div>
-    <!-- Result table -->
-    <div class="d-none border-end border-4" id="resultTableContainer">
-        <div class="row g-1 h-100">
-            <div id='summaryTable' class="d-none col-auto h-100 overflow-auto">
+
+    <!-- Spectrogram view -->
+    <div class="w-100 d-none" id="spectrogramWrapper">
+        <div>
+            <div class="bg-dark border-top border-light w-100" id="timeline"></div>
+            <div class="w-100" id="spectrogram"></div>
+            <div class="w-100" id="waveform"></div>
+        </div>
+        <!-- Controls view -->
+        <div class="container-fluid p-1 bg-dark text-white d-inline-flex" id="controlsWrapper" style="max-height: 50px">
+            <span id="setFileStart" title="Amend recording start time" class="material-icons-two-tone align-bottom pointer">edit_calendar</span>
+            <div id="filename" class="col-5 ps-1 overflow-auto"></div>
+
+            <div class="col btn-group bg-dark ps-1 pe-1 text-nowrap specFeature" role="group">
+                <button id="playToggle" class="p-1 btn btn-outline-secondary">
+                    <i class="material-icons-two-tone ">play_arrow</i><span
+                        class="align-middle d-none d-lg-inline">Play  </span>
+                    /
+                    <i class="material-icons-two-tone ">pause</i><span class="align-middle d-none d-lg-inline-block">Pause</span>
+                </button>
             </div>
-            <div class="col h-100 overflow-auto">
+
+            <div class="col btn-group bg-dark specFeature pe-2" role="group">
+                <button id="zoomIn" class="btn btn-outline-secondary">
+                    <i class="material-icons-two-tone  zoom align-middle">zoom_in</i>
+                </button>
+                <button id="zoomOut" class="btn btn-outline-secondary">
+                    <i class="material-icons-two-tone  zoom align-middle">zoom_out</i>
+                </button>
+            </div>
+            <div id="progressDiv" class="col-3" style="display:none"><span>Processing...</span><span
+                    id="fileNumber"></span><br>
+                <div class="progress w-100">
+                    <div class="progress-bar progress-bar-striped active" role="progressbar" aria-valuenow="0"
+                         aria-valuemin="0"
+                         aria-valuemax="100" style="width: 0;">0%
+                    </div>
+                </div>
+            </div>
+
+            <div id="complete" class="col-3 pe-2" style="display:none">
+                <!-- Button trigger modal -->
+                <button type="button" class="float-end text-nowrap btn btn-primary align-bottom"
+                        id="showSummary">
+                    Show Summary
+                </button>
+            </div>
+            <div class="col pe-1">
+            <span title="Toggle Nocmig mode" id="nocmigMode"
+                  class=" float-end material-icons-two-tone  btn btn-outline-secondary p-1 pointer">dark_mode</span>
+            </div>
+        </div>
+    </div>
+    <!-- Result container -->
+    <div class="d-none border-end border-4" id="resultTableContainer">
+        <div class="ps-1 row g-1 h-100">
+            <div class="col-sm-3 h-100 overflow-auto">
+                <!-- Summary table -->
+                <!--                <div class="rounded-border">-->
+                <div id='summaryTable' style="display:none"></div>
+                <!--                </div>-->
+            </div>
+            <!-- Results table -->
+            <div class="col-sm-9 h-100 overflow-auto">
                 <table id='results' class="table table-hover">
-                    <thead class="bg-dark text-white">
+                    <thead id="resultsHead">
                     <tr>
                         <th>#</th>
                         <th class="timestamp">Time</th>
                         <th>Position</th>
                         <th>Species</th>
+                        <th>Label</th>
                         <th class="text-center">Confidence<span id="confidenceFilter"
-                                                                class="material-icons-two-tone text-secondary align-bottom pointer">filter_list</span>
+                                                                class="material-icons-two-tone  text-secondary align-bottom pointer">filter_list</span>
                         </th>
                         <th class="text-center">Other IDs</th>
                         <th class="specFeature text-center">Play</th>
                         <th class="text-center">XC</th>
-                        <th class="specFeature text-center">Save</th>
-                        <th class="text-center speciesExclude d-none">Exclude</th>
-                        <th class="specFeature text-center">Feedback</th>
+                        <th class="specFeature text-center">Export</th>
+                        <th class="text-end">Notes</th>
                     </tr>
                     </thead>
                     <tbody class="text-dark" id="resultTableBody">
-
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
     <!-- Records container -->
-    <div class="d-none overflow-auto p-2" id="recordsContainer">
+    <div class="d-none h-100 overflow-auto p-2" id="recordsContainer">
         <div class="container-fluid">
             <div class="row">
-                <div class="col">
-                    <div id="speciesSearch"></div>
-                    <table id='dataRecords' class="table border border-dark d-none">
-                        <tbody id="recordsTableBody">
-                        <tr>
-                            <th>Earliest Spring Record</th>
-                            <td id="earliestSpring"></td>
-                        </tr>
-                        <tr>
-                            <th>Latest Spring Record</th>
-                            <td id="latestSpring"></td>
-                        </tr>
-                        <tr>
-                            <th>Earliest Autumn Record</th>
-                            <td id="earliestAutumn"></td>
-                        </tr>
-                        <tr>
-                            <th>Latest Autumn Record</th>
-                            <td id="latestAutumn"></td>
-                        </tr>
-                        <tr>
-                            <th>Most Calls in 24 hours</th>
-                            <td id="mostDetections"></td>
-                        </tr>
-                        <tr class="fst-italic text-sm-start">
-                            <th>Data generated in:</th>
-                            <td id="genTime"></td>
-                        </tr>
-                        </tbody>
-                    </table>
+                <div class="col-sm-3">
+                    <div id="speciesSearch" class="species-selector">
+                        <input type="text" class="input rounded-pill" placeholder="Search for a species...">
+                        <div class="chart bird-list-wrapper"></div>
+                    </div>
+                    <div id='dataRecords' class="border border-dark rounded-border d-none">
+                        <table class="table table-striped table-hover">
+                            <tbody id="recordsTableBody">
+                            <tr>
+                                <th>Earliest Spring Record</th>
+                                <td id="earliestSpring"></td>
+                            </tr>
+                            <tr>
+                                <th>Latest Spring Record</th>
+                                <td id="latestSpring"></td>
+                            </tr>
+                            <tr>
+                                <th>Earliest Autumn Record</th>
+                                <td id="earliestAutumn"></td>
+                            </tr>
+                            <tr>
+                                <th>Latest Autumn Record</th>
+                                <td id="latestAutumn"></td>
+                            </tr>
+                            <tr>
+                                <th>Most Calls in 24 hours</th>
+                                <td id="mostDetections"></td>
+                            </tr>
+                            <tr class="fst-italic text-sm-start">
+                                <th>Chart generated in:</th>
+                                <td id="genTime"></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <div class="col-9">
+                <div class="col-sm-9">
                     <div class="row">
-                        <div style="font-size: 16px" class="col text-center pointer" id="reportrange"
-                             style="padding: 12px 20px 12px 40px; width: 100%">
-                            <i class="material-icons-two-tone align-bottom">date_range</i>&nbsp;
+                        <div class="col text-center pointer" id="chartRange"
+                             style="font-size: 16px;padding: 12px 20px 12px 40px; width: 100%">
+                            <i class="material-icons-two-tone  align-bottom">date_range</i>&nbsp;
                             <span>Apply a date filter</span> <i
-                                class="material-icons-two-tone align-bottom">expand_more</i>
+                                class="material-icons-two-tone  align-bottom">expand_more</i>
                         </div>
                     </div>
                     <div class="row">
-                        <div class="col chart-outer p-2">
-                            <div id="chart-week"></div>
+                        <div class="col chart-outer">
+                            <div class="border border-dark rounded-3" id="chart-week"></div>
                         </div>
                     </div>
                 </div>
@@ -405,30 +448,7 @@
 <script src="js/exporting.js"></script>
 <script src="js/export-data.js"></script>
 <script src="js/accessibility.js"></script>
-
-
-<script>
-    function myFunction(prefix) {
-        // Declare variables
-        var input, filter, ul, li, a, i, txtValue;
-        input = document.getElementById(prefix + 'Input');
-        filter = input.value.toUpperCase();
-        ul = document.getElementById(prefix + "UL");
-        li = ul.getElementsByTagName('li');
-
-        // Loop through all list items, and hide those who don't match the search query
-        for (i = 0; i < li.length; i++) {
-            a = li[i].getElementsByTagName("a")[0];
-            txtValue = a.textContent || a.innerText;
-            if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                li[i].style.display = "";
-            } else {
-                li[i].style.display = "none";
-            }
-        }
-    }
-</script>
-
+<script src="js/no-data-to-display.js"></script>
 
 <script src="./js/ui.js"></script>
 </body>

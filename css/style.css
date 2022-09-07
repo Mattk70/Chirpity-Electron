@@ -12,15 +12,6 @@ html, body {
 }
 
 @font-face {
-    font-family: 'Material Icons';
-    font-style: normal;
-    font-weight: 400;
-    src: local('Material Icons'),
-    local('MaterialIcons-Regular'),
-    url(../fonts/MaterialIcons-Regular.woff2) format('woff2')
-}
-
-@font-face {
     font-family: 'Material Icons Two Tone';
     font-style: normal;
     font-weight: 400;
@@ -29,39 +20,12 @@ html, body {
     url(../fonts/MaterialIconsTwoTone-Regular.woff2) format('woff2')
 }
 
-@font-face {
-    font-family: 'Material Icons Outlined';
-    font-style: normal;
-    font-weight: 400;
-    src: local('Material Icons Outlined'),
-    local('MaterialIconsOutlined-Regular'),
-    url(../fonts/MaterialIconsOutlined-Regular.woff2) format('woff2')
-}
-
-.material-icons {
-    font-family: 'Material Icons';
-    font-weight: normal;
-    font-style: normal;
-    font-size: 28px; /* Preferred icon size */
-    display: inline-block;
-    line-height: 1;
-    text-transform: none;
-    letter-spacing: normal;
-    word-wrap: normal;
-    white-space: nowrap;
-    vertical-align: top;
-    direction: ltr;
-    padding-bottom: 0px;
-
-    /* Support for all WebKit browsers. */
-    -webkit-font-smoothing: antialiased;
-}
-
 .material-icons-two-tone {
     font-family: 'Material Icons Two Tone';
     font-weight: normal;
     font-style: normal;
     font-size: 28px; /* Preferred icon size */
+    font-display: block;
     display: inline-block;
     line-height: 1;
     text-transform: none;
@@ -71,25 +35,6 @@ html, body {
     vertical-align: top;
     direction: ltr;
     padding-bottom: 0px;
-    /* Support for all WebKit browsers. */
-    -webkit-font-smoothing: antialiased;
-}
-
-.material-icons-outlined {
-    font-family: 'Material Icons Outlined';
-    font-weight: normal;
-    font-style: normal;
-    font-size: 28px; /* Preferred icon size */
-    display: inline-block;
-    line-height: 1;
-    text-transform: none;
-    letter-spacing: normal;
-    word-wrap: normal;
-    white-space: nowrap;
-    vertical-align: top;
-    direction: ltr;
-    padding-bottom: 0px;
-
     /* Support for all WebKit browsers. */
     -webkit-font-smoothing: antialiased;
 }
@@ -103,10 +48,18 @@ html, body {
     vertical-align: top;
 }
 
-.inner {
+#spectrogram {
     position: absolute;
     width: 100%;
 }
+
+/*#fileNotLoaded {*/
+/*    position: relative;*/
+/*    font-size: calc(100% + 4vw);*/
+/*    z-index: 0;*/
+/*    width: 100%;*/
+/*    text-align: center;*/
+/*}*/
 
 .navbar-nav li:hover > ul.dropdown-menu {
     display: block;
@@ -170,66 +123,77 @@ span[id^="filename_"] {
     z-index: 6;
 }
 
-#transport-controls {
-    position: absolute;
-    z-index: 7;
-}
 
 div#contentWrapper {
     background: #dbe2ed url(../img/Redwing-flight.png);
     background-size: cover;
+    position: absolute;
+    top: 50px;
+    width: 100%;
 }
 
 .zoom {
     font-size: 22px;
 }
 
-#myInput, #searchInput {
+.species-selector{
+    position: relative;
+}
+
+.input {
     background-image: url('searchicon.png'); /* Add a search icon to input */
     background-position: 10px 12px; /* Position the search icon */
     background-repeat: no-repeat; /* Do not repeat the icon image */
-    width: 100%; /* Full-width */
+    width: 100%; /* Fixed-width */
     font-size: 16px; /* Increase font-size */
     padding: 12px 20px 12px 40px; /* Add some padding */
     border: 1px solid #ddd; /* Add a grey border */
-    margin-bottom: 12px; /* Add some space below the input */
+    margin-bottom: 3px; /* Add some space below the input */
 }
 
 
-#myUL, #searchUL {
+ul {
     /* Remove default list styling */
     list-style-type: none;
     padding: 0;
     margin: 0;
-    max-height: 320px;
+    width: 100%;
+}
+
+.bird-list-wrapper{
     overflow: auto;
+    max-height: 250px;
+    position:absolute;
+    width: 100%;
+    z-index: 10;
 }
 
-#searchUL {
-    position: absolute;
-}
-
-#feedbackModalBody {
-    max-height: 320px;
-}
-
-#myUL li a, #searchUL li a {
+.bird-list li a {
     border: 1px solid #ddd; /* Add a border to all links */
     margin-top: -1px; /* Prevent double borders */
     background-color: #f6f6f6; /* Grey background color */
-    padding: 12px; /* Add some padding */
+    padding: 10px; /* Add some padding */
     text-decoration: none; /* Remove default text underline */
-    font-size: 18px; /* Increase the font-size */
+    font-size: 14px; /* Increase the font-size */
     color: black; /* Add a black text color */
     display: block; /* Make it into a block element to fill the whole list */
 }
-
-#searchUL li a {
-    max-width: 300px;
+.bird-list li a:hover:not(.header){
+    background-color: #eee; /* Add a hover effect to all links, except for headers */
 }
 
-#myULli a:hover:not(.header), #searchUL li a:hover:not(.header) {
-    background-color: #eee; /* Add a hover effect to all links, except for headers */
+/* make dropdown stick to row */
+.table-active {
+    overflow: visible;
+    position: relative
+}
+
+
+#results>thead, #results>th {
+    position: sticky;
+    top:0;
+    color: white;
+    background-color: #1b1e21;
 }
 
 region.wavesurfer-region:before {
@@ -274,16 +238,14 @@ region.wavesurfer-region[data-region-highlight] {
 .dropdown:hover .dropdown-menu.top-level {
     display: block;
     margin-top: 0;
-/ / remove the gap so it doesn 't close
+/*remove the gap so it doesn't close*/
 }
 
 .chart-outer {
     height: 520px;
     margin: 0em 1em 1em;
-    width: 95%;
+    width: 100%;
     display: flex;
-
-
 }
 
 #chart-week {
@@ -292,6 +254,7 @@ region.wavesurfer-region[data-region-highlight] {
     width: 100%;
     display: flex;
     order: 1;
+    margin-top: 30px;
 }
 
 .highcharts-data-table table {
@@ -352,9 +315,24 @@ region.wavesurfer-region[data-region-highlight] {
 
 
 footer {
-  position: absolute;
+  position: fixed;
   bottom: 0;
   height: 30px;
   text-align: center;
   width: 100%;
+}
+
+/* round table borders
+
+.rounded-border{
+    border-radius: 10px;
+    margin-top: 1px;
+    overflow: hidden;
+}
+*/
+
+/* Flip comment icons */
+
+.add-comment, .edit-comment{
+    transform: scaleX(-1);
 }

@@ -17,8 +17,8 @@ const whitelist = ["Pluvialis dominica_American Golden Plover", "Acanthis hornem
 //const blacklist = ["Human_Human", "Ambient Noise_Ambient Noise", "Animal_Animal", "Vehicle_Vehicle"];
 //const blacklist = [];
 //const greylist = ["Phylloscopus fuscatus_Dusky Warbler", "Gallinago gallinago_Snipe", "Accipiter gentilis_Goshawk", "Asio otus_Long-eared Owl", "Bubo bubo_Eurasian Eagle-Owl", "Oriolus oriolus_Golden Oriole", "Cuculus canorus_Cuckoo"];
-const greylist = ["Sylvia curruca_Lesser Whitethroat", "Asio otus_Long-eared Owl", "Botaurus stellaris_Bittern"];
-const goldenlist = ["Turdus iliacus_Redwing", "Turdus philomelos_Song Thrush"];
+const greylist = []; //["Branta bernicla_Brent Goose"] //["Sylvia curruca_Lesser Whitethroat", "Asio otus_Long-eared Owl", "Botaurus stellaris_Bittern"];
+const goldenlist = [] //["Turdus iliacus_Redwing", "Turdus philomelos_Song Thrush"];
 let blocked_IDs = [];
 let allowed_IDs = [];
 let suppressed_IDs = [];
@@ -127,7 +127,7 @@ class Model {
     }
 
 
-    async predictChunk(chunks, fileStart) {
+    async predictChunk(chunks, fileStart, file) {
         let batched_results = [];
         let result;
         let audacity;
@@ -187,43 +187,56 @@ class Model {
                 let suppressed = false;
                 // If using the whitelist, we want to promote allowed IDs above any blocked IDs, so they will be visible
                 // if they meet the confidence threshold.
-                if (this.useWhitelist && blocked_IDs.indexOf(item.index[0]) !== -1) {
-                    // i.e. the top prediction is disallowed....
-                    // Is it Ambient noise?
-                    labels[item.index[0]].split('_')[1] === "Ambient Noise" ? suppressed = false : suppressed = 'text-danger'
-                    //make a copy of the top prediction
-                    const [temp_index, temp_score] = [item.index[0], item.score[0]]
-                    // Is the secondary prediction blocked too?
-                    if (blocked_IDs.indexOf(item.index[1]) !== -1) {
-                        // How about if all three predictions are blocked
-                        if (blocked_IDs.indexOf(item.index[2]) !== -1) {
-                            // switch off the suppressed warning and squash the confidence of the top prediction,
-                            // so it doesn't appear in the results
-                            item.score[0] = 0.0;
-                            suppressed = false;
-                        } else {
-                            // third prediction is allowed, but top two aren't
-                            // so, make a copy of the second prediction too
-                            const [temp_index2, temp_score2] = [item.index[1], item.score[1]]
-                            // Bump up the third prediction
-                            item.index[0] = item.index[2]
-                            item.score[0] = item.score[2]
-                            // Copy primary to secondary
-                            item.index[1] = temp_index
-                            item.score[1] = temp_score
-                            // Copy secondary to tertiary
-                            item.index[2] = temp_index2
-                            item.score[2] = temp_score2
+                if (this.useWhitelist) {
+                    let temp_item = structuredClone(item);
+                    item.index.every(id => {
+                        // If and while the top result is blocked, move it to the back
+                        if (blocked_IDs.indexOf(id) !== -1) {
+                            temp_item.index.push(temp_item.index.shift());
+                            // Squash the score
+                            temp_item.score.shift();
+                            temp_item.score.push(0.0);
+                            return true
                         }
-                    } else {
-                        // Just the top prediction is blocked, so demote it
-                        // Bump up the second prediction
-                        item.index[0] = item.index[1]
-                        item.score[0] = item.score[1]
-                        // Copy primary to secondary
-                        item.index[1] = temp_index
-                        item.score[1] = temp_score
-                    }
+                        return false
+                    })
+                    item = structuredClone(temp_item);
+                    // // i.e. the top prediction is disallowed....
+                    // // Is it Ambient noise?
+                    // labels[item.index[0]].split('_')[1] === "Ambient Noise" ? suppressed = false : suppressed = 'text-danger'
+                    // //make a copy of the top prediction
+                    // const [temp_index, temp_score] = [item.index[0], item.score[0]]
+                    // // Is the secondary prediction blocked too?
+                    // if (blocked_IDs.indexOf(item.index[1]) !== -1) {
+                    //     // How about if all three predictions are blocked
+                    //     if (blocked_IDs.indexOf(item.index[2]) !== -1) {
+                    //         // switch off the suppressed warning and squash the confidence of the top prediction,
+                    //         // so it doesn't appear in the results
+                    //         item.score[0] = 0.0;
+                    //         suppressed = false;
+                    //     } else {
+                    //         // third prediction is allowed, but top two aren't
+                    //         // so, make a copy of the second prediction too
+                    //         const [temp_index2, temp_score2] = [item.index[1], item.score[1]]
+                    //         // Bump up the third prediction
+                    //         item.index[0] = item.index[2]
+                    //         item.score[0] = item.score[2]
+                    //         // Copy primary to secondary
+                    //         item.index[1] = temp_index
+                    //         item.score[1] = temp_score
+                    //         // Copy secondary to tertiary
+                    //         item.index[2] = temp_index2
+                    //         item.score[2] = temp_score2
+                    //     }
+                    // } else {
+                    //     // Just the top prediction is blocked, so demote it
+                    //     // Bump up the second prediction
+                    //     item.index[0] = item.index[1]
+                    //     item.score[0] = item.score[1]
+                    //     // Copy primary to secondary
+                    //     item.index[1] = temp_index
+                    //     item.score[1] = temp_score
+                    // }
                 }
                 result = ({
                     start: key,
@@ -250,7 +263,9 @@ class Model {
                     score: Math.round(item.score[0] * 1000) / 1000,
                 })
                 //prepare summary
-                console.log(key, item.index[0], this.labels[item.index[0]], Math.round(item.score[0] * 1000) / 1000);
+                let hour = Math.floor(key / 3600), minute = Math.floor(key % 3600 / 60),
+                    second = Math.floor(key % 3600 % 60)
+                console.log(file, `${hour}:${minute}:${second}`, item.index[0], this.labels[item.index[0]], Math.round(item.score[0] * 1000) / 1000, this.labels[item.index[1]], Math.round(item.score[1] * 1000) / 1000, this.labels[item.index[2]], Math.round(item.score[2] * 1000) / 1000);
                 batched_results.push([key, result, audacity]);
             }
             this.result = batched_results;
@@ -290,6 +305,7 @@ async function runPredictions(e) {
             backend: tf.getBackend()
         });
     } else if (modelRequest === 'predict' && !suspended) {
+        const file = e.data.file;
         let t0 = performance.now();
         let response = {};
         let chunks = {};
@@ -304,12 +320,12 @@ async function runPredictions(e) {
         const fileStart = e.data.fileStart;
 
         //console.log(`sending message to model.js took: ${t0 - postTime} milliseconds`)
-        await myModel.predictChunk(chunks, fileStart)
+        await myModel.predictChunk(chunks, fileStart, file)
         response = {
             message: 'prediction',
             result: myModel.result,
             // time:       performance.now(),
-            file: e.data.file,
+            file: file,
             endpoint: e.data.duration,
             fileStart: fileStart,
             selection: e.data.selection,
