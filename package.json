@@ -1,6 +1,6 @@
 {
   "name": "Chirpity",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
@@ -100,7 +100,7 @@
   "homepage": "https://github.com/mattk70/Chirpity-Electron#readme",
   "devDependencies": {
     "electron": "^18.0.3",
-    "electron-packager": "^15.4.0",
+    "electron-packager": "^16.0.0",
     "electron-wix-msi": "^3.2.0"
   },
   "dependencies": {
