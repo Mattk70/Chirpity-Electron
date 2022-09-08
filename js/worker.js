@@ -1,5 +1,5 @@
 const {ipcRenderer} = require('electron');
-let appPath = '../24000_B3_full/';
+let appPath = '../24000_B3/';
 const fs = require('fs');
 const wavefileReader = require('wavefile-reader');
 const lamejs = require("lamejstmp");
@@ -136,7 +136,6 @@ ipcRenderer.on('new-client', (event) => {
                 break;
             case 'load-model':
                 UI.postMessage({event: 'spawning'});
-                await clearCache();
                 BATCH_SIZE = args.batchSize;
                 if (predictWorker) predictWorker.terminate();
                 spawnWorker(args.useWhitelist, BATCH_SIZE);
@@ -146,6 +145,7 @@ ipcRenderer.on('new-client', (event) => {
                 longitude = args.lon;
                 TEMP = args.temp;
                 await loadDB(args.path)
+                await clearCache();
                 break;
             case 'file-load-request':
                 index = 0;
@@ -288,7 +288,8 @@ const getDuration = async (src) => {
 
 const convertFileFormat = (file, destination, size, error, progressing, finish) => {
     return new Promise(function (resolve) {
-        ffmpeg(file)
+        const proc = new ffmpeg();
+        proc.addInput(file)
             .on('error', (err) => {
                 console.log('An error occurred: ' + err.message);
                 if (error) {
@@ -296,23 +297,24 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
                 }
             })
             .on('progress', (progress) => {
-                console.log('Processing: ' + progress.targetSize + ' KB converted');
+                console.log('Processing: ' + progress.percent + ' % converted');
                 UI.postMessage({
                     event: 'progress',
                     text: 'Decompressing file',
-                    progress: progress.targetSize / 1073559.65
+                    progress: progress.percent
                 })
                 if (progressing) {
-                    progressing(progress.targetSize);
+                    progressing(progress.percent / 100);
                 }
             })
             .on('end', () => {
-                UI.postMessage({event: 'progress', text: 'File decompressed', progress: 1.0})
+                UI.postMessage({event: 'progress', text: 'File decompressed', progress: 100.0})
                 if (finish) {
                     resolve(destination)
                 }
             })
-            .save(destination);
+            .save(destination)
+            .run();
     });
 }
 

@@ -1893,7 +1893,7 @@ async function onWorkerLoadedAudio(args) {
 function onProgress(args) {
     progressDiv.show();
     if (args.text) fileNumber.innerText = args.text;
-    let progress = (args.progress * 100).toFixed(1);
+    let progress = (args.progress).toFixed(1);
     progressBar.width(progress + '%');
     progressBar.attr('aria-valuenow', progress);
     progressBar.html(progress + '%');
