@@ -383,14 +383,14 @@ function updateFileName(files, openfile) {
     filenameElement.innerHTML = '';
 
     let appendstr = '<div id="fileContainer" class="d-inline-block position-absolute bg-dark text-nowrap pe-3">';
-                    if (files.length > 1){
-                appendstr += '<span class="material-icons-two-tone pointer">library_music</span>';
-            } else {
-                appendstr += '<span class="material-icons-two-tone align-bottom">audio_file</span>';
-            }
+    if (files.length > 1) {
+        appendstr += '<span class="material-icons-two-tone pointer">library_music</span>';
+    } else {
+        appendstr += '<span class="material-icons-two-tone align-bottom">audio_file</span>';
+    }
     files.forEach(item => {
-            if (item === openfile) {
-                appendstr += `<span class="revealFiles visible pointer" id="${item}">`;
+        if (item === openfile) {
+            appendstr += `<span class="revealFiles visible pointer" id="${item}">`;
 
         } else {
             appendstr += `<span class="openFiles pointer" id="${item}">`;
@@ -668,7 +668,7 @@ function loadResultRegion(paramlist) {
         position: wavesurfer.getCurrentTime() / windowLength,
         start: bufferBegin,
         end: bufferBegin + windowLength,
-        region: {start: start - bufferBegin, end: end - bufferBegin, label: label}
+        region: {start: Math.max(start - bufferBegin, 0), end: end - bufferBegin, label: label}
     });
 }
 
@@ -1776,23 +1776,23 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     Tab: function (e) {
         if (activeRow) {
             if (e.shiftKey) {
-                if (activeRow.previousSibling !== null) {
+                if (activeRow.previousSibling) {
                     activeRow.classList.remove('table-active')
-                    while (activeRow.previousSibling.classList.contains('d-none')) {
+                    while (activeRow.previousSibling && activeRow.previousSibling.classList.contains('d-none')) {
                         activeRow = activeRow.previousSibling;
                     }
                     activeRow = activeRow.previousSibling;
                 }
             } else {
-                if (activeRow.nextSibling !== null) {
+                if (activeRow.nextSibling) {
                     activeRow.classList.remove('table-active')
-                    while (activeRow.nextSibling.classList.contains('d-none')) {
+                    while (activeRow.nextSibling && activeRow.nextSibling.classList.contains('d-none')) {
                         activeRow = activeRow.nextSibling;
                     }
                     activeRow = activeRow.nextSibling;
                 }
             }
-            if (activeRow !== null) activeRow.click();
+            if (activeRow) activeRow.click();
         }
     }
 };
@@ -1893,7 +1893,7 @@ async function onWorkerLoadedAudio(args) {
 function onProgress(args) {
     progressDiv.show();
     if (args.text) fileNumber.innerText = args.text;
-    let progress = (args.progress).toFixed(1);
+    let progress = (args.progress * 100).toFixed(1);
     progressBar.width(progress + '%');
     progressBar.attr('aria-valuenow', progress);
     progressBar.html(progress + '%');
@@ -2010,11 +2010,20 @@ async function onPredictionDone(args) {
     });
     $(document).on('click', '.speciesFilter', function (e) {
         // Check if italic section was clicked
+        speciesFilter = document.querySelectorAll('.speciesFilter');
         const target = this.querySelector('span.pointer')
         const spinner = this.querySelector('span.spinner-border');
         if (spinner === null) return;
         // Remove any exclusion from the species to filter
         //e.target.parentNode.nextElementSibling.nextElementSibling.children[1].classList.remove('text-danger');
+        speciesFilter.forEach(function (el) {
+            const removeFrom = el.querySelector('span.pointer')
+            removeFrom.classList.remove('text-success');
+        })
+        // Hide open subrows
+        subRows.forEach(function (el) {
+            el.classList.add('d-none');
+        })
         const targetClass = target.classList;
         if (targetClass.contains('text-success')) {
             // Clicked on filtered species icon
@@ -2025,13 +2034,6 @@ async function onPredictionDone(args) {
             })
         } else {
             // Clicked on unfiltered species name
-            speciesFilter.forEach(function (el) {
-                el.querySelector('span.pointer').classList.remove('text-success');
-            })
-            // Hide open subrows
-            subRows.forEach(function (el) {
-                el.classList.add('d-none');
-            })
             targetClass.add('text-success', 'd-none');
             spinner.classList.remove('d-none');
             // Allow spinner to show
