@@ -160,6 +160,8 @@ ipcRenderer.on('new-client', (event) => {
             case 'explore':
                 // reset results table
                 UI.postMessage({event: 'reset-results'});
+                // And clear results from memory
+                RESULTS = [];
                 const results = await getCachedResults({species: args.species, range: args.range});
                 index = 0;
                 results.forEach(result => {
@@ -199,7 +201,7 @@ ipcRenderer.on('new-client', (event) => {
                 if (cachedFile && !args.selection) {
                     // Pull the results from the database
                     const results = await getCachedResults({file: cachedFile, range: {}});
-                    UI.postMessage({event: 'update-audio-duration', value: metadata[args.filePath].duration});
+                    UI.postMessage({event: 'update-audio-duration', value: metadata[cachedFile].duration});
                     results.forEach(result => {
                         //format dates
                         result.timestamp = new Date(result.timestamp);
@@ -301,14 +303,14 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
                 UI.postMessage({
                     event: 'progress',
                     text: 'Decompressing file',
-                    progress: progress.percent
+                    progress: progress.percent / 100
                 })
                 if (progressing) {
                     progressing(progress.percent / 100);
                 }
             })
             .on('end', () => {
-                UI.postMessage({event: 'progress', text: 'File decompressed', progress: 100.0})
+                UI.postMessage({event: 'progress', text: 'File decompressed', progress: 1.0})
                 if (finish) {
                     resolve(destination)
                 }
@@ -329,7 +331,7 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
  * @returns {Promise<boolean|*>}
  */
 async function getWorkingFile(file) {
-    if (metadata[file]) return metadata[file].proxy;
+    if (metadata[file] && metadata[file].proxy) return metadata[file].proxy;
     // find the file
     const source_file = await locateFile(file);
     let proxy = file;
@@ -337,20 +339,23 @@ async function getWorkingFile(file) {
     if (!source_file.endsWith('.wav')) {
         const workingFileName = source_file.replace(/.*\/(.*)\..*/, "$1.wav");
         const destination = p.join(TEMP, file_cache, workingFileName);
-        // get some metadata from the source file
-        const statsObj = fs.statSync(source_file);
-        const sourceMtime = statsObj.mtime;
-        //console.log(Date.UTC(sourceMtime));
+        if (fs.existsSync(destination)) {
+            proxy = destination;
+        } else {
+            // get some metadata from the source file
+            const statsObj = fs.statSync(source_file);
+            const sourceMtime = statsObj.mtime;
+            //console.log(Date.UTC(sourceMtime));
 
-        proxy = await convertFileFormat(source_file, destination, statsObj.size,
-            function (errorMessage) {
-                console.log(errorMessage)
-            }, null, function () {
-                console.log("success");
-            });
-        // assign the source file's save time to the proxy file
-        await utimes(proxy, sourceMtime.getTime());
-
+            proxy = await convertFileFormat(source_file, destination, statsObj.size,
+                function (errorMessage) {
+                    console.log(errorMessage)
+                }, null, function () {
+                    console.log("success");
+                });
+            // assign the source file's save time to the proxy file
+            await utimes(proxy, sourceMtime.getTime());
+        }
     }
     await getMetadata(file, proxy, source_file);
     return proxy;
@@ -422,7 +427,7 @@ function addDays(date, days) {
  */
 const getMetadata = (file, proxy, source_file) => {
     return new Promise(async (resolve) => {
-        if (metadata[file]) {
+        if (metadata[file] && metadata[file].proxy) {
             resolve(metadata[file])
         } else {
             // If we have it already, no need to do any more
@@ -662,6 +667,12 @@ function downloadMp3(buffer, filePath, metadata) {
     window.URL.revokeObjectURL(url);
 }
 
+const saveResults2File = () => {
+    RESULTS.forEach(result => {
+        const MP3Blob = analyzeAudioBuffer(buffer, metadata);
+    })
+}
+
 function uploadMp3(buffer, defaultName, metadata, mode) {
     const MP3Blob = analyzeAudioBuffer(buffer, metadata);
 // Populate a form with the file (blob) and filename
@@ -892,7 +903,7 @@ async function parsePredictions(e) {
                         selection: response['selection']
                     });
                 }
-                UI.postMessage({event: 'progress', progress: 1});
+                UI.postMessage({event: 'progress', progress: 1.0});
                 if (!predictionDone) {
                     UI.postMessage({
                         event: 'prediction-done',
@@ -1055,11 +1066,28 @@ const updateFileTables = async (file) => {
     })
 }
 
+const getFileIDs = () => {
+    return new Promise(function (resolve, reject) {
+        db.all('SELECT rowid, name FROM files',
+            (err, rows) => {
+                if (err) {
+                    reject(err)
+                } else {
+                    let filemap = {};
+                    rows.forEach(row =>{
+                        filemap[row.name] = row.rowid
+                    })
+                    resolve(filemap)
+                }
+            })
+    })
+}
+
 const onSave2DB = async () => {
     t0 = performance.now();
     db.run('BEGIN TRANSACTION');
     const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-    let filemap = {}
+    let filemap = await getFileIDs()
     for (let i = 0; i < RESULTS.length; i++) {
         const dateTime = new Date(RESULTS[i].timestamp).getTime();
         const birdID1 = RESULTS[i].id_1;
@@ -1079,7 +1107,7 @@ const onSave2DB = async () => {
                 if (i === (RESULTS.length - 1)) {
                     db.run('COMMIT', (err, rows) => {
                         console.log(`Update complete, ${i + 1} records added in ${((performance.now() - t0) / 1000).toFixed(5)} seconds`)
-                        UI.postMessage({event: 'progress', progress: 1});
+                        UI.postMessage({event: 'progress', progress: 1.0});
                     });
                 }
             });
