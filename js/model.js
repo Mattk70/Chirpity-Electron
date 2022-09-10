@@ -91,7 +91,7 @@ class Model {
 
     _makeSpectrogram(audioBuffer) {
         // const s0 = performance.now();
-        this.spectrogram = tf.signal.stft(audioBuffer.squeeze(), this.frame_length, this.frame_step,);
+        this.spectrogram = tf.signal.stft(audioBuffer, this.frame_length, this.frame_step,);
         // Cast from complex to float
         this.spectrogram = tf.cast(this.spectrogram, 'float32');
 
@@ -283,7 +283,7 @@ onmessage = async function (e) {
     }
         // If worker was respawned
     catch (e) {
-        process.stdout.write(".");
+        console.log(e)
     }
 }
 let suspended = false;
