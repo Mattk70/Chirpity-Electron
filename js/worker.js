@@ -322,7 +322,7 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
 
 /**
  * getWorkingFile called by loadAudioFile, getPredictBuffers, fetchAudioBuffer and processNextFile
- * purpose is to create a wav file from the source file. If the file *is* a wav file, it returns
+ * purpose is to create a wav file from the source file and set its metadata. If the file *is* a wav file, it returns
  * that file, else it checks for a temp wav file, if not found it calls convertFileFormat to extract
  * and create a wav file in the users temp folder and returns that file's path. The flag for this file is set in the
  * metadata object as metadata[file].proxy
@@ -331,9 +331,10 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
  * @returns {Promise<boolean|*>}
  */
 async function getWorkingFile(file) {
-    if (metadata[file] && metadata[file].proxy) return metadata[file].proxy;
+    if (metadata[file] && metadata[file].isComplete) return metadata[file].proxy;
     // find the file
     const source_file = await locateFile(file);
+    if (!source_file) return false;
     let proxy = file;
 
     if (!source_file.endsWith('.wav')) {
@@ -375,6 +376,10 @@ async function locateFile(file) {
         return fs.existsSync(foundFile)
     })
     if (!matchingFileExt) {
+        UI.postMessage({
+            event: 'generate-alert',
+            message: `Unable to load source file with any supported file extension: ${file}`
+        })
         return false;
     }
     return foundFile;
@@ -385,8 +390,8 @@ async function loadAudioFile(args) {
     const start = args.start || 0;
     const end = args.end || 20;
     const position = args.position || 0;
-    await getWorkingFile(file);
-    if (file) {
+    const found = await getWorkingFile(file);
+    if (found) {
         const buffer = await fetchAudioBuffer({file: file, start: start, end: end, position: position});
         const length = buffer.length;
         const myArray = buffer.getChannelData(0);
@@ -400,11 +405,6 @@ async function loadAudioFile(args) {
             length: length,
             contents: myArray,
             region: args.region
-        })
-    } else {
-        UI.postMessage({
-            event: 'generate-alert',
-            message: `Unable to load source file with any supported file extension: ${args.file}`
         })
     }
 }
@@ -427,7 +427,7 @@ function addDays(date, days) {
  */
 const getMetadata = (file, proxy, source_file) => {
     return new Promise(async (resolve) => {
-        if (metadata[file] && metadata[file].proxy) {
+        if (metadata[file] && metadata[file].isComplete) {
             resolve(metadata[file])
         } else {
             // If we have it already, no need to do any more
@@ -474,7 +474,7 @@ const getMetadata = (file, proxy, source_file) => {
             } else {
                 metadata[file].dawn = astro.dawn.getTime();
             }
-            // We use proxy here are the file *must* be a wav file
+            // We use proxy here as the file *must* be a wav file
             const readStream = fs.createReadStream(proxy);
             readStream.on('data', async chunk => {
                 let wav = new wavefileReader.WaveFileReader();
@@ -494,6 +494,8 @@ const getMetadata = (file, proxy, source_file) => {
                 metadata[file].sampleRate = wav.fmt.sampleRate;
                 metadata[file].bitsPerSample = wav.fmt.bitsPerSample
                 metadata[file].fileStart = fileStart;
+                // Set complete flag
+                metadata[file].isComplete = true;
                 readStream.close()
                 resolve(metadata[file]);
             })
@@ -524,7 +526,6 @@ async function setupCtx(chunk, file) {
 
 async function getPredictBuffers(args) {
     let start = args.start, end = args.end, selection = args.selection, file = args.file;
-    //const file = await getWorkingFile(args.file);
 
     // Ensure max and min are within range
     start = Math.max(0, start);
@@ -569,7 +570,8 @@ async function getPredictBuffers(args) {
  */
 const fetchAudioBuffer = async (args) => {
     let start = args.start, end = args.end, file = args.file;
-    await getWorkingFile(file);
+    const found = await getWorkingFile(file);
+    if (!found) return false
     return new Promise(async (resolve) => {
         // Ensure max and min are within range
         start = Math.max(0, start);
@@ -924,19 +926,23 @@ async function parsePredictions(e) {
 async function processNextFile(args) {
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
-        await getWorkingFile(file);
-        let [start, end] = args ? [args.start, args.end] : await setStartEnd(file);
-        if (start === 0 && end === 0) {
-            // Nothing to do for this file
-            UI.postMessage({
-                event: 'prediction-done',
-                file: file,
-                labels: AUDACITY,
-                batchInProgress: FILE_QUEUE.length,
-            });
-            await processNextFile();
+        const found = await getWorkingFile(file);
+        if (found) {
+            let [start, end] = args ? [args.start, args.end] : await setStartEnd(file);
+            if (start === 0 && end === 0) {
+                // Nothing to do for this file
+                UI.postMessage({
+                    event: 'prediction-done',
+                    file: file,
+                    labels: AUDACITY,
+                    batchInProgress: FILE_QUEUE.length,
+                });
+                await processNextFile();
+            } else {
+                await doPrediction({start: start, end: end, file: file, selection: false, preserveResults: true});
+            }
         } else {
-            await doPrediction({start: start, end: end, file: file, selection: false, preserveResults: true});
+            await processNextFile();
         }
     } else {
         predicting = false;
@@ -944,7 +950,6 @@ async function processNextFile(args) {
 }
 
 async function setStartEnd(file) {
-    //const metadata = await getMetadata(file);
     const meta = metadata[file];
     let start, end;
     if (nocmig) {
@@ -1074,7 +1079,7 @@ const getFileIDs = () => {
                     reject(err)
                 } else {
                     let filemap = {};
-                    rows.forEach(row =>{
+                    rows.forEach(row => {
                         filemap[row.name] = row.rowid
                     })
                     resolve(filemap)

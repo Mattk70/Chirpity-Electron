@@ -7,8 +7,7 @@ const colormap = window.module.colormap;
 const p = window.module.p;
 const SunCalc = window.module.SunCalc;
 const uuidv4 = window.module.uuidv4;
-const gzip = window.module.gzip;
-const ungzip = window.module.ungzip;
+
 
 /// Set up communication channel between UI and worker window
 
@@ -187,7 +186,7 @@ async function loadAudioFile(args) {
             return fileEnd;
         })
         if (!fileEnd) {
-            alert("Unable 2 load source file with any supported file extension: " + filePath)
+            alert("Unable to load source file with any supported file extension: " + filePath)
         } else {
             if (file) filePath = file;
             if (originalFileEnd) fileEnd = originalFileEnd;
@@ -1191,7 +1190,7 @@ function unpackNameAttr(el, cname) {
 function updateRecordID(file, start, end, cname, sname) {
     worker.postMessage({action: 'update-record', file: file, start: start, what: 'ID', value: cname});
     predictions[clickedIndex].filename =
-        `${cname.replace(/\s+/g, '_')}~${sname.replace(/\s+/g, '_')}~${Date.now().toString()}.mp3`;
+        `${cname.replace(/\s+/g, '_')}~${sname.replace(/\s+/g, '_')}~${Date.parse(predictions[clickedIndex].date)}.mp3`;
     sendFile('incorrect', predictions[clickedIndex]);
 }
 

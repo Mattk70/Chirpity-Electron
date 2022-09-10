@@ -4,7 +4,6 @@ const colormap = require("colormap");
 const p = require('path');
 const SunCalc = require('suncalc2');
 const {v4: uuidv4} = require("uuid");
-const {gzip, ungzip} = require('node-gzip');
 const si = require('systeminformation');
 
 // We need to wait until the UI  is ready to receive the message before
@@ -55,7 +54,5 @@ contextBridge.exposeInMainWorld('module', {
     p: p,
     SunCalc: SunCalc,
     uuidv4: uuidv4,
-    gzip: gzip,
-    ungzip: ungzip,
     si: si
 });
