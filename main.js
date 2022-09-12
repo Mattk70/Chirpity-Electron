@@ -167,7 +167,7 @@ app.whenReady().then(async () => {
         const dialogOpts = {
             type: 'warning',
             title: 'Crash report',
-            detail: e
+            detail: 'Oh no! The model had crashed, restarting Chirpity'
         }
 
         dialog.showMessageBox(dialogOpts).then((returnValue) => {

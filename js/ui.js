@@ -614,6 +614,12 @@ exploreLink.addEventListener('click', async () => {
     adjustSpecDims(true);
 });
 
+const datasetLink = document.getElementById('dataset');
+datasetLink.addEventListener('click', async () => {
+    const dataset_results = Object.values(predictions);
+    worker.postMessage({action: 'create-dataset', 'results':dataset_results});
+});
+
 
 function createRegion(start, end, label) {
     wavesurfer.pause();
@@ -1189,6 +1195,8 @@ function unpackNameAttr(el, cname) {
 
 function updateRecordID(file, start, end, cname, sname) {
     worker.postMessage({action: 'update-record', file: file, start: start, what: 'ID', value: cname});
+    predictions[clickedIndex].cname = cname;
+    predictions[clickedIndex].sname = sname;
     predictions[clickedIndex].filename =
         `${cname.replace(/\s+/g, '_')}~${sname.replace(/\s+/g, '_')}~${Date.parse(predictions[clickedIndex].date)}.mp3`;
     sendFile('incorrect', predictions[clickedIndex]);
@@ -2572,7 +2580,7 @@ document.addEventListener('drop', async (event) => {
     let filelist = []
     for (const f of event.dataTransfer.files) {
         // Using the path attribute to get absolute file path
-        console.log(f)
+        //console.log(f)
         filelist.push(f.path);
     }
     if (filelist.length) await onOpenFiles({filePaths: filelist})

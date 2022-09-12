@@ -239,6 +239,7 @@ class Model {
                     // }
                 }
                 result = ({
+                    file: file,
                     start: key,
                     end: end,
                     timestamp: myModel._timestampFromSeconds(key, fileStart),
@@ -325,12 +326,11 @@ async function runPredictions(e) {
             message: 'prediction',
             result: myModel.result,
             // time:       performance.now(),
-            file: file,
             endpoint: e.data.duration,
             fileStart: fileStart,
             selection: e.data.selection,
             // add a chunk to the start
-            start: i + myModel.chunkLength,
+            //start: i + myModel.chunkLength,
         }
         postMessage(response);
         let t1 = performance.now();

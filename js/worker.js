@@ -11,6 +11,7 @@ const labels = ["Tachymarptis melba_Alpine Swift", "Ambient Noise_Ambient Noise"
 const sqlite3 = require('sqlite3').verbose();
 const SunCalc = require('suncalc2');
 const ffmpeg = require('fluent-ffmpeg');
+const {writeFile, mkdir} = require('node:fs/promises');
 const {utimes} = require('utimes');
 const file_cache = 'chirpity';
 let TEMP;
@@ -130,13 +131,16 @@ ipcRenderer.on('new-client', (event) => {
             case 'get-detected-species':
                 getSpecies()
                 break;
+            case 'create-dataset':
+                saveResults2DataSet(args.results)
+                break;
             case 'clear-cache':
                 console.log('cache')
                 await clearCache();
                 break;
             case 'load-model':
                 UI.postMessage({event: 'spawning'});
-                BATCH_SIZE = args.batchSize;
+                BATCH_SIZE = parseInt(args.batchSize);
                 if (predictWorker) predictWorker.terminate();
                 spawnWorker(args.useWhitelist, BATCH_SIZE);
                 break;
@@ -290,8 +294,7 @@ const getDuration = async (src) => {
 
 const convertFileFormat = (file, destination, size, error, progressing, finish) => {
     return new Promise(function (resolve) {
-        const proc = new ffmpeg();
-        proc.addInput(file)
+        ffmpeg(file)
             .on('error', (err) => {
                 console.log('An error occurred: ' + err.message);
                 if (error) {
@@ -316,7 +319,6 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
                 }
             })
             .save(destination)
-            .run();
     });
 }
 
@@ -392,20 +394,25 @@ async function loadAudioFile(args) {
     const position = args.position || 0;
     const found = await getWorkingFile(file);
     if (found) {
-        const buffer = await fetchAudioBuffer({file: file, start: start, end: end, position: position});
-        const length = buffer.length;
-        const myArray = buffer.getChannelData(0);
-        UI.postMessage({
-            event: 'worker-loaded-audio',
-            fileStart: metadata[file].fileStart,
-            sourceDuration: metadata[file].duration,
-            bufferBegin: start,
-            file: file,
-            position: position,
-            length: length,
-            contents: myArray,
-            region: args.region
-        })
+        await fetchAudioBuffer({file: file, start: start, end: end})
+            .then((buffer) => {
+                const length = buffer.length;
+                const myArray = buffer.getChannelData(0);
+                UI.postMessage({
+                    event: 'worker-loaded-audio',
+                    fileStart: metadata[file].fileStart,
+                    sourceDuration: metadata[file].duration,
+                    bufferBegin: start,
+                    file: file,
+                    position: position,
+                    length: length,
+                    contents: myArray,
+                    region: args.region
+                });
+            })
+            .catch(e => {
+                console.log('e');
+            })
     }
 }
 
@@ -438,7 +445,7 @@ const getMetadata = (file, proxy, source_file) => {
 
             // CHeck the database first, so we honour any manual update.
             const savedMeta = await getFileInfo(file);
-            metadata[file].duration = savedMeta && savedMeta.duration ? savedMeta.duration : await getDuration(file);
+            metadata[file].duration = savedMeta && savedMeta.duration ? savedMeta.duration : await getDuration(proxy);
             if (savedMeta && savedMeta.filestart) {
                 fileStart = new Date(savedMeta.filestart);
                 fileEnd = new Date(fileStart.getTime() + (metadata[file].duration * 1000));
@@ -499,18 +506,21 @@ const getMetadata = (file, proxy, source_file) => {
                 readStream.close()
                 resolve(metadata[file]);
             })
+            readStream.on('error', err => {
+                console.log('readstream error:' + err)
+            })
         }
     })
 }
 
-const convertTimeToBytes = async (time, key) => {
-    const bytesPerSample = metadata[key].bitsPerSample / 8;
+const convertTimeToBytes = (time, metadata) => {
+    const bytesPerSample = metadata.bitsPerSample / 8;
     // get the nearest sample start - they can be 2,3 or 4 bytes representations. Then add the header offest
-    return (Math.round((time * metadata[key].bytesPerSec) / bytesPerSample) * bytesPerSample) + metadata[key].head;
+    return (Math.round((time * metadata.bytesPerSec) / bytesPerSample) * bytesPerSample) + metadata.head;
 }
 
-async function setupCtx(chunk, file) {
-    chunk = Buffer.concat([metadata[file].header, chunk]);
+async function setupCtx(chunk, header) {
+    chunk = Buffer.concat([header, chunk]);
     const audioBufferChunk = await audioCtx.decodeAudioData(chunk.buffer);
     const source = audioCtx.createBufferSource();
     source.buffer = audioBufferChunk;
@@ -532,8 +542,9 @@ async function getPredictBuffers(args) {
     // Handle no start / end supplied
     end > 0 ? end = Math.min(metadata[file].duration, end) : end = metadata[file].duration;
     if (!start) start = 0;
-    const byteStart = await convertTimeToBytes(start, file);
-    const byteEnd = await convertTimeToBytes(end, file);
+    if (end < start) return
+    const byteStart = convertTimeToBytes(start, metadata[file]);
+    const byteEnd = convertTimeToBytes(end, metadata[file]);
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
     const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * 3;
     const proxy = metadata[file].proxy;
@@ -547,12 +558,14 @@ async function getPredictBuffers(args) {
     await readStream.on('data', async chunk => {
         // Ensure data is processed in order
         readStream.pause();
-        const offlineCtx = await setupCtx(chunk, file);
-        offlineCtx.startRendering().then(resampled => {
+        const offlineCtx = await setupCtx(chunk, metadata[file].header);
+        offlineCtx.startRendering().catch(e => {
+            console.log(`Got an error decoding audio: ${e} with file ${file}`)
+        }).then(async resampled => {
             const myArray = resampled.getChannelData(0);
             const samples = (end - start) * sampleRate;
             const increment = samples < chunkLength ? samples : chunkLength;
-            feedChunksToModel(myArray, increment, chunkStart, file, end, selection);
+            await feedChunksToModel(myArray, increment, chunkStart, file, end, selection);
             chunkStart += 3 * BATCH_SIZE * sampleRate;
             // Now the async stuff is done ==>
             readStream.resume();
@@ -560,6 +573,9 @@ async function getPredictBuffers(args) {
     })
     readStream.on('end', function () {
         readStream.close()
+    })
+    readStream.on('error', err => {
+        console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`)
     })
 }
 
@@ -570,19 +586,24 @@ async function getPredictBuffers(args) {
  */
 const fetchAudioBuffer = async (args) => {
     let start = args.start, end = args.end, file = args.file;
-    const found = await getWorkingFile(file);
-    if (!found) return false
-    return new Promise(async (resolve) => {
+    const proxy = await getWorkingFile(file);
+    if (!proxy) return false
+    return new Promise(async (resolve, reject) => {
         // Ensure max and min are within range
         start = Math.max(0, start);
         // Handle no end supplied
         end = Math.min(metadata[file].duration, end);
-        const byteStart = await convertTimeToBytes(start, file);
-        const byteEnd = await convertTimeToBytes(end, file);
-        //if (isNaN(byteEnd)) byteEnd = Infinity;
+
+        const byteStart = convertTimeToBytes(start, metadata[file]);
+        const byteEnd = convertTimeToBytes(end, metadata[file]);
+
+        if (byteEnd < byteStart) {
+            console.log(`!!!!!!!!!!!!! End < start encountered for ${file}, end was ${end} start is ${start}`)
+            reject('error end < start')
+        }
         // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
         const highWaterMark = byteEnd - byteStart + 1;
-        const proxy = metadata[file].proxy;
+
         const readStream = fs.createReadStream(proxy, {
             start: byteStart,
             end: byteEnd,
@@ -591,7 +612,7 @@ const fetchAudioBuffer = async (args) => {
         readStream.on('data', async chunk => {
             // Ensure data is processed in order
             readStream.pause();
-            const offlineCtx = await setupCtx(chunk, file);
+            const offlineCtx = await setupCtx(chunk, metadata[file].header);
 
             offlineCtx.startRendering().then(resampled => {
                 // `resampled` contains an AudioBuffer resampled at 24000Hz.
@@ -604,6 +625,9 @@ const fetchAudioBuffer = async (args) => {
 
         readStream.on('end', function () {
             readStream.close()
+        })
+        readStream.on('error', err => {
+            console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`)
         })
     });
 }
@@ -657,8 +681,8 @@ async function feedChunksToModel(channelData, increment, chunkStart, file, durat
 }
 
 
-function downloadMp3(buffer, filePath, metadata) {
-    const MP3Blob = analyzeAudioBuffer(buffer, metadata);
+async function downloadMp3(buffer, filePath, metadata) {
+    const MP3Blob = await analyzeAudioBuffer(buffer, metadata);
     const anchor = document.createElement('a');
     document.body.appendChild(anchor);
     anchor.style = 'display: none';
@@ -669,14 +693,35 @@ function downloadMp3(buffer, filePath, metadata) {
     window.URL.revokeObjectURL(url);
 }
 
-const saveResults2File = () => {
-    RESULTS.forEach(result => {
-        const MP3Blob = analyzeAudioBuffer(buffer, metadata);
+const saveResults2DataSet = (results, rootDirectory) => {
+    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/MP3Dataset';
+    let promise = Promise.resolve();
+    let count = 0;
+    const t0 = Date.now();
+    results.forEach(result => {
+        promise = promise.then(async function () {
+            const buffer = await fetchAudioBuffer({start: result.start, end: result.end, file: result.file})
+            const folder = `${result.cname.replaceAll(' ', '_')}~${result.sname.replaceAll(' ', '_')}`;
+            const file = result.start + '_' + p.basename(result.file);
+            const filepath = p.join(rootDirectory, folder)
+            await mkdir(filepath, {recursive: true})
+            const MP3Blob = await analyzeAudioBuffer(buffer, result);
+            const mp3 = Buffer.from(await MP3Blob.arrayBuffer(), 'binary');
+            await writeFile(filepath + '/' + file, mp3);
+            console.log('wrote', file, '.mp3');
+            count++;
+            return new Promise(function (resolve) {
+                setTimeout(resolve, 2);
+            });
+        })
     })
+    promise.then(function () {
+        console.log(`Dataset created. ${count} files saved in ${(Date.now() - t0)} seconds`);
+    });
 }
 
-function uploadMp3(buffer, defaultName, metadata, mode) {
-    const MP3Blob = analyzeAudioBuffer(buffer, metadata);
+async function uploadMp3(buffer, defaultName, metadata, mode) {
+    const MP3Blob = await analyzeAudioBuffer(buffer, metadata);
 // Populate a form with the file (blob) and filename
     var formData = new FormData();
     //const timestamp = Date.now()
@@ -695,7 +740,7 @@ function uploadMp3(buffer, defaultName, metadata, mode) {
     xhr.send(formData);
 }
 
-function analyzeAudioBuffer(aBuffer, metadata) {
+async function analyzeAudioBuffer(aBuffer, metadata) {
     let numOfChan = aBuffer.numberOfChannels,
         btwLength = aBuffer.length * numOfChan * 2 + 44,
         btwArrBuff = new ArrayBuffer(btwLength),
@@ -787,15 +832,15 @@ function bufferToMp3(metadata, channels, sampleRate, left, right = null) {
             })
             .setFrame('TXXX', {
                 description: 'Time of detection',
-                value: metadata['date']
+                value: metadata['date'] || metadata['timestamp']
             })
             .setFrame('TXXX', {
                 description: 'Latitude',
-                value: metadata['lat']
+                value: metadata['lat'] || '0.51'
             })
             .setFrame('TXXX', {
                 description: 'Longitude',
-                value: metadata['lon']
+                value: metadata['lon'] || '0.4'
             })
             .setFrame('TXXX', {
                 description: '2nd',
@@ -807,7 +852,7 @@ function bufferToMp3(metadata, channels, sampleRate, left, right = null) {
             })
             .setFrame('TXXX', {
                 description: 'UUID',
-                value: metadata['UUID'],
+                value: metadata['UUID'] || '001',
             });
         writer.addTag();
         buffer.push(writer.arrayBuffer)
@@ -845,7 +890,7 @@ async function postMP3(args) {
     const file = args.file, defaultName = args.defaultName, start = args.start, end = args.end,
         metadata = args.metadata, mode = args.mode;
     const buffer = await fetchAudioBuffer({file: file, start: start, end: end});
-    uploadMp3(buffer, defaultName, metadata, mode)
+    await uploadMp3(buffer, defaultName, metadata, mode)
 }
 
 
@@ -854,15 +899,18 @@ function spawnWorker(useWhitelist, batchSize) {
     console.log('spawning worker')
     predictWorker = new Worker('./js/model.js');
     predictWorker.postMessage(['load', appPath, useWhitelist, batchSize])
-    predictWorker.onmessage = async (e) => {
-        await parsePredictions(e)
+    predictWorker.onmessage = (e) => {
+        parsePredictions(e)
     }
 }
+/*
+PREDICTIONS ARE BEING RECORDED BEYOND THE LENGTH OF THE FILE
+NEED TO ESTABLISH WHY !!
 
-async function parsePredictions(e) {
+ */
+function parsePredictions(e) {
     const response = e.data;
     // Restore Original file path
-    const file = response.file;
     if (response['message'] === 'model-ready') {
         chunkLength = response['chunkLength'];
         sampleRate = response['sampleRate'];
@@ -874,7 +922,7 @@ async function parsePredictions(e) {
         response['result'].forEach(prediction => {
             const position = parseFloat(prediction[0]);
             const result = prediction[1];
-            result.file = file;
+            const file = result.file
             const audacity = prediction[2];
             UI.postMessage({event: 'progress', progress: (position / metadata[file].duration)});
             //console.log('Prediction received from worker', result);
@@ -919,7 +967,7 @@ async function parsePredictions(e) {
         })
     }
     if (predictionDone) {
-        await processNextFile();
+        processNextFile();
     }
 }
 
