@@ -1,5 +1,5 @@
 const {ipcRenderer} = require('electron');
-let appPath = '../24000_B3/';
+let appPath = '../24000_v9/';
 const fs = require('fs');
 const wavefileReader = require('wavefile-reader');
 const lamejs = require("lamejstmp");
@@ -15,6 +15,8 @@ const {writeFile, mkdir} = require('node:fs/promises');
 const {utimes} = require('utimes');
 const file_cache = 'chirpity';
 let TEMP;
+
+let predictionsRequested = 0, predictionsReceived = 0;
 
 let db, nocmig, latitude, longitude;
 
@@ -91,7 +93,7 @@ async function loadDB(path) {
 }
 
 let metadata = {};
-let chunkStart, chunkLength, minConfidence, index = 0, AUDACITY = [], RESULTS = [], predictionStart;
+let minConfidence, index = 0, AUDACITY = [], RESULTS = [], predictionStart;
 let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
 let predictWorker, predicting = false, predictionDone = false, aborted = false;
 let useWhitelist = true;
@@ -155,6 +157,8 @@ ipcRenderer.on('new-client', (event) => {
                 index = 0;
                 if (predicting) onAbort(args);
                 console.log('Worker received audio ' + args.file);
+                predictionsRequested = 0;
+                predictionsReceived = 0;
                 await loadAudioFile(args);
 
                 break;
@@ -192,7 +196,7 @@ ipcRenderer.on('new-client', (event) => {
                 });
                 break;
             case 'analyze':
-                console.log(`Worker received message: ${args.confidence}, start: ${args.start}, end: ${args.end}`);
+                console.log(`Worker received message: ${args.filePath}, ${args.confidence}, start: ${args.start}, end: ${args.end}`);
                 if (args.resetResults) {
                     index = 0;
                     AUDACITY = [];
@@ -201,8 +205,16 @@ ipcRenderer.on('new-client', (event) => {
                 latitude = args.lat;
                 longitude = args.lon;
                 nocmig = args.nocmig;
+                FILE_QUEUE.push(args.filePath);
+                console.log(`Adding ${args.filePath} to the queue.`)
                 const cachedFile = await isDuplicate(args.filePath);
                 if (cachedFile && !args.selection) {
+                    //remove the file from the queue - wherever it sits, this prevents out of
+                    // sequence issues with batch analysis
+                    const place = FILE_QUEUE.indexOf(args.filePath);
+                    if (place > -1) { // only splice array when item is found
+                        FILE_QUEUE.splice(place, 1); // 2nd parameter means remove one item only
+                    }
                     // Pull the results from the database
                     const results = await getCachedResults({file: cachedFile, range: {}});
                     UI.postMessage({event: 'update-audio-duration', value: metadata[cachedFile].duration});
@@ -229,17 +241,10 @@ ipcRenderer.on('new-client', (event) => {
                         batchInProgress: false,
                     });
                     //if (FILE_QUEUE.length) await processNextFile();
-                } else {
-                    FILE_QUEUE.push(args.filePath);
-                    console.log(`Adding ${args.filePath} to the queue.`)
-                    if (predicting) {
-
-
-                    } else {
-                        predicting = true;
-                        minConfidence = args.confidence;
-                        await processNextFile(args);
-                    }
+                } else if (!predicting) {
+                    predicting = true;
+                    minConfidence = args.confidence;
+                    await processNextFile(args);
                 }
                 break;
             case 'save':
@@ -292,31 +297,41 @@ const getDuration = async (src) => {
     });
 }
 
-const convertFileFormat = (file, destination, size, error, progressing, finish) => {
+const convertFileFormat = (file, destination, size, error) => {
     return new Promise(function (resolve) {
+        let totalTime;
         ffmpeg(file)
+            .audioChannels(1)
+            .audioFrequency(24000)
             .on('error', (err) => {
                 console.log('An error occurred: ' + err.message);
                 if (error) {
                     error(err.message);
                 }
             })
+            // Handle progress % being undefined
+            .on('codecData', data => {
+                // HERE YOU GET THE TOTAL TIME
+                totalTime = parseInt(data.duration.replace(/:/g, ''))
+            })
             .on('progress', (progress) => {
-                console.log('Processing: ' + progress.percent + ' % converted');
+                // HERE IS THE CURRENT TIME
+                const time = parseInt(progress.timemark.replace(/:/g, ''))
+
+                // AND HERE IS THE CALCULATION
+                const percent = (time / totalTime) * 100
+                console.log('Processing: ' + percent + ' % converted');
                 UI.postMessage({
                     event: 'progress',
                     text: 'Decompressing file',
-                    progress: progress.percent / 100
+                    progress: percent / 100
                 })
-                if (progressing) {
-                    progressing(progress.percent / 100);
-                }
             })
             .on('end', () => {
                 UI.postMessage({event: 'progress', text: 'File decompressed', progress: 1.0})
-                if (finish) {
-                    resolve(destination)
-                }
+                //if (finish) {
+                resolve(destination)
+                //}
             })
             .save(destination)
     });
@@ -352,9 +367,8 @@ async function getWorkingFile(file) {
 
             proxy = await convertFileFormat(source_file, destination, statsObj.size,
                 function (errorMessage) {
-                    console.log(errorMessage)
-                }, null, function () {
-                    console.log("success");
+                    console.log(errorMessage);
+                    return true;
                 });
             // assign the source file's save time to the proxy file
             await utimes(proxy, sourceMtime.getTime());
@@ -370,7 +384,8 @@ async function getWorkingFile(file) {
  * @returns {Promise<*>}
  */
 async function locateFile(file) {
-    const supported_files = ['.wav', '.m4a', '.mp3', '.mpga', '.ogg', '.flac', '.aac', '.mpeg', '.mp4'];
+    const supported_files = ['.wav', '.m4a', '.mp3', '.mpga', '.ogg', '.flac', '.aac', '.mpeg', '.mp4',
+        '.WAV', '.M4A', '.MP3', '.MPGA', '.OGG', '.FLAC', '.AAC', '.MPEG', '.MP4'];
     const dir = p.parse(file).dir, name = p.parse(file).name;
     let foundFile;
     const matchingFileExt = supported_files.find(ext => {
@@ -536,13 +551,13 @@ async function setupCtx(chunk, header) {
 
 async function getPredictBuffers(args) {
     let start = args.start, end = args.end, selection = args.selection, file = args.file;
-
+    let chunkLength = 72000;
     // Ensure max and min are within range
     start = Math.max(0, start);
     // Handle no start / end supplied
-    end > 0 ? end = Math.min(metadata[file].duration, end) : end = metadata[file].duration;
-    if (!start) start = 0;
-    if (end < start) return
+    end ? end = Math.min(metadata[file].duration, end) : end = metadata[file].duration;
+
+    if (start > metadata[file].duration) return
     const byteStart = convertTimeToBytes(start, metadata[file]);
     const byteEnd = convertTimeToBytes(end, metadata[file]);
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
@@ -553,22 +568,22 @@ async function getPredictBuffers(args) {
         end: byteEnd,
         highWaterMark: highWaterMark
     });
-    chunkStart = start * sampleRate;
+    let chunkStart = start * sampleRate;
     //const fileDuration = end - start;
-    await readStream.on('data', async chunk => {
+    readStream.on('data', async chunk => {
         // Ensure data is processed in order
         readStream.pause();
         const offlineCtx = await setupCtx(chunk, metadata[file].header);
-        offlineCtx.startRendering().catch(e => {
-            console.log(`Got an error decoding audio: ${e} with file ${file}`)
-        }).then(async resampled => {
+        offlineCtx.startRendering().then((resampled) => {
             const myArray = resampled.getChannelData(0);
-            const samples = (end - start) * sampleRate;
+            const samples = parseInt((end - start) * sampleRate.toFixed(0));
             const increment = samples < chunkLength ? samples : chunkLength;
-            await feedChunksToModel(myArray, increment, chunkStart, file, end, selection);
+            feedChunksToModel(myArray, increment, chunkStart, file, end, selection);
             chunkStart += 3 * BATCH_SIZE * sampleRate;
             // Now the async stuff is done ==>
             readStream.resume();
+        }).catch(e => {
+            console.log(`Got an error decoding audio: ${e} with file ${file}`)
         })
     })
     readStream.on('end', function () {
@@ -599,7 +614,6 @@ const fetchAudioBuffer = async (args) => {
 
         if (byteEnd < byteStart) {
             console.log(`!!!!!!!!!!!!! End < start encountered for ${file}, end was ${end} start is ${start}`)
-            reject('error end < start')
         }
         // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
         const highWaterMark = byteEnd - byteStart + 1;
@@ -632,7 +646,7 @@ const fetchAudioBuffer = async (args) => {
     });
 }
 
-async function sendMessageToWorker(chunkStart, chunks, file, duration, selection) {
+function sendMessageToWorker(chunkStart, chunks, file, duration, selection) {
     const objData = {
         message: 'predict',
         chunkStart: chunkStart,
@@ -665,19 +679,21 @@ async function doPrediction(args) {
     UI.postMessage({event: 'update-audio-duration', value: metadata[file].duration});
 }
 
-async function feedChunksToModel(channelData, increment, chunkStart, file, duration, selection) {
+function feedChunksToModel(channelData, increment, chunkStart, file, duration, selection) {
     let chunks = [];
     for (let i = 0; i < channelData.length; i += increment) {
         let chunk = channelData.slice(i, i + increment);
         // Batch predictions
+        predictionsRequested++;
         chunks.push(chunk);
         if (chunks.length === BATCH_SIZE) {
-            await sendMessageToWorker(chunkStart, chunks, file, duration, selection);
+            sendMessageToWorker(chunkStart, chunks, file, duration, selection);
             chunks = [];
+            //chunkStart += 3 * BATCH_SIZE * sampleRate;
         }
     }
     //clear up remainder less than BATCH_SIZE
-    if (chunks.length) await sendMessageToWorker(chunkStart, chunks, file, duration, selection);
+    if (chunks.length) sendMessageToWorker(chunkStart, chunks, file, duration, selection);
 }
 
 
@@ -697,9 +713,11 @@ const saveResults2DataSet = (results, rootDirectory) => {
     if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/MP3Dataset';
     let promise = Promise.resolve();
     let count = 0;
+    nocmig = false; minConfidence = 0.25;
+
     const t0 = Date.now();
     results.forEach(result => {
-        promise = promise.then(async function () {
+        promise = promise.then(async function (resolve) {
             const buffer = await fetchAudioBuffer({start: result.start, end: result.end, file: result.file})
             const folder = `${result.cname.replaceAll(' ', '_')}~${result.sname.replaceAll(' ', '_')}`;
             const file = result.start + '_' + p.basename(result.file);
@@ -716,7 +734,7 @@ const saveResults2DataSet = (results, rootDirectory) => {
         })
     })
     promise.then(function () {
-        console.log(`Dataset created. ${count} files saved in ${(Date.now() - t0)} seconds`);
+        console.log(`Dataset created. ${count} files saved in ${(Date.now() - t0) / 1000} seconds`);
     });
 }
 
@@ -910,6 +928,7 @@ NEED TO ESTABLISH WHY !!
  */
 function parsePredictions(e) {
     const response = e.data;
+    let file, batchInProgress
     // Restore Original file path
     if (response['message'] === 'model-ready') {
         chunkLength = response['chunkLength'];
@@ -920,9 +939,10 @@ function parsePredictions(e) {
     } else if (response['message'] === 'prediction' && !aborted) {
         // add filename to result for db purposes
         response['result'].forEach(prediction => {
+            predictionsReceived++;
             const position = parseFloat(prediction[0]);
             const result = prediction[1];
-            const file = result.file
+            file = result.file
             const audacity = prediction[2];
             UI.postMessage({event: 'progress', progress: (position / metadata[file].duration)});
             //console.log('Prediction received from worker', result);
@@ -954,20 +974,23 @@ function parsePredictions(e) {
                     });
                 }
                 UI.postMessage({event: 'progress', progress: 1.0});
-                if (!predictionDone) {
-                    UI.postMessage({
-                        event: 'prediction-done',
-                        file: file,
-                        labels: AUDACITY,
-                        batchInProgress: FILE_QUEUE.length,
-                    });
-                }
+                batchInProgress = FILE_QUEUE.length ? true : predictionsRequested - predictionsReceived;
                 predictionDone = true;
             }
         })
     }
     if (predictionDone) {
+        console.log(`FILE QUEUE: ${FILE_QUEUE.length}, Prediction requests ${predictionsRequested}, predictions received ${predictionsReceived}`)
+        if (predictionsReceived === predictionsRequested) {
+            UI.postMessage({
+                event: 'prediction-done',
+                file: file,
+                labels: AUDACITY,
+                batchInProgress: batchInProgress
+            })
+        }
         processNextFile();
+
     }
 }
 
@@ -976,14 +999,14 @@ async function processNextFile(args) {
         let file = FILE_QUEUE.shift()
         const found = await getWorkingFile(file);
         if (found) {
-            let [start, end] = args ? [args.start, args.end] : await setStartEnd(file);
+            let [start, end] = args && args.start ? [args.start, args.end] : await setStartEnd(file);
             if (start === 0 && end === 0) {
                 // Nothing to do for this file
                 UI.postMessage({
                     event: 'prediction-done',
                     file: file,
                     labels: AUDACITY,
-                    batchInProgress: FILE_QUEUE.length,
+                    batchInProgress: FILE_QUEUE.length
                 });
                 await processNextFile();
             } else {
