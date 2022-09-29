@@ -127,7 +127,7 @@ class Model {
     }
 
 
-    async predictChunk(chunks, fileStart, file) {
+    async predictChunk(chunks, fileStart, file, duration) {
         let batched_results = [];
         let result;
         let audacity;
@@ -153,6 +153,7 @@ class Model {
             // If we have any tensors, stack them, else create ones
             tensorArray.length ? this.batch = tf.stack(tensorArray) : this.batch = tf.zeros([1, this.inputShape[1], this.inputShape[2], this.inputShape[3]]);
             if (this.batch.shape[0] < this.batchSize) {
+                console.log(`Adding ${this.batchSize - this.batch.shape[0]} tensors to the batch`)
                 const padding = tf.zeros([this.batchSize - this.batch.shape[0], this.inputShape[1], this.inputShape[2], this.inputShape[3]]);
                 this.batch = tf.concat([this.batch, padding], 0)
             }
@@ -195,49 +196,14 @@ class Model {
                             temp_item.index.push(temp_item.index.shift());
                             // Squash the score
                             temp_item.score.shift();
-                            temp_item.score.push(0.0);
+                            temp_item.score.push(-1.0);
                             return true
                         }
                         return false
                     })
                     item = structuredClone(temp_item);
-                    // // i.e. the top prediction is disallowed....
-                    // // Is it Ambient noise?
-                    // labels[item.index[0]].split('_')[1] === "Ambient Noise" ? suppressed = false : suppressed = 'text-danger'
-                    // //make a copy of the top prediction
-                    // const [temp_index, temp_score] = [item.index[0], item.score[0]]
-                    // // Is the secondary prediction blocked too?
-                    // if (blocked_IDs.indexOf(item.index[1]) !== -1) {
-                    //     // How about if all three predictions are blocked
-                    //     if (blocked_IDs.indexOf(item.index[2]) !== -1) {
-                    //         // switch off the suppressed warning and squash the confidence of the top prediction,
-                    //         // so it doesn't appear in the results
-                    //         item.score[0] = 0.0;
-                    //         suppressed = false;
-                    //     } else {
-                    //         // third prediction is allowed, but top two aren't
-                    //         // so, make a copy of the second prediction too
-                    //         const [temp_index2, temp_score2] = [item.index[1], item.score[1]]
-                    //         // Bump up the third prediction
-                    //         item.index[0] = item.index[2]
-                    //         item.score[0] = item.score[2]
-                    //         // Copy primary to secondary
-                    //         item.index[1] = temp_index
-                    //         item.score[1] = temp_score
-                    //         // Copy secondary to tertiary
-                    //         item.index[2] = temp_index2
-                    //         item.score[2] = temp_score2
-                    //     }
-                    // } else {
-                    //     // Just the top prediction is blocked, so demote it
-                    //     // Bump up the second prediction
-                    //     item.index[0] = item.index[1]
-                    //     item.score[0] = item.score[1]
-                    //     // Copy primary to secondary
-                    //     item.index[1] = temp_index
-                    //     item.score[1] = temp_score
-                    // }
                 }
+
                 result = ({
                     file: file,
                     start: key,
@@ -266,11 +232,11 @@ class Model {
                 //prepare summary
                 let hour = Math.floor(key / 3600), minute = Math.floor(key % 3600 / 60),
                     second = Math.floor(key % 3600 % 60)
-                console.log(file, `${hour}:${minute}:${second}`, item.index[0], this.labels[item.index[0]], Math.round(item.score[0] * 1000) / 1000, this.labels[item.index[1]], Math.round(item.score[1] * 1000) / 1000, this.labels[item.index[2]], Math.round(item.score[2] * 1000) / 1000);
+                console.log(file, `${hour}:${minute}:${second}`, item.index[0], this.labels[item.index[0]], Math.round(item.score[0] * 1000) / 1000, item.index[1], this.labels[item.index[1]], Math.round(item.score[1] * 1000) / 1000, item.index[2], this.labels[item.index[2]], Math.round(item.score[2] * 1000) / 1000);
                 batched_results.push([key, result, audacity]);
             }
             this.result = batched_results;
-            //console.log("result: ", this.result)
+            console.log("result: ", this.result)
             return {readyToSend: true, result: this.result}
         })
     }
@@ -308,7 +274,6 @@ async function runPredictions(e) {
     } else if (modelRequest === 'predict' && !suspended) {
         const file = e.data.file;
         let t0 = performance.now();
-        let response = {};
         let chunks = {};
         let i = e.data.chunkStart;
 
@@ -321,7 +286,7 @@ async function runPredictions(e) {
         const fileStart = e.data.fileStart;
 
         //console.log(`sending message to model.js took: ${t0 - postTime} milliseconds`)
-        await myModel.predictChunk(chunks, fileStart, file)
+        await myModel.predictChunk(chunks, fileStart, file, e.data.duration)
         response = {
             message: 'prediction',
             result: myModel.result,
