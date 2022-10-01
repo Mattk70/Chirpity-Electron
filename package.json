@@ -109,7 +109,7 @@
     "browser-id3-writer": "^4.4.0",
     "colormap": "^2.3.2",
     "jquery": "^3.6.0",
-    "lamejstmp": "^1.0.1",
+    "lamejstmp": "latest",
     "popper.js": "^1.16.1",
     "seedrandom": "^3.0.5",
     "suncalc2": "^1.8.1",
@@ -119,6 +119,7 @@
     "wavefile-reader": "^1.1.1",
     "sqlite3": "^5.0.8",
     "fluent-ffmpeg": "^2.1.2",
-    "utimes": "^5.1.1"
+    "utimes": "^5.1.1",
+    "fast-png": "^6.1.0"
   }
 }
