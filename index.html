@@ -97,6 +97,12 @@
                                     <li><a class="dropdown-item" href="#" id="useWhitelist">Use Whitelist
                                         <span class='material-icons-two-tone tick'>done</span>
                                     </a></li>
+                                    <li title="Cutoff threshold for prediction confidence"><a class="dropdown-item" href="#">Set Threshold
+                                        <span class="input-group mb-3">
+                                              <input type="text" class="form-control"  id="threshold"
+                                                   aria-label="Cutoff threshold for prediction confidence"><span class="input-group-text">%</span>
+                                        </span>
+                                    </a></li>
                                     <li>
                                         <div class="dropdown-submenu" aria-labelledby="navbarDropdown">
                                             <ul class="nav navbar-nav">
@@ -337,7 +343,7 @@
                 </button>
             </div>
             <div class="col pe-1">
-            <span title="Toggle Nocmig mode" id="nocmigMode"
+            <span title="Toggle Nocmig mode&#10;(Only analyse detections at night)" id="nocmigMode"
                   class=" float-end material-icons-two-tone  btn btn-outline-secondary p-1 pointer">dark_mode</span>
             </div>
         </div>

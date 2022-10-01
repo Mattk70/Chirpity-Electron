@@ -11,6 +11,7 @@ const labels = ["Tachymarptis melba_Alpine Swift", "Ambient Noise_Ambient Noise"
 const sqlite3 = require('sqlite3').verbose();
 const SunCalc = require('suncalc2');
 const ffmpeg = require('fluent-ffmpeg');
+const png = require('fast-png');
 const {writeFile, mkdir} = require('node:fs/promises');
 const {utimes} = require('utimes');
 const file_cache = 'chirpity';
@@ -110,7 +111,7 @@ let FILE_QUEUE = [];
 const clearCache = () => {
     return new Promise((resolve) => {
         // clear & recreate file cache folder
-        fs.rmSync(p.join(TEMP, file_cache), {recursive: true, force: true});
+        fs.rmSync(p.join(TEMP, file_cache), {'recursive': true, 'force': true});
         fs.mkdir(p.join(TEMP, file_cache), (err, path) => {
             resolve(path);
         })
@@ -134,14 +135,14 @@ ipcRenderer.on('new-client', (event) => {
                 getSpecies()
                 break;
             case 'create-dataset':
-                saveResults2DataSet(args.results)
+                saveResults2DataSet(RESULTS);
                 break;
             case 'clear-cache':
                 console.log('cache')
                 await clearCache();
                 break;
             case 'load-model':
-                UI.postMessage({event: 'spawning'});
+                UI.postMessage({'event': 'spawning'});
                 BATCH_SIZE = parseInt(args.batchSize);
                 if (predictWorker) predictWorker.terminate();
                 spawnWorker(args.useWhitelist, BATCH_SIZE);
@@ -167,10 +168,10 @@ ipcRenderer.on('new-client', (event) => {
                 break;
             case 'explore':
                 // reset results table
-                UI.postMessage({event: 'reset-results'});
+                UI.postMessage({'event': 'reset-results'});
                 // And clear results from memory
                 RESULTS = [];
-                const results = await getCachedResults({species: args.species, range: args.range});
+                const results = await getCachedResults({'species': args.species, 'range': args.range});
                 index = 0;
                 results.forEach(result => {
                     //format dates
@@ -178,11 +179,11 @@ ipcRenderer.on('new-client', (event) => {
                     result.position = new Date(result.position);
                     index++;
                     UI.postMessage({
-                        event: 'prediction-ongoing',
-                        file: result.file,
-                        result: result,
-                        index: index,
-                        selection: false,
+                        'event': 'prediction-ongoing',
+                        'file': result.file,
+                        'result': result,
+                        'index': index,
+                        'selection': false,
                     });
                     //AUDACITY.push(audacity);
                     RESULTS.push(result);
@@ -191,61 +192,12 @@ ipcRenderer.on('new-client', (event) => {
                 // When in batch mode the 'prediction-done' event simply increments
                 // the counter for the file being processed
                 UI.postMessage({
-                    event: 'prediction-done',
-                    batchInProgress: false,
+                    'event': 'prediction-done',
+                    'batchInProgress': false,
                 });
                 break;
             case 'analyze':
-                console.log(`Worker received message: ${args.filePath}, ${args.confidence}, start: ${args.start}, end: ${args.end}`);
-                if (args.resetResults) {
-                    index = 0;
-                    AUDACITY = [];
-                    RESULTS = [];
-                }
-                latitude = args.lat;
-                longitude = args.lon;
-                nocmig = args.nocmig;
-                FILE_QUEUE.push(args.filePath);
-                console.log(`Adding ${args.filePath} to the queue.`)
-                const cachedFile = await isDuplicate(args.filePath);
-                if (cachedFile && !args.selection) {
-                    //remove the file from the queue - wherever it sits, this prevents out of
-                    // sequence issues with batch analysis
-                    const place = FILE_QUEUE.indexOf(args.filePath);
-                    if (place > -1) { // only splice array when item is found
-                        FILE_QUEUE.splice(place, 1); // 2nd parameter means remove one item only
-                    }
-                    // Pull the results from the database
-                    const results = await getCachedResults({file: cachedFile, range: {}});
-                    UI.postMessage({event: 'update-audio-duration', value: metadata[cachedFile].duration});
-                    results.forEach(result => {
-                        //format dates
-                        result.timestamp = new Date(result.timestamp);
-                        result.position = new Date(result.position);
-                        index++;
-                        UI.postMessage({
-                            event: 'prediction-ongoing',
-                            file: result.file,
-                            result: result,
-                            index: index,
-                            selection: false,
-                        });
-                        //AUDACITY.push(audacity);
-                        RESULTS.push(result);
-                    })
-                    console.log(`Pulling results for ${args.filePath} from database`);
-                    // When in batch mode the 'prediction-done' event simply increments
-                    // the counter for the file being processed
-                    UI.postMessage({
-                        event: 'prediction-done',
-                        batchInProgress: false,
-                    });
-                    //if (FILE_QUEUE.length) await processNextFile();
-                } else if (!predicting) {
-                    predicting = true;
-                    minConfidence = args.confidence;
-                    await processNextFile(args);
-                }
+                await onAnalyze(args);
                 break;
             case 'save':
                 console.log("file save requested")
@@ -269,6 +221,60 @@ ipcRenderer.on('new-client', (event) => {
     }
 })
 
+
+const onAnalyze = async (args) => {
+    console.log(`Worker received message: ${args.filePath}, ${args.confidence}, start: ${args.start}, end: ${args.end}`);
+    if (args.resetResults) {
+        index = 0;
+        AUDACITY = [];
+        RESULTS = [];
+    }
+    latitude = args.lat;
+    longitude = args.lon;
+    nocmig = args.nocmig;
+    FILE_QUEUE.push(args.filePath);
+    console.log(`Adding ${args.filePath} to the queue.`)
+    const cachedFile = await isDuplicate(args.filePath);
+    if (cachedFile && !args.selection) {
+        //remove the file from the queue - wherever it sits, this prevents out of
+        // sequence issues with batch analysis
+        const place = FILE_QUEUE.indexOf(args.filePath);
+        if (place > -1) { // only splice array when item is found
+            FILE_QUEUE.splice(place, 1); // 2nd parameter means remove one item only
+        }
+        // Pull the results from the database
+        const results = await getCachedResults({file: cachedFile, range: {}});
+        UI.postMessage({'event': 'update-audio-duration', 'value': metadata[cachedFile].duration});
+        results.forEach(result => {
+            //format dates
+            result.timestamp = new Date(result.timestamp);
+            result.position = new Date(result.position);
+            index++;
+            UI.postMessage({
+                'event': 'prediction-ongoing',
+                'file': result.file,
+                'result': result,
+                'index': index,
+                'selection': false,
+            });
+            //AUDACITY.push(audacity);
+            RESULTS.push(result);
+        })
+        console.log(`Pulling results for ${args.filePath} from database`);
+        // When in batch mode the 'prediction-done' event simply increments
+        // the counter for the file being processed
+        UI.postMessage({
+            'event': 'prediction-done',
+            'batchInProgress': false,
+        });
+        //if (FILE_QUEUE.length) await processNextFile();
+    } else if (!predicting) {
+        predicting = true;
+        minConfidence = args.confidence;
+        await processNextFile(args);
+    }
+}
+
 function onAbort(args) {
     aborted = true;
     FILE_QUEUE = [];
@@ -276,14 +282,14 @@ function onAbort(args) {
     console.log("abort received")
     if (predicting) {
         //restart the worker
-        UI.postMessage({event: 'spawning'});
+        UI.postMessage({'event': 'spawning'});
         predictWorker.terminate()
         spawnWorker(useWhitelist, BATCH_SIZE)
         predicting = false;
         predictionDone = true;
     }
     if (args.sendLabels) {
-        UI.postMessage({event: 'prediction-done', labels: AUDACITY, batchInProgress: false});
+        UI.postMessage({'event': 'prediction-done', 'labels': AUDACITY, 'batchInProgress': false});
     }
 }
 
@@ -322,13 +328,13 @@ const convertFileFormat = (file, destination, size, error) => {
                 const percent = (time / totalTime) * 100
                 console.log('Processing: ' + percent + ' % converted');
                 UI.postMessage({
-                    event: 'progress',
-                    text: 'Decompressing file',
-                    progress: percent / 100
+                    'event': 'progress',
+                    'text': 'Decompressing file',
+                    'progress': percent / 100
                 })
             })
             .on('end', () => {
-                UI.postMessage({event: 'progress', text: 'File decompressed', progress: 1.0})
+                UI.postMessage({'event': 'progress', 'text': 'File decompressed', 'progress': 1.0})
                 //if (finish) {
                 resolve(destination)
                 //}
@@ -394,8 +400,8 @@ async function locateFile(file) {
     })
     if (!matchingFileExt) {
         UI.postMessage({
-            event: 'generate-alert',
-            message: `Unable to load source file with any supported file extension: ${file}`
+            'event': 'generate-alert',
+            'message': `Unable to load source file with any supported file extension: ${file}`
         })
         return false;
     }
@@ -414,15 +420,15 @@ async function loadAudioFile(args) {
                 const length = buffer.length;
                 const myArray = buffer.getChannelData(0);
                 UI.postMessage({
-                    event: 'worker-loaded-audio',
-                    fileStart: metadata[file].fileStart,
-                    sourceDuration: metadata[file].duration,
-                    bufferBegin: start,
-                    file: file,
-                    position: position,
-                    length: length,
-                    contents: myArray,
-                    region: args.region
+                    'event': 'worker-loaded-audio',
+                    'fileStart': metadata[file].fileStart,
+                    'sourceDuration': metadata[file].duration,
+                    'bufferBegin': start,
+                    'file': file,
+                    'position': position,
+                    'length': length,
+                    'contents': myArray,
+                    'region': args.region
                 });
             })
             .catch(e => {
@@ -549,6 +555,43 @@ async function setupCtx(chunk, header) {
     return offlineCtx;
 }
 
+const getAudioBuffer = (start, end, file) => {
+    const byteStart = convertTimeToBytes(start, metadata[file]);
+    const byteEnd = convertTimeToBytes(end, metadata[file]);
+    const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * 3;
+    const proxy = metadata[file].proxy;
+
+    const readStream = fs.createReadStream(proxy, {
+        start: byteStart,
+        end: byteEnd,
+        highWaterMark: highWaterMark
+    });
+
+    readStream.on('data', async chunk => {
+        // Ensure data is processed in order
+        readStream.pause();
+        return new Promise(async (resolve, reject) => {
+            const offlineCtx = await setupCtx(chunk, metadata[file].header);
+            offlineCtx.startRendering().then(
+                (resampled) => {
+                    resolve(resampled);
+                    // Now the async stuff is done ==>
+                    readStream.resume();
+                }).catch((err) => {
+                console.error(`PredictBuffer rendering failed: ${err}`);
+                // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
+            });
+        })
+    })
+    readStream.on('end', function () {
+        readStream.close()
+    })
+    readStream.on('error', err => {
+        console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`)
+    })
+}
+
+
 async function getPredictBuffers(args) {
     let start = args.start, end = args.end, selection = args.selection, file = args.file;
     let chunkLength = 72000;
@@ -574,17 +617,19 @@ async function getPredictBuffers(args) {
         // Ensure data is processed in order
         readStream.pause();
         const offlineCtx = await setupCtx(chunk, metadata[file].header);
-        offlineCtx.startRendering().then((resampled) => {
-            const myArray = resampled.getChannelData(0);
-            const samples = parseInt((end - start) * sampleRate.toFixed(0));
-            const increment = samples < chunkLength ? samples : chunkLength;
-            feedChunksToModel(myArray, increment, chunkStart, file, end, selection);
-            chunkStart += 3 * BATCH_SIZE * sampleRate;
-            // Now the async stuff is done ==>
-            readStream.resume();
-        }).catch(e => {
-            console.log(`Got an error decoding audio: ${e} with file ${file}`)
-        })
+        offlineCtx.startRendering().then(
+            (resampled) => {
+                const myArray = resampled.getChannelData(0);
+                const samples = parseInt((end - start) * sampleRate.toFixed(0));
+                const increment = samples < chunkLength ? samples : chunkLength;
+                feedChunksToModel(myArray, increment, chunkStart, file, end, selection);
+                chunkStart += 3 * BATCH_SIZE * sampleRate;
+                // Now the async stuff is done ==>
+                readStream.resume();
+            }).catch((err) => {
+            console.error(`PredictBuffer rendering failed: ${err}`);
+            // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
+        });
     })
     readStream.on('end', function () {
         readStream.close()
@@ -601,13 +646,14 @@ async function getPredictBuffers(args) {
  */
 const fetchAudioBuffer = async (args) => {
     let start = args.start, end = args.end, file = args.file;
+    if (end - start < 0.1) return  // prevents dataset creation barfing with  v. short buffers
     const proxy = await getWorkingFile(file);
     if (!proxy) return false
     return new Promise(async (resolve, reject) => {
         // Ensure max and min are within range
-        start = Math.max(0, start);
+        //start = Math.max(0, start);
         // Handle no end supplied
-        end = Math.min(metadata[file].duration, end);
+        //end = Math.min(metadata[file].duration, end);
 
         const byteStart = convertTimeToBytes(start, metadata[file]);
         const byteEnd = convertTimeToBytes(end, metadata[file]);
@@ -634,7 +680,10 @@ const fetchAudioBuffer = async (args) => {
                 //readStream.close();
                 readStream.resume();
                 resolve(resampled);
-            })
+            }).catch((err) => {
+                console.error(`FetchAudio rendering failed: ${err}`);
+                // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
+            });
         })
 
         readStream.on('end', function () {
@@ -648,13 +697,13 @@ const fetchAudioBuffer = async (args) => {
 
 function sendMessageToWorker(chunkStart, chunks, file, duration, selection) {
     const objData = {
-        message: 'predict',
-        chunkStart: chunkStart,
-        numberOfChunks: chunks.length,
-        fileStart: metadata[file].fileStart,
-        file: file,
-        duration: duration,
-        selection: selection
+        'message': 'predict',
+        'chunkStart': chunkStart,
+        'numberOfChunks': chunks.length,
+        'fileStart': metadata[file].fileStart,
+        'file': file,
+        'duration': duration,
+        'selection': selection
     }
     let chunkBuffers = [];
     for (let i = 0; i < chunks.length; i++) {
@@ -676,7 +725,7 @@ async function doPrediction(args) {
     }
     predicting = true;
     await getPredictBuffers({file: file, start: start, end: end, selection: selection});
-    UI.postMessage({event: 'update-audio-duration', value: metadata[file].duration});
+    UI.postMessage({'event': 'update-audio-duration', 'value': metadata[file].duration});
 }
 
 function feedChunksToModel(channelData, increment, chunkStart, file, duration, selection) {
@@ -709,33 +758,60 @@ async function downloadMp3(buffer, filePath, metadata) {
     window.URL.revokeObjectURL(url);
 }
 
+const speciesMatch = (path, sname) => {
+    const pathElements = path.split(p.sep);
+    const species = pathElements[pathElements.length - 2];
+    sname = sname.replaceAll(' ', '_');
+    return species.includes(sname)
+}
+
 const saveResults2DataSet = (results, rootDirectory) => {
-    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/MP3Dataset';
+    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/PNGDataset2';
     let promise = Promise.resolve();
     let count = 0;
-    nocmig = false; minConfidence = 0.25;
-
     const t0 = Date.now();
     results.forEach(result => {
+        // Check whether predicted species matches folder (i.e. the searched for species)
+        const threshold = speciesMatch(result.file, result.sname) ? 0 : 0; //0.25 : 1.0;
         promise = promise.then(async function (resolve) {
-            const buffer = await fetchAudioBuffer({start: result.start, end: result.end, file: result.file})
-            const folder = `${result.cname.replaceAll(' ', '_')}~${result.sname.replaceAll(' ', '_')}`;
-            const file = result.start + '_' + p.basename(result.file);
-            const filepath = p.join(rootDirectory, folder)
-            await mkdir(filepath, {recursive: true})
-            const MP3Blob = await analyzeAudioBuffer(buffer, result);
-            const mp3 = Buffer.from(await MP3Blob.arrayBuffer(), 'binary');
-            await writeFile(filepath + '/' + file, mp3);
-            console.log('wrote', file, '.mp3');
-            count++;
+            if (result.score >= threshold) {
+                const AudioBuffer = await fetchAudioBuffer({
+                    'start': result.start,
+                    'end': result.end,
+                    'file': result.file
+                })
+                if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e fetchAudioBUffer false when < 0.1s
+                    // REALLY NEED to figure out why 0.4 seconds silence at start of exported mp3s leading to 3s clips being 3.024s long
+                    const buffer = AudioBuffer.getChannelData(0);
+                    const folder = `${result.cname.replaceAll(' ', '_')}~${result.sname.replaceAll(' ', '_')}`;
+                    // filename format: <source file>_<confidence>_<start>.png
+                    const file = `${p.basename(result.file).replace(p.extname(result.file), '')}_${result['score'].toFixed(2)}_${result.start}-${result.end}.png`;
+                    const filepath = p.join(rootDirectory, folder)
+                    predictWorker.postMessage({
+                        'message': 'get-spectrogram',
+                        'filepath': filepath,
+                        'file': file,
+                        'buffer': buffer
+                    })
+                    count++;
+                }
+            }
             return new Promise(function (resolve) {
-                setTimeout(resolve, 2);
+                setTimeout(resolve, 5);
             });
         })
     })
     promise.then(function () {
         console.log(`Dataset created. ${count} files saved in ${(Date.now() - t0) / 1000} seconds`);
     });
+}
+
+const onSpectrogram = async (filepath, file, width, height, data, channels) => {
+    await mkdir(filepath, {recursive: true});
+    let image = await png.encode({'width': width, 'height': height, 'data': data, 'channels': channels})
+    const file_to_save = p.join(filepath, file);
+    await writeFile(file_to_save, image);
+    console.log('saved:', file_to_save);
 }
 
 async function uploadMp3(buffer, defaultName, metadata, mode) {
@@ -918,79 +994,85 @@ function spawnWorker(useWhitelist, batchSize) {
     predictWorker = new Worker('./js/model.js');
     predictWorker.postMessage(['load', appPath, useWhitelist, batchSize])
     predictWorker.onmessage = (e) => {
-        parsePredictions(e)
+        parseMessage(e)
     }
 }
-/*
-PREDICTIONS ARE BEING RECORDED BEYOND THE LENGTH OF THE FILE
-NEED TO ESTABLISH WHY !!
 
- */
-function parsePredictions(e) {
+const parsePredictions = (response) => {
+    let file, batchInProgress = false;
+    response['result'].forEach(prediction => {
+        predictionsReceived++;
+        const position = parseFloat(prediction[0]);
+        const result = prediction[1];
+        file = result.file
+        const audacity = prediction[2];
+        UI.postMessage({'event': 'progress', 'progress': (position / metadata[file].duration)});
+        //console.log('Prediction received from worker', result);
+        if (result.score > minConfidence) {
+            index++;
+            UI.postMessage({
+                'event': 'prediction-ongoing',
+                'file': file,
+                'result': result,
+                'index': index,
+                'selection': response['selection'],
+            });
+            AUDACITY.push(audacity);
+            RESULTS.push(result);
+        }
+        // 3.5 seconds subtracted because position is the beginning of a 3-second chunk and
+        // the min fragment length is 0.5 seconds
+        if (position.toFixed(0) >= (response.endpoint.toFixed(0) - 3.5)) {
+            console.log(`Prediction done ${FILE_QUEUE.length} files to go`);
+            console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
+            if (RESULTS.length === 0) {
+                const result = "No detections found.";
+                UI.postMessage({
+                    'event': 'prediction-ongoing',
+                    'file': file,
+                    'result': result,
+                    'index': 1,
+                    'selection': response['selection']
+                });
+            }
+            UI.postMessage({'event': 'progress', 'progress': 1.0});
+            batchInProgress = FILE_QUEUE.length ? true : predictionsRequested - predictionsReceived;
+            predictionDone = true;
+        }
+    })
+    return [file, batchInProgress]
+}
+
+async function parseMessage(e) {
     const response = e.data;
-    let file, batchInProgress
-    // Restore Original file path
     if (response['message'] === 'model-ready') {
         chunkLength = response['chunkLength'];
         sampleRate = response['sampleRate'];
         const backend = response['backend'];
         console.log(backend);
-        UI.postMessage({event: 'model-ready', message: 'ready', backend: backend})
+        UI.postMessage({'event': 'model-ready', 'message': 'ready', backend: backend})
     } else if (response['message'] === 'prediction' && !aborted) {
         // add filename to result for db purposes
-        response['result'].forEach(prediction => {
-            predictionsReceived++;
-            const position = parseFloat(prediction[0]);
-            const result = prediction[1];
-            file = result.file
-            const audacity = prediction[2];
-            UI.postMessage({event: 'progress', progress: (position / metadata[file].duration)});
-            //console.log('Prediction received from worker', result);
-            if (result.score > minConfidence) {
-                index++;
+        let [file, batchInProgress] = parsePredictions(response);
+        if (predictionDone) {
+            process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, Prediction requests ${predictionsRequested}, predictions received ${predictionsReceived}    \r`)
+            if (predictionsReceived === predictionsRequested) {
                 UI.postMessage({
-                    event: 'prediction-ongoing',
-                    file: file,
-                    result: result,
-                    index: index,
-                    selection: response['selection'],
-                });
-                AUDACITY.push(audacity);
-                RESULTS.push(result);
+                    'event': 'prediction-done',
+                    'file': file,
+                    'labels': AUDACITY,
+                    'batchInProgress': batchInProgress
+                })
             }
-            // 3.5 seconds subtracted because position is the beginning of a 3-second chunk and
-            // the min fragment length is 0.5 seconds
-            if (position.toFixed(0) >= (response.endpoint.toFixed(0) - 3.5)) {
-                console.log(`Prediction done ${FILE_QUEUE.length} files to go`);
-                console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
-                if (RESULTS.length === 0) {
-                    const result = "No detections found.";
-                    UI.postMessage({
-                        event: 'prediction-ongoing',
-                        file: file,
-                        result: result,
-                        index: 1,
-                        selection: response['selection']
-                    });
-                }
-                UI.postMessage({event: 'progress', progress: 1.0});
-                batchInProgress = FILE_QUEUE.length ? true : predictionsRequested - predictionsReceived;
-                predictionDone = true;
-            }
-        })
-    }
-    if (predictionDone) {
-        console.log(`FILE QUEUE: ${FILE_QUEUE.length}, Prediction requests ${predictionsRequested}, predictions received ${predictionsReceived}`)
-        if (predictionsReceived === predictionsRequested) {
-            UI.postMessage({
-                event: 'prediction-done',
-                file: file,
-                labels: AUDACITY,
-                batchInProgress: batchInProgress
-            })
+            processNextFile();
         }
-        processNextFile();
-
+    } else if (response['message'] === 'spectrogram') {
+        await onSpectrogram(response['filepath'],
+            response['file'],
+            response['width'],
+            response['height'],
+            response['image'],
+            response['channels'])
     }
 }
 
@@ -1003,10 +1085,10 @@ async function processNextFile(args) {
             if (start === 0 && end === 0) {
                 // Nothing to do for this file
                 UI.postMessage({
-                    event: 'prediction-done',
-                    file: file,
-                    labels: AUDACITY,
-                    batchInProgress: FILE_QUEUE.length
+                    'event': 'prediction-done',
+                    'file': file,
+                    'labels': AUDACITY,
+                    'batchInProgress': FILE_QUEUE.length
                 });
                 await processNextFile();
             } else {
@@ -1179,11 +1261,11 @@ const onSave2DB = async () => {
         if (!filemap[file]) filemap[file] = await updateFileTables(file);
         stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, filemap[file], position, comment, label,
             (err, row) => {
-                UI.postMessage({event: 'progress', text: "Updating Database.", progress: i / RESULTS.length});
+                UI.postMessage({'event': 'progress', 'text': "Updating Database.", 'progress': i / RESULTS.length});
                 if (i === (RESULTS.length - 1)) {
                     db.run('COMMIT', (err, rows) => {
                         console.log(`Update complete, ${i + 1} records added in ${((performance.now() - t0) / 1000).toFixed(5)} seconds`)
-                        UI.postMessage({event: 'progress', progress: 1.0});
+                        UI.postMessage({'event': 'progress', 'progress': 1.0});
                     });
                 }
             });
@@ -1326,7 +1408,7 @@ const getSpecies = () => {
         (err, rows) => {
             if (err) console.log(err);
             else {
-                UI.postMessage({event: 'seen-species-list', list: rows})
+                UI.postMessage({'event': 'seen-species-list', 'list': rows})
             }
         })
 }
@@ -1535,15 +1617,15 @@ async function onChartRequest(args) {
     console.log(`Chart rate generation took ${(Date.now() - t0) / 1000} seconds`)
     const pointStart = dateRange.start ? dateRange.start : Date.UTC(2020, 0, 0, 0, 0, 0);
     UI.postMessage({
-        event: 'chart-data',
+        'event': 'chart-data',
         // Restore species name
-        species: args.species ? args.species.replace("''", "'") : undefined,
-        results: results,
-        rate: rate,
-        total: total,
-        records: dataRecords,
-        dataPoints: dataPoints,
-        pointStart: pointStart,
-        aggregation: aggregation
+        'species': args.species ? args.species.replace("''", "'") : undefined,
+        'results': results,
+        'rate': rate,
+        'total': total,
+        'records': dataRecords,
+        'dataPoints': dataPoints,
+        'pointStart': pointStart,
+        'aggregation': aggregation
     })
 }

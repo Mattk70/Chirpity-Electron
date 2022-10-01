@@ -617,7 +617,19 @@ exploreLink.addEventListener('click', async () => {
 const datasetLink = document.getElementById('dataset');
 datasetLink.addEventListener('click', async () => {
     const dataset_results = Object.values(predictions);
-    worker.postMessage({action: 'create-dataset', 'results':dataset_results});
+    worker.postMessage({action: 'create-dataset', 'results': dataset_results});
+    //worker.postMessage({action: 'create-dataset', 'fileList': fileList});
+});
+
+const thresholdLink = document.getElementById('threshold');
+thresholdLink.addEventListener('blur', (e) => {
+    const threshold = e.target.value
+    if (100 >= threshold && threshold >= 0  ) {
+        config.minConfidence = parseFloat(e.target.value) / 100;
+        updatePrefs();
+    } else {
+        e.target.value = config.minConfidence * 100;
+    }
 });
 
 
@@ -957,6 +969,8 @@ window.onload = async () => {
         if (config.nocmig) {
             nocmigButton.classList.add('active')
         }
+        thresholdLink.value = config.minConfidence * 100;
+
         showElement([config.colormap + 'span'], true)
 
     })
@@ -1506,7 +1520,7 @@ $(document).on('click', '#loadSpectrogram', function () {
 function initSpectrogram(height) {
     showElement(['spectrogramWrapper'], false);
     let fftSamples;
-    if (windowLength < 2) {
+    if (windowLength < 2.5) {
         fftSamples = 256;
     } else {
         fftSamples = 512;
@@ -2021,16 +2035,6 @@ async function onPredictionDone(args) {
         const target = this.querySelector('span.pointer')
         const spinner = this.querySelector('span.spinner-border');
         if (spinner === null) return;
-        // Remove any exclusion from the species to filter
-        //e.target.parentNode.nextElementSibling.nextElementSibling.children[1].classList.remove('text-danger');
-        speciesFilter.forEach(function (el) {
-            const removeFrom = el.querySelector('span.pointer')
-            removeFrom.classList.remove('text-success');
-        })
-        // Hide open subrows
-        subRows.forEach(function (el) {
-            el.classList.add('d-none');
-        })
         const targetClass = target.classList;
         if (targetClass.contains('text-success')) {
             // Clicked on filtered species icon
@@ -2041,6 +2045,16 @@ async function onPredictionDone(args) {
             })
         } else {
             // Clicked on unfiltered species name
+
+            // Remove any exclusion from the species to filter
+            speciesFilter.forEach(function (el) {
+                const removeFrom = el.querySelector('span.pointer')
+                removeFrom.classList.remove('text-success');
+            })
+            // Hide open subrows
+            subRows.forEach(function (el) {
+                el.classList.add('d-none');
+            })
             targetClass.add('text-success', 'd-none');
             spinner.classList.remove('d-none');
             // Allow spinner to show
