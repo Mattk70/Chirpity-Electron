@@ -131,16 +131,16 @@ app.whenReady().then(async () => {
             // without going through the main process!
         }
     });
-    ipcMain.on('file-to-load', (event) => {
-        // THe UI has asked for it, so now is a good time to ask the UI to load a results file if needed:
-        if (event.senderFrame === mainWindow.webContents.mainFrame) {
-            const args = sharedObject.prop1;
-            if (args.length > 2 || (process.platform === 'darwin' && args.length > 0)) {
-                console.log('Asking UI to load a file', args)
-                event.senderFrame.postMessage('load-results', {file: args[args.length - 1]});
-            }
-        }
-    });
+    // ipcMain.on('file-to-load', (event) => {
+    //     // THe UI has asked for it, so now is a good time to ask the UI to load a results file if needed:
+    //     if (event.senderFrame === mainWindow.webContents.mainFrame) {
+    //         const args = sharedObject.prop1;
+    //         if (args.length > 2 || (process.platform === 'darwin' && args.length > 0)) {
+    //             console.log('Asking UI to load a file', args)
+    //             event.senderFrame.postMessage('load-results', {file: args[args.length - 1]});
+    //         }
+    //     }
+    // });
 
     if (process.platform === 'darwin') {
         //const appIcon = new Tray('./img/icon/icon.png')

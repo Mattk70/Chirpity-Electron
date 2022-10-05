@@ -94,8 +94,6 @@ span[id^="filename_"] {
 }
 
 .rotate.down {
-    -moz-transform: rotate(180deg);
-    -webkit-transform: rotate(180deg);
     transform: rotate(180deg);
 }
 

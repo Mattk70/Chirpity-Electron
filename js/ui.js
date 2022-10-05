@@ -83,6 +83,13 @@ const summaryTable = $('#summaryTable');
 let progressDiv = $('#progressDiv');
 let progressBar = $('.progress .progress-bar');
 const fileNumber = document.getElementById('fileNumber');
+const timeOfDay = document.getElementById('timeOfDay');
+const timecode = document.getElementById('timecode');
+const timeline = document.getElementById('loadTimeline');
+const inferno = document.getElementById('inferno');
+const greys = document.getElementById('greys');
+const loadSpectrogram = document.getElementById('loadSpectrogram');
+
 let batchInProgress = false;
 let activeRow;
 let predictions = {}, speciesListItems,
@@ -170,7 +177,7 @@ async function loadAudioFile(args) {
     workerHasLoadedFile = false;
     try {
         fileEnd = fs.statSync(filePath).mtime;
-        worker.postMessage({action: 'file-load-request', file: filePath, position: 0});
+        worker.postMessage({action: 'file-load-request', file: filePath, position: 0, list:config.list, warmup:config.warmup});
     } catch (e) {
         const supported_files = ['.mp3', '.wav', '.mpga', '.ogg', '.flac', '.m4a', '.aac', '.mpeg', '.mp4'];
         const dir = p.parse(filePath).dir;
@@ -193,8 +200,10 @@ async function loadAudioFile(args) {
             worker.postMessage({
                 action: 'file-load-request',
                 file: filePath,
-                preserveResults: preserveResults,
-                position: 0
+                preserveResults: args.preserveResults,
+                position: 0,
+                warmup: config.warmup,
+                list: config.list
             });
         }
     }
@@ -233,6 +242,21 @@ function updateSpec(buffer, play) {
     if (play) wavesurfer.play()
 }
 
+function createTimeline() {
+    wavesurfer.addPlugin(WaveSurfer.timeline.create({
+        container: '#timeline',
+        formatTimeCallback: formatTimeCallback,
+        timeInterval: timeInterval,
+        primaryLabelInterval: primaryLabelInterval,
+        secondaryLabelInterval: secondaryLabelInterval,
+        primaryColor: 'white',
+        secondaryColor: 'white',
+        primaryFontColor: 'white',
+        secondaryFontColor: 'white',
+        fontSize: 14
+    })).initPlugin('timeline');
+}
+
 function initWavesurfer(args) {
     if (args.reset) {
         // Show spec and timecode containers
@@ -268,26 +292,16 @@ function initWavesurfer(args) {
         ]
     })
     if (config.spectrogram) {
+
         initSpectrogram()
     }
     if (config.timeline) {
-        wavesurfer.addPlugin(WaveSurfer.timeline.create({
-            container: '#timeline',
-            formatTimeCallback: formatTimeCallback,
-            timeInterval: timeInterval,
-            primaryLabelInterval: primaryLabelInterval,
-            secondaryLabelInterval: secondaryLabelInterval,
-            primaryColor: 'white',
-            secondaryColor: 'white',
-            primaryFontColor: 'white',
-            secondaryFontColor: 'white',
-            fontSize: 14
-        })).initPlugin('timeline');
+        createTimeline()
     }
     wavesurfer.loadDecodedBuffer(args.audio);
-    updateElementCache()
-    $('.speccolor').removeClass('disabled');
-    showElement([config.colormap + ' .tick'], false);
+    updateElementCache();
+
+    config.colormap === 'greys' ? greys.clicked = true : inferno.clicked = true;
     // Set click event that removes all regions
     waveElement.mousedown(function () {
         wavesurfer.clearRegions();
@@ -446,7 +460,7 @@ async function onLoadResults(args) {
  * @returns {Promise<void>}
  */
 async function showSaveDialog() {
-    await window.electron.saveFile({'currentFile': currentFile, 'labels': AUDACITY_LABELS});
+    await window.electron.saveFile({currentFile: currentFile, labels: AUDACITY_LABELS});
 }
 
 // Worker listeners
@@ -583,7 +597,6 @@ function hideElement(id_list) {
         const thisElement = $('#' + id);
         thisElement.removeClass('d-flex');
         thisElement.addClass('d-none');
-
     })
 }
 
@@ -617,14 +630,14 @@ exploreLink.addEventListener('click', async () => {
 const datasetLink = document.getElementById('dataset');
 datasetLink.addEventListener('click', async () => {
     const dataset_results = Object.values(predictions);
-    worker.postMessage({action: 'create-dataset', 'results': dataset_results});
-    //worker.postMessage({action: 'create-dataset', 'fileList': fileList});
+    worker.postMessage({action: 'create-dataset', results: dataset_results});
+    //worker.postMessage({action: 'create-dataset', fileList: fileList});
 });
 
 const thresholdLink = document.getElementById('threshold');
 thresholdLink.addEventListener('blur', (e) => {
     const threshold = e.target.value
-    if (100 >= threshold && threshold >= 0  ) {
+    if (100 >= threshold && threshold >= 0) {
         config.minConfidence = parseFloat(e.target.value) / 100;
         updatePrefs();
     } else {
@@ -709,11 +722,11 @@ function adjustSpecDims(redraw) {
             spectrogramWrapper.height(specHeight + 21 + 46.84);
             if (!wavesurfer) {
                 initWavesurfer({
-                    'audio': currentBuffer,
-                    'backend': 'WebAudio',
-                    'alpha': 0,
-                    'height': specHeight,
-                    'reset': false
+                    audio: currentBuffer,
+                    backend: 'WebAudio',
+                    alpha: 0,
+                    height: specHeight,
+                    reset: false
                 });
             }
             wavesurfer.setHeight(specHeight);
@@ -903,21 +916,28 @@ window.onload = async () => {
     // Set config defaults
 
     config = {
-        'spectrogram': true,
-        'colormap': 'inferno',
-        'timeline': true,
-        'minConfidence': 0.45,
-        'timeOfDay': false,
-        'useWhitelist': true,
-        'latitude': 51.9,
-        'longitude': -0.4,
-        'nocmig': false,
-        'batchSize': 1
+        spectrogram: true,
+        colormap: 'inferno',
+        timeline: true,
+        minConfidence: 0.45,
+        timeOfDay: false,
+        list: 'migrants',
+        latitude: 51.9,
+        longitude: -0.4,
+        nocmig: false,
+        warmup: true,
+        batchSize: 1
     }
     config.UUID = uuidv4();
     // Load preferences and override defaults
     [appPath, tempPath] = await getPaths();
-    worker.postMessage({action: 'load-db', path: appPath, temp: tempPath, lat: config.latitude, lon: config.longitude})
+    worker.postMessage({
+        action: 'load-db',
+        path: appPath,
+        temp: tempPath,
+        lat: config.latitude,
+        lon: config.longitude})
+
     fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
         if (err) {
             console.log('JSON parse error ' + err);
@@ -944,35 +964,53 @@ window.onload = async () => {
         if (!('nocmig' in config)) {
             config.nocmig = false;
         }
-        if (!('useWhitelist' in config)) {
-            config.useWhitelist = true;
+        if (!('list' in config)) {
+            config.list = 'migrants';
+        }
+        if (!('warmup' in config)) {
+            config.warmup = true;
         }
         updatePrefs()
 
         // Set UI option state
-        $('#' + config.batchSize).click();
+        const batchSizeElement = document.getElementById(config.batchSize);
+        batchSizeElement.checked = true;
 
-        if (!config.useWhitelist) {
-            $('#useWhitelist .tick').hide()
-        }
+        // Add a checkmark to the list in use
+        window[config.list].checked = true;
+
         if (!config.spectrogram) {
-            $('#loadSpectrogram .tick').hide()
+            loadSpectrogram.checked = false;
+            timeOfDay.disabled = true;
+            timecode.disabled = true;
+            inferno.disabled = true;
+            greys.disabled = true;
+        } else {
+            loadSpectrogram.checked = true;
         }
         if (!config.timeline) {
-            $('#loadTimeline .tick').hide()
-        }
-        if (config.timeOfDay) {
-            $('#timeOfDay').click()
+            timeline.checked = false;
+            timeOfDay.disabled = true;
+            timecode.disabled = true;
         } else {
-            $('#timecode').click()
+            timeline.checked = true;
         }
+        config.timeOfDay ? timeOfDay.checked = true : timecode.checked = true;
+        ;
+        config.colormap === 'inferno' ? inferno.checked = true : greys.checked = true;
+
         if (config.nocmig) {
             nocmigButton.classList.add('active')
         }
         thresholdLink.value = config.minConfidence * 100;
 
         showElement([config.colormap + 'span'], true)
-
+        worker.postMessage({
+            action: 'load-model',
+            list: config.list,
+            batchSize: config.batchSize,
+            warmup: config.warmup
+        });
     })
     // establish the message channel
     establishMessageChannel.then((success) => {
@@ -1225,7 +1263,7 @@ $(document).on('click', '.request-bird', function (e) {
     const picker = $('#' + pickerEl).data('daterangepicker');
     const start = picker.startDate._d.getTime();
     const end = picker.endDate._d.getTime();
-    const dateRange = end !== start ? {'start': start, 'end': end} : {};
+    const dateRange = end !== start ? {start: start, end: end} : {};
     worker.postMessage({action: context, species: cname, range: dateRange})
 })
 
@@ -1495,25 +1533,28 @@ document.addEventListener('DOMContentLoaded', function () {
 
 ///////////// Nav bar Option handlers //////////////
 
-$(document).on('click', '#loadSpectrogram', function () {
+$(document).on('click', '#loadSpectrogram', function (e) {
+    e.target.checked ? config.spectrogram = true : config.spectrogram = false;
+    updatePrefs();
     if (config.spectrogram) {
-        config.spectrogram = false;
-        $('#loadSpectrogram .tick').hide()
-        $('.specFeature').hide()
-        hideElement(['spectrogramWrapper']);
-        $('.speccolor .timeline').addClass('disabled');
-        updatePrefs();
-    } else {
-        config.spectrogram = true;
-        $('#loadSpectrogram .tick').show()
         $('.specFeature').show()
+        inferno.disabled = false;
+        greys.disabled = false;
+
         if (wavesurfer && wavesurfer.isReady) {
             $('.speccolor .timeline').removeClass('disabled');
             showElement(['spectrogramWrapper'], false);
         } else {
-            loadAudioFile({filePath: currentFile});
+            timeOfDay.disabled = true;
+            timecode.disabled = true;
+            if (currentFile) loadAudioFile({filePath: currentFile});
         }
-        updatePrefs();
+    } else {
+        // Set menu state
+        inferno.disabled = true;
+        greys.disabled = true;
+        $('.specFeature').hide()
+        hideElement(['spectrogramWrapper']);
     }
 })
 
@@ -1550,53 +1591,43 @@ function initSpectrogram(height) {
 
 $(document).on('click', '.speccolor', function (e) {
     config.colormap = e.target.id;
-    initSpectrogram();
-    // set tick
-    $('.speccolor .tick').addClass('d-none');
-    $(this).children('span').removeClass('d-none');
-    // refresh caches
-    updateElementCache()
-    adjustSpecDims(true)
     updatePrefs();
-})
-
-$(document).on('click', '#useWhitelist', function () {
-    if (config.useWhitelist) {
-        config.useWhitelist = false;
-        $('#useWhitelist .tick').hide()
-    } else {
-        config.useWhitelist = true;
-        $('#useWhitelist .tick').show()
-    }
-    worker.postMessage({action: 'load-model', useWhitelist: config.useWhitelist, batchSize: config.batchSize});
-    updatePrefs();
-})
-
-$(document).on('click', '.timeline', function () {
-    if (wavesurfer.timeline && wavesurfer.timeline.wrapper !== null) {
-        wavesurfer.destroyPlugin('timeline');
-        $('#loadTimeline .tick').hide()
-        config.timeline = false;
-        updatePrefs();
-    } else {
-        config.timeline = true;
-        wavesurfer.addPlugin(WaveSurfer.timeline.create({
-            wavesurfer: wavesurfer,
-            container: "#timeline",
-            formatTimeCallback: formatTimeCallback,
-            timeInterval: timeInterval,
-            primaryLabelInterval: primaryLabelInterval,
-            secondaryLabelInterval: secondaryLabelInterval,
-            primaryColor: 'white',
-            secondaryColor: 'white',
-            primaryFontColor: 'white',
-            secondaryFontColor: 'white',
-            fontSize: 14
-        })).initPlugin('timeline');
-        $('#loadTimeline .tick').show()
+    if (wavesurfer) {
+        initSpectrogram();
         // refresh caches
         updateElementCache()
         adjustSpecDims(true)
+    }
+})
+
+const listToUse = document.getElementsByName('list');
+for (let i = 0; i < listToUse.length; i++) {
+    listToUse[i].addEventListener('click', function (e){
+        config.list = e.target.value;
+        updatePrefs();
+        worker.postMessage({action:'update-model', list: config.list})
+    })
+}
+
+$(document).on('click', '#loadTimeline', function (e) {
+    const timeOfDay = document.getElementById('timeOfDay');
+    const timecode = document.getElementById('timecode');
+    if (!e.target.checked) {
+        if (wavesurfer) wavesurfer.destroyPlugin('timeline');
+        config.timeline = false;
+        timeOfDay.disabled = true;
+        timecode.disabled = true;
+        updatePrefs();
+    } else {
+        config.timeline = true;
+        timeOfDay.disabled = false;
+        timecode.disabled = false;
+        if (wavesurfer) {
+            createTimeline();
+            // refresh caches
+            updateElementCache()
+            adjustSpecDims(true)
+        }
         updatePrefs();
     }
 })
@@ -1608,8 +1639,6 @@ $(document).on('click', '#timeOfDay', function () {
     timefields.forEach(time => {
         time.classList.remove('d-none');
     })
-    $('#timecode .tick').hide();
-    $('#timeOfDay .tick').show();
     if (fileLoaded) {
         worker.postMessage({
             action: 'update-buffer',
@@ -1629,8 +1658,6 @@ $(document).on('click', '#timecode', function () {
     timefields.forEach(time => {
         time.classList.add('d-none');
     })
-    $('#timeOfDay .tick').hide();
-    $('#timecode .tick').show();
     if (fileLoaded) {
         worker.postMessage({
             action: 'update-buffer',
@@ -1665,11 +1692,9 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     Escape: function () {
         console.log('Operation aborted');
         PREDICTING = false;
-        worker.postMessage({action: 'abort'});
+        worker.postMessage({action: 'abort', warmup: config.warmup, list:config.list});
         alert('Operation cancelled');
-
-    }
-    ,
+    },
     Home: function () {
         if (currentBuffer) {
             bufferBegin = 0;
@@ -1683,8 +1708,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             wavesurfer.seekAndCenter(0);
             wavesurfer.pause()
         }
-    }
-    ,
+    },
     End: function () {
         if (currentBuffer) {
             bufferBegin = currentFileDuration - windowLength;
@@ -1698,8 +1722,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             wavesurfer.seekAndCenter(1);
             wavesurfer.pause()
         }
-    }
-    ,
+    },
     PageUp: function () {
         if (wavesurfer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
@@ -1713,8 +1736,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             });
             wavesurfer.pause()
         }
-    }
-    ,
+    },
     PageDown: function () {
         if (wavesurfer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
@@ -1728,8 +1750,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             });
             wavesurfer.pause()
         }
-    }
-    ,
+    },
     ArrowLeft: function () {
         if (wavesurfer) {
             wavesurfer.skipBackward(0.1);
@@ -1746,8 +1767,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
                 wavesurfer.pause()
             }
         }
-    }
-    ,
+    },
     ArrowRight: function () {
         if (wavesurfer) {
             wavesurfer.skipForward(0.1);
@@ -1764,36 +1784,30 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
                 wavesurfer.pause()
             }
         }
-    }
-    ,
+    },
     KeyP: function () {
         (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
-    }
-    ,
+    },
     Equal: function () {
         if (wavesurfer) {
             zoomSpec('in')
         }
-    }
-    ,
+    },
     NumpadAdd: function () {
         if (wavesurfer) {
             zoomSpec('in')
         }
-    }
-    ,
+    },
     Minus: function () {
         if (wavesurfer) {
             zoomSpec('out')
         }
-    }
-    ,
+    },
     NumpadSubtract: function () {
         if (wavesurfer) {
             zoomSpec('out')
         }
-    }
-    ,
+    },
     Tab: function (e) {
         if (activeRow) {
             if (e.shiftKey) {
@@ -1897,9 +1911,9 @@ async function onWorkerLoadedAudio(args) {
 
     if (!wavesurfer && config.spectrogram) {
         initWavesurfer({
-            'audio': currentBuffer,
-            'backend': 'WebAudio',
-            'alpha': 0,
+            audio: currentBuffer,
+            backend: 'WebAudio',
+            alpha: 0,
         });
     } else {
         if (wavesurfer) wavesurfer.clearRegions();
@@ -2303,8 +2317,8 @@ function labelHandler(e) {
 }
 
 const tags = {
-    'Local': '<span class="badge bg-success rounded-pill edit-label pointer">Local</span>',
-    'Nocmig': '<span class="badge bg-dark rounded-pill edit-label pointer">Nocmig</span>',
+    Local: '<span class="badge bg-success rounded-pill edit-label pointer">Local</span>',
+    Nocmig: '<span class="badge bg-dark rounded-pill edit-label pointer">Nocmig</span>',
     // If remove label is clicked, we want to replace with *add* label
     'Remove Label': '<span class="badge rounded-pill bg-secondary add-label pointer d-none">Add Label</span>'
 }
@@ -2429,23 +2443,23 @@ function sendFile(mode, result) {
     let metadata;
     if (result) {
         metadata = {
-            'UUID': config.UUID,
-            'start': start,
-            'end': end,
-            'filename': result.filename,
-            'cname': result.cname,
-            'sname': result.sname,
-            'score': result.score,
-            'cname2': result.cname2,
-            'sname2': result.sname2,
-            'score2': result.score2,
-            'cname3': result.cname3,
-            'sname3': result.sname3,
-            'score3': result.score3,
-            'date': result.date,
-            'lat': config.latitude,
-            'lon': config.longitude,
-            'version': version
+            UUID: config.UUID,
+            start: start,
+            end: end,
+            filename: result.filename,
+            cname: result.cname,
+            sname: result.sname,
+            score: result.score,
+            cname2: result.cname2,
+            sname2: result.sname2,
+            score2: result.score2,
+            cname3: result.cname3,
+            sname3: result.sname3,
+            score3: result.score3,
+            date: result.date,
+            lat: config.latitude,
+            lon: config.longitude,
+            version: version
         };
     }
     if (mode === 'save') {
@@ -2468,10 +2482,10 @@ function sendFile(mode, result) {
 
 // create a dict mapping score to icon
 const iconDict = {
-    'guess': '<span class="material-icons-two-tone text-secondary score border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
-    'low': '<span class="material-icons-two-tone score text-danger border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
-    'medium': '<span class="material-icons-two-tone score text-warning border border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
-    'high': '<span class="material-icons-two-tone score text-success border border-secondary rounded" title="--%">signal_cellular_alt</span>',
+    guess: '<span class="material-icons-two-tone text-secondary score border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
+    low: '<span class="material-icons-two-tone score text-danger border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
+    medium: '<span class="material-icons-two-tone score text-warning border border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
+    high: '<span class="material-icons-two-tone score text-success border border-secondary rounded" title="--%">signal_cellular_alt</span>',
 }
 
 function iconizeScore(score) {
@@ -2572,15 +2586,21 @@ $('#zoomOut').on('click', function () {
     zoomSpec('out');
 });
 
-// Set batch size
-$('.batch').on('click', function (e) {
-    const batchSize = e.target.id || config.batchSize;
-    worker.postMessage({action: 'load-model', useWhitelist: config.useWhitelist, batchSize: batchSize});
-    $('.batch span').addClass('d-none');
-    e.target.lastChild.classList.remove('d-none');
-    config.batchSize = e.target.id || config.batchSize;
-    updatePrefs();
-});
+// Listeners to set batch size
+const batchRadios = document.getElementsByName('batch');
+
+for (let i = 0; i < batchRadios.length; i++) {
+    batchRadios[i].addEventListener('click', (e) => {
+        config.batchSize = e.target.value;
+        worker.postMessage({
+            action: 'load-model',
+            list: config.list,
+            batchSize: config.batchSize,
+            warmup: config.warmup
+        });
+        updatePrefs();
+    })
+}
 
 // Drag file to app window to open
 document.addEventListener('dragover', (event) => {
@@ -2622,8 +2642,7 @@ $(function () {
             applyLabel: 'Set Recording Start Time'
         }
     }, function (start, end, label) {
-        const newFileStart = start.toDate().getTime();
-        fileStart = newFileStart;
+        fileStart = start.toDate().getTime();
         worker.postMessage({action: 'update-file-start', file: currentFile, start: fileStart});
     });
 });
@@ -2657,7 +2676,7 @@ $(function () {
         $(this).on('apply.daterangepicker', function (ev, picker) {
             $(this).children('span').html(picker.startDate.format('MMMM D, YYYY') + ' - ' + picker.endDate.format('MMMM D, YYYY'));
             $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
-            const dateRange = {'start': picker.startDate._d.getTime(), 'end': picker.endDate._d.getTime()};
+            const dateRange = {start: picker.startDate._d.getTime(), end: picker.endDate._d.getTime()};
             if (worker) {
                 if (this.id === 'chartRange' && chartSpecies) {
                     t0 = Date.now();
