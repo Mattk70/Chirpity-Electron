@@ -61,6 +61,14 @@ html, body {
 /*    text-align: center;*/
 /*}*/
 
+.bg-dark{
+    z-index: 10;
+}
+
+.navbar-toggler {
+    padding: 0.57rem !important;
+}
+
 .navbar-nav li:hover > ul.dropdown-menu {
     display: block;
 }
@@ -72,7 +80,20 @@ html, body {
 .dropdown-submenu > .dropdown-menu {
     top: 0;
     left: 100%;
-    margin-top: -6px;
+    margin-top: -2px;
+}
+
+/* Menu Dropdown on Hover */
+.dropdown:hover .dropdown-menu.top-level {
+    display: block;
+    margin-top: 0;
+    /*remove the gap so it doesn't close*/
+}
+
+.dropup:hover .dropdown-menu.top-level {
+    display: block;
+    margin-top: 0;
+    /*remove the gap so it doesn't close*/
 }
 
 tr[id^="sub"] {
@@ -83,7 +104,7 @@ span[id^="filename_"] {
     border-bottom: 1px;
     border-bottom: #818182;
     left: 25px;
-    z-index: 100;
+    z-index: 10;
 }
 
 .rotate {
@@ -106,10 +127,6 @@ span[id^="filename_"] {
     cursor: pointer;
 }
 
-.openFiles {
-    display: none;
-}
-
 .openFiles.visible {
     display: block;
 }
@@ -118,7 +135,7 @@ span[id^="filename_"] {
     min-width: 850px;
     white-space: nowrap;
     height: 40px;
-    z-index: 6;
+    z-index: 9;
 }
 
 
@@ -134,7 +151,7 @@ div#contentWrapper {
     font-size: 22px;
 }
 
-.species-selector{
+.species-selector {
     position: relative;
 }
 
@@ -158,10 +175,10 @@ ul {
     width: 100%;
 }
 
-.bird-list-wrapper{
+.bird-list-wrapper {
     overflow: auto;
     max-height: 250px;
-    position:absolute;
+    position: absolute;
     width: 100%;
     z-index: 10;
 }
@@ -176,7 +193,8 @@ ul {
     color: black; /* Add a black text color */
     display: block; /* Make it into a block element to fill the whole list */
 }
-.bird-list li a:hover:not(.header){
+
+.bird-list li a:hover:not(.header) {
     background-color: #eee; /* Add a hover effect to all links, except for headers */
 }
 
@@ -187,9 +205,9 @@ ul {
 }
 
 
-#results>thead, #results>th {
+#results > thead, #results > th {
     position: sticky;
-    top:0;
+    top: 0;
     color: white;
     background-color: #1b1e21;
 }
@@ -232,12 +250,6 @@ region.wavesurfer-region[data-region-highlight] {
     /*cursor: default; */
 }
 
-/* Menu Dropdown on Hover */
-.dropdown:hover .dropdown-menu.top-level {
-    display: block;
-    margin-top: 0;
-/*remove the gap so it doesn't close*/
-}
 
 .chart-outer {
     height: 520px;
@@ -313,11 +325,11 @@ region.wavesurfer-region[data-region-highlight] {
 
 
 footer {
-  position: fixed;
-  bottom: 0;
-  height: 30px;
-  text-align: center;
-  width: 100%;
+    position: fixed;
+    bottom: 0;
+    height: 30px;
+    text-align: center;
+    width: 100%;
 }
 
 /* round table borders
@@ -331,6 +343,6 @@ footer {
 
 /* Flip comment icons */
 
-.add-comment, .edit-comment{
+.add-comment, .edit-comment {
     transform: scaleX(-1);
 }

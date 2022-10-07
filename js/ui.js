@@ -79,6 +79,7 @@ let contentWrapperElement = $('#contentWrapper');
 
 let completeDiv = $('#complete');
 const resultTable = $('#resultTableBody')
+const nocmigButton = document.getElementById('nocmigMode');
 const summaryTable = $('#summaryTable');
 let progressDiv = $('#progressDiv');
 let progressBar = $('.progress .progress-bar');
@@ -134,7 +135,7 @@ si.graphics()
             const key = `GPU[${count}]`;
             const vram = key + ' Memory';
             diagnostics[key] = gpu.name || gpu.vendor || gpu.model;
-            diagnostics[vram] = `${gpu.vram} MB`;
+            diagnostics[vram] = gpu.vram ? gpu.vram + ' MB' : 'Dynamic';
             count += 1;
         })
     })
@@ -177,9 +178,15 @@ async function loadAudioFile(args) {
     workerHasLoadedFile = false;
     try {
         fileEnd = fs.statSync(filePath).mtime;
-        worker.postMessage({action: 'file-load-request', file: filePath, position: 0, list:config.list, warmup:config.warmup});
+        worker.postMessage({
+            action: 'file-load-request',
+            file: filePath,
+            position: 0,
+            list: config.list,
+            warmup: config.warmup
+        });
     } catch (e) {
-        const supported_files = ['.mp3', '.wav', '.mpga', '.ogg', '.flac', '.m4a', '.aac', '.mpeg', '.mp4'];
+        const supported_files = ['.mp3', '.wav', '.mpga', '.ogg', '.opus', '.flac', '.m4a', '.aac', '.mpeg', '.mp4'];
         const dir = p.parse(filePath).dir;
         const name = p.parse(filePath).name;
         let file;
@@ -191,12 +198,14 @@ async function loadAudioFile(args) {
                 // Try the next extension
             }
             return fileEnd;
-        })
-        if (!fileEnd) {
-            alert("Unable to load source file with any supported file extension: " + filePath)
-        } else {
-            if (file) filePath = file;
-            if (originalFileEnd) fileEnd = originalFileEnd;
+        });
+        if (fileEnd) {
+            if (file) {
+                filePath = file;
+            }
+            if (originalFileEnd) {
+                fileEnd = originalFileEnd;
+            }
             worker.postMessage({
                 action: 'file-load-request',
                 file: filePath,
@@ -205,32 +214,18 @@ async function loadAudioFile(args) {
                 warmup: config.warmup,
                 list: config.list
             });
+        } else {
+            alert("Unable to load source file with any supported file extension: " + filePath)
         }
     }
 }
 
 $(document).on("click", ".openFiles", async function (e) {
-    const openFiles = $('.openFiles');
-    openFiles.removeClass('visible');
-    if (openFiles.length > 1) this.firstChild.innerHTML = "library_music";
-    e.target.classList.add('revealFiles');
-    e.target.classList.remove('openFiles');
     if (!PREDICTING) {
         await loadAudioFile({filePath: e.target.id, preserveResults: true})
     }
     e.stopImmediatePropagation()
 });
-
-$(document).on("click", ".revealFiles", function (e) {
-    this.classList.remove('revealFiles')
-    this.classList.add('openFiles')
-
-    this.firstChild.innerHTML = "audio_file"
-    const openFiles = $('.openFiles');
-    openFiles.addClass('visible');
-    e.stopImmediatePropagation()
-});
-
 
 function updateSpec(buffer, play) {
     updateElementCache();
@@ -390,28 +385,72 @@ async function showOpenDialog() {
     if (!files.canceled) await onOpenFiles({filePaths: files.filePaths});
 }
 
+// function updateFileName(files, openfile) {
+//
+//     let filenameElement = document.getElementById('filename');
+//     filenameElement.innerHTML = '';
+//
+//     let appendstr = '<div id="fileContainer" class="d-inline-block position-absolute bg-dark text-nowrap pe-3">';
+//     if (files.length > 1) {
+//         appendstr += '<span class="material-icons-two-tone pointer">library_music</span>';
+//     } else {
+//         appendstr += '<span class="material-icons-two-tone align-bottom">audio_file</span>';
+//     }
+//     files.forEach(item => {
+//         if (item === openfile) {
+//             appendstr += `<span class="revealFiles visible pointer" id="${item}">`;
+//
+//         } else {
+//             appendstr += `<span class="openFiles pointer" id="${item}">`;
+//         }
+//         appendstr += item.replace(/^.*[\\\/]/, "") + '</span>';
+//
+//     })
+//     filenameElement.innerHTML += appendstr + '</div>';
+// }
 function updateFileName(files, openfile) {
-
     let filenameElement = document.getElementById('filename');
     filenameElement.innerHTML = '';
-
-    let appendstr = '<div id="fileContainer" class="d-inline-block position-absolute bg-dark text-nowrap pe-3">';
+    let label = openfile.replace(/^.*[\\\/]/, "");
+    let dropdown_toggle = '', data_toggle = '';
     if (files.length > 1) {
-        appendstr += '<span class="material-icons-two-tone pointer">library_music</span>';
-    } else {
-        appendstr += '<span class="material-icons-two-tone align-bottom">audio_file</span>';
+        dropdown_toggle = 'dropdown-toggle';
+        data_toggle = 'class="dropdown"'
     }
+    let appendstr = `<div id="fileContainer" ${data_toggle}>
+        <button class="btn btn-secondary ${dropdown_toggle}" type="button" id="dropdownMenuButton"
+                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        <span id="setFileStart" title="Amend recording start time"
+                  class="material-icons-two-tone align-bottom pointer">edit_calendar</span> ${label}
+        </button><div class="dropdown-menu dropdown-menu-dark top-level" aria-labelledby="dropdownMenuButton">`;
     files.forEach(item => {
-        if (item === openfile) {
-            appendstr += `<span class="revealFiles visible pointer" id="${item}">`;
-
-        } else {
-            appendstr += `<span class="openFiles pointer" id="${item}">`;
+        if (item !== openfile) {
+            const label = item.replace(/^.*[\\\/]/, "");
+            appendstr += `<a id="${item}" class="dropdown-item openFiles" href="#">
+                <span class="material-icons-two-tone align-bottom">audio_file</span>${label}</a>`;
         }
-        appendstr += item.replace(/^.*[\\\/]/, "") + '</span>';
-
     })
-    filenameElement.innerHTML += appendstr + '</div>';
+    appendstr += `</div></div></div>`;
+    filenameElement.innerHTML = appendstr;
+    $(function () {
+        $('#setFileStart').daterangepicker({
+            singleDatePicker: true,
+            showDropdowns: true,
+            // file start is undefined at this point
+            startDate: moment(fileStart),
+            minYear: 2015,
+            maxDate: moment(),
+            maxYear: parseInt(moment().format('YYYY')),
+            timePicker: true,
+            timePicker24Hour: true,
+            locale: {
+                applyLabel: 'Set Recording Start Time'
+            }
+        }, function (start, end, label) {
+            fileStart = start.toDate().getTime();
+            worker.postMessage({action: 'update-file-start', file: currentFile, start: fileStart});
+        });
+    });
 }
 
 async function onOpenFiles(args) {
@@ -714,8 +753,9 @@ function adjustSpecDims(redraw) {
     const specWrapperElement = document.getElementById('spectrogramWrapper');
     let specOffset;
     if (!spectrogramWrapper.hasClass('d-none')) {
-        // Expand up to 512px
-        const specHeight = Math.min(contentHeight * 0.4, 512);
+        // Expand up to 512px unless fullscreen
+        const timelineHeight = config.timeline ? 0 : 20;
+        const specHeight = config.fullscreen ? contentHeight + timelineHeight - 70 : Math.min(contentHeight * 0.4, 512);
 
         if (currentFile) {
             // give the wrapper space for the transport controls and element padding/margins
@@ -826,22 +866,24 @@ function formatTimeCallback(secs) {
  */
 function timeInterval(pxPerSec) {
     let retval;
-    if (pxPerSec >= 25 * 100) {
+    const mulFactor = window.devicePixelRatio || 1;
+    const threshold = pxPerSec / mulFactor;
+    if (threshold >= 2500) {
         retval = 0.01;
-    } else if (pxPerSec >= 25 * 40) {
+    } else if (threshold >= 1000) {
         retval = 0.025;
-    } else if (pxPerSec >= 25 * 10) {
+    } else if (threshold >= 250) {
         retval = 0.1;
-    } else if (pxPerSec >= 25 * 4) {
+    } else if (threshold >= 100) {
         retval = 0.25;
-    } else if (pxPerSec >= 25) {
+    } else if (threshold >= 25) {
         retval = 5;
-    } else if (pxPerSec * 5 >= 25) {
+    } else if (threshold >= 5) {
         retval = 10;
-    } else if (pxPerSec * 15 >= 25) {
+    } else if (threshold >= 2) {
         retval = 15;
     } else {
-        retval = Math.ceil(0.5 / pxPerSec) * 60;
+        retval = Math.ceil(0.5 / threshold) * 60;
     }
     return retval;
 }
@@ -858,23 +900,25 @@ function timeInterval(pxPerSec) {
  * @param pxPerSec
  */
 function primaryLabelInterval(pxPerSec) {
-    var retval;
-    if (pxPerSec >= 25 * 100) {
+    let retval;
+    const mulFactor = window.devicePixelRatio || 1;
+    const threshold = pxPerSec / mulFactor;
+    if (threshold >= 2500) {
         retval = 10;
-    } else if (pxPerSec >= 25 * 40) {
+    } else if (threshold >= 1000) {
         retval = 4;
-    } else if (pxPerSec >= 25 * 10) {
+    } else if (threshold >= 250) {
         retval = 10;
-    } else if (pxPerSec >= 25 * 4) {
+    } else if (threshold >= 100) {
         retval = 4;
-    } else if (pxPerSec >= 25) {
+    } else if (threshold >= 20) {
         retval = 1;
-    } else if (pxPerSec * 5 >= 25) {
+    } else if (threshold >= 5) {
         retval = 5;
-    } else if (pxPerSec * 15 >= 25) {
+    } else if (threshold >= 2) {
         retval = 15;
     } else {
-        retval = Math.ceil(0.5 / pxPerSec) * 60;
+        retval = Math.ceil(0.5 / threshold) * 60;
     }
     return retval;
 }
@@ -896,7 +940,7 @@ function primaryLabelInterval(pxPerSec) {
  */
 function secondaryLabelInterval(pxPerSec) {
     // draw one every 1s as an example
-    return Math.floor(1 / timeInterval(pxPerSec));
+    return Math.floor(1 / timeInterval(threshold));
 }
 
 ////////// Store preferences //////////
@@ -936,7 +980,8 @@ window.onload = async () => {
         path: appPath,
         temp: tempPath,
         lat: config.latitude,
-        lon: config.longitude})
+        lon: config.longitude
+    })
 
     fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
         if (err) {
@@ -970,12 +1015,21 @@ window.onload = async () => {
         if (!('warmup' in config)) {
             config.warmup = true;
         }
+        // Never open fullscreen to begin with and don't remember setting
+        config.fullscreen = false;
         updatePrefs()
 
         // Set UI option state
         const batchSizeElement = document.getElementById(config.batchSize);
         batchSizeElement.checked = true;
-
+        warmup.checked = config.warmup;
+        // Show time of day in results?
+        const timestamp = document.querySelectorAll('.timestamp');
+        if (!config.timeOfDay) {
+            timestamp.forEach(el => {
+                el.classList.add('d-none')
+            })
+        }
         // Add a checkmark to the list in use
         window[config.list].checked = true;
 
@@ -988,6 +1042,7 @@ window.onload = async () => {
         } else {
             loadSpectrogram.checked = true;
         }
+        //Timeline settings
         if (!config.timeline) {
             timeline.checked = false;
             timeOfDay.disabled = true;
@@ -996,12 +1051,12 @@ window.onload = async () => {
             timeline.checked = true;
         }
         config.timeOfDay ? timeOfDay.checked = true : timecode.checked = true;
-        ;
+        // Spectrogram colour
         config.colormap === 'inferno' ? inferno.checked = true : greys.checked = true;
+        // Nocmig mode state
+        console.log('nocmig mode is ' + config.nocmig)
+        nocmigButton.innerText = config.nocmig ? 'bedtime' : 'bedtime_off';
 
-        if (config.nocmig) {
-            nocmigButton.classList.add('active')
-        }
         thresholdLink.value = config.minConfidence * 100;
 
         showElement([config.colormap + 'span'], true)
@@ -1152,6 +1207,7 @@ function editID(e) {
     currentID = speciesTextContainer.innerHTML;
     cname.innerHTML = `<div id='edit' class="species-selector"><input type="text" class="input rounded-pill" id="editInput" 
                     placeholder="${cname.innerText}"><div class="editing bird-list-wrapper"></div></div>`;
+    document.getElementById('editInput').focus();
 }
 
 // Bird list filtering
@@ -1534,7 +1590,7 @@ document.addEventListener('DOMContentLoaded', function () {
 ///////////// Nav bar Option handlers //////////////
 
 $(document).on('click', '#loadSpectrogram', function (e) {
-    e.target.checked ? config.spectrogram = true : config.spectrogram = false;
+    config.spectrogram = e.target.checked;
     updatePrefs();
     if (config.spectrogram) {
         $('.specFeature').show()
@@ -1542,7 +1598,6 @@ $(document).on('click', '#loadSpectrogram', function (e) {
         greys.disabled = false;
 
         if (wavesurfer && wavesurfer.isReady) {
-            $('.speccolor .timeline').removeClass('disabled');
             showElement(['spectrogramWrapper'], false);
         } else {
             timeOfDay.disabled = true;
@@ -1561,7 +1616,9 @@ $(document).on('click', '#loadSpectrogram', function (e) {
 function initSpectrogram(height) {
     showElement(['spectrogramWrapper'], false);
     let fftSamples;
-    if (windowLength < 2.5) {
+    if (windowLength < 3) {
+        fftSamples = 128;
+    } else if (windowLength < 10) {
         fftSamples = 256;
     } else {
         fftSamples = 512;
@@ -1571,12 +1628,15 @@ function initSpectrogram(height) {
     }
     if (wavesurfer.spectrogram) wavesurfer.destroyPlugin('spectrogram');
     wavesurfer.addPlugin(WaveSurfer.spectrogram.create({
+        //deferInit: false,
         wavesurfer: wavesurfer,
         container: "#spectrogram",
         scrollParent: false,
         fillParent: true,
         windowFunc: 'hamming',
         minPxPerSec: 1,
+        //frequencyMin: 250,
+        frequencyMax: 11750,
         normalize: true,
         hideScrollbar: true,
         labels: true,
@@ -1602,12 +1662,18 @@ $(document).on('click', '.speccolor', function (e) {
 
 const listToUse = document.getElementsByName('list');
 for (let i = 0; i < listToUse.length; i++) {
-    listToUse[i].addEventListener('click', function (e){
+    listToUse[i].addEventListener('click', function (e) {
         config.list = e.target.value;
         updatePrefs();
-        worker.postMessage({action:'update-model', list: config.list})
+        worker.postMessage({action: 'update-model', list: config.list})
     })
 }
+
+const warmup = document.getElementById('setWarmup');
+warmup.addEventListener('click', () => {
+    config.warmup = warmup.checked;
+    updatePrefs();
+})
 
 $(document).on('click', '#loadTimeline', function (e) {
     const timeOfDay = document.getElementById('timeOfDay');
@@ -1617,6 +1683,8 @@ $(document).on('click', '#loadTimeline', function (e) {
         config.timeline = false;
         timeOfDay.disabled = true;
         timecode.disabled = true;
+        updateElementCache();
+        adjustSpecDims(true);
         updatePrefs();
     } else {
         config.timeline = true;
@@ -1625,8 +1693,8 @@ $(document).on('click', '#loadTimeline', function (e) {
         if (wavesurfer) {
             createTimeline();
             // refresh caches
-            updateElementCache()
-            adjustSpecDims(true)
+            updateElementCache();
+            adjustSpecDims(true);
         }
         updatePrefs();
     }
@@ -1652,8 +1720,6 @@ $(document).on('click', '#timeOfDay', function () {
 })
 $(document).on('click', '#timecode', function () {
     config.timeOfDay = false;
-    config.nocmig = false;
-    nocmigButton.classList.remove('active');
     const timefields = document.querySelectorAll('.timestamp')
     timefields.forEach(time => {
         time.classList.add('d-none');
@@ -1692,7 +1758,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     Escape: function () {
         console.log('Operation aborted');
         PREDICTING = false;
-        worker.postMessage({action: 'abort', warmup: config.warmup, list:config.list});
+        worker.postMessage({action: 'abort', warmup: config.warmup, list: config.list});
         alert('Operation cancelled');
     },
     Home: function () {
@@ -1899,10 +1965,10 @@ async function onWorkerLoadedAudio(args) {
     let astro2 = SunCalc.getTimes(fileStart + 8.64e+7, config.latitude, config.longitude);
     dawn = astro2.dawn.getTime();
 
-    if (config.nocmig && fileEnd.getTime() < dusk && fileStart > firstDawn) {
-        alert(`All timestamps in this file are during daylight hours. \n\nNocmig mode will be disabled.`)
-        $('#timecode').click();
-    }
+    // if (config.nocmig && fileEnd.getTime() < dusk && fileStart > firstDawn) {
+    //     alert(`All timestamps in this file are during daylight hours. \n\nNocmig mode will be disabled.`)
+    //     $('#nocmigButton').click();
+    // }
     if (modelReady) {
         enableMenuItem(['analyze']);
         if (fileList.length > 1) analyzeAllLink.classList.remove('disabled');
@@ -2219,7 +2285,7 @@ async function renderResult(args) {
             <td>${iconizeScore(result.score)}</td>
             <td><span id='id${index}' title="Click for additional detections" class='material-icons-two-tone rotate pointer d-none'>sync</span></td>
             <td class='specFeature'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
-            <td><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:nocturnal' target="xc">
+            <td><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:"nocturnal flight call"' target="xc">
             <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
             <td class='specFeature download'><span class='material-icons-two-tone pointer'>file_download</span></td>
             <td class="comment text-end">${comment}</td>
@@ -2539,19 +2605,30 @@ $('#usage').on('click', function () {
         help.show()
     });
 });
-const nocmigButton = document.getElementById('nocmigMode');
 nocmigButton.addEventListener('click', function () {
     if (config.nocmig) {
         config.nocmig = false;
-        $('#timecode').click();
-        nocmigButton.classList.remove('active');
+        nocmigButton.innerText = 'bedtime_off';
     } else {
         config.nocmig = true;
-        $('#timeOfDay').click();
-        nocmigButton.classList.add('active');
+        nocmigButton.innerText = 'bedtime';
     }
     updatePrefs();
 })
+
+const fullscreen = document.getElementById('fullscreen');
+
+fullscreen.addEventListener('click', function (e) {
+    if (config.fullscreen) {
+        config.fullscreen = false;
+        fullscreen.innerText = 'fullscreen';
+    } else {
+        config.fullscreen = true;
+        fullscreen.innerText = 'fullscreen_exit';
+    }
+    adjustSpecDims(true);
+})
+
 
 const diagnosticMenu = document.getElementById('diagnostics')
 diagnosticMenu.addEventListener('click', function () {
@@ -2627,25 +2704,6 @@ bodyElement.on('dragstart', e => {
 
 ////////// Date Picker ///////////////
 
-$(function () {
-    $('#setFileStart').daterangepicker({
-        singleDatePicker: true,
-        showDropdowns: true,
-        // file start is undefined at this point
-        startDate: moment(fileStart),
-        minYear: 2015,
-        maxDate: moment(),
-        maxYear: parseInt(moment().format('YYYY')),
-        timePicker: true,
-        timePicker24Hour: true,
-        locale: {
-            applyLabel: 'Set Recording Start Time'
-        }
-    }, function (start, end, label) {
-        fileStart = start.toDate().getTime();
-        worker.postMessage({action: 'update-file-start', file: currentFile, start: fileStart});
-    });
-});
 
 $(function () {
     const start = moment();
