@@ -57,7 +57,6 @@ function createDB(file) {
             const [sname, cname] = labels[i].split('_')
             stmt.run(i, sname, cname);
         }
-        stmt.finalize();
         db.run(`CREATE TABLE records
                 (
                     dateTime INTEGER,
@@ -75,6 +74,7 @@ function createDB(file) {
                 )`, function (createResult) {
             if (createResult) throw createResult;
         });
+        stmt.finalize();
     });
     console.log("database initialized");
     return db;
@@ -154,7 +154,7 @@ ipcRenderer.on('new-client', (event) => {
                 latitude = args.lat;
                 longitude = args.lon;
                 TEMP = args.temp;
-                await loadDB(args.path)
+                await loadDB(args.path);
                 await clearCache();
                 break;
             case 'file-load-request':
@@ -393,8 +393,8 @@ async function getWorkingFile(file) {
  * @returns {Promise<*>}
  */
 async function locateFile(file) {
-    const supported_files = ['.wav', '.m4a', '.mp3', '.mpga', '.ogg', '.flac', '.aac', '.mpeg', '.mp4',
-        '.WAV', '.M4A', '.MP3', '.MPGA', '.OGG', '.FLAC', '.AAC', '.MPEG', '.MP4'];
+    const supported_files = ['.wav', '.m4a', '.mp3', '.mpga', '.ogg', '.opus', '.flac', '.aac', '.mpeg', '.mp4',
+        '.WAV', '.M4A', '.MP3', '.MPGA', '.OGG', '.OPUS', '.FLAC', '.AAC', '.MPEG', '.MP4'];
     const dir = p.parse(file).dir, name = p.parse(file).name;
     let foundFile;
     const matchingFileExt = supported_files.find(ext => {
@@ -450,7 +450,7 @@ function addDays(date, days) {
 /**
  * Called by getWorkingFile, setStartEnd?, getFileStart?,
  * Assigns file metadata to a metadata cache object. file is the key, and is the source file
- * proxy if required if the source file is not a wav to populate the headers
+ * proxy is required if the source file is not a wav to populate the headers
  * @param file: the file name passed to the worker
  * @param proxy: the wav file to use for predictions
  * @param source_file: the file that exists ( will be different after compression)
@@ -516,7 +516,7 @@ const getMetadata = (file, proxy, source_file) => {
                     if (el['chunkId'] === 'data') {
                         headerEnd = el.chunkData.start;
                     }
-                })
+                });
                 // Update relevant file properties
                 metadata[file].head = headerEnd;
                 metadata[file].header = chunk.slice(0, headerEnd)
@@ -529,7 +529,7 @@ const getMetadata = (file, proxy, source_file) => {
                 metadata[file].isComplete = true;
                 readStream.close()
                 resolve(metadata[file]);
-            })
+            });
             readStream.on('error', err => {
                 console.log('readstream error:' + err)
             })
@@ -601,9 +601,11 @@ async function getPredictBuffers(args) {
     // Ensure max and min are within range
     start = Math.max(0, start);
     // Handle no start / end supplied
-    end ? end = Math.min(metadata[file].duration, end) : end = metadata[file].duration;
+    end = end ? Math.min(metadata[file].duration, end) : metadata[file].duration;
 
-    if (start > metadata[file].duration) return
+    if (start > metadata[file].duration) {
+        return
+    };
     const byteStart = convertTimeToBytes(start, metadata[file]);
     const byteEnd = convertTimeToBytes(end, metadata[file]);
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
@@ -718,7 +720,6 @@ function sendMessageToWorker(chunkStart, chunks, file, duration, selection) {
 
 async function doPrediction(args) {
     const start = args.start, end = args.end, file = args.file, selection = args.selection;
-    aborted = false;
     predictionDone = false;
     predictionStart = new Date();
     if (!args.preserveResults && !selection) {
@@ -783,7 +784,7 @@ const saveResults2DataSet = (results, rootDirectory) => {
                     end: result.end,
                     file: result.file
                 })
-                if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e fetchAudioBUffer false when < 0.1s
+                if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
                     // REALLY NEED to figure out why 0.4 seconds silence at start of exported mp3s leading to 3s clips being 3.024s long
                     const buffer = AudioBuffer.getChannelData(0);
                     const folder = `${result.cname.replaceAll(' ', '_')}~${result.sname.replaceAll(' ', '_')}`;
@@ -804,9 +805,9 @@ const saveResults2DataSet = (results, rootDirectory) => {
             });
         })
     })
-    promise.then(function () {
+    promise.then(() => {
         console.log(`Dataset created. ${count} files saved in ${(Date.now() - t0) / 1000} seconds`);
-    });
+    })
 }
 
 const onSpectrogram = async (filepath, file, width, height, data, channels) => {
@@ -815,13 +816,16 @@ const onSpectrogram = async (filepath, file, width, height, data, channels) => {
     const file_to_save = p.join(filepath, file);
     await writeFile(file_to_save, image);
     console.log('saved:', file_to_save);
-}
+};
 
-async function uploadMp3(buffer, defaultName, metadata, mode) {
-    const MP3Blob = await analyzeAudioBuffer(buffer, metadata);
+//async function uploadMp3(buffer, defaultName, metadata, mode) {
+async function uploadOpus(file, start, defaultName, metadata) {
+    //const MP3Blob = await analyzeAudioBuffer(buffer, metadata);
+    const MP3Blob = await bufferToOpus(file, start, metadata);
 // Populate a form with the file (blob) and filename
-    var formData = new FormData();
+    const formData = new FormData();
     //const timestamp = Date.now()
+    //formData.append("thefile", MP3Blob, defaultName);
     formData.append("thefile", MP3Blob, defaultName);
     // Was the prediction a correct one?
     formData.append("Chirpity_assessment", mode);
@@ -835,6 +839,33 @@ async function uploadMp3(buffer, defaultName, metadata, mode) {
 // create and send the reqeust
     xhr.open('POST', 'https://birds.mattkirkland.co.uk/upload');
     xhr.send(formData);
+}
+
+const bufferToOpus = (file, start, metadata) => {
+    const tmp = p.join(TEMP,'tmp_opus.opus');
+    return new Promise(function (resolve) {
+        const command = ffmpeg(file)
+            .seekInput(start)
+            .duration(3)
+            .audioChannels(1)
+            .audioFrequency(24000)
+            .audioCodec('libopus')
+            // .audioBitrate(128)
+            // .audioQuality(10)
+            .on('error', (err) => {
+                console.log('An error occurred: ' + err.message);
+                if (error) {
+                    error(err.message);
+                }
+            })
+            .on('end', function (converted,error) {
+                const destination = new Blob(tmp.buffer, {type: 'audio/opus'})
+                resolve(destination)
+            })
+
+            const ffstream = command.pipe(fs.createWriteStream(tmp), {end:true})
+            //.save('/Users/matthew/Desktop/test.opus')
+    })
 }
 
 async function analyzeAudioBuffer(aBuffer, metadata) {
@@ -982,14 +1013,13 @@ async function saveMP3(file, start, end, filename, metadata) {
     downloadMp3(buffer, filename, metadata)
 }
 
-
 async function postMP3(args) {
     const file = args.file, defaultName = args.defaultName, start = args.start, end = args.end,
         metadata = args.metadata, mode = args.mode;
     const buffer = await fetchAudioBuffer({file: file, start: start, end: end});
-    await uploadMp3(buffer, defaultName, metadata, mode)
+    //await uploadMp3(buffer, defaultName, metadata, mode);
+    await uploadOpus(file, start, defaultName, metadata)
 }
-
 
 /// Workers  From the MDN example
 function spawnWorker(list, batchSize, warmup) {
@@ -1049,7 +1079,7 @@ const parsePredictions = (response) => {
 async function parseMessage(e) {
     const response = e.data;
     if (response['message'] === 'model-ready') {
-        chunkLength = response['chunkLength'];
+        const chunkLength = response['chunkLength'];
         sampleRate = response['sampleRate'];
         const backend = response['backend'];
         console.log(backend);
@@ -1448,8 +1478,16 @@ const getFileStart = (file) => {
     })
 }
 
-const onUpdateFileStart = (args) => {
-    const file = args.file.replace("'", "''"), newfileStart = args.start;
+const onUpdateFileStart = async (args) => {
+    let file = args.file;
+    const newfileMtime = args.start + (metadata[file].duration * 1000);
+    utimes(file, Math.round(newfileMtime));
+    // update the metadata
+    metadata[file].isComplete = false;
+    //allow for this file to be compressed...
+    await getWorkingFile(file);
+    file = file.replace("'", "''");
+
     return new Promise(function (resolve, reject) {
         db.get(`SELECT rowid, filestart
                 from files
@@ -1460,14 +1498,14 @@ const onUpdateFileStart = (args) => {
                 if (row) {
                     let rowID = row.rowid;
                     db.get(`UPDATE files
-                            SET filestart = '${newfileStart}'
+                            SET filestart = '${args.start}'
                             where rowid = '${rowID}'`, (err, rows) => {
                         if (err) {
                             console.log(err)
                         } else {
                             let t0 = Date.now();
                             db.get(`UPDATE records
-                                    set dateTime = position + ${newfileStart}
+                                    set dateTime = position + ${args.start}
                                     where fileid = ${rowID}`, (err, rowz) => {
                                 if (err) {
                                     console.log(err)

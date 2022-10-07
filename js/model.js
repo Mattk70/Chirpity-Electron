@@ -265,7 +265,6 @@ onmessage = async (e) => {
         console.log(e)
     }
 }
-let suspended = false;
 
 async function runPredictions(e) {
     const modelRequest = e.data.message || e.data[0];
@@ -274,7 +273,7 @@ async function runPredictions(e) {
         const list = e.data[2];
         const batch = e.data[3];
         const warmup = e.data[4]
-        console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`)
+        console.log(`model received load instruction. Using list: ${list}, batch size ${batch}, warmup: ${warmup}`)
         myModel = new Model(appPath, list);
         await myModel.loadModel();
         if (warmup) await myModel.warmUp(batch);
@@ -284,12 +283,12 @@ async function runPredictions(e) {
             chunkLength: myModel.chunkLength,
             backend: tf.getBackend()
         });
-    } else if (modelRequest === 'predict' && !suspended) {
+    } else if (modelRequest === 'predict') {
         const file = e.data.file;
-        let t0 = performance.now();
+        const t0 = performance.now();
+
         let chunks = {};
         let i = e.data.chunkStart;
-
         for (let j = 0; j < e.data.numberOfChunks; j++) {
             let key = 'chunk' + j;
             chunks[i] = e.data[key];
@@ -297,18 +296,13 @@ async function runPredictions(e) {
         }
 
         const fileStart = e.data.fileStart;
-
-        //console.log(`sending message to model.js took: ${t0 - postTime} milliseconds`)
         myModel.predictChunk(chunks, fileStart, file, e.data.duration)
-        let response = {
+        const response = {
             message: 'prediction',
             result: myModel.result,
-            // time:       performance.now(),
             endpoint: e.data.duration,
             fileStart: fileStart,
             selection: e.data.selection,
-            // add a chunk to the start
-            //start: i + myModel.chunkLength,
         }
         postMessage(response);
         let t1 = performance.now();
