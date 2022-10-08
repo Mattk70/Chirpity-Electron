@@ -61,39 +61,10 @@ html, body {
 /*    text-align: center;*/
 /*}*/
 
-.bg-dark{
-    z-index: 10;
-}
+
 
 .navbar-toggler {
     padding: 0.57rem !important;
-}
-
-.navbar-nav li:hover > ul.dropdown-menu {
-    display: block;
-}
-
-.dropdown-submenu {
-    position: relative;
-}
-
-.dropdown-submenu > .dropdown-menu {
-    top: 0;
-    left: 100%;
-    margin-top: -2px;
-}
-
-/* Menu Dropdown on Hover */
-.dropdown:hover .dropdown-menu.top-level {
-    display: block;
-    margin-top: 0;
-    /*remove the gap so it doesn't close*/
-}
-
-.dropup:hover .dropdown-menu.top-level {
-    display: block;
-    margin-top: 0;
-    /*remove the gap so it doesn't close*/
 }
 
 tr[id^="sub"] {
@@ -127,10 +98,6 @@ span[id^="filename_"] {
     cursor: pointer;
 }
 
-.openFiles.visible {
-    display: block;
-}
-
 #controlsWrapper .row, #transport-controls {
     min-width: 850px;
     white-space: nowrap;
@@ -148,7 +115,7 @@ div#contentWrapper {
 }
 
 .zoom {
-    font-size: 22px;
+    font-size: 36px;
 }
 
 .species-selector {
@@ -172,7 +139,7 @@ ul {
     list-style-type: none;
     padding: 0;
     margin: 0;
-    width: 100%;
+
 }
 
 .bird-list-wrapper {
@@ -346,3 +313,54 @@ footer {
 .add-comment, .edit-comment {
     transform: scaleX(-1);
 }
+
+
+/* ============ desktop view ============ */
+@media all and (min-width: 768px) {
+    .dropdown-menu li {
+        position: relative;
+    }
+
+    .nav-item .submenu {
+        display: none;
+        position: absolute;
+        left: 100%;
+        top: -7px;
+    }
+
+    .nav-item .submenu-left {
+        right: 100%;
+        left: auto;
+    }
+
+    .dropdown-menu > li:hover {
+        background-color: #f1f1f1
+    }
+
+    .dropdown-menu > li:hover > .submenu {
+        display: block;
+    }
+}
+
+/* ============ desktop view .end// ============ */
+
+/* ============ small devices ============ */
+@media (max-width: 767px) {
+    .dropdown-menu:not(.dropdown-menu .dropdown-menu) {
+        max-height: 300px;
+        overflow: auto
+    }
+
+    .dropdown-menu > li > .submenu {
+        display: block;
+    }
+
+    .dropdown-menu .dropdown-menu {
+        margin-left: 0.7rem;
+        margin-right: 0.7rem;
+        margin-bottom: .5rem;
+    }
+}
+
+/* ============ small devices .end// ============ */
+

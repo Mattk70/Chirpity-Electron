@@ -9,9 +9,9 @@
 
     <!-- Bootstrap & CSS-->
     <script src="./node_modules/jquery/dist/jquery.min.js"></script>
-    <script src="./node_modules/popper.js/dist/umd/popper.min.js"></script>
-    <script src="./node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
     <link rel="stylesheet" href="./node_modules/bootstrap/dist/css/bootstrap.min.css"/>
+    <script src="./node_modules/@popperjs/core/dist/umd/popper.min.js"></script>
+    <script src="./node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
     <!-- Additional JavaScript & CSS -->
     <link rel="stylesheet" href="css/style.css"/>
     <link rel="stylesheet" href="css/daterangepicker.css"/>
@@ -27,72 +27,68 @@
 
 <!-- Navigation bar -->
 <div id="navPadding" class="position-absolute top-0 w-100">
-    <nav class="pt-0 pb-0 navbar navbar-expand-sm navbar-dark bg-dark position-relative">
-        <!--a class="navbar-brand" href="#">Chirpity</a -->
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
-                aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse justify-content-between" id="navbarSupportedContent">
-            <ul class="navbar-nav mr-auto">
-                <li class="nav-item dropdown active">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button"
-                       data-toggle="dropdown"
-                       aria-haspopup="true" aria-expanded="false">
-                        File
-                    </a>
-                    <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
-                        <a id="open" class="dropdown-item" href="#"><u>O</u>pen Audio File </a>
-                        <a class="dropdown-item disabled" id="saveLabels" href="#">
-                            Save <u>A</u>udacity Labels</a>
-                        <a class="dropdown-item disabled" id="exportMP3" href="#">
-                            Export Selected Audio</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="#" id="exit">Exit</a>
-                    </div>
-                </li>
-                <li class="nav-item dropdown active">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarRecords" role="button" data-toggle="dropdown"
-                       aria-haspopup="true" aria-expanded="false">
-                        Records
-                    </a>
-                    <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
-                        <a class="dropdown-item disabled" href="#" id="save2db">Save Records</a>
-                        <a class="dropdown-item" href="#" id="charts">View charts</a>
-                        <a class="dropdown-item" href="#" id="explore">Explore records</a>
-                        <a class="dropdown-item" href="#" id="dataset">Create Dataset</a>
-                    </div>
-                </li>
-                <li class="nav-item dropdown active">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarAnalysis" role="button"
-                       data-toggle="dropdown"
-                       aria-haspopup="true" aria-expanded="false">
-                        Analysis
-                    </a>
-                    <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
-                        <a class="dropdown-item text-danger" href="#" id="warmup">Model Warming up
-                            <div class="spinner-grow spinner-grow-sm" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
+
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark">
+        <div class="container-fluid">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main_nav"
+                    aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="main_nav">
+                <ul class="navbar-nav">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown"
+                           data-bs-toggle="dropdown">
+                            File
                         </a>
-                        <a class="dropdown-item disabled" href="#" id="analyze">Analyze File</a>
-                        <a class="dropdown-item disabled" href="#" id="analyzeSelection">Analyze Selected Interval</a>
-                        <a class="dropdown-item disabled" href="#" id="analyzeAll">Analyze All Open Files</a>
-                    </div>
-                </li>
-                <li class="nav-item dropdown active">
-                    <a class="nav-link dropdown-toggle" href="#" id="SettingsDropdown" role="button"
-                       data-toggle="dropdown"
-                       aria-haspopup="true" aria-expanded="false">
-                        Settings
-                    </a>
-                    <div class="dropdown-menu top-level" aria-labelledby="navbarDropdown">
-                        <ul class="nav navbar-nav">
-                            <li class="dropdown-submenu">
-                                <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
-                                   aria-haspopup="true" aria-expanded="false"> <span
-                                        class="nav-label">Predictions...</span></a>
-                                <ul class="dropdown-menu">
+                        <ul class="dropdown-menu">
+                            <li><a id="open" class="dropdown-item" href="#"><u>O</u>pen Audio File </a></li>
+                            <li><a class="dropdown-item disabled" id="saveLabels" href="#">
+                                Save <u>A</u>udacity Labels</a></li>
+                            <li><a class="dropdown-item disabled" id="exportMP3" href="#">
+                                Export Selected Audio</a></li>
+                            <li>
+                                <hr class="dropdown-divider"></hr>
+                            <li><a class="dropdown-item" href="#" id="exit">Exit</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarRecords" role="button"
+                           data-bs-toggle="dropdown"
+                           aria-haspopup="true" aria-expanded="false">
+                            Records
+                        </a>
+                        <div class="dropdown-menu" aria-labelledby="navbarRecords">
+                            <a class="dropdown-item disabled" href="#" id="save2db">Save Records</a>
+                            <a class="dropdown-item" href="#" id="charts">View charts</a>
+                            <a class="dropdown-item" href="#" id="explore">Explore records</a>
+                            <a class="dropdown-item" href="#" id="dataset">Create Dataset</a>
+                        </div>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarAnalysis" role="button"
+                           data-bs-toggle="dropdown"
+                           aria-haspopup="true" aria-expanded="false">
+                            Analysis
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                            <li><a class="dropdown-item text-danger" href="#" id="warmup">Model Warming up
+                                <div class="spinner-grow spinner-grow-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </a></li>
+                            <li><a class="dropdown-item disabled" href="#" id="analyze">Analyze File</a></li>
+                            <li><a class="dropdown-item disabled" href="#" id="analyzeSelection">Analyze Selected
+                                Interval</a></li>
+                            <li><a class="dropdown-item disabled" href="#" id="analyzeAll">Analyze All Open Files</a>
+                            </li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown" id="myDropdown">
+                        <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown"> Settings </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#"> Predictions &raquo; </a>
+                                <ul class="submenu dropdown-menu">
                                     <li title="Cutoff threshold for prediction confidence">
                                         <a class="dropdown-item" href="#">Set Threshold
                                             <div style="width:100px">
@@ -105,209 +101,202 @@
                                         </a>
                                     </li>
                                     <li>
-                                        <div class="dropdown-divider"></div>
+                                        <hr class="dropdown-divider"></hr>
                                     </li>
-                                    <li class="dropdown-submenu">
-                                        <a href="#" class="dropdown-item" data-toggle="dropdown"
+                                    <li>
+                                        <a href="#" class="dropdown-item" data-bs-toggle="dropdown"
                                            role="button"
                                            aria-haspopup="true" aria-expanded="false"> <span
                                                 class="nav-label">Search For...</span></a>
-                                        <ul class="dropdown-menu ps-1">
-                                            <div class="form-check">
+                                        <ul class="submenu dropdown-menu ps-1">
+                                            <li class="form-check">
                                                 <input type="radio" class="form-check-input" id="migrants"
                                                        name="list" value="migrants" checked>
                                                 <label class="form-check-label" for="migrants">Migrants</label>
-                                            </div>
-                                            <div class="form-check">
+                                            </li>
+                                            <li class="form-check">
                                                 <input type="radio" class="form-check-input" id="birds" name="list"
                                                        value="birds">
                                                 <label class="form-check-label" for="birds">All Birds</label>
-                                            </div>
-                                            <div class="form-check">
+                                            </li>
+                                            <li class="form-check">
                                                 <input type="radio" class="form-check-input" id="everything"
                                                        name="list" value="everything">
                                                 <label class="form-check-label" for="everything">Everything</label>
-                                            </div>
+                                            </li>
                                         </ul>
                                     </li>
+                                    <li title="Optimising the batch size can increase the prediction speed by 2-3x on longer files.&#10;If it is too large, the model will terminate.&#10;If that happens, set a lower batch size and restart Chirpity">
+                                        <a href="#" class="dropdown-item" data-bs-toggle="dropdown"
+                                           role="button"
+                                           aria-haspopup="true" aria-expanded="false"> <span
+                                                class="nav-label">Batch Size...</span></a>
+                                        <ul class="submenu dropdown-menu ps-1"
+                                            style="min-width: 60px !important; width: 60px !important">
+                                            <li class="form-check">
+                                                <input type="radio" class="form-check-input" id="1"
+                                                       name="batch" value="1">
+                                                <label class="form-check-label"
+                                                       for="1">1</label>
+                                            </li>
+                                            <li class="form-check">
+                                                <input type="radio" class="form-check-input" id="2"
+                                                       name="batch" value="2">
+                                                <label class="form-check-label"
+                                                       for="2">2</label>
+                                            </li>
+                                            <li class="form-check">
+                                                <input type="radio" class="form-check-input" id="3"
+                                                       name="batch" value="3">
+                                                <label class="form-check-label"
+                                                       for="3">3</label>
+                                            </li>
+                                            <li class="form-check">
+                                                <input type="radio" class="form-check-input" id="4"
+                                                       name="batch" value="4">
+                                                <label class="form-check-label"
+                                                       for="4">4</label>
+                                            </li>
+                                            <li class="form-check">
+                                                <input type="radio" class="form-check-input" id="6"
+                                                       name="batch" value="6">
+                                                <label class="form-check-label"
+                                                       for="6">6</label>
+                                            </li>
+                                            <li class="form-check">
+                                                <input type="radio" class="form-check-input" id="8"
+                                                       name="batch" value="8">
+                                                <label class="form-check-label"
+                                                       for="8">8</label>
+                                            </li>
+                                            <li class="form-check">
+                                                <input type="radio" class="form-check-input" id="12"
+                                                       name="batch" value="12">
+                                                <label class="form-check-label"
+                                                       for="12">12</label>
+                                            </li>
+                                            <li class="form-check">
+                                                <input type="radio" class="form-check-input" id="16"
+                                                       name="batch" value="16">
+                                                <label class="form-check-label"
+                                                       for="16">16</label>
+                                            </li>
+                                            <li class="form-check">
+                                                <input type="radio" class="form-check-input" id="24"
+                                                       name="batch" value="24">
+                                                <label class="form-check-label"
+                                                       for="24">24</label>
+                                            </li>
+                                            <li class="form-check">
+                                                <input type="radio" class="form-check-input" id="32"
+                                                       name="batch" value="32">
+                                                <label class="form-check-label"
+                                                       for="32">32</label>
+                                            </li>
 
-                                    <li>
-                                        <div class="dropdown-submenu" aria-labelledby="navbarDropdown">
-                                            <ul class="nav navbar-nav">
-                                                <li class="dropdown-submenu">
-                                                    <a href="#" class="dropdown-item" data-toggle="dropdown"
-                                                       role="button"
-                                                       aria-haspopup="true" aria-expanded="false"> <span
-                                                            class="nav-label">Batch Size...</span></a>
-                                                    <ul class="dropdown-menu ps-1"
-                                                        style="min-width: 60px !important; width: 60px !important">
-                                                        <div class="form-check">
-                                                            <input type="radio" class="form-check-input" id="1"
-                                                                   name="batch" value="1">
-                                                            <label class="form-check-label"
-                                                                   for="1">1</label>
-                                                        </div>
-                                                        <div class="form-check">
-                                                            <input type="radio" class="form-check-input" id="2"
-                                                                   name="batch" value="2">
-                                                            <label class="form-check-label"
-                                                                   for="2">2</label>
-                                                        </div>
-                                                        <div class="form-check">
-                                                            <input type="radio" class="form-check-input" id="3"
-                                                                   name="batch" value="3">
-                                                            <label class="form-check-label"
-                                                                   for="3">3</label>
-                                                        </div>
-                                                        <div class="form-check">
-                                                            <input type="radio" class="form-check-input" id="4"
-                                                                   name="batch" value="4">
-                                                            <label class="form-check-label"
-                                                                   for="4">4</label>
-                                                        </div>
-                                                        <div class="form-check">
-                                                            <input type="radio" class="form-check-input" id="6"
-                                                                   name="batch" value="6">
-                                                            <label class="form-check-label"
-                                                                   for="6">6</label>
-                                                        </div>
-                                                        <div class="form-check">
-                                                            <input type="radio" class="form-check-input" id="8"
-                                                                   name="batch" value="8">
-                                                            <label class="form-check-label"
-                                                                   for="8">8</label>
-                                                        </div>
-                                                        <div class="form-check">
-                                                            <input type="radio" class="form-check-input" id="12"
-                                                                   name="batch" value="12">
-                                                            <label class="form-check-label"
-                                                                   for="12">12</label>
-                                                        </div>
-                                                        <div class="form-check">
-                                                            <input type="radio" class="form-check-input" id="16"
-                                                                   name="batch" value="16">
-                                                            <label class="form-check-label"
-                                                                   for="16">16</label>
-                                                        </div>
-                                                        <div class="form-check">
-                                                            <input type="radio" class="form-check-input" id="24"
-                                                                   name="batch" value="24">
-                                                            <label class="form-check-label"
-                                                                   for="24">24</label>
-                                                        </div>
-                                                        <div class="form-check">
-                                                            <input type="radio" class="form-check-input" id="32"
-                                                                   name="batch" value="32">
-                                                            <label class="form-check-label"
-                                                                   for="32">32</label>
-                                                        </div>
-
-                                                    </ul>
-                                                </li>
-                                            </ul>
-                                        </div>
+                                        </ul>
                                     </li>
-                                    <li title="Warm up the model before starting predictions">
-                                        <a class="dropdown-item" href="#">
-                                            <span class="input-group">
-                                                <div class="form-check">
-                                                <input type="checkbox" class="form-check-input"
-                                                       id="setWarmup" name="timeline" value="warmup" checked>
-                                                <label class="form-check-label" for="setWarmup">Warm Up</label>
-                                                </div>
-                                            </span>
-                                        </a>
-                                    </li>
+<!--                                    <li title="Warm up the model before starting predictions">-->
+<!--                                        <a class="dropdown-item" href="#">-->
+<!--                                            <div class="input-group">-->
+<!--                                                <div class="form-check">-->
+<!--                                                    <input type="checkbox" class="form-check-input"-->
+<!--                                                           id="setWarmup" name="timeline" value="warmup" checked>-->
+<!--                                                    <label class="form-check-label" for="setWarmup">Warm Up</label>-->
+<!--                                                </div>-->
+<!--                                            </div>-->
+<!--                                        </a>-->
+<!--                                    </li>-->
                                 </ul>
                             </li>
-
-                            <li class="dropdown-submenu">
-                                <a href="#" class="dropdown-item" data-toggle="dropdown" role="button"
+                            <li>
+                                <a href="#" class="dropdown-item" data-bs-toggle="dropdown" role="button"
                                    aria-haspopup="true" aria-expanded="false"><span
                                         class="nav-label">Spectrogram...</span></a>
-                                <ul class="dropdown-menu ps-1">
-                                    <div class="form-check">
+                                <ul class="submenu dropdown-menu ps-1">
+                                    <li class="form-check">
                                         <input type="checkbox" class="form-check-input" id="loadSpectrogram"
                                                name="timeline" value="loadSpectrogram">
                                         <label class="form-check-label"
                                                for="loadSpectrogram">Enable</label>
-                                    </div>
+                                    </li>
                                     <li>
                                         <div class="dropdown-divider"></div>
                                     </li>
                                     <li>
-                                        <div class="dropdown-submenu" aria-labelledby="navbarDropdown">
-                                            <ul class="nav navbar-nav">
-                                                <li class="dropdown-submenu">
-                                                    <a href="#" class="dropdown-item" id="timelineFeatures"
-                                                       data-toggle="dropdown"
-                                                       role="button"
-                                                       aria-haspopup="true" aria-expanded="false"> <span
-                                                            class="nav-label">Timeline...</span></a>
-                                                    <ul class="dropdown-menu ps-1">
-
-                                                        <div class="form-check">
-                                                            <input type="checkbox" class="form-check-input"
-                                                                   id="loadTimeline"
-                                                                   name="timeline" value="loadTimeline" checked>
-                                                            <label class="form-check-label"
-                                                                   for="loadTimeline">Enable</label>
-                                                        </div>
-                                                        <li>
-                                                            <div class="dropdown-divider"></div>
-                                                        </li>
-                                                        <div class="form-check">
-                                                            <input type="radio" class="form-check-input" id="timecode"
-                                                                   name="timeline" value="timecode" checked>
-                                                            <label class="form-check-label"
-                                                                   for="timecode">Timecode</label>
-                                                        </div>
-                                                        <div class="form-check">
-                                                            <input type="radio" class="form-check-input" id="timeOfDay"
-                                                                   name="timeline" value="timeOfDay" checked>
-                                                            <label class="form-check-label"
-                                                                   for="timeOfDay">Time of Day</label>
-                                                        </div>
-                                                    </ul>
-                                                </li>
-                                            </ul>
-
-
-                                        </div>
-                                    </li>
-                                    <div class="form-check">
+                                    <li class="form-check">
                                         <input type="radio" class="form-check-input speccolor" id="inferno"
                                                name="colormap" value="inferno" checked>
                                         <label class="form-check-label"
                                                for="inferno">Colour</label>
-                                    </div>
-                                    <div class="form-check">
+                                    </li>
+                                    <li class="form-check">
                                         <input type="radio" class="form-check-input speccolor" id="greys"
                                                name="colormap" value="greys" checked>
                                         <label class="form-check-label"
                                                for="greys">Greyscale</label>
-                                    </div>
+                                    </li>
+                                    <li>
+                                        <a href="#" class="dropdown-item" id="timelineFeatures"
+                                           data-bs-toggle="dropdown"
+                                           role="button"
+                                           aria-haspopup="true" aria-expanded="false"> <span
+                                                class="nav-label">Timeline...</span></a>
+                                        <ul class="submenu dropdown-menu ps-1">
+
+                                            <li class="form-check">
+                                                <input type="checkbox" class="form-check-input"
+                                                       id="loadTimeline"
+                                                       name="timeline" value="loadTimeline" checked>
+                                                <label class="form-check-label"
+                                                       for="loadTimeline">Enable</label>
+                                            </li>
+                                            <li>
+                                                <div class="dropdown-divider"></div>
+                                            </li>
+                                            <li class="form-check">
+                                                <input type="radio" class="form-check-input"
+                                                       id="timecode"
+                                                       name="timeline" value="timecode" checked>
+                                                <label class="form-check-label"
+                                                       for="timecode">Timecode</label>
+                                            </li>
+                                            <li class="form-check">
+                                                <input type="radio" class="form-check-input"
+                                                       id="timeOfDay"
+                                                       name="timeline" value="timeOfDay" checked>
+                                                <label class="form-check-label"
+                                                       for="timeOfDay">Time of Day</label>
+                                            </li>
+                                        </ul>
+                                    </li>
+
+                                    </li>
+
                                 </ul>
                             </li>
                         </ul>
-                    </div>
-                </li>
-                <li class="nav-item dropdown active">
-                    <a class="nav-link dropdown-toggle" href="#" id="help" role="button" data-toggle="dropdown"
-                       aria-haspopup="true" aria-expanded="false">
-                        Help
-                    </a>
-                    <div class="dropdown-menu  top-level" aria-labelledby="navbarDropdown">
-                        <a class="dropdown-item" id="usage" href="#">Usage</a>
-                        <a class="dropdown-item" id="settings" href="#">Settings</a>
-                        <a class="dropdown-item" id="keyboard" href="#">Keyboard Shortcuts</a>
-                        <a class="dropdown-item" id="diagnostics" href="#">Diagnostics</a>
-                    </div>
-                </li>
-            </ul>
+                    </li>
+                    <li class="nav-item dropdown active">
+                        <a class="nav-link dropdown-toggle" href="#" id="help" role="button" data-bs-toggle="dropdown"
+                           aria-haspopup="true" aria-expanded="false">
+                            Help
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                            <li><a class="dropdown-item" id="usage" href="#">Usage</a></li>
+                            <li><a class="dropdown-item" id="settings" href="#">Settings</a></li>
+                            <li><a class="dropdown-item" id="keyboard" href="#">Keyboard Shortcuts</a></li>
+                            <li><a class="dropdown-item" id="diagnostics" href="#">Diagnostics</a></li>
+                        </ul>
+                    </li>
+                </ul>
+
+            </div>
+            <!-- navbar-collapse.// -->
             <img src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"
                  height="50px"/>
         </div>
+        <!-- container-fluid.// -->
     </nav>
 </div>
 <!-- Content wrapper -->
@@ -378,12 +367,13 @@
     <!-- Spectrogram view -->
     <div class="w-100 d-none" id="spectrogramWrapper">
         <div>
-            <div class="bg-dark border-top border-light w-100" id="timeline"></div>
+            <div class="bg-dark border border-secondary w-100" id="timeline"></div>
             <div class="w-100" id="spectrogram"></div>
             <div class="w-100" id="waveform"></div>
         </div>
         <!-- Controls view -->
-        <div class="container-fluid p-1 bg-dark text-white d-inline-flex" id="controlsWrapper" style="max-height: 50px">
+        <div class="container-fluid p-1 bg-dark text-white d-inline-flex" id="controlsWrapper"
+             style="max-height: 50px">
 
             <div id="filename" class="col-5 ps-1 overflow-visible"></div>
 
@@ -392,7 +382,8 @@
                     <i class="material-icons-two-tone ">play_arrow</i><span
                         class="align-middle d-none d-lg-inline">Play  </span>
                     /
-                    <i class="material-icons-two-tone ">pause</i><span class="align-middle d-none d-lg-inline-block">Pause</span>
+                    <i class="material-icons-two-tone ">pause</i><span
+                        class="align-middle d-none d-lg-inline-block">Pause</span>
                 </button>
             </div>
 
@@ -450,7 +441,8 @@
                         <th>Position</th>
                         <th>Species</th>
                         <th>Label</th>
-                        <th class="text-center">Confidence<span id="confidenceFilter" class="material-icons-two-tone text-secondary align-bottom pointer">filter_list</span>
+                        <th class="text-center">Confidence<span id="confidenceFilter"
+                                                                class="material-icons-two-tone text-secondary align-bottom pointer">filter_list</span>
                         </th>
                         <th class="text-center">Other IDs</th>
                         <th class="specFeature text-center">Play</th>
