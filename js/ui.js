@@ -14,7 +14,7 @@ const uuidv4 = window.module.uuidv4;
 let worker;
 
 const establishMessageChannel =
-    new Promise((resolve, reject) => {
+    new Promise((resolve) => {
         window.onmessage = (event) => {
             // event.source === window means the message is coming from the preload
             // script, as opposed to from an <iframe> or other source.
@@ -36,7 +36,7 @@ const establishMessageChannel =
         console.log(value);
     }, reason => {
         console.log(reason);
-    })
+    });
 
 
 async function getPaths() {
@@ -44,18 +44,18 @@ async function getPaths() {
     const tempPromise = window.electron.getTemp();
     const appPath = await pathPromise;
     const tempPath = await tempPromise;
-    console.log('path is ', appPath, 'temp is ', tempPath)
+    console.log('path is ', appPath, 'temp is ', tempPath);
     return [appPath, tempPath];
 }
 
 
 let version;
-let diagnostics = {}
+let diagnostics = {};
 
 window.electron.getVersion()
     .then((appVersion) => {
         version = appVersion;
-        console.log('App version: ', appVersion)
+        console.log('App version: ', appVersion);
         diagnostics['Chirpity Version'] = version;
     })
     .catch(e => {
@@ -122,14 +122,14 @@ const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampl
 // Analysis Rate: x real time performance
 
 // Timers
-let t0_warmup, t1_warmup, t0_analysis, t1_analysis
+let t0_warmup, t1_warmup, t0_analysis, t1_analysis;
 
 const si = window.module.si;
 
 // promises style - new since version 3
 si.graphics()
     .then(data => {
-        let count = 0
+        let count = 0;
         //console.log(data)
         data.controllers.forEach(gpu => {
             const key = `GPU[${count}]`;
@@ -234,7 +234,9 @@ function updateSpec(buffer, play) {
     specCanvasElement.width('100%');
     $('.spec-labels').width('55px');
     adjustSpecDims(true);
-    if (play) wavesurfer.play()
+    if (play) {
+        wavesurfer.play()
+    }
 }
 
 function createTimeline() {
@@ -258,7 +260,9 @@ function initWavesurfer(args) {
         hideAll();
         showElement(['spectrogramWrapper'], false);
     }
-    if (wavesurfer) wavesurfer.pause();
+    if (wavesurfer) {
+        wavesurfer.pause();
+    }
     // Setup waveform and spec views
     wavesurfer = WaveSurfer.create({
         container: '#waveform',
@@ -285,7 +289,7 @@ function initWavesurfer(args) {
                 color: "rgba(255, 255, 255, 0.2)"
             })
         ]
-    })
+    });
     if (config.spectrogram) {
 
         initSpectrogram()
@@ -306,7 +310,7 @@ function initWavesurfer(args) {
     });
     // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
-        region = e
+        region = e;
         enableMenuItem(['exportMP3']);
         if (modelReady) {
             enableMenuItem(['analyzeSelection']);
@@ -326,10 +330,10 @@ function initWavesurfer(args) {
             });
             wavesurfer.play()
         }
-    })
+    });
     // Show controls
     showElement(['controlsWrapper']);
-    updateElementCache()
+    updateElementCache();
     // Resize canvas of spec and labels
     adjustSpecDims(false);
 }
@@ -337,17 +341,17 @@ function initWavesurfer(args) {
 function updateElementCache() {
     // Update element caches
     dummyElement = $('#dummy');
-    waveElement = $('#waveform')
+    waveElement = $('#waveform');
 
-    specElement = $('spectrogram')
-    specCanvasElement = $('#spectrogram canvas')
-    waveCanvasElement = $('#waveform canvas')
-    waveWaveElement = $('#waveform wave')
+    specElement = $('spectrogram');
+    specCanvasElement = $('#spectrogram canvas');
+    waveCanvasElement = $('#waveform canvas');
+    waveWaveElement = $('#waveform wave');
     specWaveElement = $('#spectrogram wave')
 }
 
 function zoomSpec(direction) {
-    let offsetSeconds = wavesurfer.getCurrentTime()
+    let offsetSeconds = wavesurfer.getCurrentTime();
     let position = offsetSeconds / windowLength;
     let timeNow = bufferBegin + offsetSeconds;
     if (direction === 'in') {
@@ -355,12 +359,16 @@ function zoomSpec(direction) {
         windowLength /= 2;
         bufferBegin += windowLength * position;
     } else {
-        if (windowLength > 100 || windowLength === currentFileDuration) return
+        if (windowLength > 100 || windowLength === currentFileDuration) return;
         bufferBegin -= windowLength * position;
         windowLength = Math.min(currentFileDuration, windowLength * 2);
 
-        if (bufferBegin < 0) bufferBegin = 0;
-        else if (bufferBegin + windowLength > currentFileDuration) bufferBegin = currentFileDuration - windowLength
+        if (bufferBegin < 0) {
+            bufferBegin = 0;
+        } else if (bufferBegin + windowLength > currentFileDuration) {
+            bufferBegin = currentFileDuration - windowLength
+
+        }
     }
     // Keep playhead at same time in file
     position = (timeNow - bufferBegin) / windowLength;
@@ -412,26 +420,31 @@ function updateFileName(files, openfile) {
     let filenameElement = document.getElementById('filename');
     filenameElement.innerHTML = '';
     let label = openfile.replace(/^.*[\\\/]/, "");
-    let dropdown_toggle = '', data_toggle = '';
+    let appendStr;
     if (files.length > 1) {
-        dropdown_toggle = 'dropdown-toggle';
-        data_toggle = 'class="dropdown"'
-    }
-    let appendstr = `<div id="fileContainer" ${data_toggle}>
-        <button class="btn btn-secondary ${dropdown_toggle}" type="button" id="dropdownMenuButton"
+        appendStr = `<div id="fileContainer" class="dropup">
+        <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton1"
                 data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
         <span id="setFileStart" title="Amend recording start time"
                   class="material-icons-two-tone align-bottom pointer">edit_calendar</span> ${label}
-        </button><div class="dropdown-menu dropdown-menu-dark top-level" aria-labelledby="dropdownMenuButton">`;
-    files.forEach(item => {
-        if (item !== openfile) {
-            const label = item.replace(/^.*[\\\/]/, "");
-            appendstr += `<a id="${item}" class="dropdown-item openFiles" href="#">
+        </button><div class="dropdown-menu dropdown-menu-dark top-level" aria-labelledby="dropdownMenuButton1">`;
+        files.forEach(item => {
+            if (item !== openfile) {
+                const label = item.replace(/^.*[\\\/]/, "");
+                appendStr += `<a id="${item}" class="dropdown-item openFiles" href="#">
                 <span class="material-icons-two-tone align-bottom">audio_file</span>${label}</a>`;
-        }
-    })
-    appendstr += `</div></div></div>`;
-    filenameElement.innerHTML = appendstr;
+            }
+        })
+        appendStr += `</div></div>`;
+    } else {
+        appendStr = `<div id="fileContainer">
+        <button class="btn btn-secondary" type="button">
+        <span id="setFileStart" title="Amend recording start time"
+                  class="material-icons-two-tone align-bottom pointer">edit_calendar</span> ${label}
+        </button></div>`;
+    }
+
+    filenameElement.innerHTML = appendStr;
     $(function () {
         $('#setFileStart').daterangepicker({
             singleDatePicker: true,
@@ -530,10 +543,10 @@ function refreshResultsView() {
     adjustSpecDims(true);
 }
 
-const navbarAnalysis = document.getElementById('navbarAnalysis');
-navbarAnalysis.addEventListener('click', async () => {
-    refreshResultsView();
-});
+// const navbarAnalysis = document.getElementById('navbarAnalysis');
+// navbarAnalysis.addEventListener('click', async () => {
+//     refreshResultsView();
+// });
 
 const analyzeLink = document.getElementById('analyze');
 //speciesExclude = document.querySelectorAll('speciesExclude');
@@ -1013,7 +1026,7 @@ window.onload = async () => {
             config.list = 'migrants';
         }
         if (!('warmup' in config)) {
-            config.warmup = true;
+            config.warmup = false;
         }
         // Never open fullscreen to begin with and don't remember setting
         config.fullscreen = false;
@@ -1022,7 +1035,7 @@ window.onload = async () => {
         // Set UI option state
         const batchSizeElement = document.getElementById(config.batchSize);
         batchSizeElement.checked = true;
-        warmup.checked = config.warmup;
+        //warmup.checked = config.warmup;
         // Show time of day in results?
         const timestamp = document.querySelectorAll('.timestamp');
         if (!config.timeOfDay) {
@@ -1581,11 +1594,12 @@ function enableKeyDownEvent() {
     document.addEventListener('keydown', handleKeyDown, true);
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-    enableKeyDownEvent();
-    addEvents('comment');
-    addEvents('label');
-});
+//
+// document.addEventListener('DOMContentLoaded', function () {
+//     enableKeyDownEvent();
+//     addEvents('comment');
+//     addEvents('label');
+// });
 
 ///////////// Nav bar Option handlers //////////////
 
@@ -1616,9 +1630,9 @@ $(document).on('click', '#loadSpectrogram', function (e) {
 function initSpectrogram(height) {
     showElement(['spectrogramWrapper'], false);
     let fftSamples;
-    if (windowLength < 3) {
+    if (windowLength < 2) {
         fftSamples = 128;
-    } else if (windowLength < 10) {
+    } else if (windowLength < 5) {
         fftSamples = 256;
     } else {
         fftSamples = 512;
@@ -1669,11 +1683,11 @@ for (let i = 0; i < listToUse.length; i++) {
     })
 }
 
-const warmup = document.getElementById('setWarmup');
-warmup.addEventListener('click', () => {
-    config.warmup = warmup.checked;
-    updatePrefs();
-})
+// const warmup = document.getElementById('setWarmup');
+// warmup.addEventListener('click', () => {
+//     config.warmup = warmup.checked;
+//     updatePrefs();
+// })
 
 $(document).on('click', '#loadTimeline', function (e) {
     const timeOfDay = document.getElementById('timeOfDay');
@@ -1818,11 +1832,12 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         }
     },
     ArrowLeft: function () {
+        const skip = windowLength / 100;
         if (wavesurfer) {
-            wavesurfer.skipBackward(0.1);
+            wavesurfer.skipBackward(skip);
             const position = wavesurfer.getCurrentTime() / windowLength;
-            if (wavesurfer.getCurrentTime() < 0.1 && bufferBegin > 0) {
-                bufferBegin -= 0.5;
+            if (wavesurfer.getCurrentTime() < skip && bufferBegin > 0) {
+                bufferBegin -= skip;
                 worker.postMessage({
                     action: 'update-buffer',
                     file: currentFile,
@@ -1835,11 +1850,12 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         }
     },
     ArrowRight: function () {
+        const skip = windowLength / 100;
         if (wavesurfer) {
-            wavesurfer.skipForward(0.1);
+            wavesurfer.skipForward(skip);
             const position = wavesurfer.getCurrentTime() / windowLength;
-            if (wavesurfer.getCurrentTime() > windowLength - 0.1) {
-                bufferBegin = Math.min(currentFileDuration - windowLength, bufferBegin += 0.5)
+            if (wavesurfer.getCurrentTime() > windowLength - skip) {
+                bufferBegin = Math.min(currentFileDuration - windowLength, bufferBegin += skip)
                 worker.postMessage({
                     action: 'update-buffer',
                     file: currentFile,
@@ -2770,3 +2786,40 @@ function onScreen(el) {
 
     return ((elemBottom <= ViewBottom) && (elemTop >= ViewTop));
 }
+
+document.addEventListener("DOMContentLoaded", function () {
+    enableKeyDownEvent();
+    addEvents('comment');
+    addEvents('label');
+// make it as accordion for smaller screens
+    if (window.innerWidth < 500) {
+
+        // close all inner dropdowns when parent is closed
+        document.querySelectorAll('.navbar .dropdown').forEach(function (everydropdown) {
+            everydropdown.addEventListener('hidden.bs.dropdown', function () {
+                // after dropdown is hidden, then find all submenus
+                this.querySelectorAll('.submenu').forEach(function (everysubmenu) {
+                    // hide every submenu as well
+                    everysubmenu.style.display = 'none';
+                });
+            })
+        });
+
+        document.querySelectorAll('.dropdown-menu a').forEach(function (element) {
+            element.addEventListener('click', function (e) {
+                let nextEl = this.nextElementSibling;
+                if (nextEl && nextEl.classList.contains('submenu')) {
+                    // prevent opening link if link needs to open dropdown
+                    e.preventDefault();
+                    if (nextEl.style.display == 'block') {
+                        nextEl.style.display = 'none';
+                    } else {
+                        nextEl.style.display = 'block';
+                    }
+
+                }
+            });
+        })
+    }
+// end if innerWidth
+});
