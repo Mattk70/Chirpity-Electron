@@ -758,7 +758,7 @@ function loadResultRegion(paramlist) {
  * Sets the height of elements on the results pages.
  * @param redraw
  */
-function adjustSpecDims(redraw) {
+function adjustSpecDims(redraw, fftSamples) {
     contentWrapperElement.height(bodyElement.height() - 80);
     const contentHeight = contentWrapperElement.height();
     const exploreWrapperElement = document.getElementById('exploreWrapper');
@@ -783,7 +783,7 @@ function adjustSpecDims(redraw) {
                 });
             }
             wavesurfer.setHeight(specHeight);
-            initSpectrogram(specHeight);
+            initSpectrogram(specHeight, fftSamples);
             specCanvasElement.width('100%');
             specElement.css('z-index', 0);
             $('.spec-labels').width('55px')
@@ -1627,15 +1627,16 @@ $(document).on('click', '#loadSpectrogram', function (e) {
     }
 })
 
-function initSpectrogram(height) {
+function initSpectrogram(height, fftSamples) {
     showElement(['spectrogramWrapper'], false);
-    let fftSamples;
-    if (windowLength < 2) {
-        fftSamples = 128;
-    } else if (windowLength < 5) {
-        fftSamples = 256;
-    } else {
-        fftSamples = 512;
+    if (!fftSamples) {
+        if (windowLength < 2) {
+            fftSamples = 128;
+        } else if (windowLength < 5) {
+            fftSamples = 256;
+        } else {
+            fftSamples = 512;
+        }
     }
     if (!height) {
         height = fftSamples / 2
@@ -1870,24 +1871,60 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     KeyP: function () {
         (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
     },
-    Equal: function () {
+    Equal: function (e) {
         if (wavesurfer) {
-            zoomSpec('in')
+            let fftSamples = wavesurfer.spectrogram.fftSamples;
+            if (e.shiftKey) {
+                if (fftSamples >= 64) {
+                    fftSamples /= 2;
+                    adjustSpecDims(true, fftSamples);
+                    console.log(fftSamples);
+                }
+            } else {
+                zoomSpec('in')
+            }
         }
     },
-    NumpadAdd: function () {
+    NumpadAdd: function (e) {
         if (wavesurfer) {
-            zoomSpec('in')
+            let fftSamples = wavesurfer.spectrogram.fftSamples;
+            if (e.shiftKey) {
+                if (fftSamples >= 64) {
+                    fftSamples /= 2;
+                    adjustSpecDims(true, fftSamples);
+                    console.log(fftSamples);
+                }
+            } else {
+                zoomSpec('in')
+            }
         }
     },
-    Minus: function () {
+    Minus: function (e) {
         if (wavesurfer) {
-            zoomSpec('out')
+            let fftSamples = wavesurfer.spectrogram.fftSamples;
+            if (e.shiftKey) {
+                if (fftSamples <= 2048) {
+                    fftSamples *= 2;
+                    adjustSpecDims(true, fftSamples);
+                    console.log(fftSamples);
+                }
+            } else {
+                zoomSpec('in')
+            }
         }
     },
-    NumpadSubtract: function () {
+    NumpadSubtract: function (e) {
         if (wavesurfer) {
-            zoomSpec('out')
+            let fftSamples = wavesurfer.spectrogram.fftSamples;
+            if (e.shiftKey) {
+                if (fftSamples <= 2048) {
+                    fftSamples *= 2;
+                    adjustSpecDims(true, fftSamples);
+                    console.log(fftSamples);
+                }
+            } else {
+                zoomSpec('in')
+            }
         }
     },
     Tab: function (e) {
@@ -1909,7 +1946,9 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
                     activeRow = activeRow.nextSibling;
                 }
             }
-            if (activeRow) activeRow.click();
+            if (activeRow) {
+                activeRow.click();
+            }
         }
     }
 };
@@ -2792,7 +2831,7 @@ document.addEventListener("DOMContentLoaded", function () {
     addEvents('comment');
     addEvents('label');
 // make it as accordion for smaller screens
-    if (window.innerWidth < 500) {
+    if (window.innerWidth < 768) {
 
         // close all inner dropdowns when parent is closed
         document.querySelectorAll('.navbar .dropdown').forEach(function (everydropdown) {
