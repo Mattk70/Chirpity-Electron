@@ -39,13 +39,8 @@ html, body {
     -webkit-font-smoothing: antialiased;
 }
 
-.tick {
-    font-size: 20px;
-}
-
-.arrow {
-    font-size: 22px;
-    vertical-align: top;
+.navbar {
+    z-index: 5;
 }
 
 #spectrogram {
@@ -63,9 +58,6 @@ html, body {
 
 
 
-.navbar-toggler {
-    padding: 0.57rem !important;
-}
 
 tr[id^="sub"] {
     font-size: 12px;
@@ -75,7 +67,7 @@ span[id^="filename_"] {
     border-bottom: 1px;
     border-bottom: #818182;
     left: 25px;
-    z-index: 10;
+    z-index: 2;
 }
 
 .rotate {
@@ -110,7 +102,7 @@ div#contentWrapper {
     background: #dbe2ed url(../img/Redwing-flight.png);
     background-size: cover;
     position: absolute;
-    top: 50px;
+    top: 66px;
     width: 100%;
 }
 
@@ -177,21 +169,22 @@ ul {
     top: 0;
     color: white;
     background-color: #1b1e21;
+    z-index: 2;
 }
 
-region.wavesurfer-region:before {
-    content: attr(data-region-label);
-    position: absolute;
-    color: beige;
-    background-color: rgba(266, 255, 236, 0.0);
-    top: 0;
-    padding-left: 5px;
-}
+/*region.wavesurfer-region:before {*/
+/*    content: attr(data-region-label);*/
+/*    position: absolute;*/
+/*    color: beige;*/
+/*    background-color: rgba(266, 255, 236, 0.0);*/
+/*    top: 0;*/
+/*    padding-left: 5px;*/
+/*}*/
 
-region.wavesurfer-region[data-region-highlight] {
-    border: 1px solid rgb(86, 180, 239);
-    box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.05) inset, 2px 0px 8px rgba(266, 255, 236, 0.6);
-}
+/*region.wavesurfer-region[data-region-highlight] {*/
+/*    border: 1px solid rgb(86, 180, 239);*/
+/*    box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.05) inset, 2px 0px 8px rgba(266, 255, 236, 0.6);*/
+/*}*/
 
 .nighttime {
     background-color: rgba(0, 0, 72, 0.2);
@@ -297,6 +290,7 @@ footer {
     height: 30px;
     text-align: center;
     width: 100%;
+    z-index: 1000;
 }
 
 /* round table borders
@@ -313,6 +307,19 @@ footer {
 .add-comment, .edit-comment {
     transform: scaleX(-1);
 }
+
+#dropdownMenuButton {
+    max-width: 350px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dropdown-menu-dark {
+    max-height: 300px;
+    overflow: auto;
+}
+
 
 
 /* ============ desktop view ============ */
@@ -348,7 +355,7 @@ footer {
 @media (max-width: 767px) {
     .dropdown-menu:not(.dropdown-menu .dropdown-menu) {
         max-height: 300px;
-        overflow: auto
+        overflow: auto;
     }
 
     .dropdown-menu > li > .submenu {
