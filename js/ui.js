@@ -422,12 +422,15 @@ function updateFileName(files, openfile) {
     let label = openfile.replace(/^.*[\\\/]/, "");
     let appendStr;
     if (files.length > 1) {
-        appendStr = `<div id="fileContainer" class="dropup">
-        <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton1"
-                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-        <span id="setFileStart" title="Amend recording start time"
+        appendStr = `<div id="fileContainer" class="btn-group dropup">
+        <button type="button" class="btn btn-secondary" id="dropdownMenuButton"><span id="setFileStart" title="Amend recording start time"
                   class="material-icons-two-tone align-bottom pointer">edit_calendar</span> ${label}
-        </button><div class="dropdown-menu dropdown-menu-dark top-level" aria-labelledby="dropdownMenuButton1">`;
+        </button>
+        <button class="btn btn-secondary dropdown-toggle dropdown-toggle-split" type="button" 
+                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <span class="visually-hidden">Toggle Dropdown</span>
+        </button>
+        <div class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton">`;
         files.forEach(item => {
             if (item !== openfile) {
                 const label = item.replace(/^.*[\\\/]/, "");
@@ -438,7 +441,7 @@ function updateFileName(files, openfile) {
         appendStr += `</div></div>`;
     } else {
         appendStr = `<div id="fileContainer">
-        <button class="btn btn-secondary" type="button">
+        <button class="btn btn-secondary" type="button" id="dropdownMenuButton">
         <span id="setFileStart" title="Amend recording start time"
                   class="material-icons-two-tone align-bottom pointer">edit_calendar</span> ${label}
         </button></div>`;
@@ -759,20 +762,21 @@ function loadResultRegion(paramlist) {
  * @param redraw
  */
 function adjustSpecDims(redraw, fftSamples) {
-    contentWrapperElement.height(bodyElement.height() - 80);
-    const contentHeight = contentWrapperElement.height();
-    const exploreWrapperElement = document.getElementById('exploreWrapper');
-    const formOffset = exploreWrapperElement.offsetHeight;
+    //Contentwrapper starts below navbar (66px) and ends above footer (30px). Hence - 96
+    contentWrapperElement.height(bodyElement.height() - 96);
+    const contentHeight = contentWrapperElement.outerHeight(true);
+    // + 2 for padding
+    const formOffset = $('#exploreWrapper').outerHeight(true);
     const specWrapperElement = document.getElementById('spectrogramWrapper');
     let specOffset;
     if (!spectrogramWrapper.hasClass('d-none')) {
         // Expand up to 512px unless fullscreen
-        const timelineHeight = config.timeline ? 0 : 20;
-        const specHeight = config.fullscreen ? contentHeight + timelineHeight - 70 : Math.min(contentHeight * 0.4, 512);
+        const controlsHeight = $('#controlsWrapper').outerHeight(true);
+        const timelineHeight = $('#timeline').outerHeight(true);
+        const specHeight = config.fullscreen ? contentHeight - timelineHeight - formOffset - controlsHeight : Math.min(contentHeight * 0.4, 512);
 
         if (currentFile) {
             // give the wrapper space for the transport controls and element padding/margins
-            spectrogramWrapper.height(specHeight + 21 + 46.84);
             if (!wavesurfer) {
                 initWavesurfer({
                     audio: currentBuffer,
@@ -781,8 +785,9 @@ function adjustSpecDims(redraw, fftSamples) {
                     height: specHeight,
                     reset: false
                 });
+            } else {
+                wavesurfer.setHeight(specHeight);
             }
-            wavesurfer.setHeight(specHeight);
             initSpectrogram(specHeight, fftSamples);
             specCanvasElement.width('100%');
             specElement.css('z-index', 0);
@@ -1035,7 +1040,7 @@ window.onload = async () => {
         // Set UI option state
         const batchSizeElement = document.getElementById(config.batchSize);
         batchSizeElement.checked = true;
-        //warmup.checked = config.warmup;
+        warmup.checked = config.warmup;
         // Show time of day in results?
         const timestamp = document.querySelectorAll('.timestamp');
         if (!config.timeOfDay) {
@@ -1319,7 +1324,7 @@ function updateRecordID(file, start, end, cname, sname) {
     predictions[clickedIndex].cname = cname;
     predictions[clickedIndex].sname = sname;
     predictions[clickedIndex].filename =
-        `${cname.replace(/\s+/g, '_')}~${sname.replace(/\s+/g, '_')}~${Date.parse(predictions[clickedIndex].date)}.mp3`;
+        `${cname.replace(/\s+/g, '_')}~${sname.replace(/\s+/g, '_')}~${Date.parse(predictions[clickedIndex].date)}.opus`;
     sendFile('incorrect', predictions[clickedIndex]);
 }
 
@@ -1594,12 +1599,6 @@ function enableKeyDownEvent() {
     document.addEventListener('keydown', handleKeyDown, true);
 }
 
-//
-// document.addEventListener('DOMContentLoaded', function () {
-//     enableKeyDownEvent();
-//     addEvents('comment');
-//     addEvents('label');
-// });
 
 ///////////// Nav bar Option handlers //////////////
 
@@ -1630,9 +1629,7 @@ $(document).on('click', '#loadSpectrogram', function (e) {
 function initSpectrogram(height, fftSamples) {
     showElement(['spectrogramWrapper'], false);
     if (!fftSamples) {
-        if (windowLength < 2) {
-            fftSamples = 128;
-        } else if (windowLength < 5) {
+        if (windowLength < 5) {
             fftSamples = 256;
         } else {
             fftSamples = 512;
@@ -1650,9 +1647,9 @@ function initSpectrogram(height, fftSamples) {
         fillParent: true,
         windowFunc: 'hamming',
         minPxPerSec: 1,
-        //frequencyMin: 250,
+        frequencyMin: 0,
         frequencyMax: 11750,
-        normalize: true,
+        normalize: false,
         hideScrollbar: true,
         labels: true,
         height: height,
@@ -1684,11 +1681,11 @@ for (let i = 0; i < listToUse.length; i++) {
     })
 }
 
-// const warmup = document.getElementById('setWarmup');
-// warmup.addEventListener('click', () => {
-//     config.warmup = warmup.checked;
-//     updatePrefs();
-// })
+const warmup = document.getElementById('setWarmup');
+warmup.addEventListener('click', () => {
+    config.warmup = warmup.checked;
+    updatePrefs();
+})
 
 $(document).on('click', '#loadTimeline', function (e) {
     const timeOfDay = document.getElementById('timeOfDay');
@@ -1771,10 +1768,12 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         }
     },
     Escape: function () {
-        console.log('Operation aborted');
-        PREDICTING = false;
-        worker.postMessage({action: 'abort', warmup: config.warmup, list: config.list});
-        alert('Operation cancelled');
+        if (PREDICTING) {
+            console.log('Operation aborted');
+            PREDICTING = false;
+            worker.postMessage({action: 'abort', warmup: config.warmup, list: config.list});
+            alert('Operation cancelled');
+        }
     },
     Home: function () {
         if (currentBuffer) {
@@ -1909,7 +1908,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
                     console.log(fftSamples);
                 }
             } else {
-                zoomSpec('in')
+                zoomSpec('out')
             }
         }
     },
@@ -1923,7 +1922,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
                     console.log(fftSamples);
                 }
             } else {
-                zoomSpec('in')
+                zoomSpec('out')
             }
         }
     },
@@ -2218,7 +2217,6 @@ function scrollResults(row) {
 
 function matchSpecies(row, target, spinner, mode) {
     const spinnerClasses = spinner.classList;
-    //const hideIcon = e.target.closest('tr').getElementsByClassName('speciesHide')[0];
     const targetClass = target.classList;
     let resultSpecies, currentRow;
     const tableContext = row.closest('table').id;
@@ -2251,7 +2249,7 @@ async function renderResult(args) {
     result.timestamp = new Date(result.timestamp);
     result.position = new Date(result.position);
     // Datetime wrangling for Nocmig mode
-    if (result !== "No detections found.") {
+    if (result !== "No predictions.") {
         let astro = SunCalc.getTimes(result.timestamp, config.latitude, config.longitude);
         if (astro.dawn.setMilliseconds(0) < result.timestamp && astro.dusk.setMilliseconds(0) > result.timestamp) {
             result.dayNight = 'daytime';
@@ -2264,17 +2262,17 @@ async function renderResult(args) {
     if (index === 1) {
         showElement(['resultTableContainer'], false);
         if (!selection) {
-            //const tableRows = document.querySelectorAll('#results > tbody > tr');
             // Remove old results
             resultTable.empty();
             summaryTable.empty();
-            //if (!onScreen(tableRows[0])) scrollResults(tableRows[0]);
         } else {
-            resultTable.append('<tr><td class="bg-dark text-white text-center" colspan="20"><b>Selection Analysis</b></td></tr>')
+            resultTable.append('<tr><td class="bg-dark text-white text-center" colspan="-1"><b>Selection Analysis</b></td></tr>')
         }
     }
-    if (result === "No detections found.") {
-        tr += "<tr><td>" + result + "</td></tr>";
+    if (result === "No predictions.") {
+        const nocturnal = config.nocmig ? 'during the night' : '';
+
+        tr += `<tr><td>${result} (Predicting ${config.list} ${nocturnal} with at least ${config.minConfidence * 100}% confidence in the prediction)</td></tr>`;
     } else {
         if (config.nocmig && !region) {
             /*
@@ -2316,7 +2314,7 @@ async function renderResult(args) {
         result.date = result.timestamp;
         const timestamp = result.timestamp.toString().split(' ');
         const UI_timestamp = `${timestamp[2]} ${timestamp[1]} ${timestamp[3].substring(2)}<br/>${timestamp[4]}`;
-        result.filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp + '.mp3';
+        result.filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp + '.opus';
         let spliceStart;
         result.position < 3600000 ? spliceStart = 14 : spliceStart = 11;
         const UI_position = new Date(result.position).toISOString().substring(spliceStart, 19);
@@ -2402,8 +2400,10 @@ $(document).on('click', '.add-comment, .edit-comment', function (e) {
     $(document).off('mouseleave', '.comment');
     $(document).off('mouseenter', '.comment');
     document.removeEventListener('keydown', handleKeyDown, true);
-    this.parentNode.innerHTML = `<textarea class="h-100 rounded-3 comment-textarea" placeholder="Enter notes...">${note}</textarea>`;
+    const parent = this.parentNode;
+    parent.innerHTML = `<textarea class="h-100 rounded-3 comment-textarea" placeholder="Enter notes...">${note}</textarea>`;
     $('.comment-textarea').on('keydown', commentHandler);
+    parent.firstChild.focus();
 })
 
 function commentHandler(e) {
@@ -2548,7 +2548,7 @@ function sendFile(mode, result) {
     if (result) {
         start = result.start;
         end = result.end;
-        filename = result.filename
+        filename = result.filename;
     }
     if (!start && start !== 0) {
         if (!region.start) {
@@ -2692,8 +2692,10 @@ diagnosticMenu.addEventListener('click', function () {
         if (key === 'Audio Duration') {
             if (value < 3600) {
                 value = new Date(value * 1000).toISOString().substring(14, 19)
-            } else {
+            } else if (value < 86400) {
                 value = new Date(value * 1000).toISOString().substring(11, 19)
+            } else {
+                value = new Date(value * 1000).toISOString().substring(8, 19)
             }
         }
         diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
@@ -2815,22 +2817,12 @@ $(function () {
     })
 });
 
-// Check if element is on the screen
-function onScreen(el) {
-    const resultTable = document.getElementById('results');
-    const ViewTop = resultTable.scrollTop;
-    const ViewBottom = resultTableElement.height();
-    const elemTop = el.offsetTop;
-    const elemBottom = elemTop + el.offsetHeight;
-
-    return ((elemBottom <= ViewBottom) && (elemTop >= ViewTop));
-}
 
 document.addEventListener("DOMContentLoaded", function () {
     enableKeyDownEvent();
     addEvents('comment');
     addEvents('label');
-// make it as accordion for smaller screens
+// make menu an accordion for smaller screens
     if (window.innerWidth < 768) {
 
         // close all inner dropdowns when parent is closed
@@ -2850,7 +2842,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (nextEl && nextEl.classList.contains('submenu')) {
                     // prevent opening link if link needs to open dropdown
                     e.preventDefault();
-                    if (nextEl.style.display == 'block') {
+                    if (nextEl.style.display === 'block') {
                         nextEl.style.display = 'none';
                     } else {
                         nextEl.style.display = 'block';

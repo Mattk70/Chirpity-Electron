@@ -52,7 +52,7 @@ function createWindow() {
         height: 768,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
-            nodeIntegration: false,
+            nodeIntegration: true,
             contextIsolation: true,
             backgroundThrottling: false
         }
@@ -231,7 +231,7 @@ ipcMain.handle('dialog', (event, method, params) => {
     dialog[method](mainWindow, params);
 });
 
-ipcMain.handle('openFiles', async (event) => {
+ipcMain.handle('openFiles', async () => {
     // Show file dialog to select audio file
     const result = await dialog.showOpenDialog(mainWindow, {
         filters: [{

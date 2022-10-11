@@ -1,5 +1,5 @@
 const {ipcRenderer} = require('electron');
-let appPath = '../24000_v9/';
+let appPath = '../24000_B3/';
 const fs = require('fs');
 const wavefileReader = require('wavefile-reader');
 const lamejs = require("lamejstmp");
@@ -14,6 +14,8 @@ const ffmpeg = require('fluent-ffmpeg');
 const png = require('fast-png');
 const {writeFile, mkdir} = require('node:fs/promises');
 const {utimes} = require('utimes');
+const stream = require("stream");
+const {op} = require("@tensorflow/tfjs");
 const file_cache = 'chirpity';
 let TEMP;
 
@@ -314,7 +316,7 @@ const convertFileFormat = (file, destination, size, error) => {
             .audioFrequency(24000)
             .on('error', (err) => {
                 console.log('An error occurred: ' + err.message);
-                if (error) {
+                if (err) {
                     error(err.message);
                 }
             })
@@ -605,7 +607,8 @@ async function getPredictBuffers(args) {
 
     if (start > metadata[file].duration) {
         return
-    };
+    }
+    ;
     const byteStart = convertTimeToBytes(start, metadata[file]);
     const byteEnd = convertTimeToBytes(end, metadata[file]);
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
@@ -818,14 +821,11 @@ const onSpectrogram = async (filepath, file, width, height, data, channels) => {
     console.log('saved:', file_to_save);
 };
 
-//async function uploadMp3(buffer, defaultName, metadata, mode) {
-async function uploadOpus(file, start, defaultName, metadata) {
-    //const MP3Blob = await analyzeAudioBuffer(buffer, metadata);
+async function uploadOpus(file, start, defaultName, metadata, mode) {
     const MP3Blob = await bufferToOpus(file, start, metadata);
 // Populate a form with the file (blob) and filename
     const formData = new FormData();
     //const timestamp = Date.now()
-    //formData.append("thefile", MP3Blob, defaultName);
     formData.append("thefile", MP3Blob, defaultName);
     // Was the prediction a correct one?
     formData.append("Chirpity_assessment", mode);
@@ -842,7 +842,15 @@ async function uploadOpus(file, start, defaultName, metadata) {
 }
 
 const bufferToOpus = (file, start, metadata) => {
-    const tmp = p.join(TEMP,'tmp_opus.opus');
+    const bufferStream = new stream.PassThrough();
+    let optionList = [];
+    for (let [k,v] of Object.entries(metadata)) {
+        if (typeof v === 'string') {
+            v = v.replaceAll(' ', '_');
+        }
+        optionList.push('-metadata');
+        optionList.push(`${k}=${v}`);
+    };
     return new Promise(function (resolve) {
         const command = ffmpeg(file)
             .seekInput(start)
@@ -850,21 +858,27 @@ const bufferToOpus = (file, start, metadata) => {
             .audioChannels(1)
             .audioFrequency(24000)
             .audioCodec('libopus')
-            // .audioBitrate(128)
-            // .audioQuality(10)
+            .format('opus')
+            .outputOptions(optionList)
             .on('error', (err) => {
                 console.log('An error occurred: ' + err.message);
-                if (error) {
-                    error(err.message);
-                }
             })
-            .on('end', function (converted,error) {
-                const destination = new Blob(tmp.buffer, {type: 'audio/opus'})
-                resolve(destination)
+            .on('end', function () {
+                console.log('Formatting finished')
             })
+            .writeToStream(bufferStream);
 
-            const ffstream = command.pipe(fs.createWriteStream(tmp), {end:true})
-            //.save('/Users/matthew/Desktop/test.opus')
+        const buffers = [];
+        bufferStream.on('data', (buf) => {
+            buffers.push(buf);
+        })
+        bufferStream.on('end', function () {
+            const outputBuffer = Buffer.concat(buffers);
+            let audio = [];
+            audio.push(new Int8Array(outputBuffer))
+            const blob = new Blob(audio, {type: 'audio/ogg'});
+            resolve(blob);
+        });
     })
 }
 
@@ -1014,11 +1028,12 @@ async function saveMP3(file, start, end, filename, metadata) {
 }
 
 async function postMP3(args) {
-    const file = args.file, defaultName = args.defaultName, start = args.start, end = args.end,
-        metadata = args.metadata, mode = args.mode;
-    const buffer = await fetchAudioBuffer({file: file, start: start, end: end});
+    const file = args.file, defaultName = args.defaultName, start = args.start, end = args.end;
+    const metadata = args.metadata ? args.metadata : {test: 'test'};
+    const mode = args.mode;
+    //const buffer = await fetchAudioBuffer({file: file, start: start, end: end});
     //await uploadMp3(buffer, defaultName, metadata, mode);
-    await uploadOpus(file, start, defaultName, metadata)
+    await uploadOpus(file, start, defaultName, metadata, mode)
 }
 
 /// Workers  From the MDN example
@@ -1059,7 +1074,7 @@ const parsePredictions = (response) => {
             console.log(`Prediction done ${FILE_QUEUE.length} files to go`);
             console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
             if (RESULTS.length === 0) {
-                const result = "No detections found.";
+                const result = "No predictions.";
                 UI.postMessage({
                     event: 'prediction-ongoing',
                     file: file,

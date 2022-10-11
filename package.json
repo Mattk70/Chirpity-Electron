@@ -99,7 +99,7 @@
   },
   "homepage": "https://github.com/mattk70/Chirpity-Electron#readme",
   "devDependencies": {
-    "electron": "^18.0.3",
+    "electron": "^21.1.0",
     "electron-packager": "^16.0.0",
     "electron-wix-msi": "^3.2.0"
   },
