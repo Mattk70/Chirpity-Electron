@@ -349,7 +349,7 @@ const convertFileFormat = (file, destination, size, error) => {
                 resolve(destination)
                 //}
             })
-            .save(destination)
+            .save(destination);
     });
 }
 
@@ -371,14 +371,16 @@ async function getWorkingFile(file) {
     let proxy = file;
 
     if (!source_file.endsWith('.wav')) {
-        const workingFileName = source_file.replace(/.*\/(.*)\..*/, "$1.wav");
-        const destination = p.join(TEMP, file_cache, workingFileName);
+        const pc = p.parse(source_file);
+        const filename = pc.base.replace(pc.ext, '.wav');
+        const destination = p.join(TEMP, file_cache, filename);
         if (fs.existsSync(destination)) {
             proxy = destination;
         } else {
             // get some metadata from the source file
             const statsObj = fs.statSync(source_file);
             const sourceMtime = statsObj.mtime;
+
             //console.log(Date.UTC(sourceMtime));
 
             proxy = await convertFileFormat(source_file, destination, statsObj.size,

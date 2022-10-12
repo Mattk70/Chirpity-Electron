@@ -5,7 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "export": "electron-builder build -w -l -m --x64"
+    "export": "electron-builder build -w  --x64"
   },
   "repository": {
     "type": "git",
@@ -16,11 +16,9 @@
       "**/*",
       "!test*${/*}",
       "!dist${/*}",
-      "!24000*${/*}",
-      "24000_v9/*",
-      "24000_B3/*",
-      "!tfjs*${/*}",
-      "!.gitignore",
+      "!24000_v9${/*}",
+      "!*git*${/*}",
+      "!package-lock.json",
       "!.idea",
       "node_modules/ffmpeg-static-electron/bin/${os}/${arch}/ffmpeg",
       "node_modules/ffmpeg-static-electron/index.js",
@@ -117,6 +115,7 @@
       "icon": "./packages/img/icon/icon.icns"
     },
     "win": {
+      "asar": true,
       "icon": "./img/icon/icon.png",
       "files": [
         "node_modules/ffmpeg-static-electron/bin/win/${arch}/ffmpeg",
