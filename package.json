@@ -5,65 +5,83 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "export": "electron-packager . --platform=all --arch=x64 --prune --out packages --overwrite --icon=/Users/matthew/PycharmProjects/Chirpity-Electron/img/icon/icon"
+    "export": "electron-builder build -w -l -m --x64"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mattk70/Chirpity-Electron.git"
   },
   "build": {
+    "files": [
+      "**/*",
+      "!test*${/*}",
+      "!dist${/*}",
+      "!24000*${/*}",
+      "24000_v9/*",
+      "24000_B3/*",
+      "!tfjs*${/*}",
+      "!.gitignore",
+      "!.idea",
+      "node_modules/ffmpeg-static-electron/bin/${os}/${arch}/ffmpeg",
+      "node_modules/ffmpeg-static-electron/index.js",
+      "node_modules/ffmpeg-static-electron/package.json",
+      "node_modules/ffprobe-static-electron/bin/${os}/${arch}/ffmpeg",
+      "node_modules/ffprobe-static-electron/index.js",
+      "node_modules/ffprobe-static-electron/package.json"
+    ],
     "fileAssociations": [
       {
         "ext": "mp3",
         "name": "MP3 File",
-        "role": "Editor",
-        "perMachine": true
+        "role": "Editor"
       },
       {
         "ext": "wav",
         "name": "WAVE File",
-        "role": "Editor",
-        "perMachine": true
+        "role": "Editor"
       },
       {
         "ext": "ogg",
         "name": "WAVE File",
-        "role": "Editor",
-        "perMachine": true
+        "role": "Editor"
       },
       {
         "ext": "mpga",
         "name": "MPEG Audio File",
-        "role": "Editor",
-        "perMachine": true
+        "role": "Editor"
       },
       {
         "ext": "aac",
         "name": "AAC File",
-        "role": "Editor",
-        "perMachine": true
+        "role": "Editor"
       },
       {
         "ext": "mpa",
         "name": "MPA File",
-        "role": "Editor",
-        "perMachine": true
+        "role": "Editor"
       },
       {
         "ext": "flac",
         "name": "FLAC File",
-        "role": "Editor",
-        "perMachine": true
+        "role": "Editor"
       },
       {
         "ext": "mp4",
         "name": "MPEG4 File",
-        "role": "Editor",
-        "perMachine": true
+        "role": "Editor"
       }
     ],
     "mac": {
-      "icon": "./packages/img/icon/icon.icns",
+      "target": [
+        "pkg"
+      ],
+      "files": [
+        "!node_modules/ffmpeg-static-electron/bin/win${/*}",
+        "!node_modules/ffmpeg-static-electron/bin/linux${/*}",
+        "!node_modules/ffprobe-static-electron/bin/win${/*}",
+        "!node_modules/ffprobe-static-electron/bin/linux${/*}"
+      ],
+      "icon": "./img/icon/icon.icns",
       "category": "public.app-category.utilities",
       "fileAssociations": [
         {
@@ -81,6 +99,34 @@
           "description": "Audio files",
           "role": "Viewer"
         }
+      ]
+    },
+    "linux": {
+      "icon": "./img/icon/icon.png",
+      "target": [
+        "AppImage"
+      ],
+      "files": [
+        "!node_modules/ffmpeg-static-electron/bin/linux/ia32${/*}",
+        "!node_modules/ffmpeg-static-electron/bin/win${/*}",
+        "!node_modules/ffmpeg-static-electron/bin/mac${/*}",
+        "!node_modules/ffprobe-static-electron/bin/linux/ia32${/*}",
+        "!node_modules/ffprobe-static-electron/bin/win${/*}",
+        "!node_modules/ffprobe-static-electron/bin/mac${/*}"
+      ],
+      "icon": "./packages/img/icon/icon.icns"
+    },
+    "win": {
+      "icon": "./img/icon/icon.png",
+      "files": [
+        "node_modules/ffmpeg-static-electron/bin/win/${arch}/ffmpeg",
+        "!node_modules/ffmpeg-static-electron/bin/win/ia32${/*}",
+        "!node_modules/ffmpeg-static-electron/bin/linux${/*}",
+        "!node_modules/ffmpeg-static-electron/bin/mac${/*}",
+        "node_modules/ffprobe-static-electron/bin/win/${arch}/ffprobe",
+        "!node_modules/ffprobe-static-electron/bin/win/ia32${/*}",
+        "!node_modules/ffprobe-static-electron/bin/linux${/*}",
+        "!node_modules/ffprobe-static-electron/bin/mac${/*}"
       ]
     }
   },
@@ -100,8 +146,8 @@
   "homepage": "https://github.com/mattk70/Chirpity-Electron#readme",
   "devDependencies": {
     "electron": "^21.1.0",
-    "electron-packager": "^16.0.0",
-    "electron-wix-msi": "^3.2.0"
+    "electron-builder": "^23.6.0",
+    "electron-wix-msi": "^4.0.0"
   },
   "dependencies": {
     "@tensorflow/tfjs": "3.18.0",
@@ -113,13 +159,14 @@
     "@popperjs/core": "^2.9.2",
     "seedrandom": "^3.0.5",
     "suncalc2": "^1.8.1",
-    "systeminformation": "^5.11.9",
+    "systeminformation": "^5.12.6",
     "uuid": "^8.3.2",
     "wavesurfer.js": "^6.2.0",
     "wavefile-reader": "^1.1.1",
     "sqlite3": "^5.0.8",
     "fluent-ffmpeg": "^2.1.2",
-    "utimes": "^5.1.1",
-    "fast-png": "^6.1.0"
+    "utimes": "5.1.0",
+    "fast-png": "^6.1.0",
+    "ffmpeg-static-electron": "^2.0.3"
   }
 }
