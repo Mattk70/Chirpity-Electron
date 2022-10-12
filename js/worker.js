@@ -19,6 +19,11 @@ const {op} = require("@tensorflow/tfjs");
 const file_cache = 'chirpity';
 let TEMP;
 
+const staticFfmpeg = require('ffmpeg-static-electron');
+console.log(staticFfmpeg.path);
+ffmpeg.setFfmpegPath(staticFfmpeg.path);
+
+
 let predictionsRequested = 0, predictionsReceived = 0;
 
 let db, nocmig, latitude, longitude;
@@ -209,7 +214,7 @@ ipcRenderer.on('new-client', (event) => {
                 await saveMP3(args.file, args.start, args.end, args.filename, args.metadata);
                 break;
             case 'post':
-                await postMP3(args)
+                await postOpus(args)
                 break;
             case 'save2db':
                 onSave2DB();
@@ -608,7 +613,6 @@ async function getPredictBuffers(args) {
     if (start > metadata[file].duration) {
         return
     }
-    ;
     const byteStart = convertTimeToBytes(start, metadata[file]);
     const byteEnd = convertTimeToBytes(end, metadata[file]);
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
@@ -822,11 +826,11 @@ const onSpectrogram = async (filepath, file, width, height, data, channels) => {
 };
 
 async function uploadOpus(file, start, defaultName, metadata, mode) {
-    const MP3Blob = await bufferToOpus(file, start, metadata);
+    const Blob = await bufferToAudio(file, start, metadata);
 // Populate a form with the file (blob) and filename
     const formData = new FormData();
     //const timestamp = Date.now()
-    formData.append("thefile", MP3Blob, defaultName);
+    formData.append("thefile", Blob, defaultName);
     // Was the prediction a correct one?
     formData.append("Chirpity_assessment", mode);
 // post form data
@@ -841,16 +845,18 @@ async function uploadOpus(file, start, defaultName, metadata, mode) {
     xhr.send(formData);
 }
 
-const bufferToOpus = (file, start, metadata) => {
+const bufferToAudio = (file, start, metadata) => {
+
     const bufferStream = new stream.PassThrough();
     let optionList = [];
-    for (let [k,v] of Object.entries(metadata)) {
+    for (let [k, v] of Object.entries(metadata)) {
         if (typeof v === 'string') {
             v = v.replaceAll(' ', '_');
         }
         optionList.push('-metadata');
         optionList.push(`${k}=${v}`);
-    };
+    }
+    ;
     return new Promise(function (resolve) {
         const command = ffmpeg(file)
             .seekInput(start)
@@ -1027,7 +1033,7 @@ async function saveMP3(file, start, end, filename, metadata) {
     downloadMp3(buffer, filename, metadata)
 }
 
-async function postMP3(args) {
+async function postOpus(args) {
     const file = args.file, defaultName = args.defaultName, start = args.start, end = args.end;
     const metadata = args.metadata ? args.metadata : {test: 'test'};
     const mode = args.mode;
@@ -1132,6 +1138,16 @@ async function processNextFile(args) {
             let [start, end] = args && args.start ? [args.start, args.end] : await setStartEnd(file);
             if (start === 0 && end === 0) {
                 // Nothing to do for this file
+                const result = "No predictions.";
+                if (!FILE_QUEUE.length) {
+                    UI.postMessage({
+                        event: 'prediction-ongoing',
+                        file: file,
+                        result: result,
+                        index: 1,
+                        selection: false,
+                    });
+                }
                 UI.postMessage({
                     event: 'prediction-done',
                     file: file,
