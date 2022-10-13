@@ -253,7 +253,6 @@ ipcMain.handle('saveFile', (event, arg) => {
         //console.log(file.canceled);
         if (!file.canceled) {
             const AUDACITY_LABELS = arg.labels;
-            console.log(file.filePath.toString());
             let str = ""
             // Format results
             for (let i = 0; i < AUDACITY_LABELS.length; i++) {
