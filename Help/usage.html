@@ -7,48 +7,24 @@
 <body>
 <h4 class="text-center bg-dark text-white p-3">Suggested Workflow</h4>
 <ol>
-    <li>Open an audio file. There are a two ways to do this:
-        <ul>
-            <li>From Windows Explorer, select an audio file and right-click with your mouse to <b>"Open with" &gt;
+    <li>Open an audio file or files. There are a three ways to do this:
+        <ol>
+            <li>From Windows Explorer, select your audio file(s) and right-click with your mouse to <b>"Open with" &gt;
                 Chirpity Nocmig</b>
             </li>
-            <li>In the Application, select <b>File > Open Audio File</b> or press <b>Ctrl-O</b></li>
-        </ul>
-        Ideally, this will be the file that was recorded by your digital recorder with its original
-        timestamp. By using this file, you will be able to take advantage of the <b>Options &gt; Spectrogram &gt;
-            Timeline &gt; Time of Day</b> mode for the spectrogram timeline, which will show the actual time calls were
-        detected.
-        <br/><b>N.B.</b>
-        <ol type="A">
-            <li>The maximum duration of an audio file Chirpity can process is dependent on the audio sample rate. The
-                following limits apply:
-                <table class="table table-hover border w-75" style="max-width: 500px">
-                    <thead class="thead-light">
-                    <tr>
-                        <th scope="col">Sample Rate</th>
-                        <th scope="col">Maximum Duration</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr>
-                        <td>48000Hz:</td>
-                        <td>3 hours 6 minutes 20 seconds</td>
-                    </tr>
-                    <tr>
-                        <td>44100Hz:</td>
-                        <td>3 hours 22 minutes 49 seconds</td>
-                    </tr>
-                    <tr>
-                        <td>24000Hz:</td>
-                        <td>6 hours 12 minutes 40 seconds</td>
-                    </tr>
-                    </tbody>
-                </table>
-            </li>
-            <li>It is possible to cancel a file load operation by pressing the <b>Esc</b> key.</li>
+            <li>In the Application, select <b>File > Open Audio File</b> or press <b>Ctrl-O</b> and select files to open</li>
+            <li>Drag a file or files into the application.</li>
         </ol>
+        Ideally, files will be those recorded by your digital recorder with their original
+        timestamp. In this scenario, you will be able to take advantage of the <b>Options &gt; Spectrogram &gt;
+            Timeline &gt; Time of Day</b> mode for the spectrogram timeline, which will show the actual time calls were
+        detected. If not, you can still display (and store) the correct time of day for the file and detections if you edit its start time.
+        This can be edited by selecting the appropriate date and time on the
+        <span class="material-icons-two-tone align-bottom">edit_calendar</span>
+                    icon next to the file name on the transport controls panel.
+
     </li>
-    <li><b>Nocmig mode.</b> Once the file is loaded, the spectrogram will appear, along with transport controls for
+    <li>Choose whether to use <b>Nocmig mode.</b> Once the file is loaded, the spectrogram will appear, along with transport controls for
         navigating the audio. A <i>nocmig mode</i> button (<span
                 class="material-icons-two-tone align-bottom">dark_mode</span>) will also appear on the
         right hand side. Nocmig mode takes its
@@ -80,26 +56,18 @@
         Nocmig recordings uploaded by others.
     </li>
     <li>
-        If multiple detections apply, a <span class='material-icons-two-tone'>sync</span> icon will be displayed in the
-        Other IDs table column. Clicking this will open rows beneath with the details of those species. If a detection
-        with a higher priority was suppressed, this icon will have an exclamation mark within it, like so: <span
-            class='material-icons-two-tone'>sync_problem</span>
+        If multiple detections apply for a given time period, a <span class='material-icons-two-tone'>sync</span> icon will be displayed in the
+        Other IDs table column. Clicking this will open rows beneath with the details of those species.
     </li>
 </ol>
 <h5 class="pt-2">Summary and Filtering Detections</h5>
 <ol start="7">
     <li>
-        <button type="button" class="btn btn-primary btn-sm" data-toggle="modal">
-            Show Summary
-        </button>
-        appears once the model has completed its analysis. Clicking the button will open a summary table of the
-        detections across the file. Importantly, this table allows you to filter the results displayed in the main
-        results
-        table. Click the filter icon ( <span class="material-icons-two-tone align-bottom">filter_alt</span> ) to limit
-        the display to that single species, or the ( <span
-            class="material-icons-two-tone align-bottom">filter_alt_off</span> ) icon
-        to hide a species from the result table. This is <i>extremely</i> useful if several hundred Robin calls were
-        detected! <b>N.B.</b> Hiding and excluding species are not the same thing! See below...
+        A summary table appears to the left of the results once the model has completed its analysis. Importantly, this
+        table allows you to filter the results displayed in the main results
+        table. Click the species name in the summary to limit
+        the display to that single species. This is <i>extremely</i> useful if several hundred Robin calls were
+        detected!
     </li>
 </ol>
 <h5 class="pt-2">Custom "Deep Dive" Detections</h5>
@@ -116,80 +84,46 @@
 
 <h5 class="pt-2">Amending Results</h5>
 <ol start="10">
-    <li>It is possible to exclude results from what will be saved by selecting the exclude icon <span
+    <li class="strikethrough">It is possible to exclude results from what will be saved by selecting the exclude icon <span
             class="material-icons-two-tone align-bottom">clear</span> . This can be selected on a per-detection basis in
         the results table, or a per-species basis in the summary.
     </li>
+
 </ol>
 
 <h5 class="pt-2">Saving Results</h5>
-<ol start="9">
+<ol start="10">
     <li>There are several ways to save results:
         <ol>
-            <li>A CHIRP file is saved automatically each time an analysis is completed. This file can be used to <a
-                    href="#reload">reload the results of the analysis</A>.
-            </li>
-            <li>Save the detections as a CSV file. Press <b>Ctrl-S</b> or select <b>File > Save
-                Detections</b> from the menu. A file named "Chirpity - detections.csv" will be created in the folder
-                contining the current audio file. If you attempt to save and this file exists, it will offer to append
-                the new results to the existing file. If you don't want to do that, it will save a file with the
-                following name format "Chirpity - detections (1).csv", incrementing the number as necessary.
-            </li>
+
+            <li>Once the analysis is complete, and after you have made any amendments, you can save the results to a database.
+            After this, any time you re-analyse a file, it will bring in the results from the database records. You can also explore and chart saved records.
+
             <li>Save the detections as a label file in Audacity format. Press <b>Ctrl-A</b> or select <b>File > Save
                 Audacity Labels</b> from the menu. By default, the label file will have the same name as the audio file,
                 with a ".txt" extension.
             </li>
             <li>
                 Save a 3-second audio clip of a detection (in MP3 format). To do this, click the <span
-                    class='material-icons-outlined align-bottom'>
-            file_download</span> icon in the result table. By default, the filename will contain the species and
-                timestamp of the detection identifying its position in the original audio file.
+                    class='material-icons-two-tone align-bottom'>file_download</span> icon in the result table. By default, the filename will contain the species and
+                timestamp of the detection identifying its position in the original audio file. These files are saved in the Opus format.
             </li>
             <li>
-                Save a custom MP3 clip. Select a region of the spectrogram by dragging the mouse over the area of audio
-                you
-                want
-                to save.
-                From the File menu, select <b>Export Selected Audio</b> to bring up a file save dialog.
+                Save a custom clip. Select a region of the spectrogram by dragging the mouse over the area of audio
+                you want to save. From the File menu, select <b>Export Selected Audio</b> to bring up a file save dialog.
             </li>
         </ol>
     </li>
 </ol>
 <h5 class="pt-2">Feedback</h5>
-<ol start="11">
-    <li>
-        <p>Machine Learning requires vast amounts of data. Adequate results can be obtained from a few hundred examples
-            of a
-            call, but for robust and reliable results several thousand examples are needed. Those examples need to be
-            representative of the
-            range of vocalisations a bird can make, under a wide range of conditions.
-            Providing feedback is the best way to help improve the quality of detections and takes as few as two clicks
-            of a
-            mouse.</p>
-        <ul>
-            <li>
-                If you think a detection is correct, click the <span
-                    class='material-icons-two-tone text-success align-bottom'>
-             thumb_up_alt</span> icon and confirm to submit the feedback.
-            </li>
-            <li>
-                If you think the prediction is incorrect, click the <span
-                    class='material-icons-two-tone text-danger align-bottom'>
-             thumb_down_alt</span> icon. This will bring up a prompt inviting you to say what you think the prediction
-                should have been. The list can be filtered by entering the first few letters of the species in the box.
-                Selecting the species will check the ID, and hitting send will submit the feedback.
-            </li>
-            <li>In either case, hitting <b>Esc</b> will cancel the submission.</li>
-        </ul>
-    </li>
-</ol>
+
 <h5 id="reload" class="pt-2">Restoring Results</h5>
-When you run an analysis in Chirpity Nocmig, a CHIRP file is created matching the name of the source audio file. This
-will be saved in the same directory as the source file, and have the same name - but with a CHIRP extension. If you
-select this file and <b>"Open with" &gt; Chirpity Nocmig</b> It will load the source file (so long as it is still in the
-same directory) and pull in the results of the analysis. <b>N.B.</b> If the original file is missing because it has
-since been compressed to one of the supported formats ('.mp3', '.wav', '.mpga', '.ogg', '.flac', '.aac'), so long as it
-retains the same name, but with a new extension, Chirpity will find and load that file instead and, rather tha take its
-cue from this file's creation time, use the original one.
+<p>When you save your detections in Chirpity Nocmig, a database is updated with the details of the detections. If you
+reload your file at a later date, and select analyse file, the saved results are restored. <b>N.B.</b> If the original file is missing because it has
+since been compressed to one of the supported formats ('.mp3', '.wav', '.mpga', '.ogg', '.opus', '.flac', '.aac'), so long as it
+retains the same name, but with a new extension, Chirpity will find and load that file instead and, rather than take its
+cue from this file's creation time, use the original one.</p>
+<p>From the records menu, you can also browse saved detections by species, and within a date range of your choosing.
+    Furthermore, you can generate charts of the species detected over time.</p>
 </body>
 </html>

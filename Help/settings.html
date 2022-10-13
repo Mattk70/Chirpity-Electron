@@ -8,16 +8,27 @@
 
 <table class="table table-hover p-1">
     <tr>
-        <td colspan="2" class="text-center bg-dark text-white"><h5>Model settings</h5></td>
+        <td colspan="2" class="text-center bg-dark text-white"><h5>Predictions</h5></td>
     </tr>
     <tr>
-        <td><b>Use whitelist</b></td>
-        <td>Enabled by default. This option limits the species detections shown to those recorded at UK Nocmig sites
-            submitting data to Trektellen.
-            <p>If disabled, the full list of potential detections is used. This includes
-                UK vagrants as well as those birds not known to call or fly at night. Non-bird detections will also
-                appear. </p>
-            This full list comprises 306 bird species and the following non-bird classes:
+        <th>Set Threshold</th>
+        <td>Sets the confidence above which the model will report a detection. Higher values will reduce false
+            positives, at the expense of missing genuine calls.
+        </td>
+    </tr>
+    <tr>
+        <th>Model</th>
+        <td><ul>
+                <li><b>DenseNet:</b> Original model.</li>
+                <li><b>Efficient:</b> New model. Faster, less memory intensive and more sensitive. More prone to false IDs when there is a lot of background noise.</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <th>Search for</th>
+        <td><p><b>Migrants and Owls</b>. Just report detections relating to these species.</p>
+            <p><b>All birds</b>. Include Local birds, including those not known to call at night.</p>
+            <p><b>Everything</b>. This full list comprises 305 bird species and the following non-bird classes:</p>
             <ul>
                 <li><b>Ambient noise:</b> wind, rain, pops and bangs. Things that go bump in the night...</li>
                 <li><b>Animals:</b> cats, dogs, bats, etc.</li>
@@ -26,35 +37,32 @@
                     (including domestic burglar alarms) and horns.
                 </li>
             </ul>
-            <p>If you wish to see the full list of species Chirpity <i>Nocmig</i> was trained on, it is contained in the
-                feedback prompt offered when giving feedback on an incorrect prediction.</p>
-            Disabling the whitelist is <em>not</em> recommended for general use. It will lead to an increase in false
-            positive detections, and clutter the results table with irrelevant detections.
+            <p>If you wish to see the full list of species Chirpity <i>Nocmig</i> was trained on, just explore the list
+                offered when correcting a prediction.</p>
         </td>
     </tr>
     <tr>
-        <td colspan="2" class="text-center bg-dark text-white"><h5>Spectrogram settings</h5></td>
-    </tr>
-    <tr>
-        <td><b>Enable</b></td>
-        <td>Whether to display the Spectrogram view. Will reduce the computer RAM required for larger files, at the cost
-            of significantly reduced functionality. However, results will be displayed and a label file may be exported
-            for use in Audacity.
+        <th>Batch Size</th>
+        <td>Sets the number of predictions to pass to the model each time. A higher number will make predictions up to
+            3x faster on long files.
+            If set too high for your machine, the Chirpity model will crash as it runs out of memory. In that event, set
+            a lower value, close and restart Chirpity.
         </td>
     </tr>
     <tr>
-        <td><b>Timeline</b></td>
-        <td>Whether to display a timeline above the spectrogram. The timeline has two modes.
-            <ul>
-                <li>
-                    <b>Time Elapsed</b> displays the time from the beginning of the file.
-                </li>
-                <li>
-                    <b>Time of Day</b> uses the file timestamp to
-                    calculate the actual time of the calls detected. If a file does not have a timestamp reflecting the
-                    time of the recording, this will give a spurious reading.
-                </li>
-            </ul>
+        <th>Warm Up</th>
+        <td>Because of the way the model works, the first prediction it is asked to do after Chirpity is opened will
+            take much longer to process.
+            When "Warm up" is checked, the model is passed a dummy prediction as soon as it is loaded. This happens in
+            the background.
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center bg-dark text-white"><h5>Spectrogram</h5></td>
+    </tr>
+    <tr>
+        <th>Enable</th>
+        <td>Whether to display the Spectrogram view.
         </td>
     </tr>
     <tr>
@@ -64,6 +72,25 @@
     <tr>
         <td><b>Grayscale</b></td>
         <td>Displays the spectrogram in black and white.</td>
+    </tr>
+    <tr>
+        <th>Timeline</th>
+        <td>Whether to display a timeline above the spectrogram. The timeline has two modes.
+            <ul>
+                <li>
+                    <b>Time Elapsed</b> displays the time from the beginning of the file.
+                </li>
+                <li>
+                    <b>Time of Day</b> uses the file timestamp to
+                    calculate the actual time of the calls detected. If a file does not have a timestamp reflecting the
+                    time of the recording, this will give a spurious reading. The start time of the current file can be
+                    edited
+                    by selecting the appropriate date and time on the <span
+                        class="material-icons-two-tone align-bottom">edit_calendar</span>
+                    icon next to the file name on the transport controls panel.
+                </li>
+            </ul>
+        </td>
     </tr>
 </table>
 
