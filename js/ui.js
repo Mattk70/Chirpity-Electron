@@ -1013,9 +1013,10 @@ window.onload = async () => {
             // If file read error, use defaults, set new UUID
             config.UUID = uuidv4();
             updatePrefs();
-            return
+        } else {
+            config = JSON.parse(data);
         }
-        config = JSON.parse(data)
+
 
         // Check for keys - in case updates have added new ones
         if (!('UUID' in config)) {
@@ -1702,11 +1703,13 @@ for (let i = 0; i < modelToUse.length; i++) {
         config.model = e.target.value;
         updatePrefs();
         diagnostics['Model'] = config.model;
-        worker.postMessage({action: 'load-model',
+        worker.postMessage({
+            action: 'load-model',
             model: config.model,
             list: config.list,
             batchSize: config.batchSize,
-            warmup: config.warmup})
+            warmup: config.warmup
+        })
     })
 }
 
