@@ -267,7 +267,6 @@ const onAnalyze = async (args) => {
                 index: index,
                 selection: false,
             });
-            AUDACITY.push(audacity);
             RESULTS.push(result);
         })
         console.log(`Pulling results for ${args.filePath} from database`);
