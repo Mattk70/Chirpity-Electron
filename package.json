@@ -160,11 +160,11 @@
     "suncalc2": "^1.8.1",
     "systeminformation": "^5.12.6",
     "uuid": "^8.3.2",
-    "wavesurfer.js": "^6.2.0",
+    "wavesurfer.js": "^6.3.0",
     "wavefile-reader": "^1.1.1",
     "sqlite3": "^5.0.8",
     "fluent-ffmpeg": "^2.1.2",
-    "utimes": "5.1.0",
+    "utimes": "5.1.1",
     "fast-png": "^6.1.0",
     "ffmpeg-static-electron": "^2.0.3"
   }
