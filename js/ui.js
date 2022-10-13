@@ -988,6 +988,7 @@ window.onload = async () => {
         minConfidence: 0.45,
         timeOfDay: false,
         list: 'migrants',
+        model: 'efficientnet',
         latitude: 51.9,
         longitude: -0.4,
         nocmig: false,
@@ -1034,6 +1035,9 @@ window.onload = async () => {
         if (!('list' in config)) {
             config.list = 'migrants';
         }
+        if (!('model' in config)) {
+            config.model = 'efficientnet';
+        }
         if (!('warmup' in config)) {
             config.warmup = false;
         }
@@ -1044,6 +1048,10 @@ window.onload = async () => {
         // Set UI option state
         const batchSizeElement = document.getElementById(config.batchSize);
         batchSizeElement.checked = true;
+
+        const modelToUse = document.getElementById(config.model);
+        modelToUse.checked = true;
+
         warmup.checked = config.warmup;
         // Show time of day in results?
         const timestamp = document.querySelectorAll('.timestamp');
@@ -1084,6 +1092,7 @@ window.onload = async () => {
         showElement([config.colormap + 'span'], true)
         worker.postMessage({
             action: 'load-model',
+            model: config.model,
             list: config.list,
             batchSize: config.batchSize,
             warmup: config.warmup
@@ -1685,6 +1694,19 @@ for (let i = 0; i < listToUse.length; i++) {
     })
 }
 
+const modelToUse = document.getElementsByName('model');
+for (let i = 0; i < modelToUse.length; i++) {
+    modelToUse[i].addEventListener('click', function (e) {
+        config.model = e.target.value;
+        updatePrefs();
+        worker.postMessage({action: 'load-model',
+            model: config.model,
+            list: config.list,
+            batchSize: config.batchSize,
+            warmup: config.warmup})
+    })
+}
+
 const warmup = document.getElementById('setWarmup');
 warmup.addEventListener('click', () => {
     config.warmup = warmup.checked;
@@ -1768,7 +1790,6 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     },
     KeyA: function (e) {
         if (AUDACITY_LABELS.length) {
-            _
             if (e.ctrlKey) showSaveDialog();
         }
     },
@@ -1776,7 +1797,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         if (PREDICTING) {
             console.log('Operation aborted');
             PREDICTING = false;
-            worker.postMessage({action: 'abort', warmup: config.warmup, list: config.list});
+            worker.postMessage({action: 'abort', model: config.model, warmup: config.warmup, list: config.list});
             alert('Operation cancelled');
         }
     },
@@ -2736,6 +2757,7 @@ for (let i = 0; i < batchRadios.length; i++) {
         config.batchSize = e.target.value;
         worker.postMessage({
             action: 'load-model',
+            model: config.model,
             list: config.list,
             batchSize: config.batchSize,
             warmup: config.warmup

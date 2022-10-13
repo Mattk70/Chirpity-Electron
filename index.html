@@ -107,12 +107,30 @@
                                         <a href="#" class="dropdown-item" data-bs-toggle="dropdown"
                                            role="button"
                                            aria-haspopup="true" aria-expanded="false"> <span
-                                                class="nav-label">Search For...</span></a>
+                                                class="nav-label">Model &raquo;</span></a>
+                                        <ul class="submenu dropdown-menu ps-1">
+                                            <li class="form-check">
+                                                <input type="radio" class="form-check-input" id="densenet"
+                                                       name="model" value="densenet">
+                                                <label class="form-check-label" for="densenet">DenseNet</label>
+                                            </li>
+                                            <li class="form-check">
+                                                <input type="radio" class="form-check-input" id="efficientnet" name="model"
+                                                       value="efficientnet">
+                                                <label class="form-check-label" for="efficientnet">EfficientNet</label>
+                                            </li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        <a href="#" class="dropdown-item" data-bs-toggle="dropdown"
+                                           role="button"
+                                           aria-haspopup="true" aria-expanded="false"> <span
+                                                class="nav-label">Search For &raquo;</span></a>
                                         <ul class="submenu dropdown-menu ps-1">
                                             <li class="form-check">
                                                 <input type="radio" class="form-check-input" id="migrants"
                                                        name="list" value="migrants" checked>
-                                                <label class="form-check-label" for="migrants">Migrants</label>
+                                                <label class="form-check-label" for="migrants">Migrants and Owls</label>
                                             </li>
                                             <li class="form-check">
                                                 <input type="radio" class="form-check-input" id="birds" name="list"
@@ -416,7 +434,7 @@
                 <span title="Toggle Fullscreen mode" id="fullscreen"
                       class="material-icons-two-tone btn btn-outline-secondary p-1 pointer float-end">fullscreen</span>
                 <span title="Toggle Nocmig mode&#10;(Only analyse detections at night)" id="nocmigMode"
-                                  class="material-icons-two-tone btn btn-outline-secondary p-1 pointer float-end">bedtime</span>
+                      class="material-icons-two-tone btn btn-outline-secondary p-1 pointer float-end">bedtime</span>
             </div>
         </div>
     </div>

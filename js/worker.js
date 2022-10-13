@@ -152,7 +152,7 @@ ipcRenderer.on('new-client', (event) => {
                 UI.postMessage({event: 'spawning'});
                 BATCH_SIZE = parseInt(args.batchSize);
                 if (predictWorker) predictWorker.terminate();
-                spawnWorker(args.list, BATCH_SIZE, args.warmup);
+                spawnWorker(args.model, args.list, BATCH_SIZE, args.warmup);
                 break;
             case 'update-model':
                 predictWorker.postMessage({message: 'list', list: args.list})
@@ -267,7 +267,7 @@ const onAnalyze = async (args) => {
                 index: index,
                 selection: false,
             });
-            //AUDACITY.push(audacity);
+            AUDACITY.push(audacity);
             RESULTS.push(result);
         })
         console.log(`Pulling results for ${args.filePath} from database`);
@@ -294,7 +294,7 @@ function onAbort(args) {
         //restart the worker
         UI.postMessage({event: 'spawning'});
         predictWorker.terminate()
-        spawnWorker(args.list, BATCH_SIZE, args.warmup)
+        spawnWorker(args.model, args.list, BATCH_SIZE, args.warmup)
         predicting = false;
         predictionDone = true;
     }
@@ -1045,10 +1045,11 @@ async function postOpus(args) {
 }
 
 /// Workers  From the MDN example
-function spawnWorker(list, batchSize, warmup) {
+function spawnWorker(model, list, batchSize, warmup) {
     console.log(`spawning worker with ${list}, ${batchSize}, ${warmup}`)
     predictWorker = new Worker('./js/model.js');
-    predictWorker.postMessage(['load', appPath, list, batchSize, warmup])
+    const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
+    predictWorker.postMessage(['load', modelPath, list, batchSize, warmup])
     predictWorker.onmessage = (e) => {
         parseMessage(e)
     }
