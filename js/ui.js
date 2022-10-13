@@ -118,6 +118,7 @@ const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampl
 // "Analysis Duration": time on detections (seconds)
 // "Audio Duration": length of audio (seconds)
 // "Chirpity Version": app version
+// "Model": model in use
 // "Tensorflow Backend"
 // Analysis Rate: x real time performance
 
@@ -1051,6 +1052,7 @@ window.onload = async () => {
 
         const modelToUse = document.getElementById(config.model);
         modelToUse.checked = true;
+        diagnostics['Model'] = config.model;
 
         warmup.checked = config.warmup;
         // Show time of day in results?
@@ -1699,6 +1701,7 @@ for (let i = 0; i < modelToUse.length; i++) {
     modelToUse[i].addEventListener('click', function (e) {
         config.model = e.target.value;
         updatePrefs();
+        diagnostics['Model'] = config.model;
         worker.postMessage({action: 'load-model',
             model: config.model,
             list: config.list,
