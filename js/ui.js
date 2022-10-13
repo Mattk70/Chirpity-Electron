@@ -718,11 +718,15 @@ function createRegion(start, end, label) {
 
 const tbody = document.getElementById('resultTableBody')
 tbody.addEventListener('click', function (e) {
-    if (activeRow) activeRow.classList.remove('table-active')
+    if (activeRow) {
+        activeRow.classList.remove('table-active')
+    }
     const row = e.target.closest('tr');
     row.classList.add('table-active');
     activeRow = row;
-    loadResultRegion(row.attributes[0].value.split('|'));
+    const params = row.attributes[0].value.split('|');
+    if (e.target.classList.contains('play')) params.push('true')
+    loadResultRegion(params);
     // if (!onScreen(row)) {
     //     scrollResults(row);
     // }
@@ -737,7 +741,7 @@ function loadResultRegion(paramlist) {
     // Accepts global start and end timecodes from model detections
     // Need to find and centre a view of the detection in the spectrogram
     // 3 second detections
-    let [file, start, end, label] = paramlist;
+    let [file, start, end, label, play] = paramlist;
     // Let the UI know what file's being loaded
     currentFile = file;
     start = parseFloat(start);
@@ -753,7 +757,7 @@ function loadResultRegion(paramlist) {
         position: wavesurfer.getCurrentTime() / windowLength,
         start: bufferBegin,
         end: bufferBegin + windowLength,
-        region: {start: Math.max(start - bufferBegin, 0), end: end - bufferBegin, label: label}
+        region: {start: Math.max(start - bufferBegin, 0), end: end - bufferBegin, label: label, play: play}
     });
 }
 
@@ -1571,7 +1575,7 @@ function WindowResize() {
 }
 
 $(document).on('click', '.play', function () {
-    region.play()
+    (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
 })
 
 function handleKeyDown(e) {
@@ -1764,6 +1768,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     },
     KeyA: function (e) {
         if (AUDACITY_LABELS.length) {
+            _
             if (e.ctrlKey) showSaveDialog();
         }
     },
@@ -2041,6 +2046,9 @@ async function onWorkerLoadedAudio(args) {
         wavesurfer.seekTo(args.position);
         if (args.region) {
             createRegion(args.region.start, args.region.end, args.region.label)
+            if (args.region.play) {
+                region.play()
+            }
         }
     }
 }
@@ -2107,7 +2115,7 @@ function updateSummary() {
 }
 
 async function onPredictionDone(args) {
-    AUDACITY_LABELS.push(args.labels);
+    AUDACITY_LABELS = AUDACITY_LABELS.concat(args.labels);
     // Defer further processing until batch complete
     if (args.batchInProgress) {
         progressDiv.show();
