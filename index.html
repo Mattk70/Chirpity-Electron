@@ -115,7 +115,8 @@
                                                 <label class="form-check-label" for="densenet">DenseNet</label>
                                             </li>
                                             <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="efficientnet" name="model"
+                                                <input type="radio" class="form-check-input" id="efficientnet"
+                                                       name="model"
                                                        value="efficientnet">
                                                 <label class="form-check-label" for="efficientnet">EfficientNet</label>
                                             </li>
@@ -211,7 +212,18 @@
                                                 <label class="form-check-label"
                                                        for="32">32</label>
                                             </li>
-
+                                            <li class="form-check">
+                                                <input type="radio" class="form-check-input" id="64"
+                                                       name="batch" value="64">
+                                                <label class="form-check-label"
+                                                       for="64">64</label>
+                                            </li>
+                                            <li class="form-check">
+                                                <input type="radio" class="form-check-input" id="128"
+                                                       name="batch" value="128">
+                                                <label class="form-check-label"
+                                                       for="128">128</label>
+                                            </li>
                                         </ul>
                                     </li>
                                     <li title="Warm up the model before starting predictions">
@@ -406,11 +418,12 @@
             </div>
 
             <div class="col btn-group bg-dark specFeature pe-2" role="group">
-                <button id="zoomIn" title="Zoom into the spectrogram" class="btn btn-outline-secondary">
-                    <i class="material-icons-two-tone zoom align-middle">zoom_in</i>
+                <button id="zoomIn" title="Zoom into the spectrogram" class="btn btn-outline-secondary"
+                        style="max-width: 70px">
+                    <span class="material-icons-two-tone zoom">zoom_in</span>
                 </button>
-                <button id="zoomOut" title="Zoom out of the spectrogram" class="btn btn-outline-secondary">
-                    <i class="material-icons-two-tone zoom align-middle">zoom_out</i>
+                <button id="zoomOut" title="Zoom out of the spectrogram" class="btn btn-outline-secondary"
+                        style="max-width: 70px"><span class="material-icons-two-tone zoom align-middle">zoom_out</span>
                 </button>
             </div>
             <div id="progressDiv" class="col-3" style="display:none"><span>Processing...</span><span
@@ -431,24 +444,27 @@
                 </button>
             </div>
             <div class="col pe-1">
-                <span title="Toggle Fullscreen mode" id="fullscreen"
-                      class="material-icons-two-tone btn btn-outline-secondary p-1 pointer float-end">fullscreen</span>
-                <span title="Toggle Nocmig mode&#10;(Only analyse detections at night)" id="nocmigMode"
-                      class="material-icons-two-tone btn btn-outline-secondary p-1 pointer float-end">bedtime</span>
+                <div class="btn-group float-end">
+                    <span style="max-width: 70px" title="Toggle Nocmig mode&#10;(Only analyse detections at night)"
+                      id="nocmigMode"
+                      class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">bedtime</span>
+                    <span style="max-width: 70px" title="Toggle Fullscreen mode" id="fullscreen"
+                          class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">fullscreen</span>
+                </div>
             </div>
         </div>
     </div>
     <!-- Result container -->
     <div class="d-none border-end border-4" id="resultTableContainer">
         <div class="ps-1 row g-1 h-100">
-            <div class="col-sm-3 h-100 overflow-auto" id="summary">
+            <div class="col-sm-3 h-100 overflow-auto d-none" id="summary">
                 <!-- Summary table -->
                 <!--                <div class="rounded-border">-->
                 <div id='summaryTable' style="display:none"></div>
                 <!--                </div>-->
             </div>
             <!-- Results table -->
-            <div class="col-sm-9 h-100 overflow-auto" id="resultsDiv">
+            <div class="col-sm-12 h-100 overflow-auto" id="resultsDiv">
                 <table id='results' class="table table-hover">
                     <thead id="resultsHead">
                     <tr>

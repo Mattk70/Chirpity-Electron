@@ -236,7 +236,7 @@ ipcMain.handle('openFiles', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
         filters: [{
             name: 'Audio Files',
-            extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4']
+            extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus']
         }],
         properties: ['openFile', 'multiSelections']
     });

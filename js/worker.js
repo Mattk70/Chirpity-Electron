@@ -1,13 +1,12 @@
 const {ipcRenderer} = require('electron');
-let appPath = '../24000_B3/';
 const fs = require('fs');
 const wavefileReader = require('wavefile-reader');
 const lamejs = require("lamejstmp");
 const ID3Writer = require('browser-id3-writer');
 const p = require('path');
 let BATCH_SIZE = 12;
-console.log(appPath);
-const labels = ["Tachymarptis melba_Alpine Swift", "Ambient Noise_Ambient Noise", "Pluvialis dominica_American Golden Plover", "Mareca americana_American Wigeon", "Animal_Animal", "Acrocephalus paludicola_Aquatic Warbler", "Acanthis hornemanni_Arctic Redpoll", "Stercorarius parasiticus_Arctic Skua", "Sterna paradisaea_Arctic Tern", "Phylloscopus borealis_Arctic Warbler", "Recurvirostra avosetta_Avocet", "Porzana pusilla_Baillon's Crake", "Limosa lapponica_Bar-tailed Godwit", "Tyto alba_Barn Owl", "Branta leucopsis_Barnacle Goose", "Sylvia nisoria_Barred Warbler", "Panurus biarmicus_Bearded Tit", "Merops apiaster_Bee-eater", "Cygnus columbianus_Bewick's Swan", "Botaurus stellaris_Bittern", "Oenanthe hispanica_Black-eared Wheatear", "Chroicocephalus ridibundus_Black-headed Gull", "Podiceps nigricollis_Black-necked Grebe", "Limosa limosa_Black-tailed Godwit", "Himantopus himantopus_Black-winged Stilt", "Lyrurus tetrix_Black Grouse", "Cepphus grylle_Black Guillemot", "Milvus migrans_Black Kite", "Phoenicurus ochruros_Black Redstart", "Chlidonias niger_Black Tern", "Turdus merula_Blackbird", "Sylvia atricapilla_Blackcap", "Spatula discors_Blue-winged Teal", "Cyanistes caeruleus_Blue Tit", "Luscinia svecica_Bluethroat", "Acrocephalus dumetorum_Blyth's Reed Warbler", "Fringilla montifringilla_Brambling", "Branta bernicla_Brent Goose", "Pyrrhula pyrrhula_Bullfinch", "Buteo buteo_Buzzard", "Branta canadensis_Canada Goose", "Tetrao urogallus_Capercaillie", "Corvus corone_Carrion/Hooded Crow", "Larus cachinnans_Caspian Gull", "Bubulcus ibis_Cattle Egret", "Cettia cetti_Cetti's Warbler", "Fringilla coelebs_Chaffinch", "Phylloscopus collybita_Chiffchaff", "Pyrrhocorax pyrrhocorax_Chough", "Emberiza cirlus_Cirl Bunting", "Motacilla citreola_Citrine Wagtail", "Periparus ater_Coal Tit", "Streptopelia decaocto_Collared Dove", "Glareola pratincola_Collared Pratincole", "Loxia curvirostra_Common Crossbill", "Larus canus_Common Gull", "Acanthis flammea_Common Redpoll", "Carpodacus erythrinus_Common Rosefinch", "Actitis hypoleucos_Common Sandpiper", "Melanitta nigra_Common Scoter", "Sterna hirundo_Common Tern", "Fulica atra_Coot", "Phalacrocorax carbo_Cormorant", "Emberiza calandra_Corn Bunting", "Crex crex_Corncrake", "Calonectris borealis_Cory's Shearwater", "Grus grus_Crane", "Lophophanes cristatus_Crested Tit", "Cuculus canorus_Cuckoo", "Calidris ferruginea_Curlew Sandpiper", "Numenius arquata_Curlew", "Sylvia undata_Dartford Warbler", "Cinclus cinclus_Dipper", "Charadrius morinellus_Dotterel", "Calidris alpina_Dunlin", "Prunella modularis_Dunnock", "Phylloscopus fuscatus_Dusky Warbler", "Alopochen aegyptiaca_Egyptian Goose", "Somateria mollissima_Eider", "Bubo bubo_Eurasian Eagle-Owl", "Turdus pilaris_Fieldfare", "Regulus ignicapilla_Firecrest", "Fulmarus glacialis_Fulmar", "Mareca strepera_Gadwall", "Morus bassanus_Gannet", "Sylvia borin_Garden Warbler", "Spatula querquedula_Garganey", "Larus hyperboreus_Glaucous Gull", "Plegadis falcinellus_Glossy Ibis", "Regulus regulus_Goldcrest", "Aquila chrysaetos_Golden Eagle", "Oriolus oriolus_Golden Oriole", "Pluvialis apricaria_Golden Plover", "Bucephala clangula_Goldeneye", "Carduelis carduelis_Goldfinch", "Mergus merganser_Goosander", "Accipiter gentilis_Goshawk", "Locustella naevia_Grasshopper Warbler", "Larus marinus_Great Black-backed Gull", "Podiceps cristatus_Great Crested Grebe", "Lanius excubitor_Great Grey Shrike", "Gavia immer_Great Northern Diver", "Stercorarius skua_Great Skua", "Dendrocopos major_Great Spotted Woodpecker", "Parus major_Great Tit", "Ardea alba_Great White Egret", "Anas carolinensis_Green-winged Teal", "Tringa ochropus_Green Sandpiper", "Picus viridis_Green Woodpecker", "Chloris chloris_Greenfinch", "Phylloscopus trochiloides_Greenish Warbler", "Tringa nebularia_Greenshank", "Ardea cinerea_Grey Heron", "Perdix perdix_Grey Partridge", "Phalaropus fulicarius_Grey Phalarope", "Pluvialis squatarola_Grey Plover", "Motacilla cinerea_Grey Wagtail", "Anser anser_Greylag Goose", "Uria aalge_Guillemot", "Gelochelidon nilotica_Gull-billed Tern", "Coccothraustes coccothraustes_Hawfinch", "Larus argentatus_Herring Gull", "Falco subbuteo_Hobby", "Pernis apivorus_Honey-buzzard", "Upupa epops_Hoopoe", "Delichon urbicum_House Martin", "Passer domesticus_House Sparrow", "Human_Human", "Phylloscopus ibericus_Iberian Chiffchaff", "Hippolais icterina_Icterine Warbler", "Lymnocryptes minimus_Jack Snipe", "Coloeus monedula_Jackdaw", "Garrulus glandarius_Jay", "Charadrius alexandrinus_Kentish Plover", "Falco tinnunculus_Kestrel", "Alcedo atthis_Kingfisher", "Rissa tridactyla_Kittiwake", "Calidris canutus_Knot", "Calcarius lapponicus_Lapland Bunting", "Vanellus vanellus_Lapwing", "Larus fuscus_Lesser Black-backed Gull", "Acanthis cabaret_Lesser Redpoll", "Dryobates minor_Lesser Spotted Woodpecker", "Sylvia curruca_Lesser Whitethroat", "Linaria cannabina_Linnet", "Ixobrychus minutus_Little Bittern", "Emberiza pusilla_Little Bunting", "Egretta garzetta_Little Egret", "Tachybaptus ruficollis_Little Grebe", "Hydrocoloeus minutus_Little Gull", "Athene noctua_Little Owl", "Charadrius dubius_Little Ringed Plover", "Calidris minuta_Little Stint", "Sternula albifrons_Little Tern", "Asio otus_Long-eared Owl", "Clangula hyemalis_Long-tailed Duck", "Stercorarius longicaudus_Long-tailed Skua", "Aegithalos caudatus_Long-tailed Tit", "Pica pica_Magpie", "Anas platyrhynchos_Mallard", "Aix galericulata_Mandarin Duck", "Puffinus puffinus_Manx Shearwater", "Circus aeruginosus_Marsh Harrier", "Poecile palustris_Marsh Tit", "Anthus pratensis_Meadow Pipit", "Ichthyaetus melanocephalus_Mediterranean Gull", "Hippolais polyglotta_Melodious Warbler", "Falco columbarius_Merlin", "Turdus viscivorus_Mistle Thrush", "Circus pygargus_Montagu's Harrier", "Gallinula chloropus_Moorhen", "Cygnus olor_Mute Swan", "Nycticorax nycticorax_Night Heron", "Luscinia megarhynchos_Nightingale", "Caprimulgus europaeus_Nightjar", "Sitta europaea_Nuthatch", "Anthus hodgsoni_Olive-backed Pipit", "Emberiza hortulana_Ortolan Bunting", "Pandion haliaetus_Osprey", "Haematopus ostralegus_Oystercatcher", "Syrrhaptes paradoxus_Pallas's Sandgrouse", "Phylloscopus proregulus_Pallas's Warbler", "Loxia pytyopsittacus_Parrot Crossbill", "Calidris melanotos_Pectoral Sandpiper", "Remiz pendulinus_Penduline Tit", "Falco peregrinus_Peregrine", "Phasianus colchicus_Pheasant", "Ficedula hypoleuca_Pied Flycatcher", "Motacilla alba_Pied Wagtail", "Anser brachyrhynchus_Pink-footed Goose", "Anas acuta_Pintail", "Aythya ferina_Pochard", "Lagopus muta_Ptarmigan", "Ardea purpurea_Purple Heron", "Calidris maritima_Purple Sandpiper", "Coturnix coturnix_Quail", "Phylloscopus schwarzi_Radde's Warbler", "Corvus corax_Raven", "Alca torda_Razorbill", "Lanius collurio_Red-backed Shrike", "Ficedula parva_Red-breasted Flycatcher", "Mergus serrator_Red-breasted Merganser", "Netta rufina_Red-crested Pochard", "Tarsiger cyanurus_Red-flanked Bluetail", "Alectoris rufa_Red-legged Partridge", "Podiceps grisegena_Red-necked Grebe", "Caprimulgus ruficollis_Red-necked Nightjar", "Phalaropus lobatus_Red-necked Phalarope", "Cecropis daurica_Red-rumped Swallow", "Gavia stellata_Red-throated Diver", "Lagopus lagopus_Red Grouse", "Milvus milvus_Red Kite", "Tringa totanus_Redshank", "Phoenicurus phoenicurus_Redstart", "Turdus iliacus_Redwing", "Emberiza schoeniclus_Reed Bunting", "Acrocephalus scirpaceus_Reed Warbler", "Anthus richardi_Richard's Pipit", "Larus delawarensis_Ring-billed Gull", "Psittacula krameri_Ring-necked Parakeet", "Turdus torquatus_Ring Ouzel", "Charadrius hiaticula_Ringed Plover", "Erithacus rubecula_Robin", "Columba livia_Rock Dove", "Anthus petrosus_Rock Pipit", "Corvus frugilegus_Rook", "Pastor roseus_Rose-coloured Starling", "Sterna dougallii_Roseate Tern", "Buteo lagopus_Rough-legged Buzzard", "Oxyura jamaicensis_Ruddy Duck", "Tadorna ferruginea_Ruddy Shelduck", "Calidris pugnax_Ruff", "Xema sabini_Sabine's Gull", "Riparia riparia_Sand Martin", "Calidris alba_Sanderling", "Thalasseus sandvicensis_Sandwich Tern", "Locustella luscinioides_Savi's Warbler", "Aythya marila_Scaup", "Loxia scotica_Scottish Crossbill", "Acrocephalus schoenobaenus_Sedge Warbler", "Calidris pusilla_Semipalmated Sandpiper", "Serinus serinus_Serin", "Tadorna tadorna_Shelduck", "Eremophila alpestris_Shore Lark", "Asio flammeus_Short-eared Owl", "Calandrella brachydactyla_Short-toed Lark", "Spatula clypeata_Shoveler", "Spinus spinus_Siskin", "Alauda arvensis_Skylark", "Podiceps auritus_Slavonian Grebe", "Gallinago gallinago_Snipe", "Plectrophenax nivalis_Snow Bunting", "Anser caerulescens_Snow Goose", "Turdus philomelos_Song Thrush", "Accipiter nisus_Sparrowhawk", "Platalea leucorodia_Spoonbill", "Porzana porzana_Spotted Crake", "Muscicapa striata_Spotted Flycatcher", "Tringa erythropus_Spotted Redshank", "Actitis macularius_Spotted Sandpiper", "Sturnus vulgaris_Starling", "Columba oenas_Stock Dove", "Burhinus oedicnemus_Stone-curlew", "Saxicola rubicola_Stonechat", "Hydrobates pelagicus_Storm Petrel", "Sylvia cantillans_Subalpine Warbler", "Hirundo rustica_Swallow", "Apus apus_Swift", "Anser fabalis_Taiga Bean Goose", "Strix aluco_Tawny Owl", "Anas crecca_Teal", "Calidris temminckii_Temminck's Stint", "Anthus trivialis_Tree Pipit", "Passer montanus_Tree Sparrow", "Certhia familiaris_Treecreeper", "Aythya fuligula_Tufted Duck", "Anser serrirostris_Tundra Bean Goose", "Arenaria interpres_Turnstone", "Streptopelia turtur_Turtle Dove", "Linaria flavirostris_Twite", "Loxia leucoptera_Two-barred Crossbill", "Vehicle_Vehicle", "Anthus spinoletta_Water Pipit", "Rallus aquaticus_Water Rail", "Bombycilla garrulus_Waxwing", "Oenanthe oenanthe_Wheatear", "Numenius phaeopus_Whimbrel", "Saxicola rubetra_Whinchat", "Anser albifrons_White-fronted Goose", "Calidris fuscicollis_White-rumped Sandpiper", "Haliaeetus albicilla_White-tailed Eagle", "Chlidonias leucopterus_White-winged Black Tern", "Ciconia ciconia_White Stork", "Sylvia communis_Whitethroat", "Cygnus cygnus_Whooper Swan", "Mareca penelope_Wigeon", "Poecile montanus_Willow Tit", "Phylloscopus trochilus_Willow Warbler", "Tringa glareola_Wood Sandpiper", "Phylloscopus sibilatrix_Wood Warbler", "Scolopax rusticola_Woodcock", "Lullula arborea_Woodlark", "Columba palumbus_Woodpigeon", "Troglodytes troglodytes_Wren", "Jynx torquilla_Wryneck", "Phylloscopus inornatus_Yellow-browed Warbler", "Larus michahellis_Yellow-legged Gull", "Motacilla flava_Yellow Wagtail", "Emberiza citrinella_Yellowhammer"];
+const adding_chirpity_additions = false;
+let labels;
 const sqlite3 = require('sqlite3').verbose();
 const SunCalc = require('suncalc2');
 const ffmpeg = require('fluent-ffmpeg');
@@ -17,7 +16,7 @@ const {utimes} = require('utimes');
 const stream = require("stream");
 const {op} = require("@tensorflow/tfjs");
 const file_cache = 'chirpity';
-let TEMP;
+let TEMP, appPath;
 
 const staticFfmpeg = require('ffmpeg-static-electron');
 console.log(staticFfmpeg.path);
@@ -88,16 +87,20 @@ function createDB(file) {
 }
 
 async function loadDB(path) {
-    const file = p.join(path, 'archive.sqlite');
-    if (!fs.existsSync(file)) {
-        db = createDB(file)
+    if (!db) {
+        const file = p.join(path, 'archive.sqlite');
+        if (!fs.existsSync(file)) {
+            db = createDB(file)
 
+        } else {
+            db = new sqlite3.Database(file);
+        }
+        db.on("error", function (error) {
+            console.log("Getting an error : ", error);
+        });
     } else {
-        db = new sqlite3.Database(file);
+        console.log('Database loaded, nothing to do')
     }
-    db.on("error", function (error) {
-        console.log("Getting an error : ", error);
-    });
 }
 
 let metadata = {};
@@ -132,6 +135,9 @@ ipcRenderer.on('new-client', (event) => {
         const action = args.action;
         console.log('message received ', action)
         switch (action) {
+            case 'set-variables':
+                latitude = args.lat, longitude = args.lon, TEMP = args.temp, appPath = args.path;
+                break;
             case 'update-record':
                 await onUpdateRecord(args)
                 break;
@@ -139,14 +145,11 @@ ipcRenderer.on('new-client', (event) => {
                 await onUpdateFileStart(args)
                 break;
             case 'get-detected-species':
+                await loadDB(appPath);
                 getSpecies()
                 break;
             case 'create-dataset':
                 saveResults2DataSet(RESULTS);
-                break;
-            case 'clear-cache':
-                console.log('cache')
-                await clearCache();
                 break;
             case 'load-model':
                 UI.postMessage({event: 'spawning'});
@@ -154,15 +157,18 @@ ipcRenderer.on('new-client', (event) => {
                 if (predictWorker) predictWorker.terminate();
                 spawnWorker(args.model, args.list, BATCH_SIZE, args.warmup);
                 break;
+            case 'init':
+                latitude = args.lat;
+                longitude = args.lon;
+                TEMP = args.temp;
+                appPath = args.path;
+                await clearCache();
+                break;
             case 'update-model':
                 predictWorker.postMessage({message: 'list', list: args.list})
                 break;
             case 'load-db':
-                latitude = args.lat;
-                longitude = args.lon;
-                TEMP = args.temp;
                 await loadDB(args.path);
-                await clearCache();
                 break;
             case 'file-load-request':
                 index = 0;
@@ -177,6 +183,7 @@ ipcRenderer.on('new-client', (event) => {
                 await loadAudioFile(args);
                 break;
             case 'explore':
+                await loadDB(appPath);
                 // reset results table
                 UI.postMessage({event: 'reset-results'});
                 // And clear results from memory
@@ -207,6 +214,8 @@ ipcRenderer.on('new-client', (event) => {
                 });
                 break;
             case 'analyze':
+                predictionsReceived = 0;
+                predictionsRequested = 0;
                 await onAnalyze(args);
                 break;
             case 'save':
@@ -267,7 +276,7 @@ const onAnalyze = async (args) => {
                 index: index,
                 selection: false,
             });
-            AUDACITY.push(audacity);
+            //AUDACITY.push(audacity);
             RESULTS.push(result);
         })
         console.log(`Pulling results for ${args.filePath} from database`);
@@ -295,21 +304,27 @@ function onAbort(args) {
         UI.postMessage({event: 'spawning'});
         predictWorker.terminate()
         spawnWorker(args.model, args.list, BATCH_SIZE, args.warmup)
-        predicting = false;
-        predictionDone = true;
     }
-    if (args.sendLabels) {
-        UI.postMessage({event: 'prediction-done', labels: AUDACITY, batchInProgress: false});
-    }
+    predicting = false;
+    predictionDone = true;
+    UI.postMessage({event: 'prediction-done', labels: AUDACITY, batchInProgress: false});
 }
 
 const getDuration = async (src) => {
+    let audio;
     return new Promise(function (resolve) {
-        const audio = new Audio();
-        audio.addEventListener("loadedmetadata", function () {
-            resolve(audio.duration);
-        });
+        audio = new Audio();
         audio.src = src;
+        audio.addEventListener("loadedmetadata", function () {
+            const duration = audio.duration
+            audio = null;
+            // Tidy up - cloning removes event listeners
+            const old_element = document.getElementById("audio");
+            const new_element = old_element.cloneNode(true);
+            old_element.parentNode.replaceChild(new_element, old_element);
+
+            resolve(duration);
+        });
     });
 }
 
@@ -630,20 +645,26 @@ async function getPredictBuffers(args) {
     readStream.on('data', async chunk => {
         // Ensure data is processed in order
         readStream.pause();
-        const offlineCtx = await setupCtx(chunk, metadata[file].header);
-        offlineCtx.startRendering().then(
-            (resampled) => {
-                const myArray = resampled.getChannelData(0);
-                const samples = parseInt((end - start) * sampleRate.toFixed(0));
-                const increment = samples < chunkLength ? samples : chunkLength;
-                feedChunksToModel(myArray, increment, chunkStart, file, end, selection);
-                chunkStart += 3 * BATCH_SIZE * sampleRate;
-                // Now the async stuff is done ==>
-                readStream.resume();
-            }).catch((err) => {
-            console.error(`PredictBuffer rendering failed: ${err}`);
-            // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
-        });
+        if (chunk.length > 6000) { // 1/4 of a second
+            const offlineCtx = await setupCtx(chunk, metadata[file].header);
+            offlineCtx.startRendering().then(
+                (resampled) => {
+                    const myArray = resampled.getChannelData(0);
+                    const samples = parseInt((end - start) * sampleRate.toFixed(0));
+
+                    const increment = samples < chunkLength ? samples : chunkLength;
+                    feedChunksToModel(myArray, increment, chunkStart, file, end, selection);
+                    chunkStart += 3 * BATCH_SIZE * sampleRate;
+                    // Now the async stuff is done ==>
+                    readStream.resume();
+                }).catch((err) => {
+                console.error(`PredictBuffer rendering failed: ${err}`);
+                // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
+            });
+        } else {
+            console.log('Short chunk', chunk.length, 'skipping')
+            readStream.resume();
+        }
     })
     readStream.on('end', function () {
         readStream.close()
@@ -779,13 +800,29 @@ const speciesMatch = (path, sname) => {
 }
 
 const saveResults2DataSet = (results, rootDirectory) => {
-    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/PNGDataset2';
+    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/Additions_png';
     let promise = Promise.resolve();
     let count = 0;
     const t0 = Date.now();
+    let ambient, threshold, value;
     results.forEach(result => {
-        // Check whether predicted species matches folder (i.e. the searched for species)
-        const threshold = speciesMatch(result.file, result.sname) ? 0 : 0; //0.25 : 1.0;
+        // Check for level of ambient noise activation
+
+        if (!adding_chirpity_additions) {
+            ambient, threshold, value = 0.25;
+            ambient = (result.sname2 === 'Ambient Noise' ? result.score2 : result.sname3 === 'Ambient Noise' ? result.score3 : false)
+            console.log('Ambient', ambient)
+            // If we have a high level of ambient noise activation, insist on a high threshold for species detection
+            if (ambient && ambient > 0.2) {
+                value = 0.7
+            }
+            // Check whether top predicted species matches folder (i.e. the searched for species)
+            // species not matching the top prediction sets threshold to 2, effectively doing nothing with results
+            // that don't match the searched for species
+            threshold = speciesMatch(result.file, result.sname) ? value : 2.0;
+        } else {
+            threshold = 0;
+        }
         promise = promise.then(async function (resolve) {
             if (result.score >= threshold) {
                 const AudioBuffer = await fetchAudioBuffer({
@@ -796,7 +833,7 @@ const saveResults2DataSet = (results, rootDirectory) => {
                 if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
                     // REALLY NEED to figure out why 0.4 seconds silence at start of exported mp3s leading to 3s clips being 3.024s long
                     const buffer = AudioBuffer.getChannelData(0);
-                    const folder = `${result.cname.replaceAll(' ', '_')}~${result.sname.replaceAll(' ', '_')}`;
+                    const [_, folder] = p.dirname(result.file).match(/^.*\/(.*)$/)
                     // filename format: <source file>_<confidence>_<start>.png
                     const file = `${p.basename(result.file).replace(p.extname(result.file), '')}_${result['score'].toFixed(2)}_${result.start}-${result.end}.png`;
                     const filepath = p.join(rootDirectory, folder)
@@ -1048,7 +1085,11 @@ async function postOpus(args) {
 function spawnWorker(model, list, batchSize, warmup) {
     console.log(`spawning worker with ${list}, ${batchSize}, ${warmup}`)
     predictWorker = new Worker('./js/model.js');
-    const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
+    //const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
+    const modelPath = model === 'efficientnet' ? '../test_big/' : '../24000_v9/';
+    console.log(modelPath);
+    // Now we've loaded a new model, clear the aborted flag
+    aborted = false;
     predictWorker.postMessage(['load', modelPath, list, batchSize, warmup])
     predictWorker.onmessage = (e) => {
         parseMessage(e)
@@ -1104,10 +1145,11 @@ async function parseMessage(e) {
     const response = e.data;
     if (response['message'] === 'model-ready') {
         const chunkLength = response['chunkLength'];
+        labels = response['labels'];
         sampleRate = response['sampleRate'];
         const backend = response['backend'];
         console.log(backend);
-        UI.postMessage({event: 'model-ready', message: 'ready', backend: backend})
+        UI.postMessage({event: 'model-ready', message: 'ready', backend: backend, labels: labels})
     } else if (response['message'] === 'prediction' && !aborted) {
         // add filename to result for db purposes
         let [file, batchInProgress] = parsePredictions(response);
@@ -1259,18 +1301,23 @@ function getKeyByValue(object, value) {
 }
 
 const getFileInfo = async (file) => {
-    // look for file, ignore extension
-    const baseName = file.replace(/^(.*)\..*$/g, '$1').replace("'", "''");
-    return new Promise(function (resolve, reject) {
-        db.get(`SELECT *
-                FROM files
-                WHERE name LIKE '${baseName}%'`, (err, row) => {
-            if (err) console.log('There was an error ', err)
-            else {
-                resolve(row)
-            }
+    // Set original filestamp for converted files. DOESN'T work if file sent before DB loaded
+    if (db) {
+        // look for file, ignore extension
+        const baseName = file.replace(/^(.*)\..*$/g, '$1').replace("'", "''");
+        return new Promise(function (resolve, reject) {
+            db.get(`SELECT *
+                    FROM files
+                    WHERE name LIKE '${baseName}%'`, (err, row) => {
+                if (err) console.log('There was an error ', err)
+                else {
+                    resolve(row)
+                }
+            })
         })
-    })
+    } else {
+        return undefined
+    }
 }
 
 const updateFileTables = async (file) => {
