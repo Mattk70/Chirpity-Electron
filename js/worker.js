@@ -25,12 +25,19 @@ ffmpeg.setFfmpegPath(staticFfmpeg.path);
 
 let predictionsRequested = 0, predictionsReceived = 0;
 
-let db, nocmig, latitude, longitude;
+let diskDB, memoryDB, nocmig, latitude, longitude;
 
 function createDB(file) {
-    console.log("creating database file");
-    fs.openSync(file, "w");
-    db = new sqlite3.Database(file);
+    const archiveMode = file ? true : false;
+    if (file) {
+        fs.openSync(file, "w");
+        diskDB = new sqlite3.Database(file);
+        console.log("Opened disk database", file);
+    } else {
+        memoryDB = new sqlite3.Database(':memory:');
+        console.log("Created new in-memory database");
+    }
+    const db = archiveMode ? diskDB : memoryDB;
     db.serialize(() => {
         db.run(`CREATE TABLE species
                 (
@@ -87,13 +94,14 @@ function createDB(file) {
 }
 
 async function loadDB(path) {
+    let db = diskDB;
     if (!db) {
-        const file = p.join(path, 'archive.sqlite');
+        const file = path ? p.join(path, 'archive.sqlite') : '';
         if (!fs.existsSync(file)) {
-            db = createDB(file)
-
+            diskDB = createDB(file)
         } else {
-            db = new sqlite3.Database(file);
+            diskDB = new sqlite3.Database(file);
+            db = diskDB;
         }
         db.on("error", function (error) {
             console.log("Getting an error : ", error);
@@ -107,10 +115,6 @@ let metadata = {};
 let minConfidence, index = 0, AUDACITY = [], RESULTS = [], predictionStart;
 let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
 let predictWorker, predicting = false, predictionDone = false, aborted = false;
-
-// We might get multiple clients, for instance if there are multiple windows,
-// or if the main window reloads.
-const isDevMode = true;
 
 // Set up the audio context:
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
@@ -144,9 +148,10 @@ ipcRenderer.on('new-client', (event) => {
             case 'update-file-start':
                 await onUpdateFileStart(args)
                 break;
-            case 'get-detected-species':
+            case 'get-detected-species-list':
+                // Checking the archive database
                 await loadDB(appPath);
-                getSpecies()
+                getSpecies(diskDB);
                 break;
             case 'create-dataset':
                 saveResults2DataSet(RESULTS);
@@ -168,7 +173,10 @@ ipcRenderer.on('new-client', (event) => {
                 predictWorker.postMessage({message: 'list', list: args.list})
                 break;
             case 'load-db':
-                await loadDB(args.path);
+                // Create in-memory database
+                //await loadDB();
+                // Load the archive one too
+                await loadDB(appPath);
                 break;
             case 'file-load-request':
                 index = 0;
@@ -182,36 +190,17 @@ ipcRenderer.on('new-client', (event) => {
             case 'update-buffer':
                 await loadAudioFile(args);
                 break;
+            case 'filter':
+                // Check the memory database
+                await loadDB();
+                args.db = memoryDB;
+                await sendResults2UI(args);
+                break;
             case 'explore':
+                // Check the archive database
                 await loadDB(appPath);
-                // reset results table
-                UI.postMessage({event: 'reset-results'});
-                // And clear results from memory
-                RESULTS = [];
-                const results = await getCachedResults({species: args.species, range: args.range});
-                index = 0;
-                results.forEach(result => {
-                    //format dates
-                    result.timestamp = new Date(result.timestamp);
-                    result.position = new Date(result.position);
-                    index++;
-                    UI.postMessage({
-                        event: 'prediction-ongoing',
-                        file: result.file,
-                        result: result,
-                        index: index,
-                        selection: false,
-                    });
-                    //AUDACITY.push(audacity);
-                    RESULTS.push(result);
-                })
-                console.log(`Pulling results for ${args.species} from database`);
-                // When in batch mode the 'prediction-done' event simply increments
-                // the counter for the file being processed
-                UI.postMessage({
-                    event: 'prediction-done',
-                    batchInProgress: false,
-                });
+                args.db = diskDB;
+                await sendResults2UI(args);
                 break;
             case 'analyze':
                 predictionsReceived = 0;
@@ -226,7 +215,8 @@ ipcRenderer.on('new-client', (event) => {
                 await postOpus(args)
                 break;
             case 'save2db':
-                onSave2DB();
+                await loadDB(appPath)
+                onSave2DB(diskDB);
                 break;
             case 'abort':
                 onAbort(args);
@@ -240,6 +230,37 @@ ipcRenderer.on('new-client', (event) => {
     }
 })
 
+const sendResults2UI = async (args) => {
+    // reset results table, but not summary
+    UI.postMessage({event: 'reset-results', saveSummary: true});
+    // And clear results from memory
+
+    RESULTS = [];
+    const results = await getCachedResults({db: args.db, species: args.species, range: args.range});
+    index = 0;
+    results.forEach(result => {
+        //format dates
+        result.timestamp = new Date(result.timestamp);
+        result.position = new Date(result.position);
+        index++;
+        UI.postMessage({
+            event: 'prediction-ongoing',
+            file: result.file,
+            result: result,
+            index: index,
+            selection: false,
+        });
+        RESULTS.push(result);
+    })
+    console.log(`Pulling results for ${args.species} from the archive database`);
+    // When in batch mode the 'prediction-done' event simply increments
+    // the counter for the file being processed
+    UI.postMessage({
+        event: 'prediction-done',
+        batchInProgress: false,
+        saveSummary: true,
+    });
+}
 
 const onAnalyze = async (args) => {
     console.log(`Worker received message: ${args.filePath}, ${args.confidence}, start: ${args.start}, end: ${args.end}`);
@@ -247,6 +268,7 @@ const onAnalyze = async (args) => {
         index = 0;
         AUDACITY = [];
         RESULTS = [];
+        createDB();
     }
     latitude = args.lat;
     longitude = args.lon;
@@ -262,7 +284,7 @@ const onAnalyze = async (args) => {
             FILE_QUEUE.splice(place, 1); // 2nd parameter means remove one item only
         }
         // Pull the results from the database
-        const results = await getCachedResults({file: cachedFile, range: {}});
+        const results = await getCachedResults({db: diskDB, file: cachedFile, range: {}});
         UI.postMessage({event: 'update-audio-duration', value: metadata[cachedFile].duration});
         results.forEach(result => {
             //format dates
@@ -1208,6 +1230,7 @@ async function processNextFile(args) {
         }
     } else {
         predicting = false;
+        onSave2DB(memoryDB);
     }
 }
 
@@ -1243,11 +1266,12 @@ async function setStartEnd(file) {
 let t1, t0;
 
 const getCachedResults = (args) => {
-    let where;
+    let where = '';
+    const db = args.db;
     const dateRange = args.range;
-    if (args.file) where = `files.name =  '${args.file.replace("'", "''")}'`;
-    if (args.species) where = `s1.cname =  '${args.species.replace("'", "''")}'`;
-    const when = dateRange.start ? `AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
+    if (args.file) where = ` WHERE files.name =  '${args.file.replace("'", "''")}'`;
+    if (args.species) where = `WHERE s1.cname =  '${args.species.replace("'", "''")}'`;
+    const when = dateRange && dateRange.start ? `AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
     return new Promise(function (resolve, reject) {
         db.all(`SELECT dateTime AS timestamp, position AS position, 
             s1.cname as cname, s2.cname as cname2, s3.cname as cname3, 
@@ -1267,7 +1291,6 @@ const getCachedResults = (args) => {
                 LEFT JOIN species s2 on s2.id = birdid2 
                 LEFT JOIN species s3 on s3.id = birdid3 
                 INNER JOIN files on files.rowid = records.fileid 
-                WHERE
                 ${where}
                 ${when}`,
             (err, rows) => {
@@ -1280,11 +1303,10 @@ const getCachedResults = (args) => {
     })
 }
 
-const isDuplicate = (file) => {
-    //return false
-    //if (metadata[file]) return file
+const isDuplicate = async (file) => {
+    const db = diskDB;
     const baseName = file.replace(/^(.*)\..*$/g, '$1').replace("'", "''");
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
         db.get(`SELECT *
                 FROM files
                 WHERE name LIKE '${baseName}%'`, (err, row) => {
@@ -1301,6 +1323,7 @@ function getKeyByValue(object, value) {
 }
 
 const getFileInfo = async (file) => {
+    const db = await loadDB(appPath);
     // Set original filestamp for converted files. DOESN'T work if file sent before DB loaded
     if (db) {
         // look for file, ignore extension
@@ -1320,7 +1343,7 @@ const getFileInfo = async (file) => {
     }
 }
 
-const updateFileTables = async (file) => {
+const updateFileTables = async (db, file) => {
     return new Promise(function (resolve) {
         const newFileStmt = db.prepare("INSERT INTO files VALUES (?,?,?)");
         const selectStmt = db.prepare('SELECT rowid FROM files WHERE name = (?)');
@@ -1338,7 +1361,7 @@ const updateFileTables = async (file) => {
     })
 }
 
-const getFileIDs = () => {
+const getFileIDs = (db) => {
     return new Promise(function (resolve, reject) {
         db.all('SELECT rowid, name FROM files',
             (err, rows) => {
@@ -1355,11 +1378,11 @@ const getFileIDs = () => {
     })
 }
 
-const onSave2DB = async () => {
+const onSave2DB = async (db) => {
     t0 = performance.now();
     db.run('BEGIN TRANSACTION');
     const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-    let filemap = await getFileIDs()
+    let filemap = await getFileIDs(db)
     for (let i = 0; i < RESULTS.length; i++) {
         const dateTime = new Date(RESULTS[i].timestamp).getTime();
         const birdID1 = RESULTS[i].id_1;
@@ -1372,7 +1395,7 @@ const onSave2DB = async () => {
         const file = RESULTS[i].file;
         const comment = RESULTS[i].comment;
         const label = RESULTS[i].label;
-        if (!filemap[file]) filemap[file] = await updateFileTables(file);
+        if (!filemap[file]) filemap[file] = await updateFileTables(db, file);
         stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, filemap[file], position, comment, label,
             (err, row) => {
                 UI.postMessage({event: 'progress', text: "Updating Database.", progress: i / RESULTS.length});
@@ -1389,7 +1412,7 @@ const onSave2DB = async () => {
 const getSeasonRecords = (species, season) => {
     const seasonMonth = {spring: "< '07'", autumn: " > '06'"}
     return new Promise(function (resolve, reject) {
-        const stmt = db.prepare(`
+        const stmt = diskDB.prepare(`
             SELECT MAX(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS maxDate,
                    MIN(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS minDate
             FROM records
@@ -1410,7 +1433,7 @@ const getSeasonRecords = (species, season) => {
 
 const getMostCalls = (species) => {
     return new Promise(function (resolve, reject) {
-        db.get(`
+        diskDB.get(`
             SELECT count(*) as count, 
             DATE(dateTime/1000, 'unixepoch', 'localtime') as date
             FROM records INNER JOIN species
@@ -1461,17 +1484,17 @@ const getChartTotals = (args) => {
     }
 
     return new Promise(function (resolve, reject) {
-        db.all(`SELECT STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS Year, 
+        diskDB.all(`SELECT STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS Year, 
             STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Week,
             STRFTIME('%j', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Day, 
             STRFTIME('%H', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Hour,    
             COUNT(*) as count
-                FROM records
-                    INNER JOIN species
-                on species.id = birdid1
-                WHERE species.cname = '${species}' ${dateFilter}
-                GROUP BY ${groupBy}
-                ORDER BY ${orderBy};`, (err, rows) => {
+                    FROM records
+                        INNER JOIN species
+                    on species.id = birdid1
+                    WHERE species.cname = '${species}' ${dateFilter}
+                    GROUP BY ${groupBy}
+                    ORDER BY ${orderBy};`, (err, rows) => {
             if (err) {
                 reject(err)
             } else {
@@ -1490,15 +1513,15 @@ const getRate = (species) => {
         const total = new Array(52).fill(0);
 
 
-        db.all(`select STRFTIME('%W', DATE(dateTime / 1000, 'unixepoch', 'localtime')) as week, count(*) as calls
-                from records
-                         INNER JOIN species ON species.id = records.birdid1
-                WHERE species.cname = '${species}'
-                group by week;`, (err, rows) => {
+        diskDB.all(`select STRFTIME('%W', DATE(dateTime / 1000, 'unixepoch', 'localtime')) as week, count(*) as calls
+                    from records
+                             INNER JOIN species ON species.id = records.birdid1
+                    WHERE species.cname = '${species}'
+                    group by week;`, (err, rows) => {
             for (let i = 0; i < rows.length; i++) {
                 calls[parseInt(rows[i].week) - 1] = rows[i].calls;
             }
-            db.all("select STRFTIME('%W', DATE(duration.day / 1000, 'unixepoch', 'localtime')) as week, cast(sum(duration) as real)/3600  as total from duration group by week;", (err, rows) => {
+            diskDB.all("select STRFTIME('%W', DATE(duration.day / 1000, 'unixepoch', 'localtime')) as week, cast(sum(duration) as real)/3600  as total from duration group by week;", (err, rows) => {
                 for (let i = 0; i < rows.length; i++) {
                     // Round the total to 2 dp
                     total[parseInt(rows[i].week) - 1] = Math.round(rows[i].total * 100) / 100;
@@ -1517,7 +1540,7 @@ const getRate = (species) => {
     })
 }
 
-const getSpecies = () => {
+const getSpecies = (db) => {
     db.all('SELECT DISTINCT cname, sname FROM records INNER JOIN species ON birdid1 = id ORDER BY cname',
         (err, rows) => {
             if (err) console.log(err);
@@ -1527,7 +1550,7 @@ const getSpecies = () => {
         })
 }
 
-const getFileStart = (file) => {
+const getFileStart = (db, file) => {
     return new Promise(function (resolve, reject) {
         db.get(`SELECT filestart
                 FROM files
@@ -1641,7 +1664,7 @@ const updateResults = async (args) => {
 
 const onUpdateRecord = async (args) => {
     args.start = parseFloat(args.start);
-    let what = args.what, file = args.file, start = args.start, value = args.value;
+    let what = args.what, file = args.file, start = args.start, value = args.value, db = args.db;
     // Sanitize input
     if (!value) value = '';
     await updateResults(args);
@@ -1651,7 +1674,7 @@ const onUpdateRecord = async (args) => {
     }
     if (!metadata[file]) metadata[file] = {};
     if (!metadata[file].fileStart) {
-        metadata[file].fileStart = await getFileStart(file);
+        metadata[file].fileStart = await getFileStart(db, file);
     }
     const dateTime = metadata[file].fileStart + (start * 1000);
     return new Promise(function (resolve, reject) {
