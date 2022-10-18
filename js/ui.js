@@ -1,5 +1,5 @@
 let firstDawn, dawn, dusk, seenTheDarkness = false, shownDaylightBanner = false;
-const labels = ["Tachymarptis melba_Alpine Swift", "Pluvialis dominica_American Golden Plover", "Mareca americana_American Wigeon", "Acrocephalus paludicola_Aquatic Warbler", "Acanthis hornemanni_Arctic Redpoll", "Stercorarius parasiticus_Arctic Skua", "Sterna paradisaea_Arctic Tern", "Phylloscopus borealis_Arctic Warbler", "Recurvirostra avosetta_Avocet", "Porzana pusilla_Baillon's Crake", "Limosa lapponica_Bar-tailed Godwit", "Tyto alba_Barn Owl", "Branta leucopsis_Barnacle Goose", "Sylvia nisoria_Barred Warbler", "Panurus biarmicus_Bearded Tit", "Merops apiaster_Bee-eater", "Cygnus columbianus_Bewick's Swan", "Botaurus stellaris_Bittern", "Oenanthe hispanica_Black-eared Wheatear", "Chroicocephalus ridibundus_Black-headed Gull", "Podiceps nigricollis_Black-necked Grebe", "Limosa limosa_Black-tailed Godwit", "Himantopus himantopus_Black-winged Stilt", "Lyrurus tetrix_Black Grouse", "Cepphus grylle_Black Guillemot", "Milvus migrans_Black Kite", "Phoenicurus ochruros_Black Redstart", "Chlidonias niger_Black Tern", "Turdus merula_Blackbird", "Sylvia atricapilla_Blackcap", "Spatula discors_Blue-winged Teal", "Cyanistes caeruleus_Blue Tit", "Luscinia svecica_Bluethroat", "Acrocephalus dumetorum_Blyth's Reed Warbler", "Fringilla montifringilla_Brambling", "Branta bernicla_Brent Goose", "Pyrrhula pyrrhula_Bullfinch", "Buteo buteo_Buzzard", "Branta canadensis_Canada Goose", "Tetrao urogallus_Capercaillie", "Corvus corone_Carrion/Hooded Crow", "Larus cachinnans_Caspian Gull", "Bubulcus ibis_Cattle Egret", "Cettia cetti_Cetti's Warbler", "Fringilla coelebs_Chaffinch", "Phylloscopus collybita_Chiffchaff", "Pyrrhocorax pyrrhocorax_Chough", "Emberiza cirlus_Cirl Bunting", "Motacilla citreola_Citrine Wagtail", "Periparus ater_Coal Tit", "Streptopelia decaocto_Collared Dove", "Glareola pratincola_Collared Pratincole", "Loxia curvirostra_Common Crossbill", "Larus canus_Common Gull", "Acanthis flammea_Common Redpoll", "Carpodacus erythrinus_Common Rosefinch", "Actitis hypoleucos_Common Sandpiper", "Melanitta nigra_Common Scoter", "Sterna hirundo_Common Tern", "Fulica atra_Coot", "Phalacrocorax carbo_Cormorant", "Emberiza calandra_Corn Bunting", "Crex crex_Corncrake", "Calonectris borealis_Cory's Shearwater", "Grus grus_Crane", "Lophophanes cristatus_Crested Tit", "Cuculus canorus_Cuckoo", "Calidris ferruginea_Curlew Sandpiper", "Numenius arquata_Curlew", "Sylvia undata_Dartford Warbler", "Cinclus cinclus_Dipper", "Charadrius morinellus_Dotterel", "Calidris alpina_Dunlin", "Prunella modularis_Dunnock", "Phylloscopus fuscatus_Dusky Warbler", "Alopochen aegyptiaca_Egyptian Goose", "Somateria mollissima_Eider", "Bubo bubo_Eurasian Eagle-Owl", "Turdus pilaris_Fieldfare", "Regulus ignicapilla_Firecrest", "Fulmarus glacialis_Fulmar", "Mareca strepera_Gadwall", "Morus bassanus_Gannet", "Sylvia borin_Garden Warbler", "Spatula querquedula_Garganey", "Larus hyperboreus_Glaucous Gull", "Plegadis falcinellus_Glossy Ibis", "Regulus regulus_Goldcrest", "Aquila chrysaetos_Golden Eagle", "Oriolus oriolus_Golden Oriole", "Pluvialis apricaria_Golden Plover", "Bucephala clangula_Goldeneye", "Carduelis carduelis_Goldfinch", "Mergus merganser_Goosander", "Accipiter gentilis_Goshawk", "Locustella naevia_Grasshopper Warbler", "Larus marinus_Great Black-backed Gull", "Podiceps cristatus_Great Crested Grebe", "Lanius excubitor_Great Grey Shrike", "Gavia immer_Great Northern Diver", "Stercorarius skua_Great Skua", "Dendrocopos major_Great Spotted Woodpecker", "Parus major_Great Tit", "Ardea alba_Great White Egret", "Anas carolinensis_Green-winged Teal", "Tringa ochropus_Green Sandpiper", "Picus viridis_Green Woodpecker", "Chloris chloris_Greenfinch", "Phylloscopus trochiloides_Greenish Warbler", "Tringa nebularia_Greenshank", "Ardea cinerea_Grey Heron", "Perdix perdix_Grey Partridge", "Phalaropus fulicarius_Grey Phalarope", "Pluvialis squatarola_Grey Plover", "Motacilla cinerea_Grey Wagtail", "Anser anser_Greylag Goose", "Uria aalge_Guillemot", "Gelochelidon nilotica_Gull-billed Tern", "Coccothraustes coccothraustes_Hawfinch", "Larus argentatus_Herring Gull", "Falco subbuteo_Hobby", "Pernis apivorus_Honey-buzzard", "Upupa epops_Hoopoe", "Delichon urbicum_House Martin", "Passer domesticus_House Sparrow", "Homo Sapiens", "Phylloscopus ibericus_Iberian Chiffchaff", "Hippolais icterina_Icterine Warbler", "Lymnocryptes minimus_Jack Snipe", "Coloeus monedula_Jackdaw", "Garrulus glandarius_Jay", "Charadrius alexandrinus_Kentish Plover", "Falco tinnunculus_Kestrel", "Alcedo atthis_Kingfisher", "Rissa tridactyla_Kittiwake", "Calidris canutus_Knot", "Calcarius lapponicus_Lapland Bunting", "Vanellus vanellus_Lapwing", "Larus fuscus_Lesser Black-backed Gull", "Acanthis cabaret_Lesser Redpoll", "Dryobates minor_Lesser Spotted Woodpecker", "Sylvia curruca_Lesser Whitethroat", "Linaria cannabina_Linnet", "Ixobrychus minutus_Little Bittern", "Emberiza pusilla_Little Bunting", "Egretta garzetta_Little Egret", "Tachybaptus ruficollis_Little Grebe", "Hydrocoloeus minutus_Little Gull", "Athene noctua_Little Owl", "Charadrius dubius_Little Ringed Plover", "Calidris minuta_Little Stint", "Sternula albifrons_Little Tern", "Asio otus_Long-eared Owl", "Clangula hyemalis_Long-tailed Duck", "Stercorarius longicaudus_Long-tailed Skua", "Aegithalos caudatus_Long-tailed Tit", "Pica pica_Magpie", "Anas platyrhynchos_Mallard", "Aix galericulata_Mandarin Duck", "Puffinus puffinus_Manx Shearwater", "Circus aeruginosus_Marsh Harrier", "Poecile palustris_Marsh Tit", "Anthus pratensis_Meadow Pipit", "Ichthyaetus melanocephalus_Mediterranean Gull", "Hippolais polyglotta_Melodious Warbler", "Falco columbarius_Merlin", "Turdus viscivorus_Mistle Thrush", "Circus pygargus_Montagu's Harrier", "Gallinula chloropus_Moorhen", "Cygnus olor_Mute Swan", "Nycticorax nycticorax_Night Heron", "Luscinia megarhynchos_Nightingale", "Caprimulgus europaeus_Nightjar", "No Call_No Call", "Sitta europaea_Nuthatch", "Anthus hodgsoni_Olive-backed Pipit", "Emberiza hortulana_Ortolan Bunting", "Pandion haliaetus_Osprey", "Haematopus ostralegus_Oystercatcher", "Syrrhaptes paradoxus_Pallas's Sandgrouse", "Phylloscopus proregulus_Pallas's Warbler", "Loxia pytyopsittacus_Parrot Crossbill", "Calidris melanotos_Pectoral Sandpiper", "Remiz pendulinus_Penduline Tit", "Falco peregrinus_Peregrine", "Phasianus colchicus_Pheasant", "Ficedula hypoleuca_Pied Flycatcher", "Motacilla alba_Pied Wagtail", "Anser brachyrhynchus_Pink-footed Goose", "Anas acuta_Pintail", "Aythya ferina_Pochard", "Lagopus muta_Ptarmigan", "Ardea purpurea_Purple Heron", "Calidris maritima_Purple Sandpiper", "Coturnix coturnix_Quail", "Phylloscopus schwarzi_Radde's Warbler", "Corvus corax_Raven", "Alca torda_Razorbill", "Lanius collurio_Red-backed Shrike", "Ficedula parva_Red-breasted Flycatcher", "Mergus serrator_Red-breasted Merganser", "Netta rufina_Red-crested Pochard", "Tarsiger cyanurus_Red-flanked Bluetail", "Alectoris rufa_Red-legged Partridge", "Podiceps grisegena_Red-necked Grebe", "Caprimulgus ruficollis_Red-necked Nightjar", "Phalaropus lobatus_Red-necked Phalarope", "Cecropis daurica_Red-rumped Swallow", "Gavia stellata_Red-throated Diver", "Lagopus lagopus_Red Grouse", "Milvus milvus_Red Kite", "Tringa totanus_Redshank", "Phoenicurus phoenicurus_Redstart", "Turdus iliacus_Redwing", "Emberiza schoeniclus_Reed Bunting", "Acrocephalus scirpaceus_Reed Warbler", "Anthus richardi_Richard's Pipit", "Larus delawarensis_Ring-billed Gull", "Psittacula krameri_Ring-necked Parakeet", "Turdus torquatus_Ring Ouzel", "Charadrius hiaticula_Ringed Plover", "Erithacus rubecula_Robin", "Columba livia_Rock Dove", "Anthus petrosus_Rock Pipit", "Corvus frugilegus_Rook", "Pastor roseus_Rose-coloured Starling", "Sterna dougallii_Roseate Tern", "Buteo lagopus_Rough-legged Buzzard", "Oxyura jamaicensis_Ruddy Duck", "Tadorna ferruginea_Ruddy Shelduck", "Calidris pugnax_Ruff", "Xema sabini_Sabine's Gull", "Riparia riparia_Sand Martin", "Calidris alba_Sanderling", "Thalasseus sandvicensis_Sandwich Tern", "Locustella luscinioides_Savi's Warbler", "Aythya marila_Scaup", "Loxia scotica_Scottish Crossbill", "Acrocephalus schoenobaenus_Sedge Warbler", "Calidris pusilla_Semipalmated Sandpiper", "Serinus serinus_Serin", "Tadorna tadorna_Shelduck", "Eremophila alpestris_Shore Lark", "Asio flammeus_Short-eared Owl", "Calandrella brachydactyla_Short-toed Lark", "Spatula clypeata_Shoveler", "Spinus spinus_Siskin", "Alauda arvensis_Skylark", "Podiceps auritus_Slavonian Grebe", "Gallinago gallinago_Snipe", "Plectrophenax nivalis_Snow Bunting", "Anser caerulescens_Snow Goose", "Turdus philomelos_Song Thrush", "Accipiter nisus_Sparrowhawk", "Platalea leucorodia_Spoonbill", "Porzana porzana_Spotted Crake", "Muscicapa striata_Spotted Flycatcher", "Tringa erythropus_Spotted Redshank", "Actitis macularius_Spotted Sandpiper", "Sturnus vulgaris_Starling", "Columba oenas_Stock Dove", "Burhinus oedicnemus_Stone-curlew", "Saxicola rubicola_Stonechat", "Hydrobates pelagicus_Storm Petrel", "Sylvia cantillans_Subalpine Warbler", "Hirundo rustica_Swallow", "Apus apus_Swift", "Anser fabalis_Taiga Bean Goose", "Strix aluco_Tawny Owl", "Anas crecca_Teal", "Calidris temminckii_Temminck's Stint", "Anthus trivialis_Tree Pipit", "Passer montanus_Tree Sparrow", "Certhia familiaris_Treecreeper", "Aythya fuligula_Tufted Duck", "Anser serrirostris_Tundra Bean Goose", "Arenaria interpres_Turnstone", "Streptopelia turtur_Turtle Dove", "Linaria flavirostris_Twite", "Loxia leucoptera_Two-barred Crossbill", "Anthus spinoletta_Water Pipit", "Rallus aquaticus_Water Rail", "Bombycilla garrulus_Waxwing", "Oenanthe oenanthe_Wheatear", "Numenius phaeopus_Whimbrel", "Saxicola rubetra_Whinchat", "Anser albifrons_White-fronted Goose", "Calidris fuscicollis_White-rumped Sandpiper", "Haliaeetus albicilla_White-tailed Eagle", "Chlidonias leucopterus_White-winged Black Tern", "Ciconia ciconia_White Stork", "Sylvia communis_Whitethroat", "Cygnus cygnus_Whooper Swan", "Mareca penelope_Wigeon", "Poecile montanus_Willow Tit", "Phylloscopus trochilus_Willow Warbler", "Tringa glareola_Wood Sandpiper", "Phylloscopus sibilatrix_Wood Warbler", "Scolopax rusticola_Woodcock", "Lullula arborea_Woodlark", "Columba palumbus_Woodpigeon", "Troglodytes troglodytes_Wren", "Jynx torquilla_Wryneck", "Phylloscopus inornatus_Yellow-browed Warbler", "Larus michahellis_Yellow-legged Gull", "Motacilla flava_Yellow Wagtail", "Emberiza citrinella_Yellowhammer", "animals_animals", "vehicles_vehicles"];
+let labels = [];
 
 // Get the modules loaded in preload.js
 const fs = window.module.fs;
@@ -76,7 +76,6 @@ let waveCanvasElement, waveWaveElement,
     resultTableElement = $('#resultTableContainer');
 resultTableElement.animate({scrollTop: '300px'}, 400, 'swing');
 let contentWrapperElement = $('#contentWrapper');
-
 let completeDiv = $('#complete');
 const resultTable = $('#resultTableBody')
 const nocmigButton = document.getElementById('nocmigMode');
@@ -90,6 +89,10 @@ const timeline = document.getElementById('loadTimeline');
 const inferno = document.getElementById('inferno');
 const greys = document.getElementById('greys');
 const loadSpectrogram = document.getElementById('loadSpectrogram');
+const resultsDiv = document.getElementById('resultsDiv');
+const summaryButton = document.getElementById('showSummary');
+const summaryDiv = document.getElementById('summary');
+
 
 let batchInProgress = false;
 let activeRow;
@@ -164,8 +167,12 @@ console.table(diagnostics);
 function resetResults() {
     summary = {};
     summaryTable.empty();
+    summaryDiv.classList.add('d-none');
+    resultsDiv.classList.remove('col-sm-9');
+    resultsDiv.classList.add('col-sm-12');
     resultTable.empty();
     predictions = {};
+    //refreshResultsView()
     seenTheDarkness = false;
     shownDaylightBanner = false;
     progressDiv.hide();
@@ -540,28 +547,30 @@ function refreshResultsView() {
     hideAll();
     if (fileLoaded) {
         showElement(['spectrogramWrapper'], false);
-        if (!isEmptyObject(predictions)) showElement(['resultTableContainer'], false);
+        if (!isEmptyObject(predictions)) {
+            showElement(['resultTableContainer'], false);
+        }
     } else {
         showElement(['loadFileHint', 'loadFileHintText'], true);
     }
     adjustSpecDims(true);
 }
 
-// const navbarAnalysis = document.getElementById('navbarAnalysis');
-// navbarAnalysis.addEventListener('click', async () => {
-//     refreshResultsView();
-// });
+const navbarAnalysis = document.getElementById('navbarAnalysis');
+navbarAnalysis.addEventListener('click', async () => {
+    refreshResultsView();
+});
 
 const analyzeLink = document.getElementById('analyze');
 //speciesExclude = document.querySelectorAll('speciesExclude');
 analyzeLink.addEventListener('click', async () => {
-    refreshResultsView()
+    resetResults();
     postAnalyzeMessage({confidence: config.minConfidence, resetResults: true, files: [currentFile], selection: false});
 });
 
 const analyzeAllLink = document.getElementById('analyzeAll');
 analyzeAllLink.addEventListener('click', async () => {
-    refreshResultsView();
+    resetResults();
     postAnalyzeMessage({confidence: config.minConfidence, resetResults: true, files: fileList, selection: false});
 });
 
@@ -680,6 +689,7 @@ exploreLink.addEventListener('click', async () => {
     worker.postMessage({action: 'get-detected-species'});
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
+    hideElement([completeDiv]);
     adjustSpecDims(true);
 });
 
@@ -999,14 +1009,6 @@ window.onload = async () => {
     config.UUID = uuidv4();
     // Load preferences and override defaults
     [appPath, tempPath] = await getPaths();
-    worker.postMessage({
-        action: 'load-db',
-        path: appPath,
-        temp: tempPath,
-        lat: config.latitude,
-        lon: config.longitude
-    })
-
     fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
         if (err) {
             console.log('JSON parse error ' + err);
@@ -1050,7 +1052,7 @@ window.onload = async () => {
         // Set UI option state
         const batchSizeElement = document.getElementById(config.batchSize);
         batchSizeElement.checked = true;
-
+        diagnostics['Batch size'] = config.batchSize;
         const modelToUse = document.getElementById(config.model);
         modelToUse.checked = true;
         diagnostics['Model'] = config.model;
@@ -1093,17 +1095,25 @@ window.onload = async () => {
         thresholdLink.value = config.minConfidence * 100;
 
         showElement([config.colormap + 'span'], true)
+        t0_warmup = Date.now();
+        worker.postMessage({
+            action: 'init',
+            path: appPath,
+            temp: tempPath,
+            lat: config.latitude,
+            lon: config.longitude
+        });
         worker.postMessage({
             action: 'load-model',
             model: config.model,
             list: config.list,
             batchSize: config.batchSize,
-            warmup: config.warmup
+            warmup: config.warmup,
         });
+
     })
     // establish the message channel
     establishMessageChannel.then((success) => {
-        t0_warmup = Date.now();
         worker.addEventListener('message', function (e) {
             const args = e.data;
             const event = args.event;
@@ -1153,8 +1163,6 @@ window.onload = async () => {
     })
     // Set footer year
     $('#year').text(new Date().getFullYear());
-    // Put the bird list in its parking lot
-    generateBirdList('allSpecies');
     //Cache list elements
     speciesListItems = $('#bird-list li span');
 };
@@ -1647,8 +1655,12 @@ function initSpectrogram(height, fftSamples) {
     if (!fftSamples) {
         if (windowLength < 5) {
             fftSamples = 256;
-        } else {
+        } else if (windowLength <= 15) {
             fftSamples = 512;
+        } else if (windowLength < 20) {
+            fftSamples = 1024;
+        } else {
+            fftSamples = 2048;
         }
     }
     if (!height) {
@@ -1703,13 +1715,14 @@ for (let i = 0; i < modelToUse.length; i++) {
         config.model = e.target.value;
         updatePrefs();
         diagnostics['Model'] = config.model;
+        t0_warmup = Date.now();
         worker.postMessage({
             action: 'load-model',
             model: config.model,
             list: config.list,
             batchSize: config.batchSize,
-            warmup: config.warmup
-        })
+            warmup: config.warmup,
+        });
     })
 }
 
@@ -1995,6 +2008,13 @@ function displayWarmUpMessage() {
 
 function onModelReady(args) {
     modelReady = true;
+    worker.postMessage({
+        action: 'load-db',
+        path: appPath,
+    })
+    labels = args.labels;
+    // Put the bird list in its parking lot
+    generateBirdList('allSpecies');
     warmupText.classList.add('d-none');
     if (workerHasLoadedFile) {
         enableMenuItem(['analyze'])
@@ -2004,6 +2024,7 @@ function onModelReady(args) {
     t1_warmup = Date.now();
     diagnostics['Warm Up'] = ((t1_warmup - t0_warmup) / 1000).toFixed(2) + ' seconds';
     diagnostics['Tensorflow Backend'] = args.backend;
+    //resetResults();
 }
 
 
@@ -2066,6 +2087,7 @@ async function onWorkerLoadedAudio(args) {
             audio: currentBuffer,
             backend: 'WebAudio',
             alpha: 0,
+            reset: true
         });
     } else {
         if (wavesurfer) wavesurfer.clearRegions();
@@ -2095,12 +2117,7 @@ function updateSummary() {
     speciesName = document.querySelectorAll('#results .cname');
     speciesName.forEach(row => {
         const key = row.innerHTML;
-        if (key in summary) {
-
-            summary[key] += 1
-        } else {
-            summary[key] = 1
-        }
+        key in summary ? summary[key] += 1 : summary[key] = 1;
     })
 
     console.table(summary);
@@ -2240,7 +2257,7 @@ async function onPredictionDone(args) {
     diagnostics['Analysis Rate'] = (diagnostics['Audio Duration'] / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
 
     //show summary table
-    if (summaryButton.innerText.indexOf('Show') !== -1) summaryButton.click();
+    summaryButton.click();
 }
 
 function scrollResults(row) {
@@ -2387,7 +2404,7 @@ async function renderResult(args) {
                 <td></td>                    
                 <td class='text-center'>${iconizeScore(result.score2)}</td>
                 <td> </td><td class='specFeature'> </td>
-                <td><a href='https://xeno-canto.org/explore?query=${result.sname2}%20type:nocturnal' target=\"_blank\">
+                <td><a href='https://xeno-canto.org/explore?query=${result.sname2}%20type:"nocturnal flight call"' target=\"_blank\">
                     <img src='img/logo/XC.png' alt='Search ${result.cname2} on Xeno Canto' title='${result.cname2} NFCs on Xeno Canto'></a> </td>
                 <td> </td>
                 <td> </td>
@@ -2402,7 +2419,7 @@ async function renderResult(args) {
                     <td></td>
                     <td class='text-center'>${iconizeScore(result.score3)}</td>
                     <td> </td><td class='specFeature'> </td>
-                    <td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:nocturnal' target=\"_blank\">
+                    <td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:"nocturnal flight call"' target=\"_blank\">
                         <img src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>
                     <td> </td>
                     <td> </td>
@@ -2534,7 +2551,6 @@ function addEvents(element) {
         this.innerHTML = element === 'comment' ?
             `<span title="Add a ${element}" class="material-icons-two-tone pointer add-${element} d-none">add_${element}</span>` :
             tags['Remove Label'];
-
     })
 }
 
@@ -2546,12 +2562,19 @@ function getSpeciesIndex(e) {
     clickedIndex = clickedNode.querySelector('th') ? clickedNode.querySelector('th').innerText : null;
 }
 
-const summaryButton = document.getElementById('showSummary');
 summaryButton.addEventListener('click', () => {
-    summaryTable.animate({width: 'toggle'});
-    summaryButton.innerText.indexOf('Show') !== -1 ?
-        summaryButton.innerText = 'Hide Summary' :
+    if (summaryButton.innerText.indexOf('Show') !== -1) {
+        summaryButton.innerText = 'Hide Summary';
+        summaryDiv.classList.remove('d-none');
+        resultsDiv.classList.add('col-sm-9');
+        resultsDiv.classList.remove('col-sm-12');
+    } else {
         summaryButton.innerText = 'Show Summary';
+        summaryDiv.classList.add('d-none');
+        resultsDiv.classList.remove('col-sm-9');
+        resultsDiv.classList.add('col-sm-12');
+    }
+    summaryTable.animate({width: 'toggle'});
 });
 
 $(document).on('click', '.download', function (e) {
@@ -2761,12 +2784,14 @@ const batchRadios = document.getElementsByName('batch');
 for (let i = 0; i < batchRadios.length; i++) {
     batchRadios[i].addEventListener('click', (e) => {
         config.batchSize = e.target.value;
+        diagnostics['Batch size'] = config.batchSize;
+        t0_warmup = Date.now();
         worker.postMessage({
             action: 'load-model',
             model: config.model,
             list: config.list,
             batchSize: config.batchSize,
-            warmup: config.warmup
+            warmup: config.warmup,
         });
         updatePrefs();
     })
@@ -2789,6 +2814,7 @@ document.addEventListener('drop', async (event) => {
     }
     if (filelist.length) await onOpenFiles({filePaths: filelist})
 });
+
 // Prevent drag for UI elements
 bodyElement.on('dragstart', e => {
     e.preventDefault()
@@ -2848,7 +2874,6 @@ $(function () {
                     }
                 }
             }
-
         });
     })
 });
