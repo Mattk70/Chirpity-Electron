@@ -164,10 +164,13 @@ si.mem()
 console.table(diagnostics);
 
 
-function resetResults() {
-    summary = {};
-    summaryTable.empty();
-    summaryDiv.classList.add('d-none');
+function resetResults(args) {
+    if (args && !args.saveSummary) {
+        summary = {};
+        summaryTable.empty();
+        summaryDiv.classList.add('d-none');
+    }
+
     resultsDiv.classList.remove('col-sm-9');
     resultsDiv.classList.add('col-sm-12');
     resultTable.empty();
@@ -678,7 +681,7 @@ save2dbLink.addEventListener('click', async () => {
 
 const chartsLink = document.getElementById('charts');
 chartsLink.addEventListener('click', async () => {
-    worker.postMessage({action: 'get-detected-species'});
+    worker.postMessage({action: 'get-detected-species=list'});
     hideAll();
     showElement(['recordsContainer']);
     worker.postMessage({action: 'chart', species: undefined, range: {}});
@@ -686,7 +689,7 @@ chartsLink.addEventListener('click', async () => {
 
 const exploreLink = document.getElementById('explore');
 exploreLink.addEventListener('click', async () => {
-    worker.postMessage({action: 'get-detected-species'});
+    worker.postMessage({action: 'get-detected-species-list'});
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
     hideElement([completeDiv]);
@@ -1153,7 +1156,7 @@ window.onload = async () => {
                     onChartData(args);
                     break;
                 case 'reset-results':
-                    resetResults();
+                    resetResults(args);
                     break;
                 case 'generate-alert':
                     alert(args.message)
@@ -2186,7 +2189,7 @@ async function onPredictionDone(args) {
         disableMenuItem(['saveLabels', 'save2db']);
     }
     analyzeLink.disabled = false;
-    updateSummary();
+    if (!args.saveSummary) updateSummary();
     subRows = document.querySelectorAll('.subrow')
 
     speciesFilter = document.querySelectorAll('.speciesFilter');
@@ -2218,33 +2221,23 @@ async function onPredictionDone(args) {
     $(document).on('click', '.speciesFilter', function (e) {
         // Check if italic section was clicked
         speciesFilter = document.querySelectorAll('.speciesFilter');
-        const target = this.querySelector('span.pointer')
-        const spinner = this.querySelector('span.spinner-border');
-        if (spinner === null) return;
+        const target = this.querySelector('span.pointer');
         const targetClass = target.classList;
         if (targetClass.contains('text-success')) {
             // Clicked on filtered species icon
             targetClass.remove('text-success')
-            speciesName.forEach(function (el) {
-                const classes = el.parentNode.classList;
-                if (!classes.contains('hidden')) classes.remove('d-none')
-            })
+            worker.postMessage({action: 'filter'});
+
         } else {
             // Clicked on unfiltered species name
-
             // Remove any exclusion from the species to filter
             speciesFilter.forEach(function (el) {
                 const removeFrom = el.querySelector('span.pointer')
                 removeFrom.classList.remove('text-success');
             })
-            // Hide open subrows
-            subRows.forEach(function (el) {
-                el.classList.add('d-none');
-            })
-            targetClass.add('text-success', 'd-none');
-            spinner.classList.remove('d-none');
-            // Allow spinner to show
-            setTimeout(matchSpecies, 1, this, target, spinner, 'filter');
+            targetClass.add('text-success');
+            const species = target.innerHTML.replace(/\s<.*/, '')
+            worker.postMessage({action: 'filter', species: species});
         }
         //scrollResults(tableRows[0]);
         document.getElementById('results').scrollTop = 0;
@@ -2258,6 +2251,10 @@ async function onPredictionDone(args) {
 
     //show summary table
     summaryButton.click();
+    // midnight hack: arrgh, but it works...
+    if (summaryDiv.classList.contains('d-none')) {
+        summaryButton.click();
+    }
 }
 
 function scrollResults(row) {
@@ -2265,34 +2262,6 @@ function scrollResults(row) {
     activeRow = row;
     const container = row.closest('.overflow-auto')
     container.scrollTop = row.offsetTop - container.offsetTop - document.getElementById('resultsHead').offsetHeight;
-}
-
-function matchSpecies(row, target, spinner, mode) {
-    const spinnerClasses = spinner.classList;
-    const targetClass = target.classList;
-    let resultSpecies, currentRow;
-    const tableContext = row.closest('table').id;
-    if (tableContext === 'results') {
-        currentRow = spinner.closest('tr');
-        currentRow.classList.add('strikethrough');
-        resultSpecies = currentRow.querySelectorAll('td.cname');
-    } else {
-        resultSpecies = speciesName;
-    }
-    // What are we looking for?
-    const lookup = target.innerText;
-    resultSpecies.forEach(function (el) {
-        const classes = el.parentNode.classList;
-        // Extract species name from cell
-        const searchFor = el.innerText;
-        if (searchFor === lookup || tableContext === 'results') {
-            if (mode === 'filter' || mode === 'unhide') {
-                classes.remove('d-none', 'hidden');
-            } else classes.add('d-none', 'hidden'); // mode == hide
-        } else if (mode === 'filter') classes.add('d-none');
-    })
-    spinnerClasses.add('d-none');
-    targetClass.remove('d-none');
 }
 
 async function renderResult(args) {
@@ -2315,8 +2284,8 @@ async function renderResult(args) {
         showElement(['resultTableContainer'], false);
         if (!selection) {
             // Remove old results
-            resultTable.empty();
-            summaryTable.empty();
+            // resultTable.empty();
+            // summaryTable.empty();
         } else {
             resultTable.append('<tr><td class="bg-dark text-white text-center" colspan="-1"><b>Selection Analysis</b></td></tr>')
         }
