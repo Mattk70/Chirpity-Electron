@@ -201,6 +201,7 @@ ipcRenderer.on('new-client', (event) => {
                 // Check the archive database
                 await loadDB(appPath);
                 args.db = diskDB;
+                args.saveSummary = false;
                 await sendResults2UI(args);
                 break;
             case 'analyze':
@@ -232,13 +233,13 @@ ipcRenderer.on('new-client', (event) => {
 })
 
 const sendResults2UI = async (args) => {
-    // reset results table, but not summary
-    UI.postMessage({event: 'reset-results', saveSummary: true});
+    // reset results table
+    UI.postMessage({event: 'reset-results', saveSummary: args.saveSummary});
     // And clear results from memory
 
     RESULTS = [];
     let results = await getCachedResults({
-        db: memoryDB,
+        db: args.db,
         species: args.species,
         range: args.range,
         files: args.filelist
@@ -268,7 +269,7 @@ const sendResults2UI = async (args) => {
     UI.postMessage({
         event: 'prediction-done',
         batchInProgress: false,
-        saveSummary: true,
+        saveSummary: args.saveSummary,
     });
 }
 
@@ -1432,11 +1433,11 @@ const onSave2DB = async (db) => {
     }
 }
 
-const getSeasonRecords = (species, season) => {
+const getSeasonRecords = async (species, season) => {
+    await loadDB(appPath);
     const seasonMonth = {spring: "< '07'", autumn: " > '06'"}
     return new Promise(function (resolve, reject) {
         const stmt = diskDB.prepare(`
-    }
             SELECT MAX(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS maxDate,
                    MIN(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS minDate
             FROM records
