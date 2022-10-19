@@ -167,8 +167,8 @@ async function createWorker() {
 
 // This method will be called when Electron has finished
 app.whenReady().then(async () => {
-    ipcMain.handle('getPath', (e) => app.getPath('userData'));
-    ipcMain.handle('getTemp', (e) => app.getPath('temp'));
+    ipcMain.handle('getPath', () => app.getPath('userData'));
+    ipcMain.handle('getTemp', () => app.getPath('temp'));
     ipcMain.handle('getVersion', () => app.getVersion());
 
     await createWorker();
@@ -209,10 +209,10 @@ app.whenReady().then(async () => {
         app.dock.bounce();
     }
 
-    app.on('activate', () => {
+    app.on('activate', async  () => {
         if (BrowserWindow.getAllWindows().length === 0) {
-            createWorker();
-            createWindow();
+            await createWorker();
+            await createWindow();
         }
     })
 
@@ -234,7 +234,7 @@ app.whenReady().then(async () => {
         dialog.showMessageBox(dialogOpts).then((returnValue) => {
             if (returnValue.response === 0) {
                 app.relaunch();
-                app.quit()
+                app.quit();
             }
         })
     });
@@ -278,13 +278,13 @@ app.on('window-all-closed', () => {
 //     await session.defaultSession.clearStorageData();
 // })
 
-app.on('activate', () => {
+app.on('activate', async () => {
     if (mainWindow === null) {
-        createWindow();
+        await createWindow();
     }
 
     if (workerWindow == null) {
-        createWorker();
+        await createWorker();
     }
 });
 
@@ -294,14 +294,13 @@ ipcMain.handle('dialog', (event, method, params) => {
 
 ipcMain.handle('openFiles', async () => {
     // Show file dialog to select audio file
-    const result = await dialog.showOpenDialog(mainWindow, {
+    return await dialog.showOpenDialog(mainWindow, {
         filters: [{
             name: 'Audio Files',
             extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus']
         }],
         properties: ['openFile', 'multiSelections']
     });
-    return result;
 })
 ipcMain.handle('saveFile', (event, arg) => {
     // Show file dialog to select audio file
