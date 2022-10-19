@@ -1421,7 +1421,7 @@ const onSave2DB = async (db) => {
                     UI.postMessage({event: 'progress', text: "Updating Database.", progress: i / RESULTS.length});
                     if (i === (RESULTS.length - 1)) {
                         db.run('COMMIT', (err, rows) => {
-                            UI.postMessage({event: 'generate-alert', message: `Update complete, ${i + 1} records updated in ${((performance.now() - t0) / 1000).toFixed(3)} seconds`})
+                            if (db === diskDB) UI.postMessage({event: 'generate-alert', message: `Update complete, ${i + 1} records updated in ${((performance.now() - t0) / 1000).toFixed(3)} seconds`})
                             UI.postMessage({event: 'progress', progress: 1.0});
                         });
                     }
