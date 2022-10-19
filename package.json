@@ -149,6 +149,7 @@
     "electron-wix-msi": "^4.0.0"
   },
   "dependencies": {
+    "electron-settings": "^4.0.2",
     "@tensorflow/tfjs": "3.18.0",
     "bootstrap": "^5.2.2",
     "browser-id3-writer": "^4.4.0",
