@@ -172,7 +172,7 @@ app.whenReady().then(async () => {
     ipcMain.handle('getVersion', () => app.getVersion());
 
     await createWorker();
-    createWindow();
+    await createWindow();
     // We'll be sending one end of this channel to the main world of the
     // context-isolated page.
 
