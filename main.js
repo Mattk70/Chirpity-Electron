@@ -1,6 +1,7 @@
 const {app, dialog, ipcMain, MessageChannelMain, BrowserWindow} = require('electron');
 const fs = require("fs");
-const path = require('path')
+const path = require('path');
+const settings = require('electron-settings');
 
 //require('update-electron-app')();
 global.sharedObject = {prop1: process.argv};
@@ -31,25 +32,77 @@ process.stdin.resume();//so the program will not close instantly
 
 function exitHandler(options, exitCode) {
     if (options.cleanup) console.log('clean');
-    else { console.log('no clean')}
+    else {
+        console.log('no clean')
+    }
     if (exitCode || exitCode === 0) console.log(exitCode);
     if (options.exit) process.exit();
 }
 
 //do something when app is closing
-process.on('exit', exitHandler.bind(null,{cleanup:false}));
+process.on('exit', exitHandler.bind(null, {cleanup: false}));
 
 let mainWindow;
 let workerWindow;
 
 
-function createWindow() {
+async function windowStateKeeper(windowName) {
+    let window, windowState;
+
+    async function setBounds() {
+        // Restore from settings
+        if (await settings.has(`windowState.${windowName}`)) {
+            windowState = await settings.get(`windowState.${windowName}`);
+        } else {
+            // Default
+            windowState = {
+                x: undefined,
+                y: undefined,
+                width: 1280,
+                height: 768,
+            };
+        }
+    }
+
+    async function saveState() {
+        if (!windowState.isMaximized) {
+            windowState = window.getBounds();
+        }
+        windowState.isMaximized = window.isMaximized();
+        await settings.set(`windowState.${windowName}`, windowState);
+    }
+
+    function track(win) {
+        window = win;
+        ['resize', 'move', 'close'].forEach(event => {
+            win.on(event, saveState);
+        });
+    }
+
+    await setBounds();
+    return ({
+        x: windowState.x,
+        y: windowState.y,
+        width: windowState.width,
+        height: windowState.height,
+        isMaximized: windowState.isMaximized,
+        track,
+    });
+}
+
+async function createWindow() {
     // Create the browser window.
+    // Get window state
+    const mainWindowStateKeeper = await windowStateKeeper('main');
+
     mainWindow = new BrowserWindow({
         show: false,
         title: "Chirpity Nocmig",
-        width: 1280,
-        height: 768,
+        x: mainWindowStateKeeper.x,
+        y: mainWindowStateKeeper.y,
+        width: mainWindowStateKeeper.width,
+        height: mainWindowStateKeeper.height,
+
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: true,
@@ -57,6 +110,8 @@ function createWindow() {
             backgroundThrottling: false
         }
     })
+    // Track window state
+    mainWindowStateKeeper.track(mainWindow);
 
     // Set icon
     mainWindow.setIcon(__dirname + '/img/icon/icon.png');
@@ -83,10 +138,14 @@ function createWindow() {
 
 async function createWorker() {
     // hidden worker
+        // Get window state
+    const mainWindowStateKeeper = await windowStateKeeper('worker');
     workerWindow = new BrowserWindow({
         show: true,
-        height: 800,
-        width: 1200,
+        x: mainWindowStateKeeper.x,
+        y: mainWindowStateKeeper.y,
+        width: mainWindowStateKeeper.width,
+        height: mainWindowStateKeeper.height,
         webPreferences: {
             nodeIntegration: true,
             nodeIntegrationInWorker: false,
@@ -94,6 +153,8 @@ async function createWorker() {
             backgroundThrottling: false
         }
     });
+        // Track window state
+    mainWindowStateKeeper.track(workerWindow);
     workerWindow.setIcon(__dirname + '/img/icon/icon.png');
     await workerWindow.loadFile('worker.html');
 

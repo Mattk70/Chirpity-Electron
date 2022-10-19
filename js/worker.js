@@ -143,6 +143,7 @@ ipcRenderer.on('new-client', (event) => {
                 latitude = args.lat, longitude = args.lon, TEMP = args.temp, appPath = args.path;
                 break;
             case 'update-record':
+                args.db = diskDB;
                 await onUpdateRecord(args)
                 break;
             case 'update-file-start':
@@ -236,7 +237,17 @@ const sendResults2UI = async (args) => {
     // And clear results from memory
 
     RESULTS = [];
-    const results = await getCachedResults({db: args.db, species: args.species, range: args.range});
+    let results = await getCachedResults({
+        db: memoryDB,
+        species: args.species,
+        range: args.range,
+        files: args.filelist
+    });
+    // No results? Try the archive
+    if (!results.length) {
+        console.log(`No results in the memory db, trying the archive db.`);
+        results = await getCachedResults({db: diskDB, species: args.species, range: args.range, files: args.filelist});
+    }
     index = 0;
     results.forEach(result => {
         //format dates
@@ -248,11 +259,10 @@ const sendResults2UI = async (args) => {
             file: result.file,
             result: result,
             index: index,
-            selection: false,
+            selection: args.selection,
         });
         RESULTS.push(result);
     })
-    console.log(`Pulling results for ${args.species} from the archive database`);
     // When in batch mode the 'prediction-done' event simply increments
     // the counter for the file being processed
     UI.postMessage({
@@ -263,7 +273,9 @@ const sendResults2UI = async (args) => {
 }
 
 const onAnalyze = async (args) => {
-    console.log(`Worker received message: ${args.filePath}, ${args.confidence}, start: ${args.start}, end: ${args.end}`);
+    console.log(`Worker received message: ${args.files}, ${args.confidence}, start: ${args.start}, end: ${args.end}`);
+    // Analyze works on one file at a time
+    const file = args.files[0];
     if (args.resetResults) {
         index = 0;
         AUDACITY = [];
@@ -273,18 +285,19 @@ const onAnalyze = async (args) => {
     latitude = args.lat;
     longitude = args.lon;
     nocmig = args.nocmig;
-    FILE_QUEUE.push(args.filePath);
-    console.log(`Adding ${args.filePath} to the queue.`)
-    const cachedFile = await isDuplicate(args.filePath);
+    FILE_QUEUE.push(file);
+    console.log(`Adding ${file} to the queue.`)
+    // check if results for the file have been saved to the disk DB
+    const cachedFile = await isDuplicate(file);
     if (cachedFile && !args.selection) {
         //remove the file from the queue - wherever it sits, this prevents out of
         // sequence issues with batch analysis
-        const place = FILE_QUEUE.indexOf(args.filePath);
+        const place = FILE_QUEUE.indexOf(file);
         if (place > -1) { // only splice array when item is found
             FILE_QUEUE.splice(place, 1); // 2nd parameter means remove one item only
         }
         // Pull the results from the database
-        const results = await getCachedResults({db: diskDB, file: cachedFile, range: {}});
+        const results = await getCachedResults({db: diskDB, files: [cachedFile], range: {}});
         UI.postMessage({event: 'update-audio-duration', value: metadata[cachedFile].duration});
         results.forEach(result => {
             //format dates
@@ -301,7 +314,7 @@ const onAnalyze = async (args) => {
             //AUDACITY.push(audacity);
             RESULTS.push(result);
         })
-        console.log(`Pulling results for ${args.filePath} from database`);
+        console.log(`Pulling results for ${file} from the memory database`);
         // When in batch mode the 'prediction-done' event simply increments
         // the counter for the file being processed
         UI.postMessage({
@@ -931,7 +944,7 @@ const bufferToAudio = (file, start, metadata) => {
                 console.log('An error occurred: ' + err.message);
             })
             .on('end', function () {
-                console.log('Formatting finished')
+                console.log('Opus file rendered')
             })
             .writeToStream(bufferStream);
 
@@ -1269,7 +1282,13 @@ const getCachedResults = (args) => {
     let where = '';
     const db = args.db;
     const dateRange = args.range;
-    if (args.file) where = ` WHERE files.name =  '${args.file.replace("'", "''")}'`;
+    //if (args.file) where = ` WHERE files.name =  '${args.file.replace("'", "''")}'`;
+    if (args.files) {
+        // Format the file list
+        let files = `("${args.files.toString()}")`;
+        files = files.replaceAll("'", "''");
+        where = ` WHERE files.name IN  ${files}`;
+    }
     if (args.species) where = `WHERE s1.cname =  '${args.species.replace("'", "''")}'`;
     const when = dateRange && dateRange.start ? `AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
     return new Promise(function (resolve, reject) {
@@ -1290,7 +1309,7 @@ const getCachedResults = (args) => {
                 LEFT JOIN species s1 on s1.id = birdid1 
                 LEFT JOIN species s2 on s2.id = birdid2 
                 LEFT JOIN species s3 on s3.id = birdid3 
-                INNER JOIN files on files.rowid = records.fileid 
+                INNER JOIN files on files.rowid = records.fileid
                 ${where}
                 ${when}`,
             (err, rows) => {
@@ -1304,12 +1323,11 @@ const getCachedResults = (args) => {
 }
 
 const isDuplicate = async (file) => {
-    const db = diskDB;
     const baseName = file.replace(/^(.*)\..*$/g, '$1').replace("'", "''");
     return new Promise(async (resolve) => {
-        db.get(`SELECT *
-                FROM files
-                WHERE name LIKE '${baseName}%'`, (err, row) => {
+        diskDB.get(`SELECT *
+                    FROM files
+                    WHERE name LIKE '${baseName}%'`, (err, row) => {
             if (row) {
                 metadata[row.name] = {fileStart: row.filestart, duration: row.duration}
                 resolve(row.name)
@@ -1344,6 +1362,7 @@ const getFileInfo = async (file) => {
 }
 
 const updateFileTables = async (db, file) => {
+    if (!metadata[file].isComplete) await getWorkingFile(file);
     return new Promise(function (resolve) {
         const newFileStmt = db.prepare("INSERT INTO files VALUES (?,?,?)");
         const selectStmt = db.prepare('SELECT rowid FROM files WHERE name = (?)');
@@ -1380,32 +1399,36 @@ const getFileIDs = (db) => {
 
 const onSave2DB = async (db) => {
     t0 = performance.now();
-    db.run('BEGIN TRANSACTION');
-    const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-    let filemap = await getFileIDs(db)
-    for (let i = 0; i < RESULTS.length; i++) {
-        const dateTime = new Date(RESULTS[i].timestamp).getTime();
-        const birdID1 = RESULTS[i].id_1;
-        const birdID2 = RESULTS[i].id_2;
-        const birdID3 = RESULTS[i].id_3;
-        const conf1 = RESULTS[i].score;
-        const conf2 = RESULTS[i].score2;
-        const conf3 = RESULTS[i].score3;
-        const position = new Date(RESULTS[i].position).getTime();
-        const file = RESULTS[i].file;
-        const comment = RESULTS[i].comment;
-        const label = RESULTS[i].label;
-        if (!filemap[file]) filemap[file] = await updateFileTables(db, file);
-        stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, filemap[file], position, comment, label,
-            (err, row) => {
-                UI.postMessage({event: 'progress', text: "Updating Database.", progress: i / RESULTS.length});
-                if (i === (RESULTS.length - 1)) {
-                    db.run('COMMIT', (err, rows) => {
-                        console.log(`Update complete, ${i + 1} records added in ${((performance.now() - t0) / 1000).toFixed(5)} seconds`)
-                        UI.postMessage({event: 'progress', progress: 1.0});
-                    });
-                }
-            });
+    if (RESULTS.length) {
+        db.run('BEGIN TRANSACTION');
+        const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+        let filemap = await getFileIDs(db)
+        for (let i = 0; i < RESULTS.length; i++) {
+            const dateTime = new Date(RESULTS[i].timestamp).getTime();
+            const birdID1 = RESULTS[i].id_1;
+            const birdID2 = RESULTS[i].id_2;
+            const birdID3 = RESULTS[i].id_3;
+            const conf1 = RESULTS[i].score;
+            const conf2 = RESULTS[i].score2;
+            const conf3 = RESULTS[i].score3;
+            const position = new Date(RESULTS[i].position).getTime();
+            const file = RESULTS[i].file;
+            const comment = RESULTS[i].comment;
+            const label = RESULTS[i].label;
+            if (!filemap[file]) filemap[file] = await updateFileTables(db, file);
+            stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, filemap[file], position, comment, label,
+                (err, row) => {
+                    UI.postMessage({event: 'progress', text: "Updating Database.", progress: i / RESULTS.length});
+                    if (i === (RESULTS.length - 1)) {
+                        db.run('COMMIT', (err, rows) => {
+                            UI.postMessage({event: 'generate-alert', message: `Update complete, ${i + 1} records updated in ${((performance.now() - t0) / 1000).toFixed(3)} seconds`})
+                            UI.postMessage({event: 'progress', progress: 1.0});
+                        });
+                    }
+                });
+        }
+    } else {
+        console.log('No results to save')
     }
 }
 
@@ -1413,6 +1436,7 @@ const getSeasonRecords = (species, season) => {
     const seasonMonth = {spring: "< '07'", autumn: " > '06'"}
     return new Promise(function (resolve, reject) {
         const stmt = diskDB.prepare(`
+    }
             SELECT MAX(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS maxDate,
                    MIN(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS minDate
             FROM records
@@ -1630,9 +1654,9 @@ let speciesCache = {};
 const cacheSpecies = (cname) => {
     cname = cname.replace("'", "''");
     return new Promise((resolve, reject) => {
-        db.get(`SELECT *
-                FROM SPECIES
-                WHERE cname = '${cname}'`, (err, row) => {
+        memoryDB.get(`SELECT *
+                      FROM SPECIES
+                      WHERE cname = '${cname}'`, (err, row) => {
             if (err) reject(err)
             else {
                 speciesCache[cname] = {id: row.id, cname: row.cname, sname: row.sname}
@@ -1670,7 +1694,7 @@ const onUpdateRecord = async (args) => {
     await updateResults(args);
     if (what === 'ID') {
         what = 'birdID1';
-        value = speciesCache[args.value].id; //await getBirdID(value);
+        value = speciesCache[args.value].id;
     }
     if (!metadata[file]) metadata[file] = {};
     if (!metadata[file].fileStart) {
@@ -1678,14 +1702,27 @@ const onUpdateRecord = async (args) => {
     }
     const dateTime = metadata[file].fileStart + (start * 1000);
     return new Promise(function (resolve, reject) {
-        db.get(`UPDATE records
+        db.run(`UPDATE records
                 SET ${what} = '${value}'
-                WHERE datetime = '${dateTime}'`, (err, row) => {
+                WHERE datetime = '${dateTime}'`, function (err, row) {
             if (err) {
                 reject(err)
             } else {
                 resolve(row)
-                if (row) console.log(`Updated ${what}, setting ${dateTime} to ${value}`);
+                if (this.changes) {
+                    console.log(`Updated ${what} in ${db.filename.replace(/.*\//, '')} database, setting ${dateTime} to ${value}`)
+                } else {
+                    console.log(`No records updated in ${db.filename.replace(/.*\//, '')}`)
+                    // Update memoryDB
+                    if (args.db === diskDB) {
+                        args.db = memoryDB;
+                        onUpdateRecord(args);
+                        UI.postMessage({
+                            event: 'generate-alert',
+                            message: 'Remember to save your records to store this change'
+                        })
+                    }
+                }
             }
         })
     })

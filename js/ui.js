@@ -561,6 +561,7 @@ function refreshResultsView() {
 
 const navbarAnalysis = document.getElementById('navbarAnalysis');
 navbarAnalysis.addEventListener('click', async () => {
+
     refreshResultsView();
 });
 
@@ -579,9 +580,9 @@ analyzeAllLink.addEventListener('click', async () => {
 
 const analyzeSelectionLink = document.getElementById('analyzeSelection');
 analyzeSelectionLink.addEventListener('click', async () => {
-    refreshResultsView();
-    delete diagnostics['Audio Duration'];
-    analyseReset();
+    //refreshResultsView();
+    //delete diagnostics['Audio Duration'];
+    //analyseReset();
     progressDiv.show();
     const start = region.start + bufferBegin;
     let end = region.end + bufferBegin;
@@ -618,7 +619,7 @@ function postAnalyzeMessage(args) {
             nocmig: config.nocmig,
             lat: config.latitude,
             lon: config.longitude,
-            filePath: file,
+            files: [file],
             selection: args.selection
         });
     })
@@ -692,7 +693,7 @@ exploreLink.addEventListener('click', async () => {
     worker.postMessage({action: 'get-detected-species-list'});
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
-    hideElement([completeDiv]);
+    hideElement(['completeDiv']);
     adjustSpecDims(true);
 });
 
@@ -760,6 +761,10 @@ function loadResultRegion(paramlist) {
     currentFile = file;
     start = parseFloat(start);
     end = parseFloat(end);
+
+    // ensure region doesn't spread across the whole window
+    if (windowLength <= 3.5) windowLength = 6;
+
     bufferBegin = Math.max(0, start - (windowLength / 2) + 1.5)
     if (!wavesurfer) {
         spectrogramWrapper.removeClass('d-none');
@@ -2237,7 +2242,7 @@ async function onPredictionDone(args) {
             })
             targetClass.add('text-success');
             const species = target.innerHTML.replace(/\s<.*/, '')
-            worker.postMessage({action: 'filter', species: species});
+            worker.postMessage({action: 'filter', species: species, filelist: fileList});
         }
         //scrollResults(tableRows[0]);
         document.getElementById('results').scrollTop = 0;
@@ -2302,6 +2307,9 @@ async function renderResult(args) {
             * abort entirely when dawn breaks
             */
             if (!seenTheDarkness && result.dayNight === 'daytime') {
+
+                tr = '<tr><td>Skipping daytime results... </td></tr>';
+                resultTable.html(tr);
                 // Not dark yet
                 return
             }
@@ -2531,7 +2539,7 @@ function getSpeciesIndex(e) {
     clickedIndex = clickedNode.querySelector('th') ? clickedNode.querySelector('th').innerText : null;
 }
 
-summaryButton.addEventListener('click', () => {
+summaryButton.addEventListener('click', (e) => {
     if (summaryButton.innerText.indexOf('Show') !== -1) {
         summaryButton.innerText = 'Hide Summary';
         summaryDiv.classList.remove('d-none');
@@ -2543,7 +2551,11 @@ summaryButton.addEventListener('click', () => {
         resultsDiv.classList.remove('col-sm-9');
         resultsDiv.classList.add('col-sm-12');
     }
-    summaryTable.animate({width: 'toggle'});
+    if (e.isTrusted) {
+        summaryTable.animate({width: 'toggle'})
+    } else {
+        summaryTable.animate({width: 'show'})
+    }
 });
 
 $(document).on('click', '.download', function (e) {
