@@ -682,7 +682,7 @@ save2dbLink.addEventListener('click', async () => {
 
 const chartsLink = document.getElementById('charts');
 chartsLink.addEventListener('click', async () => {
-    worker.postMessage({action: 'get-detected-species=list'});
+    worker.postMessage({action: 'get-detected-species-list'});
     hideAll();
     showElement(['recordsContainer']);
     worker.postMessage({action: 'chart', species: undefined, range: {}});
@@ -2231,7 +2231,7 @@ async function onPredictionDone(args) {
         if (targetClass.contains('text-success')) {
             // Clicked on filtered species icon
             targetClass.remove('text-success')
-            worker.postMessage({action: 'filter'});
+            worker.postMessage({action: 'filter', filelist: fileList, saveSummary: true});
 
         } else {
             // Clicked on unfiltered species name
@@ -2242,7 +2242,7 @@ async function onPredictionDone(args) {
             })
             targetClass.add('text-success');
             const species = target.innerHTML.replace(/\s<.*/, '')
-            worker.postMessage({action: 'filter', species: species, filelist: fileList});
+            worker.postMessage({action: 'filter', species: species, filelist: fileList,  saveSummary: true});
         }
         //scrollResults(tableRows[0]);
         document.getElementById('results').scrollTop = 0;
