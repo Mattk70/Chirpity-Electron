@@ -315,7 +315,7 @@ async function runPredictions(e) {
             result: myModel.result,
             endpoint: e.data.duration,
             fileStart: fileStart,
-            selection: e.data.selection,
+            resetResults: e.data.resetResults,
         }
         postMessage(response);
         let t1 = performance.now();

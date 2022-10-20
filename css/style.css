@@ -164,7 +164,7 @@ ul {
 }
 
 
-#results > thead, #results > th {
+#results > thead, #results > th, #resultSummary > thead, #resultSummary > th {
     position: sticky;
     top: 0;
     color: white;

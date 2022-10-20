@@ -260,7 +260,7 @@ const sendResults2UI = async (args) => {
             file: result.file,
             result: result,
             index: index,
-            selection: args.selection,
+            resetResults: args.resetResults,
         });
         RESULTS.push(result);
     })
@@ -290,7 +290,7 @@ const onAnalyze = async (args) => {
     console.log(`Adding ${file} to the queue.`)
     // check if results for the file have been saved to the disk DB
     const cachedFile = await isDuplicate(file);
-    if (cachedFile && !args.selection) {
+    if (cachedFile && !args.resetResults) {
         //remove the file from the queue - wherever it sits, this prevents out of
         // sequence issues with batch analysis
         const place = FILE_QUEUE.indexOf(file);
@@ -310,9 +310,8 @@ const onAnalyze = async (args) => {
                 file: result.file,
                 result: result,
                 index: index,
-                selection: false,
+                resetResults: false,
             });
-            //AUDACITY.push(audacity);
             RESULTS.push(result);
         })
         console.log(`Pulling results for ${file} from the memory database`);
@@ -656,7 +655,7 @@ const getAudioBuffer = (start, end, file) => {
 
 
 async function getPredictBuffers(args) {
-    let start = args.start, end = args.end, selection = args.selection, file = args.file;
+    let start = args.start, end = args.end, resetResults = args.resetResults, file = args.file;
     let chunkLength = 72000;
     // Ensure max and min are within range
     start = Math.max(0, start);
@@ -689,7 +688,7 @@ async function getPredictBuffers(args) {
                     const samples = parseInt((end - start) * sampleRate.toFixed(0));
 
                     const increment = samples < chunkLength ? samples : chunkLength;
-                    feedChunksToModel(myArray, increment, chunkStart, file, end, selection);
+                    feedChunksToModel(myArray, increment, chunkStart, file, end, resetResults);
                     chunkStart += 3 * BATCH_SIZE * sampleRate;
                     // Now the async stuff is done ==>
                     readStream.resume();
@@ -766,7 +765,7 @@ const fetchAudioBuffer = async (args) => {
     });
 }
 
-function sendMessageToWorker(chunkStart, chunks, file, duration, selection) {
+function sendMessageToWorker(chunkStart, chunks, file, duration, resetResults) {
     const objData = {
         message: 'predict',
         chunkStart: chunkStart,
@@ -774,7 +773,7 @@ function sendMessageToWorker(chunkStart, chunks, file, duration, selection) {
         fileStart: metadata[file].fileStart,
         file: file,
         duration: duration,
-        selection: selection
+        resetResults: resetResults
     }
     let chunkBuffers = [];
     for (let i = 0; i < chunks.length; i++) {
@@ -785,20 +784,20 @@ function sendMessageToWorker(chunkStart, chunks, file, duration, selection) {
 }
 
 async function doPrediction(args) {
-    const start = args.start, end = args.end, file = args.file, selection = args.selection;
+    const start = args.start, end = args.end, file = args.file, resetResults = args.resetResults;
     predictionDone = false;
     predictionStart = new Date();
-    if (!args.preserveResults && !selection) {
+    if (!args.preserveResults && resetResults) {
         index = 0;
         AUDACITY = [];
         RESULTS = [];
     }
     predicting = true;
-    await getPredictBuffers({file: file, start: start, end: end, selection: selection});
+    await getPredictBuffers({file: file, start: start, end: end, resetResults: resetResults});
     UI.postMessage({event: 'update-audio-duration', value: metadata[file].duration});
 }
 
-function feedChunksToModel(channelData, increment, chunkStart, file, duration, selection) {
+function feedChunksToModel(channelData, increment, chunkStart, file, duration, resetResults) {
     let chunks = [];
     for (let i = 0; i < channelData.length; i += increment) {
         let chunk = channelData.slice(i, i + increment);
@@ -806,13 +805,13 @@ function feedChunksToModel(channelData, increment, chunkStart, file, duration, s
         predictionsRequested++;
         chunks.push(chunk);
         if (chunks.length === BATCH_SIZE) {
-            sendMessageToWorker(chunkStart, chunks, file, duration, selection);
+            sendMessageToWorker(chunkStart, chunks, file, duration, resetResults);
             chunks = [];
             //chunkStart += 3 * BATCH_SIZE * sampleRate;
         }
     }
     //clear up remainder less than BATCH_SIZE
-    if (chunks.length) sendMessageToWorker(chunkStart, chunks, file, duration, selection);
+    if (chunks.length) sendMessageToWorker(chunkStart, chunks, file, duration, resetResults);
 }
 
 
@@ -1149,7 +1148,7 @@ const parsePredictions = (response) => {
                 file: file,
                 result: result,
                 index: index,
-                selection: response['selection'],
+                resetResults: response['resetResults'],
             });
             AUDACITY.push(audacity);
             RESULTS.push(result);
@@ -1166,7 +1165,7 @@ const parsePredictions = (response) => {
                     file: file,
                     result: result,
                     index: 1,
-                    selection: response['selection']
+                    resetResults: response['resetResults']
                 });
             }
             UI.postMessage({event: 'progress', progress: 1.0});
@@ -1226,7 +1225,7 @@ async function processNextFile(args) {
                         file: file,
                         result: result,
                         index: 1,
-                        selection: false,
+                        resetResults: false,
                     });
                 }
                 UI.postMessage({
@@ -1235,12 +1234,13 @@ async function processNextFile(args) {
                     labels: AUDACITY,
                     batchInProgress: FILE_QUEUE.length
                 });
-                await processNextFile();
+                await processNextFile(args);
             } else {
-                await doPrediction({start: start, end: end, file: file, selection: false, preserveResults: true});
+                const resetResults = args ? args.resetResults : false;
+                await doPrediction({start: start, end: end, file: file, resetResults: resetResults, preserveResults: true});
             }
         } else {
-            await processNextFile();
+            await processNextFile(args);
         }
     } else {
         predicting = false;
@@ -1285,12 +1285,17 @@ const getCachedResults = (args) => {
     const dateRange = args.range;
     //if (args.file) where = ` WHERE files.name =  '${args.file.replace("'", "''")}'`;
     if (args.files) {
+        where = 'WHERE files.name IN  (';
         // Format the file list
-        let files = `("${args.files.toString()}")`;
-        files = files.replaceAll("'", "''");
-        where = ` WHERE files.name IN  ${files}`;
+        args.files.forEach(file => {
+            file = file.replaceAll("'", "''");
+            where += `'${file}',`
+        })
+        // remove last comma
+        where = where.slice(0, -1);
+        where += ')';
     }
-    if (args.species) where = `WHERE s1.cname =  '${args.species.replace("'", "''")}'`;
+    if (args.species) where = `${args.files ? ' AND ' : ' WHERE ' } s1.cname =  '${args.species.replace("'", "''")}'`;
     const when = dateRange && dateRange.start ? `AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
     return new Promise(function (resolve, reject) {
         db.all(`SELECT dateTime AS timestamp, position AS position, 

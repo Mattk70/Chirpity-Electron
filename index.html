@@ -457,7 +457,7 @@
     <!-- Result container -->
     <div class="d-none border-end border-4" id="resultTableContainer">
         <div class="ps-1 row g-1 h-100">
-            <div class="col-sm-3 h-100 overflow-auto d-none" id="summary">
+            <div class="col-sm-4 h-100 overflow-auto d-none" id="summary">
                 <!-- Summary table -->
                 <!--                <div class="rounded-border">-->
                 <div id='summaryTable' style="display:none"></div>
@@ -465,22 +465,23 @@
             </div>
             <!-- Results table -->
             <div class="col-sm-12 h-100 overflow-auto" id="resultsDiv">
-                <table id='results' class="table table-hover">
+                <table id='results' class="text-center table table-hover">
                     <thead id="resultsHead">
                     <tr>
                         <th>#</th>
-                        <th class="timestamp">Time</th>
-                        <th>Position</th>
-                        <th>Species</th>
-                        <th>Label</th>
-                        <th class="text-center">Confidence<span id="confidenceFilter"
-                                                                class="material-icons-two-tone text-secondary align-bottom pointer">filter_list</span>
+                        <th class="col-auto timestamp">Time</th>
+                        <th class="text-start">Position</th>
+                        <th class="text-start">Species</th>
+                        <th class="">Label</th>
+                        <th class="col-auto ">Confidence
+                            <span id="confidenceFilter"
+                                  class="material-icons-two-tone text-secondary align-bottom pointer">filter_list</span>
                         </th>
-                        <th class="text-center">Other IDs</th>
-                        <th class="specFeature text-center">Play</th>
-                        <th class="text-center">XC</th>
-                        <th class="specFeature text-center">Export</th>
-                        <th class="text-end">Notes</th>
+                        <th class="col-auto">Other IDs</th>
+                        <th class="col-auto specFeature">Play</th>
+                        <th class="col-auto">XC</th>
+                        <th class="col-auto specFeature">Export</th>
+                        <th class="col-auto text-end">Notes</th>
                     </tr>
                     </thead>
                     <tbody class="text-dark" id="resultTableBody">
