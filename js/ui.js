@@ -170,8 +170,7 @@ function resetResults(args) {
         summaryTable.empty();
         summaryDiv.classList.add('d-none');
     }
-
-    resultsDiv.classList.remove('col-sm-9');
+    resultsDiv.classList.remove('col-sm-8');
     resultsDiv.classList.add('col-sm-12');
     resultTable.empty();
     predictions = {};
@@ -483,7 +482,7 @@ function updateFileName(files, openfile) {
 async function onOpenFiles(args) {
     hideAll();
     showElement(['spectrogramWrapper'], false)
-    resetResults();
+    resetResults(args);
     completeDiv.hide();
     // Store the file list and Load First audio file
     fileList = args.filePaths;
@@ -568,14 +567,12 @@ navbarAnalysis.addEventListener('click', async () => {
 const analyzeLink = document.getElementById('analyze');
 //speciesExclude = document.querySelectorAll('speciesExclude');
 analyzeLink.addEventListener('click', async () => {
-    resetResults();
-    postAnalyzeMessage({confidence: config.minConfidence, resetResults: true, files: [currentFile], selection: false});
+    postAnalyzeMessage({confidence: config.minConfidence, resetResults: true, files: [currentFile]});
 });
 
 const analyzeAllLink = document.getElementById('analyzeAll');
 analyzeAllLink.addEventListener('click', async () => {
-    resetResults();
-    postAnalyzeMessage({confidence: config.minConfidence, resetResults: true, files: fileList, selection: false});
+    postAnalyzeMessage({confidence: config.minConfidence, resetResults: true, files: fileList});
 });
 
 const analyzeSelectionLink = document.getElementById('analyzeSelection');
@@ -596,7 +593,6 @@ analyzeSelectionLink.addEventListener('click', async () => {
         files: [currentFile],
         start: start,
         end: end,
-        selection: true
     });
     summary = {};
 });
@@ -604,7 +600,7 @@ analyzeSelectionLink.addEventListener('click', async () => {
 function postAnalyzeMessage(args) {
     analyseReset();
     if (args.resetResults) {
-        resetResults();
+        // resetResults(args);
     } else {
         progressDiv.show();
         delete diagnostics['Audio Duration'];
@@ -620,7 +616,6 @@ function postAnalyzeMessage(args) {
             lat: config.latitude,
             lon: config.longitude,
             files: [file],
-            selection: args.selection
         });
     })
     if (args.files.length > 1) {
@@ -2032,7 +2027,6 @@ function onModelReady(args) {
     t1_warmup = Date.now();
     diagnostics['Warm Up'] = ((t1_warmup - t0_warmup) / 1000).toFixed(2) + ' seconds';
     diagnostics['Tensorflow Backend'] = args.backend;
-    //resetResults();
 }
 
 
@@ -2122,10 +2116,19 @@ function onProgress(args) {
 
 function updateSummary() {
     summary = {};
-    speciesName = document.querySelectorAll('#results .cname');
+    speciesName = document.querySelectorAll('#results .top-row');
     speciesName.forEach(row => {
-        const key = row.innerHTML;
-        key in summary ? summary[key] += 1 : summary[key] = 1;
+        let confidence = row.getElementsByClassName('confidence')[0].title;
+        confidence = parseFloat(confidence);
+        const key = row.querySelector('.cname').innerHTML;
+        if (key in summary) {
+            summary[key]['total'] += 1
+            summary[key]['max'] = Math.max(summary[key]['max'], confidence);
+        } else {
+            summary[key] = {};
+            summary[key]['total'] = 1;
+            summary[key]['max'] = confidence;
+        }
     })
 
     console.table(summary);
@@ -2135,7 +2138,7 @@ function updateSummary() {
         sortable.push([bird, summary[bird]]);
     }
     sortable.sort(function (a, b) {
-        return a[1] - b[1];
+        return a[1]['max'] - b[1]['max'];
     });
     //count down from most seen:
     sortable = sortable.reverse();
@@ -2145,20 +2148,20 @@ function updateSummary() {
         summarySorted[item[0]] = item[1]
     })
 
-    let summaryHTML = `<table id="resultSummary" class="table table-striped table-dark table-hover p-1"><thead class="thead-dark">
+    let summaryHTML = `<table id="resultSummary" class="table table-striped table-dark table-hover p-1"><thead>
             <tr>
+                <th class="w-auto">Max</th>
                 <th scope="col">Species</th>
                 <th scope="col" class="text-end">Count</th>
-                <th class="text-end w-25">Label</th>
+                <th class="text-end w-auto">Label</th>
             </tr>
             </thead><tbody>`;
 
     for (const [key, value] of Object.entries(summarySorted)) {
         summaryHTML += `<tr>
-                        <td class="cname speciesFilter"><span class="spinner-border spinner-border-sm text-success d-none" role="status"></span>
-                         <span class="pointer">${key}</span>
-                        </td>                       
-                        <td class="text-end">${value}</td>
+                        <td class="max">${iconizeScore(value.max /100)}</td>
+                        <td class="cname speciesFilter"><span class="pointer">${key}</span></td>                       
+                        <td class="text-end">${value.total}</td>
                         <td class="label">${tags['Remove Label']}</td>`;
 
     }
@@ -2242,7 +2245,7 @@ async function onPredictionDone(args) {
             })
             targetClass.add('text-success');
             const species = target.innerHTML.replace(/\s<.*/, '')
-            worker.postMessage({action: 'filter', species: species, filelist: fileList,  saveSummary: true});
+            worker.postMessage({action: 'filter', species: species, filelist: fileList, saveSummary: true});
         }
         //scrollResults(tableRows[0]);
         document.getElementById('results').scrollTop = 0;
@@ -2270,7 +2273,7 @@ function scrollResults(row) {
 }
 
 async function renderResult(args) {
-    const result = args.result, selection = args.selection, file = args.file;
+    const result = args.result, resetResults = args.resetResults, file = args.file;
     let index = args.index;
     result.timestamp = new Date(result.timestamp);
     result.position = new Date(result.position);
@@ -2287,13 +2290,6 @@ async function renderResult(args) {
     let tr = '';
     if (index === 1) {
         showElement(['resultTableContainer'], false);
-        if (!selection) {
-            // Remove old results
-            // resultTable.empty();
-            // summaryTable.empty();
-        } else {
-            resultTable.append('<tr><td class="bg-dark text-white text-center" colspan="-1"><b>Selection Analysis</b></td></tr>')
-        }
     }
     if (result === "No predictions.") {
         const nocturnal = config.nocmig ? 'during the night' : '';
@@ -2348,8 +2344,8 @@ async function renderResult(args) {
         result.position < 3600000 ? spliceStart = 14 : spliceStart = 11;
         const UI_position = new Date(result.position).toISOString().substring(spliceStart, 19);
         // Now we have formatted the fields, and skipped detections as required by nocmig mode, add result to predictions file
-        if (selection) {
-            const tableRows = document.querySelectorAll('#results > tbody > tr');
+        if (!resetResults) {
+            const tableRows = document.querySelectorAll('#results > tbody > tr.top-row');
             index = tableRows.length + 1;
         }
         predictions[index] = result;
@@ -2358,7 +2354,7 @@ async function renderResult(args) {
 
         const label = result.label ? tags[result.label] : tags['Remove Label'];
 
-        tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" class=' text-center border-top border-secondary top-row ${result.dayNight}'>
+        tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" class='border-top border-secondary top-row ${result.dayNight}'>
             <th scope='row'>${index}</th>
             <td class='text-start text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-end">${UI_position}</td>
@@ -2368,19 +2364,20 @@ async function renderResult(args) {
             <td><span id='id${index}' title="Click for additional detections" class='material-icons-two-tone rotate pointer d-none'>sync</span></td>
             <td class='specFeature'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
             <td><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:"nocturnal flight call"' target="xc">
-            <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
+                <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
             <td class='specFeature download'><span class='material-icons-two-tone pointer'>file_download</span></td>
             <td class="comment text-end">${comment}</td>
         </tr>`;
         if (result.score2 > 0.2) {
             tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" id='subrow${index}' class='subrow d-none'>
                 <th scope='row'>${index}</th>
-                <td class='timestamp ${showTimeOfDay}'> </td>
-                <td> </td><td class='cname2'>${result.cname2}
-                    <i>${result.sname2}</i></td>
+                <td class="timestamp ${showTimeOfDay}"> </td>
+                <td> </td>
+                <td class='cname2 text-start'>${result.cname2} <i>${result.sname2}</i></td>
                 <td></td>                    
-                <td class='text-center'>${iconizeScore(result.score2)}</td>
-                <td> </td><td class='specFeature'> </td>
+                <td>${iconizeScore(result.score2)}</td>
+                <td> </td>
+                <td class='specFeature'> </td>
                 <td><a href='https://xeno-canto.org/explore?query=${result.sname2}%20type:"nocturnal flight call"' target=\"_blank\">
                     <img src='img/logo/XC.png' alt='Search ${result.cname2} on Xeno Canto' title='${result.cname2} NFCs on Xeno Canto'></a> </td>
                 <td> </td>
@@ -2391,11 +2388,11 @@ async function renderResult(args) {
                     <th scope='row'>${index}</th>
                     <td class='timestamp ${showTimeOfDay}'> </td>
                     <td> </td>
-                    <td class='cname3'>${result.cname3}
-                        <i>${result.sname3}</i></td>
+                    <td class='cname3 text-start'>${result.cname3} <i>${result.sname3}</i></td>
                     <td></td>
-                    <td class='text-center'>${iconizeScore(result.score3)}</td>
-                    <td> </td><td class='specFeature'> </td>
+                    <td>${iconizeScore(result.score3)}</td>
+                    <td> </td>
+                    <td class='specFeature'> </td>
                     <td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:"nocturnal flight call"' target=\"_blank\">
                         <img src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>
                     <td> </td>
@@ -2405,11 +2402,10 @@ async function renderResult(args) {
         }
     }
     resultTable.append(tr)
-    if (selection) {
-        const tableRows = document.querySelectorAll('#results > tbody > tr');
-        scrollResults(tableRows[tableRows.length - 1])
-
-    }
+    // if (!resetResults) {
+    //     const tableRows = document.querySelectorAll('#results > tbody > tr');
+    //     scrollResults(tableRows[tableRows.length - 1])
+    // }
     // Show the alternate detections toggle:
     if (result.score2 > 0.2) {
         const id = `id${index}`;
@@ -2419,10 +2415,6 @@ async function renderResult(args) {
 }
 
 // Comment handling
-
-$(document).on('click', '.material-icons', function () {
-    $(this).toggleClass("down");
-})
 
 $(document).on('click', '.add-comment, .edit-comment', function (e) {
     const note = e.target.title === "Add a comment" ? '' : e.target.title;
@@ -2543,12 +2535,12 @@ summaryButton.addEventListener('click', (e) => {
     if (summaryButton.innerText.indexOf('Show') !== -1) {
         summaryButton.innerText = 'Hide Summary';
         summaryDiv.classList.remove('d-none');
-        resultsDiv.classList.add('col-sm-9');
+        resultsDiv.classList.add('col-sm-8');
         resultsDiv.classList.remove('col-sm-12');
     } else {
         summaryButton.innerText = 'Show Summary';
         summaryDiv.classList.add('d-none');
-        resultsDiv.classList.remove('col-sm-9');
+        resultsDiv.classList.remove('col-sm-8');
         resultsDiv.classList.add('col-sm-12');
     }
     if (e.isTrusted) {
@@ -2642,10 +2634,10 @@ function sendFile(mode, result) {
 
 // create a dict mapping score to icon
 const iconDict = {
-    guess: '<span class="material-icons-two-tone text-secondary score border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
-    low: '<span class="material-icons-two-tone score text-danger border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
-    medium: '<span class="material-icons-two-tone score text-warning border border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
-    high: '<span class="material-icons-two-tone score text-success border border-secondary rounded" title="--%">signal_cellular_alt</span>',
+    guess: '<span class="confidence material-icons-two-tone text-secondary score border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
+    low: '<span class="confidence material-icons-two-tone score text-danger border border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
+    medium: '<span class="confidence material-icons-two-tone score text-warning border border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
+    high: '<span class="confidence material-icons-two-tone score text-success border border-secondary rounded" title="--%">signal_cellular_alt</span>',
 }
 
 function iconizeScore(score) {
