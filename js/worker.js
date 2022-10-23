@@ -25,87 +25,89 @@ ffmpeg.setFfmpegPath(staticFfmpeg.path);
 
 let predictionsRequested = 0, predictionsReceived = 0;
 
-let diskDB, memoryDB, nocmig, latitude, longitude;
+let diskDB, memoryDB, NOCMIG, latitude, longitude;
 
-function createDB(file) {
-    const archiveMode = file ? true : false;
-    if (file) {
-        fs.openSync(file, "w");
-        diskDB = new sqlite3.Database(file);
-        console.log("Opened disk database", file);
-    } else {
-        memoryDB = new sqlite3.Database(':memory:');
-        console.log("Created new in-memory database");
-    }
-    const db = archiveMode ? diskDB : memoryDB;
-    db.serialize(() => {
-        db.run(`CREATE TABLE species
-                (
-                    id    INTEGER PRIMARY KEY,
-                    sname TEXT,
-                    cname TEXT
-                )`, function (createResult) {
-            if (createResult) throw createResult;
-        });
-        db.run(`CREATE TABLE files
-                (
-                    name      TEXT,
-                    duration  REAL,
-                    filestart INTEGER,
-                    UNIQUE (name)
-                )`, function (createResult) {
-            if (createResult) throw createResult;
-        });
-        db.run(`CREATE TABLE duration
-                (
-                    day      INTEGER,
-                    duration INTEGER,
-                    fileID   INTEGER,
-                    UNIQUE (day, fileID)
-                )`, function (createResult) {
-            if (createResult) throw createResult;
-        });
-        const stmt = db.prepare("INSERT INTO species VALUES (?, ?, ?)");
-        for (let i = 0; i < labels.length; i++) {
-            const [sname, cname] = labels[i].split('_')
-            stmt.run(i, sname, cname);
+const createDB = (file) => {
+    return new Promise((resolve, reject) => {
+        const archiveMode = !!file;
+        if (file) {
+            fs.openSync(file, "w");
+            diskDB = new sqlite3.Database(file);
+            console.log("Created disk database", file);
+        } else {
+            memoryDB = new sqlite3.Database(':memory:');
+            console.log("Created new in-memory database");
         }
-        db.run(`CREATE TABLE records
-                (
-                    dateTime INTEGER,
-                    birdID1  INTEGER,
-                    birdID2  INTEGER,
-                    birdID3  INTEGER,
-                    conf1    REAL,
-                    conf2    REAL,
-                    conf3    REAL,
-                    fileID   INTEGER,
-                    position INTEGER,
-                    label    TEXT,
-                    comment  TEXT,
-                    UNIQUE (dateTime, fileID)
-                )`, function (createResult) {
-            if (createResult) throw createResult;
+        const db = archiveMode ? diskDB : memoryDB;
+        db.serialize(() => {
+            db.run(`CREATE TABLE species
+                    (
+                        id    INTEGER PRIMARY KEY,
+                        sname TEXT,
+                        cname TEXT
+                    )`, function (createResult) {
+                if (createResult) throw createResult;
+            });
+            db.run(`CREATE TABLE files
+                    (
+                        name      TEXT,
+                        duration  REAL,
+                        filestart INTEGER,
+                        UNIQUE (name)
+                    )`, function (createResult) {
+                if (createResult) throw createResult;
+            });
+            db.run(`CREATE TABLE duration
+                    (
+                        day      INTEGER,
+                        duration INTEGER,
+                        fileID   INTEGER,
+                        UNIQUE (day, fileID)
+                    )`, function (createResult) {
+                if (createResult) throw createResult;
+            });
+
+            db.run(`CREATE TABLE records
+                    (
+                        dateTime INTEGER,
+                        birdID1  INTEGER,
+                        birdID2  INTEGER,
+                        birdID3  INTEGER,
+                        conf1    REAL,
+                        conf2    REAL,
+                        conf3    REAL,
+                        fileID   INTEGER,
+                        position REAL,
+                        label    TEXT,
+                        comment  TEXT,
+                        UNIQUE (dateTime, fileID)
+                    )`, function (createResult) {
+                if (createResult) throw createResult;
+            });
+            const stmt = db.prepare("INSERT INTO species VALUES (?, ?, ?)");
+            for (let i = 0; i < labels.length; i++) {
+                const [sname, cname] = labels[i].split('_')
+                stmt.run(i, sname, cname);
+            }
+            stmt.finalize();
         });
-        stmt.finalize();
-    });
-    console.log("database initialized");
-    return db;
+    })
 }
 
-async function loadDB(path) {
-    let db = diskDB;
+function loadDB(path) {
+    let db = path ? diskDB : memoryDB;
     if (!db) {
-        const file = path ? p.join(path, 'archive.sqlite') : '';
-        if (!fs.existsSync(file)) {
-            diskDB = createDB(file)
+        if (path) {
+            const file = p.join(path, 'archive.sqlite')
+            if (!fs.existsSync(file)) {
+                createDB(file);
+            } else {
+                diskDB = new sqlite3.Database(file);
+                console.log("Opened disk db " + file)
+            }
         } else {
-            diskDB = new sqlite3.Database(file);
-            db = diskDB;
+            createDB();
         }
-        db.on("error", function (error) {
-            console.log("Getting an error : ", error);
-        });
     } else {
         console.log('Database loaded, nothing to do')
     }
@@ -150,8 +152,6 @@ ipcRenderer.on('new-client', (event) => {
                 await onUpdateFileStart(args)
                 break;
             case 'get-detected-species-list':
-                // Checking the archive database
-                await loadDB(appPath);
                 getSpecies(diskDB);
                 break;
             case 'create-dataset':
@@ -173,12 +173,6 @@ ipcRenderer.on('new-client', (event) => {
             case 'update-model':
                 predictWorker.postMessage({message: 'list', list: args.list})
                 break;
-            case 'load-db':
-                // Create in-memory database
-                //await loadDB();
-                // Load the archive one too
-                await loadDB(appPath);
-                break;
             case 'file-load-request':
                 index = 0;
                 if (predicting) onAbort(args);
@@ -192,14 +186,9 @@ ipcRenderer.on('new-client', (event) => {
                 await loadAudioFile(args);
                 break;
             case 'filter':
-                // Check the memory database
-                await loadDB();
-                args.db = memoryDB;
                 await sendResults2UI(args);
                 break;
             case 'explore':
-                // Check the archive database
-                await loadDB(appPath);
                 args.db = diskDB;
                 args.saveSummary = false;
                 await sendResults2UI(args);
@@ -214,11 +203,10 @@ ipcRenderer.on('new-client', (event) => {
                 await saveMP3(args.file, args.start, args.end, args.filename, args.metadata);
                 break;
             case 'post':
-                await postOpus(args)
+                await uploadOpus(args);
                 break;
             case 'save2db':
-                await loadDB(appPath)
-                onSave2DB(diskDB);
+                await onSave2DB(diskDB);
                 break;
             case 'abort':
                 onAbort(args);
@@ -232,22 +220,29 @@ ipcRenderer.on('new-client', (event) => {
     }
 })
 
-const sendResults2UI = async (args) => {
+// No need to pass through arguments object, so arrow function used.
+const sendResults2UI = async ({
+                                  saveSummary = false,
+                                  db = memoryDB,
+                                  species = undefined,
+                                  range = undefined,
+                                  filelist = undefined
+                              }) => {
     // reset results table
-    UI.postMessage({event: 'reset-results', saveSummary: args.saveSummary});
+    UI.postMessage({event: 'reset-results', saveSummary: saveSummary});
     // And clear results from memory
 
     RESULTS = [];
     let results = await getCachedResults({
-        db: args.db,
-        species: args.species,
-        range: args.range,
-        files: args.filelist
+        db: db,
+        species: species,
+        range: range,
+        files: filelist
     });
     // No results? Try the archive
     if (!results.length) {
-        console.log(`No results in the memory db, trying the archive db.`);
-        results = await getCachedResults({db: diskDB, species: args.species, range: args.range, files: args.filelist});
+        console.log(`No results in ${db.filename.replace(/.*\//, '')}, trying the archive db.`);
+        results = await getCachedResults({db: diskDB, species: species, range: range, files: filelist});
     }
     index = 0;
     results.forEach(result => {
@@ -260,7 +255,7 @@ const sendResults2UI = async (args) => {
             file: result.file,
             result: result,
             index: index,
-            resetResults: args.resetResults,
+            saveSummary: saveSummary
         });
         RESULTS.push(result);
     })
@@ -269,28 +264,40 @@ const sendResults2UI = async (args) => {
     UI.postMessage({
         event: 'prediction-done',
         batchInProgress: false,
-        saveSummary: args.saveSummary,
+        filterSpecies: species,
+        saveSummary: saveSummary
     });
 }
 
-const onAnalyze = async (args) => {
-    console.log(`Worker received message: ${args.files}, ${args.confidence}, start: ${args.start}, end: ${args.end}`);
+// Not an arrow function. Async function has access to arguments - so we can pass them to processnextfile
+async function onAnalyze({
+                             files = [],
+                             confidence = 0.5,
+                             start = 0,
+                             end = undefined,
+                             resetResults = false,
+                             lat = 51,
+                             lon = -0.4,
+                             nocmig = false
+                         }) {
+    console.log(`Worker received message: ${files}, ${confidence}, start: ${start}, end: ${end}`);
     // Analyze works on one file at a time
-    const file = args.files[0];
-    if (args.resetResults) {
+    const file = files[0];
+    if (resetResults) {
         index = 0;
         AUDACITY = [];
         RESULTS = [];
         createDB();
     }
-    latitude = args.lat;
-    longitude = args.lon;
-    nocmig = args.nocmig;
+    latitude = lat;
+    longitude = lon;
+    // Set global var, for parsePredictions
+    NOCMIG = nocmig;
     FILE_QUEUE.push(file);
     console.log(`Adding ${file} to the queue.`)
     // check if results for the file have been saved to the disk DB
     const cachedFile = await isDuplicate(file);
-    if (cachedFile && !args.resetResults) {
+    if (cachedFile && resetResults) {
         //remove the file from the queue - wherever it sits, this prevents out of
         // sequence issues with batch analysis
         const place = FILE_QUEUE.indexOf(file);
@@ -324,12 +331,16 @@ const onAnalyze = async (args) => {
         //if (FILE_QUEUE.length) await processNextFile();
     } else if (!predicting) {
         predicting = true;
-        minConfidence = args.confidence;
-        await processNextFile(args);
+        minConfidence = confidence;
+        await processNextFile(arguments[0]);
     }
 }
 
-function onAbort(args) {
+function onAbort({
+                     model = 'efficientnet',
+                     list = 'migrants',
+                     warmup = true
+                 }) {
     aborted = true;
     FILE_QUEUE = [];
     index = 0;
@@ -338,11 +349,11 @@ function onAbort(args) {
         //restart the worker
         UI.postMessage({event: 'spawning'});
         predictWorker.terminate()
-        spawnWorker(args.model, args.list, BATCH_SIZE, args.warmup)
+        spawnWorker(model, list, BATCH_SIZE, warmup)
     }
     predicting = false;
     predictionDone = true;
-    UI.postMessage({event: 'prediction-done', labels: AUDACITY, batchInProgress: false});
+    UI.postMessage({event: 'prediction-done', audacityLabels: AUDACITY, batchInProgress: false});
 }
 
 const getDuration = async (src) => {
@@ -470,14 +481,16 @@ async function locateFile(file) {
     return foundFile;
 }
 
-async function loadAudioFile(args) {
-    let file = args.file;
-    const start = args.start || 0;
-    const end = args.end || 20;
-    const position = args.position || 0;
+async function loadAudioFile({
+                                 file = '',
+                                 start = 0,
+                                 end = 20,
+                                 position = 0,
+                                 region = false
+                             }) {
     const found = await getWorkingFile(file);
     if (found) {
-        await fetchAudioBuffer({file: file, start: start, end: end})
+        await fetchAudioBuffer({file, start, end})
             .then((buffer) => {
                 const length = buffer.length;
                 const myArray = buffer.getChannelData(0);
@@ -490,7 +503,7 @@ async function loadAudioFile(args) {
                     position: position,
                     length: length,
                     contents: myArray,
-                    region: args.region
+                    region: region
                 });
             })
             .catch(e => {
@@ -654,13 +667,17 @@ const getAudioBuffer = (start, end, file) => {
 }
 
 
-async function getPredictBuffers(args) {
-    let start = args.start, end = args.end, resetResults = args.resetResults, file = args.file;
+const getPredictBuffers = async ({
+                                     file = '',
+                                     start = 0,
+                                     end = undefined,
+                                     resetResults = false
+                                 }) => {
+    //let start = args.start, end = args.end, resetResults = args.resetResults, file = args.file;
     let chunkLength = 72000;
     // Ensure max and min are within range
     start = Math.max(0, start);
-    // Handle no start / end supplied
-    end = end ? Math.min(metadata[file].duration, end) : metadata[file].duration;
+    end = Math.min(metadata[file].duration, end);
 
     if (start > metadata[file].duration) {
         return
@@ -685,7 +702,7 @@ async function getPredictBuffers(args) {
             offlineCtx.startRendering().then(
                 (resampled) => {
                     const myArray = resampled.getChannelData(0);
-                    const samples = parseInt((end - start) * sampleRate.toFixed(0));
+                    const samples = parseInt(((end - start) * sampleRate).toFixed(0));
 
                     const increment = samples < chunkLength ? samples : chunkLength;
                     feedChunksToModel(myArray, increment, chunkStart, file, end, resetResults);
@@ -714,8 +731,11 @@ async function getPredictBuffers(args) {
  * @param args
  * @returns {Promise<unknown>}
  */
-const fetchAudioBuffer = async (args) => {
-    let start = args.start, end = args.end, file = args.file;
+const fetchAudioBuffer = async ({
+                                    file = '',
+                                    start = 0,
+                                    end = metadata[file].duration
+                                }) => {
     if (end - start < 0.1) return  // prevents dataset creation barfing with  v. short buffers
     const proxy = await getWorkingFile(file);
     if (!proxy) return false
@@ -783,11 +803,15 @@ function sendMessageToWorker(chunkStart, chunks, file, duration, resetResults) {
     predictWorker.postMessage(objData, chunkBuffers);
 }
 
-async function doPrediction(args) {
-    const start = args.start, end = args.end, file = args.file, resetResults = args.resetResults;
+async function doPrediction({
+                                file = '',
+                                start = 0,
+                                end = metadata[file].duration,
+                                resetResults = false
+                            }) {
     predictionDone = false;
     predictionStart = new Date();
-    if (!args.preserveResults && resetResults) {
+    if (resetResults) {
         index = 0;
         AUDACITY = [];
         RESULTS = [];
@@ -899,7 +923,7 @@ const onSpectrogram = async (filepath, file, width, height, data, channels) => {
     console.log('saved:', file_to_save);
 };
 
-async function uploadOpus(file, start, defaultName, metadata, mode) {
+async function uploadOpus({file, start, defaultName, metadata, mode}) {
     const Blob = await bufferToAudio(file, start, metadata);
 // Populate a form with the file (blob) and filename
     const formData = new FormData();
@@ -930,7 +954,6 @@ const bufferToAudio = (file, start, metadata) => {
         optionList.push('-metadata');
         optionList.push(`${k}=${v}`);
     }
-    ;
     return new Promise(function (resolve) {
         const command = ffmpeg(file)
             .seekInput(start)
@@ -1107,15 +1130,6 @@ async function saveMP3(file, start, end, filename, metadata) {
     downloadMp3(buffer, filename, metadata)
 }
 
-async function postOpus(args) {
-    const file = args.file, defaultName = args.defaultName, start = args.start, end = args.end;
-    const metadata = args.metadata ? args.metadata : {test: 'test'};
-    const mode = args.mode;
-    //const buffer = await fetchAudioBuffer({file: file, start: start, end: end});
-    //await uploadMp3(buffer, defaultName, metadata, mode);
-    await uploadOpus(file, start, defaultName, metadata, mode)
-}
-
 /// Workers  From the MDN example
 function spawnWorker(model, list, batchSize, warmup) {
     console.log(`spawning worker with ${list}, ${batchSize}, ${warmup}`)
@@ -1180,11 +1194,19 @@ async function parseMessage(e) {
     const response = e.data;
     if (response['message'] === 'model-ready') {
         const chunkLength = response['chunkLength'];
-        labels = response['labels'];
         sampleRate = response['sampleRate'];
         const backend = response['backend'];
         console.log(backend);
         UI.postMessage({event: 'model-ready', message: 'ready', backend: backend, labels: labels})
+    } else if (response['message'] === 'labels') {
+        labels = response['labels'];
+        // Now we have what we need to populate a database...
+        const t0 = Date.now();
+        // Create in-memory database
+        loadDB();
+        // Load the archive one too
+        loadDB(appPath);
+        console.log(`Databases loaded in ${(Date.now() - t0)} milliseconds.`);
     } else if (response['message'] === 'prediction' && !aborted) {
         // add filename to result for db purposes
         let [file, batchInProgress] = parsePredictions(response);
@@ -1194,7 +1216,7 @@ async function parseMessage(e) {
                 UI.postMessage({
                     event: 'prediction-done',
                     file: file,
-                    labels: AUDACITY,
+                    audacityLabels: AUDACITY,
                     batchInProgress: batchInProgress
                 })
             }
@@ -1210,12 +1232,21 @@ async function parseMessage(e) {
     }
 }
 
-async function processNextFile(args) {
+// Optional Arguments
+async function processNextFile({
+                                   confidence = 0.5,
+                                   start = undefined,
+                                   end = undefined,
+                                   resetResults = false,
+                                   lat = 51,
+                                   lon = -0.4,
+                                   nocmig = NOCMIG
+                               } = {}) {
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
         const found = await getWorkingFile(file);
         if (found) {
-            let [start, end] = args && args.start ? [args.start, args.end] : await setStartEnd(file);
+            if (!start) [start, end] = await setStartEnd(file);
             if (start === 0 && end === 0) {
                 // Nothing to do for this file
                 const result = "No predictions.";
@@ -1224,34 +1255,38 @@ async function processNextFile(args) {
                         event: 'prediction-ongoing',
                         file: file,
                         result: result,
-                        index: 1,
+                        index: -1,
                         resetResults: false,
                     });
                 }
                 UI.postMessage({
                     event: 'prediction-done',
                     file: file,
-                    labels: AUDACITY,
+                    audacityLabels: AUDACITY,
                     batchInProgress: FILE_QUEUE.length
                 });
-                await processNextFile(args);
+                await processNextFile(arguments[0]);
             } else {
-                const resetResults = args ? args.resetResults : false;
-                await doPrediction({start: start, end: end, file: file, resetResults: resetResults, preserveResults: true});
+                await doPrediction({
+                    start: start,
+                    end: end,
+                    file: file,
+                    resetResults: resetResults,
+                });
             }
         } else {
-            await processNextFile(args);
+            await processNextFile(arguments[0]);
         }
     } else {
         predicting = false;
-        onSave2DB(memoryDB);
+        await onSave2DB(memoryDB);
     }
 }
 
 async function setStartEnd(file) {
     const meta = metadata[file];
     let start, end;
-    if (nocmig) {
+    if (NOCMIG) {
         const fileEnd = meta.fileStart + (meta.duration * 1000);
         // If it's dark at the file start, start at 0 ...otherwise start at dusk
         if (meta.fileStart < meta.dawn || meta.fileStart > meta.dusk) {
@@ -1279,15 +1314,19 @@ async function setStartEnd(file) {
 
 let t1, t0;
 
-const getCachedResults = (args) => {
+const getCachedResults = ({
+                              db = undefined,
+                              range = undefined,
+                              files = undefined,
+                              species = undefined,
+                          }) => {
     let where = '';
-    const db = args.db;
-    const dateRange = args.range;
+    const dateRange = range;
     //if (args.file) where = ` WHERE files.name =  '${args.file.replace("'", "''")}'`;
-    if (args.files) {
+    if (files) {
         where = 'WHERE files.name IN  (';
         // Format the file list
-        args.files.forEach(file => {
+        files.forEach(file => {
             file = file.replaceAll("'", "''");
             where += `'${file}',`
         })
@@ -1295,7 +1334,7 @@ const getCachedResults = (args) => {
         where = where.slice(0, -1);
         where += ')';
     }
-    if (args.species) where = `${args.files ? ' AND ' : ' WHERE ' } s1.cname =  '${args.species.replace("'", "''")}'`;
+    if (species) where += `${files ? ' AND ' : ' WHERE '} s1.cname =  '${species.replace("'", "''")}'`;
     const when = dateRange && dateRange.start ? `AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
     return new Promise(function (resolve, reject) {
         db.all(`SELECT dateTime AS timestamp, position AS position, 
@@ -1347,28 +1386,22 @@ function getKeyByValue(object, value) {
 }
 
 const getFileInfo = async (file) => {
-    const db = await loadDB(appPath);
-    // Set original filestamp for converted files. DOESN'T work if file sent before DB loaded
-    if (db) {
-        // look for file, ignore extension
-        const baseName = file.replace(/^(.*)\..*$/g, '$1').replace("'", "''");
-        return new Promise(function (resolve, reject) {
-            db.get(`SELECT *
+    // look for file in the disk DB, ignore extension
+    const baseName = file.replace(/^(.*)\..*$/g, '$1').replace("'", "''");
+    return new Promise(function (resolve, reject) {
+        diskDB.get(`SELECT *
                     FROM files
                     WHERE name LIKE '${baseName}%'`, (err, row) => {
-                if (err) console.log('There was an error ', err)
-                else {
-                    resolve(row)
-                }
-            })
+            if (err) console.log('There was an error ', err)
+            else {
+                resolve(row)
+            }
         })
-    } else {
-        return undefined
-    }
+    })
 }
 
 const updateFileTables = async (db, file) => {
-    if (!metadata[file].isComplete) await getWorkingFile(file);
+    if (!metadata[file] || !metadata[file].isComplete) await getWorkingFile(file);
     return new Promise(function (resolve) {
         const newFileStmt = db.prepare("INSERT INTO files VALUES (?,?,?)");
         const selectStmt = db.prepare('SELECT rowid FROM files WHERE name = (?)');
@@ -1406,9 +1439,9 @@ const getFileIDs = (db) => {
 const onSave2DB = async (db) => {
     t0 = performance.now();
     if (RESULTS.length) {
+        let filemap = await getFileIDs(db)
         db.run('BEGIN TRANSACTION');
         const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-        let filemap = await getFileIDs(db)
         for (let i = 0; i < RESULTS.length; i++) {
             const dateTime = new Date(RESULTS[i].timestamp).getTime();
             const birdID1 = RESULTS[i].id_1;
@@ -1427,7 +1460,10 @@ const onSave2DB = async (db) => {
                     UI.postMessage({event: 'progress', text: "Updating Database.", progress: i / RESULTS.length});
                     if (i === (RESULTS.length - 1)) {
                         db.run('COMMIT', (err, rows) => {
-                            if (db === diskDB) UI.postMessage({event: 'generate-alert', message: `Update complete, ${i + 1} records updated in ${((performance.now() - t0) / 1000).toFixed(3)} seconds`})
+                            UI.postMessage({
+                                event: 'generate-alert',
+                                message: `${db.filename.replace(/.*\//, '')} database update complete, ${i + 1} records updated in ${((performance.now() - t0) / 1000).toFixed(3)} seconds`
+                            })
                             UI.postMessage({event: 'progress', progress: 1.0});
                         });
                     }
@@ -1439,7 +1475,6 @@ const onSave2DB = async (db) => {
 }
 
 const getSeasonRecords = async (species, season) => {
-    await loadDB(appPath);
     const seasonMonth = {spring: "< '07'", autumn: " > '06'"}
     return new Promise(function (resolve, reject) {
         const stmt = diskDB.prepare(`
@@ -1482,9 +1517,11 @@ const getMostCalls = (species) => {
     })
 }
 
-const getChartTotals = (args) => {
-    const species = args.species;
-    const dateRange = args.range;
+const getChartTotals = ({
+                            species = undefined,
+                            range = {}
+                        }) => {
+    const dateRange = range;
     // Work out sensible aggregations from hours difference in daterange
     const hours_diff = dateRange.start ?
         Math.round((dateRange.end - dateRange.start) / (1000 * 60 * 60)) : 745;
@@ -1655,74 +1692,81 @@ const onUpdateFileStart = async (args) => {
         })
     })
 }
-let speciesCache = {};
 
-const cacheSpecies = (cname) => {
-    cname = cname.replace("'", "''");
-    return new Promise((resolve, reject) => {
-        memoryDB.get(`SELECT *
-                      FROM SPECIES
-                      WHERE cname = '${cname}'`, (err, row) => {
-            if (err) reject(err)
-            else {
-                speciesCache[cname] = {id: row.id, cname: row.cname, sname: row.sname}
-                resolve(speciesCache)
-            }
-        })
-    })
-}
-
-const updateResults = async (args) => {
-    if (args.what === 'ID' && !speciesCache[args.value]) await cacheSpecies(args.value);
-    let obj = RESULTS.find(o => {
-        if (o.start === args.start && o.file === args.file) {
-            if (args.what === 'ID') {
-
-                const rec = speciesCache[args.value]
-                o.id_1 = rec.id;
-                o.cname = rec.cname;
-                o.sname = rec.sname;
-            } else if (args.what === 'comment') {
-                o.comment = args.value;
-            } else if (args.what === 'label') {
-                o.label = args.value;
-            }
-            return true // Stop the search
-        }
-    })
-}
-
-const onUpdateRecord = async (args) => {
-    args.start = parseFloat(args.start);
-    let what = args.what, file = args.file, start = args.start, value = args.value, db = args.db;
+async function onUpdateRecord({
+                                  files = undefined,
+                                  start = 0,
+                                  value = '',
+                                  db = diskDB,
+                                  isBatch = false,
+                                  from = '',
+                                  what = 'birdID1',
+                                  isReset = false,
+                                  isFiltered = false,
+                                  isExplore = false
+                              }) {
     // Sanitize input
-    if (!value) value = '';
-    await updateResults(args);
-    if (what === 'ID') {
+    let whatSQL, whereSQL;
+    // Construct the SQL
+    if (what === 'ID' || what === 'birdID1') {
+        // Map the field name to the one in the database
         what = 'birdID1';
-        value = speciesCache[args.value].id;
+        whatSQL = `birdID1 = (SELECT id FROM species WHERE cname = '${value}')`;
+    } else if (what === 'label') {
+        whatSQL = `label = '${value}'`;
+    } else {
+        whatSQL = `comment = '${value}'`;
     }
-    if (!metadata[file]) metadata[file] = {};
-    if (!metadata[file].fileStart) {
-        metadata[file].fileStart = await getFileStart(db, file);
+
+    if (isBatch) {
+        //Batch update
+        whereSQL = `WHERE birdID1 = (SELECT id FROM species WHERE cname = '${from}') `;
+        if (files) {
+            whereSQL += 'AND fileID IN (SELECT rowid from files WHERE name in (';
+            // Format the file list
+            files.forEach(file => {
+                file = file.replaceAll("'", "''");
+                whereSQL += `'${file}',`
+            })
+            // remove last comma
+            whereSQL = whereSQL.slice(0, -1);
+            whereSQL += '))';
+        }
+    } else {
+        // Single record
+        whereSQL = `WHERE datetime = (SELECT filestart FROM files WHERE name = '${files[0]}') + ${(start * 1000).toFixed(0)}`
     }
-    const dateTime = metadata[file].fileStart + (start * 1000);
-    return new Promise(function (resolve, reject) {
+    const t0 = Date.now();
+    return new Promise((resolve, reject) => {
         db.run(`UPDATE records
-                SET ${what} = '${value}'
-                WHERE datetime = '${dateTime}'`, function (err, row) {
+                SET ${whatSQL} ${whereSQL}`, async function (err, row) {
             if (err) {
                 reject(err)
             } else {
-                resolve(row)
                 if (this.changes) {
-                    console.log(`Updated ${what} in ${db.filename.replace(/.*\//, '')} database, setting ${dateTime} to ${value}`)
+                    console.log(`Updated ${this.changes} records for ${what} in ${db.filename.replace(/.*\//, '')} database, setting them to ${value}`);
+                    console.log(`Update without transaction took ${Date.now() - t0} milliseconds`);
+                    const species = isFiltered || isExplore ? from : '';
+                    if (isExplore) files = undefined;
+                    sendResults2UI({db: db, filelist: files, species: species, saveSummary: isFiltered});
+                    resolve(this.changes)
                 } else {
                     console.log(`No records updated in ${db.filename.replace(/.*\//, '')}`)
-                    // Update memoryDB
-                    if (args.db === diskDB) {
-                        args.db = memoryDB;
-                        onUpdateRecord(args);
+                    // Not in diskDB, so update memoryDB
+                    if (db === diskDB) {
+                        await onUpdateRecord(
+                            //because no access to this in arrow function, and regular function replaces arguments[0]
+                            {
+                                files: files,
+                                start: start,
+                                value: value,
+                                db: memoryDB,
+                                isBatch: isBatch,
+                                from: from,
+                                what: what,
+                                isReset: isReset,
+                                isFiltered: isFiltered
+                            });
                         UI.postMessage({
                             event: 'generate-alert',
                             message: 'Remember to save your records to store this change'
