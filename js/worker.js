@@ -77,7 +77,7 @@ const createDB = (file) => {
                         conf2    REAL,
                         conf3    REAL,
                         fileID   INTEGER,
-                        position REAL,
+                        position INTEGER,
                         label    TEXT,
                         comment  TEXT,
                         UNIQUE (dateTime, fileID)
@@ -1317,13 +1317,13 @@ let t1, t0;
 const getCachedResults = ({
                               db = undefined,
                               range = undefined,
-                              files = undefined,
+                              files = [],
                               species = undefined,
                           }) => {
     let where = '';
     const dateRange = range;
     //if (args.file) where = ` WHERE files.name =  '${args.file.replace("'", "''")}'`;
-    if (files) {
+    if (files.length) {
         where = 'WHERE files.name IN  (';
         // Format the file list
         files.forEach(file => {
@@ -1334,7 +1334,7 @@ const getCachedResults = ({
         where = where.slice(0, -1);
         where += ')';
     }
-    if (species) where += `${files ? ' AND ' : ' WHERE '} s1.cname =  '${species.replace("'", "''")}'`;
+    if (species) where += `${files.length ? ' AND ' : ' WHERE '} s1.cname =  '${species.replace("'", "''")}'`;
     const when = dateRange && dateRange.start ? `AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
     return new Promise(function (resolve, reject) {
         db.all(`SELECT dateTime AS timestamp, position AS position, 
@@ -1342,8 +1342,7 @@ const getCachedResults = ({
             birdid1 as id_1, birdid2 as id_2, birdid3 as id_3, 
             position / 1000 as
                 start, (position / 1000) + 3 as
-                end
-                ,  
+                end,  
                 conf1 as score, conf2 as score2, conf3 as score3, 
                 s1.sname as sname, s2.sname as sname2, s3.sname as sname3,
                 files.duration, 
@@ -1694,7 +1693,7 @@ const onUpdateFileStart = async (args) => {
 }
 
 async function onUpdateRecord({
-                                  files = undefined,
+                                  files = [],
                                   start = 0,
                                   value = '',
                                   db = diskDB,
@@ -1705,6 +1704,8 @@ async function onUpdateRecord({
                                   isFiltered = false,
                                   isExplore = false
                               }) {
+
+
     // Sanitize input
     let whatSQL, whereSQL;
     // Construct the SQL
@@ -1734,7 +1735,7 @@ async function onUpdateRecord({
         }
     } else {
         // Single record
-        whereSQL = `WHERE datetime = (SELECT filestart FROM files WHERE name = '${files[0]}') + ${(start * 1000).toFixed(0)}`
+        whereSQL = `WHERE datetime = (SELECT filestart FROM files WHERE name = '${files[0]}') + ${start}`
     }
     const t0 = Date.now();
     return new Promise((resolve, reject) => {
@@ -1747,7 +1748,7 @@ async function onUpdateRecord({
                     console.log(`Updated ${this.changes} records for ${what} in ${db.filename.replace(/.*\//, '')} database, setting them to ${value}`);
                     console.log(`Update without transaction took ${Date.now() - t0} milliseconds`);
                     const species = isFiltered || isExplore ? from : '';
-                    if (isExplore) files = undefined;
+                    if (isExplore) files = [];
                     sendResults2UI({db: db, filelist: files, species: species, saveSummary: isFiltered});
                     resolve(this.changes)
                 } else {
