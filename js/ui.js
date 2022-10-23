@@ -402,29 +402,6 @@ async function showOpenDialog() {
     if (!files.canceled) await onOpenFiles({filePaths: files.filePaths});
 }
 
-// function updateFileName(files, openfile) {
-//
-//     let filenameElement = document.getElementById('filename');
-//     filenameElement.innerHTML = '';
-//
-//     let appendstr = '<div id="fileContainer" class="d-inline-block position-absolute bg-dark text-nowrap pe-3">';
-//     if (files.length > 1) {
-//         appendstr += '<span class="material-icons-two-tone pointer">library_music</span>';
-//     } else {
-//         appendstr += '<span class="material-icons-two-tone align-bottom">audio_file</span>';
-//     }
-//     files.forEach(item => {
-//         if (item === openfile) {
-//             appendstr += `<span class="revealFiles visible pointer" id="${item}">`;
-//
-//         } else {
-//             appendstr += `<span class="openFiles pointer" id="${item}">`;
-//         }
-//         appendstr += item.replace(/^.*[\\\/]/, "") + '</span>';
-//
-//     })
-//     filenameElement.innerHTML += appendstr + '</div>';
-// }
 function updateFileName(files, openfile) {
     let filenameElement = document.getElementById('filename');
     filenameElement.innerHTML = '';
@@ -457,6 +434,12 @@ function updateFileName(files, openfile) {
     }
 
     filenameElement.innerHTML = appendStr;
+    //remove filename picker so they don't accumulate!
+    const pickers = document.getElementsByClassName('opensright');
+    while(pickers.length > 0){
+        pickers[0].parentNode.removeChild(pickers[0]);
+    }
+    //Before adding this one
     $(function () {
         $('#setFileStart').daterangepicker({
             singleDatePicker: true,
@@ -1354,7 +1337,7 @@ function editResultID(cname, sname, cell) {
         isReset: true,
         isExplore: exploreMode
     });
-    //updateSummary();
+    worker.postMessage({action: 'get-detected-species-list'});
 }
 
 function unpackNameAttr(el, cname) {
@@ -2550,7 +2533,10 @@ function commentHandler(e) {
         } else {
             e.target.parentNode.innerHTML = `<span title="Add a comment" class="material-icons-two-tone pointer add-comment">add_comment</span>`;
         }
-        const [file, start, ,] = unpackNameAttr(activeRow);
+        let [file, start, ,] = unpackNameAttr(activeRow);
+        start = parseInt(start) * 1000;
+        //start = new Date(zero.getTime() + (start * 1000))
+        //start = start.getTime()
         worker.postMessage({
             action: 'update-record',
             files: [file],
