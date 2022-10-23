@@ -436,7 +436,7 @@ function updateFileName(files, openfile) {
     filenameElement.innerHTML = appendStr;
     //remove filename picker so they don't accumulate!
     const pickers = document.getElementsByClassName('opensright');
-    while(pickers.length > 0){
+    while (pickers.length > 0) {
         pickers[0].parentNode.removeChild(pickers[0]);
     }
     //Before adding this one
@@ -530,16 +530,16 @@ function isEmptyObject(obj) {
 function refreshResultsView() {
     // // Only do this if the results are hidden...
     // if (resultTableElement.hasClass('d-none')) {
-        hideAll();
-        if (fileLoaded) {
-            showElement(['spectrogramWrapper'], false);
-            if (!isEmptyObject(predictions)) {
-                showElement(['resultTableContainer'], false);
-            }
-        } else {
-            showElement(['loadFileHint', 'loadFileHintText'], true);
+    hideAll();
+    if (fileLoaded) {
+        showElement(['spectrogramWrapper'], false);
+        if (!isEmptyObject(predictions)) {
+            showElement(['resultTableContainer'], false);
         }
-        adjustSpecDims(true);
+    } else {
+        showElement(['loadFileHint', 'loadFileHintText'], true);
+    }
+    adjustSpecDims(true);
     // }
 }
 
@@ -566,7 +566,7 @@ analyzeSelectionLink.addEventListener('click', async () => {
     //delete diagnostics['Audio Duration'];
     //analyseReset();
     progressDiv.show();
-    const start = region.start + bufferBegin;
+    let start = region.start + bufferBegin;
     let end = region.end + bufferBegin;
     if (end - start < 0.5) {
         region.end = region.start + 0.5;
@@ -583,6 +583,10 @@ analyzeSelectionLink.addEventListener('click', async () => {
 });
 
 function postAnalyzeMessage(args) {
+    let start = args.start, end = args.end;
+    // Format start / end as millisecond integers
+    //if (start) start = (start * 1000).toFixed(0);
+    //if (end) end = (end * 1000).toFixed(0)
     analyseReset();
     if (args.resetResults) {
         resetResults(args);
@@ -595,8 +599,8 @@ function postAnalyzeMessage(args) {
             action: 'analyze',
             confidence: args.confidence,
             resetResults: args.resetResults,
-            start: args.start,
-            end: args.end,
+            start: start,
+            end: end,
             nocmig: config.nocmig,
             lat: config.latitude,
             lon: config.longitude,
@@ -2355,14 +2359,15 @@ function scrollResults(row) {
 }
 
 async function renderResult(args) {
-    const result = args.result, resetResults = args.resetResults, file = args.file;
+    const result = args.result, file = args.file;
     let index = args.index;
-    result.timestamp = new Date(result.timestamp);
-    result.position = new Date(result.position);
+    // Convert timestamp and position to date so easier to format results in UI
+    let timestamp = new Date(result.timestamp);
+    const position = new Date(result.position * 1000);
     // Datetime wrangling for Nocmig mode
     if (result !== "No predictions.") {
-        let astro = SunCalc.getTimes(result.timestamp, config.latitude, config.longitude);
-        if (astro.dawn.setMilliseconds(0) < result.timestamp && astro.dusk.setMilliseconds(0) > result.timestamp) {
+        let astro = SunCalc.getTimes(timestamp, config.latitude, config.longitude);
+        if (astro.dawn.setMilliseconds(0) < timestamp && astro.dusk.setMilliseconds(0) > timestamp) {
             result.dayNight = 'daytime';
         } else {
             result.dayNight = 'nighttime';
@@ -2418,13 +2423,14 @@ async function renderResult(args) {
         if (result.score < 0.65) {
             confidence = '&#63;';
         }
-        result.date = result.timestamp;
-        const timestamp = result.timestamp.toString().split(' ');
+        result.date = timestamp;
+        timestamp = timestamp.toString()
+            timestamp = timestamp.split(' ');
         const UI_timestamp = `${timestamp[2]} ${timestamp[1]} ${timestamp[3].substring(2)}<br/>${timestamp[4]}`;
-        result.filename = result.cname.replace(/'/g, "\\'") + ' ' + result.timestamp + '.opus';
+        result.filename = result.cname.replace(/'/g, "\\'") + ' ' + timestamp + '.mp3';
         let spliceStart;
         result.position < 3600000 ? spliceStart = 14 : spliceStart = 11;
-        const UI_position = new Date(result.position).toISOString().substring(spliceStart, 19);
+        const UI_position = position.toISOString().substring(spliceStart, 19);
         // Now we have formatted the fields, and skipped detections as required by nocmig mode, add result to predictions file
         // if (!resetResults) {
         //     const tableRows = document.querySelectorAll('#results > tbody > tr.top-row');
@@ -2534,9 +2540,6 @@ function commentHandler(e) {
             e.target.parentNode.innerHTML = `<span title="Add a comment" class="material-icons-two-tone pointer add-comment">add_comment</span>`;
         }
         let [file, start, ,] = unpackNameAttr(activeRow);
-        start = parseInt(start) * 1000;
-        //start = new Date(zero.getTime() + (start * 1000))
-        //start = start.getTime()
         worker.postMessage({
             action: 'update-record',
             files: [file],

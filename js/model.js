@@ -136,15 +136,6 @@ class Model {
         return spec_image_resized
     }
 
-    _timestampFromSeconds(seconds, fileStart) {
-        const date = new Date(fileStart);
-        //if (fileStart === 0) date.setHours(date.getHours() - 1);
-        //const date = new Date(1970, 0, 1);
-        date.setSeconds(date.getSeconds() + seconds);
-        return date // .toTimeString().replace(/.*(\d{2}:\d{2}:\d{2}).*/, "$1");
-
-    }
-
     warmUp(batchSize) {
         this.batchSize = parseInt(batchSize);
         const warmupResult = this.model.predict(
@@ -231,8 +222,8 @@ class Model {
                     file: file,
                     start: key,
                     end: end,
-                    timestamp: myModel._timestampFromSeconds(key, fileStart),
-                    position: myModel._timestampFromSeconds(key, 0),
+                    timestamp: key * 1000 + fileStart,
+                    position: key,
                     id_1: item.index[0],
                     id_2: item.index[1],
                     id_3: item.index[2],

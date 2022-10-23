@@ -247,8 +247,8 @@ const sendResults2UI = async ({
     index = 0;
     results.forEach(result => {
         //format dates
-        result.timestamp = new Date(result.timestamp);
-        result.position = new Date(result.position);
+        //result.timestamp = new Date(result.timestamp);
+        //result.position = new Date(result.position);
         index++;
         UI.postMessage({
             event: 'prediction-ongoing',
@@ -310,7 +310,7 @@ async function onAnalyze({
         results.forEach(result => {
             //format dates
             result.timestamp = new Date(result.timestamp);
-            result.position = new Date(result.position);
+            //result.position = new Date(result.position);
             index++;
             UI.postMessage({
                 event: 'prediction-ongoing',
@@ -1340,8 +1340,8 @@ const getCachedResults = ({
         db.all(`SELECT dateTime AS timestamp, position AS position, 
             s1.cname as cname, s2.cname as cname2, s3.cname as cname3, 
             birdid1 as id_1, birdid2 as id_2, birdid3 as id_3, 
-            position / 1000 as
-                start, (position / 1000) + 3 as
+            position as
+                start, position + 3 as
                 end,  
                 conf1 as score, conf2 as score2, conf3 as score3, 
                 s1.sname as sname, s2.sname as sname2, s3.sname as sname3,
@@ -1449,7 +1449,7 @@ const onSave2DB = async (db) => {
             const conf1 = RESULTS[i].score;
             const conf2 = RESULTS[i].score2;
             const conf3 = RESULTS[i].score3;
-            const position = new Date(RESULTS[i].position).getTime();
+            const position = RESULTS[i].position;
             const file = RESULTS[i].file;
             const comment = RESULTS[i].comment;
             const label = RESULTS[i].label;
@@ -1706,8 +1706,10 @@ async function onUpdateRecord({
                               }) {
 
 
-    // Sanitize input
-    let whatSQL, whereSQL;
+    // Sanitize input: start is passed to the function in float seconds,
+    // but we need a millisecond integer
+    const startMilliseconds = (start * 1000).toFixed(0);
+
     // Construct the SQL
     if (what === 'ID' || what === 'birdID1') {
         // Map the field name to the one in the database
@@ -1735,7 +1737,7 @@ async function onUpdateRecord({
         }
     } else {
         // Single record
-        whereSQL = `WHERE datetime = (SELECT filestart FROM files WHERE name = '${files[0]}') + ${start}`
+        whereSQL = `WHERE datetime = (SELECT filestart FROM files WHERE name = '${files[0]}') + ${startMilliseconds}`
     }
     const t0 = Date.now();
     return new Promise((resolve, reject) => {
