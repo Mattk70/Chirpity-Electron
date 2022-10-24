@@ -665,8 +665,14 @@ const getAudioBuffer = (start, end, file) => {
         console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`)
     })
 }
-
-
+/**
+ *
+ * @param file
+ * @param start
+ * @param end
+ * @param resetResults
+ * @returns {Promise<void>}
+ */
 const getPredictBuffers = async ({
                                      file = '',
                                      start = 0,
@@ -859,16 +865,15 @@ const speciesMatch = (path, sname) => {
 }
 
 const saveResults2DataSet = (results, rootDirectory) => {
-    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/Additions_png';
+    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/Amendment_temp_folder';
     let promise = Promise.resolve();
     let count = 0;
     const t0 = Date.now();
-    let ambient, threshold, value;
     results.forEach(result => {
         // Check for level of ambient noise activation
-
+        let ambient, threshold, value = 0.25;
+        // adding_chirpity_additions is a flag for curated files, if true we assume every detection is correct
         if (!adding_chirpity_additions) {
-            ambient, threshold, value = 0.25;
             ambient = (result.sname2 === 'Ambient Noise' ? result.score2 : result.sname3 === 'Ambient Noise' ? result.score3 : false)
             console.log('Ambient', ambient)
             // If we have a high level of ambient noise activation, insist on a high threshold for species detection
@@ -890,7 +895,6 @@ const saveResults2DataSet = (results, rootDirectory) => {
                     file: result.file
                 })
                 if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
-                    // REALLY NEED to figure out why 0.4 seconds silence at start of exported mp3s leading to 3s clips being 3.024s long
                     const buffer = AudioBuffer.getChannelData(0);
                     const [_, folder] = p.dirname(result.file).match(/^.*\/(.*)$/)
                     // filename format: <source file>_<confidence>_<start>.png
@@ -985,6 +989,8 @@ const bufferToAudio = (file, start, metadata) => {
     })
 }
 
+
+// TODO: remove mp3 creating code and use ffmpeg, adapting buffer2Audio above
 async function analyzeAudioBuffer(aBuffer, metadata) {
     let numOfChan = aBuffer.numberOfChannels,
         btwLength = aBuffer.length * numOfChan * 2 + 44,
@@ -1219,6 +1225,7 @@ async function parseMessage(e) {
                     audacityLabels: AUDACITY,
                     batchInProgress: batchInProgress
                 })
+                await onSave2DB(memoryDB);
             }
             processNextFile();
         }
@@ -1279,7 +1286,7 @@ async function processNextFile({
         }
     } else {
         predicting = false;
-        await onSave2DB(memoryDB);
+        // await onSave2DB(memoryDB);
     }
 }
 
@@ -1342,7 +1349,8 @@ const getCachedResults = ({
             birdid1 as id_1, birdid2 as id_2, birdid3 as id_3, 
             position as
                 start, position + 3 as
-                end,  
+                end
+                ,  
                 conf1 as score, conf2 as score2, conf3 as score3, 
                 s1.sname as sname, s2.sname as sname2, s3.sname as sname3,
                 files.duration, 
@@ -1459,11 +1467,13 @@ const onSave2DB = async (db) => {
                     UI.postMessage({event: 'progress', text: "Updating Database.", progress: i / RESULTS.length});
                     if (i === (RESULTS.length - 1)) {
                         db.run('COMMIT', (err, rows) => {
+                            UI.postMessage({event: 'progress', progress: 1.0});
+                            if (db === diskDB){
                             UI.postMessage({
                                 event: 'generate-alert',
                                 message: `${db.filename.replace(/.*\//, '')} database update complete, ${i + 1} records updated in ${((performance.now() - t0) / 1000).toFixed(3)} seconds`
                             })
-                            UI.postMessage({event: 'progress', progress: 1.0});
+                                }
                         });
                     }
                 });
@@ -1693,7 +1703,8 @@ const onUpdateFileStart = async (args) => {
 }
 
 async function onUpdateRecord({
-                                  files = [],
+                                  openFiles = [],
+                                  currentFile = '',
                                   start = 0,
                                   value = '',
                                   db = diskDB,
@@ -1711,6 +1722,7 @@ async function onUpdateRecord({
     const startMilliseconds = (start * 1000).toFixed(0);
 
     // Construct the SQL
+    let whatSQL, whereSQL;
     if (what === 'ID' || what === 'birdID1') {
         // Map the field name to the one in the database
         what = 'birdID1';
@@ -1724,10 +1736,10 @@ async function onUpdateRecord({
     if (isBatch) {
         //Batch update
         whereSQL = `WHERE birdID1 = (SELECT id FROM species WHERE cname = '${from}') `;
-        if (files) {
+        if (openFiles.length) {
             whereSQL += 'AND fileID IN (SELECT rowid from files WHERE name in (';
             // Format the file list
-            files.forEach(file => {
+            openFiles.forEach(file => {
                 file = file.replaceAll("'", "''");
                 whereSQL += `'${file}',`
             })
@@ -1737,7 +1749,7 @@ async function onUpdateRecord({
         }
     } else {
         // Single record
-        whereSQL = `WHERE datetime = (SELECT filestart FROM files WHERE name = '${files[0]}') + ${startMilliseconds}`
+        whereSQL = `WHERE datetime = (SELECT filestart FROM files WHERE name = '${currentFile}') + ${startMilliseconds}`
     }
     const t0 = Date.now();
     return new Promise((resolve, reject) => {
@@ -1750,8 +1762,8 @@ async function onUpdateRecord({
                     console.log(`Updated ${this.changes} records for ${what} in ${db.filename.replace(/.*\//, '')} database, setting them to ${value}`);
                     console.log(`Update without transaction took ${Date.now() - t0} milliseconds`);
                     const species = isFiltered || isExplore ? from : '';
-                    if (isExplore) files = [];
-                    sendResults2UI({db: db, filelist: files, species: species, saveSummary: isFiltered});
+                    if (isExplore) openFiles = [];
+                    sendResults2UI({db: db, filelist: openFiles, species: species, saveSummary: isFiltered});
                     resolve(this.changes)
                 } else {
                     console.log(`No records updated in ${db.filename.replace(/.*\//, '')}`)
@@ -1760,7 +1772,8 @@ async function onUpdateRecord({
                         await onUpdateRecord(
                             //because no access to this in arrow function, and regular function replaces arguments[0]
                             {
-                                files: files,
+                                openFiles: openFiles,
+                                currentFile:currentFile,
                                 start: start,
                                 value: value,
                                 db: memoryDB,
