@@ -761,8 +761,9 @@ function loadResultRegion(paramlist) {
 }
 
 /**
- * Sets the height of elements on the results pages.
- * @param redraw
+ *
+ * @param redraw boolean, whether to re-render the spectrogram
+ * @param fftSamples: Optional, the number of fftsamples to use for rendering. Must be a factor of 2
  */
 function adjustSpecDims(redraw, fftSamples) {
     //Contentwrapper starts below navbar (66px) and ends above footer (30px). Hence - 96
@@ -1188,7 +1189,7 @@ const fullListStore = document.getElementById('allSpecies');
 const seenListStore = document.getElementById('seenSpecies');
 
 $(document).on('focus', '.input', function () {
-    document.removeEventListener('keydown', handleKeyDown, true);
+    document.removeEventListener('keydown', handleKeyDownDeBounce, true);
     const container = this.parentNode.querySelector('.bird-list-wrapper');
     if (container.classList.contains('editing')) {
         const theList = document.querySelector('#allSpecies .bird-list')
@@ -1202,7 +1203,7 @@ $(document).on('focus', '.input', function () {
 })
 
 $(document).on('blur', '.input', function () {
-    document.addEventListener('keydown', handleKeyDown, true);
+    document.addEventListener('keydown', handleKeyDownDeBounce, true);
     // Use timeout to allow a click event on the list to fire
     setTimeout(hideBirdList, 250, this.parentNode);
 })
@@ -1222,26 +1223,24 @@ function hideBirdList(el) {
 
 let restoreSpecies, currentID;
 
-resultTableElement.on('click', '.edit, .cname', editID);
+resultTableElement.on('contextmenu', '.edit, .cname', editID);
 
 //$(document).on('click', '.cname', editID);
 
 function editID(e) {
-    if (e.shiftKey) {
-        setClickedIndex(e);
-        const currentRow = e.target.closest('tr');
-        let cname = currentRow.querySelector('.cname span') || currentRow.querySelector('.cname');
-        // save the original cell contents in case edit is aborted or doesn't change species
-        restoreSpecies = cname.innerHTML;
-        // save the original species to use in batch edit search
-        const speciesTextContainer = cname.querySelector('span.pointer') || cname;
-        currentID = speciesTextContainer.innerHTML;
+    setClickedIndex(e);
+    const currentRow = e.target.closest('tr');
+    let cname = currentRow.querySelector('.cname span') || currentRow.querySelector('.cname');
+    // save the original cell contents in case edit is aborted or doesn't change species
+    restoreSpecies = cname.innerHTML;
+    // save the original species to use in batch edit search
+    const speciesTextContainer = cname.querySelector('span.pointer') || cname;
+    currentID = speciesTextContainer.innerHTML;
 
-        cname.innerHTML = `<div id='edit' class="species-selector"><input type="text" class="input rounded-pill" id="editInput" 
+    cname.innerHTML = `<div id='edit' class="species-selector"><input type="text" class="input rounded-pill" id="editInput" 
                     placeholder="Search for a species..."><div class="editing bird-list-wrapper"></div></div>`;
 
-        document.getElementById('editInput').focus();
-    }
+    document.getElementById('editInput').focus();
 }
 
 
@@ -1319,10 +1318,9 @@ function editResultID(cname, sname, cell) {
     let from = restoreSpecies.replace(/(.*)\s<.*/, "$1");
     // Are we batch editing here?
     const batch = cell.closest('table').id !== 'results';
-    let start, files, file;
+    let start, files = [], file;
     if (!batch) {
         [file, start, _, currentRow] = unpackNameAttr(cell, cname);
-        files = [file];
         sendFeedback(file, cname, sname);
     } else {
         if (!exploreMode) files = fileList;
@@ -1331,7 +1329,8 @@ function editResultID(cname, sname, cell) {
     cell.innerHTML = `<span id="${cname} ${sname}" class="pointer">${cname} <i>${sname}</i></span>`;
     worker.postMessage({
         action: 'update-record',
-        files: files,
+        openFiles: files,
+        currentFile: currentFile,
         what: 'ID',
         start: start,
         value: cname,
@@ -1386,7 +1385,8 @@ function updateLabel(e) {
         [file, start, ,] = unpackNameAttr(activeRow);
         worker.postMessage({
             action: 'update-record',
-            files: [file],
+            openFiles: fileList,
+            currentFile: currentFile,
             start: start,
             what: 'label',
             from: species,
@@ -1398,10 +1398,10 @@ function updateLabel(e) {
     } else {
         // this is the summary table and a batch update is wanted
         //are we in Explore mode?
-        const files = exploreMode ? undefined : fileList;
+        const files = exploreMode ? [] : fileList;
         worker.postMessage({
             action: 'update-record',
-            files: files,
+            openFiles: files,
             from: species,
             what: 'label',
             value: label,
@@ -1676,6 +1676,13 @@ $(document).on('click', '.play', function () {
     (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
 })
 
+
+function handleKeyDownDeBounce(e){
+        waitForFinalEvent(function () {
+        handleKeyDown(e);
+    }, 100, 'keyhandler');
+}
+
 function handleKeyDown(e) {
     let action = e.code;
     if (action in GLOBAL_ACTIONS) {
@@ -1698,7 +1705,7 @@ function handleKeyDown(e) {
 }
 
 function enableKeyDownEvent() {
-    document.addEventListener('keydown', handleKeyDown, true);
+    document.addEventListener('keydown', handleKeyDownDeBounce, true);
 }
 
 
@@ -2303,40 +2310,37 @@ async function onPredictionDone({
     $(document).on('click', '.speciesFilter', function (e) {
         // Prevent crazy double firing of handler
         e.stopImmediatePropagation();
-        // Do nothing if shift key used or if the bird list is clicked
-        if (!e.shiftKey) {
-            // Species filtering in Explore is meaningless...
-            if (isExplore()) return
+        // Species filtering in Explore is meaningless...
+        if (isExplore()) return
 
-            // Check if italic section was clicked
-            speciesFilter = document.querySelectorAll('.speciesFilter');
-            const target = this.querySelector('span.pointer');
+        // Check if italic section was clicked
+        speciesFilter = document.querySelectorAll('.speciesFilter');
+        const target = this.querySelector('span.pointer');
 
-            // There won't be a target if the input box is clicked rather than the list
-            if (target) {
-                const targetClass = target.classList;
-                if (targetClass.contains('text-success')) {
-                    // Clicked on filtered species icon
-                    targetClass.remove('text-success');
-                    worker.postMessage({action: 'filter', filelist: fileList, saveSummary: false});
-                    speciesViewIsFiltered = false
-                } else {
-                    // Clicked on unfiltered species name
-                    // Remove any exclusion from the species to filter
-                    speciesFilter.forEach(function (el) {
-                        const removeFrom = el.querySelector('span.pointer')
-                        removeFrom.classList.remove('text-success');
-                    })
-                    targetClass.add('text-success');
-                    const species = target.innerHTML.replace(/\s<.*/, '');
-                    worker.postMessage({action: 'filter', species: species, filelist: fileList, saveSummary: true});
-                    speciesViewIsFiltered = true;
-                }
+        // There won't be a target if the input box is clicked rather than the list
+        if (target) {
+            const targetClass = target.classList;
+            if (targetClass.contains('text-success')) {
+                // Clicked on filtered species icon
+                targetClass.remove('text-success');
+                worker.postMessage({action: 'filter', filelist: fileList, saveSummary: false});
+                speciesViewIsFiltered = false
+            } else {
+                // Clicked on unfiltered species name
+                // Remove any exclusion from the species to filter
+                speciesFilter.forEach(function (el) {
+                    const removeFrom = el.querySelector('span.pointer')
+                    removeFrom.classList.remove('text-success');
+                })
+                targetClass.add('text-success');
+                const species = target.innerHTML.replace(/\s<.*/, '');
+                worker.postMessage({action: 'filter', species: species, filelist: fileList, saveSummary: true});
+                speciesViewIsFiltered = true;
             }
-            //scrollResults(tableRows[0]);
-            document.getElementById('results').scrollTop = 0;
         }
-    });
+        //scrollResults(tableRows[0]);
+        document.getElementById('results').scrollTop = 0;
+    })
 
     // Diagnostics:
     t1_analysis = Date.now();
@@ -2357,6 +2361,10 @@ function scrollResults(row) {
     const container = row.closest('.overflow-auto')
     container.scrollTop = row.offsetTop - container.offsetTop - document.getElementById('resultsHead').offsetHeight;
 }
+
+
+// TODO: limit results table to n records, paginate. Have summary contain full detection counts.
+// TODO: show every detection in the spec window as a region on the spectrogram
 
 async function renderResult(args) {
     const result = args.result, file = args.file;
@@ -2425,7 +2433,7 @@ async function renderResult(args) {
         }
         result.date = timestamp;
         timestamp = timestamp.toString()
-            timestamp = timestamp.split(' ');
+        timestamp = timestamp.split(' ');
         const UI_timestamp = `${timestamp[2]} ${timestamp[1]} ${timestamp[3].substring(2)}<br/>${timestamp[4]}`;
         result.filename = result.cname.replace(/'/g, "\\'") + ' ' + timestamp + '.mp3';
         let spliceStart;
@@ -2443,7 +2451,7 @@ async function renderResult(args) {
 
         const label = result.label ? tags[result.label] : tags['Remove Label'];
 
-        tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" class='border-top border-secondary top-row ${result.dayNight}'>
+        tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" class='border-top border-2 border-secondary top-row ${result.dayNight}'>
             <th scope='row'>${index}</th>
             <td class='text-start text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-end">${UI_position}</td>
@@ -2509,7 +2517,7 @@ $(document).on('click', '.add-comment, .edit-comment', function (e) {
     const note = e.target.title === "Add a comment" ? '' : e.target.title;
     $(document).off('mouseleave', '.comment');
     $(document).off('mouseenter', '.comment');
-    document.removeEventListener('keydown', handleKeyDown, true);
+    document.removeEventListener('keydown', handleKeyDownDeBounce, true);
     const parent = this.parentNode;
     parent.innerHTML = `<textarea class="h-100 rounded-3 comment-textarea" placeholder="Enter notes...">${note}</textarea>`;
     $('.comment-textarea').on('keydown', commentHandler);
@@ -2542,7 +2550,8 @@ function commentHandler(e) {
         let [file, start, ,] = unpackNameAttr(activeRow);
         worker.postMessage({
             action: 'update-record',
-            files: [file],
+            openFiles: fileList,
+            currentFile: currentFile,
             start: start,
             from: species,
             what: 'comment',
@@ -2551,7 +2560,7 @@ function commentHandler(e) {
             isExplore: exploreMode
         });
         addEvents('comment');
-        document.addEventListener('keydown', handleKeyDown, true);
+        document.addEventListener('keydown', handleKeyDownDeBounce, true);
     }
 }
 
