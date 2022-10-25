@@ -1141,7 +1141,7 @@ function spawnWorker(model, list, batchSize, warmup) {
     console.log(`spawning worker with ${list}, ${batchSize}, ${warmup}`)
     predictWorker = new Worker('./js/model.js');
     //const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
-    const modelPath = model === 'efficientnet' ? '../test_big/' : '../24000_v9/';
+    const modelPath = model === 'efficientnet' ? '../test_big_2/' : '../24000_v9/';
     console.log(modelPath);
     // Now we've loaded a new model, clear the aborted flag
     aborted = false;
@@ -1225,7 +1225,7 @@ async function parseMessage(e) {
                     audacityLabels: AUDACITY,
                     batchInProgress: batchInProgress
                 })
-                await onSave2DB(memoryDB);
+                //await onSave2DB(memoryDB);
             }
             processNextFile();
         }
@@ -1286,7 +1286,7 @@ async function processNextFile({
         }
     } else {
         predicting = false;
-        // await onSave2DB(memoryDB);
+        await onSave2DB(memoryDB);
     }
 }
 
