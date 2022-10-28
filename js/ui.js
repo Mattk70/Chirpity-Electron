@@ -1209,7 +1209,7 @@ $(document).on('blur', '.input', function () {
 })
 
 function hideBirdList(el) {
-    const list = el.querySelector('.bird-list');
+    const list = document.querySelector('.bird-list');
     const container = el.closest('.species-selector').querySelector('.bird-list-wrapper');
     // Move the bird list back to its parking spot before updating the cname cell
     if (container.classList.contains('editing')) {
@@ -1677,8 +1677,9 @@ $(document).on('click', '.play', function () {
 })
 
 
-function handleKeyDownDeBounce(e){
-        waitForFinalEvent(function () {
+function handleKeyDownDeBounce(e) {
+    e.preventDefault();
+    waitForFinalEvent(function () {
         handleKeyDown(e);
     }, 100, 'keyhandler');
 }
@@ -1686,7 +1687,6 @@ function handleKeyDownDeBounce(e){
 function handleKeyDown(e) {
     let action = e.code;
     if (action in GLOBAL_ACTIONS) {
-        e.preventDefault();
         if (document === e.target || document.body === e.target || e.target.attributes["data-action"]) {
 
         }

@@ -141,6 +141,13 @@ ipcRenderer.on('new-client', (event) => {
         const action = args.action;
         console.log('message received ', action)
         switch (action) {
+            case 'init':
+                latitude = args.lat;
+                longitude = args.lon;
+                TEMP = args.temp;
+                appPath = args.path;
+                await clearCache();
+                break;
             case 'set-variables':
                 latitude = args.lat, longitude = args.lon, TEMP = args.temp, appPath = args.path;
                 break;
@@ -162,13 +169,6 @@ ipcRenderer.on('new-client', (event) => {
                 BATCH_SIZE = parseInt(args.batchSize);
                 if (predictWorker) predictWorker.terminate();
                 spawnWorker(args.model, args.list, BATCH_SIZE, args.warmup);
-                break;
-            case 'init':
-                latitude = args.lat;
-                longitude = args.lon;
-                TEMP = args.temp;
-                appPath = args.path;
-                await clearCache();
                 break;
             case 'update-model':
                 predictWorker.postMessage({message: 'list', list: args.list})
@@ -212,7 +212,7 @@ ipcRenderer.on('new-client', (event) => {
                 onAbort(args);
                 break;
             case 'chart':
-                onChartRequest(args);
+                await onChartRequest(args);
                 break;
             default:
                 UI.postMessage('Worker communication lines open')
@@ -221,6 +221,22 @@ ipcRenderer.on('new-client', (event) => {
 })
 
 // No need to pass through arguments object, so arrow function used.
+
+
+/**
+ * Summary SQL:
+ * select max(conf1), cname, sname, count(cname) from records inner join species on species.id = birdid1 inner join files on fileID = files.rowid  where files.name in ('/Users/matthew/Desktop/220805_1160.wav') group by cname order by max(conf1) desc;
+ *
+ *
+ * @param saveSummary
+ * @param db
+ * @param species
+ * @param range
+ * @param filelist
+ * @returns {Promise<void>}
+ */
+
+
 const sendResults2UI = async ({
                                   saveSummary = false,
                                   db = memoryDB,
@@ -844,19 +860,6 @@ function feedChunksToModel(channelData, increment, chunkStart, file, duration, r
     if (chunks.length) sendMessageToWorker(chunkStart, chunks, file, duration, resetResults);
 }
 
-
-async function downloadMp3(buffer, filePath, metadata) {
-    const MP3Blob = await analyzeAudioBuffer(buffer, metadata);
-    const anchor = document.createElement('a');
-    document.body.appendChild(anchor);
-    anchor.style = 'display: none';
-    const url = window.URL.createObjectURL(MP3Blob);
-    anchor.href = url;
-    anchor.download = filePath;
-    anchor.click();
-    window.URL.revokeObjectURL(url);
-}
-
 const speciesMatch = (path, sname) => {
     const pathElements = path.split(p.sep);
     const species = pathElements[pathElements.length - 2];
@@ -928,7 +931,7 @@ const onSpectrogram = async (filepath, file, width, height, data, channels) => {
 };
 
 async function uploadOpus({file, start, defaultName, metadata, mode}) {
-    const Blob = await bufferToAudio(file, start, metadata);
+    const Blob = await bufferToAudio({file: file, start: start, format: 'opus', metadata: metadata});
 // Populate a form with the file (blob) and filename
     const formData = new FormData();
     //const timestamp = Date.now()
@@ -947,9 +950,23 @@ async function uploadOpus({file, start, defaultName, metadata, mode}) {
     xhr.send(formData);
 }
 
-const bufferToAudio = (file, start, metadata) => {
-
-    const bufferStream = new stream.PassThrough();
+const bufferToAudio = ({
+                           file = '',
+                           start = 0,
+                            end = 3,
+                           format = 'opus',
+                           metadata = {}
+                       }) => {
+    let audioCodec, soundFormat, mimeType;
+    if (format === 'opus') {
+        audioCodec = 'libopus';
+        soundFormat = 'opus'
+        mimeType = 'audio/ogg'
+    } else if (format === 'mp3') {
+        audioCodec = 'libmp3lame';
+        soundFormat = 'mp3';
+        mimeType = 'audio/mpeg'
+    }
     let optionList = [];
     for (let [k, v] of Object.entries(metadata)) {
         if (typeof v === 'string') {
@@ -959,19 +976,20 @@ const bufferToAudio = (file, start, metadata) => {
         optionList.push(`${k}=${v}`);
     }
     return new Promise(function (resolve) {
+        const bufferStream = new stream.PassThrough();
         const command = ffmpeg(file)
             .seekInput(start)
-            .duration(3)
+            .duration(end - start)
             .audioChannels(1)
             .audioFrequency(24000)
-            .audioCodec('libopus')
-            .format('opus')
+            .audioCodec(audioCodec)
+            .format(soundFormat)
             .outputOptions(optionList)
             .on('error', (err) => {
                 console.log('An error occurred: ' + err.message);
             })
             .on('end', function () {
-                console.log('Opus file rendered')
+                console.log(format + " file rendered")
             })
             .writeToStream(bufferStream);
 
@@ -983,158 +1001,31 @@ const bufferToAudio = (file, start, metadata) => {
             const outputBuffer = Buffer.concat(buffers);
             let audio = [];
             audio.push(new Int8Array(outputBuffer))
-            const blob = new Blob(audio, {type: 'audio/ogg'});
+            const blob = new Blob(audio, {type: mimeType});
             resolve(blob);
         });
     })
 }
 
-
-// TODO: remove mp3 creating code and use ffmpeg, adapting buffer2Audio above
-async function analyzeAudioBuffer(aBuffer, metadata) {
-    let numOfChan = aBuffer.numberOfChannels,
-        btwLength = aBuffer.length * numOfChan * 2 + 44,
-        btwArrBuff = new ArrayBuffer(btwLength),
-        btwView = new DataView(btwArrBuff),
-        btwChnls = [],
-        btwIndex,
-        btwSample,
-        btwOffset = 0,
-        btwPos = 0;
-    setUint32(0x46464952); // "RIFF"
-    setUint32(btwLength - 8); // file length - 8
-    setUint32(0x45564157); // "WAVE"
-    setUint32(0x20746d66); // "fmt " chunk
-    setUint32(16); // length = 16
-    setUint16(1); // PCM (uncompressed)
-    setUint16(numOfChan);
-    setUint32(aBuffer.sampleRate);
-    setUint32(aBuffer.sampleRate * 2 * numOfChan); // avg. bytes/sec
-    setUint16(numOfChan * 2); // block-align
-    setUint16(16); // 16-bit
-    setUint32(0x61746164); // "data" - chunk
-    setUint32(btwLength - btwPos - 4); // chunk length
-
-    for (btwIndex = 0; btwIndex < aBuffer.numberOfChannels; btwIndex++)
-        btwChnls.push(aBuffer.getChannelData(btwIndex));
-
-    while (btwPos < btwLength) {
-        for (btwIndex = 0; btwIndex < numOfChan; btwIndex++) {
-            // interleave btwChnls
-            btwSample = Math.max(-1, Math.min(1, btwChnls[btwIndex][btwOffset])); // clamp
-            btwSample = (0.5 + btwSample < 0 ? btwSample * 32768 : btwSample * 32767) | 0; // scale to 16-bit signed int
-            btwView.setInt16(btwPos, btwSample, true); // write 16-bit sample
-            btwPos += 2;
-        }
-        btwOffset++; // next source sample
-    }
-
-    let wavHdr = lamejs.WavHeader.readHeader(new DataView(btwArrBuff));
-
-    //Stereo
-    let data = new Int16Array(btwArrBuff, wavHdr.dataOffset, wavHdr.dataLen / 2);
-    let leftData = [];
-    let rightData = [];
-    for (let i = 0; i < data.length; i += 2) {
-        leftData.push(data[i]);
-        rightData.push(data[i + 1]);
-    }
-    var left = new Int16Array(leftData);
-    var right = new Int16Array(rightData);
-
-
-    //STEREO
-    if (wavHdr.channels === 2)
-        return bufferToMp3(metadata, wavHdr.channels, wavHdr.sampleRate, left, right);
-    //MONO
-    else if (wavHdr.channels === 1)
-        return bufferToMp3(metadata, wavHdr.channels, wavHdr.sampleRate, data);
-
-
-    function setUint16(data) {
-        btwView.setUint16(btwPos, data, true);
-        btwPos += 2;
-    }
-
-    function setUint32(data) {
-        btwView.setUint32(btwPos, data, true);
-        btwPos += 4;
-    }
-}
-
-function bufferToMp3(metadata, channels, sampleRate, left, right = null) {
-    var buffer = [];
-    var mp3enc = new lamejs.Mp3Encoder(channels, sampleRate, 192);
-    var remaining = left.length;
-    var samplesPerFrame = 1152;
-    if (metadata) {
-        //const ID3content = JSON.stringify(metadata)
-        // Add metadata
-        const writer = new ID3Writer(Buffer.alloc(0));
-        writer.setFrame('TPE1', [metadata['cname']])  // Artist Name
-            .setFrame('TIT3', metadata['sname'])
-            .setFrame('TPE2', [metadata['cname2'], metadata['cname3']])  // Contributing Artists
-            .setFrame('TCON', ['Nocmig']) // Genre
-            .setFrame('TPUB', 'Chirpity Nocmig ' + metadata['version']) // Publisher
-            .setFrame('TYER', new Date().getFullYear()) // Year
-            .setFrame('TXXX', {
-                description: 'ID Confidence',
-                value: parseFloat(parseFloat(metadata['score']) * 100).toFixed(0) + '%'
-            })
-            .setFrame('TXXX', {
-                description: 'Time of detection',
-                value: metadata['date'] || metadata['timestamp']
-            })
-            .setFrame('TXXX', {
-                description: 'Latitude',
-                value: metadata['lat'] || '0.51'
-            })
-            .setFrame('TXXX', {
-                description: 'Longitude',
-                value: metadata['lon'] || '0.4'
-            })
-            .setFrame('TXXX', {
-                description: '2nd',
-                value: metadata['cname2'] + ' (' + parseFloat(parseFloat(metadata['score2']) * 100).toFixed(0) + '%)'
-            })
-            .setFrame('TXXX', {
-                description: '3rd',
-                value: metadata['cname3'] + ' (' + parseFloat(parseFloat(metadata['score']) * 100).toFixed(0) + '%)'
-            })
-            .setFrame('TXXX', {
-                description: 'UUID',
-                value: metadata['UUID'] || '001',
-            });
-        writer.addTag();
-        buffer.push(writer.arrayBuffer)
-    }
-    for (let i = 0; remaining >= samplesPerFrame; i += samplesPerFrame) {
-        let mp3buf
-        if (!right) {
-            var mono = left.subarray(i, i + samplesPerFrame);
-            mp3buf = mp3enc.encodeBuffer(mono);
-        } else {
-            var leftChunk = left.subarray(i, i + samplesPerFrame);
-            var rightChunk = right.subarray(i, i + samplesPerFrame);
-            mp3buf = mp3enc.encodeBuffer(leftChunk, rightChunk);
-        }
-        if (mp3buf.length > 0) {
-            buffer.push(mp3buf);//new Int8Array(mp3buf));
-        }
-        remaining -= samplesPerFrame;
-    }
-    var d = mp3enc.flush();
-    if (d.length > 0) {
-        buffer.push(new Int8Array(d));
-    }
-    return new Blob(buffer, {type: 'audio/mpeg'});
-
-}
-
 async function saveMP3(file, start, end, filename, metadata) {
-    const buffer = await fetchAudioBuffer({file: file, start: start, end: end})
-    downloadMp3(buffer, filename, metadata)
+    const MP3Blob = await bufferToAudio({
+        file: file,
+        start: start,
+        end: end,
+        format: 'mp3',
+        metadata: metadata
+    });
+    const anchor = document.createElement('a');
+    document.body.appendChild(anchor);
+    anchor.style = 'display: none';
+    const url = window.URL.createObjectURL(MP3Blob);
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
 }
+
+
 
 /// Workers  From the MDN example
 function spawnWorker(model, list, batchSize, warmup) {
@@ -1219,11 +1110,14 @@ async function parseMessage(e) {
         if (predictionDone) {
             process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, Prediction requests ${predictionsRequested}, predictions received ${predictionsReceived}    \r`)
             if (predictionsReceived === predictionsRequested) {
+                // This is the one time results *do not* come from the database
                 UI.postMessage({
                     event: 'prediction-done',
                     file: file,
                     audacityLabels: AUDACITY,
-                    batchInProgress: batchInProgress
+                    batchInProgress: batchInProgress,
+                    // saveSummary true when analyse selection
+                    saveSummary: !response['resetResults']
                 })
                 //await onSave2DB(memoryDB);
             }
@@ -1468,12 +1362,12 @@ const onSave2DB = async (db) => {
                     if (i === (RESULTS.length - 1)) {
                         db.run('COMMIT', (err, rows) => {
                             UI.postMessage({event: 'progress', progress: 1.0});
-                            if (db === diskDB){
-                            UI.postMessage({
-                                event: 'generate-alert',
-                                message: `${db.filename.replace(/.*\//, '')} database update complete, ${i + 1} records updated in ${((performance.now() - t0) / 1000).toFixed(3)} seconds`
-                            })
-                                }
+                            if (db === diskDB) {
+                                UI.postMessage({
+                                    event: 'generate-alert',
+                                    message: `${db.filename.replace(/.*\//, '')} database update complete, ${i + 1} records updated in ${((performance.now() - t0) / 1000).toFixed(3)} seconds`
+                                })
+                            }
                         });
                     }
                 });
@@ -1773,7 +1667,7 @@ async function onUpdateRecord({
                             //because no access to this in arrow function, and regular function replaces arguments[0]
                             {
                                 openFiles: openFiles,
-                                currentFile:currentFile,
+                                currentFile: currentFile,
                                 start: start,
                                 value: value,
                                 db: memoryDB,
