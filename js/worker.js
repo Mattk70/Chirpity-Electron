@@ -19,6 +19,7 @@ const file_cache = 'chirpity';
 let TEMP, appPath;
 
 const staticFfmpeg = require('ffmpeg-static-electron');
+const {bathymetry} = require("colormap/colorScale");
 console.log(staticFfmpeg.path);
 ffmpeg.setFfmpegPath(staticFfmpeg.path);
 
@@ -190,7 +191,6 @@ ipcRenderer.on('new-client', (event) => {
                 break;
             case 'explore':
                 args.db = diskDB;
-                args.saveSummary = false;
                 await sendResults2UI(args);
                 break;
             case 'analyze':
@@ -228,7 +228,6 @@ ipcRenderer.on('new-client', (event) => {
  * select max(conf1), cname, sname, count(cname) from records inner join species on species.id = birdid1 inner join files on fileID = files.rowid  where files.name in ('/Users/matthew/Desktop/220805_1160.wav') group by cname order by max(conf1) desc;
  *
  *
- * @param saveSummary
  * @param db
  * @param species
  * @param range
@@ -238,27 +237,31 @@ ipcRenderer.on('new-client', (event) => {
 
 
 const sendResults2UI = async ({
-                                  saveSummary = false,
                                   db = memoryDB,
                                   species = undefined,
                                   range = undefined,
                                   filelist = undefined
                               }) => {
     // reset results table
-    UI.postMessage({event: 'reset-results', saveSummary: saveSummary});
+    UI.postMessage({event: 'reset-results'});
     // And clear results from memory
 
     RESULTS = [];
+    let summary;
     let results = await getCachedResults({
         db: db,
         species: species,
         range: range,
         files: filelist
     });
+
+    summary = await getCachedSummary({db: db, files: filelist})
     // No results? Try the archive
-    if (!results.length) {
+    if (!results.length && !summary.length) {
         console.log(`No results in ${db.filename.replace(/.*\//, '')}, trying the archive db.`);
         results = await getCachedResults({db: diskDB, species: species, range: range, files: filelist});
+            // Get the summary from the diskdb to send on prediction done
+        summary = await getCachedSummary({db: diskDB, files: filelist})
     }
     index = 0;
     results.forEach(result => {
@@ -271,17 +274,15 @@ const sendResults2UI = async ({
             file: result.file,
             result: result,
             index: index,
-            saveSummary: saveSummary
         });
         RESULTS.push(result);
     })
-    // When in batch mode the 'prediction-done' event simply increments
-    // the counter for the file being processed
+
     UI.postMessage({
         event: 'prediction-done',
+        summary: summary,
         batchInProgress: false,
         filterSpecies: species,
-        saveSummary: saveSummary
     });
 }
 
@@ -421,7 +422,7 @@ const convertFileFormat = (file, destination, size, error) => {
                 })
             })
             .on('end', () => {
-                UI.postMessage({event: 'progress', text: 'File decompressed', progress: 1.0})
+               UI.postMessage({event: 'progress', text: 'File decompressed', progress: 1.0})
                 //if (finish) {
                 resolve(destination)
                 //}
@@ -953,9 +954,9 @@ async function uploadOpus({file, start, defaultName, metadata, mode}) {
 const bufferToAudio = ({
                            file = '',
                            start = 0,
-                            end = 3,
+                           end = 3,
                            format = 'opus',
-                           metadata = {}
+                           meta = {}
                        }) => {
     let audioCodec, soundFormat, mimeType;
     if (format === 'opus') {
@@ -968,7 +969,7 @@ const bufferToAudio = ({
         mimeType = 'audio/mpeg'
     }
     let optionList = [];
-    for (let [k, v] of Object.entries(metadata)) {
+    for (let [k, v] of Object.entries(meta)) {
         if (typeof v === 'string') {
             v = v.replaceAll(' ', '_');
         }
@@ -977,7 +978,7 @@ const bufferToAudio = ({
     }
     return new Promise(function (resolve) {
         const bufferStream = new stream.PassThrough();
-        const command = ffmpeg(file)
+        const command = ffmpeg(metadata[file].proxy)
             .seekInput(start)
             .duration(end - start)
             .audioChannels(1)
@@ -1026,13 +1027,12 @@ async function saveMP3(file, start, end, filename, metadata) {
 }
 
 
-
 /// Workers  From the MDN example
 function spawnWorker(model, list, batchSize, warmup) {
     console.log(`spawning worker with ${list}, ${batchSize}, ${warmup}`)
     predictWorker = new Worker('./js/model.js');
     //const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
-    const modelPath = model === 'efficientnet' ? '../test_big_2/' : '../24000_v9/';
+    const modelPath = model === 'efficientnet' ? '../test_big_3/' : '../24000_v9/';
     console.log(modelPath);
     // Now we've loaded a new model, clear the aborted flag
     aborted = false;
@@ -1050,7 +1050,7 @@ const parsePredictions = (response) => {
         const result = prediction[1];
         file = result.file
         const audacity = prediction[2];
-        UI.postMessage({event: 'progress', progress: (position / metadata[file].duration)});
+        UI.postMessage({event: 'progress', progress: (position / metadata[file].duration), file: file});
         //console.log('Prediction received from worker', result);
         if (result.score > minConfidence) {
             index++;
@@ -1079,7 +1079,7 @@ const parsePredictions = (response) => {
                     resetResults: response['resetResults']
                 });
             }
-            UI.postMessage({event: 'progress', progress: 1.0});
+            UI.postMessage({event: 'progress', progress: 1.0, text: '...'});
             batchInProgress = FILE_QUEUE.length ? true : predictionsRequested - predictionsReceived;
             predictionDone = true;
         }
@@ -1111,13 +1111,17 @@ async function parseMessage(e) {
             process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, Prediction requests ${predictionsRequested}, predictions received ${predictionsReceived}    \r`)
             if (predictionsReceived === predictionsRequested) {
                 // This is the one time results *do not* come from the database
+                let summary;
+                if (!batchInProgress) {
+                    await onSave2DB(memoryDB);
+                    summary = await getCachedSummary();
+                }
                 UI.postMessage({
                     event: 'prediction-done',
                     file: file,
+                    summary: summary,
                     audacityLabels: AUDACITY,
                     batchInProgress: batchInProgress,
-                    // saveSummary true when analyse selection
-                    saveSummary: !response['resetResults']
                 })
                 //await onSave2DB(memoryDB);
             }
@@ -1180,7 +1184,7 @@ async function processNextFile({
         }
     } else {
         predicting = false;
-        await onSave2DB(memoryDB);
+        //await onSave2DB(memoryDB);
     }
 }
 
@@ -1215,15 +1219,8 @@ async function setStartEnd(file) {
 
 let t1, t0;
 
-const getCachedResults = ({
-                              db = undefined,
-                              range = undefined,
-                              files = [],
-                              species = undefined,
-                          }) => {
+const setWhereWhen = ({dateRange, species, files, context}) => {
     let where = '';
-    const dateRange = range;
-    //if (args.file) where = ` WHERE files.name =  '${args.file.replace("'", "''")}'`;
     if (files.length) {
         where = 'WHERE files.name IN  (';
         // Format the file list
@@ -1235,8 +1232,56 @@ const getCachedResults = ({
         where = where.slice(0, -1);
         where += ')';
     }
-    if (species) where += `${files.length ? ' AND ' : ' WHERE '} s1.cname =  '${species.replace("'", "''")}'`;
+    const cname = context === 'results' ? 's1.cname' : 'cname';
+    if (species) where += `${files.length ? ' AND ' : ' WHERE '} ${cname} =  '${species.replaceAll("'", "''")}'`;
     const when = dateRange && dateRange.start ? `AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
+    return [where, when]
+}
+
+
+const getCachedSummary = ({
+                              db = memoryDB,
+                              range = undefined,
+                              files = [],
+                              species = undefined,
+                          } = {}) => {
+    const [where, when] = setWhereWhen({
+        dateRange: range,
+        files: files,
+        context: 'summary'
+    });
+    return new Promise(function (resolve, reject) {
+        db.all(`SELECT MAX(conf1) as max, cname, sname, COUNT(cname) as count
+                FROM records
+                    INNER JOIN species
+                ON species.id = birdid1
+                    INNER JOIN files ON fileID = files.rowid
+                    ${where} ${when}
+                GROUP BY cname
+                ORDER BY max (conf1) DESC;`,
+            (err, rows) => {
+                if (err) {
+                    reject(err)
+                } else {
+                    resolve(rows)
+                }
+            })
+    })
+}
+
+
+const getCachedResults = ({
+                              db = undefined,
+                              range = undefined,
+                              files = [],
+                              species = undefined,
+                          }) => {
+    const [where, when] = setWhereWhen({
+        dateRange: range,
+        species: species,
+        files: files,
+        context: 'results'
+    });
     return new Promise(function (resolve, reject) {
         db.all(`SELECT dateTime AS timestamp, position AS position, 
             s1.cname as cname, s2.cname as cname2, s3.cname as cname3, 
@@ -1339,42 +1384,47 @@ const getFileIDs = (db) => {
 
 const onSave2DB = async (db) => {
     t0 = performance.now();
-    if (RESULTS.length) {
-        let filemap = await getFileIDs(db)
-        db.run('BEGIN TRANSACTION');
-        const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-        for (let i = 0; i < RESULTS.length; i++) {
-            const dateTime = new Date(RESULTS[i].timestamp).getTime();
-            const birdID1 = RESULTS[i].id_1;
-            const birdID2 = RESULTS[i].id_2;
-            const birdID3 = RESULTS[i].id_3;
-            const conf1 = RESULTS[i].score;
-            const conf2 = RESULTS[i].score2;
-            const conf3 = RESULTS[i].score3;
-            const position = RESULTS[i].position;
-            const file = RESULTS[i].file;
-            const comment = RESULTS[i].comment;
-            const label = RESULTS[i].label;
-            if (!filemap[file]) filemap[file] = await updateFileTables(db, file);
-            stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, filemap[file], position, comment, label,
-                (err, row) => {
-                    UI.postMessage({event: 'progress', text: "Updating Database.", progress: i / RESULTS.length});
-                    if (i === (RESULTS.length - 1)) {
-                        db.run('COMMIT', (err, rows) => {
-                            UI.postMessage({event: 'progress', progress: 1.0});
-                            if (db === diskDB) {
-                                UI.postMessage({
-                                    event: 'generate-alert',
-                                    message: `${db.filename.replace(/.*\//, '')} database update complete, ${i + 1} records updated in ${((performance.now() - t0) / 1000).toFixed(3)} seconds`
-                                })
-                            }
-                        });
-                    }
-                });
+    return new Promise(async function (resolve, reject) {
+        if (RESULTS.length) {
+            let filemap = await getFileIDs(db)
+            db.run('BEGIN TRANSACTION');
+            const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+            for (let i = 0; i < RESULTS.length; i++) {
+                const dateTime = new Date(RESULTS[i].timestamp).getTime();
+                const birdID1 = RESULTS[i].id_1;
+                const birdID2 = RESULTS[i].id_2;
+                const birdID3 = RESULTS[i].id_3;
+                const conf1 = RESULTS[i].score;
+                const conf2 = RESULTS[i].score2;
+                const conf3 = RESULTS[i].score3;
+                const position = RESULTS[i].position;
+                const file = RESULTS[i].file;
+                const comment = RESULTS[i].comment;
+                const label = RESULTS[i].label;
+                if (!filemap[file]) filemap[file] = await updateFileTables(db, file);
+                stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, filemap[file], position, comment, label,
+                    (err, row) => {
+                        if (err) reject(err)
+                        UI.postMessage({event: 'progress', text: "Updating Database.", progress: i / RESULTS.length});
+                        if (i === (RESULTS.length - 1)) {
+                            db.run('COMMIT', (err, rows) => {
+                                if (err) reject(err)
+                                UI.postMessage({event: 'progress', progress: 1.0});
+                                if (db === diskDB) {
+                                    UI.postMessage({
+                                        event: 'generate-alert',
+                                        message: `${db.filename.replace(/.*\//, '')} database update complete, ${i + 1} records updated in ${((performance.now() - t0) / 1000).toFixed(3)} seconds`
+                                    })
+                                }
+                                resolve(row)
+                            });
+                        }
+                    });
+            }
+        } else {
+            resolve('No results to save')
         }
-    } else {
-        console.log('No results to save')
-    }
+    })
 }
 
 const getSeasonRecords = async (species, season) => {
@@ -1657,7 +1707,7 @@ async function onUpdateRecord({
                     console.log(`Update without transaction took ${Date.now() - t0} milliseconds`);
                     const species = isFiltered || isExplore ? from : '';
                     if (isExplore) openFiles = [];
-                    sendResults2UI({db: db, filelist: openFiles, species: species, saveSummary: isFiltered});
+                    sendResults2UI({db: db, filelist: openFiles, species: species});
                     resolve(this.changes)
                 } else {
                     console.log(`No records updated in ${db.filename.replace(/.*\//, '')}`)
