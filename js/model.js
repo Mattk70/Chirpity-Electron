@@ -155,6 +155,7 @@ class Model {
         let keys = [];
         tf.tidy(() => {
             for (const [key, value] of Object.entries(chunks)) {
+                // Check chunk meets SNR threshold
                 let chunk = tf.tensor1d(value);
                 keys.push([parseFloat(key), parseFloat(key) + chunk.shape[0]]);
                 // if the file is too short, pad with zeroes.
@@ -164,7 +165,25 @@ class Model {
                     chunk = chunk.concat(padding);
                 }
                 const spectrogram = this.makeSpectrogram(chunk);
-                tensorArray.push(spectrogram);
+                // // check signal noise threshold
+                // const mean = tf.mean(spectrogram, 1);
+                // const max = tf.max(spectrogram, 1);
+                // //tf.print(mean);
+                // //tf.print(max);
+                // const ratio = tf.divNoNan(max, mean);
+                // const snr = tf.max(ratio);
+                // // tf.print('snr is' + snr)
+                // const threshold = tf.scalar(60);
+                // // tf.print('threshold is' + threshold)
+                // let result = snr.greater(threshold);
+                // result = result.dataSync();
+                // if (result > 0) {
+                    //tf.print(result)
+                    tensorArray.push(spectrogram);
+                //     //tf.print('signal ' + snr + 'is greater than threshold' + threshold + ' ' +   snr.greater(threshold))
+                // } else {
+                //     //tf.print('signal ' + snr + 'is not greater than threshold' + threshold + ' '+ snr.greater(threshold))
+                // }
             }
             // If we have any tensors, stack them, else create ones
             tensorArray.length ? this.batch = tf.stack(tensorArray) : this.batch = tf.zeros([1, this.inputShape[1], this.inputShape[2], this.inputShape[3]]);

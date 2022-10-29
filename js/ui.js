@@ -164,14 +164,7 @@ console.table(diagnostics);
 
 
 function resetResults(args) {
-    if (args && !args.saveSummary) {
-        summary = {};
-        summaryTable.empty();
-        summaryDiv.classList.add('d-none');
-        resultsDiv.classList.remove('col-sm-8');
-        resultsDiv.classList.add('col-sm-12');
-        speciesViewIsFiltered = false;
-    }
+    summaryTable.empty();
     resultTable.empty();
     predictions = {};
     seenTheDarkness = false;
@@ -609,7 +602,6 @@ function postAnalyzeMessage(args) {
     })
     if (args.files.length > 1) {
         batchInProgress = true;
-        fileNumber.innerText = `(File 1 of ${fileList.length})`;
     }
 }
 
@@ -723,7 +715,7 @@ tbody.addEventListener('click', function (e) {
     const row = e.target.closest('tr');
     row.classList.add('table-active');
     activeRow = row;
-    const params = row.attributes[0].value.split('|');
+    const params = row.attributes[2].value.split('|');
     if (e.target.classList.contains('play')) params.push('true')
     loadResultRegion(params);
     // if (!onScreen(row)) {
@@ -1193,10 +1185,10 @@ $(document).on('focus', '.input', function () {
     const container = this.parentNode.querySelector('.bird-list-wrapper');
     if (container.classList.contains('editing')) {
         const theList = document.querySelector('#allSpecies .bird-list')
-        if (theList) container.appendChild(theList);
+        if (theList) container.appendChild(theList.cloneNode(true));
     } else {
         const theList = document.querySelector('#seenSpecies .bird-list')
-        container.appendChild(theList);
+        container.appendChild(theList.cloneNode(true));
     }
     if (this.id === "speciesSearch") hideElement(['dataRecords']);
 
@@ -1320,7 +1312,7 @@ function editResultID(cname, sname, cell) {
     const batch = cell.closest('table').id !== 'results';
     let start, files = [], file;
     if (!batch) {
-        [file, start, _, currentRow] = unpackNameAttr(cell, cname);
+        [file, start, end, currentRow] = unpackNameAttr(cell, cname);
         sendFeedback(file, cname, sname);
     } else {
         if (!exploreMode) files = fileList;
@@ -1345,7 +1337,7 @@ function editResultID(cname, sname, cell) {
 
 function unpackNameAttr(el, cname) {
     const currentRow = el.closest("tr");
-    const nameAttr = currentRow.attributes[0].value;
+    const nameAttr = currentRow.attributes[2].value;
     let [file, start, end, commonName] = nameAttr.split('|');
     if (cname) commonName = cname;
     currentRow.attributes[0].value = [file, start, end, commonName].join('|');
@@ -1880,7 +1872,7 @@ $(document).on('click', '#timecode', function () {
 
 const GLOBAL_ACTIONS = { // eslint-disable-line
     Space: function () {
-        wavesurfer.playPause();
+        if (wavesurfer) wavesurfer.playPause();
     },
     KeyO: function (e) {
         if (e.ctrlKey) showOpenDialog();
@@ -2182,7 +2174,12 @@ async function onWorkerLoadedAudio(args) {
 
 function onProgress(args) {
     progressDiv.show();
-    if (args.text) fileNumber.innerText = args.text;
+    if (args.text) {
+        fileNumber.innerText = args.text;
+    } else {
+        const count = fileList.indexOf(args.file) + 1;
+        fileNumber.innerText = `(File ${count} of ${fileList.length})`;
+    }
     let progress = (args.progress * 100).toFixed(1);
     progressBar.width(progress + '%');
     progressBar.attr('aria-valuenow', progress);
@@ -2190,39 +2187,14 @@ function onProgress(args) {
     if (parseFloat(progress) === 100.0) progressDiv.hide();
 }
 
-function updateSummary() {
-    summary = {};
-    speciesName = document.querySelectorAll('#results .top-row');
-    speciesName.forEach(row => {
-        let confidence = row.getElementsByClassName('confidence')[0].title;
-        confidence = parseFloat(confidence);
-        const key = row.querySelector('.cname').innerHTML;
-        if (key in summary) {
-            summary[key]['total'] += 1
-            summary[key]['max'] = Math.max(summary[key]['max'], confidence);
-        } else {
-            summary[key] = {};
-            summary[key]['total'] = 1;
-            summary[key]['max'] = confidence;
-        }
-    })
-    console.table(summary);
-    // Sort summary by count
-    let sortable = [];
-    for (const bird in summary) {
-        sortable.push([bird, summary[bird]]);
-    }
-    sortable.sort(function (a, b) {
-        return a[1]['max'] - b[1]['max'];
-    });
-    //count down from most seen:
-    sortable = sortable.reverse();
-    // Recreate object
-    let summarySorted = {};
-    sortable.forEach(function (item) {
-        summarySorted[item[0]] = item[1]
-    })
 
+// Todo: jump back to where you were after editing/unfiltering. Save activerow id??
+// todo: stop flickering
+const updateSummary = ({
+                           summary = [],
+                           filterSpecies = ''
+                       }) => {
+    console.table(summary);
     let summaryHTML = `<table id="resultSummary" class="table table-striped table-dark table-hover p-1"><thead>
             <tr>
                 <th class="w-auto">Max</th>
@@ -2232,11 +2204,14 @@ function updateSummary() {
             </tr>
             </thead><tbody>`;
 
-    for (const [key, value] of Object.entries(summarySorted)) {
+    for (let i = 0; i < summary.length; i++) {
+        const selected = summary[i].cname === filterSpecies ? 'text-success' : '';
         summaryHTML += `<tr>
-                        <td class="max">${iconizeScore(value.max / 100)}</td>
-                        <td class="cname speciesFilter"><span class="pointer">${key}</span></td>                       
-                        <td class="text-end">${value.total}</td>
+                        <td class="max">${iconizeScore(summary[i].max)}</td>
+                        <td class="cname speciesFilter">
+                            <span class="pointer ${selected}">${summary[i].cname} <i>${summary[i].sname}</i></span>
+                        </td>                       
+                        <td class="text-end">${summary[i].count}</td>
                         <td class="label">${tags['Remove Label']}</td>`;
 
     }
@@ -2249,16 +2224,18 @@ async function onPredictionDone({
                                     batchInProgress = false,
                                     audacityLabels = [],
                                     file = undefined,
-                                    saveSummary = false
+                                    summary = {}
                                 }) {
+
+    updateSummary({summary: summary, filterSpecies: filterSpecies});
     AUDACITY_LABELS = AUDACITY_LABELS.concat(audacityLabels);
     // Defer further processing until batch complete
     if (batchInProgress) {
         progressDiv.show();
         // The file we've completed is one less than the file we're going to be processing
         // and the index is zero-based, so + 2 to get the file we're going to process
-        const count = fileList.indexOf(file) + 2;
-        fileNumber.innerText = `(File ${count} of ${fileList.length})`;
+        // const count = fileList.indexOf(file) + 2;
+        // fileNumber.innerText = `(File ${count} of ${fileList.length})`;
         return;
     } else {
         PREDICTING = false;
@@ -2278,7 +2255,6 @@ async function onPredictionDone({
         disableMenuItem(['saveLabels', 'save2db']);
     }
     analyzeLink.disabled = false;
-    if (!saveSummary) updateSummary();
     subRows = document.querySelectorAll('.subrow')
 
     speciesFilter = document.querySelectorAll('.speciesFilter');
@@ -2322,19 +2298,13 @@ async function onPredictionDone({
             const targetClass = target.classList;
             if (targetClass.contains('text-success')) {
                 // Clicked on filtered species icon
-                targetClass.remove('text-success');
-                worker.postMessage({action: 'filter', filelist: fileList, saveSummary: false});
+                worker.postMessage({action: 'filter', filelist: fileList});
                 speciesViewIsFiltered = false
             } else {
                 // Clicked on unfiltered species name
                 // Remove any exclusion from the species to filter
-                speciesFilter.forEach(function (el) {
-                    const removeFrom = el.querySelector('span.pointer')
-                    removeFrom.classList.remove('text-success');
-                })
-                targetClass.add('text-success');
                 const species = target.innerHTML.replace(/\s<.*/, '');
-                worker.postMessage({action: 'filter', species: species, filelist: fileList, saveSummary: true});
+                worker.postMessage({action: 'filter', species: species, filelist: fileList});
                 speciesViewIsFiltered = true;
             }
         }
@@ -2439,11 +2409,6 @@ async function renderResult(args) {
         let spliceStart;
         result.position < 3600000 ? spliceStart = 14 : spliceStart = 11;
         const UI_position = position.toISOString().substring(spliceStart, 19);
-        // Now we have formatted the fields, and skipped detections as required by nocmig mode, add result to predictions file
-        // if (!resetResults) {
-        //     const tableRows = document.querySelectorAll('#results > tbody > tr.top-row');
-        //     index = tableRows.length + 1;
-        // }
 
         predictions[index] = result;
         let showTimeOfDay;
@@ -2451,7 +2416,7 @@ async function renderResult(args) {
 
         const label = result.label ? tags[result.label] : tags['Remove Label'];
 
-        tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" class='border-top border-2 border-secondary top-row ${result.dayNight}'>
+        tr += `<tr tabindex="-1" id="result${index}" name="${file}|${start}|${end}|${result.cname}${confidence}" class='border-top border-2 border-secondary top-row ${result.dayNight}'>
             <th scope='row'>${index}</th>
             <td class='text-start text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-end">${UI_position}</td>
@@ -2639,7 +2604,7 @@ function sendFile(mode, result) {
     let start, end, filename;
     if (result) {
         start = result.start;
-        end = result.end;
+        end = result.end || start + 3;
         filename = result.filename;
     }
     if (!start && start !== 0) {
