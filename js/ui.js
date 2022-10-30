@@ -2188,7 +2188,6 @@ function onProgress(args) {
 }
 
 
-// Todo: jump back to where you were after editing/unfiltering. Save activerow id??
 // todo: stop flickering
 const updateSummary = ({
                            summary = [],
@@ -2288,7 +2287,7 @@ async function onPredictionDone({
         e.stopImmediatePropagation();
         // Species filtering in Explore is meaningless...
         if (isExplore()) return
-
+        activeRow = undefined;
         // Check if italic section was clicked
         speciesFilter = document.querySelectorAll('.speciesFilter');
         const target = this.querySelector('span.pointer');
@@ -2322,6 +2321,13 @@ async function onPredictionDone({
     // midnight hack: arrgh, but it works...
     if (summaryDiv.classList.contains('d-none')) {
         summaryButton.click();
+    }
+
+    if (activeRow) {
+    // Refresh and scroll to active row:
+        activeRow = document.getElementById(activeRow.id)
+        activeRow.focus()
+        activeRow.click()
     }
 }
 
