@@ -931,8 +931,8 @@ const onSpectrogram = async (filepath, file, width, height, data, channels) => {
     console.log('saved:', file_to_save);
 };
 
-async function uploadOpus({file, start, defaultName, metadata, mode}) {
-    const Blob = await bufferToAudio({file: file, start: start, format: 'opus', metadata: metadata});
+async function uploadOpus({file, start, end, defaultName, metadata, mode}) {
+    const Blob = await bufferToAudio({file: file, start: start, end: end, format: 'opus', meta: metadata});
 // Populate a form with the file (blob) and filename
     const formData = new FormData();
     //const timestamp = Date.now()
@@ -1014,7 +1014,7 @@ async function saveMP3(file, start, end, filename, metadata) {
         start: start,
         end: end,
         format: 'mp3',
-        metadata: metadata
+        meta: metadata
     });
     const anchor = document.createElement('a');
     document.body.appendChild(anchor);
