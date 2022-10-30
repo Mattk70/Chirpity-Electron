@@ -155,10 +155,9 @@ class Model {
         let keys = [];
         tf.tidy(() => {
             for (const [key, value] of Object.entries(chunks)) {
-                // Check chunk meets SNR threshold
                 let chunk = tf.tensor1d(value);
                 keys.push([parseFloat(key), parseFloat(key) + chunk.shape[0]]);
-                // if the file is too short, pad with zeroes.
+                // if the chunk is too short, pad with zeroes.
                 // Min length is 0.5s, set in UI.js - a wavesurfer region option
                 if (chunk.shape[0] < this.chunkLength) {
                     let padding = tf.zeros([this.chunkLength - chunk.shape[0]]);
@@ -313,6 +312,8 @@ async function runPredictions(e) {
 
         let chunks = {};
         let i = e.data.chunkStart;
+
+        // this assumes contiguous chunks so remove logic here and create keys for chunk object in worker
         for (let j = 0; j < e.data.numberOfChunks; j++) {
             let key = 'chunk' + j;
             chunks[i] = e.data[key];
