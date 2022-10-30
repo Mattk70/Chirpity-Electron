@@ -260,7 +260,7 @@ const sendResults2UI = async ({
     if (!results.length && !summary.length) {
         console.log(`No results in ${db.filename.replace(/.*\//, '')}, trying the archive db.`);
         results = await getCachedResults({db: diskDB, species: species, range: range, files: filelist});
-            // Get the summary from the diskdb to send on prediction done
+        // Get the summary from the diskdb to send on prediction done
         summary = await getCachedSummary({db: diskDB, files: filelist})
     }
     index = 0;
@@ -422,7 +422,7 @@ const convertFileFormat = (file, destination, size, error) => {
                 })
             })
             .on('end', () => {
-               UI.postMessage({event: 'progress', text: 'File decompressed', progress: 1.0})
+                UI.postMessage({event: 'progress', text: 'File decompressed', progress: 1.0})
                 //if (finish) {
                 resolve(destination)
                 //}
@@ -726,7 +726,6 @@ const getPredictBuffers = async ({
                 (resampled) => {
                     const myArray = resampled.getChannelData(0);
                     const samples = parseInt(((end - start) * sampleRate).toFixed(0));
-
                     const increment = samples < chunkLength ? samples : chunkLength;
                     feedChunksToModel(myArray, increment, chunkStart, file, end, resetResults);
                     chunkStart += 3 * BATCH_SIZE * sampleRate;

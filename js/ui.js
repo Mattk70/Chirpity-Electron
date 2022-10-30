@@ -2066,6 +2066,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
                 }
             }
             if (activeRow) {
+                activeRow.focus();
                 activeRow.click();
             }
         }
