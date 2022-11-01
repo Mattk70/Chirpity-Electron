@@ -53,6 +53,8 @@ class Model {
         this.result = null;
         this.appPath = appPath;
         this.list = list;
+        this.tensorArray = [];
+        this.true = tf.scalar(1, 'bool');
     }
 
     async loadModel() {
@@ -112,6 +114,22 @@ class Model {
         return spec;
     }
 
+    SNRok(spectrogram, threshold) {
+        //threshold = tf.scalar(threshold);
+        // check signal noise threshold
+        const max = tf.max(spectrogram, 1);
+        //const max_tmp = max.dataSync();
+        const mean = tf.mean(spectrogram, 1);
+        //const mean_tmp = mean.dataSync();
+        const ratio = tf.divNoNan(max, mean);
+        //const ratio_tmp = ratio.dataSync();
+        const snr = tf.max(ratio);
+        //const snr_tmp = snr.dataSync();
+        const ok = snr.greater(threshold);
+        //const ok_tmp = ok.dataSync()
+        return ok //.dataSync();
+    }
+
     makeSpectrogram(audioBuffer) {
         // const s0 = performance.now();
         /*
@@ -146,14 +164,99 @@ class Model {
         return true;
     }
 
-
-    predictChunk(chunks, fileStart, file, duration) {
+    predictBatch(keys, file, fileStart) {
         let batched_results = [];
         let result;
         let audacity;
-        let tensorArray = [];
+        this.batch = tf.stack(this.tensorArray)
+        if (this.batch.shape[0] < this.batchSize) {
+            console.log(`Adding ${this.batchSize - this.batch.shape[0]} tensors to the batch`)
+            const padding = tf.zeros([this.batchSize - this.batch.shape[0], this.inputShape[1], this.inputShape[2], this.inputShape[3]]);
+            this.batch = tf.concat([this.batch, padding], 0)
+        }
+        //let t0 = performance.now();
+        const prediction = this.model.predict(this.batch, {batchSize: this.batchSize})
+        // Get label
+        let top3, top3scores;
+        const {indices, values} = prediction.topk(3);
+        top3 = indices.arraySync();
+        top3scores = values.arraySync();
+        const batch = {};
+        for (let j = 0; j < keys.length; j++) {
+            const currentKeys = keys[j];
+            batch[currentKeys[0]] = ({index: top3[j], score: top3scores[j], end: currentKeys[1]});
+        }
+
+        // Try this method of adjusting results
+        for (let [key, item] of Object.entries(batch)) {
+            // turn the key back to a number and convert from samples to seconds:
+            key = parseFloat(key) / this.config.sampleRate;
+            const end = item.end / this.config.sampleRate;
+            for (let i = 0; i < item.index.length; i++) {
+                if (suppressed_IDs.includes(item.index[i])) {
+                    item.score[i] = item.score[i] ** 3;
+                } else if (enhanced_IDs.includes(item.index[i])) {
+                    //item.score[i] = Math.pow(item.score[i], 0.35);
+                    item.score[i] = Math.pow(item.score[i], 0.5);
+                }
+            }
+            let suppressed = false;
+            // If using the whitelist, we want to promote allowed IDs above any blocked IDs, so they will be visible
+            // if they meet the confidence threshold.
+            let temp_item = structuredClone(item);
+            item.index.every(id => {
+                // If and while the top result is blocked, move it to the back
+                if (blocked_IDs.indexOf(id) !== -1) {
+                    temp_item.index.push(temp_item.index.shift());
+                    // Squash the score
+                    temp_item.score.shift();
+                    temp_item.score.push(-1.0);
+                    return true
+                }
+                return false
+            })
+            item = structuredClone(temp_item);
+
+
+            result = ({
+                file: file,
+                start: key,
+                end: end,
+                timestamp: key * 1000 + fileStart,
+                position: key,
+                id_1: item.index[0],
+                id_2: item.index[1],
+                id_3: item.index[2],
+                sname: this.labels[item.index[0]].split('_')[0],
+                cname: this.labels[item.index[0]].split('_')[1],
+                score: Math.round(item.score[0] * 1000) / 1000,
+                sname2: this.labels[item.index[1]].split('_')[0],
+                cname2: this.labels[item.index[1]].split('_')[1],
+                score2: Math.round(item.score[1] * 1000) / 1000,
+                sname3: this.labels[item.index[2]].split('_')[0],
+                cname3: this.labels[item.index[2]].split('_')[1],
+                score3: Math.round(item.score[2] * 1000) / 1000,
+                suppressed: suppressed
+            });
+            audacity = ({
+                timestamp: key + '\t' + end,
+                cname: this.labels[item.index[0]].split('_')[1],
+                score: Math.round(item.score[0] * 1000) / 1000,
+            })
+            //prepare summary
+            let hour = Math.floor(key / 3600), minute = Math.floor(key % 3600 / 60),
+                second = Math.floor(key % 3600 % 60)
+            console.log(file, `${hour}:${minute}:${second}`, item.index[0], this.labels[item.index[0]], Math.round(item.score[0] * 1000) / 1000, item.index[1], this.labels[item.index[1]], Math.round(item.score[1] * 1000) / 1000, item.index[2], this.labels[item.index[2]], Math.round(item.score[2] * 1000) / 1000);
+            batched_results.push([key, result, audacity]);
+        }
+        this.result = batched_results;
+        this.clearTensorArray();
+        return {readyToSend: true, result: this.result}
+    }
+
+    predictChunk(chunks, fileStart, file, duration, finalchunk) {
         let keys = [];
-        tf.tidy(() => {
+        return tf.tidy(() => {
             for (const [key, value] of Object.entries(chunks)) {
                 let chunk = tf.tensor1d(value);
                 keys.push([parseFloat(key), parseFloat(key) + chunk.shape[0]]);
@@ -164,113 +267,35 @@ class Model {
                     chunk = chunk.concat(padding);
                 }
                 const spectrogram = this.makeSpectrogram(chunk);
-                // // check signal noise threshold
-                // const mean = tf.mean(spectrogram, 1);
-                // const max = tf.max(spectrogram, 1);
-                // //tf.print(mean);
-                // //tf.print(max);
-                // const ratio = tf.divNoNan(max, mean);
-                // const snr = tf.max(ratio);
-                // // tf.print('snr is' + snr)
-                // const threshold = tf.scalar(60);
-                // // tf.print('threshold is' + threshold)
-                // let result = snr.greater(threshold);
-                // result = result.dataSync();
-                // if (result > 0) {
-                    //tf.print(result)
-                    tensorArray.push(spectrogram);
-                //     //tf.print('signal ' + snr + 'is greater than threshold' + threshold + ' ' +   snr.greater(threshold))
-                // } else {
-                //     //tf.print('signal ' + snr + 'is not greater than threshold' + threshold + ' '+ snr.greater(threshold))
-                // }
-            }
-            // If we have any tensors, stack them, else create ones
-            tensorArray.length ? this.batch = tf.stack(tensorArray) : this.batch = tf.zeros([1, this.inputShape[1], this.inputShape[2], this.inputShape[3]]);
-
-            if (this.batch.shape[0] < this.batchSize) {
-                console.log(`Adding ${this.batchSize - this.batch.shape[0]} tensors to the batch`)
-                const padding = tf.zeros([this.batchSize - this.batch.shape[0], this.inputShape[1], this.inputShape[2], this.inputShape[3]]);
-                this.batch = tf.concat([this.batch, padding], 0)
-            }
-            //let t0 = performance.now();
-            const prediction = this.model.predict(this.batch, {batchSize: this.batchSize})
-            // Get label
-            let top3, top3scores;
-            const {indices, values} = prediction.topk(3);
-            top3 = indices.arraySync();
-            top3scores = values.arraySync();
-            const batch = {};
-            for (let j = 0; j < keys.length; j++) {
-                const currentKeys = keys[j];
-                batch[currentKeys[0]] = ({index: top3[j], score: top3scores[j], end: currentKeys[1]});
-            }
-
-            // Try this method of adjusting results
-            for (let [key, item] of Object.entries(batch)) {
-                // turn the key back to a number and convert from samples to seconds:
-                key = parseFloat(key) / this.config.sampleRate;
-                const end = item.end / this.config.sampleRate;
-                for (let i = 0; i < item.index.length; i++) {
-                    if (suppressed_IDs.includes(item.index[i])) {
-                        item.score[i] = item.score[i] ** 3;
-                    } else if (enhanced_IDs.includes(item.index[i])) {
-                        //item.score[i] = Math.pow(item.score[i], 0.35);
-                        item.score[i] = Math.pow(item.score[i], 0.5);
-                    }
+                const ok = this.SNRok(spectrogram, 6).dataSync();
+                if (ok > 0) {
+                    this.tensorArray.push(tf.keep(spectrogram));
                 }
-                let suppressed = false;
-                // If using the whitelist, we want to promote allowed IDs above any blocked IDs, so they will be visible
-                // if they meet the confidence threshold.
-                let temp_item = structuredClone(item);
-                item.index.every(id => {
-                    // If and while the top result is blocked, move it to the back
-                    if (blocked_IDs.indexOf(id) !== -1) {
-                        temp_item.index.push(temp_item.index.shift());
-                        // Squash the score
-                        temp_item.score.shift();
-                        temp_item.score.push(-1.0);
-                        return true
-                    }
-                    return false
-                })
-                item = structuredClone(temp_item);
 
-
-                result = ({
-                    file: file,
-                    start: key,
-                    end: end,
-                    timestamp: key * 1000 + fileStart,
-                    position: key,
-                    id_1: item.index[0],
-                    id_2: item.index[1],
-                    id_3: item.index[2],
-                    sname: this.labels[item.index[0]].split('_')[0],
-                    cname: this.labels[item.index[0]].split('_')[1],
-                    score: Math.round(item.score[0] * 1000) / 1000,
-                    sname2: this.labels[item.index[1]].split('_')[0],
-                    cname2: this.labels[item.index[1]].split('_')[1],
-                    score2: Math.round(item.score[1] * 1000) / 1000,
-                    sname3: this.labels[item.index[2]].split('_')[0],
-                    cname3: this.labels[item.index[2]].split('_')[1],
-                    score3: Math.round(item.score[2] * 1000) / 1000,
-                    suppressed: suppressed
-                });
-                audacity = ({
-                    timestamp: key + '\t' + end,
-                    cname: this.labels[item.index[0]].split('_')[1],
-                    score: Math.round(item.score[0] * 1000) / 1000,
-                })
-                //prepare summary
-                let hour = Math.floor(key / 3600), minute = Math.floor(key % 3600 / 60),
-                    second = Math.floor(key % 3600 % 60)
-                console.log(file, `${hour}:${minute}:${second}`, item.index[0], this.labels[item.index[0]], Math.round(item.score[0] * 1000) / 1000, item.index[1], this.labels[item.index[1]], Math.round(item.score[1] * 1000) / 1000, item.index[2], this.labels[item.index[2]], Math.round(item.score[2] * 1000) / 1000);
-                batched_results.push([key, result, audacity]);
+                //Loop will continue
+                if (this.tensorArray.length === this.batchSize) {
+                    return this.predictBatch(keys, file, fileStart)
+                }
             }
-            this.result = batched_results;
-            //console.log("result: ", this.result)
+            // If we haven't filled the batch but there are more chunks to come, we're not ready to send for prediction
+            if (this.tensorArray.length < this.batchSize && !finalchunk) {
+                return {readyToSend: false};
+            }
+            // Clear up final predictions less than batch size
+            this.predictBatch(keys, file, fileStart)
+
+            this.clearTensorArray();
             return {readyToSend: true, result: this.result}
         })
+    }
+
+    clearTensorArray() {
+        // Dispose of accumulated kept tensors in model tensor array
+        this.tensorArray.forEach(tensor => {
+            tensor.dispose()
+        })
+        // And clear tensorArray
+        this.tensorArray = [];
     }
 }
 
@@ -308,6 +333,8 @@ async function runPredictions(e) {
         });
     } else if (modelRequest === 'predict') {
         const file = e.data.file;
+        const finalChunk = e.data.finalChunk;
+        if (finalChunk) console.log('Received final chunks')
         const t0 = performance.now();
 
         let chunks = {};
@@ -321,17 +348,20 @@ async function runPredictions(e) {
         }
 
         const fileStart = e.data.fileStart;
-        myModel.predictChunk(chunks, fileStart, file, e.data.duration)
-        const response = {
-            message: 'prediction',
-            result: myModel.result,
-            endpoint: e.data.duration,
-            fileStart: fileStart,
-            resetResults: e.data.resetResults,
+        const {readyToSend} = myModel.predictChunk(chunks, fileStart, file, e.data.duration, finalChunk);
+        if (readyToSend) {
+            const response = {
+                message: 'prediction',
+                result: myModel.result,
+                endpoint: e.data.duration,
+                fileStart: fileStart,
+                resetResults: e.data.resetResults,
+                predictionsReceived: e.data.predictionsRequested
+            }
+            postMessage(response);
+            let t1 = performance.now();
+            console.log(`receive to post took: ${t1 - t0} milliseconds`)
         }
-        postMessage(response);
-        let t1 = performance.now();
-        console.log(`receive to post took: ${t1 - t0} milliseconds`)
     } else if (modelRequest === 'get-spectrogram') {
         const buffer = e.data.buffer;
         // Only consider full specs
