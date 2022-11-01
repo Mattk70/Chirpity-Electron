@@ -807,7 +807,8 @@ const fetchAudioBuffer = async ({
     });
 }
 
-function sendMessageToWorker(chunkStart, chunks, file, duration, resetResults) {
+function sendMessageToWorker(chunkStart, chunks, file, duration, resetResults, predictionsRequested) {
+    const finalChunk = chunkStart/sampleRate + chunks.length * 3 > duration - 3;
     const objData = {
         message: 'predict',
         chunkStart: chunkStart,
@@ -815,7 +816,9 @@ function sendMessageToWorker(chunkStart, chunks, file, duration, resetResults) {
         fileStart: metadata[file].fileStart,
         file: file,
         duration: duration,
-        resetResults: resetResults
+        resetResults: resetResults,
+        finalChunk: finalChunk,
+        predictionsRequested: predictionsRequested
     }
     let chunkBuffers = [];
     for (let i = 0; i < chunks.length; i++) {
@@ -851,13 +854,13 @@ function feedChunksToModel(channelData, increment, chunkStart, file, duration, r
         predictionsRequested++;
         chunks.push(chunk);
         if (chunks.length === BATCH_SIZE) {
-            sendMessageToWorker(chunkStart, chunks, file, duration, resetResults);
+            sendMessageToWorker(chunkStart, chunks, file, duration, resetResults, predictionsRequested);
             chunks = [];
             //chunkStart += 3 * BATCH_SIZE * sampleRate;
         }
     }
     //clear up remainder less than BATCH_SIZE
-    if (chunks.length) sendMessageToWorker(chunkStart, chunks, file, duration, resetResults);
+    if (chunks.length) sendMessageToWorker(chunkStart, chunks, file, duration, resetResults, predictionsRequested);
 }
 
 const speciesMatch = (path, sname) => {
@@ -1044,7 +1047,7 @@ function spawnWorker(model, list, batchSize, warmup) {
 const parsePredictions = (response) => {
     let file, batchInProgress = false;
     response['result'].forEach(prediction => {
-        predictionsReceived++;
+        predictionsReceived = response['predictionsReceived'];
         const position = parseFloat(prediction[0]);
         const result = prediction[1];
         file = result.file
