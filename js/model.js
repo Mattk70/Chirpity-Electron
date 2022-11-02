@@ -50,11 +50,10 @@ class Model {
         this.frame_length = 512;
         this.frame_step = 186;
         this.prediction = null;
-        this.result = null;
+        this.result = [];
         this.appPath = appPath;
         this.list = list;
-        this.tensorArray = [];
-        this.true = tf.scalar(1, 'bool');
+        this.goodTensors = {};
     }
 
     async loadModel() {
@@ -164,27 +163,35 @@ class Model {
         return true;
     }
 
-    predictBatch(keys, file, fileStart) {
+    predictBatch(file, fileStart) {
         let batched_results = [];
         let result;
         let audacity;
-        this.batch = tf.stack(this.tensorArray)
+        let t0 = performance.now();
+        this.batch = tf.stack(Object.values(this.goodTensors))
         if (this.batch.shape[0] < this.batchSize) {
             console.log(`Adding ${this.batchSize - this.batch.shape[0]} tensors to the batch`)
             const padding = tf.zeros([this.batchSize - this.batch.shape[0], this.inputShape[1], this.inputShape[2], this.inputShape[3]]);
             this.batch = tf.concat([this.batch, padding], 0)
         }
-        //let t0 = performance.now();
+        console.log(`stacking & padding took ${performance.now() - t0} milliseconds`)
+        //t0 = performance.now();
         const prediction = this.model.predict(this.batch, {batchSize: this.batchSize})
+        //console.log(`model predict took ${performance.now() - t0} milliseconds`)
         // Get label
         let top3, top3scores;
+        //t0 = performance.now();
         const {indices, values} = prediction.topk(3);
+        //console.log(`topk took ${performance.now() - t0} milliseconds`)
+        //t0 = performance.now();
         top3 = indices.arraySync();
         top3scores = values.arraySync();
+        //console.log(`sync took ${performance.now() - t0} milliseconds`)
+        //t0 = performance.now();
         const batch = {};
-        for (let j = 0; j < keys.length; j++) {
-            const currentKeys = keys[j];
-            batch[currentKeys[0]] = ({index: top3[j], score: top3scores[j], end: currentKeys[1]});
+        const keys = Object.keys(this.goodTensors);
+        for (let i = 0; i < keys.length; i++) {
+            batch[keys[i]] = ({index: top3[i], score: top3scores[i], end: keys[i] + this.chunkLength});
         }
 
         // Try this method of adjusting results
@@ -249,17 +256,19 @@ class Model {
             console.log(file, `${hour}:${minute}:${second}`, item.index[0], this.labels[item.index[0]], Math.round(item.score[0] * 1000) / 1000, item.index[1], this.labels[item.index[1]], Math.round(item.score[1] * 1000) / 1000, item.index[2], this.labels[item.index[2]], Math.round(item.score[2] * 1000) / 1000);
             batched_results.push([key, result, audacity]);
         }
-        this.result = batched_results;
+        this.result = this.result.concat(batched_results);
+        // console.log(`format results took ${performance.now() - t0} milliseconds`)
+        //t0 = performance.now();
         this.clearTensorArray();
-        return {readyToSend: true, result: this.result}
+        //console.log(`Clear tensors took ${performance.now() - t0} milliseconds`)
+        return true
     }
 
-    predictChunk(chunks, fileStart, file, duration, finalchunk) {
-        let keys = [];
+    predictChunk(chunks, fileStart, file, finalchunk) {
         return tf.tidy(() => {
+            let readyToSend = false;
             for (const [key, value] of Object.entries(chunks)) {
                 let chunk = tf.tensor1d(value);
-                keys.push([parseFloat(key), parseFloat(key) + chunk.shape[0]]);
                 // if the chunk is too short, pad with zeroes.
                 // Min length is 0.5s, set in UI.js - a wavesurfer region option
                 if (chunk.shape[0] < this.chunkLength) {
@@ -267,35 +276,41 @@ class Model {
                     chunk = chunk.concat(padding);
                 }
                 const spectrogram = this.makeSpectrogram(chunk);
-                const ok = this.SNRok(spectrogram, 6).dataSync();
-                if (ok > 0) {
-                    this.tensorArray.push(tf.keep(spectrogram));
+                const useSNR = false;
+                if (useSNR) {
+                    const ok = this.SNRok(spectrogram, 7).dataSync();
+                    if (ok > 0) {
+                        this.goodTensors[key] = tf.keep(spectrogram);
+                    }
+                } else {
+                    this.goodTensors[key] = tf.keep(spectrogram);
                 }
 
                 //Loop will continue
-                if (this.tensorArray.length === this.batchSize) {
-                    return this.predictBatch(keys, file, fileStart)
+                if (Object.keys(this.goodTensors).length === this.batchSize) {
+                    // There's a new batch of predictions to make
+                    readyToSend = this.predictBatch(file, fileStart)
                 }
             }
-            // If we haven't filled the batch but there are more chunks to come, we're not ready to send for prediction
-            if (this.tensorArray.length < this.batchSize && !finalchunk) {
-                return {readyToSend: false};
+            if (finalchunk) {
+                // Top up results with any final tensor predictions
+                if (Object.keys(this.goodTensors).length) {
+                    this.predictBatch(file, fileStart)
+                }
+                return true
+            } else {
+                return readyToSend
             }
-            // Clear up final predictions less than batch size
-            this.predictBatch(keys, file, fileStart)
-
-            this.clearTensorArray();
-            return {readyToSend: true, result: this.result}
         })
     }
 
     clearTensorArray() {
         // Dispose of accumulated kept tensors in model tensor array
-        this.tensorArray.forEach(tensor => {
+        for (const tensor of Object.values(this.goodTensors)) {
             tensor.dispose()
-        })
-        // And clear tensorArray
-        this.tensorArray = [];
+        }
+        // Clear tensorArray
+        this.goodTensors = {};
     }
 }
 
@@ -335,32 +350,24 @@ async function runPredictions(e) {
         const file = e.data.file;
         const finalChunk = e.data.finalChunk;
         if (finalChunk) console.log('Received final chunks')
-        const t0 = performance.now();
-
-        let chunks = {};
-        let i = e.data.chunkStart;
-
-        // this assumes contiguous chunks so remove logic here and create keys for chunk object in worker
-        for (let j = 0; j < e.data.numberOfChunks; j++) {
-            let key = 'chunk' + j;
-            chunks[i] = e.data[key];
-            i = i + myModel.chunkLength;
-        }
-
+        //const t0 = performance.now();
+        let chunks = e.data.chunks;
         const fileStart = e.data.fileStart;
-        const {readyToSend} = myModel.predictChunk(chunks, fileStart, file, e.data.duration, finalChunk);
+        const readyToSend = myModel.predictChunk(chunks, fileStart, file, finalChunk);
         if (readyToSend) {
             const response = {
                 message: 'prediction',
                 result: myModel.result,
-                endpoint: e.data.duration,
+                finished: finalChunk,
                 fileStart: fileStart,
                 resetResults: e.data.resetResults,
                 predictionsReceived: e.data.predictionsRequested
             }
             postMessage(response);
-            let t1 = performance.now();
-            console.log(`receive to post took: ${t1 - t0} milliseconds`)
+            // reset the results
+            myModel.result = [];
+            //let t1 = performance.now();
+            //console.log(`receive to post took: ${t1 - t0} milliseconds`)
         }
     } else if (modelRequest === 'get-spectrogram') {
         const buffer = e.data.buffer;

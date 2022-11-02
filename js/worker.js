@@ -191,6 +191,7 @@ ipcRenderer.on('new-client', (event) => {
                 break;
             case 'explore':
                 args.db = diskDB;
+                args.explore = true;
                 await sendResults2UI(args);
                 break;
             case 'analyze':
@@ -240,7 +241,8 @@ const sendResults2UI = async ({
                                   db = memoryDB,
                                   species = undefined,
                                   range = undefined,
-                                  filelist = undefined
+                                  filelist = undefined,
+                                  explore = false
                               }) => {
     // reset results table
     UI.postMessage({event: 'reset-results'});
@@ -254,14 +256,13 @@ const sendResults2UI = async ({
         range: range,
         files: filelist
     });
-
-    summary = await getCachedSummary({db: db, files: filelist})
+    summary = await getCachedSummary({db: db, files: filelist, species: species, explore: explore})
     // No results? Try the archive
     if (!results.length && !summary.length) {
         console.log(`No results in ${db.filename.replace(/.*\//, '')}, trying the archive db.`);
         results = await getCachedResults({db: diskDB, species: species, range: range, files: filelist});
         // Get the summary from the diskdb to send on prediction done
-        summary = await getCachedSummary({db: diskDB, files: filelist})
+        summary = await getCachedSummary({db: diskDB, files: filelist, species: species, explore: explore})
     }
     index = 0;
     results.forEach(result => {
@@ -323,6 +324,7 @@ async function onAnalyze({
         }
         // Pull the results from the database
         const results = await getCachedResults({db: diskDB, files: [cachedFile], range: {}});
+        const summary = await getCachedSummary({db: diskDB, files: [cachedFile]});
         UI.postMessage({event: 'update-audio-duration', value: metadata[cachedFile].duration});
         results.forEach(result => {
             //format dates
@@ -344,6 +346,7 @@ async function onAnalyze({
         UI.postMessage({
             event: 'prediction-done',
             batchInProgress: false,
+            summary: summary
         });
         //if (FILE_QUEUE.length) await processNextFile();
     } else if (!predicting) {
@@ -808,11 +811,10 @@ const fetchAudioBuffer = async ({
 }
 
 function sendMessageToWorker(chunkStart, chunks, file, duration, resetResults, predictionsRequested) {
-    const finalChunk = chunkStart/sampleRate + chunks.length * 3 > duration - 3;
+    const finalChunk = chunkStart / sampleRate + (chunks.length * 3) >= (duration - 3);
+
     const objData = {
         message: 'predict',
-        chunkStart: chunkStart,
-        numberOfChunks: chunks.length,
         fileStart: metadata[file].fileStart,
         file: file,
         duration: duration,
@@ -820,11 +822,14 @@ function sendMessageToWorker(chunkStart, chunks, file, duration, resetResults, p
         finalChunk: finalChunk,
         predictionsRequested: predictionsRequested
     }
-    let chunkBuffers = [];
-    for (let i = 0; i < chunks.length; i++) {
-        objData['chunk' + i] = chunks[i];
-        chunkBuffers.push(objData['chunk' + i].buffer)
-    }
+    let chunkBuffers = {};
+    // Key chunks by their position
+    let position = chunkStart;
+    chunks.forEach(chunk => {
+        chunkBuffers[position] = chunk;
+        position += sampleRate * 3;
+    })
+    objData['chunks'] = chunkBuffers;
     predictWorker.postMessage(objData, chunkBuffers);
 }
 
@@ -983,6 +988,7 @@ const bufferToAudio = ({
         const command = ffmpeg(metadata[file].proxy)
             .seekInput(start)
             .duration(end - start)
+            .audioBitrate(160)
             .audioChannels(1)
             .audioFrequency(24000)
             .audioCodec(audioCodec)
@@ -1066,26 +1072,24 @@ const parsePredictions = (response) => {
             AUDACITY.push(audacity);
             RESULTS.push(result);
         }
-        // 3.5 seconds subtracted because position is the beginning of a 3-second chunk and
-        // the min fragment length is 0.5 seconds
-        if (position.toFixed(0) >= (response.endpoint.toFixed(0) - 3.5)) {
-            console.log(`Prediction done ${FILE_QUEUE.length} files to go`);
-            console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
-            if (RESULTS.length === 0) {
-                const result = "No predictions.";
-                UI.postMessage({
-                    event: 'prediction-ongoing',
-                    file: file,
-                    result: result,
-                    index: 1,
-                    resetResults: response['resetResults']
-                });
-            }
-            UI.postMessage({event: 'progress', progress: 1.0, text: '...'});
-            batchInProgress = FILE_QUEUE.length ? true : predictionsRequested - predictionsReceived;
-            predictionDone = true;
-        }
     })
+    if (response.finished) {
+        if (RESULTS.length === 0) {
+            const result = "No predictions.";
+            UI.postMessage({
+                event: 'prediction-ongoing',
+                file: file,
+                result: result,
+                index: 1,
+                resetResults: response['resetResults']
+            });
+        }
+        console.log(`Prediction done ${FILE_QUEUE.length} files to go`);
+        console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
+        UI.postMessage({event: 'progress', progress: 1.0, text: '...'});
+        batchInProgress = FILE_QUEUE.length ? true : predictionsRequested - predictionsReceived;
+        predictionDone = true;
+    }
     return [file, batchInProgress]
 }
 
@@ -1105,6 +1109,7 @@ async function parseMessage(e) {
         loadDB();
         // Load the archive one too
         loadDB(appPath);
+        await dbSpeciesCheck();
         console.log(`Databases loaded in ${(Date.now() - t0)} milliseconds.`);
     } else if (response['message'] === 'prediction' && !aborted) {
         // add filename to result for db purposes
@@ -1246,9 +1251,11 @@ const getCachedSummary = ({
                               range = undefined,
                               files = [],
                               species = undefined,
+                              explore = false
                           } = {}) => {
     const [where, when] = setWhereWhen({
         dateRange: range,
+        species: explore ? species : undefined,
         files: files,
         context: 'summary'
     });
@@ -1271,6 +1278,26 @@ const getCachedSummary = ({
     })
 }
 
+
+const dbSpeciesCheck = () => {
+    return new Promise(function (resolve, reject) {
+        diskDB.get(`SELECT COUNT(*) as speciesCount
+                    FROM species`, (err, row) => {
+            if (row) {
+                if (parseInt(row.speciesCount) !== labels.length) {
+                    UI.postMessage({
+                        event: 'generate-alert',
+                        message: `Warning:\nThe ${row.speciesCount} species in the archive database does not match the ${labels.length} species being used by the model.`
+                    })
+                    resolve(false)
+                }
+                resolve(row.speciesCount)
+            } else {
+                reject(err)
+            }
+        })
+    })
+}
 
 const getCachedResults = ({
                               db = undefined,
@@ -1407,7 +1434,11 @@ const onSave2DB = async (db) => {
                 stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, filemap[file], position, comment, label,
                     (err, row) => {
                         if (err) reject(err)
-                        UI.postMessage({event: 'progress', text: "Updating Database.", progress: i / RESULTS.length});
+                        UI.postMessage({
+                            event: 'progress',
+                            text: "Updating Database.",
+                            progress: i / RESULTS.length
+                        });
                         if (i === (RESULTS.length - 1)) {
                             db.run('COMMIT', (err, rows) => {
                                 if (err) reject(err)
@@ -1709,7 +1740,7 @@ async function onUpdateRecord({
                     console.log(`Update without transaction took ${Date.now() - t0} milliseconds`);
                     const species = isFiltered || isExplore ? from : '';
                     if (isExplore) openFiles = [];
-                    sendResults2UI({db: db, filelist: openFiles, species: species});
+                    sendResults2UI({db: db, filelist: openFiles, species: species, explore: isExplore});
                     resolve(this.changes)
                 } else {
                     console.log(`No records updated in ${db.filename.replace(/.*\//, '')}`)

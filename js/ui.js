@@ -555,10 +555,6 @@ analyzeAllLink.addEventListener('click', async () => {
 
 const analyzeSelectionLink = document.getElementById('analyzeSelection');
 analyzeSelectionLink.addEventListener('click', async () => {
-    //refreshResultsView();
-    //delete diagnostics['Audio Duration'];
-    //analyseReset();
-    progressDiv.show();
     let start = region.start + bufferBegin;
     let end = region.end + bufferBegin;
     if (end - start < 0.5) {
@@ -1183,33 +1179,35 @@ const seenListStore = document.getElementById('seenSpecies');
 $(document).on('focus', '.input', function () {
     document.removeEventListener('keydown', handleKeyDownDeBounce, true);
     const container = this.parentNode.querySelector('.bird-list-wrapper');
-    if (container.classList.contains('editing')) {
-        const theList = document.querySelector('#allSpecies .bird-list')
+    // check we're not adjusting the confidence threshold - if we are, container will be null
+    if (container) {
+        let theList;
+        if (container.classList.contains('editing')) {
+            theList = document.querySelector('#allSpecies .bird-list')
+        } else {
+            theList = document.querySelector('#seenSpecies .bird-list')
+        }
         if (theList) container.appendChild(theList.cloneNode(true));
-    } else {
-        const theList = document.querySelector('#seenSpecies .bird-list')
-        container.appendChild(theList.cloneNode(true));
     }
     if (this.id === "speciesSearch") hideElement(['dataRecords']);
 
 })
 
-$(document).on('blur', '.input', function () {
+$(document).on('blur', '.input', function (e) {
     document.addEventListener('keydown', handleKeyDownDeBounce, true);
-    // Use timeout to allow a click event on the list to fire
-    setTimeout(hideBirdList, 250, this.parentNode);
+    if (this.id !== 'threshold') {
+        // We're looking at the birdlist search, so use a timeout to allow a click event on the list to fire
+        setTimeout(hideBirdList, 250, this.parentNode);
+    }
 })
 
 function hideBirdList(el) {
-    const list = document.querySelector('.bird-list');
-    const container = el.closest('.species-selector').querySelector('.bird-list-wrapper');
-    // Move the bird list back to its parking spot before updating the cname cell
-    if (container.classList.contains('editing')) {
-        if (list) fullListStore.appendChild(list);
-        const cnameCell = el.closest('.cname');
-        if (cnameCell) cnameCell.innerHTML = restoreSpecies;
+    const list = el.closest('.species-selector').querySelector('.bird-list');
+    if (el.id === 'edit') {
+        const cname = el.closest('.cname')
+        if (cname) cname.innerHTML = restoreSpecies;
     } else {
-        if (list) seenListStore.appendChild(list);
+        list.remove();
     }
 }
 
@@ -1242,7 +1240,7 @@ $('.species-selector > input').on('focus', function () {
 })
 
 // Bird list filtering
-$(document).on('keypress', '.input', filterList);
+$(document).on('keypress', '.input:not(.form-control)', filterList);
 
 function filterList(e) {
     const input = e.target;
@@ -1279,22 +1277,21 @@ function formatInputText(species) {
 $(document).on('click', '.bird-list', function (e) {
     e.preventDefault();
     e.stopImmediatePropagation();
-    if (!e.shiftKey) {
-        const [speciesLabel,] = formatInputText(e.target.innerText)
-        const input = this.closest('.species-selector').querySelector('input');
-        input.value = speciesLabel;
-        const container = this.closest('.species-selector').querySelector('.bird-list-wrapper');
-        if (container.classList.contains('editing')) {
-            let species = e.target.innerText;
-            let [cname, sname] = species.split(' - ');
-            // Handle animal, vehicle, etc.
-            if (!sname) sname = cname;
-            const cnameCell = this.closest('.cname');
-            // Move the bird list back to its parking spot before updating the cname cell
-            hideBirdList(container)
-            editResultID(cname, sname, cnameCell);
-        }
+    const [speciesLabel,] = formatInputText(e.target.innerText)
+    const input = this.closest('.species-selector').querySelector('input');
+    input.value = speciesLabel;
+    const container = this.closest('.species-selector').querySelector('.bird-list-wrapper');
+    if (container.classList.contains('editing')) {
+        let species = e.target.innerText;
+        let [cname, sname] = species.split(' - ');
+        // Handle animal, vehicle, etc.
+        if (!sname) sname = cname;
+        const cnameCell = this.closest('.cname');
+        // Move the bird list back to its parking spot before updating the cname cell
+        //hideBirdList(container) <- remove as this will fire on blur event
+        editResultID(cname, sname, cnameCell);
     }
+
 })
 
 
@@ -1306,16 +1303,16 @@ const isSpeciesViewFiltered = () => {
 function editResultID(cname, sname, cell) {
     const exploreMode = isExplore();
     // Make sure we update the restore species
-    restoreSpecies = cell.innerHTML;
+    //restoreSpecies = cell.innerHTML;
     let from = restoreSpecies.replace(/(.*)\s<.*/, "$1");
     // Are we batch editing here?
     const batch = cell.closest('table').id !== 'results';
-    let start, files = [], file;
+    let start, files = fileList, file;
     if (!batch) {
         [file, start, end, currentRow] = unpackNameAttr(cell, cname);
         sendFeedback(file, cname, sname);
     } else {
-        if (!exploreMode) files = fileList;
+        if (exploreMode) files = [];
     }
 
     cell.innerHTML = `<span id="${cname} ${sname}" class="pointer">${cname} <i>${sname}</i></span>`;
@@ -1358,7 +1355,7 @@ function updateLabel(e) {
     e.stopImmediatePropagation();
     const exploreMode = isExplore();
     // ??
-    if (this.childElementCount < 2) return
+    //if (this.childElementCount < 2) return
 
     let label = e.target.innerText.replace('Remove Label', '');
     // update the clicked badge
@@ -1366,8 +1363,8 @@ function updateLabel(e) {
     let species = e.target.closest('tr');
     species = species.querySelector('.cname').innerHTML
     // Extract species cname - urgh
-    species = species.replace(/^<[^>]+>/, '')
-    species = species.replace(/(.*)\s<i.*/, "$1");
+    species = species.replace(/^\s*<[^>]+>/m, '')
+    species = species.replace(/^(.*)\s<i.*\s*/m, "$1");
 
     parent.innerHTML = tags[label];
     // Update the label record(s) in the db
@@ -2227,19 +2224,15 @@ async function onPredictionDone({
                                     summary = {}
                                 }) {
 
-    updateSummary({summary: summary, filterSpecies: filterSpecies});
     AUDACITY_LABELS = AUDACITY_LABELS.concat(audacityLabels);
     // Defer further processing until batch complete
     if (batchInProgress) {
         progressDiv.show();
-        // The file we've completed is one less than the file we're going to be processing
-        // and the index is zero-based, so + 2 to get the file we're going to process
-        // const count = fileList.indexOf(file) + 2;
-        // fileNumber.innerText = `(File ${count} of ${fileList.length})`;
         return;
     } else {
         PREDICTING = false;
     }
+    updateSummary({summary: summary, filterSpecies: filterSpecies});
     scrolled = false;
 
     progressDiv.hide();
@@ -2325,10 +2318,18 @@ async function onPredictionDone({
     }
 
     if (activeRow) {
-    // Refresh and scroll to active row:
+        // Refresh and scroll to active row:
         activeRow = document.getElementById(activeRow.id)
-        activeRow.focus()
-        activeRow.click()
+        if (activeRow) { // after an edit the active row may not exist
+            activeRow.focus()
+            activeRow.click()
+        } else { // in which case...go to the last table row
+            const rows = document.getElementById('resultTableBody').querySelectorAll('.top-row')
+            if (rows.length) {
+                const lastRow = rows[rows.length - 1];
+                lastRow.focus();
+            }
+        }
     }
 }
 
@@ -2346,6 +2347,8 @@ function scrollResults(row) {
 async function renderResult(args) {
     const result = args.result, file = args.file;
     let index = args.index;
+    // Memory saver
+    if (index > 3000) return
     // Convert timestamp and position to date so easier to format results in UI
     let timestamp = new Date(result.timestamp);
     const position = new Date(result.position * 1000);
