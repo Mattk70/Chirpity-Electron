@@ -194,10 +194,10 @@ ipcRenderer.on('new-client', (event) => {
                 args.explore = true;
                 await sendResults2UI(args);
                 break;
-            case 'analyze':
+            case 'analyse':
                 predictionsReceived = 0;
                 predictionsRequested = 0;
-                await onAnalyze(args);
+                await onAnalyse(args);
                 break;
             case 'save':
                 console.log("file save requested")
@@ -288,7 +288,7 @@ const sendResults2UI = async ({
 }
 
 // Not an arrow function. Async function has access to arguments - so we can pass them to processnextfile
-async function onAnalyze({
+async function onAnalyse({
                              files = [],
                              confidence = 0.5,
                              start = 0,
@@ -296,10 +296,11 @@ async function onAnalyze({
                              resetResults = false,
                              lat = 51,
                              lon = -0.4,
-                             nocmig = false
+                             nocmig = false,
+                             reanalyse = false
                          }) {
     console.log(`Worker received message: ${files}, ${confidence}, start: ${start}, end: ${end}`);
-    // Analyze works on one file at a time
+    // Analyse works on one file at a time
     const file = files[0];
     if (resetResults) {
         index = 0;
@@ -315,7 +316,7 @@ async function onAnalyze({
     console.log(`Adding ${file} to the queue.`)
     // check if results for the file have been saved to the disk DB
     const cachedFile = await isDuplicate(file);
-    if (cachedFile && resetResults) {
+    if (cachedFile && resetResults && !reanalyse) {
         //remove the file from the queue - wherever it sits, this prevents out of
         // sequence issues with batch analysis
         const place = FILE_QUEUE.indexOf(file);
