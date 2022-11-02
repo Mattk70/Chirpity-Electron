@@ -307,15 +307,15 @@ function initWavesurfer(args) {
     waveElement.mousedown(function () {
         wavesurfer.clearRegions();
         region = false;
-        disableMenuItem(['analyzeSelection', 'exportMP3']);
-        if (workerHasLoadedFile) enableMenuItem(['analyze']);
+        disableMenuItem(['analyseSelection', 'exportMP3']);
+        if (workerHasLoadedFile) enableMenuItem(['analyse']);
     });
     // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
         region = e;
         enableMenuItem(['exportMP3']);
         if (modelReady) {
-            enableMenuItem(['analyzeSelection']);
+            enableMenuItem(['analyseSelection']);
         }
     });
 
@@ -464,7 +464,7 @@ async function onOpenFiles(args) {
 
     // Sort file by time created (the oldest first):
     if (fileList.length > 1) {
-        if (modelReady) analyzeAllLink.classList.remove('disabled');
+        if (modelReady) enableMenuItem(['analyseAll', 'reanalyseAll'])
         fileList = fileList.map(fileName => ({
             name: fileName,
             time: fs.statSync(fileName).mtime.getTime(),
@@ -472,13 +472,13 @@ async function onOpenFiles(args) {
             .sort((a, b) => a.time - b.time)
             .map(file => file.name);
     } else {
-        analyzeAllLink.classList.add('disabled');
+        disableMenuItem(['analyseAll', 'reanalyseAll'])
     }
     updateFileName(fileList, fileList[0]);
     await loadAudioFile({filePath: fileList[0]});
     currentFile = fileList[0];
 
-    disableMenuItem(['analyzeSelection', 'analyze', 'analyzeAll'])
+    disableMenuItem(['analyseSelection', 'analyse', 'analyseAll', 'reanalyse', 'reanalyseAll'])
     // Reset the buffer playhead and zoom:
     bufferBegin = 0;
     windowLength = 20;
@@ -542,26 +542,37 @@ navbarAnalysis.addEventListener('click', async () => {
 
 });
 
-const analyzeLink = document.getElementById('analyze');
+const analyseLink = document.getElementById('analyse');
 //speciesExclude = document.querySelectorAll('speciesExclude');
-analyzeLink.addEventListener('click', async () => {
-    postAnalyzeMessage({confidence: config.minConfidence, resetResults: true, files: [currentFile]});
+analyseLink.addEventListener('click', async () => {
+    postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: [currentFile]});
 });
 
-const analyzeAllLink = document.getElementById('analyzeAll');
-analyzeAllLink.addEventListener('click', async () => {
-    postAnalyzeMessage({confidence: config.minConfidence, resetResults: true, files: fileList});
+const reanalyseLink = document.getElementById('reanalyse');
+//speciesExclude = document.querySelectorAll('speciesExclude');
+reanalyseLink.addEventListener('click', async () => {
+    postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: [currentFile], reanalyse: true});
 });
 
-const analyzeSelectionLink = document.getElementById('analyzeSelection');
-analyzeSelectionLink.addEventListener('click', async () => {
+const analyseAllLink = document.getElementById('analyseAll');
+analyseAllLink.addEventListener('click', async () => {
+    postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: fileList});
+});
+
+const reanalyseAllLink = document.getElementById('reanalyseAll');
+reanalyseAllLink.addEventListener('click', async () => {
+    postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: fileList, reanalyse: true});
+});
+
+const analyseSelectionLink = document.getElementById('analyseSelection');
+analyseSelectionLink.addEventListener('click', async () => {
     let start = region.start + bufferBegin;
     let end = region.end + bufferBegin;
     if (end - start < 0.5) {
         region.end = region.start + 0.5;
         end = start + 0.5
     }
-    postAnalyzeMessage({
+    postAnalyseMessage({
         confidence: 0.1,
         resetResults: false,
         files: [currentFile],
@@ -571,7 +582,7 @@ analyzeSelectionLink.addEventListener('click', async () => {
     summary = {};
 });
 
-function postAnalyzeMessage(args) {
+function postAnalyseMessage(args) {
     let start = args.start, end = args.end;
     // Format start / end as millisecond integers
     //if (start) start = (start * 1000).toFixed(0);
@@ -585,7 +596,7 @@ function postAnalyzeMessage(args) {
     }
     args.files.forEach(file => {
         worker.postMessage({
-            action: 'analyze',
+            action: 'analyse',
             confidence: args.confidence,
             resetResults: args.resetResults,
             start: start,
@@ -594,6 +605,7 @@ function postAnalyzeMessage(args) {
             lat: config.latitude,
             lon: config.longitude,
             files: [file],
+            reanalyse: args.reanalyse
         });
     })
     if (args.files.length > 1) {
@@ -1296,7 +1308,7 @@ $(document).on('click', '.bird-list', function (e) {
 
 
 const isSpeciesViewFiltered = () => {
-    return document.querySelector('.speciesFilter span.text-success') !== null;
+    return document.querySelector('.speciesFilter span.text-warning') !== null;
 }
 
 //Works for single and batch items in Explore, but not in Analyse
@@ -2075,7 +2087,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
 const warmupText = document.getElementById('warmup');
 
 function displayWarmUpMessage() {
-    disableMenuItem(['analyze', 'analyzeAll', 'analyseSelection']);
+    disableMenuItem(['analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'analyseSelection']);
     warmupText.classList.remove('d-none');
 }
 
@@ -2086,10 +2098,10 @@ function onModelReady(args) {
     generateBirdList('allSpecies');
     warmupText.classList.add('d-none');
     if (workerHasLoadedFile) {
-        enableMenuItem(['analyze'])
-        if (fileList.length > 1) analyzeAllLink.classList.remove('disabled');
+        enableMenuItem(['analyse', 'reanalyse'])
+        if (fileList.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
     }
-    if (region) enableMenuItem(['analyzeSelection'])
+    if (region) enableMenuItem(['analyseSelection'])
     t1_warmup = Date.now();
     diagnostics['Warm Up'] = ((t1_warmup - t0_warmup) / 1000).toFixed(2) + ' seconds';
     diagnostics['Tensorflow Backend'] = args.backend;
@@ -2145,8 +2157,8 @@ async function onWorkerLoadedAudio(args) {
     //     $('#nocmigButton').click();
     // }
     if (modelReady) {
-        enableMenuItem(['analyze']);
-        if (fileList.length > 1) analyzeAllLink.classList.remove('disabled');
+        enableMenuItem(['analyse', 'reanalyse']);
+        if (fileList.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
     }
     fileLoaded = true;
 
@@ -2202,7 +2214,7 @@ const updateSummary = ({
             </thead><tbody>`;
 
     for (let i = 0; i < summary.length; i++) {
-        const selected = summary[i].cname === filterSpecies ? 'text-success' : '';
+        const selected = summary[i].cname === filterSpecies ? 'text-warning' : '';
         summaryHTML += `<tr>
                         <td class="max">${iconizeScore(summary[i].max)}</td>
                         <td class="cname speciesFilter">
@@ -2247,7 +2259,7 @@ async function onPredictionDone({
     } else {
         disableMenuItem(['saveLabels', 'save2db']);
     }
-    analyzeLink.disabled = false;
+    enableMenuItem(['analyse', 'reanalyse'])
     subRows = document.querySelectorAll('.subrow')
 
     speciesFilter = document.querySelectorAll('.speciesFilter');
@@ -2289,7 +2301,7 @@ async function onPredictionDone({
         // There won't be a target if the input box is clicked rather than the list
         if (target) {
             const targetClass = target.classList;
-            if (targetClass.contains('text-success')) {
+            if (targetClass.contains('text-warning')) {
                 // Clicked on filtered species icon
                 worker.postMessage({action: 'filter', filelist: fileList});
                 speciesViewIsFiltered = false
