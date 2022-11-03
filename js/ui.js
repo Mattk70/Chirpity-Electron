@@ -511,6 +511,7 @@ function analyseReset() {
     AUDACITY_LABELS = [];
     completeDiv.hide();
     progressDiv.show();
+    stretchTable();
     // Diagnostics
     t0_analysis = Date.now();
 }
@@ -2203,7 +2204,6 @@ const updateSummary = ({
                            summary = [],
                            filterSpecies = ''
                        }) => {
-    console.table(summary);
     let summaryHTML = `<table id="resultSummary" class="table table-striped table-dark table-hover p-1"><thead>
             <tr>
                 <th class="w-auto">Max</th>
@@ -2225,6 +2225,7 @@ const updateSummary = ({
 
     }
     summaryHTML += '</tbody></table>';
+    squishTable();
     summaryTable.html(summaryHTML);
 }
 
@@ -2579,17 +2580,25 @@ function setClickedIndex(e) {
     clickedIndex = clickedNode.querySelector('th') ? clickedNode.querySelector('th').innerText : null;
 }
 
+const stretchTable = () => {
+    summaryDiv.classList.add('d-none');
+    resultsDiv.classList.remove('col-sm-8');
+    resultsDiv.classList.add('col-sm-12');
+}
+
+const squishTable = () => {
+    summaryDiv.classList.remove('d-none');
+    resultsDiv.classList.add('col-sm-8');
+    resultsDiv.classList.remove('col-sm-12');
+}
+
 summaryButton.addEventListener('click', (e) => {
     if (summaryButton.innerText.indexOf('Show') !== -1) {
         summaryButton.innerText = 'Hide Summary';
-        summaryDiv.classList.remove('d-none');
-        resultsDiv.classList.add('col-sm-8');
-        resultsDiv.classList.remove('col-sm-12');
+        stretchTable()
     } else {
         summaryButton.innerText = 'Show Summary';
-        summaryDiv.classList.add('d-none');
-        resultsDiv.classList.remove('col-sm-8');
-        resultsDiv.classList.add('col-sm-12');
+        squishTable()
     }
     if (e.isTrusted) {
         summaryTable.animate({width: 'toggle'})
