@@ -1,102 +1,121 @@
 const {ipcRenderer} = require('electron');
-let appPath = '../24000_B3_full/';
 const fs = require('fs');
 const wavefileReader = require('wavefile-reader');
-const lamejs = require("lamejstmp");
-const ID3Writer = require('browser-id3-writer');
 const p = require('path');
-let BATCH_SIZE = 12;
-console.log(appPath);
-const labels = ["Tachymarptis melba_Alpine Swift", "Ambient Noise_Ambient Noise", "Pluvialis dominica_American Golden Plover", "Mareca americana_American Wigeon", "Animal_Animal", "Acrocephalus paludicola_Aquatic Warbler", "Acanthis hornemanni_Arctic Redpoll", "Stercorarius parasiticus_Arctic Skua", "Sterna paradisaea_Arctic Tern", "Phylloscopus borealis_Arctic Warbler", "Recurvirostra avosetta_Avocet", "Porzana pusilla_Baillon's Crake", "Limosa lapponica_Bar-tailed Godwit", "Tyto alba_Barn Owl", "Branta leucopsis_Barnacle Goose", "Sylvia nisoria_Barred Warbler", "Panurus biarmicus_Bearded Tit", "Merops apiaster_Bee-eater", "Cygnus columbianus_Bewick's Swan", "Botaurus stellaris_Bittern", "Oenanthe hispanica_Black-eared Wheatear", "Chroicocephalus ridibundus_Black-headed Gull", "Podiceps nigricollis_Black-necked Grebe", "Limosa limosa_Black-tailed Godwit", "Himantopus himantopus_Black-winged Stilt", "Lyrurus tetrix_Black Grouse", "Cepphus grylle_Black Guillemot", "Milvus migrans_Black Kite", "Phoenicurus ochruros_Black Redstart", "Chlidonias niger_Black Tern", "Turdus merula_Blackbird", "Sylvia atricapilla_Blackcap", "Spatula discors_Blue-winged Teal", "Cyanistes caeruleus_Blue Tit", "Luscinia svecica_Bluethroat", "Acrocephalus dumetorum_Blyth's Reed Warbler", "Fringilla montifringilla_Brambling", "Branta bernicla_Brent Goose", "Pyrrhula pyrrhula_Bullfinch", "Buteo buteo_Buzzard", "Branta canadensis_Canada Goose", "Tetrao urogallus_Capercaillie", "Corvus corone_Carrion/Hooded Crow", "Larus cachinnans_Caspian Gull", "Bubulcus ibis_Cattle Egret", "Cettia cetti_Cetti's Warbler", "Fringilla coelebs_Chaffinch", "Phylloscopus collybita_Chiffchaff", "Pyrrhocorax pyrrhocorax_Chough", "Emberiza cirlus_Cirl Bunting", "Motacilla citreola_Citrine Wagtail", "Periparus ater_Coal Tit", "Streptopelia decaocto_Collared Dove", "Glareola pratincola_Collared Pratincole", "Loxia curvirostra_Common Crossbill", "Larus canus_Common Gull", "Acanthis flammea_Common Redpoll", "Carpodacus erythrinus_Common Rosefinch", "Actitis hypoleucos_Common Sandpiper", "Melanitta nigra_Common Scoter", "Sterna hirundo_Common Tern", "Fulica atra_Coot", "Phalacrocorax carbo_Cormorant", "Emberiza calandra_Corn Bunting", "Crex crex_Corncrake", "Calonectris borealis_Cory's Shearwater", "Grus grus_Crane", "Lophophanes cristatus_Crested Tit", "Cuculus canorus_Cuckoo", "Calidris ferruginea_Curlew Sandpiper", "Numenius arquata_Curlew", "Sylvia undata_Dartford Warbler", "Cinclus cinclus_Dipper", "Charadrius morinellus_Dotterel", "Calidris alpina_Dunlin", "Prunella modularis_Dunnock", "Phylloscopus fuscatus_Dusky Warbler", "Alopochen aegyptiaca_Egyptian Goose", "Somateria mollissima_Eider", "Bubo bubo_Eurasian Eagle-Owl", "Turdus pilaris_Fieldfare", "Regulus ignicapilla_Firecrest", "Fulmarus glacialis_Fulmar", "Mareca strepera_Gadwall", "Morus bassanus_Gannet", "Sylvia borin_Garden Warbler", "Spatula querquedula_Garganey", "Larus hyperboreus_Glaucous Gull", "Plegadis falcinellus_Glossy Ibis", "Regulus regulus_Goldcrest", "Aquila chrysaetos_Golden Eagle", "Oriolus oriolus_Golden Oriole", "Pluvialis apricaria_Golden Plover", "Bucephala clangula_Goldeneye", "Carduelis carduelis_Goldfinch", "Mergus merganser_Goosander", "Accipiter gentilis_Goshawk", "Locustella naevia_Grasshopper Warbler", "Larus marinus_Great Black-backed Gull", "Podiceps cristatus_Great Crested Grebe", "Lanius excubitor_Great Grey Shrike", "Gavia immer_Great Northern Diver", "Stercorarius skua_Great Skua", "Dendrocopos major_Great Spotted Woodpecker", "Parus major_Great Tit", "Ardea alba_Great White Egret", "Anas carolinensis_Green-winged Teal", "Tringa ochropus_Green Sandpiper", "Picus viridis_Green Woodpecker", "Chloris chloris_Greenfinch", "Phylloscopus trochiloides_Greenish Warbler", "Tringa nebularia_Greenshank", "Ardea cinerea_Grey Heron", "Perdix perdix_Grey Partridge", "Phalaropus fulicarius_Grey Phalarope", "Pluvialis squatarola_Grey Plover", "Motacilla cinerea_Grey Wagtail", "Anser anser_Greylag Goose", "Uria aalge_Guillemot", "Gelochelidon nilotica_Gull-billed Tern", "Coccothraustes coccothraustes_Hawfinch", "Larus argentatus_Herring Gull", "Falco subbuteo_Hobby", "Pernis apivorus_Honey-buzzard", "Upupa epops_Hoopoe", "Delichon urbicum_House Martin", "Passer domesticus_House Sparrow", "Human_Human", "Phylloscopus ibericus_Iberian Chiffchaff", "Hippolais icterina_Icterine Warbler", "Lymnocryptes minimus_Jack Snipe", "Coloeus monedula_Jackdaw", "Garrulus glandarius_Jay", "Charadrius alexandrinus_Kentish Plover", "Falco tinnunculus_Kestrel", "Alcedo atthis_Kingfisher", "Rissa tridactyla_Kittiwake", "Calidris canutus_Knot", "Calcarius lapponicus_Lapland Bunting", "Vanellus vanellus_Lapwing", "Larus fuscus_Lesser Black-backed Gull", "Acanthis cabaret_Lesser Redpoll", "Dryobates minor_Lesser Spotted Woodpecker", "Sylvia curruca_Lesser Whitethroat", "Linaria cannabina_Linnet", "Ixobrychus minutus_Little Bittern", "Emberiza pusilla_Little Bunting", "Egretta garzetta_Little Egret", "Tachybaptus ruficollis_Little Grebe", "Hydrocoloeus minutus_Little Gull", "Athene noctua_Little Owl", "Charadrius dubius_Little Ringed Plover", "Calidris minuta_Little Stint", "Sternula albifrons_Little Tern", "Asio otus_Long-eared Owl", "Clangula hyemalis_Long-tailed Duck", "Stercorarius longicaudus_Long-tailed Skua", "Aegithalos caudatus_Long-tailed Tit", "Pica pica_Magpie", "Anas platyrhynchos_Mallard", "Aix galericulata_Mandarin Duck", "Puffinus puffinus_Manx Shearwater", "Circus aeruginosus_Marsh Harrier", "Poecile palustris_Marsh Tit", "Anthus pratensis_Meadow Pipit", "Ichthyaetus melanocephalus_Mediterranean Gull", "Hippolais polyglotta_Melodious Warbler", "Falco columbarius_Merlin", "Turdus viscivorus_Mistle Thrush", "Circus pygargus_Montagu's Harrier", "Gallinula chloropus_Moorhen", "Cygnus olor_Mute Swan", "Nycticorax nycticorax_Night Heron", "Luscinia megarhynchos_Nightingale", "Caprimulgus europaeus_Nightjar", "Sitta europaea_Nuthatch", "Anthus hodgsoni_Olive-backed Pipit", "Emberiza hortulana_Ortolan Bunting", "Pandion haliaetus_Osprey", "Haematopus ostralegus_Oystercatcher", "Syrrhaptes paradoxus_Pallas's Sandgrouse", "Phylloscopus proregulus_Pallas's Warbler", "Loxia pytyopsittacus_Parrot Crossbill", "Calidris melanotos_Pectoral Sandpiper", "Remiz pendulinus_Penduline Tit", "Falco peregrinus_Peregrine", "Phasianus colchicus_Pheasant", "Ficedula hypoleuca_Pied Flycatcher", "Motacilla alba_Pied Wagtail", "Anser brachyrhynchus_Pink-footed Goose", "Anas acuta_Pintail", "Aythya ferina_Pochard", "Lagopus muta_Ptarmigan", "Ardea purpurea_Purple Heron", "Calidris maritima_Purple Sandpiper", "Coturnix coturnix_Quail", "Phylloscopus schwarzi_Radde's Warbler", "Corvus corax_Raven", "Alca torda_Razorbill", "Lanius collurio_Red-backed Shrike", "Ficedula parva_Red-breasted Flycatcher", "Mergus serrator_Red-breasted Merganser", "Netta rufina_Red-crested Pochard", "Tarsiger cyanurus_Red-flanked Bluetail", "Alectoris rufa_Red-legged Partridge", "Podiceps grisegena_Red-necked Grebe", "Caprimulgus ruficollis_Red-necked Nightjar", "Phalaropus lobatus_Red-necked Phalarope", "Cecropis daurica_Red-rumped Swallow", "Gavia stellata_Red-throated Diver", "Lagopus lagopus_Red Grouse", "Milvus milvus_Red Kite", "Tringa totanus_Redshank", "Phoenicurus phoenicurus_Redstart", "Turdus iliacus_Redwing", "Emberiza schoeniclus_Reed Bunting", "Acrocephalus scirpaceus_Reed Warbler", "Anthus richardi_Richard's Pipit", "Larus delawarensis_Ring-billed Gull", "Psittacula krameri_Ring-necked Parakeet", "Turdus torquatus_Ring Ouzel", "Charadrius hiaticula_Ringed Plover", "Erithacus rubecula_Robin", "Columba livia_Rock Dove", "Anthus petrosus_Rock Pipit", "Corvus frugilegus_Rook", "Pastor roseus_Rose-coloured Starling", "Sterna dougallii_Roseate Tern", "Buteo lagopus_Rough-legged Buzzard", "Oxyura jamaicensis_Ruddy Duck", "Tadorna ferruginea_Ruddy Shelduck", "Calidris pugnax_Ruff", "Xema sabini_Sabine's Gull", "Riparia riparia_Sand Martin", "Calidris alba_Sanderling", "Thalasseus sandvicensis_Sandwich Tern", "Locustella luscinioides_Savi's Warbler", "Aythya marila_Scaup", "Loxia scotica_Scottish Crossbill", "Acrocephalus schoenobaenus_Sedge Warbler", "Calidris pusilla_Semipalmated Sandpiper", "Serinus serinus_Serin", "Tadorna tadorna_Shelduck", "Eremophila alpestris_Shore Lark", "Asio flammeus_Short-eared Owl", "Calandrella brachydactyla_Short-toed Lark", "Spatula clypeata_Shoveler", "Spinus spinus_Siskin", "Alauda arvensis_Skylark", "Podiceps auritus_Slavonian Grebe", "Gallinago gallinago_Snipe", "Plectrophenax nivalis_Snow Bunting", "Anser caerulescens_Snow Goose", "Turdus philomelos_Song Thrush", "Accipiter nisus_Sparrowhawk", "Platalea leucorodia_Spoonbill", "Porzana porzana_Spotted Crake", "Muscicapa striata_Spotted Flycatcher", "Tringa erythropus_Spotted Redshank", "Actitis macularius_Spotted Sandpiper", "Sturnus vulgaris_Starling", "Columba oenas_Stock Dove", "Burhinus oedicnemus_Stone-curlew", "Saxicola rubicola_Stonechat", "Hydrobates pelagicus_Storm Petrel", "Sylvia cantillans_Subalpine Warbler", "Hirundo rustica_Swallow", "Apus apus_Swift", "Anser fabalis_Taiga Bean Goose", "Strix aluco_Tawny Owl", "Anas crecca_Teal", "Calidris temminckii_Temminck's Stint", "Anthus trivialis_Tree Pipit", "Passer montanus_Tree Sparrow", "Certhia familiaris_Treecreeper", "Aythya fuligula_Tufted Duck", "Anser serrirostris_Tundra Bean Goose", "Arenaria interpres_Turnstone", "Streptopelia turtur_Turtle Dove", "Linaria flavirostris_Twite", "Loxia leucoptera_Two-barred Crossbill", "Vehicle_Vehicle", "Anthus spinoletta_Water Pipit", "Rallus aquaticus_Water Rail", "Bombycilla garrulus_Waxwing", "Oenanthe oenanthe_Wheatear", "Numenius phaeopus_Whimbrel", "Saxicola rubetra_Whinchat", "Anser albifrons_White-fronted Goose", "Calidris fuscicollis_White-rumped Sandpiper", "Haliaeetus albicilla_White-tailed Eagle", "Chlidonias leucopterus_White-winged Black Tern", "Ciconia ciconia_White Stork", "Sylvia communis_Whitethroat", "Cygnus cygnus_Whooper Swan", "Mareca penelope_Wigeon", "Poecile montanus_Willow Tit", "Phylloscopus trochilus_Willow Warbler", "Tringa glareola_Wood Sandpiper", "Phylloscopus sibilatrix_Wood Warbler", "Scolopax rusticola_Woodcock", "Lullula arborea_Woodlark", "Columba palumbus_Woodpigeon", "Troglodytes troglodytes_Wren", "Jynx torquilla_Wryneck", "Phylloscopus inornatus_Yellow-browed Warbler", "Larus michahellis_Yellow-legged Gull", "Motacilla flava_Yellow Wagtail", "Emberiza citrinella_Yellowhammer"];
+let BATCH_SIZE;
+const adding_chirpity_additions = false;
+let labels;
 const sqlite3 = require('sqlite3').verbose();
 const SunCalc = require('suncalc2');
 const ffmpeg = require('fluent-ffmpeg');
+const png = require('fast-png');
+const {writeFile, mkdir, readdir} = require('node:fs/promises');
 const {utimes} = require('utimes');
+const stream = require("stream");
 const file_cache = 'chirpity';
-let TEMP;
+let TEMP, appPath, CACHE_LOCATION;
 
-let db, nocmig, latitude, longitude;
+const staticFfmpeg = require('ffmpeg-static-electron');
+const {stat} = require("fs/promises");
+console.log(staticFfmpeg.path);
+ffmpeg.setFfmpegPath(staticFfmpeg.path);
 
-function createDB(file) {
-    console.log("creating database file");
-    fs.openSync(file, "w");
-    db = new sqlite3.Database(file);
-    db.serialize(() => {
-        db.run(`CREATE TABLE species
-                (
-                    id    INTEGER PRIMARY KEY,
-                    sname TEXT,
-                    cname TEXT
-                )`, function (createResult) {
-            if (createResult) throw createResult;
-        });
-        db.run(`CREATE TABLE files
-                (
-                    name      TEXT,
-                    duration  REAL,
-                    filestart INTEGER,
-                    UNIQUE (name)
-                )`, function (createResult) {
-            if (createResult) throw createResult;
-        });
-        db.run(`CREATE TABLE duration
-                (
-                    day      INTEGER,
-                    duration INTEGER,
-                    fileID   INTEGER,
-                    UNIQUE (day, fileID)
-                )`, function (createResult) {
-            if (createResult) throw createResult;
-        });
-        const stmt = db.prepare("INSERT INTO species VALUES (?, ?, ?)");
-        for (let i = 0; i < labels.length; i++) {
-            const [sname, cname] = labels[i].split('_')
-            stmt.run(i, sname, cname);
+let predictionsRequested = 0, predictionsReceived = 0;
+
+let diskDB, memoryDB, NOCMIG, latitude, longitude;
+
+const createDB = (file) => {
+    return new Promise((resolve, reject) => {
+        const archiveMode = !!file;
+        if (file) {
+            fs.openSync(file, "w");
+            diskDB = new sqlite3.Database(file);
+            console.log("Created disk database", file);
+        } else {
+            memoryDB = new sqlite3.Database(':memory:');
+            console.log("Created new in-memory database");
         }
-        stmt.finalize();
-        db.run(`CREATE TABLE records
-                (
-                    dateTime INTEGER,
-                    birdID1  INTEGER,
-                    birdID2  INTEGER,
-                    birdID3  INTEGER,
-                    conf1    REAL,
-                    conf2    REAL,
-                    conf3    REAL,
-                    fileID   INTEGER,
-                    position INTEGER,
-                    label    TEXT,
-                    comment  TEXT
+        const db = archiveMode ? diskDB : memoryDB;
+        db.serialize(() => {
+            db.run(`CREATE TABLE species
+                    (
+                        id    INTEGER PRIMARY KEY,
+                        sname TEXT,
+                        cname TEXT
+                    )`, function (createResult) {
+                if (createResult) throw createResult;
+            });
+            db.run(`CREATE TABLE files
+                    (
+                        name      TEXT,
+                        duration  REAL,
+                        filestart INTEGER,
+                        UNIQUE (name)
+                    )`, function (createResult) {
+                if (createResult) throw createResult;
+            });
+            db.run(`CREATE TABLE duration
+                    (
+                        day      INTEGER,
+                        duration INTEGER,
+                        fileID   INTEGER,
+                        UNIQUE (day, fileID)
+                    )`, function (createResult) {
+                if (createResult) throw createResult;
+            });
+
+            db.run(`CREATE TABLE records
+                    (
+                        dateTime INTEGER,
+                        birdID1  INTEGER,
+                        birdID2  INTEGER,
+                        birdID3  INTEGER,
+                        conf1    REAL,
+                        conf2    REAL,
+                        conf3    REAL,
+                        fileID   INTEGER,
+                        position INTEGER,
+                        label    TEXT,
+                        comment  TEXT,
                         UNIQUE (dateTime, fileID)
-                )`, function (createResult) {
-            if (createResult) throw createResult;
+                    )`, function (createResult) {
+                if (createResult) throw createResult;
+            });
+            const stmt = db.prepare("INSERT INTO species VALUES (?, ?, ?)");
+            for (let i = 0; i < labels.length; i++) {
+                const [sname, cname] = labels[i].split('_')
+                stmt.run(i, sname, cname);
+            }
+            stmt.finalize();
         });
-    });
-    console.log("database initialized");
-    return db;
+        resolve(db)
+    })
 }
 
 async function loadDB(path) {
-    const file = p.join(path, 'archive.sqlite');
-    if (!fs.existsSync(file)) {
-        db = createDB(file)
-
+    let db = path ? diskDB : memoryDB;
+    if (!db) {
+        if (path) {
+            const file = p.join(path, 'archive.sqlite')
+            if (!fs.existsSync(file)) {
+                await createDB(file);
+            } else {
+                diskDB = new sqlite3.Database(file);
+                console.log("Opened disk db " + file)
+            }
+        } else {
+            await createDB();
+        }
     } else {
-        db = new sqlite3.Database(file);
+        console.log('Database loaded, nothing to do')
     }
-    db.on("error", function (error) {
-        console.log("Getting an error : ", error);
-    });
+    return true
 }
 
 let metadata = {};
-let chunkStart, chunkLength, minConfidence, index = 0, AUDACITY = [], RESULTS = [], predictionStart;
+let minConfidence, index = 0, AUDACITY = [], RESULTS = [], predictionStart;
 let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
 let predictWorker, predicting = false, predictionDone = false, aborted = false;
-let useWhitelist = true;
-// We might get multiple clients, for instance if there are multiple windows,
-// or if the main window reloads.
-const isDevMode = true;
 
 // Set up the audio context:
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
@@ -104,14 +123,42 @@ const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampl
 let UI;
 let FILE_QUEUE = [];
 
-const clearCache = () => {
-    return new Promise((resolve) => {
-        // clear & recreate file cache folder
-        fs.rmSync(p.join(TEMP, file_cache), {recursive: true, force: true});
-        fs.mkdir(p.join(TEMP, file_cache), (err, path) => {
-            resolve(path);
-        })
+
+const dirSize = async dir => {
+    const files = await readdir(dir, {withFileTypes: true});
+    const atimes = [];
+    const paths = files.map(async file => {
+        const path = p.join(dir, file.name);
+        if (file.isDirectory()) return await dirSize(path);
+        if (file.isFile()) {
+            const {size, atimeMs} = await stat(path);
+            atimes.push([path, atimeMs, size]);
+            return size
+
+        }
+        return 0;
+    });
+    const size = (await Promise.all(paths)).flat(Infinity).reduce((i, size) => i + size, 0);
+    // Newest to oldest file, so we can pop the list (faster)
+    atimes.sort((a, b) => {
+        return b[1] - a[1]
     })
+
+    console.table(atimes);
+    return [size, atimes];
+}
+
+const clearCache = async (fileCache, sizeLimitInGB) => {
+    // Cache size
+    let [size, aTimes] = await dirSize(fileCache);
+    while (size > sizeLimitInGB * 1024**3) {
+        const [file, , fileSize] = aTimes.pop();
+        fs.rmSync(file, {force: true});
+        console.log('removed ' + file);
+        size -= fileSize;
+        console.log('size is now ' + size + 'bytes')
+    }
+    console.log('cache size is: ' + size)
 }
 
 ipcRenderer.on('new-client', (event) => {
@@ -121,136 +168,79 @@ ipcRenderer.on('new-client', (event) => {
         const action = args.action;
         console.log('message received ', action)
         switch (action) {
+            case 'init':
+                latitude = args.lat;
+                longitude = args.lon;
+                TEMP = args.temp;
+                appPath = args.path;
+                CACHE_LOCATION = p.join(TEMP, 'chirpity');
+                await clearCache(CACHE_LOCATION, 0);  // belt and braces - in dev mode, ctrl-c will prevent cache clear on exit
+                break;
+            case 'set-variables':
+                latitude = args.lat; longitude = args.lon; TEMP = args.temp; appPath = args.path;
+                break;
             case 'update-record':
+                args.db = diskDB;
                 await onUpdateRecord(args)
                 break;
             case 'update-file-start':
                 await onUpdateFileStart(args)
                 break;
-            case 'get-detected-species':
-                getSpecies()
+            case 'get-detected-species-list':
+                getSpecies(diskDB);
                 break;
-            case 'clear-cache':
-                console.log('cache')
-                await clearCache();
+            case 'create-dataset':
+                saveResults2DataSet(RESULTS);
                 break;
             case 'load-model':
                 UI.postMessage({event: 'spawning'});
-                await clearCache();
-                BATCH_SIZE = args.batchSize;
+                BATCH_SIZE = parseInt(args.batchSize);
                 if (predictWorker) predictWorker.terminate();
-                spawnWorker(args.useWhitelist, BATCH_SIZE);
+                spawnWorker(args.model, args.list, BATCH_SIZE, args.warmup);
                 break;
-            case 'load-db':
-                latitude = args.lat;
-                longitude = args.lon;
-                TEMP = args.temp;
-                await loadDB(args.path)
+            case 'update-model':
+                predictWorker.postMessage({message: 'list', list: args.list})
                 break;
             case 'file-load-request':
                 index = 0;
                 if (predicting) onAbort(args);
                 console.log('Worker received audio ' + args.file);
+                predictionsRequested = 0;
+                predictionsReceived = 0;
                 await loadAudioFile(args);
 
                 break;
             case 'update-buffer':
                 await loadAudioFile(args);
                 break;
-            case 'explore':
-                // reset results table
-                UI.postMessage({event: 'reset-results'});
-                const results = await getCachedResults({species: args.species, range: args.range});
-                index = 0;
-                results.forEach(result => {
-                    //format dates
-                    result.timestamp = new Date(result.timestamp);
-                    result.position = new Date(result.position);
-                    index++;
-                    UI.postMessage({
-                        event: 'prediction-ongoing',
-                        file: result.file,
-                        result: result,
-                        index: index,
-                        selection: false,
-                    });
-                    //AUDACITY.push(audacity);
-                    RESULTS.push(result);
-                })
-                console.log(`Pulling results for ${args.species} from database`);
-                // When in batch mode the 'prediction-done' event simply increments
-                // the counter for the file being processed
-                UI.postMessage({
-                    event: 'prediction-done',
-                    batchInProgress: false,
-                });
+            case 'filter':
+                await sendResults2UI(args);
                 break;
-            case 'analyze':
-                console.log(`Worker received message: ${args.confidence}, start: ${args.start}, end: ${args.end}`);
-                if (args.resetResults) {
-                    index = 0;
-                    AUDACITY = [];
-                    RESULTS = [];
-                }
-                latitude = args.lat;
-                longitude = args.lon;
-                nocmig = args.nocmig;
-                const cachedFile = await isDuplicate(args.filePath);
-                if (cachedFile && !args.selection) {
-                    // Pull the results from the database
-                    const results = await getCachedResults({file: cachedFile, range: {}});
-                    UI.postMessage({event: 'update-audio-duration', value: metadata[args.filePath].duration});
-                    results.forEach(result => {
-                        //format dates
-                        result.timestamp = new Date(result.timestamp);
-                        result.position = new Date(result.position);
-                        index++;
-                        UI.postMessage({
-                            event: 'prediction-ongoing',
-                            file: result.file,
-                            result: result,
-                            index: index,
-                            selection: false,
-                        });
-                        //AUDACITY.push(audacity);
-                        RESULTS.push(result);
-                    })
-                    console.log(`Pulling results for ${args.filePath} from database`);
-                    // When in batch mode the 'prediction-done' event simply increments
-                    // the counter for the file being processed
-                    UI.postMessage({
-                        event: 'prediction-done',
-                        batchInProgress: false,
-                    });
-                    //if (FILE_QUEUE.length) await processNextFile();
-                } else {
-                    FILE_QUEUE.push(args.filePath);
-                    console.log(`Adding ${args.filePath} to the queue.`)
-                    if (predicting) {
-
-
-                    } else {
-                        predicting = true;
-                        minConfidence = args.confidence;
-                        await processNextFile(args);
-                    }
-                }
+            case 'explore':
+                args.db = diskDB;
+                args.explore = true;
+                await sendResults2UI(args);
+                break;
+            case 'analyse':
+                predictionsReceived = 0;
+                predictionsRequested = 0;
+                await onAnalyse(args);
                 break;
             case 'save':
                 console.log("file save requested")
                 await saveMP3(args.file, args.start, args.end, args.filename, args.metadata);
                 break;
             case 'post':
-                await postMP3(args)
+                await uploadOpus(args);
                 break;
             case 'save2db':
-                onSave2DB();
+                await onSave2DB(diskDB);
                 break;
             case 'abort':
                 onAbort(args);
                 break;
             case 'chart':
-                onChartRequest(args);
+                await onChartRequest(args);
                 break;
             default:
                 UI.postMessage('Worker communication lines open')
@@ -258,7 +248,147 @@ ipcRenderer.on('new-client', (event) => {
     }
 })
 
-function onAbort(args) {
+// No need to pass through arguments object, so arrow function used.
+
+
+/**
+ * Summary SQL:
+ * select max(conf1), cname, sname, count(cname) from records inner join species on species.id = birdid1 inner join files on fileID = files.rowid  where files.name in ('/Users/matthew/Desktop/220805_1160.wav') group by cname order by max(conf1) desc;
+ *
+ *
+ * @param db
+ * @param species
+ * @param range
+ * @param filelist
+ * @returns {Promise<void>}
+ */
+
+
+const sendResults2UI = async ({
+                                  db = memoryDB,
+                                  species = undefined,
+                                  range = undefined,
+                                  filelist = undefined,
+                                  explore = false
+                              }) => {
+    // reset results table
+    UI.postMessage({event: 'reset-results'});
+    // And clear results from memory
+
+    RESULTS = [];
+    let summary;
+    let results = await getCachedResults({
+        db: db,
+        species: species,
+        range: range,
+        files: filelist
+    });
+    summary = await getCachedSummary({db: db, files: filelist, species: species, explore: explore})
+    // No results? Try the archive
+    if (!results.length && !summary.length) {
+        console.log(`No results in ${db.filename.replace(/.*\//, '')}, trying the archive db.`);
+        results = await getCachedResults({db: diskDB, species: species, range: range, files: filelist});
+        // Get the summary from the diskdb to send on prediction done
+        summary = await getCachedSummary({db: diskDB, files: filelist, species: species, explore: explore})
+    }
+    index = 0;
+    results.forEach(result => {
+        //format dates
+        //result.timestamp = new Date(result.timestamp);
+        //result.position = new Date(result.position);
+        index++;
+        UI.postMessage({
+            event: 'prediction-ongoing',
+            file: result.file,
+            result: result,
+            index: index,
+        });
+        RESULTS.push(result);
+    })
+
+    UI.postMessage({
+        event: 'prediction-done',
+        summary: summary,
+        batchInProgress: false,
+        filterSpecies: species,
+    });
+}
+
+// Not an arrow function. Async function has access to arguments - so we can pass them to processnextfile
+async function onAnalyse({
+                             files = [],
+                             confidence = 0.5,
+                             start = 0,
+                             end = undefined,
+                             resetResults = false,
+                             lat = 51,
+                             lon = -0.4,
+                             nocmig = false,
+                             reanalyse = false
+                         }) {
+    console.log(`Worker received message: ${files}, ${confidence}, start: ${start}, end: ${end}`);
+    // Analyse works on one file at a time
+    const file = files[0];
+    if (resetResults) {
+        index = 0;
+        AUDACITY = [];
+        RESULTS = [];
+        await createDB();
+    }
+    latitude = lat;
+    longitude = lon;
+    // Set global var, for parsePredictions
+    NOCMIG = nocmig;
+    FILE_QUEUE.push(file);
+    console.log(`Adding ${file} to the queue.`)
+    // check if results for the file have been saved to the disk DB
+    const cachedFile = await isDuplicate(file);
+    if (cachedFile && resetResults && !reanalyse) {
+        //remove the file from the queue - wherever it sits, this prevents out of
+        // sequence issues with batch analysis
+        const place = FILE_QUEUE.indexOf(file);
+        if (place > -1) { // only splice array when item is found
+            FILE_QUEUE.splice(place, 1); // 2nd parameter means remove one item only
+        }
+        // Pull the results from the database
+        const results = await getCachedResults({db: diskDB, files: [cachedFile], range: {}});
+        const summary = await getCachedSummary({db: diskDB, files: [cachedFile]});
+        UI.postMessage({event: 'update-audio-duration', value: metadata[cachedFile].duration});
+        results.forEach(result => {
+            //format dates
+            result.timestamp = new Date(result.timestamp);
+            //result.position = new Date(result.position);
+            index++;
+            UI.postMessage({
+                event: 'prediction-ongoing',
+                file: result.file,
+                result: result,
+                index: index,
+                resetResults: false,
+            });
+            RESULTS.push(result);
+        })
+        console.log(`Pulling results for ${file} from the memory database`);
+        // When in batch mode the 'prediction-done' event simply increments
+        // the counter for the file being processed
+        UI.postMessage({
+            event: 'prediction-done',
+            batchInProgress: false,
+            summary: summary
+        });
+        //if (FILE_QUEUE.length) await processNextFile();
+    } else if (!predicting) {
+        predicting = true;
+        minConfidence = confidence;
+        await processNextFile(arguments[0]);
+    }
+}
+
+function onAbort({
+                     model = 'efficientnet',
+                     list = 'migrants',
+                     warmup = true
+                 }) {
     aborted = true;
     FILE_QUEUE = [];
     index = 0;
@@ -267,58 +397,81 @@ function onAbort(args) {
         //restart the worker
         UI.postMessage({event: 'spawning'});
         predictWorker.terminate()
-        spawnWorker(useWhitelist, BATCH_SIZE)
-        predicting = false;
-        predictionDone = true;
+        spawnWorker(model, list, BATCH_SIZE, warmup)
     }
-    if (args.sendLabels) {
-        UI.postMessage({event: 'prediction-done', labels: AUDACITY, batchInProgress: false});
-    }
+    predicting = false;
+    predictionDone = true;
+    UI.postMessage({event: 'prediction-done', audacityLabels: AUDACITY, batchInProgress: false});
 }
 
 const getDuration = async (src) => {
+    let audio;
     return new Promise(function (resolve) {
-        const audio = new Audio();
-        audio.addEventListener("loadedmetadata", function () {
-            resolve(audio.duration);
-        });
+        audio = new Audio();
         audio.src = src;
+        audio.addEventListener("loadedmetadata", function () {
+            const duration = audio.duration
+            audio = null;
+            // Tidy up - cloning removes event listeners
+            const old_element = document.getElementById("audio");
+            const new_element = old_element.cloneNode(true);
+            old_element.parentNode.replaceChild(new_element, old_element);
+
+            resolve(duration);
+        });
     });
 }
 
-const convertFileFormat = (file, destination, size, error, progressing, finish) => {
+const convertFileFormat = (file, destination, size, error) => {
     return new Promise(function (resolve) {
+        const sampleRate = 24000, channels = 1, bitDepth = 2;
+        let totalTime, finalSizeInGB;
         ffmpeg(file)
+            .audioChannels(channels)
+            .audioFrequency(sampleRate)
             .on('error', (err) => {
                 console.log('An error occurred: ' + err.message);
-                if (error) {
+                if (err) {
                     error(err.message);
                 }
             })
+            // Handle progress % being undefined
+            .on('codecData', async data => {
+                // HERE YOU GET THE TOTAL TIME
+                totalTime = parseInt(data.duration.replace(/:/g, ''))
+                // And Final file size
+                const a = data.duration.split(':'); // split it at the colons
+                const seconds = (+a[0]) * 60 * 60 + (+a[1]) * 60 + (+a[2]);
+                // As this is uncompressed PCM we can calculate the final file size
+                // And clear space in the cache to accommodate the new file
+                finalSizeInGB = (seconds * sampleRate * channels * bitDepth) / 1024**3;
+                const limit = 4 - finalSizeInGB;
+                await clearCache(CACHE_LOCATION, limit);
+            })
             .on('progress', (progress) => {
-                console.log('Processing: ' + progress.targetSize + ' KB converted');
+                // HERE IS THE CURRENT TIME
+                const time = parseInt(progress.timemark.replace(/:/g, ''))
+
+                // AND HERE IS THE CALCULATION
+                const percent = (time / totalTime) * 100
+                console.log('Processing: ' + percent + ' % converted');
                 UI.postMessage({
                     event: 'progress',
                     text: 'Decompressing file',
-                    progress: progress.targetSize / 1073559.65
+                    progress: percent / 100
                 })
-                if (progressing) {
-                    progressing(progress.targetSize);
-                }
             })
             .on('end', () => {
                 UI.postMessage({event: 'progress', text: 'File decompressed', progress: 1.0})
-                if (finish) {
-                    resolve(destination)
-                }
+                resolve(destination)
             })
-            .save(destination);
+            .save(destination)
     });
 }
 
 /**
  * getWorkingFile called by loadAudioFile, getPredictBuffers, fetchAudioBuffer and processNextFile
- * purpose is to create a wav file from the source file. If the file *is* a wav file, it returns
+ * purpose is to create a wav file from the source file and set its metadata. If the file *is* a wav file, it returns
  * that file, else it checks for a temp wav file, if not found it calls convertFileFormat to extract
  * and create a wav file in the users temp folder and returns that file's path. The flag for this file is set in the
  * metadata object as metadata[file].proxy
@@ -327,30 +480,35 @@ const convertFileFormat = (file, destination, size, error, progressing, finish) 
  * @returns {Promise<boolean|*>}
  */
 async function getWorkingFile(file) {
-    if (metadata[file]) return metadata[file].proxy;
+    if (metadata[file] && metadata[file].isComplete) return metadata[file].proxy;
     // find the file
     const source_file = await locateFile(file);
-    let proxy = file;
+    if (!source_file) return false;
+    let proxy = source_file;
 
     if (!source_file.endsWith('.wav')) {
-        const workingFileName = source_file.replace(/.*\/(.*)\..*/, "$1.wav");
-        const destination = p.join(TEMP, file_cache, workingFileName);
-        // get some metadata from the source file
-        const statsObj = fs.statSync(source_file);
-        const sourceMtime = statsObj.mtime;
-        //console.log(Date.UTC(sourceMtime));
+        const pc = p.parse(source_file);
+        const filename = pc.base.replace(pc.ext, '.wav');
+        const destination = p.join(TEMP, file_cache, filename);
+        if (fs.existsSync(destination)) {
+            proxy = destination;
+        } else {
+            // get some metadata from the source file
+            const statsObj = fs.statSync(source_file);
+            const sourceMtime = statsObj.mtime;
 
-        proxy = await convertFileFormat(source_file, destination, statsObj.size,
-            function (errorMessage) {
-                console.log(errorMessage)
-            }, null, function () {
-                console.log("success");
-            });
-        // assign the source file's save time to the proxy file
-        await utimes(proxy, sourceMtime.getTime());
+            //console.log(Date.UTC(sourceMtime));
 
+            proxy = await convertFileFormat(source_file, destination, statsObj.size,
+                function (errorMessage) {
+                    console.log(errorMessage);
+                    return true;
+                });
+            // assign the source file's save time to the proxy file
+            await utimes(proxy, sourceMtime.getTime());
+        }
     }
-    await getMetadata(file, proxy, source_file);
+    await getMetadata({file: file, proxy: proxy, source_file: source_file});
     return proxy;
 }
 
@@ -360,45 +518,60 @@ async function getWorkingFile(file) {
  * @returns {Promise<*>}
  */
 async function locateFile(file) {
-    const supported_files = ['.wav', '.m4a', '.mp3', '.mpga', '.ogg', '.flac', '.aac', '.mpeg', '.mp4'];
+    // Ordered from the highest likely quality to lowest
+    const supported_files = ['.wav', '.flac', '.opus', '.m4a', '.mp3', '.mpga', '.ogg', '.aac', '.mpeg', '.mp4'];
     const dir = p.parse(file).dir, name = p.parse(file).name;
-    let foundFile;
-    const matchingFileExt = supported_files.find(ext => {
-        foundFile = p.join(dir, name + ext);
-        return fs.existsSync(foundFile)
+    let [, folderInfo] = await dirSize(dir);
+    let filesInFolder = [];
+    folderInfo.forEach(item =>{
+        filesInFolder.push(item[0])
+    })
+    let supportedVariants = []
+    supported_files.forEach(ext =>{
+        supportedVariants.push(p.join(dir, name + ext))
+    })
+    const matchingFileExt = supportedVariants.find(variant => {
+        const matching = (file) => variant.toLowerCase() === file.toLowerCase();
+        return filesInFolder.some(matching)
     })
     if (!matchingFileExt) {
-        return false;
-    }
-    return foundFile;
-}
-
-async function loadAudioFile(args) {
-    let file = args.file;
-    const start = args.start || 0;
-    const end = args.end || 20;
-    const position = args.position || 0;
-    await getWorkingFile(file);
-    if (file) {
-        const buffer = await fetchAudioBuffer({file: file, start: start, end: end, position: position});
-        const length = buffer.length;
-        const myArray = buffer.getChannelData(0);
-        UI.postMessage({
-            event: 'worker-loaded-audio',
-            fileStart: metadata[file].fileStart,
-            sourceDuration: metadata[file].duration,
-            bufferBegin: start,
-            file: file,
-            position: position,
-            length: length,
-            contents: myArray,
-            region: args.region
-        })
-    } else {
         UI.postMessage({
             event: 'generate-alert',
-            message: `Unable to load source file with any supported file extension: ${args.file}`
+            message: `Unable to load source file with any supported file extension: ${file}`
         })
+        return false;
+    }
+    return matchingFileExt;
+}
+
+async function loadAudioFile({
+                                 file = '',
+                                 start = 0,
+                                 end = 20,
+                                 position = 0,
+                                 region = false
+                             }) {
+    const found = await getWorkingFile(file);
+    if (found) {
+        await fetchAudioBuffer({file, start, end})
+            .then((buffer) => {
+                const length = buffer.length;
+                const myArray = buffer.getChannelData(0);
+                UI.postMessage({
+                    event: 'worker-loaded-audio',
+                    fileStart: metadata[file].fileStart,
+                    sourceDuration: metadata[file].duration,
+                    bufferBegin: start,
+                    file: file,
+                    position: position,
+                    length: length,
+                    contents: myArray,
+                    region: region
+                });
+            })
+            .catch(e => {
+                console.log('e');
+            })
     }
 }
 
@@ -412,26 +585,23 @@ function addDays(date, days) {
 /**
  * Called by getWorkingFile, setStartEnd?, getFileStart?,
  * Assigns file metadata to a metadata cache object. file is the key, and is the source file
- * proxy if required if the source file is not a wav to populate the headers
+ * proxy is required if the source file is not a wav to populate the headers
  * @param file: the file name passed to the worker
  * @param proxy: the wav file to use for predictions
  * @param source_file: the file that exists ( will be different after compression)
  * @returns {Promise<unknown>}
  */
-const getMetadata = (file, proxy, source_file) => {
-    return new Promise(async (resolve) => {
-        if (metadata[file]) {
+const getMetadata = async ({file, proxy = file, source_file = file}) => {
+    metadata[file] = {proxy: proxy};
+    // CHeck the database first, so we honour any manual update.
+    const savedMeta = await getFileInfo(file);
+    metadata[file].duration = savedMeta && savedMeta.duration ? savedMeta.duration : await getDuration(proxy);
+
+    return new Promise((resolve) => {
+        if (metadata[file] && metadata[file].isComplete) {
             resolve(metadata[file])
         } else {
-            // If we have it already, no need to do any more
-            if (!proxy) proxy = file;
-            if (!source_file) source_file = file;
             let fileStart, fileEnd;
-            metadata[file] = {proxy: proxy};
-
-            // CHeck the database first, so we honour any manual update.
-            const savedMeta = await getFileInfo(file);
-            metadata[file].duration = savedMeta && savedMeta.duration ? savedMeta.duration : await getDuration(file);
             if (savedMeta && savedMeta.filestart) {
                 fileStart = new Date(savedMeta.filestart);
                 fileEnd = new Date(fileStart.getTime() + (metadata[file].duration * 1000));
@@ -467,7 +637,7 @@ const getMetadata = (file, proxy, source_file) => {
             } else {
                 metadata[file].dawn = astro.dawn.getTime();
             }
-            // We use proxy here are the file *must* be a wav file
+            // We use proxy here as the file *must* be a wav file
             const readStream = fs.createReadStream(proxy);
             readStream.on('data', async chunk => {
                 let wav = new wavefileReader.WaveFileReader();
@@ -478,7 +648,7 @@ const getMetadata = (file, proxy, source_file) => {
                     if (el['chunkId'] === 'data') {
                         headerEnd = el.chunkData.start;
                     }
-                })
+                });
                 // Update relevant file properties
                 metadata[file].head = headerEnd;
                 metadata[file].header = chunk.slice(0, headerEnd)
@@ -487,21 +657,26 @@ const getMetadata = (file, proxy, source_file) => {
                 metadata[file].sampleRate = wav.fmt.sampleRate;
                 metadata[file].bitsPerSample = wav.fmt.bitsPerSample
                 metadata[file].fileStart = fileStart;
+                // Set complete flag
+                metadata[file].isComplete = true;
                 readStream.close()
                 resolve(metadata[file]);
+            });
+            readStream.on('error', err => {
+                console.log('readstream error:' + err)
             })
         }
     })
 }
 
-const convertTimeToBytes = async (time, key) => {
-    const bytesPerSample = metadata[key].bitsPerSample / 8;
+const convertTimeToBytes = (time, metadata) => {
+    const bytesPerSample = metadata.bitsPerSample / 8;
     // get the nearest sample start - they can be 2,3 or 4 bytes representations. Then add the header offest
-    return (Math.round((time * metadata[key].bytesPerSec) / bytesPerSample) * bytesPerSample) + metadata[key].head;
+    return (Math.round((time * metadata.bytesPerSec) / bytesPerSample) * bytesPerSample) + metadata.head;
 }
 
-async function setupCtx(chunk, file) {
-    chunk = Buffer.concat([metadata[file].header, chunk]);
+async function setupCtx(chunk, header) {
+    chunk = Buffer.concat([header, chunk]);
     const audioBufferChunk = await audioCtx.decodeAudioData(chunk.buffer);
     const source = audioCtx.createBufferSource();
     source.buffer = audioBufferChunk;
@@ -515,17 +690,66 @@ async function setupCtx(chunk, file) {
     return offlineCtx;
 }
 
-async function getPredictBuffers(args) {
-    let start = args.start, end = args.end, selection = args.selection, file = args.file;
-    //const file = await getWorkingFile(args.file);
+const getAudioBuffer = (start, end, file) => {
+    const byteStart = convertTimeToBytes(start, metadata[file]);
+    const byteEnd = convertTimeToBytes(end, metadata[file]);
+    const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * 3;
+    const proxy = metadata[file].proxy;
 
+    const readStream = fs.createReadStream(proxy, {
+        start: byteStart,
+        end: byteEnd,
+        highWaterMark: highWaterMark
+    });
+
+    readStream.on('data', async chunk => {
+        // Ensure data is processed in order
+        readStream.pause();
+        return new Promise(async (resolve, reject) => {
+            const offlineCtx = await setupCtx(chunk, metadata[file].header);
+            offlineCtx.startRendering().then(
+                (resampled) => {
+                    resolve(resampled);
+                    // Now the async stuff is done ==>
+                    readStream.resume();
+                }).catch((err) => {
+                console.error(`PredictBuffer rendering failed: ${err}`);
+                // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
+            });
+        })
+    })
+    readStream.on('end', function () {
+        readStream.close()
+    })
+    readStream.on('error', err => {
+        console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`)
+    })
+}
+/**
+ *
+ * @param file
+ * @param start
+ * @param end
+ * @param resetResults
+ * @returns {Promise<void>}
+ */
+const getPredictBuffers = async ({
+                                     file = '',
+                                     start = 0,
+                                     end = undefined,
+                                     resetResults = false
+                                 }) => {
+    //let start = args.start, end = args.end, resetResults = args.resetResults, file = args.file;
+    let chunkLength = 72000;
     // Ensure max and min are within range
     start = Math.max(0, start);
-    // Handle no start / end supplied
-    end > 0 ? end = Math.min(metadata[file].duration, end) : end = metadata[file].duration;
-    if (!start) start = 0;
-    const byteStart = await convertTimeToBytes(start, file);
-    const byteEnd = await convertTimeToBytes(end, file);
+    end = Math.min(metadata[file].duration, end);
+
+    if (start > metadata[file].duration) {
+        return
+    }
+    const byteStart = convertTimeToBytes(start, metadata[file]);
+    const byteEnd = convertTimeToBytes(end, metadata[file]);
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
     const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * 3;
     const proxy = metadata[file].proxy;
@@ -534,24 +758,36 @@ async function getPredictBuffers(args) {
         end: byteEnd,
         highWaterMark: highWaterMark
     });
-    chunkStart = start * sampleRate;
+    let chunkStart = start * sampleRate;
     //const fileDuration = end - start;
-    await readStream.on('data', async chunk => {
+    readStream.on('data', async chunk => {
         // Ensure data is processed in order
         readStream.pause();
-        const offlineCtx = await setupCtx(chunk, file);
-        offlineCtx.startRendering().then(resampled => {
-            const myArray = resampled.getChannelData(0);
-            const samples = (end - start) * sampleRate;
-            const increment = samples < chunkLength ? samples : chunkLength;
-            feedChunksToModel(myArray, increment, chunkStart, file, end, selection);
-            chunkStart += 3 * BATCH_SIZE * sampleRate;
-            // Now the async stuff is done ==>
+        if (chunk.length > 6000) { // 1/4 of a second
+            const offlineCtx = await setupCtx(chunk, metadata[file].header);
+            offlineCtx.startRendering().then(
+                (resampled) => {
+                    const myArray = resampled.getChannelData(0);
+                    const samples = parseInt(((end - start) * sampleRate).toFixed(0));
+                    const increment = samples < chunkLength ? samples : chunkLength;
+                    feedChunksToModel(myArray, increment, chunkStart, file, end, resetResults);
+                    chunkStart += 3 * BATCH_SIZE * sampleRate;
+                    // Now the async stuff is done ==>
+                    readStream.resume();
+                }).catch((err) => {
+                console.error(`PredictBuffer rendering failed: ${err}`);
+                // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
+            });
+        } else {
+            console.log('Short chunk', chunk.length, 'skipping')
             readStream.resume();
-        })
+        }
     })
     readStream.on('end', function () {
         readStream.close()
+    })
+    readStream.on('error', err => {
+        console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`)
     })
 }
 
@@ -560,20 +796,29 @@ async function getPredictBuffers(args) {
  * @param args
  * @returns {Promise<unknown>}
  */
-const fetchAudioBuffer = async (args) => {
-    let start = args.start, end = args.end, file = args.file;
-    await getWorkingFile(file);
-    return new Promise(async (resolve) => {
+const fetchAudioBuffer = async ({
+                                    file = '',
+                                    start = 0,
+                                    end = metadata[file].duration
+                                }) => {
+    if (end - start < 0.1) return  // prevents dataset creation barfing with  v. short buffers
+    const proxy = await getWorkingFile(file);
+    if (!proxy) return false
+    return new Promise(async (resolve, reject) => {
         // Ensure max and min are within range
-        start = Math.max(0, start);
+        //start = Math.max(0, start);
         // Handle no end supplied
-        end = Math.min(metadata[file].duration, end);
-        const byteStart = await convertTimeToBytes(start, file);
-        const byteEnd = await convertTimeToBytes(end, file);
-        //if (isNaN(byteEnd)) byteEnd = Infinity;
+        //end = Math.min(metadata[file].duration, end);
+
+        const byteStart = convertTimeToBytes(start, metadata[file]);
+        const byteEnd = convertTimeToBytes(end, metadata[file]);
+
+        if (byteEnd < byteStart) {
+            console.log(`!!!!!!!!!!!!! End < start encountered for ${file}, end was ${end} start is ${start}`)
+        }
         // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
         const highWaterMark = byteEnd - byteStart + 1;
-        const proxy = metadata[file].proxy;
+
         const readStream = fs.createReadStream(proxy, {
             start: byteStart,
             end: byteEnd,
@@ -582,7 +827,7 @@ const fetchAudioBuffer = async (args) => {
         readStream.on('data', async chunk => {
             // Ensure data is processed in order
             readStream.pause();
-            const offlineCtx = await setupCtx(chunk, file);
+            const offlineCtx = await setupCtx(chunk, metadata[file].header);
 
             offlineCtx.startRendering().then(resampled => {
                 // `resampled` contains an AudioBuffer resampled at 24000Hz.
@@ -590,82 +835,155 @@ const fetchAudioBuffer = async (args) => {
                 //readStream.close();
                 readStream.resume();
                 resolve(resampled);
-            })
+            }).catch((err) => {
+                console.error(`FetchAudio rendering failed: ${err}`);
+                // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
+            });
         })
 
         readStream.on('end', function () {
             readStream.close()
         })
+        readStream.on('error', err => {
+            console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`)
+        })
     });
 }
 
-async function sendMessageToWorker(chunkStart, chunks, file, duration, selection) {
+function sendMessageToWorker(chunkStart, chunks, file, duration, resetResults, predictionsRequested) {
+    const finalChunk = chunkStart / sampleRate + (chunks.length * 3) >= (duration - 3);
+
     const objData = {
         message: 'predict',
-        chunkStart: chunkStart,
-        numberOfChunks: chunks.length,
         fileStart: metadata[file].fileStart,
         file: file,
         duration: duration,
-        selection: selection
+        resetResults: resetResults,
+        finalChunk: finalChunk,
+        predictionsRequested: predictionsRequested
     }
-    let chunkBuffers = [];
-    for (let i = 0; i < chunks.length; i++) {
-        objData['chunk' + i] = chunks[i];
-        chunkBuffers.push(objData['chunk' + i].buffer)
-    }
+    let chunkBuffers = {};
+    // Key chunks by their position
+    let position = chunkStart;
+    chunks.forEach(chunk => {
+        chunkBuffers[position] = chunk;
+        position += sampleRate * 3;
+    })
+    objData['chunks'] = chunkBuffers;
     predictWorker.postMessage(objData, chunkBuffers);
 }
 
-async function doPrediction(args) {
-    const start = args.start, end = args.end, file = args.file, selection = args.selection;
-    aborted = false;
+async function doPrediction({
+                                file = '',
+                                start = 0,
+                                end = metadata[file].duration,
+                                resetResults = false
+                            }) {
     predictionDone = false;
     predictionStart = new Date();
-    if (!args.preserveResults && !selection) {
+    if (resetResults) {
         index = 0;
         AUDACITY = [];
         RESULTS = [];
     }
     predicting = true;
-    await getPredictBuffers({file: file, start: start, end: end, selection: selection});
+    await getPredictBuffers({file: file, start: start, end: end, resetResults: resetResults});
     UI.postMessage({event: 'update-audio-duration', value: metadata[file].duration});
 }
 
-async function feedChunksToModel(channelData, increment, chunkStart, file, duration, selection) {
+function feedChunksToModel(channelData, increment, chunkStart, file, duration, resetResults) {
     let chunks = [];
     for (let i = 0; i < channelData.length; i += increment) {
         let chunk = channelData.slice(i, i + increment);
         // Batch predictions
+        predictionsRequested++;
         chunks.push(chunk);
         if (chunks.length === BATCH_SIZE) {
-            await sendMessageToWorker(chunkStart, chunks, file, duration, selection);
+            sendMessageToWorker(chunkStart, chunks, file, duration, resetResults, predictionsRequested);
             chunks = [];
+            //chunkStart += 3 * BATCH_SIZE * sampleRate;
         }
     }
     //clear up remainder less than BATCH_SIZE
-    if (chunks.length) await sendMessageToWorker(chunkStart, chunks, file, duration, selection);
+    if (chunks.length) sendMessageToWorker(chunkStart, chunks, file, duration, resetResults, predictionsRequested);
 }
 
-
-function downloadMp3(buffer, filePath, metadata) {
-    const MP3Blob = analyzeAudioBuffer(buffer, metadata);
-    const anchor = document.createElement('a');
-    document.body.appendChild(anchor);
-    anchor.style = 'display: none';
-    const url = window.URL.createObjectURL(MP3Blob);
-    anchor.href = url;
-    anchor.download = filePath;
-    anchor.click();
-    window.URL.revokeObjectURL(url);
+const speciesMatch = (path, sname) => {
+    const pathElements = path.split(p.sep);
+    const species = pathElements[pathElements.length - 2];
+    sname = sname.replaceAll(' ', '_');
+    return species.includes(sname)
 }
 
-function uploadMp3(buffer, defaultName, metadata, mode) {
-    const MP3Blob = analyzeAudioBuffer(buffer, metadata);
+const saveResults2DataSet = (results, rootDirectory) => {
+    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/Amendment_temp_folder';
+    let promise = Promise.resolve();
+    let count = 0;
+    const t0 = Date.now();
+    results.forEach(result => {
+        // Check for level of ambient noise activation
+        let ambient, threshold, value = 0.25;
+        // adding_chirpity_additions is a flag for curated files, if true we assume every detection is correct
+        if (!adding_chirpity_additions) {
+            ambient = (result.sname2 === 'Ambient Noise' ? result.score2 : result.sname3 === 'Ambient Noise' ? result.score3 : false)
+            console.log('Ambient', ambient)
+            // If we have a high level of ambient noise activation, insist on a high threshold for species detection
+            if (ambient && ambient > 0.2) {
+                value = 0.7
+            }
+            // Check whether top predicted species matches folder (i.e. the searched for species)
+            // species not matching the top prediction sets threshold to 2, effectively doing nothing with results
+            // that don't match the searched for species
+            threshold = speciesMatch(result.file, result.sname) ? value : 2.0;
+        } else {
+            threshold = 0;
+        }
+        promise = promise.then(async function (resolve) {
+            if (result.score >= threshold) {
+                const AudioBuffer = await fetchAudioBuffer({
+                    start: result.start,
+                    end: result.end,
+                    file: result.file
+                })
+                if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
+                    const buffer = AudioBuffer.getChannelData(0);
+                    const [_, folder] = p.dirname(result.file).match(/^.*\/(.*)$/)
+                    // filename format: <source file>_<confidence>_<start>.png
+                    const file = `${p.basename(result.file).replace(p.extname(result.file), '')}_${result['score'].toFixed(2)}_${result.start}-${result.end}.png`;
+                    const filepath = p.join(rootDirectory, folder)
+                    predictWorker.postMessage({
+                        message: 'get-spectrogram',
+                        filepath: filepath,
+                        file: file,
+                        buffer: buffer
+                    })
+                    count++;
+                }
+            }
+            return new Promise(function (resolve) {
+                setTimeout(resolve, 5);
+            });
+        })
+    })
+    promise.then(() => {
+        console.log(`Dataset created. ${count} files saved in ${(Date.now() - t0) / 1000} seconds`);
+    })
+}
+
+const onSpectrogram = async (filepath, file, width, height, data, channels) => {
+    await mkdir(filepath, {recursive: true});
+    let image = await png.encode({width: width, height: height, data: data, channels: channels})
+    const file_to_save = p.join(filepath, file);
+    await writeFile(file_to_save, image);
+    console.log('saved:', file_to_save);
+};
+
+async function uploadOpus({file, start, end, defaultName, metadata, mode}) {
+    const Blob = await bufferToAudio({file: file, start: start, end: end, format: 'opus', meta: metadata});
 // Populate a form with the file (blob) and filename
-    var formData = new FormData();
+    const formData = new FormData();
     //const timestamp = Date.now()
-    formData.append("thefile", MP3Blob, defaultName);
+    formData.append("thefile", Blob, defaultName);
     // Was the prediction a correct one?
     formData.append("Chirpity_assessment", mode);
 // post form data
@@ -680,261 +998,248 @@ function uploadMp3(buffer, defaultName, metadata, mode) {
     xhr.send(formData);
 }
 
-function analyzeAudioBuffer(aBuffer, metadata) {
-    let numOfChan = aBuffer.numberOfChannels,
-        btwLength = aBuffer.length * numOfChan * 2 + 44,
-        btwArrBuff = new ArrayBuffer(btwLength),
-        btwView = new DataView(btwArrBuff),
-        btwChnls = [],
-        btwIndex,
-        btwSample,
-        btwOffset = 0,
-        btwPos = 0;
-    setUint32(0x46464952); // "RIFF"
-    setUint32(btwLength - 8); // file length - 8
-    setUint32(0x45564157); // "WAVE"
-    setUint32(0x20746d66); // "fmt " chunk
-    setUint32(16); // length = 16
-    setUint16(1); // PCM (uncompressed)
-    setUint16(numOfChan);
-    setUint32(aBuffer.sampleRate);
-    setUint32(aBuffer.sampleRate * 2 * numOfChan); // avg. bytes/sec
-    setUint16(numOfChan * 2); // block-align
-    setUint16(16); // 16-bit
-    setUint32(0x61746164); // "data" - chunk
-    setUint32(btwLength - btwPos - 4); // chunk length
-
-    for (btwIndex = 0; btwIndex < aBuffer.numberOfChannels; btwIndex++)
-        btwChnls.push(aBuffer.getChannelData(btwIndex));
-
-    while (btwPos < btwLength) {
-        for (btwIndex = 0; btwIndex < numOfChan; btwIndex++) {
-            // interleave btwChnls
-            btwSample = Math.max(-1, Math.min(1, btwChnls[btwIndex][btwOffset])); // clamp
-            btwSample = (0.5 + btwSample < 0 ? btwSample * 32768 : btwSample * 32767) | 0; // scale to 16-bit signed int
-            btwView.setInt16(btwPos, btwSample, true); // write 16-bit sample
-            btwPos += 2;
+const bufferToAudio = ({
+                           file = '',
+                           start = 0,
+                           end = 3,
+                           format = 'opus',
+                           meta = {}
+                       }) => {
+    let audioCodec, soundFormat, mimeType;
+    if (format === 'opus') {
+        audioCodec = 'libopus';
+        soundFormat = 'opus'
+        mimeType = 'audio/ogg'
+    } else if (format === 'mp3') {
+        audioCodec = 'libmp3lame';
+        soundFormat = 'mp3';
+        mimeType = 'audio/mpeg'
+    }
+    let optionList = [];
+    for (let [k, v] of Object.entries(meta)) {
+        if (typeof v === 'string') {
+            v = v.replaceAll(' ', '_');
         }
-        btwOffset++; // next source sample
+        optionList.push('-metadata');
+        optionList.push(`${k}=${v}`);
     }
-
-    let wavHdr = lamejs.WavHeader.readHeader(new DataView(btwArrBuff));
-
-    //Stereo
-    let data = new Int16Array(btwArrBuff, wavHdr.dataOffset, wavHdr.dataLen / 2);
-    let leftData = [];
-    let rightData = [];
-    for (let i = 0; i < data.length; i += 2) {
-        leftData.push(data[i]);
-        rightData.push(data[i + 1]);
-    }
-    var left = new Int16Array(leftData);
-    var right = new Int16Array(rightData);
-
-
-    //STEREO
-    if (wavHdr.channels === 2)
-        return bufferToMp3(metadata, wavHdr.channels, wavHdr.sampleRate, left, right);
-    //MONO
-    else if (wavHdr.channels === 1)
-        return bufferToMp3(metadata, wavHdr.channels, wavHdr.sampleRate, data);
-
-
-    function setUint16(data) {
-        btwView.setUint16(btwPos, data, true);
-        btwPos += 2;
-    }
-
-    function setUint32(data) {
-        btwView.setUint32(btwPos, data, true);
-        btwPos += 4;
-    }
-}
-
-function bufferToMp3(metadata, channels, sampleRate, left, right = null) {
-    var buffer = [];
-    var mp3enc = new lamejs.Mp3Encoder(channels, sampleRate, 192);
-    var remaining = left.length;
-    var samplesPerFrame = 1152;
-    if (metadata) {
-        //const ID3content = JSON.stringify(metadata)
-        // Add metadata
-        const writer = new ID3Writer(Buffer.alloc(0));
-        writer.setFrame('TPE1', [metadata['cname']])  // Artist Name
-            .setFrame('TIT3', metadata['sname'])
-            .setFrame('TPE2', [metadata['cname2'], metadata['cname3']])  // Contributing Artists
-            .setFrame('TCON', ['Nocmig']) // Genre
-            .setFrame('TPUB', 'Chirpity Nocmig ' + metadata['version']) // Publisher
-            .setFrame('TYER', new Date().getFullYear()) // Year
-            .setFrame('TXXX', {
-                description: 'ID Confidence',
-                value: parseFloat(parseFloat(metadata['score']) * 100).toFixed(0) + '%'
+    return new Promise(function (resolve) {
+        const bufferStream = new stream.PassThrough();
+        const command = ffmpeg(metadata[file].proxy)
+            .seekInput(start)
+            .duration(end - start)
+            .audioBitrate(160)
+            .audioChannels(1)
+            .audioFrequency(24000)
+            .audioCodec(audioCodec)
+            .format(soundFormat)
+            .outputOptions(optionList)
+            .on('error', (err) => {
+                console.log('An error occurred: ' + err.message);
             })
-            .setFrame('TXXX', {
-                description: 'Time of detection',
-                value: metadata['date']
+            .on('end', function () {
+                console.log(format + " file rendered")
             })
-            .setFrame('TXXX', {
-                description: 'Latitude',
-                value: metadata['lat']
-            })
-            .setFrame('TXXX', {
-                description: 'Longitude',
-                value: metadata['lon']
-            })
-            .setFrame('TXXX', {
-                description: '2nd',
-                value: metadata['cname2'] + ' (' + parseFloat(parseFloat(metadata['score2']) * 100).toFixed(0) + '%)'
-            })
-            .setFrame('TXXX', {
-                description: '3rd',
-                value: metadata['cname3'] + ' (' + parseFloat(parseFloat(metadata['score']) * 100).toFixed(0) + '%)'
-            })
-            .setFrame('TXXX', {
-                description: 'UUID',
-                value: metadata['UUID'],
-            });
-        writer.addTag();
-        buffer.push(writer.arrayBuffer)
-    }
-    for (let i = 0; remaining >= samplesPerFrame; i += samplesPerFrame) {
-        let mp3buf
-        if (!right) {
-            var mono = left.subarray(i, i + samplesPerFrame);
-            mp3buf = mp3enc.encodeBuffer(mono);
-        } else {
-            var leftChunk = left.subarray(i, i + samplesPerFrame);
-            var rightChunk = right.subarray(i, i + samplesPerFrame);
-            mp3buf = mp3enc.encodeBuffer(leftChunk, rightChunk);
-        }
-        if (mp3buf.length > 0) {
-            buffer.push(mp3buf);//new Int8Array(mp3buf));
-        }
-        remaining -= samplesPerFrame;
-    }
-    var d = mp3enc.flush();
-    if (d.length > 0) {
-        buffer.push(new Int8Array(d));
-    }
-    return new Blob(buffer, {type: 'audio/mpeg'});
+            .writeToStream(bufferStream);
 
+        const buffers = [];
+        bufferStream.on('data', (buf) => {
+            buffers.push(buf);
+        })
+        bufferStream.on('end', function () {
+            const outputBuffer = Buffer.concat(buffers);
+            let audio = [];
+            audio.push(new Int8Array(outputBuffer))
+            const blob = new Blob(audio, {type: mimeType});
+            resolve(blob);
+        });
+    })
 }
 
 async function saveMP3(file, start, end, filename, metadata) {
-    const buffer = await fetchAudioBuffer({file: file, start: start, end: end})
-    downloadMp3(buffer, filename, metadata)
-}
-
-
-async function postMP3(args) {
-    const file = args.file, defaultName = args.defaultName, start = args.start, end = args.end,
-        metadata = args.metadata, mode = args.mode;
-    const buffer = await fetchAudioBuffer({file: file, start: start, end: end});
-    uploadMp3(buffer, defaultName, metadata, mode)
+    const MP3Blob = await bufferToAudio({
+        file: file,
+        start: start,
+        end: end,
+        format: 'mp3',
+        meta: metadata
+    });
+    const anchor = document.createElement('a');
+    document.body.appendChild(anchor);
+    anchor.style = 'display: none';
+    const url = window.URL.createObjectURL(MP3Blob);
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
 }
 
 
 /// Workers  From the MDN example
-function spawnWorker(useWhitelist, batchSize) {
-    console.log('spawning worker')
+function spawnWorker(model, list, batchSize, warmup) {
+    console.log(`spawning worker with ${list}, ${batchSize}, ${warmup}`)
     predictWorker = new Worker('./js/model.js');
-    predictWorker.postMessage(['load', appPath, useWhitelist, batchSize])
+    //const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
+    const modelPath = model === 'efficientnet' ? '../test_big_3/' : '../24000_v9/';
+    console.log(modelPath);
+    // Now we've loaded a new model, clear the aborted flag
+    aborted = false;
+    predictWorker.postMessage(['load', modelPath, list, batchSize, warmup])
     predictWorker.onmessage = async (e) => {
-        await parsePredictions(e)
+        await parseMessage(e)
     }
 }
 
-async function parsePredictions(e) {
+const parsePredictions = (response) => {
+    let file, batchInProgress = false;
+    response['result'].forEach(prediction => {
+        predictionsReceived = response['predictionsReceived'];
+        const position = parseFloat(prediction[0]);
+        const result = prediction[1];
+        file = result.file
+        const audacity = prediction[2];
+        UI.postMessage({event: 'progress', progress: (position / metadata[file].duration), file: file});
+        //console.log('Prediction received from worker', result);
+        if (result.score > minConfidence) {
+            index++;
+            UI.postMessage({
+                event: 'prediction-ongoing',
+                file: file,
+                result: result,
+                index: index,
+                resetResults: response['resetResults'],
+            });
+            AUDACITY.push(audacity);
+            RESULTS.push(result);
+        }
+    })
+    if (response.finished) {
+        if (RESULTS.length === 0) {
+            const result = "No predictions.";
+            UI.postMessage({
+                event: 'prediction-ongoing',
+                file: file,
+                result: result,
+                index: 1,
+                resetResults: response['resetResults']
+            });
+        }
+        console.log(`Prediction done ${FILE_QUEUE.length} files to go`);
+        console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
+        UI.postMessage({event: 'progress', progress: 1.0, text: '...'});
+        batchInProgress = FILE_QUEUE.length ? true : predictionsRequested - predictionsReceived;
+        predictionDone = true;
+    }
+    return [file, batchInProgress]
+}
+
+async function parseMessage(e) {
     const response = e.data;
-    // Restore Original file path
-    const file = response.file;
     if (response['message'] === 'model-ready') {
-        chunkLength = response['chunkLength'];
+        const chunkLength = response['chunkLength'];
         sampleRate = response['sampleRate'];
         const backend = response['backend'];
         console.log(backend);
-        UI.postMessage({event: 'model-ready', message: 'ready', backend: backend})
+        UI.postMessage({event: 'model-ready', message: 'ready', backend: backend, labels: labels})
+    } else if (response['message'] === 'labels') {
+        labels = response['labels'];
+        // Now we have what we need to populate a database...
+        const t0 = Date.now();
+        // Create in-memory database
+        await loadDB();
+        // Load the archive one too
+        await loadDB(appPath);
+        await dbSpeciesCheck();
+        console.log(`Databases loaded in ${(Date.now() - t0)} milliseconds.`);
     } else if (response['message'] === 'prediction' && !aborted) {
         // add filename to result for db purposes
-        response['result'].forEach(prediction => {
-            const position = parseFloat(prediction[0]);
-            const result = prediction[1];
-            result.file = file;
-            const audacity = prediction[2];
-            UI.postMessage({event: 'progress', progress: (position / metadata[file].duration)});
-            //console.log('Prediction received from worker', result);
-            if (result.score > minConfidence) {
-                index++;
+        let [file, batchInProgress] = parsePredictions(response);
+        if (response['finished']) {
+            process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, Prediction requests ${predictionsRequested}, predictions received ${predictionsReceived}    \r`)
+            if (predictionsReceived === predictionsRequested) {
+                // This is the one time results *do not* come from the database
+                let summary;
+                if (!batchInProgress) {
+                    await onSave2DB(memoryDB);
+                    summary = await getCachedSummary();
+                }
                 UI.postMessage({
-                    event: 'prediction-ongoing',
+                    event: 'prediction-done',
                     file: file,
-                    result: result,
-                    index: index,
-                    selection: response['selection'],
-                });
-                AUDACITY.push(audacity);
-                RESULTS.push(result);
+                    summary: summary,
+                    audacityLabels: AUDACITY,
+                    batchInProgress: batchInProgress,
+                })
+                //await onSave2DB(memoryDB);
             }
-            // 3.5 seconds subtracted because position is the beginning of a 3-second chunk and
-            // the min fragment length is 0.5 seconds
-            if (position.toFixed(0) >= (response.endpoint.toFixed(0) - 3.5)) {
-                console.log(`Prediction done ${FILE_QUEUE.length} files to go`);
-                console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
-                if (RESULTS.length === 0) {
-                    const result = "No detections found.";
+            await processNextFile();
+        }
+    } else if (response['message'] === 'spectrogram') {
+        await onSpectrogram(response['filepath'],
+            response['file'],
+            response['width'],
+            response['height'],
+            response['image'],
+            response['channels'])
+    }
+}
+
+// Optional Arguments
+async function processNextFile({
+                                   confidence = 0.5,
+                                   start = undefined,
+                                   end = undefined,
+                                   resetResults = false,
+                                   lat = 51,
+                                   lon = -0.4,
+                                   nocmig = NOCMIG
+                               } = {}) {
+    if (FILE_QUEUE.length) {
+        let file = FILE_QUEUE.shift()
+        const found = await getWorkingFile(file);
+        if (found) {
+            if (!start) [start, end] = await setStartEnd(file);
+            if (start === 0 && end === 0) {
+                // Nothing to do for this file
+                const result = "No predictions.";
+                if (!FILE_QUEUE.length) {
                     UI.postMessage({
                         event: 'prediction-ongoing',
                         file: file,
                         result: result,
-                        index: 1,
-                        selection: response['selection']
+                        index: -1,
+                        resetResults: false,
                     });
                 }
-                UI.postMessage({event: 'progress', progress: 1});
-                if (!predictionDone) {
-                    UI.postMessage({
-                        event: 'prediction-done',
-                        file: file,
-                        labels: AUDACITY,
-                        batchInProgress: FILE_QUEUE.length,
-                    });
-                }
-                predictionDone = true;
+                UI.postMessage({
+                    event: 'prediction-done',
+                    file: file,
+                    audacityLabels: AUDACITY,
+                    batchInProgress: FILE_QUEUE.length
+                });
+                await processNextFile(arguments[0]);
+            } else {
+                await doPrediction({
+                    start: start,
+                    end: end,
+                    file: file,
+                    resetResults: resetResults,
+                });
             }
-        })
-    }
-    if (predictionDone) {
-        await processNextFile();
-    }
-}
-
-async function processNextFile(args) {
-    if (FILE_QUEUE.length) {
-        let file = FILE_QUEUE.shift()
-        await getWorkingFile(file);
-        let [start, end] = args ? [args.start, args.end] : await setStartEnd(file);
-        if (start === 0 && end === 0) {
-            // Nothing to do for this file
-            UI.postMessage({
-                event: 'prediction-done',
-                file: file,
-                labels: AUDACITY,
-                batchInProgress: FILE_QUEUE.length,
-            });
-            await processNextFile();
         } else {
-            await doPrediction({start: start, end: end, file: file, selection: false, preserveResults: true});
+            await processNextFile(arguments[0]);
         }
     } else {
         predicting = false;
+        return true
+        //await onSave2DB(memoryDB);
     }
 }
 
 async function setStartEnd(file) {
-    //const metadata = await getMetadata(file);
     const meta = metadata[file];
     let start, end;
-    if (nocmig) {
+    if (NOCMIG) {
         const fileEnd = meta.fileStart + (meta.duration * 1000);
         // If it's dark at the file start, start at 0 ...otherwise start at dusk
         if (meta.fileStart < meta.dawn || meta.fileStart > meta.dusk) {
@@ -962,18 +1267,97 @@ async function setStartEnd(file) {
 
 let t1, t0;
 
-const getCachedResults = (args) => {
-    let where;
-    const dateRange = args.range;
-    if (args.file) where = `files.name =  '${args.file.replace("'", "''")}'`;
-    if (args.species) where = `s1.cname =  '${args.species.replace("'", "''")}'`;
-    const when = dateRange.start ? `AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
+const setWhereWhen = ({dateRange, species, files, context}) => {
+    let where = '';
+    if (files.length) {
+        where = 'WHERE files.name IN  (';
+        // Format the file list
+        files.forEach(file => {
+            file = file.replaceAll("'", "''");
+            where += `'${file}',`
+        })
+        // remove last comma
+        where = where.slice(0, -1);
+        where += ')';
+    }
+    const cname = context === 'results' ? 's1.cname' : 'cname';
+    if (species) where += `${files.length ? ' AND ' : ' WHERE '} ${cname} =  '${species.replaceAll("'", "''")}'`;
+    const when = dateRange && dateRange.start ? `AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
+    return [where, when]
+}
+
+
+const getCachedSummary = ({
+                              db = memoryDB,
+                              range = undefined,
+                              files = [],
+                              species = undefined,
+                              explore = false
+                          } = {}) => {
+    const [where, when] = setWhereWhen({
+        dateRange: range,
+        species: explore ? species : undefined,
+        files: files,
+        context: 'summary'
+    });
+    return new Promise(function (resolve, reject) {
+        db.all(`SELECT MAX(conf1) as max, cname, sname, COUNT(cname) as count
+                FROM records
+                    INNER JOIN species
+                ON species.id = birdid1
+                    INNER JOIN files ON fileID = files.rowid
+                    ${where} ${when}
+                GROUP BY cname
+                ORDER BY max (conf1) DESC;`,
+            (err, rows) => {
+                if (err) {
+                    reject(err)
+                } else {
+                    resolve(rows)
+                }
+            })
+    })
+}
+
+
+const dbSpeciesCheck = () => {
+    return new Promise(function (resolve, reject) {
+        diskDB.get(`SELECT COUNT(*) as speciesCount
+                    FROM species`, (err, row) => {
+            if (row) {
+                if (parseInt(row.speciesCount) !== labels.length) {
+                    UI.postMessage({
+                        event: 'generate-alert',
+                        message: `Warning:\nThe ${row.speciesCount} species in the archive database does not match the ${labels.length} species being used by the model.`
+                    })
+                    resolve(false)
+                }
+                resolve(row.speciesCount)
+            } else {
+                reject(err)
+            }
+        })
+    })
+}
+
+const getCachedResults = ({
+                              db = undefined,
+                              range = undefined,
+                              files = [],
+                              species = undefined,
+                          }) => {
+    const [where, when] = setWhereWhen({
+        dateRange: range,
+        species: species,
+        files: files,
+        context: 'results'
+    });
     return new Promise(function (resolve, reject) {
         db.all(`SELECT dateTime AS timestamp, position AS position, 
             s1.cname as cname, s2.cname as cname2, s3.cname as cname3, 
             birdid1 as id_1, birdid2 as id_2, birdid3 as id_3, 
-            position / 1000 as
-                start, (position / 1000) + 3 as
+            position as
+                start, position + 3 as
                 end
                 ,  
                 conf1 as score, conf2 as score2, conf3 as score3, 
@@ -986,8 +1370,7 @@ const getCachedResults = (args) => {
                 LEFT JOIN species s1 on s1.id = birdid1 
                 LEFT JOIN species s2 on s2.id = birdid2 
                 LEFT JOIN species s3 on s3.id = birdid3 
-                INNER JOIN files on files.rowid = records.fileid 
-                WHERE
+                INNER JOIN files on files.rowid = records.fileid
                 ${where}
                 ${when}`,
             (err, rows) => {
@@ -1000,14 +1383,12 @@ const getCachedResults = (args) => {
     })
 }
 
-const isDuplicate = (file) => {
-    //return false
-    //if (metadata[file]) return file
+const isDuplicate = async (file) => {
     const baseName = file.replace(/^(.*)\..*$/g, '$1').replace("'", "''");
-    return new Promise((resolve) => {
-        db.get(`SELECT *
-                FROM files
-                WHERE name LIKE '${baseName}%'`, (err, row) => {
+    return new Promise(async (resolve) => {
+        diskDB.get(`SELECT *
+                    FROM files
+                    WHERE name LIKE '${baseName}%'`, (err, row) => {
             if (row) {
                 metadata[row.name] = {fileStart: row.filestart, duration: row.duration}
                 resolve(row.name)
@@ -1016,17 +1397,13 @@ const isDuplicate = (file) => {
     })
 }
 
-function getKeyByValue(object, value) {
-    return Object.keys(object).find(key => object[key] === value);
-}
-
 const getFileInfo = async (file) => {
-    // look for file, ignore extension
+    // look for file in the disk DB, ignore extension
     const baseName = file.replace(/^(.*)\..*$/g, '$1').replace("'", "''");
     return new Promise(function (resolve, reject) {
-        db.get(`SELECT *
-                FROM files
-                WHERE name LIKE '${baseName}%'`, (err, row) => {
+        diskDB.get(`SELECT *
+                    FROM files
+                    WHERE name LIKE '${baseName}%'`, (err, row) => {
             if (err) console.log('There was an error ', err)
             else {
                 resolve(row)
@@ -1035,7 +1412,8 @@ const getFileInfo = async (file) => {
     })
 }
 
-const updateFileTables = async (file) => {
+const updateFileTables = async (db, file) => {
+    if (!metadata[file] || !metadata[file].isComplete) await getWorkingFile(file);
     return new Promise(function (resolve) {
         const newFileStmt = db.prepare("INSERT INTO files VALUES (?,?,?)");
         const selectStmt = db.prepare('SELECT rowid FROM files WHERE name = (?)');
@@ -1053,41 +1431,76 @@ const updateFileTables = async (file) => {
     })
 }
 
-const onSave2DB = async () => {
-    t0 = performance.now();
-    db.run('BEGIN TRANSACTION');
-    const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-    let filemap = {}
-    for (let i = 0; i < RESULTS.length; i++) {
-        const dateTime = new Date(RESULTS[i].timestamp).getTime();
-        const birdID1 = RESULTS[i].id_1;
-        const birdID2 = RESULTS[i].id_2;
-        const birdID3 = RESULTS[i].id_3;
-        const conf1 = RESULTS[i].score;
-        const conf2 = RESULTS[i].score2;
-        const conf3 = RESULTS[i].score3;
-        const position = new Date(RESULTS[i].position).getTime();
-        const file = RESULTS[i].file;
-        const comment = RESULTS[i].comment;
-        const label = RESULTS[i].label;
-        if (!filemap[file]) filemap[file] = await updateFileTables(file);
-        stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, filemap[file], position, comment, label,
-            (err, row) => {
-                UI.postMessage({event: 'progress', text: "Updating Database.", progress: i / RESULTS.length});
-                if (i === (RESULTS.length - 1)) {
-                    db.run('COMMIT', (err, rows) => {
-                        console.log(`Update complete, ${i + 1} records added in ${((performance.now() - t0) / 1000).toFixed(5)} seconds`)
-                        UI.postMessage({event: 'progress', progress: 1});
-                    });
+const getFileIDs = (db) => {
+    return new Promise(function (resolve, reject) {
+        db.all('SELECT rowid, name FROM files',
+            (err, rows) => {
+                if (err) {
+                    reject(err)
+                } else {
+                    let filemap = {};
+                    rows.forEach(row => {
+                        filemap[row.name] = row.rowid
+                    })
+                    resolve(filemap)
                 }
-            });
-    }
+            })
+    })
 }
 
-const getSeasonRecords = (species, season) => {
-    const seasonMonth = {'spring': "< '07'", 'autumn': " > '06'"}
+const onSave2DB = async (db) => {
+    t0 = performance.now();
+    return new Promise(async function (resolve, reject) {
+        if (RESULTS.length) {
+            let filemap = await getFileIDs(db)
+            db.run('BEGIN TRANSACTION');
+            const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+            for (let i = 0; i < RESULTS.length; i++) {
+                const dateTime = new Date(RESULTS[i].timestamp).getTime();
+                const birdID1 = RESULTS[i].id_1;
+                const birdID2 = RESULTS[i].id_2;
+                const birdID3 = RESULTS[i].id_3;
+                const conf1 = RESULTS[i].score;
+                const conf2 = RESULTS[i].score2;
+                const conf3 = RESULTS[i].score3;
+                const position = RESULTS[i].position;
+                const file = RESULTS[i].file;
+                const comment = RESULTS[i].comment;
+                const label = RESULTS[i].label;
+                if (!filemap[file]) filemap[file] = await updateFileTables(db, file);
+                stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, filemap[file], position, comment, label,
+                    (err, row) => {
+                        if (err) reject(err)
+                        UI.postMessage({
+                            event: 'progress',
+                            text: "Updating Database.",
+                            progress: i / RESULTS.length
+                        });
+                        if (i === (RESULTS.length - 1)) {
+                            db.run('COMMIT', (err, rows) => {
+                                if (err) reject(err)
+                                UI.postMessage({event: 'progress', progress: 1.0});
+                                if (db === diskDB) {
+                                    UI.postMessage({
+                                        event: 'generate-alert',
+                                        message: `${db.filename.replace(/.*\//, '')} database update complete, ${i + 1} records updated in ${((performance.now() - t0) / 1000).toFixed(3)} seconds`
+                                    })
+                                }
+                                resolve(row)
+                            });
+                        }
+                    });
+            }
+        } else {
+            resolve('No results to save')
+        }
+    })
+}
+
+const getSeasonRecords = async (species, season) => {
+    const seasonMonth = {spring: "< '07'", autumn: " > '06'"}
     return new Promise(function (resolve, reject) {
-        const stmt = db.prepare(`
+        const stmt = diskDB.prepare(`
             SELECT MAX(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS maxDate,
                    MIN(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS minDate
             FROM records
@@ -1108,7 +1521,7 @@ const getSeasonRecords = (species, season) => {
 
 const getMostCalls = (species) => {
     return new Promise(function (resolve, reject) {
-        db.get(`
+        diskDB.get(`
             SELECT count(*) as count, 
             DATE(dateTime/1000, 'unixepoch', 'localtime') as date
             FROM records INNER JOIN species
@@ -1127,9 +1540,11 @@ const getMostCalls = (species) => {
     })
 }
 
-const getChartTotals = (args) => {
-    const species = args.species;
-    const dateRange = args.range;
+const getChartTotals = ({
+                            species = undefined,
+                            range = {}
+                        }) => {
+    const dateRange = range;
     // Work out sensible aggregations from hours difference in daterange
     const hours_diff = dateRange.start ?
         Math.round((dateRange.end - dateRange.start) / (1000 * 60 * 60)) : 745;
@@ -1159,17 +1574,17 @@ const getChartTotals = (args) => {
     }
 
     return new Promise(function (resolve, reject) {
-        db.all(`SELECT STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS Year, 
+        diskDB.all(`SELECT STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS Year, 
             STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Week,
             STRFTIME('%j', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Day, 
             STRFTIME('%H', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Hour,    
             COUNT(*) as count
-                FROM records
-                    INNER JOIN species
-                on species.id = birdid1
-                WHERE species.cname = '${species}' ${dateFilter}
-                GROUP BY ${groupBy}
-                ORDER BY ${orderBy};`, (err, rows) => {
+                    FROM records
+                        INNER JOIN species
+                    on species.id = birdid1
+                    WHERE species.cname = '${species}' ${dateFilter}
+                    GROUP BY ${groupBy}
+                    ORDER BY ${orderBy};`, (err, rows) => {
             if (err) {
                 reject(err)
             } else {
@@ -1188,15 +1603,15 @@ const getRate = (species) => {
         const total = new Array(52).fill(0);
 
 
-        db.all(`select STRFTIME('%W', DATE(dateTime / 1000, 'unixepoch', 'localtime')) as week, count(*) as calls
-                from records
-                         INNER JOIN species ON species.id = records.birdid1
-                WHERE species.cname = '${species}'
-                group by week;`, (err, rows) => {
+        diskDB.all(`select STRFTIME('%W', DATE(dateTime / 1000, 'unixepoch', 'localtime')) as week, count(*) as calls
+                    from records
+                             INNER JOIN species ON species.id = records.birdid1
+                    WHERE species.cname = '${species}'
+                    group by week;`, (err, rows) => {
             for (let i = 0; i < rows.length; i++) {
                 calls[parseInt(rows[i].week) - 1] = rows[i].calls;
             }
-            db.all("select STRFTIME('%W', DATE(duration.day / 1000, 'unixepoch', 'localtime')) as week, cast(sum(duration) as real)/3600  as total from duration group by week;", (err, rows) => {
+            diskDB.all("select STRFTIME('%W', DATE(duration.day / 1000, 'unixepoch', 'localtime')) as week, cast(sum(duration) as real)/3600  as total from duration group by week;", (err, rows) => {
                 for (let i = 0; i < rows.length; i++) {
                     // Round the total to 2 dp
                     total[parseInt(rows[i].week) - 1] = Math.round(rows[i].total * 100) / 100;
@@ -1215,7 +1630,7 @@ const getRate = (species) => {
     })
 }
 
-const getSpecies = () => {
+const getSpecies = (db) => {
     db.all('SELECT DISTINCT cname, sname FROM records INNER JOIN species ON birdid1 = id ORDER BY cname',
         (err, rows) => {
             if (err) console.log(err);
@@ -1225,7 +1640,7 @@ const getSpecies = () => {
         })
 }
 
-const getFileStart = (file) => {
+const getFileStart = (db, file) => {
     return new Promise(function (resolve, reject) {
         db.get(`SELECT filestart
                 FROM files
@@ -1235,7 +1650,7 @@ const getFileStart = (file) => {
             } else {
                 if (row['filestart'] === null) {
                     // This should only be needed while we catch up with the new files schema
-                    await getMetadata(file);
+                    await getMetadata({file: file});
                     db.get(`UPDATE files
                             SET filestart = '${metadata[file].fileStart}'
                             WHERE name = '${file}'`,
@@ -1257,8 +1672,16 @@ const getFileStart = (file) => {
     })
 }
 
-const onUpdateFileStart = (args) => {
-    const file = args.file.replace("'", "''"), newfileStart = args.start;
+const onUpdateFileStart = async (args) => {
+    let file = args.file;
+    const newfileMtime = args.start + (metadata[file].duration * 1000);
+    await utimes(file, Math.round(newfileMtime));
+    // update the metadata
+    metadata[file].isComplete = false;
+    //allow for this file to be compressed...
+    await getWorkingFile(file);
+    file = file.replace("'", "''");
+
     return new Promise(function (resolve, reject) {
         db.get(`SELECT rowid, filestart
                 from files
@@ -1269,14 +1692,14 @@ const onUpdateFileStart = (args) => {
                 if (row) {
                     let rowID = row.rowid;
                     db.get(`UPDATE files
-                            SET filestart = '${newfileStart}'
+                            SET filestart = '${args.start}'
                             where rowid = '${rowID}'`, (err, rows) => {
                         if (err) {
                             console.log(err)
                         } else {
                             let t0 = Date.now();
                             db.get(`UPDATE records
-                                    set dateTime = position + ${newfileStart}
+                                    set dateTime = position + ${args.start}
                                     where fileid = ${rowID}`, (err, rowz) => {
                                 if (err) {
                                     console.log(err)
@@ -1292,67 +1715,94 @@ const onUpdateFileStart = (args) => {
         })
     })
 }
-let speciesCache = {};
 
-const cacheSpecies = (cname) => {
-    cname = cname.replace("'", "''");
-    return new Promise((resolve, reject) => {
-        db.get(`SELECT *
-                FROM SPECIES
-                WHERE cname = '${cname}'`, (err, row) => {
-            if (err) reject(err)
-            else {
-                speciesCache[cname] = {id: row.id, cname: row.cname, sname: row.sname}
-                resolve(speciesCache)
-            }
-        })
-    })
-}
+async function onUpdateRecord({
+                                  openFiles = [],
+                                  currentFile = '',
+                                  start = 0,
+                                  value = '',
+                                  db = diskDB,
+                                  isBatch = false,
+                                  from = '',
+                                  what = 'birdID1',
+                                  isReset = false,
+                                  isFiltered = false,
+                                  isExplore = false
+                              }) {
 
-const updateResults = async (args) => {
-    if (args.what === 'ID' && !speciesCache[args.value]) await cacheSpecies(args.value);
-    let obj = RESULTS.find(o => {
-        if (o.start === args.start && o.file === args.file) {
-            if (args.what === 'ID') {
 
-                const rec = speciesCache[args.value]
-                o.id_1 = rec.id;
-                o.cname = rec.cname;
-                o.sname = rec.sname;
-            } else if (args.what === 'comment') {
-                o.comment = args.value;
-            } else if (args.what === 'label') {
-                o.label = args.value;
-            }
-            return true // Stop the search
-        }
-    })
-}
+    // Sanitize input: start is passed to the function in float seconds,
+    // but we need a millisecond integer
+    const startMilliseconds = (start * 1000).toFixed(0);
 
-const onUpdateRecord = async (args) => {
-    args.start = parseFloat(args.start);
-    let what = args.what, file = args.file, start = args.start, value = args.value;
-    // Sanitize input
-    if (!value) value = '';
-    await updateResults(args);
-    if (what === 'ID') {
+    // Construct the SQL
+    let whatSQL, whereSQL;
+    if (what === 'ID' || what === 'birdID1') {
+        // Map the field name to the one in the database
         what = 'birdID1';
-        value = speciesCache[args.value].id; //await getBirdID(value);
+        whatSQL = `birdID1 = (SELECT id FROM species WHERE cname = '${value}')`;
+    } else if (what === 'label') {
+        whatSQL = `label = '${value}'`;
+    } else {
+        whatSQL = `comment = '${value}'`;
     }
-    if (!metadata[file]) metadata[file] = {};
-    if (!metadata[file].fileStart) {
-        metadata[file].fileStart = await getFileStart(file);
+
+    if (isBatch) {
+        //Batch update
+        whereSQL = `WHERE birdID1 = (SELECT id FROM species WHERE cname = '${from}') `;
+        if (openFiles.length) {
+            whereSQL += 'AND fileID IN (SELECT rowid from files WHERE name in (';
+            // Format the file list
+            openFiles.forEach(file => {
+                file = file.replaceAll("'", "''");
+                whereSQL += `'${file}',`
+            })
+            // remove last comma
+            whereSQL = whereSQL.slice(0, -1);
+            whereSQL += '))';
+        }
+    } else {
+        // Single record
+        whereSQL = `WHERE datetime = (SELECT filestart FROM files WHERE name = '${currentFile}') + ${startMilliseconds}`
     }
-    const dateTime = metadata[file].fileStart + (start * 1000);
-    return new Promise(function (resolve, reject) {
-        db.get(`UPDATE records
-                SET ${what} = '${value}'
-                WHERE datetime = '${dateTime}'`, (err, row) => {
+    const t0 = Date.now();
+    return new Promise((resolve, reject) => {
+        db.run(`UPDATE records
+                SET ${whatSQL} ${whereSQL}`, async function (err, row) {
             if (err) {
                 reject(err)
             } else {
-                resolve(row)
-                if (row) console.log(`Updated ${what}, setting ${dateTime} to ${value}`);
+                if (this.changes) {
+                    console.log(`Updated ${this.changes} records for ${what} in ${db.filename.replace(/.*\//, '')} database, setting them to ${value}`);
+                    console.log(`Update without transaction took ${Date.now() - t0} milliseconds`);
+                    const species = isFiltered || isExplore ? from : '';
+                    if (isExplore) openFiles = [];
+                    await sendResults2UI({db: db, filelist: openFiles, species: species, explore: isExplore});
+                    resolve(this.changes)
+                } else {
+                    console.log(`No records updated in ${db.filename.replace(/.*\//, '')}`)
+                    // Not in diskDB, so update memoryDB
+                    if (db === diskDB) {
+                        await onUpdateRecord(
+                            //because no access to this in arrow function, and regular function replaces arguments[0]
+                            {
+                                openFiles: openFiles,
+                                currentFile: currentFile,
+                                start: start,
+                                value: value,
+                                db: memoryDB,
+                                isBatch: isBatch,
+                                from: from,
+                                what: what,
+                                isReset: isReset,
+                                isFiltered: isFiltered
+                            });
+                        UI.postMessage({
+                            event: 'generate-alert',
+                            message: 'Remember to save your records to store this change'
+                        })
+                    }
+                }
             }
         })
     })
@@ -1441,3 +1891,77 @@ async function onChartRequest(args) {
         aggregation: aggregation
     })
 }
+
+
+/*
+Todo: bugs
+    *** Detection end incorrect in HTML table.
+    "unable to locate source file with any supported extension mp3" when browsing files in filename list
+    Confidence filter not honoured on refresh results
+    ***Table does not always expand to fit when summary table absent
+    Predictions requests/received not equal at end of long analyses.
+    Memory dumps with long analyses.
+    Limit 2500 files to create dataset.
+
+Todo: Database
+     Database delete: records, files (and all associated records). Use when reanalysing
+     Database file path update, batch update - so we can move files around after analysis
+     Move database functions to separate file
+     Compatibility with updates, esp. when num classes change
+
+Todo: Location.
+     Associate lat lon with files, expose lat lon settings in UI. Allow for editing once saved
+
+Todo cache:
+    ***Clear cache on application exit, as well as start
+    ***Set max cache size
+
+Todo: UI
+    Drag folder to load audio files within
+    Stop flickering when updating results
+    Expose SNR feature
+    Pagination? Limit table records to say, 1000
+    Better tooltips, for all options
+    Sort summary by headers
+    Have a panel for all analyse settings, not just nocmig mode
+
+Todo: Charts
+    Allow better control of grouping (e.g) hourly over a week
+    Permit inclusion of hours recorded in other date ranges
+    Allow choice of chart type
+    Rip out highcharts, use chart.js?
+    Allow multiple species comparison, e.g. compare Song Thrush and Redwing peak migration periods
+
+Todo: Performance
+    Explore spawning predictworker from UI, Shared worker??
+        => hopefully prevents  background throttling (imapact TBD)
+
+Todo: model.
+ Improve accuracy, accuracy accuracy!
+ Establish classes protocol. What's in, what name to give it
+
+Todo: Releases
+     Limit features for free users
+     Premium features are??
+     Automatic updates
+     Implement version protocol
+
+Todo: IDs
+    Manual record entry
+    Verified records -
+    Search by label,
+    Search for comment
+
+Todo: Tests & code quality
+    Order / group functions semantically
+    Investigate unit tests
+    Investigate coverage
+    Integrate with commit?
+    Document code, jsdoc?
+    Use de-referencing on all args parameters
+    Shorten functions
+    Review all global vars: set global var policy. Capitalise all globals
+    Make use of const functions / arrow vs. normal ones consistent.
+    **Review use of async functions
+    **Make Locatefile() case insensitive
+ */
