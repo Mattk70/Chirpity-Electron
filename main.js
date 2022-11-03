@@ -1,6 +1,8 @@
 const {app, dialog, ipcMain, MessageChannelMain, BrowserWindow} = require('electron');
 const fs = require("fs");
-const path = require('path')
+const path = require('path');
+const settings = require('electron-settings');
+const p = require("path");
 
 //require('update-electron-app')();
 global.sharedObject = {prop1: process.argv};
@@ -29,34 +31,115 @@ let files = [];
 //})
 process.stdin.resume();//so the program will not close instantly
 
-function exitHandler(options, exitCode) {
-    if (options.cleanup) console.log('clean');
-    else { console.log('no clean')}
+
+
+const clearCache =  (file_cache) => {
+    return new Promise((resolve) => {
+        // clear & recreate file cache folder
+        fs.rmSync(file_cache, {recursive: true, force: true});
+        fs.mkdir(file_cache, (err, path) => {
+            resolve(path);
+        })
+    })
+}
+
+async function exitHandler(options, exitCode) {
+    if (options.cleanup) {
+        const tmp_folder = path.join(app.getPath('temp'), 'chirpity');
+        // size of cache
+        const stat = fs.statSync(tmp_folder);
+        console.log('size of cache: ' + stat.size)
+        console.table(stat)
+        await clearCache(tmp_folder);
+        console.log('cleaned ' + tmp_folder)
+    } else {
+        console.log('no clean')
+        console.table(options)
+    }
     if (exitCode || exitCode === 0) console.log(exitCode);
     if (options.exit) process.exit();
 }
 
 //do something when app is closing
-process.on('exit', exitHandler.bind(null,{cleanup:false}));
+process.on('exit', exitHandler.bind(null, {cleanup: true}));
+//catches ctrl+c event (but not in main process!)
+process.on('SIGINT', exitHandler.bind(null, {exit: true}));
+// catches "kill pid" (for example: nodemon restart)
+process.on('SIGUSR1', exitHandler.bind(null, {exit: true}));
+process.on('SIGUSR2', exitHandler.bind(null, {exit: true}));
+//catches uncaught exceptions
+process.on('uncaughtException', exitHandler.bind(null, {exit: true}));
 
 let mainWindow;
 let workerWindow;
 
 
-function createWindow() {
+async function windowStateKeeper(windowName) {
+    let window, windowState;
+
+    async function setBounds() {
+        // Restore from settings
+        if (await settings.has(`windowState.${windowName}`)) {
+            windowState = await settings.get(`windowState.${windowName}`);
+        } else {
+            // Default
+            windowState = {
+                x: undefined,
+                y: undefined,
+                width: 1280,
+                height: 768,
+            };
+        }
+    }
+
+    async function saveState() {
+        if (!windowState.isMaximized) {
+            windowState = window.getBounds();
+        }
+        windowState.isMaximized = window.isMaximized();
+        await settings.set(`windowState.${windowName}`, windowState);
+    }
+
+    function track(win) {
+        window = win;
+        ['resize', 'move', 'close'].forEach(event => {
+            win.on(event, saveState);
+        });
+    }
+
+    await setBounds();
+    return ({
+        x: windowState.x,
+        y: windowState.y,
+        width: windowState.width,
+        height: windowState.height,
+        isMaximized: windowState.isMaximized,
+        track,
+    });
+}
+
+async function createWindow() {
     // Create the browser window.
+    // Get window state
+    const mainWindowStateKeeper = await windowStateKeeper('main');
+
     mainWindow = new BrowserWindow({
         show: false,
         title: "Chirpity Nocmig",
-        width: 1280,
-        height: 768,
+        x: mainWindowStateKeeper.x,
+        y: mainWindowStateKeeper.y,
+        width: mainWindowStateKeeper.width,
+        height: mainWindowStateKeeper.height,
+
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
-            nodeIntegration: false,
+            nodeIntegration: true,
             contextIsolation: true,
             backgroundThrottling: false
         }
     })
+    // Track window state
+    mainWindowStateKeeper.track(mainWindow);
 
     // Set icon
     mainWindow.setIcon(__dirname + '/img/icon/icon.png');
@@ -68,7 +151,7 @@ function createWindow() {
     mainWindow.loadFile('index.html')
 
     // Open the DevTools. Comment out for release
-    //mainWindow.webContents.openDevTools()
+    mainWindow.webContents.openDevTools()
 
     mainWindow.once('ready-to-show', () => {
         mainWindow.show()
@@ -83,10 +166,14 @@ function createWindow() {
 
 async function createWorker() {
     // hidden worker
+    // Get window state
+    const mainWindowStateKeeper = await windowStateKeeper('worker');
     workerWindow = new BrowserWindow({
-        show: false,
-        height: 800,
-        width: 1200,
+        show: true,
+        x: mainWindowStateKeeper.x,
+        y: mainWindowStateKeeper.y,
+        width: mainWindowStateKeeper.width,
+        height: mainWindowStateKeeper.height,
         webPreferences: {
             nodeIntegration: true,
             nodeIntegrationInWorker: false,
@@ -94,6 +181,8 @@ async function createWorker() {
             backgroundThrottling: false
         }
     });
+    // Track window state
+    mainWindowStateKeeper.track(workerWindow);
     workerWindow.setIcon(__dirname + '/img/icon/icon.png');
     await workerWindow.loadFile('worker.html');
 
@@ -106,12 +195,12 @@ async function createWorker() {
 
 // This method will be called when Electron has finished
 app.whenReady().then(async () => {
-    ipcMain.handle('getPath', (e) => app.getPath('userData'));
-    ipcMain.handle('getTemp', (e) => app.getPath('temp'));
+    ipcMain.handle('getPath', () => app.getPath('userData'));
+    ipcMain.handle('getTemp', () => app.getPath('temp'));
     ipcMain.handle('getVersion', () => app.getVersion());
 
     await createWorker();
-    createWindow();
+    await createWindow();
     // We'll be sending one end of this channel to the main world of the
     // context-isolated page.
 
@@ -131,16 +220,16 @@ app.whenReady().then(async () => {
             // without going through the main process!
         }
     });
-    ipcMain.on('file-to-load', (event) => {
-        // THe UI has asked for it, so now is a good time to ask the UI to load a results file if needed:
-        if (event.senderFrame === mainWindow.webContents.mainFrame) {
-            const args = sharedObject.prop1;
-            if (args.length > 2 || (process.platform === 'darwin' && args.length > 0)) {
-                console.log('Asking UI to load a file', args)
-                event.senderFrame.postMessage('load-results', {file: args[args.length - 1]});
-            }
-        }
-    });
+    // ipcMain.on('file-to-load', (event) => {
+    //     // THe UI has asked for it, so now is a good time to ask the UI to load a results file if needed:
+    //     if (event.senderFrame === mainWindow.webContents.mainFrame) {
+    //         const args = sharedObject.prop1;
+    //         if (args.length > 2 || (process.platform === 'darwin' && args.length > 0)) {
+    //             console.log('Asking UI to load a file', args)
+    //             event.senderFrame.postMessage('load-results', {file: args[args.length - 1]});
+    //         }
+    //     }
+    // });
 
     if (process.platform === 'darwin') {
         //const appIcon = new Tray('./img/icon/icon.png')
@@ -148,10 +237,10 @@ app.whenReady().then(async () => {
         app.dock.bounce();
     }
 
-    app.on('activate', () => {
+    app.on('activate', async () => {
         if (BrowserWindow.getAllWindows().length === 0) {
-            createWorker();
-            createWindow();
+            await createWorker();
+            await createWindow();
         }
     })
 
@@ -167,13 +256,13 @@ app.whenReady().then(async () => {
         const dialogOpts = {
             type: 'warning',
             title: 'Crash report',
-            detail: e
+            detail: 'Oh no! The model had crashed, restarting Chirpity'
         }
 
         dialog.showMessageBox(dialogOpts).then((returnValue) => {
             if (returnValue.response === 0) {
                 app.relaunch();
-                app.quit()
+                app.quit();
             }
         })
     });
@@ -217,13 +306,13 @@ app.on('window-all-closed', () => {
 //     await session.defaultSession.clearStorageData();
 // })
 
-app.on('activate', () => {
+app.on('activate', async () => {
     if (mainWindow === null) {
-        createWindow();
+        await createWindow();
     }
 
     if (workerWindow == null) {
-        createWorker();
+        await createWorker();
     }
 });
 
@@ -231,16 +320,15 @@ ipcMain.handle('dialog', (event, method, params) => {
     dialog[method](mainWindow, params);
 });
 
-ipcMain.handle('openFiles', async (event) => {
+ipcMain.handle('openFiles', async () => {
     // Show file dialog to select audio file
-    const result = await dialog.showOpenDialog(mainWindow, {
+    return await dialog.showOpenDialog(mainWindow, {
         filters: [{
             name: 'Audio Files',
-            extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4']
+            extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus']
         }],
         properties: ['openFile', 'multiSelections']
     });
-    return result;
 })
 ipcMain.handle('saveFile', (event, arg) => {
     // Show file dialog to select audio file
@@ -253,7 +341,6 @@ ipcMain.handle('saveFile', (event, arg) => {
         //console.log(file.canceled);
         if (!file.canceled) {
             const AUDACITY_LABELS = arg.labels;
-            console.log(file.filePath.toString());
             let str = ""
             // Format results
             for (let i = 0; i < AUDACITY_LABELS.length; i++) {

@@ -39,13 +39,8 @@ html, body {
     -webkit-font-smoothing: antialiased;
 }
 
-.tick {
-    font-size: 20px;
-}
-
-.arrow {
-    font-size: 22px;
-    vertical-align: top;
+.navbar {
+    z-index: 5;
 }
 
 #spectrogram {
@@ -61,19 +56,8 @@ html, body {
 /*    text-align: center;*/
 /*}*/
 
-.navbar-nav li:hover > ul.dropdown-menu {
-    display: block;
-}
 
-.dropdown-submenu {
-    position: relative;
-}
 
-.dropdown-submenu > .dropdown-menu {
-    top: 0;
-    left: 100%;
-    margin-top: -6px;
-}
 
 tr[id^="sub"] {
     font-size: 12px;
@@ -83,7 +67,7 @@ span[id^="filename_"] {
     border-bottom: 1px;
     border-bottom: #818182;
     left: 25px;
-    z-index: 100;
+    z-index: 2;
 }
 
 .rotate {
@@ -94,8 +78,6 @@ span[id^="filename_"] {
 }
 
 .rotate.down {
-    -moz-transform: rotate(180deg);
-    -webkit-transform: rotate(180deg);
     transform: rotate(180deg);
 }
 
@@ -108,19 +90,11 @@ span[id^="filename_"] {
     cursor: pointer;
 }
 
-.openFiles {
-    display: none;
-}
-
-.openFiles.visible {
-    display: block;
-}
-
 #controlsWrapper .row, #transport-controls {
     min-width: 850px;
     white-space: nowrap;
     height: 40px;
-    z-index: 6;
+    z-index: 9;
 }
 
 
@@ -128,19 +102,19 @@ div#contentWrapper {
     background: #dbe2ed url(../img/Redwing-flight.png);
     background-size: cover;
     position: absolute;
-    top: 50px;
+    top: 66px;
     width: 100%;
 }
 
 .zoom {
-    font-size: 22px;
+    font-size: 36px;
 }
 
-.species-selector{
+.species-selector {
     position: relative;
 }
 
-.input {
+.input:not(.form-control) {
     background-image: url('searchicon.png'); /* Add a search icon to input */
     background-position: 10px 12px; /* Position the search icon */
     background-repeat: no-repeat; /* Do not repeat the icon image */
@@ -157,13 +131,13 @@ ul {
     list-style-type: none;
     padding: 0;
     margin: 0;
-    width: 100%;
+
 }
 
-.bird-list-wrapper{
+.bird-list-wrapper {
     overflow: auto;
     max-height: 250px;
-    position:absolute;
+    position: absolute;
     width: 100%;
     z-index: 10;
 }
@@ -178,7 +152,8 @@ ul {
     color: black; /* Add a black text color */
     display: block; /* Make it into a block element to fill the whole list */
 }
-.bird-list li a:hover:not(.header){
+
+.bird-list li a:hover:not(.header) {
     background-color: #eee; /* Add a hover effect to all links, except for headers */
 }
 
@@ -189,11 +164,12 @@ ul {
 }
 
 
-#results>thead, #results>th {
+#results > thead, #results > th, #resultSummary > thead, #resultSummary > th {
     position: sticky;
-    top:0;
+    top: 0;
     color: white;
     background-color: #1b1e21;
+    z-index: 2;
 }
 
 region.wavesurfer-region:before {
@@ -234,12 +210,6 @@ region.wavesurfer-region[data-region-highlight] {
     /*cursor: default; */
 }
 
-/* Menu Dropdown on Hover */
-.dropdown:hover .dropdown-menu.top-level {
-    display: block;
-    margin-top: 0;
-/*remove the gap so it doesn't close*/
-}
 
 .chart-outer {
     height: 520px;
@@ -315,11 +285,12 @@ region.wavesurfer-region[data-region-highlight] {
 
 
 footer {
-  position: fixed;
-  bottom: 0;
-  height: 30px;
-  text-align: center;
-  width: 100%;
+    position: fixed;
+    bottom: 0;
+    height: 30px;
+    text-align: center;
+    width: 100%;
+    z-index: 1000;
 }
 
 /* round table borders
@@ -333,6 +304,70 @@ footer {
 
 /* Flip comment icons */
 
-.add-comment, .edit-comment{
+.add-comment, .edit-comment {
     transform: scaleX(-1);
 }
+
+#dropdownMenuButton {
+    max-width: 350px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dropdown-menu-dark {
+    max-height: 300px;
+    overflow: auto;
+}
+
+
+
+/* ============ desktop view ============ */
+@media all and (min-width: 768px) {
+    .dropdown-menu li {
+        position: relative;
+    }
+
+    .nav-item .submenu {
+        display: none;
+        position: absolute;
+        left: 100%;
+        top: -7px;
+    }
+
+    .nav-item .submenu-left {
+        right: 100%;
+        left: auto;
+    }
+
+    .dropdown-menu > li:hover {
+        background-color: #f1f1f1
+    }
+
+    .dropdown-menu > li:hover > .submenu {
+        display: block;
+    }
+}
+
+/* ============ desktop view .end// ============ */
+
+/* ============ small devices ============ */
+@media (max-width: 767px) {
+    .dropdown-menu:not(.dropdown-menu .dropdown-menu) {
+        max-height: 300px;
+        overflow: auto;
+    }
+
+    .dropdown-menu > li > .submenu {
+        display: block;
+    }
+
+    .dropdown-menu .dropdown-menu {
+        margin-left: 0.7rem;
+        margin-right: 0.7rem;
+        margin-bottom: .5rem;
+    }
+}
+
+/* ============ small devices .end// ============ */
+
