@@ -191,7 +191,7 @@ class Model {
         const batch = {};
         const keys = Object.keys(this.goodTensors);
         for (let i = 0; i < keys.length; i++) {
-            batch[keys[i]] = ({index: top3[i], score: top3scores[i], end: keys[i] + this.chunkLength});
+            batch[keys[i]] = ({index: top3[i], score: top3scores[i], end: parseInt(keys[i]) + this.chunkLength});
         }
 
         // Try this method of adjusting results
@@ -295,7 +295,7 @@ class Model {
             if (finalchunk) {
                 // Top up results with any final tensor predictions
                 if (Object.keys(this.goodTensors).length) {
-                    this.predictBatch(file, fileStart)
+                    return this.predictBatch(file, fileStart)
                 }
                 return true
             } else {

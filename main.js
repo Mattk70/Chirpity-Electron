@@ -2,6 +2,7 @@ const {app, dialog, ipcMain, MessageChannelMain, BrowserWindow} = require('elect
 const fs = require("fs");
 const path = require('path');
 const settings = require('electron-settings');
+const p = require("path");
 
 //require('update-electron-app')();
 global.sharedObject = {prop1: process.argv};
@@ -30,17 +31,44 @@ let files = [];
 //})
 process.stdin.resume();//so the program will not close instantly
 
-function exitHandler(options, exitCode) {
-    if (options.cleanup) console.log('clean');
-    else {
+
+
+const clearCache =  (file_cache) => {
+    return new Promise((resolve) => {
+        // clear & recreate file cache folder
+        fs.rmSync(file_cache, {recursive: true, force: true});
+        fs.mkdir(file_cache, (err, path) => {
+            resolve(path);
+        })
+    })
+}
+
+async function exitHandler(options, exitCode) {
+    if (options.cleanup) {
+        const tmp_folder = path.join(app.getPath('temp'), 'chirpity');
+        // size of cache
+        const stat = fs.statSync(tmp_folder);
+        console.log('size of cache: ' + stat.size)
+        console.table(stat)
+        await clearCache(tmp_folder);
+        console.log('cleaned ' + tmp_folder)
+    } else {
         console.log('no clean')
+        console.table(options)
     }
     if (exitCode || exitCode === 0) console.log(exitCode);
     if (options.exit) process.exit();
 }
 
 //do something when app is closing
-process.on('exit', exitHandler.bind(null, {cleanup: false}));
+process.on('exit', exitHandler.bind(null, {cleanup: true}));
+//catches ctrl+c event (but not in main process!)
+process.on('SIGINT', exitHandler.bind(null, {exit: true}));
+// catches "kill pid" (for example: nodemon restart)
+process.on('SIGUSR1', exitHandler.bind(null, {exit: true}));
+process.on('SIGUSR2', exitHandler.bind(null, {exit: true}));
+//catches uncaught exceptions
+process.on('uncaughtException', exitHandler.bind(null, {exit: true}));
 
 let mainWindow;
 let workerWindow;
@@ -138,7 +166,7 @@ async function createWindow() {
 
 async function createWorker() {
     // hidden worker
-        // Get window state
+    // Get window state
     const mainWindowStateKeeper = await windowStateKeeper('worker');
     workerWindow = new BrowserWindow({
         show: true,
@@ -153,7 +181,7 @@ async function createWorker() {
             backgroundThrottling: false
         }
     });
-        // Track window state
+    // Track window state
     mainWindowStateKeeper.track(workerWindow);
     workerWindow.setIcon(__dirname + '/img/icon/icon.png');
     await workerWindow.loadFile('worker.html');
@@ -209,7 +237,7 @@ app.whenReady().then(async () => {
         app.dock.bounce();
     }
 
-    app.on('activate', async  () => {
+    app.on('activate', async () => {
         if (BrowserWindow.getAllWindows().length === 0) {
             await createWorker();
             await createWindow();

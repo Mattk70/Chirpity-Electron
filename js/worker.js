@@ -1,28 +1,24 @@
 const {ipcRenderer} = require('electron');
 const fs = require('fs');
 const wavefileReader = require('wavefile-reader');
-const lamejs = require("lamejstmp");
-const ID3Writer = require('browser-id3-writer');
 const p = require('path');
-let BATCH_SIZE = 12;
+let BATCH_SIZE;
 const adding_chirpity_additions = false;
 let labels;
 const sqlite3 = require('sqlite3').verbose();
 const SunCalc = require('suncalc2');
 const ffmpeg = require('fluent-ffmpeg');
 const png = require('fast-png');
-const {writeFile, mkdir} = require('node:fs/promises');
+const {writeFile, mkdir, readdir} = require('node:fs/promises');
 const {utimes} = require('utimes');
 const stream = require("stream");
-const {op} = require("@tensorflow/tfjs");
 const file_cache = 'chirpity';
-let TEMP, appPath;
+let TEMP, appPath, CACHE_LOCATION;
 
 const staticFfmpeg = require('ffmpeg-static-electron');
-const {bathymetry} = require("colormap/colorScale");
+const {stat} = require("fs/promises");
 console.log(staticFfmpeg.path);
 ffmpeg.setFfmpegPath(staticFfmpeg.path);
-
 
 let predictionsRequested = 0, predictionsReceived = 0;
 
@@ -92,26 +88,28 @@ const createDB = (file) => {
             }
             stmt.finalize();
         });
+        resolve(db)
     })
 }
 
-function loadDB(path) {
+async function loadDB(path) {
     let db = path ? diskDB : memoryDB;
     if (!db) {
         if (path) {
             const file = p.join(path, 'archive.sqlite')
             if (!fs.existsSync(file)) {
-                createDB(file);
+                await createDB(file);
             } else {
                 diskDB = new sqlite3.Database(file);
                 console.log("Opened disk db " + file)
             }
         } else {
-            createDB();
+            await createDB();
         }
     } else {
         console.log('Database loaded, nothing to do')
     }
+    return true
 }
 
 let metadata = {};
@@ -125,14 +123,42 @@ const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampl
 let UI;
 let FILE_QUEUE = [];
 
-const clearCache = () => {
-    return new Promise((resolve) => {
-        // clear & recreate file cache folder
-        fs.rmSync(p.join(TEMP, file_cache), {recursive: true, force: true});
-        fs.mkdir(p.join(TEMP, file_cache), (err, path) => {
-            resolve(path);
-        })
+
+const dirSize = async dir => {
+    const files = await readdir(dir, {withFileTypes: true});
+    const atimes = [];
+    const paths = files.map(async file => {
+        const path = p.join(dir, file.name);
+        if (file.isDirectory()) return await dirSize(path);
+        if (file.isFile()) {
+            const {size, atimeMs} = await stat(path);
+            atimes.push([path, atimeMs, size]);
+            return size
+
+        }
+        return 0;
+    });
+    const size = (await Promise.all(paths)).flat(Infinity).reduce((i, size) => i + size, 0);
+    // Newest to oldest file, so we can pop the list (faster)
+    atimes.sort((a, b) => {
+        return b[1] - a[1]
     })
+
+    console.table(atimes);
+    return [size, atimes];
+}
+
+const clearCache = async (fileCache, sizeLimitInGB) => {
+    // Cache size
+    let [size, aTimes] = await dirSize(fileCache);
+    while (size > sizeLimitInGB * 1024**3) {
+        const [file, , fileSize] = aTimes.pop();
+        fs.rmSync(file, {force: true});
+        console.log('removed ' + file);
+        size -= fileSize;
+        console.log('size is now ' + size + 'bytes')
+    }
+    console.log('cache size is: ' + size)
 }
 
 ipcRenderer.on('new-client', (event) => {
@@ -147,10 +173,11 @@ ipcRenderer.on('new-client', (event) => {
                 longitude = args.lon;
                 TEMP = args.temp;
                 appPath = args.path;
-                await clearCache();
+                CACHE_LOCATION = p.join(TEMP, 'chirpity');
+                await clearCache(CACHE_LOCATION, 0);  // belt and braces - in dev mode, ctrl-c will prevent cache clear on exit
                 break;
             case 'set-variables':
-                latitude = args.lat, longitude = args.lon, TEMP = args.temp, appPath = args.path;
+                latitude = args.lat; longitude = args.lon; TEMP = args.temp; appPath = args.path;
                 break;
             case 'update-record':
                 args.db = diskDB;
@@ -306,7 +333,7 @@ async function onAnalyse({
         index = 0;
         AUDACITY = [];
         RESULTS = [];
-        createDB();
+        await createDB();
     }
     latitude = lat;
     longitude = lon;
@@ -397,10 +424,11 @@ const getDuration = async (src) => {
 
 const convertFileFormat = (file, destination, size, error) => {
     return new Promise(function (resolve) {
-        let totalTime;
+        const sampleRate = 24000, channels = 1, bitDepth = 2;
+        let totalTime, finalSizeInGB;
         ffmpeg(file)
-            .audioChannels(1)
-            .audioFrequency(24000)
+            .audioChannels(channels)
+            .audioFrequency(sampleRate)
             .on('error', (err) => {
                 console.log('An error occurred: ' + err.message);
                 if (err) {
@@ -408,9 +436,17 @@ const convertFileFormat = (file, destination, size, error) => {
                 }
             })
             // Handle progress % being undefined
-            .on('codecData', data => {
+            .on('codecData', async data => {
                 // HERE YOU GET THE TOTAL TIME
                 totalTime = parseInt(data.duration.replace(/:/g, ''))
+                // And Final file size
+                const a = data.duration.split(':'); // split it at the colons
+                const seconds = (+a[0]) * 60 * 60 + (+a[1]) * 60 + (+a[2]);
+                // As this is uncompressed PCM we can calculate the final file size
+                // And clear space in the cache to accommodate the new file
+                finalSizeInGB = (seconds * sampleRate * channels * bitDepth) / 1024**3;
+                const limit = 4 - finalSizeInGB;
+                await clearCache(CACHE_LOCATION, limit);
             })
             .on('progress', (progress) => {
                 // HERE IS THE CURRENT TIME
@@ -427,11 +463,9 @@ const convertFileFormat = (file, destination, size, error) => {
             })
             .on('end', () => {
                 UI.postMessage({event: 'progress', text: 'File decompressed', progress: 1.0})
-                //if (finish) {
                 resolve(destination)
-                //}
             })
-            .save(destination);
+            .save(destination)
     });
 }
 
@@ -450,7 +484,7 @@ async function getWorkingFile(file) {
     // find the file
     const source_file = await locateFile(file);
     if (!source_file) return false;
-    let proxy = file;
+    let proxy = source_file;
 
     if (!source_file.endsWith('.wav')) {
         const pc = p.parse(source_file);
@@ -474,7 +508,7 @@ async function getWorkingFile(file) {
             await utimes(proxy, sourceMtime.getTime());
         }
     }
-    await getMetadata(file, proxy, source_file);
+    await getMetadata({file: file, proxy: proxy, source_file: source_file});
     return proxy;
 }
 
@@ -484,13 +518,21 @@ async function getWorkingFile(file) {
  * @returns {Promise<*>}
  */
 async function locateFile(file) {
-    const supported_files = ['.wav', '.m4a', '.mp3', '.mpga', '.ogg', '.opus', '.flac', '.aac', '.mpeg', '.mp4',
-        '.WAV', '.M4A', '.MP3', '.MPGA', '.OGG', '.OPUS', '.FLAC', '.AAC', '.MPEG', '.MP4'];
+    // Ordered from the highest likely quality to lowest
+    const supported_files = ['.wav', '.flac', '.opus', '.m4a', '.mp3', '.mpga', '.ogg', '.aac', '.mpeg', '.mp4'];
     const dir = p.parse(file).dir, name = p.parse(file).name;
-    let foundFile;
-    const matchingFileExt = supported_files.find(ext => {
-        foundFile = p.join(dir, name + ext);
-        return fs.existsSync(foundFile)
+    let [, folderInfo] = await dirSize(dir);
+    let filesInFolder = [];
+    folderInfo.forEach(item =>{
+        filesInFolder.push(item[0])
+    })
+    let supportedVariants = []
+    supported_files.forEach(ext =>{
+        supportedVariants.push(p.join(dir, name + ext))
+    })
+    const matchingFileExt = supportedVariants.find(variant => {
+        const matching = (file) => variant.toLowerCase() === file.toLowerCase();
+        return filesInFolder.some(matching)
     })
     if (!matchingFileExt) {
         UI.postMessage({
@@ -499,7 +541,7 @@ async function locateFile(file) {
         })
         return false;
     }
-    return foundFile;
+    return matchingFileExt;
 }
 
 async function loadAudioFile({
@@ -549,20 +591,17 @@ function addDays(date, days) {
  * @param source_file: the file that exists ( will be different after compression)
  * @returns {Promise<unknown>}
  */
-const getMetadata = (file, proxy, source_file) => {
-    return new Promise(async (resolve) => {
+const getMetadata = async ({file, proxy = file, source_file = file}) => {
+    metadata[file] = {proxy: proxy};
+    // CHeck the database first, so we honour any manual update.
+    const savedMeta = await getFileInfo(file);
+    metadata[file].duration = savedMeta && savedMeta.duration ? savedMeta.duration : await getDuration(proxy);
+
+    return new Promise((resolve) => {
         if (metadata[file] && metadata[file].isComplete) {
             resolve(metadata[file])
         } else {
-            // If we have it already, no need to do any more
-            if (!proxy) proxy = file;
-            if (!source_file) source_file = file;
             let fileStart, fileEnd;
-            metadata[file] = {proxy: proxy};
-
-            // CHeck the database first, so we honour any manual update.
-            const savedMeta = await getFileInfo(file);
-            metadata[file].duration = savedMeta && savedMeta.duration ? savedMeta.duration : await getDuration(proxy);
             if (savedMeta && savedMeta.filestart) {
                 fileStart = new Date(savedMeta.filestart);
                 fileEnd = new Date(fileStart.getTime() + (metadata[file].duration * 1000));
@@ -1046,8 +1085,8 @@ function spawnWorker(model, list, batchSize, warmup) {
     // Now we've loaded a new model, clear the aborted flag
     aborted = false;
     predictWorker.postMessage(['load', modelPath, list, batchSize, warmup])
-    predictWorker.onmessage = (e) => {
-        parseMessage(e)
+    predictWorker.onmessage = async (e) => {
+        await parseMessage(e)
     }
 }
 
@@ -1107,15 +1146,15 @@ async function parseMessage(e) {
         // Now we have what we need to populate a database...
         const t0 = Date.now();
         // Create in-memory database
-        loadDB();
+        await loadDB();
         // Load the archive one too
-        loadDB(appPath);
+        await loadDB(appPath);
         await dbSpeciesCheck();
         console.log(`Databases loaded in ${(Date.now() - t0)} milliseconds.`);
     } else if (response['message'] === 'prediction' && !aborted) {
         // add filename to result for db purposes
         let [file, batchInProgress] = parsePredictions(response);
-        if (predictionDone) {
+        if (response['finished']) {
             process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, Prediction requests ${predictionsRequested}, predictions received ${predictionsReceived}    \r`)
             if (predictionsReceived === predictionsRequested) {
                 // This is the one time results *do not* come from the database
@@ -1133,7 +1172,7 @@ async function parseMessage(e) {
                 })
                 //await onSave2DB(memoryDB);
             }
-            processNextFile();
+            await processNextFile();
         }
     } else if (response['message'] === 'spectrogram') {
         await onSpectrogram(response['filepath'],
@@ -1192,6 +1231,7 @@ async function processNextFile({
         }
     } else {
         predicting = false;
+        return true
         //await onSave2DB(memoryDB);
     }
 }
@@ -1355,10 +1395,6 @@ const isDuplicate = async (file) => {
             } else resolve(false)
         })
     })
-}
-
-function getKeyByValue(object, value) {
-    return Object.keys(object).find(key => object[key] === value);
 }
 
 const getFileInfo = async (file) => {
@@ -1614,7 +1650,7 @@ const getFileStart = (db, file) => {
             } else {
                 if (row['filestart'] === null) {
                     // This should only be needed while we catch up with the new files schema
-                    await getMetadata(file);
+                    await getMetadata({file: file});
                     db.get(`UPDATE files
                             SET filestart = '${metadata[file].fileStart}'
                             WHERE name = '${file}'`,
@@ -1639,7 +1675,7 @@ const getFileStart = (db, file) => {
 const onUpdateFileStart = async (args) => {
     let file = args.file;
     const newfileMtime = args.start + (metadata[file].duration * 1000);
-    utimes(file, Math.round(newfileMtime));
+    await utimes(file, Math.round(newfileMtime));
     // update the metadata
     metadata[file].isComplete = false;
     //allow for this file to be compressed...
@@ -1741,7 +1777,7 @@ async function onUpdateRecord({
                     console.log(`Update without transaction took ${Date.now() - t0} milliseconds`);
                     const species = isFiltered || isExplore ? from : '';
                     if (isExplore) openFiles = [];
-                    sendResults2UI({db: db, filelist: openFiles, species: species, explore: isExplore});
+                    await sendResults2UI({db: db, filelist: openFiles, species: species, explore: isExplore});
                     resolve(this.changes)
                 } else {
                     console.log(`No records updated in ${db.filename.replace(/.*\//, '')}`)
@@ -1855,3 +1891,77 @@ async function onChartRequest(args) {
         aggregation: aggregation
     })
 }
+
+
+/*
+Todo: bugs
+    *** Detection end incorrect in HTML table.
+    "unable to locate source file with any supported extension mp3" when browsing files in filename list
+    Confidence filter not honoured on refresh results
+    ***Table does not always expand to fit when summary table absent
+    Predictions requests/received not equal at end of long analyses.
+    Memory dumps with long analyses.
+    Limit 2500 files to create dataset.
+
+Todo: Database
+     Database delete: records, files (and all associated records). Use when reanalysing
+     Database file path update, batch update - so we can move files around after analysis
+     Move database functions to separate file
+     Compatibility with updates, esp. when num classes change
+
+Todo: Location.
+     Associate lat lon with files, expose lat lon settings in UI. Allow for editing once saved
+
+Todo cache:
+    ***Clear cache on application exit, as well as start
+    ***Set max cache size
+
+Todo: UI
+    Drag folder to load audio files within
+    Stop flickering when updating results
+    Expose SNR feature
+    Pagination? Limit table records to say, 1000
+    Better tooltips, for all options
+    Sort summary by headers
+    Have a panel for all analyse settings, not just nocmig mode
+
+Todo: Charts
+    Allow better control of grouping (e.g) hourly over a week
+    Permit inclusion of hours recorded in other date ranges
+    Allow choice of chart type
+    Rip out highcharts, use chart.js?
+    Allow multiple species comparison, e.g. compare Song Thrush and Redwing peak migration periods
+
+Todo: Performance
+    Explore spawning predictworker from UI, Shared worker??
+        => hopefully prevents  background throttling (imapact TBD)
+
+Todo: model.
+ Improve accuracy, accuracy accuracy!
+ Establish classes protocol. What's in, what name to give it
+
+Todo: Releases
+     Limit features for free users
+     Premium features are??
+     Automatic updates
+     Implement version protocol
+
+Todo: IDs
+    Manual record entry
+    Verified records -
+    Search by label,
+    Search for comment
+
+Todo: Tests & code quality
+    Order / group functions semantically
+    Investigate unit tests
+    Investigate coverage
+    Integrate with commit?
+    Document code, jsdoc?
+    Use de-referencing on all args parameters
+    Shorten functions
+    Review all global vars: set global var policy. Capitalise all globals
+    Make use of const functions / arrow vs. normal ones consistent.
+    **Review use of async functions
+    **Make Locatefile() case insensitive
+ */
