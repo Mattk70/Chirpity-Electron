@@ -72,7 +72,7 @@ let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
 let bodyElement = $('body');
 let spectrogramWrapper = $('#spectrogramWrapper'), specElement, waveElement, specCanvasElement, specWaveElement;
 let waveCanvasElement, waveWaveElement,
-    resultTableElement = $('#resultTableContainer');
+    resultTableElement = $('#resultTableContainer'), dummyElement;
 resultTableElement.animate({scrollTop: '300px'}, 400, 'swing');
 let contentWrapperElement = $('#contentWrapper');
 let completeDiv = $('#complete');
@@ -384,15 +384,8 @@ function zoomSpec(direction) {
 }
 
 async function showOpenDialog() {
-    const dialogConfig = {
-        filters: [{
-            name: 'Audio Files',
-            extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4']
-        }],
-        properties: ['openFile', 'multiSelections']
-    };
-    const files = await window.electron.openDialog('showOpenDialog', dialogConfig);
-    if (!files.canceled) await onOpenFiles({filePaths: files.filePaths});
+    const files = await window.electron.openDialog('showOpenDialog');
+    if (!files.canceled)  await onOpenFiles({filePaths: files.filePaths});
 }
 
 function updateFileName(files, openfile) {
@@ -454,6 +447,16 @@ function updateFileName(files, openfile) {
     })
 }
 
+
+/**
+ * We post the list to the worker as it has node and that allows it easier access to the
+ * required filesystem routines
+ * @param filePaths
+ */
+const openFiles = ({filePaths}) =>{
+    worker.postMessage({action: 'open-files', files: filePaths})
+}
+
 async function onOpenFiles(args) {
     hideAll();
     showElement(['spectrogramWrapper'], false)
@@ -461,7 +464,6 @@ async function onOpenFiles(args) {
     completeDiv.hide();
     // Store the file list and Load First audio file
     fileList = args.filePaths;
-
     // Sort file by time created (the oldest first):
     if (fileList.length > 1) {
         if (modelReady) enableMenuItem(['analyseAll', 'reanalyseAll'])
@@ -1110,6 +1112,9 @@ window.onload = async () => {
             switch (event) {
                 case 'model-ready':
                     onModelReady(args);
+                    break;
+                case 'files':
+                    onOpenFiles(args);
                     break;
                 case 'seen-species-list':
                     generateBirdList('seenSpecies', args.list);
@@ -2215,7 +2220,7 @@ const updateSummary = ({
 
     for (let i = 0; i < summary.length; i++) {
         const selected = summary[i].cname === filterSpecies ? 'text-warning' : '';
-        summaryHTML += `<tr>
+        summaryHTML += `<tr tabindex="-1">
                         <td class="max">${iconizeScore(summary[i].max)}</td>
                         <td class="cname speciesFilter">
                             <span class="pointer ${selected}">${summary[i].cname} <i>${summary[i].sname}</i></span>
@@ -2227,6 +2232,11 @@ const updateSummary = ({
     summaryHTML += '</tbody></table>';
     squishTable();
     summaryTable.html(summaryHTML);
+    const currentFilter = document.querySelector('.speciesFilter span.text-warning');
+    if (currentFilter) {
+        const filterRow = currentFilter.closest('tr');
+        filterRow.focus();
+    }
 }
 
 async function onPredictionDone({
@@ -2366,7 +2376,7 @@ async function renderResult(args) {
     let timestamp = new Date(result.timestamp);
     const position = new Date(result.position * 1000);
     // Datetime wrangling for Nocmig mode
-    if (result !== "No predictions.") {
+    if (typeof(result) !== 'string') {
         let astro = SunCalc.getTimes(timestamp, config.latitude, config.longitude);
         if (astro.dawn.setMilliseconds(0) < timestamp && astro.dusk.setMilliseconds(0) > timestamp) {
             result.dayNight = 'daytime';
@@ -2379,10 +2389,10 @@ async function renderResult(args) {
     if (index === 1 || -1) {
         showElement(['resultTableContainer'], false);
     }
-    if (result === "No predictions.") {
+    if (typeof(result) === 'string') {
         const nocturnal = config.nocmig ? '<b>during the night</b>' : '';
 
-        tr += `<tr><td>${result} (Predicting ${config.list} ${nocturnal} with at least ${config.minConfidence * 100}% confidence in the prediction)</td></tr>`;
+        tr += `<tr><td colspan="8">${result} (Predicting ${config.list} ${nocturnal} with at least ${config.minConfidence * 100}% confidence in the prediction)</td></tr>`;
     } else {
         if (config.nocmig && !region) {
             /*
@@ -2608,7 +2618,7 @@ summaryButton.addEventListener('click', (e) => {
 });
 
 $(document).on('click', '.download', function (e) {
-    mode = 'save';
+    const mode = 'save';
     setClickedIndex(e);
     sendFile(mode, predictions[clickedIndex])
     e.stopImmediatePropagation();
@@ -2842,8 +2852,9 @@ document.addEventListener('drop', async (event) => {
         //console.log(f)
         filelist.push(f.path);
     }
-    if (filelist.length) await onOpenFiles({filePaths: filelist})
+    if (filelist.length)  openFiles({filePaths: filelist})
 });
+
 
 // Prevent drag for UI elements
 bodyElement.on('dragstart', e => {

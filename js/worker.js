@@ -21,7 +21,7 @@ console.log(staticFfmpeg.path);
 ffmpeg.setFfmpegPath(staticFfmpeg.path);
 
 let predictionsRequested = 0, predictionsReceived = 0;
-
+let COMPLETED = [];
 let diskDB, memoryDB, NOCMIG, latitude, longitude;
 
 const createDB = (file) => {
@@ -94,20 +94,20 @@ const createDB = (file) => {
 
 async function loadDB(path) {
     let db = path ? diskDB : memoryDB;
-    if (!db) {
-        if (path) {
-            const file = p.join(path, 'archive.sqlite')
-            if (!fs.existsSync(file)) {
+    if (db) {
+        console.log('Database loaded, nothing to do');
+        return true
+    }
+    if (path) {
+        const file = p.join(path, 'archive.sqlite')
+        if (!fs.existsSync(file)) {
                 await createDB(file);
-            } else {
-                diskDB = new sqlite3.Database(file);
-                console.log("Opened disk db " + file)
-            }
         } else {
-            await createDB();
+            diskDB = new sqlite3.Database(file);
+            console.log("Opened disk db " + file)
         }
     } else {
-        console.log('Database loaded, nothing to do')
+        await createDB();
     }
     return true
 }
@@ -124,15 +124,21 @@ let UI;
 let FILE_QUEUE = [];
 
 
-const dirSize = async dir => {
-    const files = await readdir(dir, {withFileTypes: true});
-    const atimes = [];
+const dirInfo = async ({folder = undefined, recursive = false}) => {
+    const files = await readdir(folder, {withFileTypes: true});
+    const ctimes = [];
     const paths = files.map(async file => {
-        const path = p.join(dir, file.name);
-        if (file.isDirectory()) return await dirSize(path);
-        if (file.isFile()) {
-            const {size, atimeMs} = await stat(path);
-            atimes.push([path, atimeMs, size]);
+        const path = p.join(folder, file.name);
+        if (file.isDirectory()) {
+            if (recursive) {
+                return await dirInfo({folder: path, recursive: true})
+            } else {
+                return 0
+            }
+        }
+        if (file.isFile() || file.isSymbolicLink()) {
+            const {size, ctimeMs} = await stat(path);
+            ctimes.push([path, ctimeMs, size]);
             return size
 
         }
@@ -140,25 +146,56 @@ const dirSize = async dir => {
     });
     const size = (await Promise.all(paths)).flat(Infinity).reduce((i, size) => i + size, 0);
     // Newest to oldest file, so we can pop the list (faster)
-    atimes.sort((a, b) => {
-        return b[1] - a[1]
+    ctimes.sort((a, b) => {
+        return a[1] - b[1]
     })
-
-    console.table(atimes);
-    return [size, atimes];
+    //console.table(ctimes);
+    return [size, ctimes];
 }
 
-const clearCache = async (fileCache, sizeLimitInGB) => {
+const clearCache = async (fileCache, sizeLimitInGB, message) => {
     // Cache size
-    let [size, aTimes] = await dirSize(fileCache);
-    while (size > sizeLimitInGB * 1024**3) {
-        const [file, , fileSize] = aTimes.pop();
-        fs.rmSync(file, {force: true});
-        console.log('removed ' + file);
-        size -= fileSize;
-        console.log('size is now ' + size + 'bytes')
+    let [size, ctimes] = await dirInfo({folder: fileCache});
+    const requiredSpace = sizeLimitInGB * 1024 ** 3;
+    // If Full, clear at least 25% of cache, so we're not doing this too frequently
+    let newSize;
+    if (size > requiredSpace) {
+        // while (size > requiredSpace && COMPLETED.length) {
+        while (COMPLETED.length > 1) {
+            const file = COMPLETED.shift();
+            const proxy = metadata[file].proxy;
+            // Make sure we don't delete original files!
+            if (proxy !== file) {
+                const stat = fs.lstatSync(proxy);
+                // Remove tmp file from metadata
+                fs.rmSync(proxy, {force: true});
+                // Unset the proxy field in metadata
+                metadata[file].proxy = undefined;
+                console.log(`removed ${file} from cache`);
+                size -= stat.size;
+            }
+        }
+        if (!COMPLETED.length) {
+            console.log('All completed files removed from cache')
+            // Cache still full?
+            if (size > requiredSpace) {
+                console.log('Cache still full')
+            }
+        }
+        //newSize = Math.min(size * 0.9, requiredSpace);
+        // while (size > requiredSpace) {
+        //     console.log(message);
+        //     const [file, ctime, fileSize] = ctimes.shift();
+        //     fs.rmSync(file, {force: true});
+        //     const oldest = ctimes.length ? ctimes[0][1] : 'No files left';
+        //     console.log(`removed ${file} with ctime ${ctime} most recent ctime is ${oldest}`);
+        //     size -= fileSize;
+        //     //console.log('size is now ' + size + 'bytes')
+        // }
+        //console.log('cache size after pruning is: ' + (size / 1024 ** 3).toFixed(2) + 'GB')
+        return true
     }
-    console.log('cache size is: ' + size)
+    return false
 }
 
 ipcRenderer.on('new-client', (event) => {
@@ -174,10 +211,18 @@ ipcRenderer.on('new-client', (event) => {
                 TEMP = args.temp;
                 appPath = args.path;
                 CACHE_LOCATION = p.join(TEMP, 'chirpity');
+                if (!fs.existsSync(CACHE_LOCATION)) fs.mkdirSync(CACHE_LOCATION);
                 await clearCache(CACHE_LOCATION, 0);  // belt and braces - in dev mode, ctrl-c will prevent cache clear on exit
                 break;
             case 'set-variables':
-                latitude = args.lat; longitude = args.lon; TEMP = args.temp; appPath = args.path;
+                latitude = args.lat;
+                longitude = args.lon;
+                TEMP = args.temp;
+                appPath = args.path;
+                break;
+            case 'open-files':
+                const files = await getFiles(args.files)
+
                 break;
             case 'update-record':
                 args.db = diskDB;
@@ -204,6 +249,8 @@ ipcRenderer.on('new-client', (event) => {
             case 'file-load-request':
                 index = 0;
                 if (predicting) onAbort(args);
+                // Create a new memory db
+                await createDB();
                 console.log('Worker received audio ' + args.file);
                 predictionsRequested = 0;
                 predictionsReceived = 0;
@@ -248,8 +295,38 @@ ipcRenderer.on('new-client', (event) => {
     }
 })
 
-// No need to pass through arguments object, so arrow function used.
 
+const getFiles = async (files) => {
+    let file_list = [];
+    for (let i = 0; i < files.length; i++) {
+        const stats = fs.lstatSync(files[i])
+        if (stats.isDirectory()) {
+            const dirFiles = await getFilesInDirectory(files[i])
+            file_list = file_list.concat(dirFiles)
+        } else {
+            file_list.push(files[i])
+        }
+    }
+    UI.postMessage({event: 'files', filePaths: file_list});
+}
+
+// Get a list of files in a folder and subfolders
+const getFilesInDirectory = async dir => {
+    const files = await readdir(dir, {withFileTypes: true});
+    let file_map = files.map(async file => {
+        const path = p.join(dir, file.name);
+        if (file.isDirectory()) return await getFilesInDirectory(path);
+        if (file.isFile() || file.isSymbolicLink()) {
+            return path
+        }
+        return 0;
+    });
+    file_map = (await Promise.all(file_map)).flat(Infinity)
+    return file_map
+}
+
+
+// No need to pass through arguments object, so arrow function used.
 
 /**
  * Summary SQL:
@@ -333,7 +410,6 @@ async function onAnalyse({
         index = 0;
         AUDACITY = [];
         RESULTS = [];
-        await createDB();
     }
     latitude = lat;
     longitude = lon;
@@ -401,6 +477,8 @@ function onAbort({
     }
     predicting = false;
     predictionDone = true;
+    predictionsReceived = 0;
+    predictionsRequested = 0;
     UI.postMessage({event: 'prediction-done', audacityLabels: AUDACITY, batchInProgress: false});
 }
 
@@ -439,14 +517,16 @@ const convertFileFormat = (file, destination, size, error) => {
             .on('codecData', async data => {
                 // HERE YOU GET THE TOTAL TIME
                 totalTime = parseInt(data.duration.replace(/:/g, ''))
-                // And Final file size
-                const a = data.duration.split(':'); // split it at the colons
-                const seconds = (+a[0]) * 60 * 60 + (+a[1]) * 60 + (+a[2]);
-                // As this is uncompressed PCM we can calculate the final file size
-                // And clear space in the cache to accommodate the new file
-                finalSizeInGB = (seconds * sampleRate * channels * bitDepth) / 1024**3;
-                const limit = 4 - finalSizeInGB;
-                await clearCache(CACHE_LOCATION, limit);
+                // // And Final file size
+                // const a = data.duration.split(':'); // split it at the colons
+                // const seconds = (+a[0]) * 60 * 60 + (+a[1]) * 60 + (+a[2]);
+                // // As this is uncompressed PCM we can calculate the final file size
+                // // And clear space in the cache to accommodate the new file
+                // finalSizeInGB = (seconds * sampleRate * channels * bitDepth) / 1024 ** 3;
+                // // Hard coded cache size 50GB
+                // const limit = 0.1 - finalSizeInGB;
+                // const message = `Processing ${file} about to clear the cache`;
+                // await clearCache(CACHE_LOCATION, limit, message);
             })
             .on('progress', (progress) => {
                 // HERE IS THE CURRENT TIME
@@ -480,9 +560,9 @@ const convertFileFormat = (file, destination, size, error) => {
  * @returns {Promise<boolean|*>}
  */
 async function getWorkingFile(file) {
-    if (metadata[file] && metadata[file].isComplete) return metadata[file].proxy;
+    if (metadata[file] && metadata[file].isComplete && metadata[file].proxy) return metadata[file].proxy;
     // find the file
-    const source_file = await locateFile(file);
+    const source_file = fs.existsSync(file) ? file : await locateFile(file);
     if (!source_file) return false;
     let proxy = source_file;
 
@@ -508,7 +588,9 @@ async function getWorkingFile(file) {
             await utimes(proxy, sourceMtime.getTime());
         }
     }
-    await getMetadata({file: file, proxy: proxy, source_file: source_file});
+    if (!metadata[file] || !metadata[file].isComplete) {
+        await getMetadata({file: file, proxy: proxy, source_file: source_file});
+    }
     return proxy;
 }
 
@@ -521,13 +603,13 @@ async function locateFile(file) {
     // Ordered from the highest likely quality to lowest
     const supported_files = ['.wav', '.flac', '.opus', '.m4a', '.mp3', '.mpga', '.ogg', '.aac', '.mpeg', '.mp4'];
     const dir = p.parse(file).dir, name = p.parse(file).name;
-    let [, folderInfo] = await dirSize(dir);
+    let [, folderInfo] = await dirInfo({folder: dir, recursive: false});
     let filesInFolder = [];
-    folderInfo.forEach(item =>{
+    folderInfo.forEach(item => {
         filesInFolder.push(item[0])
     })
     let supportedVariants = []
-    supported_files.forEach(ext =>{
+    supported_files.forEach(ext => {
         supportedVariants.push(p.join(dir, name + ext))
     })
     const matchingFileExt = supportedVariants.find(variant => {
@@ -676,7 +758,12 @@ const convertTimeToBytes = (time, metadata) => {
 }
 
 async function setupCtx(chunk, header) {
-    chunk = Buffer.concat([header, chunk]);
+    // Deal with detached arraybuffer issue
+    try {
+        chunk = Buffer.concat([header, chunk]);
+    } catch {
+        return false
+    }
     const audioBufferChunk = await audioCtx.decodeAudioData(chunk.buffer);
     const source = audioCtx.createBufferSource();
     source.buffer = audioBufferChunk;
@@ -707,15 +794,19 @@ const getAudioBuffer = (start, end, file) => {
         readStream.pause();
         return new Promise(async (resolve, reject) => {
             const offlineCtx = await setupCtx(chunk, metadata[file].header);
-            offlineCtx.startRendering().then(
-                (resampled) => {
-                    resolve(resampled);
-                    // Now the async stuff is done ==>
-                    readStream.resume();
-                }).catch((err) => {
-                console.error(`PredictBuffer rendering failed: ${err}`);
-                // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
-            });
+            if (offlineCtx) {
+                offlineCtx.startRendering().then(
+                    (resampled) => {
+                        resolve(resampled);
+                        // Now the async stuff is done ==>
+                        readStream.resume();
+                    }).catch((err) => {
+                    console.error(`PredictBuffer rendering failed: ${err}`);
+                    // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
+                });
+            } else {
+                reject('Detected array buffer')
+            }
         })
     })
     readStream.on('end', function () {
@@ -763,8 +854,8 @@ const getPredictBuffers = async ({
     readStream.on('data', async chunk => {
         // Ensure data is processed in order
         readStream.pause();
-        if (chunk.length > 6000) { // 1/4 of a second
-            const offlineCtx = await setupCtx(chunk, metadata[file].header);
+        const offlineCtx = await setupCtx(chunk, metadata[file].header);
+        if (offlineCtx) {
             offlineCtx.startRendering().then(
                 (resampled) => {
                     const myArray = resampled.getChannelData(0);
@@ -779,7 +870,10 @@ const getPredictBuffers = async ({
                 // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
             });
         } else {
-            console.log('Short chunk', chunk.length, 'skipping')
+            console.log('Short end chunk', chunk.length, 'skipping')
+            // Create array with 0's (short segment of silence that will trigger the finalChunk flag
+            const myArray = new Float32Array(new Array(1000).fill(0));
+            feedChunksToModel(myArray, chunkLength, chunkStart, file, end, resetResults);
             readStream.resume();
         }
     })
@@ -851,8 +945,10 @@ const fetchAudioBuffer = async ({
 }
 
 function sendMessageToWorker(chunkStart, chunks, file, duration, resetResults, predictionsRequested) {
-    const finalChunk = chunkStart / sampleRate + (chunks.length * 3) >= (duration - 3);
-
+    // - 0.25: We may not send the last quarter of a second (v. small buffers cause issues in webAudio rendering)
+    const finalChunk = (chunkStart / sampleRate) + (chunks.length * 3) >= duration;
+    // const finalChunk = duration % 3 > 0 ? (chunkStart / sampleRate) + (chunks.length * 3) > duration:
+    //     chunks[chunks.length -1].length < 72000;
     const objData = {
         message: 'predict',
         fileStart: metadata[file].fileStart,
@@ -1080,7 +1176,7 @@ function spawnWorker(model, list, batchSize, warmup) {
     console.log(`spawning worker with ${list}, ${batchSize}, ${warmup}`)
     predictWorker = new Worker('./js/model.js');
     //const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
-    const modelPath = model === 'efficientnet' ? '../test_big_3/' : '../24000_v9/';
+    const modelPath = model === 'efficientnet' ? '../test_big_7/' : '../24000_v9/';
     console.log(modelPath);
     // Now we've loaded a new model, clear the aborted flag
     aborted = false;
@@ -1114,8 +1210,9 @@ const parsePredictions = (response) => {
         }
     })
     if (response.finished) {
+        COMPLETED.push(file);
         if (RESULTS.length === 0) {
-            const result = "No predictions.";
+            const result = `No predictions found in ${file}`;
             UI.postMessage({
                 event: 'prediction-ongoing',
                 file: file,
@@ -1157,6 +1254,8 @@ async function parseMessage(e) {
         if (response['finished']) {
             process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, Prediction requests ${predictionsRequested}, predictions received ${predictionsReceived}    \r`)
             if (predictionsReceived === predictionsRequested) {
+                const limit = 0.1
+                await clearCache(CACHE_LOCATION, limit);
                 // This is the one time results *do not* come from the database
                 let summary;
                 if (!batchInProgress) {
@@ -1170,7 +1269,6 @@ async function parseMessage(e) {
                     audacityLabels: AUDACITY,
                     batchInProgress: batchInProgress,
                 })
-                //await onSave2DB(memoryDB);
             }
             await processNextFile();
         }
@@ -1186,12 +1284,12 @@ async function parseMessage(e) {
 
 // Optional Arguments
 async function processNextFile({
-                                   confidence = 0.5,
+                                   confidence = minConfidence,
                                    start = undefined,
                                    end = undefined,
                                    resetResults = false,
-                                   lat = 51,
-                                   lon = -0.4,
+                                   lat = latitude,
+                                   lon = longitude,
                                    nocmig = NOCMIG
                                } = {}) {
     if (FILE_QUEUE.length) {
@@ -1201,7 +1299,7 @@ async function processNextFile({
             if (!start) [start, end] = await setStartEnd(file);
             if (start === 0 && end === 0) {
                 // Nothing to do for this file
-                const result = "No predictions.";
+                const result = `No predictions.for ${file}. It has no period within it where predictions would be given`;
                 if (!FILE_QUEUE.length) {
                     UI.postMessage({
                         event: 'prediction-ongoing',
@@ -1232,7 +1330,6 @@ async function processNextFile({
     } else {
         predicting = false;
         return true
-        //await onSave2DB(memoryDB);
     }
 }
 
@@ -1301,22 +1398,22 @@ const getCachedSummary = ({
         context: 'summary'
     });
     return new Promise(function (resolve, reject) {
-        db.all(`SELECT MAX(conf1) as max, cname, sname, COUNT(cname) as count
-                FROM records
-                    INNER JOIN species
-                ON species.id = birdid1
-                    INNER JOIN files ON fileID = files.rowid
-                    ${where} ${when}
-                GROUP BY cname
-                ORDER BY max (conf1) DESC;`,
-            (err, rows) => {
-                if (err) {
-                    reject(err)
-                } else {
-                    resolve(rows)
-                }
-            })
-    })
+            db.all(`SELECT MAX(conf1) as max, cname, sname, COUNT(cname) as count
+                    FROM records
+                        INNER JOIN species
+                    ON species.id = birdid1
+                        INNER JOIN files ON fileID = files.rowid
+                        ${where} ${when}
+                    GROUP BY cname
+                    ORDER BY max (conf1) DESC;`,
+                function (err, rows) {
+                    if (err) {
+                        reject(err)
+                    } else {
+                        resolve(rows)
+                    }
+                })
+        })
 }
 
 
@@ -1326,12 +1423,12 @@ const dbSpeciesCheck = () => {
                     FROM species`, (err, row) => {
             if (row) {
                 if (parseInt(row.speciesCount) !== labels.length) {
-                    UI.postMessage({
-                        event: 'generate-alert',
+        UI.postMessage({
+            event: 'generate-alert',
                         message: `Warning:\nThe ${row.speciesCount} species in the archive database does not match the ${labels.length} species being used by the model.`
-                    })
+        })
                     resolve(false)
-                }
+    }
                 resolve(row.speciesCount)
             } else {
                 reject(err)
@@ -1415,12 +1512,12 @@ const getFileInfo = async (file) => {
 const updateFileTables = async (db, file) => {
     if (!metadata[file] || !metadata[file].isComplete) await getWorkingFile(file);
     return new Promise(function (resolve) {
-        const newFileStmt = db.prepare("INSERT INTO files VALUES (?,?,?)");
+        const newFileStmt = db.prepare("INSERT OR IGNORE INTO files VALUES (?,?,?)");
         const selectStmt = db.prepare('SELECT rowid FROM files WHERE name = (?)');
         const durationStmt = db.prepare("INSERT OR REPLACE INTO duration VALUES (?,?,?)");
-        newFileStmt.run(file, metadata[file].duration, metadata[file].fileStart, (err, row) => {
+        newFileStmt.run(file, metadata[file].duration, metadata[file].fileStart, function (err, row) {
             for (const [date, duration] of Object.entries(metadata[file].dateDuration)) {
-                selectStmt.get(file, (err, row) => {
+                selectStmt.get(file, function (err, row) {
                     const fileid = row.rowid;
                     console.log('file table updated')
                     resolve(fileid);
@@ -1899,9 +1996,10 @@ Todo: bugs
     "unable to locate source file with any supported extension mp3" when browsing files in filename list
     Confidence filter not honoured on refresh results
     ***Table does not always expand to fit when summary table absent
-    Predictions requests/received not equal at end of long analyses.
-    Memory dumps with long analyses.
-    Limit 2500 files to create dataset.
+    *??Predictions requests/received not equal at end of long analyses.
+    *??Memory dumps with long analyses.
+    ***Limit 2500 files to create dataset. Limit seems to be with drag and drop.
+    ***Load folder
 
 Todo: Database
      Database delete: records, files (and all associated records). Use when reanalysing
@@ -1915,9 +2013,16 @@ Todo: Location.
 Todo cache:
     ***Clear cache on application exit, as well as start
     ***Set max cache size
+    ***Cache fills before analyse complete. So it fills up ahead of predictions, and files get deleted
+        before they're done with
+    ***Now cache is limited, need to re-open file when browsing and file not present
+
+Todo: manual entry
+    check creation of manual entries
+    get entry to appear in position among existing detections and centre on it **********************
 
 Todo: UI
-    Drag folder to load audio files within
+    ***Drag folder to load audio files within (recursively)
     Stop flickering when updating results
     Expose SNR feature
     Pagination? Limit table records to say, 1000
@@ -1932,13 +2037,17 @@ Todo: Charts
     Rip out highcharts, use chart.js?
     Allow multiple species comparison, e.g. compare Song Thrush and Redwing peak migration periods
 
+Todo: Explore
+    Make summary range aware
+
 Todo: Performance
     Explore spawning predictworker from UI, Shared worker??
         => hopefully prevents  background throttling (imapact TBD)
+    Can we avoid the datasync in snr routine?
 
 Todo: model.
- Improve accuracy, accuracy accuracy!
- Establish classes protocol. What's in, what name to give it
+     Improve accuracy, accuracy accuracy!
+     Establish classes protocol. What's in, what name to give it
 
 Todo: Releases
      Limit features for free users
