@@ -101,7 +101,7 @@ async function loadDB(path) {
     if (path) {
         const file = p.join(path, 'archive.sqlite')
         if (!fs.existsSync(file)) {
-                await createDB(file);
+            await createDB(file);
         } else {
             diskDB = new sqlite3.Database(file);
             console.log("Opened disk db " + file)
@@ -261,12 +261,13 @@ ipcRenderer.on('new-client', (event) => {
                 await loadAudioFile(args);
                 break;
             case 'filter':
-                await sendResults2UI(args);
+                args.db = memoryDB;
+                await getCachedResults(args);
                 break;
             case 'explore':
                 args.db = diskDB;
                 args.explore = true;
-                await sendResults2UI(args);
+                await getCachedResults(args);
                 break;
             case 'analyse':
                 predictionsReceived = 0;
@@ -328,69 +329,6 @@ const getFilesInDirectory = async dir => {
 
 // No need to pass through arguments object, so arrow function used.
 
-/**
- * Summary SQL:
- * select max(conf1), cname, sname, count(cname) from records inner join species on species.id = birdid1 inner join files on fileID = files.rowid  where files.name in ('/Users/matthew/Desktop/220805_1160.wav') group by cname order by max(conf1) desc;
- *
- *
- * @param db
- * @param species
- * @param range
- * @param filelist
- * @returns {Promise<void>}
- */
-
-
-const sendResults2UI = async ({
-                                  db = memoryDB,
-                                  species = undefined,
-                                  range = undefined,
-                                  filelist = undefined,
-                                  explore = false
-                              }) => {
-    // reset results table
-    UI.postMessage({event: 'reset-results'});
-    // And clear results from memory
-
-    RESULTS = [];
-    let summary;
-    let results = await getCachedResults({
-        db: db,
-        species: species,
-        range: range,
-        files: filelist
-    });
-    summary = await getCachedSummary({db: db, files: filelist, species: species, explore: explore})
-    // No results? Try the archive
-    if (!results.length && !summary.length) {
-        console.log(`No results in ${db.filename.replace(/.*\//, '')}, trying the archive db.`);
-        results = await getCachedResults({db: diskDB, species: species, range: range, files: filelist});
-        // Get the summary from the diskdb to send on prediction done
-        summary = await getCachedSummary({db: diskDB, files: filelist, species: species, explore: explore})
-    }
-    index = 0;
-    results.forEach(result => {
-        //format dates
-        //result.timestamp = new Date(result.timestamp);
-        //result.position = new Date(result.position);
-        index++;
-        UI.postMessage({
-            event: 'prediction-ongoing',
-            file: result.file,
-            result: result,
-            index: index,
-        });
-        RESULTS.push(result);
-    })
-
-    UI.postMessage({
-        event: 'prediction-done',
-        summary: summary,
-        batchInProgress: false,
-        filterSpecies: species,
-    });
-}
-
 // Not an arrow function. Async function has access to arguments - so we can pass them to processnextfile
 async function onAnalyse({
                              files = [],
@@ -427,32 +365,9 @@ async function onAnalyse({
             FILE_QUEUE.splice(place, 1); // 2nd parameter means remove one item only
         }
         // Pull the results from the database
-        const results = await getCachedResults({db: diskDB, files: [cachedFile], range: {}});
-        const summary = await getCachedSummary({db: diskDB, files: [cachedFile]});
+        const resultCount = await getCachedResults({db: diskDB, files: [cachedFile], range: {}});
         UI.postMessage({event: 'update-audio-duration', value: metadata[cachedFile].duration});
-        results.forEach(result => {
-            //format dates
-            result.timestamp = new Date(result.timestamp);
-            //result.position = new Date(result.position);
-            index++;
-            UI.postMessage({
-                event: 'prediction-ongoing',
-                file: result.file,
-                result: result,
-                index: index,
-                resetResults: false,
-            });
-            RESULTS.push(result);
-        })
-        console.log(`Pulling results for ${file} from the memory database`);
-        // When in batch mode the 'prediction-done' event simply increments
-        // the counter for the file being processed
-        UI.postMessage({
-            event: 'prediction-done',
-            batchInProgress: false,
-            summary: summary
-        });
-        //if (FILE_QUEUE.length) await processNextFile();
+
     } else if (!predicting) {
         predicting = true;
         minConfidence = confidence;
@@ -1398,22 +1313,28 @@ const getCachedSummary = ({
         context: 'summary'
     });
     return new Promise(function (resolve, reject) {
-            db.all(`SELECT MAX(conf1) as max, cname, sname, COUNT(cname) as count
-                    FROM records
-                        INNER JOIN species
-                    ON species.id = birdid1
-                        INNER JOIN files ON fileID = files.rowid
-                        ${where} ${when}
-                    GROUP BY cname
-                    ORDER BY max (conf1) DESC;`,
-                function (err, rows) {
-                    if (err) {
-                        reject(err)
-                    } else {
-                        resolve(rows)
-                    }
-                })
-        })
+        db.all(`SELECT MAX(conf1) as max, cname, sname, COUNT(cname) as count
+                FROM records
+                    INNER JOIN species
+                ON species.id = birdid1
+                    INNER JOIN files ON fileID = files.rowid
+                    ${where} ${when}
+                GROUP BY cname
+                ORDER BY max (conf1) DESC;`,
+            function (err, summary) {
+                if (err) {
+                    reject(err)
+                } else {
+                    UI.postMessage({
+                        event: 'prediction-done',
+                        summary: summary,
+                        filterSpecies: species,
+                        batchInProgress: false,
+                    })
+                    resolve(summary)
+                }
+            })
+    })
 }
 
 
@@ -1423,12 +1344,12 @@ const dbSpeciesCheck = () => {
                     FROM species`, (err, row) => {
             if (row) {
                 if (parseInt(row.speciesCount) !== labels.length) {
-        UI.postMessage({
-            event: 'generate-alert',
+                    UI.postMessage({
+                        event: 'generate-alert',
                         message: `Warning:\nThe ${row.speciesCount} species in the archive database does not match the ${labels.length} species being used by the model.`
-        })
+                    })
                     resolve(false)
-    }
+                }
                 resolve(row.speciesCount)
             } else {
                 reject(err)
@@ -1442,39 +1363,69 @@ const getCachedResults = ({
                               range = undefined,
                               files = [],
                               species = undefined,
+                              explore = false
                           }) => {
+    // reset results table in UI
+    UI.postMessage({event: 'reset-results'});
+    // Clear results from memory
+    RESULTS = [];
     const [where, when] = setWhereWhen({
         dateRange: range,
         species: species,
         files: files,
         context: 'results'
     });
+    let index = 0;
     return new Promise(function (resolve, reject) {
-        db.all(`SELECT dateTime AS timestamp, position AS position, 
+        // db.each doesn't call the callback if there are no results, so:
+        db.each(`SELECT dateTime AS timestamp, position AS position, 
             s1.cname as cname, s2.cname as cname2, s3.cname as cname3, 
             birdid1 as id_1, birdid2 as id_2, birdid3 as id_3, 
             position as
-                start, position + 3 as
+                 start, position + 3 as
                 end
-                ,  
-                conf1 as score, conf2 as score2, conf3 as score3, 
+                , conf1 as score, conf2 as score2, conf3 as score3, 
                 s1.sname as sname, s2.sname as sname2, s3.sname as sname3,
-                files.duration, 
-                files.name as file,
-                comment,
-                    label
+                files.duration, files.name as file, comment, label
                 FROM records 
                 LEFT JOIN species s1 on s1.id = birdid1 
                 LEFT JOIN species s2 on s2.id = birdid2 
                 LEFT JOIN species s3 on s3.id = birdid3 
                 INNER JOIN files on files.rowid = records.fileid
                 ${where}
-                ${when}`,
-            (err, rows) => {
+                ${when}
+                ORDER BY timestamp`
+                ,
+            (err, result) => {
                 if (err) {
                     reject(err)
+                } else { // on each result
+                    //format dates
+                    result.timestamp = new Date(result.timestamp);
+                    //result.position = new Date(result.position);
+                    index++;
+                    UI.postMessage({
+                        event: 'prediction-ongoing',
+                        file: result.file,
+                        result: result,
+                        index: index,
+                        resetResults: false,
+                    });
+                    RESULTS.push(result);
+                }
+            },
+            async (err, count) => {   //on finish
+                if (!count) {  // count === 0 => no results
+                    if (db.filename === ':memory:') {
+                        // No results in memory? Try the archive
+                        console.log(`No results in ${db.filename.replace(/.*\//, '')}, trying the archive db.`);
+                        await getCachedResults({db: diskDB, species: species, range: range, files: files});
+                    } else {
+                        resolve(0);
+                    }
                 } else {
-                    resolve(rows)
+                    await getCachedSummary({db: db, files: files, species: species, explore: explore});
+                    resolve(count)
                 }
             })
     })
@@ -1516,10 +1467,11 @@ const updateFileTables = async (db, file) => {
         const selectStmt = db.prepare('SELECT rowid FROM files WHERE name = (?)');
         const durationStmt = db.prepare("INSERT OR REPLACE INTO duration VALUES (?,?,?)");
         newFileStmt.run(file, metadata[file].duration, metadata[file].fileStart, function (err, row) {
+            const changes = this.changes;
             for (const [date, duration] of Object.entries(metadata[file].dateDuration)) {
                 selectStmt.get(file, function (err, row) {
                     const fileid = row.rowid;
-                    console.log('file table updated')
+                    if (changes) console.log('file table updated')
                     resolve(fileid);
                     durationStmt.run(date, Math.round(duration).toFixed(0), fileid);
                 })
@@ -1874,7 +1826,7 @@ async function onUpdateRecord({
                     console.log(`Update without transaction took ${Date.now() - t0} milliseconds`);
                     const species = isFiltered || isExplore ? from : '';
                     if (isExplore) openFiles = [];
-                    await sendResults2UI({db: db, filelist: openFiles, species: species, explore: isExplore});
+                    await getCachedResults({db: db, filelist: openFiles, species: species, explore: isExplore});
                     resolve(this.changes)
                 } else {
                     console.log(`No records updated in ${db.filename.replace(/.*\//, '')}`)
@@ -2006,8 +1958,10 @@ Todo: Database
      Database file path update, batch update - so we can move files around after analysis
      Move database functions to separate file
      Compatibility with updates, esp. when num classes change
+     Create a new database for each model with appropriate num classes
 
 Todo: Location.
+
      Associate lat lon with files, expose lat lon settings in UI. Allow for editing once saved
 
 Todo cache:

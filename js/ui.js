@@ -385,7 +385,7 @@ function zoomSpec(direction) {
 
 async function showOpenDialog() {
     const files = await window.electron.openDialog('showOpenDialog');
-    if (!files.canceled)  await onOpenFiles({filePaths: files.filePaths});
+    if (!files.canceled) await onOpenFiles({filePaths: files.filePaths});
 }
 
 function updateFileName(files, openfile) {
@@ -453,7 +453,7 @@ function updateFileName(files, openfile) {
  * required filesystem routines
  * @param filePaths
  */
-const openFiles = ({filePaths}) =>{
+const openFiles = ({filePaths}) => {
     worker.postMessage({action: 'open-files', files: filePaths})
 }
 
@@ -2314,13 +2314,13 @@ async function onPredictionDone({
             const targetClass = target.classList;
             if (targetClass.contains('text-warning')) {
                 // Clicked on filtered species icon
-                worker.postMessage({action: 'filter', filelist: fileList});
+                worker.postMessage({action: 'filter', files: fileList});
                 speciesViewIsFiltered = false
             } else {
                 // Clicked on unfiltered species name
                 // Remove any exclusion from the species to filter
                 const species = target.innerHTML.replace(/\s<.*/, '');
-                worker.postMessage({action: 'filter', species: species, filelist: fileList});
+                worker.postMessage({action: 'filter', species: species, files: fileList});
                 speciesViewIsFiltered = true;
             }
         }
@@ -2370,13 +2370,14 @@ function scrollResults(row) {
 async function renderResult(args) {
     const result = args.result, file = args.file;
     let index = args.index;
+    const subRowThreshold = 0.01;
     // Memory saver
     if (index > 3000) return
     // Convert timestamp and position to date so easier to format results in UI
     let timestamp = new Date(result.timestamp);
     const position = new Date(result.position * 1000);
     // Datetime wrangling for Nocmig mode
-    if (typeof(result) !== 'string') {
+    if (typeof (result) !== 'string') {
         let astro = SunCalc.getTimes(timestamp, config.latitude, config.longitude);
         if (astro.dawn.setMilliseconds(0) < timestamp && astro.dusk.setMilliseconds(0) > timestamp) {
             result.dayNight = 'daytime';
@@ -2389,7 +2390,7 @@ async function renderResult(args) {
     if (index === 1 || -1) {
         showElement(['resultTableContainer'], false);
     }
-    if (typeof(result) === 'string') {
+    if (typeof (result) === 'string') {
         const nocturnal = config.nocmig ? '<b>during the night</b>' : '';
 
         tr += `<tr><td colspan="8">${result} (Predicting ${config.list} ${nocturnal} with at least ${config.minConfidence * 100}% confidence in the prediction)</td></tr>`;
@@ -2463,7 +2464,8 @@ async function renderResult(args) {
             <td class='specFeature download'><span class='material-icons-two-tone pointer'>file_download</span></td>
             <td class="comment text-end">${comment}</td>
         </tr>`;
-        if (result.score2 > 0.2) {
+
+        if (result.score2 > subRowThreshold) {
             tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" id='subrow${index}' class='subrow d-none'>
                 <th scope='row'>${index}</th>
                 <td class="timestamp ${showTimeOfDay}"> </td>
@@ -2478,7 +2480,7 @@ async function renderResult(args) {
                 <td> </td>
                 <td> </td>
                </tr>`;
-            if (result.score3 > 0.2) {
+            if (result.score3 > subRowThreshold) {
                 tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" id='subsubrow${index}' class='subrow d-none'>
                     <th scope='row'>${index}</th>
                     <td class='timestamp ${showTimeOfDay}'> </td>
@@ -2502,7 +2504,7 @@ async function renderResult(args) {
     //     scrollResults(tableRows[tableRows.length - 1])
     // }
     // Show the alternate detections toggle:
-    if (result.score2 > 0.2) {
+    if (result.score2 > subRowThreshold) {
         const id = `id${index}`;
         document.getElementById(id).classList.remove('d-none')
     }
@@ -2852,7 +2854,7 @@ document.addEventListener('drop', async (event) => {
         //console.log(f)
         filelist.push(f.path);
     }
-    if (filelist.length)  openFiles({filePaths: filelist})
+    if (filelist.length) openFiles({filePaths: filelist})
 });
 
 
