@@ -21,7 +21,7 @@ console.log(staticFfmpeg.path);
 ffmpeg.setFfmpegPath(staticFfmpeg.path);
 
 let predictionsRequested = 0, predictionsReceived = 0;
-let COMPLETED = [];
+let COMPLETED = [], OPENFILES = [];
 let diskDB, memoryDB, NOCMIG, latitude, longitude;
 
 const createDB = (file) => {
@@ -182,17 +182,6 @@ const clearCache = async (fileCache, sizeLimitInGB, message) => {
                 console.log('Cache still full')
             }
         }
-        //newSize = Math.min(size * 0.9, requiredSpace);
-        // while (size > requiredSpace) {
-        //     console.log(message);
-        //     const [file, ctime, fileSize] = ctimes.shift();
-        //     fs.rmSync(file, {force: true});
-        //     const oldest = ctimes.length ? ctimes[0][1] : 'No files left';
-        //     console.log(`removed ${file} with ctime ${ctime} most recent ctime is ${oldest}`);
-        //     size -= fileSize;
-        //     //console.log('size is now ' + size + 'bytes')
-        // }
-        //console.log('cache size after pruning is: ' + (size / 1024 ** 3).toFixed(2) + 'GB')
         return true
     }
     return false
@@ -205,24 +194,21 @@ ipcRenderer.on('new-client', (event) => {
         const action = args.action;
         console.log('message received ', action)
         switch (action) {
-            case 'init':
-                latitude = args.lat;
-                longitude = args.lon;
-                TEMP = args.temp;
-                appPath = args.path;
-                CACHE_LOCATION = p.join(TEMP, 'chirpity');
-                if (!fs.existsSync(CACHE_LOCATION)) fs.mkdirSync(CACHE_LOCATION);
-                await clearCache(CACHE_LOCATION, 0);  // belt and braces - in dev mode, ctrl-c will prevent cache clear on exit
-                break;
             case 'set-variables':
                 latitude = args.lat;
                 longitude = args.lon;
+                NOCMIG = args.nocmig;
+                minConfidence = args.confidence;
                 TEMP = args.temp;
                 appPath = args.path;
                 break;
+            case 'clear-cache':
+                CACHE_LOCATION = p.join(TEMP, 'chirpity');
+                if (!fs.existsSync(CACHE_LOCATION)) fs.mkdirSync(CACHE_LOCATION);
+                await clearCache(CACHE_LOCATION, 0);  // belt and braces - in dev mode, ctrl-c in console will prevent cache clear on exit
+                break;
             case 'open-files':
-                const files = await getFiles(args.files)
-
+                await getFiles(args.files)
                 break;
             case 'update-record':
                 args.db = diskDB;
@@ -263,11 +249,13 @@ ipcRenderer.on('new-client', (event) => {
             case 'filter':
                 args.db = memoryDB;
                 await getCachedResults(args);
+                await getCachedSummary(args);
                 break;
             case 'explore':
                 args.db = diskDB;
                 args.explore = true;
                 await getCachedResults(args);
+                await getCachedSummary(args);
                 break;
             case 'analyse':
                 predictionsReceived = 0;
@@ -332,46 +320,46 @@ const getFilesInDirectory = async dir => {
 // Not an arrow function. Async function has access to arguments - so we can pass them to processnextfile
 async function onAnalyse({
                              files = [],
-                             confidence = 0.5,
                              start = 0,
                              end = undefined,
                              resetResults = false,
-                             lat = 51,
-                             lon = -0.4,
-                             nocmig = false,
                              reanalyse = false
                          }) {
-    console.log(`Worker received message: ${files}, ${confidence}, start: ${start}, end: ${end}`);
+    console.log(`Worker received message: ${files}, ${minConfidence}, start: ${start}, end: ${end}`);
     // Analyse works on one file at a time
-    const file = files[0];
-    if (resetResults) {
-        index = 0;
-        AUDACITY = [];
-        RESULTS = [];
-    }
-    latitude = lat;
-    longitude = lon;
-    // Set global var, for parsePredictions
-    NOCMIG = nocmig;
-    FILE_QUEUE.push(file);
-    console.log(`Adding ${file} to the queue.`)
-    // check if results for the file have been saved to the disk DB
-    const cachedFile = await isDuplicate(file);
-    if (cachedFile && resetResults && !reanalyse) {
-        //remove the file from the queue - wherever it sits, this prevents out of
-        // sequence issues with batch analysis
-        const place = FILE_QUEUE.indexOf(file);
-        if (place > -1) { // only splice array when item is found
-            FILE_QUEUE.splice(place, 1); // 2nd parameter means remove one item only
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (resetResults) { // i.e. not "analyse selection"
+            //Set global OPENFILES for summary to use
+            OPENFILES = files;
+            index = 0;
+            AUDACITY = [];
+            RESULTS = [];
         }
-        // Pull the results from the database
-        const resultCount = await getCachedResults({db: diskDB, files: [cachedFile], range: {}});
-        UI.postMessage({event: 'update-audio-duration', value: metadata[cachedFile].duration});
-
-    } else if (!predicting) {
-        predicting = true;
-        minConfidence = confidence;
-        await processNextFile(arguments[0]);
+        // Set global var, for parsePredictions
+        FILE_QUEUE.push(file);
+        console.log(`Adding ${file} to the queue.`)
+        // check if results for the file have been saved to the disk DB
+        const cachedFile = await isDuplicate(file);
+        if (cachedFile && resetResults && !reanalyse) {
+            //remove the file from the queue - wherever it sits, this prevents out of
+            // sequence issues with batch analysis
+            const place = FILE_QUEUE.indexOf(file);
+            if (place > -1) { // only splice array when item is found
+                FILE_QUEUE.splice(place, 1); // 2nd parameter means remove one item only
+            }
+            // Pull the results from the database
+            const resultCount = await getCachedResults({db: diskDB, files: [cachedFile], range: {}});
+            UI.postMessage({event: 'update-audio-duration', value: metadata[cachedFile].duration});
+            // last file?
+            if (i === files.length - 1) {
+                await onSave2DB(memoryDB)
+                await getCachedSummary({files: files})
+            }
+        } else if (!predicting) {
+            predicting = true;
+            await processNextFile(arguments[0]);
+        }
     }
 }
 
@@ -692,45 +680,6 @@ async function setupCtx(chunk, header) {
     return offlineCtx;
 }
 
-const getAudioBuffer = (start, end, file) => {
-    const byteStart = convertTimeToBytes(start, metadata[file]);
-    const byteEnd = convertTimeToBytes(end, metadata[file]);
-    const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * 3;
-    const proxy = metadata[file].proxy;
-
-    const readStream = fs.createReadStream(proxy, {
-        start: byteStart,
-        end: byteEnd,
-        highWaterMark: highWaterMark
-    });
-
-    readStream.on('data', async chunk => {
-        // Ensure data is processed in order
-        readStream.pause();
-        return new Promise(async (resolve, reject) => {
-            const offlineCtx = await setupCtx(chunk, metadata[file].header);
-            if (offlineCtx) {
-                offlineCtx.startRendering().then(
-                    (resampled) => {
-                        resolve(resampled);
-                        // Now the async stuff is done ==>
-                        readStream.resume();
-                    }).catch((err) => {
-                    console.error(`PredictBuffer rendering failed: ${err}`);
-                    // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
-                });
-            } else {
-                reject('Detected array buffer')
-            }
-        })
-    })
-    readStream.on('end', function () {
-        readStream.close()
-    })
-    readStream.on('error', err => {
-        console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`)
-    })
-}
 /**
  *
  * @param file
@@ -1091,7 +1040,7 @@ function spawnWorker(model, list, batchSize, warmup) {
     console.log(`spawning worker with ${list}, ${batchSize}, ${warmup}`)
     predictWorker = new Worker('./js/model.js');
     //const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
-    const modelPath = model === 'efficientnet' ? '../test_big_7/' : '../24000_v9/';
+    const modelPath = model === 'efficientnet' ? '../test_big_5/' : '../24000_v9/';
     console.log(modelPath);
     // Now we've loaded a new model, clear the aborted flag
     aborted = false;
@@ -1175,15 +1124,14 @@ async function parseMessage(e) {
                 let summary;
                 if (!batchInProgress) {
                     await onSave2DB(memoryDB);
-                    summary = await getCachedSummary();
+                    // how do we know how many files to summarise?
+                    await getCachedSummary({files: OPENFILES});
+                } else {
+                    UI.postMessage({
+                        event: 'prediction-done',
+                        batchInProgress: true,
+                    })
                 }
-                UI.postMessage({
-                    event: 'prediction-done',
-                    file: file,
-                    summary: summary,
-                    audacityLabels: AUDACITY,
-                    batchInProgress: batchInProgress,
-                })
             }
             await processNextFile();
         }
@@ -1199,13 +1147,9 @@ async function parseMessage(e) {
 
 // Optional Arguments
 async function processNextFile({
-                                   confidence = minConfidence,
                                    start = undefined,
                                    end = undefined,
                                    resetResults = false,
-                                   lat = latitude,
-                                   lon = longitude,
-                                   nocmig = NOCMIG
                                } = {}) {
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
@@ -1328,6 +1272,7 @@ const getCachedSummary = ({
                     UI.postMessage({
                         event: 'prediction-done',
                         summary: summary,
+                        audacityLabels: AUDACITY,
                         filterSpecies: species,
                         batchInProgress: false,
                     })
@@ -1367,8 +1312,7 @@ const getCachedResults = ({
                           }) => {
     // reset results table in UI
     UI.postMessage({event: 'reset-results'});
-    // Clear results from memory
-    RESULTS = [];
+
     const [where, when] = setWhereWhen({
         dateRange: range,
         species: species,
@@ -1394,15 +1338,14 @@ const getCachedResults = ({
                 INNER JOIN files on files.rowid = records.fileid
                 ${where}
                 ${when}
-                ORDER BY timestamp`
-                ,
+                ORDER
+                BY
+                timestamp`
+            ,
             (err, result) => {
                 if (err) {
                     reject(err)
                 } else { // on each result
-                    //format dates
-                    result.timestamp = new Date(result.timestamp);
-                    //result.position = new Date(result.position);
                     index++;
                     UI.postMessage({
                         event: 'prediction-ongoing',
@@ -1412,6 +1355,11 @@ const getCachedResults = ({
                         resetResults: false,
                     });
                     RESULTS.push(result);
+                    AUDACITY.push({
+                        timestamp: `${result.start}\t${result.start + 3}`,
+                        cname: result.cname,
+                        score: result.score
+                    })
                 }
             },
             async (err, count) => {   //on finish
@@ -1424,7 +1372,6 @@ const getCachedResults = ({
                         resolve(0);
                     }
                 } else {
-                    await getCachedSummary({db: db, files: files, species: species, explore: explore});
                     resolve(count)
                 }
             })
@@ -1460,7 +1407,7 @@ const getFileInfo = async (file) => {
     })
 }
 
-const updateFileTables = async (db, file) => {
+const updateFileTables = async (db, file, filemap) => {
     if (!metadata[file] || !metadata[file].isComplete) await getWorkingFile(file);
     return new Promise(function (resolve) {
         const newFileStmt = db.prepare("INSERT OR IGNORE INTO files VALUES (?,?,?)");
@@ -1471,8 +1418,9 @@ const updateFileTables = async (db, file) => {
             for (const [date, duration] of Object.entries(metadata[file].dateDuration)) {
                 selectStmt.get(file, function (err, row) {
                     const fileid = row.rowid;
+                    filemap[file] = fileid; // top up the filemap to save unnecessary repeated calls to db
                     if (changes) console.log('file table updated')
-                    resolve(fileid);
+                    resolve([fileid, filemap]);
                     durationStmt.run(date, Math.round(duration).toFixed(0), fileid);
                 })
             }
@@ -1481,18 +1429,18 @@ const updateFileTables = async (db, file) => {
 }
 
 const getFileIDs = (db) => {
+    let filemap = {};
     return new Promise(function (resolve, reject) {
-        db.all('SELECT rowid, name FROM files',
-            (err, rows) => {
+        db.each('SELECT rowid, name FROM files',
+            (err, row) => {
                 if (err) {
                     reject(err)
                 } else {
-                    let filemap = {};
-                    rows.forEach(row => {
-                        filemap[row.name] = row.rowid
-                    })
-                    resolve(filemap)
+                    filemap[row.name] = row.rowid
                 }
+            },
+            (err, count) => {
+                resolve(filemap)
             })
     })
 }
@@ -1505,19 +1453,15 @@ const onSave2DB = async (db) => {
             db.run('BEGIN TRANSACTION');
             const stmt = db.prepare("INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?,?)");
             for (let i = 0; i < RESULTS.length; i++) {
-                const dateTime = new Date(RESULTS[i].timestamp).getTime();
-                const birdID1 = RESULTS[i].id_1;
-                const birdID2 = RESULTS[i].id_2;
-                const birdID3 = RESULTS[i].id_3;
-                const conf1 = RESULTS[i].score;
-                const conf2 = RESULTS[i].score2;
-                const conf3 = RESULTS[i].score3;
-                const position = RESULTS[i].position;
-                const file = RESULTS[i].file;
-                const comment = RESULTS[i].comment;
-                const label = RESULTS[i].label;
-                if (!filemap[file]) filemap[file] = await updateFileTables(db, file);
-                stmt.run(dateTime, birdID1, birdID2, birdID3, conf1, conf2, conf3, filemap[file], position, comment, label,
+                let r = {...RESULTS[i]};  // make a copy
+                if (filemap[r.file]) {
+                    r.file = filemap[r.file]
+                } else {
+                    let id;
+                    [id, filemap] = await updateFileTables(db, r.file, filemap);
+                    r.file = id;
+                }
+                stmt.run(r.timestamp, r.id_1, r.id_2, r.id_3, r.score, r.score2, r.score3, r.file, r.position, r.comment, r.label,
                     (err, row) => {
                         if (err) reject(err)
                         UI.postMessage({
@@ -1529,7 +1473,7 @@ const onSave2DB = async (db) => {
                             db.run('COMMIT', (err, rows) => {
                                 if (err) reject(err)
                                 UI.postMessage({event: 'progress', progress: 1.0});
-                                if (db === diskDB) {
+                                if (db === diskDB || memoryDB) {
                                     UI.postMessage({
                                         event: 'generate-alert',
                                         message: `${db.filename.replace(/.*\//, '')} database update complete, ${i + 1} records updated in ${((performance.now() - t0) / 1000).toFixed(3)} seconds`
@@ -1545,6 +1489,7 @@ const onSave2DB = async (db) => {
         }
     })
 }
+
 
 const getSeasonRecords = async (species, season) => {
     const seasonMonth = {spring: "< '07'", autumn: " > '06'"}
@@ -1826,7 +1771,7 @@ async function onUpdateRecord({
                     console.log(`Update without transaction took ${Date.now() - t0} milliseconds`);
                     const species = isFiltered || isExplore ? from : '';
                     if (isExplore) openFiles = [];
-                    await getCachedResults({db: db, filelist: openFiles, species: species, explore: isExplore});
+                    await getCachedResults({db: db, files: openFiles, species: species, explore: isExplore});
                     resolve(this.changes)
                 } else {
                     console.log(`No records updated in ${db.filename.replace(/.*\//, '')}`)
@@ -1952,16 +1897,19 @@ Todo: bugs
     *??Memory dumps with long analyses.
     ***Limit 2500 files to create dataset. Limit seems to be with drag and drop.
     ***Load folder
+    when current model list differs from the one used when saving records, getCachedResults gives wrong species
+    when nocmig mode on, getcachedresults for daytime files prints no results, but summary printed. No warning given.
+
+
 
 Todo: Database
      Database delete: records, files (and all associated records). Use when reanalysing
      Database file path update, batch update - so we can move files around after analysis
      Move database functions to separate file
      Compatibility with updates, esp. when num classes change
-     Create a new database for each model with appropriate num classes
+        -Create a new database for each model with appropriate num classes?
 
 Todo: Location.
-
      Associate lat lon with files, expose lat lon settings in UI. Allow for editing once saved
 
 Todo cache:
@@ -2001,7 +1949,10 @@ Todo: Performance
 
 Todo: model.
      Improve accuracy, accuracy accuracy!
+        - refine training
+        - look at snr for false positives impact
      Establish classes protocol. What's in, what name to give it
+     Speed - knowledge distillation??
 
 Todo: Releases
      Limit features for free users
@@ -2010,7 +1961,6 @@ Todo: Releases
      Implement version protocol
 
 Todo: IDs
-    Manual record entry
     Verified records -
     Search by label,
     Search for comment
