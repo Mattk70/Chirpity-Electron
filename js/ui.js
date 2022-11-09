@@ -581,6 +581,7 @@ analyseSelectionLink.addEventListener('click', async () => {
         files: [currentFile],
         start: start,
         end: end,
+        list: 'everything'
     });
     summary = {};
 });
@@ -600,11 +601,13 @@ function postAnalyseMessage(args) {
     //args.files.forEach(file => {
         worker.postMessage({
             action: 'analyse',
+            confidence: args.confidence,
             resetResults: args.resetResults,
             start: start,
             end: end,
             files: args.files,
-            reanalyse: args.reanalyse
+            reanalyse: args.reanalyse,
+            list: args.list || config.list
         });
     //})
     if (args.files.length > 1) {
@@ -695,12 +698,7 @@ thresholdLink.addEventListener('blur', (e) => {
         updatePrefs();
         worker.postMessage({
             action: 'set-variables',
-            path: appPath,
-            temp: tempPath,
-            lat: config.latitude,
-            lon: config.longitude,
             confidence: config.minConfidence,
-            nocmig: config.nocmig
         });
     } else {
         e.target.value = config.minConfidence * 100;
@@ -2774,6 +2772,10 @@ nocmigButton.addEventListener('click', function () {
         config.nocmig = true;
         nocmigButton.innerText = 'bedtime';
     }
+    worker.postMessage({
+        action: 'set-variables',
+        nocmig: config.nocmig,
+    });
     updatePrefs();
 })
 

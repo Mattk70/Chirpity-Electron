@@ -195,12 +195,14 @@ ipcRenderer.on('new-client', (event) => {
         console.log('message received ', action)
         switch (action) {
             case 'set-variables':
-                latitude = args.lat;
-                longitude = args.lon;
-                NOCMIG = args.nocmig;
-                minConfidence = args.confidence;
-                TEMP = args.temp;
-                appPath = args.path;
+                // This pattern to only update variables that have values
+                latitude = args.lat || latitude;
+                longitude = args.lon || longitude;
+                // Boolean value an issue with this pattern so...
+                if (Object.keys(args).includes('nocmig')) NOCMIG = args.nocmig;
+                minConfidence = args.confidence || minConfidence;
+                TEMP = args.temp || TEMP;
+                appPath = args.path || appPath;
                 break;
             case 'clear-cache':
                 CACHE_LOCATION = p.join(TEMP, 'chirpity');
@@ -323,10 +325,14 @@ async function onAnalyse({
                              start = 0,
                              end = undefined,
                              resetResults = false,
-                             reanalyse = false
+                             reanalyse = false,
+                             confidence = minConfidence,
+                             list = 'everything'
                          }) {
-    console.log(`Worker received message: ${files}, ${minConfidence}, start: ${start}, end: ${end}`);
+    console.log(`Worker received message: ${files}, ${confidence}, start: ${start}, end: ${end}, list ${list}`);
+    minConfidence = confidence;
     // Analyse works on one file at a time
+    predictWorker.postMessage({message: 'list', list: list})
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (resetResults) { // i.e. not "analyse selection"
