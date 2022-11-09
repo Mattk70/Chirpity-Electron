@@ -597,20 +597,16 @@ function postAnalyseMessage(args) {
         progressDiv.show();
         delete diagnostics['Audio Duration'];
     }
-    args.files.forEach(file => {
+    //args.files.forEach(file => {
         worker.postMessage({
             action: 'analyse',
-            confidence: args.confidence,
             resetResults: args.resetResults,
             start: start,
             end: end,
-            nocmig: config.nocmig,
-            lat: config.latitude,
-            lon: config.longitude,
-            files: [file],
+            files: args.files,
             reanalyse: args.reanalyse
         });
-    })
+    //})
     if (args.files.length > 1) {
         batchInProgress = true;
     }
@@ -697,6 +693,15 @@ thresholdLink.addEventListener('blur', (e) => {
     if (100 >= threshold && threshold >= 0) {
         config.minConfidence = parseFloat(e.target.value) / 100;
         updatePrefs();
+        worker.postMessage({
+            action: 'set-variables',
+            path: appPath,
+            temp: tempPath,
+            lat: config.latitude,
+            lon: config.longitude,
+            confidence: config.minConfidence,
+            nocmig: config.nocmig
+        });
     } else {
         e.target.value = config.minConfidence * 100;
     }
@@ -1089,11 +1094,13 @@ window.onload = async () => {
         showElement([config.colormap + 'span'], true)
         t0_warmup = Date.now();
         worker.postMessage({
-            action: 'init',
+            action: 'set-variables',
             path: appPath,
             temp: tempPath,
             lat: config.latitude,
-            lon: config.longitude
+            lon: config.longitude,
+            confidence: config.minConfidence,
+            nocmig: config.nocmig
         });
         worker.postMessage({
             action: 'load-model',
@@ -1102,7 +1109,7 @@ window.onload = async () => {
             batchSize: config.batchSize,
             warmup: config.warmup,
         });
-
+        worker.postMessage({action: 'clear-cache'})
     })
     // establish the message channel
     establishMessageChannel.then((success) => {
@@ -2252,8 +2259,7 @@ async function onPredictionDone({
     if (batchInProgress) {
         progressDiv.show();
         return;
-    } else {
-        PREDICTING = false;
+    } else {        PREDICTING = false;
     }
     updateSummary({summary: summary, filterSpecies: filterSpecies});
     scrolled = false;
