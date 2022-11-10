@@ -17,10 +17,12 @@ let TEMP, appPath, CACHE_LOCATION;
 
 const staticFfmpeg = require('ffmpeg-static-electron');
 const {stat} = require("fs/promises");
+const {mem} = require("systeminformation");
 console.log(staticFfmpeg.path);
 ffmpeg.setFfmpegPath(staticFfmpeg.path);
 
 let predictionsRequested = 0, predictionsReceived = 0;
+let activeTimestamp = undefined;
 let COMPLETED = [], OPENFILES = [];
 let diskDB, memoryDB, NOCMIG, latitude, longitude;
 
@@ -333,29 +335,31 @@ async function onAnalyse({
     minConfidence = confidence;
     // Analyse works on one file at a time
     predictWorker.postMessage({message: 'list', list: list})
+    //if (!end) { // i.e. not "analyse selection"
+        //Set global OPENFILES for summary to use
+        OPENFILES = files;
+        index = 0;
+        AUDACITY = [];
+        RESULTS = [];
+        COMPLETED = [];
+    //}
     for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (resetResults) { // i.e. not "analyse selection"
-            //Set global OPENFILES for summary to use
-            OPENFILES = files;
-            index = 0;
-            AUDACITY = [];
-            RESULTS = [];
-        }
+        let file = files[i];
         // Set global var, for parsePredictions
         FILE_QUEUE.push(file);
         console.log(`Adding ${file} to the queue.`)
         // check if results for the file have been saved to the disk DB
         const cachedFile = await isDuplicate(file);
-        if (cachedFile && resetResults && !reanalyse) {
+        if (cachedFile && !end && !reanalyse) {
             //remove the file from the queue - wherever it sits, this prevents out of
             // sequence issues with batch analysis
             const place = FILE_QUEUE.indexOf(file);
             if (place > -1) { // only splice array when item is found
                 FILE_QUEUE.splice(place, 1); // 2nd parameter means remove one item only
             }
+            file = cachedFile;
             // Pull the results from the database
-            const resultCount = await getCachedResults({db: diskDB, files: [cachedFile], range: {}});
+            const resultCount = await getCachedResults({db: diskDB, files: files, range: {}});
             UI.postMessage({event: 'update-audio-duration', value: metadata[cachedFile].duration});
             // last file?
             if (i === files.length - 1) {
@@ -370,9 +374,7 @@ async function onAnalyse({
 }
 
 function onAbort({
-                     model = 'efficientnet',
-                     list = 'migrants',
-                     warmup = true
+                     model = 'efficientnet', list = 'migrants', warmup = true
                  }) {
     aborted = true;
     FILE_QUEUE = [];
@@ -445,9 +447,7 @@ const convertFileFormat = (file, destination, size, error) => {
                 const percent = (time / totalTime) * 100
                 console.log('Processing: ' + percent + ' % converted');
                 UI.postMessage({
-                    event: 'progress',
-                    text: 'Decompressing file',
-                    progress: percent / 100
+                    event: 'progress', text: 'Decompressing file', progress: percent / 100
                 })
             })
             .on('end', () => {
@@ -488,11 +488,10 @@ async function getWorkingFile(file) {
 
             //console.log(Date.UTC(sourceMtime));
 
-            proxy = await convertFileFormat(source_file, destination, statsObj.size,
-                function (errorMessage) {
-                    console.log(errorMessage);
-                    return true;
-                });
+            proxy = await convertFileFormat(source_file, destination, statsObj.size, function (errorMessage) {
+                console.log(errorMessage);
+                return true;
+            });
             // assign the source file's save time to the proxy file
             await utimes(proxy, sourceMtime.getTime());
         }
@@ -527,8 +526,7 @@ async function locateFile(file) {
     })
     if (!matchingFileExt) {
         UI.postMessage({
-            event: 'generate-alert',
-            message: `Unable to load source file with any supported file extension: ${file}`
+            event: 'generate-alert', message: `Unable to load source file with any supported file extension: ${file}`
         })
         return false;
     }
@@ -536,11 +534,7 @@ async function locateFile(file) {
 }
 
 async function loadAudioFile({
-                                 file = '',
-                                 start = 0,
-                                 end = 20,
-                                 position = 0,
-                                 region = false
+                                 file = '', start = 0, end = 20, position = 0, region = false
                              }) {
     const found = await getWorkingFile(file);
     if (found) {
@@ -695,10 +689,7 @@ async function setupCtx(chunk, header) {
  * @returns {Promise<void>}
  */
 const getPredictBuffers = async ({
-                                     file = '',
-                                     start = 0,
-                                     end = undefined,
-                                     resetResults = false
+                                     file = '', start = 0, end = undefined, resetResults = false
                                  }) => {
     //let start = args.start, end = args.end, resetResults = args.resetResults, file = args.file;
     let chunkLength = 72000;
@@ -715,9 +706,7 @@ const getPredictBuffers = async ({
     const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * 3;
     const proxy = metadata[file].proxy;
     const readStream = fs.createReadStream(proxy, {
-        start: byteStart,
-        end: byteEnd,
-        highWaterMark: highWaterMark
+        start: byteStart, end: byteEnd, highWaterMark: highWaterMark
     });
     let chunkStart = start * sampleRate;
     //const fileDuration = end - start;
@@ -726,16 +715,15 @@ const getPredictBuffers = async ({
         readStream.pause();
         const offlineCtx = await setupCtx(chunk, metadata[file].header);
         if (offlineCtx) {
-            offlineCtx.startRendering().then(
-                (resampled) => {
-                    const myArray = resampled.getChannelData(0);
-                    const samples = parseInt(((end - start) * sampleRate).toFixed(0));
-                    const increment = samples < chunkLength ? samples : chunkLength;
-                    feedChunksToModel(myArray, increment, chunkStart, file, end, resetResults);
-                    chunkStart += 3 * BATCH_SIZE * sampleRate;
-                    // Now the async stuff is done ==>
-                    readStream.resume();
-                }).catch((err) => {
+            offlineCtx.startRendering().then((resampled) => {
+                const myArray = resampled.getChannelData(0);
+                const samples = parseInt(((end - start) * sampleRate).toFixed(0));
+                const increment = samples < chunkLength ? samples : chunkLength;
+                feedChunksToModel(myArray, increment, chunkStart, file, end, resetResults);
+                chunkStart += 3 * BATCH_SIZE * sampleRate;
+                // Now the async stuff is done ==>
+                readStream.resume();
+            }).catch((err) => {
                 console.error(`PredictBuffer rendering failed: ${err}`);
                 // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
             });
@@ -761,9 +749,7 @@ const getPredictBuffers = async ({
  * @returns {Promise<unknown>}
  */
 const fetchAudioBuffer = async ({
-                                    file = '',
-                                    start = 0,
-                                    end = metadata[file].duration
+                                    file = '', start = 0, end = metadata[file].duration
                                 }) => {
     if (end - start < 0.1) return  // prevents dataset creation barfing with  v. short buffers
     const proxy = await getWorkingFile(file);
@@ -784,9 +770,7 @@ const fetchAudioBuffer = async ({
         const highWaterMark = byteEnd - byteStart + 1;
 
         const readStream = fs.createReadStream(proxy, {
-            start: byteStart,
-            end: byteEnd,
-            highWaterMark: highWaterMark
+            start: byteStart, end: byteEnd, highWaterMark: highWaterMark
         });
         readStream.on('data', async chunk => {
             // Ensure data is processed in order
@@ -840,18 +824,15 @@ function sendMessageToWorker(chunkStart, chunks, file, duration, resetResults, p
 }
 
 async function doPrediction({
-                                file = '',
-                                start = 0,
-                                end = metadata[file].duration,
-                                resetResults = false
+                                file = '', start = 0, end = metadata[file].duration, resetResults = false
                             }) {
     predictionDone = false;
     predictionStart = new Date();
-    if (resetResults) {
-        index = 0;
-        AUDACITY = [];
-        RESULTS = [];
-    }
+    // if (resetResults) {
+    //     index = 0;
+    //     AUDACITY = [];
+    //     RESULTS = [];
+    // }
     predicting = true;
     await getPredictBuffers({file: file, start: start, end: end, resetResults: resetResults});
     UI.postMessage({event: 'update-audio-duration', value: metadata[file].duration});
@@ -907,9 +888,7 @@ const saveResults2DataSet = (results, rootDirectory) => {
         promise = promise.then(async function (resolve) {
             if (result.score >= threshold) {
                 const AudioBuffer = await fetchAudioBuffer({
-                    start: result.start,
-                    end: result.end,
-                    file: result.file
+                    start: result.start, end: result.end, file: result.file
                 })
                 if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
                     const buffer = AudioBuffer.getChannelData(0);
@@ -918,10 +897,7 @@ const saveResults2DataSet = (results, rootDirectory) => {
                     const file = `${p.basename(result.file).replace(p.extname(result.file), '')}_${result['score'].toFixed(2)}_${result.start}-${result.end}.png`;
                     const filepath = p.join(rootDirectory, folder)
                     predictWorker.postMessage({
-                        message: 'get-spectrogram',
-                        filepath: filepath,
-                        file: file,
-                        buffer: buffer
+                        message: 'get-spectrogram', filepath: filepath, file: file, buffer: buffer
                     })
                     count++;
                 }
@@ -965,11 +941,7 @@ async function uploadOpus({file, start, end, defaultName, metadata, mode}) {
 }
 
 const bufferToAudio = ({
-                           file = '',
-                           start = 0,
-                           end = 3,
-                           format = 'opus',
-                           meta = {}
+                           file = '', start = 0, end = 3, format = 'opus', meta = {}
                        }) => {
     let audioCodec, soundFormat, mimeType;
     if (format === 'opus') {
@@ -1024,11 +996,7 @@ const bufferToAudio = ({
 
 async function saveMP3(file, start, end, filename, metadata) {
     const MP3Blob = await bufferToAudio({
-        file: file,
-        start: start,
-        end: end,
-        format: 'mp3',
-        meta: metadata
+        file: file, start: start, end: end, format: 'mp3', meta: metadata
     });
     const anchor = document.createElement('a');
     document.body.appendChild(anchor);
@@ -1068,6 +1036,10 @@ const parsePredictions = (response) => {
         //console.log('Prediction received from worker', result);
         if (result.score > minConfidence) {
             index++;
+            if (!response['resetResults']) {
+                // This is a selection, create a result flag to allow the UI to scroll to its position
+                activeTimestamp = result.timestamp;
+            } else {activeTimestamp = undefined}
             UI.postMessage({
                 event: 'prediction-ongoing',
                 file: file,
@@ -1131,62 +1103,48 @@ async function parseMessage(e) {
                 if (!batchInProgress) {
                     await onSave2DB(memoryDB);
                     // how do we know how many files to summarise?
+                    await getCachedResults({db: memoryDB, files: OPENFILES})
                     await getCachedSummary({files: OPENFILES});
                 } else {
                     UI.postMessage({
-                        event: 'prediction-done',
-                        batchInProgress: true,
+                        event: 'prediction-done', batchInProgress: true,
                     })
                 }
             }
             await processNextFile();
         }
     } else if (response['message'] === 'spectrogram') {
-        await onSpectrogram(response['filepath'],
-            response['file'],
-            response['width'],
-            response['height'],
-            response['image'],
-            response['channels'])
+        await onSpectrogram(response['filepath'], response['file'], response['width'], response['height'], response['image'], response['channels'])
     }
 }
 
 // Optional Arguments
 async function processNextFile({
-                                   start = undefined,
-                                   end = undefined,
-                                   resetResults = false,
+                                   start = undefined, end = undefined, resetResults = false,
                                } = {}) {
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
         const found = await getWorkingFile(file);
         if (found) {
-            if (!start) [start, end] = await setStartEnd(file);
+            if (end) {
+                // If we have an end value already, we're analysing a selection
+            }
+            if (start === undefined) [start, end] = await setStartEnd(file);
             if (start === 0 && end === 0) {
                 // Nothing to do for this file
                 const result = `No predictions.for ${file}. It has no period within it where predictions would be given`;
                 if (!FILE_QUEUE.length) {
                     UI.postMessage({
-                        event: 'prediction-ongoing',
-                        file: file,
-                        result: result,
-                        index: -1,
-                        resetResults: false,
+                        event: 'prediction-ongoing', file: file, result: result, index: -1, resetResults: false,
                     });
                 }
                 UI.postMessage({
-                    event: 'prediction-done',
-                    file: file,
-                    audacityLabels: AUDACITY,
-                    batchInProgress: FILE_QUEUE.length
+                    event: 'prediction-done', file: file, audacityLabels: AUDACITY, batchInProgress: FILE_QUEUE.length
                 });
                 await processNextFile(arguments[0]);
             } else {
                 await doPrediction({
-                    start: start,
-                    end: end,
-                    file: file,
-                    resetResults: resetResults,
+                    start: start, end: end, file: file, resetResults: resetResults,
                 });
             }
         } else {
@@ -1217,9 +1175,7 @@ async function setStartEnd(file) {
             }
         }
         // Now set the end
-        meta.fileStart < meta.dawn && fileEnd >= meta.dawn ?
-            end = (meta.dawn - meta.fileStart) / 1000 :
-            end = meta.duration;
+        meta.fileStart < meta.dawn && fileEnd >= meta.dawn ? end = (meta.dawn - meta.fileStart) / 1000 : end = meta.duration;
     } else {
         start = 0;
         end = meta.duration;
@@ -1250,17 +1206,11 @@ const setWhereWhen = ({dateRange, species, files, context}) => {
 
 
 const getCachedSummary = ({
-                              db = memoryDB,
-                              range = undefined,
-                              files = [],
-                              species = undefined,
-                              explore = false
+                              db = memoryDB, range = undefined, files = [],
+                              species = undefined, explore = false, activeID = undefined
                           } = {}) => {
     const [where, when] = setWhereWhen({
-        dateRange: range,
-        species: explore ? species : undefined,
-        files: files,
-        context: 'summary'
+        dateRange: range, species: explore ? species : undefined, files: files, context: 'summary'
     });
     return new Promise(function (resolve, reject) {
         db.all(`SELECT MAX(conf1) as max, cname, sname, COUNT(cname) as count
@@ -1270,21 +1220,21 @@ const getCachedSummary = ({
                     INNER JOIN files ON fileID = files.rowid
                     ${where} ${when}
                 GROUP BY cname
-                ORDER BY max (conf1) DESC;`,
-            function (err, summary) {
-                if (err) {
-                    reject(err)
-                } else {
-                    UI.postMessage({
-                        event: 'prediction-done',
-                        summary: summary,
-                        audacityLabels: AUDACITY,
-                        filterSpecies: species,
-                        batchInProgress: false,
-                    })
-                    resolve(summary)
-                }
-            })
+                ORDER BY max (conf1) DESC;`, function (err, summary) {
+            if (err) {
+                reject(err)
+            } else {
+                UI.postMessage({
+                    event: 'prediction-done',
+                    summary: summary,
+                    audacityLabels: AUDACITY,
+                    filterSpecies: species,
+                    activeID: activeID,
+                    batchInProgress: false,
+                })
+                resolve(summary)
+            }
+        })
     })
 }
 
@@ -1310,20 +1260,13 @@ const dbSpeciesCheck = () => {
 }
 
 const getCachedResults = ({
-                              db = undefined,
-                              range = undefined,
-                              files = [],
-                              species = undefined,
-                              explore = false
+                              db = undefined, range = undefined, files = [], species = undefined, explore = false
                           }) => {
     // reset results table in UI
     UI.postMessage({event: 'reset-results'});
 
     const [where, when] = setWhereWhen({
-        dateRange: range,
-        species: species,
-        files: files,
-        context: 'results'
+        dateRange: range, species: species, files: files, context: 'results'
     });
     let index = 0;
     return new Promise(function (resolve, reject) {
@@ -1333,8 +1276,8 @@ const getCachedResults = ({
             birdid1 as id_1, birdid2 as id_2, birdid3 as id_3, 
             position as
                  start, position + 3 as
-                end
-                , conf1 as score, conf2 as score2, conf3 as score3, 
+        end
+        , conf1 as score, conf2 as score2, conf3 as score3, 
                 s1.sname as sname, s2.sname as sname2, s3.sname as sname3,
                 files.duration, files.name as file, comment, label
                 FROM records 
@@ -1342,45 +1285,38 @@ const getCachedResults = ({
                 LEFT JOIN species s2 on s2.id = birdid2 
                 LEFT JOIN species s3 on s3.id = birdid3 
                 INNER JOIN files on files.rowid = records.fileid
-                ${where}
-                ${when}
-                ORDER
-                BY
-                timestamp`
-            ,
-            (err, result) => {
-                if (err) {
-                    reject(err)
-                } else { // on each result
-                    index++;
-                    UI.postMessage({
-                        event: 'prediction-ongoing',
-                        file: result.file,
-                        result: result,
-                        index: index,
-                        resetResults: false,
-                    });
-                    RESULTS.push(result);
-                    AUDACITY.push({
-                        timestamp: `${result.start}\t${result.start + 3}`,
-                        cname: result.cname,
-                        score: result.score
-                    })
-                }
-            },
-            async (err, count) => {   //on finish
-                if (!count) {  // count === 0 => no results
-                    if (db.filename === ':memory:') {
-                        // No results in memory? Try the archive
-                        console.log(`No results in ${db.filename.replace(/.*\//, '')}, trying the archive db.`);
-                        await getCachedResults({db: diskDB, species: species, range: range, files: files});
-                    } else {
-                        resolve(0);
-                    }
+        ${where}
+        ${when}
+        ORDER
+        BY
+        timestamp`, (err, result) => {
+            if (err) {
+                reject(err)
+            } else { // on each result
+                index++;
+                if (result.timestamp === activeTimestamp) result['active'] = true;
+                UI.postMessage({
+                    event: 'prediction-ongoing', file: result.file, result: result, index: index, resetResults: false,
+                });
+                RESULTS.push(result);
+                AUDACITY.push({
+                    timestamp: `${result.start}\t${result.start + 3}`, cname: result.cname, score: result.score
+                })
+            }
+        }, async (err, count) => {   //on finish
+            if (!count) {  // count === 0 => no results
+                if (db.filename === ':memory:') {
+                    // No results in memory? Try the archive
+                    console.log(`No results in ${db.filename.replace(/.*\//, '')}, trying the archive db.`);
+                    await getCachedResults({db: diskDB, species: species, range: range, files: files});
                 } else {
-                    resolve(count)
+                    resolve(0);
                 }
-            })
+            } else {
+
+                resolve(count)
+            }
+        })
     })
 }
 
@@ -1405,8 +1341,9 @@ const getFileInfo = async (file) => {
         diskDB.get(`SELECT *
                     FROM files
                     WHERE name LIKE '${baseName}%'`, (err, row) => {
-            if (err) console.log('There was an error ', err)
-            else {
+            if (err) {
+                console.log('There was an error ', err)
+            } else {
                 resolve(row)
             }
         })
@@ -1437,17 +1374,15 @@ const updateFileTables = async (db, file, filemap) => {
 const getFileIDs = (db) => {
     let filemap = {};
     return new Promise(function (resolve, reject) {
-        db.each('SELECT rowid, name FROM files',
-            (err, row) => {
-                if (err) {
-                    reject(err)
-                } else {
-                    filemap[row.name] = row.rowid
-                }
-            },
-            (err, count) => {
-                resolve(filemap)
-            })
+        db.each('SELECT rowid, name FROM files', (err, row) => {
+            if (err) {
+                reject(err)
+            } else {
+                filemap[row.name] = row.rowid
+            }
+        }, (err, count) => {
+            resolve(filemap)
+        })
     })
 }
 
@@ -1467,28 +1402,25 @@ const onSave2DB = async (db) => {
                     [id, filemap] = await updateFileTables(db, r.file, filemap);
                     r.file = id;
                 }
-                stmt.run(r.timestamp, r.id_1, r.id_2, r.id_3, r.score, r.score2, r.score3, r.file, r.position, r.comment, r.label,
-                    (err, row) => {
-                        if (err) reject(err)
-                        UI.postMessage({
-                            event: 'progress',
-                            text: "Updating Database.",
-                            progress: i / RESULTS.length
-                        });
-                        if (i === (RESULTS.length - 1)) {
-                            db.run('COMMIT', (err, rows) => {
-                                if (err) reject(err)
-                                UI.postMessage({event: 'progress', progress: 1.0});
-                                if (db === diskDB || memoryDB) {
-                                    UI.postMessage({
-                                        event: 'generate-alert',
-                                        message: `${db.filename.replace(/.*\//, '')} database update complete, ${i + 1} records updated in ${((performance.now() - t0) / 1000).toFixed(3)} seconds`
-                                    })
-                                }
-                                resolve(row)
-                            });
-                        }
+                stmt.run(r.timestamp, r.id_1, r.id_2, r.id_3, r.score, r.score2, r.score3, r.file, r.position, r.comment, r.label, (err, row) => {
+                    if (err) reject(err)
+                    UI.postMessage({
+                        event: 'progress', text: "Updating Database.", progress: i / RESULTS.length
                     });
+                    if (i === (RESULTS.length - 1)) {
+                        db.run('COMMIT', (err, rows) => {
+                            if (err) reject(err)
+                            UI.postMessage({event: 'progress', progress: 1.0});
+                            if (db === diskDB) {
+                                UI.postMessage({
+                                    event: 'generate-alert',
+                                    message: `${db.filename.replace(/.*\//, '')} database update complete, ${i + 1} records updated in ${((performance.now() - t0) / 1000).toFixed(3)} seconds`
+                                })
+                            }
+                            resolve(row)
+                        });
+                    }
+                });
             }
         } else {
             resolve('No results to save')
@@ -1541,13 +1473,11 @@ const getMostCalls = (species) => {
 }
 
 const getChartTotals = ({
-                            species = undefined,
-                            range = {}
+                            species = undefined, range = {}
                         }) => {
     const dateRange = range;
     // Work out sensible aggregations from hours difference in daterange
-    const hours_diff = dateRange.start ?
-        Math.round((dateRange.end - dateRange.start) / (1000 * 60 * 60)) : 745;
+    const hours_diff = dateRange.start ? Math.round((dateRange.end - dateRange.start) / (1000 * 60 * 60)) : 745;
     console.log(hours_diff, "difference in hours")
     const dateFilter = dateRange.start ? ` AND dateTime BETWEEN ${dateRange.start} AND ${dateRange.end} ` : '';
     // default to group by Week
@@ -1631,13 +1561,11 @@ const getRate = (species) => {
 }
 
 const getSpecies = (db) => {
-    db.all('SELECT DISTINCT cname, sname FROM records INNER JOIN species ON birdid1 = id ORDER BY cname',
-        (err, rows) => {
-            if (err) console.log(err);
-            else {
-                UI.postMessage({event: 'seen-species-list', list: rows})
-            }
-        })
+    db.all('SELECT DISTINCT cname, sname FROM records INNER JOIN species ON birdid1 = id ORDER BY cname', (err, rows) => {
+        if (err) console.log(err); else {
+            UI.postMessage({event: 'seen-species-list', list: rows})
+        }
+    })
 }
 
 const getFileStart = (db, file) => {
@@ -1653,16 +1581,15 @@ const getFileStart = (db, file) => {
                     await getMetadata({file: file});
                     db.get(`UPDATE files
                             SET filestart = '${metadata[file].fileStart}'
-                            WHERE name = '${file}'`,
-                        (err, row) => {
-                            if (err) {
-                                console.log(err)
-                            } else {
-                                console.log(row)
-                                row = metadata[file].fileStart;
-                                resolve(row)
-                            }
-                        })
+                            WHERE name = '${file}'`, (err, row) => {
+                        if (err) {
+                            console.log(err)
+                        } else {
+                            console.log(row)
+                            row = metadata[file].fileStart;
+                            resolve(row)
+                        }
+                    })
 
                 } else {
                     resolve(row)
@@ -1778,13 +1705,13 @@ async function onUpdateRecord({
                     const species = isFiltered || isExplore ? from : '';
                     if (isExplore) openFiles = [];
                     await getCachedResults({db: db, files: openFiles, species: species, explore: isExplore});
+                    await getCachedSummary({db: db, files: openFiles, species: species, explore: isExplore});
                     resolve(this.changes)
                 } else {
                     console.log(`No records updated in ${db.filename.replace(/.*\//, '')}`)
                     // Not in diskDB, so update memoryDB
                     if (db === diskDB) {
-                        await onUpdateRecord(
-                            //because no access to this in arrow function, and regular function replaces arguments[0]
+                        await onUpdateRecord(//because no access to this in arrow function, and regular function replaces arguments[0]
                             {
                                 openFiles: openFiles,
                                 currentFile: currentFile,
@@ -1798,8 +1725,7 @@ async function onUpdateRecord({
                                 isFiltered: isFiltered
                             });
                         UI.postMessage({
-                            event: 'generate-alert',
-                            message: 'Remember to save your records to store this change'
+                            event: 'generate-alert', message: 'Remember to save your records to store this change'
                         })
                     }
                 }
@@ -1835,8 +1761,7 @@ async function onChartRequest(args) {
     t0 = Date.now();
     await getMostCalls(args.species)
         .then((row) => {
-            row ? dataRecords.mostDetections = [row.count, row.date] :
-                dataRecords.mostDetections = ['N/A', 'Not detected'];
+            row ? dataRecords.mostDetections = [row.count, row.date] : dataRecords.mostDetections = ['N/A', 'Not detected'];
         }).catch((message) => {
             console.log(message)
         })
@@ -1879,8 +1804,7 @@ async function onChartRequest(args) {
     console.log(`Chart rate generation took ${(Date.now() - t0) / 1000} seconds`)
     const pointStart = dateRange.start ? dateRange.start : Date.UTC(2020, 0, 0, 0, 0, 0);
     UI.postMessage({
-        event: 'chart-data',
-        // Restore species name
+        event: 'chart-data', // Restore species name
         species: args.species ? args.species.replace("''", "'") : undefined,
         results: results,
         rate: rate,
@@ -1926,8 +1850,9 @@ Todo cache:
     ***Now cache is limited, need to re-open file when browsing and file not present
 
 Todo: manual entry
-    check creation of manual entries
-    get entry to appear in position among existing detections and centre on it **********************
+    ***check creation of manual entries
+    indicate manual entry/confirmed entry
+    ***get entry to appear in position among existing detections and centre on it
 
 Todo: UI
     ***Drag folder to load audio files within (recursively)
