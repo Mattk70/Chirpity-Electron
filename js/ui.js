@@ -97,7 +97,7 @@ let batchInProgress = false;
 let activeRow;
 let predictions = {}, speciesListItems,
     clickedIndex, speciesName, speciesFilter,
-    subRows, scrolled, currentFileDuration;
+    subRows, currentFileDuration;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
 let workerHasLoadedFile = false;
@@ -579,8 +579,8 @@ analyseSelectionLink.addEventListener('click', async () => {
         confidence: 0.1,
         resetResults: false,
         files: [currentFile],
-        start: start,
-        end: end,
+        start: start.toFixed(3),
+        end: end.toFixed(3),
         list: 'everything'
     });
     summary = {};
@@ -599,16 +599,16 @@ function postAnalyseMessage(args) {
         delete diagnostics['Audio Duration'];
     }
     //args.files.forEach(file => {
-        worker.postMessage({
-            action: 'analyse',
-            confidence: args.confidence,
-            resetResults: args.resetResults,
-            start: start,
-            end: end,
-            files: args.files,
-            reanalyse: args.reanalyse,
-            list: args.list || config.list
-        });
+    worker.postMessage({
+        action: 'analyse',
+        confidence: args.confidence,
+        resetResults: args.resetResults,
+        start: start,
+        end: end,
+        files: args.files,
+        reanalyse: args.reanalyse,
+        list: args.list || config.list
+    });
     //})
     if (args.files.length > 1) {
         batchInProgress = true;
@@ -2249,7 +2249,8 @@ async function onPredictionDone({
                                     batchInProgress = false,
                                     audacityLabels = [],
                                     file = undefined,
-                                    summary = {}
+                                    summary = {},
+                                    activeID = undefined
                                 }) {
 
     AUDACITY_LABELS = AUDACITY_LABELS.concat(audacityLabels);
@@ -2257,10 +2258,10 @@ async function onPredictionDone({
     if (batchInProgress) {
         progressDiv.show();
         return;
-    } else {        PREDICTING = false;
+    } else {
+        PREDICTING = false;
     }
     updateSummary({summary: summary, filterSpecies: filterSpecies});
-    scrolled = false;
 
     progressDiv.hide();
     progressBar.width(0 + '%');
@@ -2345,7 +2346,7 @@ async function onPredictionDone({
     }
 
     if (activeRow) {
-        // Refresh and scroll to active row:
+        // Refresh node and scroll to active row:
         activeRow = document.getElementById(activeRow.id)
         if (activeRow) { // after an edit the active row may not exist
             activeRow.focus()
@@ -2513,6 +2514,10 @@ async function renderResult(args) {
         document.getElementById(id).classList.remove('d-none')
     }
     if (!config.spectrogram) $('.specFeature').hide();
+
+    if (result.active) {
+        activeRow = document.getElementById(`result${index}`);
+    }
 }
 
 // Comment handling
