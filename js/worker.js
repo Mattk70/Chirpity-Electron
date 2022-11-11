@@ -222,7 +222,7 @@ ipcRenderer.on('new-client', (event) => {
                 await onUpdateFileStart(args)
                 break;
             case 'get-detected-species-list':
-                getSpecies(diskDB);
+                getSpecies(diskDB, args.range);
                 break;
             case 'create-dataset':
                 saveResults2DataSet(RESULTS);
@@ -1560,8 +1560,10 @@ const getRate = (species) => {
     })
 }
 
-const getSpecies = (db) => {
-    db.all('SELECT DISTINCT cname, sname FROM records INNER JOIN species ON birdid1 = id ORDER BY cname', (err, rows) => {
+const getSpecies = (db, range) => {
+    const where = Object.keys(range).length ? `WHERE dateTime BETWEEN ${range.start} AND ${range.end}` : '';
+    db.all(`SELECT DISTINCT cname, sname FROM records INNER JOIN species ON birdid1 = id ${where} ORDER BY cname`,
+        (err, rows) => {
         if (err) console.log(err); else {
             UI.postMessage({event: 'seen-species-list', list: rows})
         }
@@ -1667,7 +1669,7 @@ async function onUpdateRecord({
     if (what === 'ID' || what === 'birdID1') {
         // Map the field name to the one in the database
         what = 'birdID1';
-        whatSQL = `birdID1 = (SELECT id FROM species WHERE cname = '${value}')`;
+        whatSQL = `conf1 = 2, birdID1 = (SELECT id FROM species WHERE cname = '${value}')`;
     } else if (what === 'label') {
         whatSQL = `label = '${value}'`;
     } else {
@@ -1825,7 +1827,7 @@ Todo: bugs
     Table does not  expand to fit when operation aborted
     when current model list differs from the one used when saving records, getCachedResults gives wrong species
     when nocmig mode on, getcachedresults for daytime files prints no results, but summary printed. No warning given.
-    ***manual records entry doesn't preserve species in explore mode######################## 1
+    ***manual records entry doesn't preserve species in explore mode
 
 Todo: Database
      Database delete: records, files (and all associated records). Use when reanalysing
@@ -1845,7 +1847,7 @@ Todo cache:
 
 Todo: manual entry
     ***check creation of manual entries
-    indicate manual entry/confirmed entry#################################### 3
+    ***indicate manual entry/confirmed entry
     save entire selected range as one entry. By default or as an option?
     ***get entry to appear in position among existing detections and centre on it
 
@@ -1867,7 +1869,8 @@ Todo: Charts
     Allow multiple species comparison, e.g. compare Song Thrush and Redwing peak migration periods
 
 Todo: Explore
-    Make summary range aware
+    ***Make summary range aware
+    ***Make seen species list range aware
 
 Todo: Performance
     Investigate background throttling when worker hidden

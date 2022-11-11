@@ -662,17 +662,19 @@ save2dbLink.addEventListener('click', async () => {
     worker.postMessage({action: 'save2db'})
 });
 
+let chartRange = {}
 const chartsLink = document.getElementById('charts');
 chartsLink.addEventListener('click', async () => {
-    worker.postMessage({action: 'get-detected-species-list'});
+    worker.postMessage({action: 'get-detected-species-list', range: chartRange});
     hideAll();
     showElement(['recordsContainer']);
     worker.postMessage({action: 'chart', species: undefined, range: {}});
 });
 
+let exploreRange = {};
 const exploreLink = document.getElementById('explore');
 exploreLink.addEventListener('click', async () => {
-    worker.postMessage({action: 'get-detected-species-list'});
+    worker.postMessage({action: 'get-detected-species-list', range: exploreRange});
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
     hideElement(['completeDiv']);
@@ -2270,7 +2272,7 @@ async function onPredictionDone({
     } else {
         disableMenuItem(['saveLabels', 'save2db']);
     }
-    enableMenuItem(['analyse', 'reanalyse'])
+    if (currentFile) enableMenuItem(['analyse', 'reanalyse'])
     subRows = document.querySelectorAll('.subrow')
 
     speciesFilter = document.querySelectorAll('.speciesFilter');
@@ -2609,12 +2611,12 @@ const squishTable = () => {
 }
 
 summaryButton.addEventListener('click', (e) => {
-    if (summaryButton.innerText.indexOf('Show') !== -1) {
+    if (summaryDiv.classList.contains('d-none')) {
         summaryButton.innerText = 'Hide Summary';
-        stretchTable()
+        squishTable()
     } else {
         summaryButton.innerText = 'Show Summary';
-        squishTable()
+        stretchTable()
     }
     if (e.isTrusted) {
         summaryTable.animate({width: 'toggle'})
@@ -2711,6 +2713,7 @@ const iconDict = {
     low: '<span class="confidence material-icons-two-tone score text-danger border border-2 border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
     medium: '<span class="confidence material-icons-two-tone score text-warning border border-2 border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
     high: '<span class="confidence material-icons-two-tone score text-success border border-2 border-secondary rounded" title="--%">signal_cellular_alt</span>',
+    confirmed: '<span class="confidence material-icons-two-tone score text-success border border-2 border-secondary rounded" title="confirmed">done</span>',
 }
 
 function iconizeScore(score) {
@@ -2718,7 +2721,8 @@ function iconizeScore(score) {
     if (parseFloat(score) < 0.5) return iconDict['guess'].replace('--', tooltip)
     else if (parseFloat(score) < 0.65) return iconDict['low'].replace('--', tooltip)
     else if (parseFloat(score) < 0.85) return iconDict['medium'].replace('--', tooltip)
-    else return iconDict['high'].replace('--', tooltip)
+    else if (parseFloat(score) <= 1.0) return iconDict['high'].replace('--', tooltip)
+    else return iconDict['confirmed']
 }
 
 // File menu handling
@@ -2874,7 +2878,6 @@ bodyElement.on('dragstart', e => {
 
 ////////// Date Picker ///////////////
 
-
 $(function () {
     const start = moment();
     const end = start;
@@ -2906,11 +2909,21 @@ $(function () {
             $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
             const dateRange = {start: picker.startDate._d.getTime(), end: picker.endDate._d.getTime()};
             if (worker) {
-                if (this.id === 'chartRange' && chartSpecies) {
-                    t0 = Date.now();
-                    worker.postMessage({action: 'chart', species: chartSpecies, range: dateRange});
-                } else if (this.id === 'exploreRange' && exploreSpecies) {
-                    worker.postMessage({action: 'explore', species: exploreSpecies, range: dateRange});
+                // Update the seen species list
+                worker.postMessage({action: 'get-detected-species-list', range: dateRange});
+                if (this.id === 'chartRange') {
+                    chartRange = dateRange;
+                    if (chartSpecies) {
+                        t0 = Date.now();
+                        worker.postMessage({action: 'chart', species: chartSpecies, range: dateRange});
+                    }
+                } else if (this.id === 'exploreRange') {
+                    exploreRange = dateRange;
+                    if (exploreSpecies) worker.postMessage({
+                        action: 'explore',
+                        species: exploreSpecies,
+                        range: dateRange
+                    });
                 }
             }
         });
@@ -2918,6 +2931,8 @@ $(function () {
         $(this).on('cancel.daterangepicker', function () {
             $(this).children('span').html('Apply a date filter');
             if (worker) {
+                // Update the seen species list
+                worker.postMessage({action: 'get-detected-species-list'});
                 if (this.id === 'chartRange') {
                     if (chartSpecies) {
                         t0 = Date.now();
