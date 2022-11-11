@@ -579,6 +579,7 @@ analyseSelectionLink.addEventListener('click', async () => {
         confidence: 0.1,
         resetResults: false,
         files: [currentFile],
+        // The rounding below is essential to finding record in database
         start: start.toFixed(3),
         end: end.toFixed(3),
         list: 'everything'
@@ -588,9 +589,6 @@ analyseSelectionLink.addEventListener('click', async () => {
 
 function postAnalyseMessage(args) {
     let start = args.start, end = args.end;
-    // Format start / end as millisecond integers
-    //if (start) start = (start * 1000).toFixed(0);
-    //if (end) end = (end * 1000).toFixed(0)
     analyseReset();
     if (args.resetResults) {
         resetResults(args);
@@ -598,7 +596,6 @@ function postAnalyseMessage(args) {
         progressDiv.show();
         delete diagnostics['Audio Duration'];
     }
-    //args.files.forEach(file => {
     worker.postMessage({
         action: 'analyse',
         confidence: args.confidence,
@@ -609,7 +606,6 @@ function postAnalyseMessage(args) {
         reanalyse: args.reanalyse,
         list: args.list || config.list
     });
-    //})
     if (args.files.length > 1) {
         batchInProgress = true;
     }
@@ -1352,7 +1348,6 @@ function editResultID(cname, sname, cell) {
         isReset: true,
         isExplore: exploreMode
     });
-    worker.postMessage({action: 'get-detected-species-list'});
 }
 
 function unpackNameAttr(el, cname) {
