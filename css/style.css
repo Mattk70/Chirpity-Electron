@@ -57,8 +57,6 @@ html, body {
 /*}*/
 
 
-
-
 tr[id^="sub"] {
     font-size: 12px;
 }
@@ -321,33 +319,46 @@ footer {
 }
 
 
-
 /* ============ desktop view ============ */
 @media all and (min-width: 768px) {
     .dropdown-menu li {
         position: relative;
     }
-
-    .nav-item .submenu {
-        display: none;
-        position: absolute;
-        left: 100%;
-        top: -7px;
-    }
-
-    .nav-item .submenu-left {
-        right: 100%;
-        left: auto;
-    }
-
-    .dropdown-menu > li:hover {
+    ul ul > li:hover {
         background-color: #f1f1f1
     }
-
     .dropdown-menu > li:hover > .submenu {
         display: block;
     }
+
+    #primary_nav_wrap ul ul {
+        visibility: hidden;
+        position: absolute;
+        top: 95%;
+        left: 0;
+        background: #fff;
+        border-radius: 5px;
+        box-shadow:  2px 6px 6px rgba(0,0,0,0.4);
+
+    }
+
+    #primary_nav_wrap:not(:hover) ul {
+        transition: all 0.1s;
+        transition-delay: 1s;
+    }
+
+    #primary_nav_wrap ul ul ul {
+        top: 5px;
+        left: 100%
+    }
+
+    #primary_nav_wrap ul li:hover > ul {
+        visibility: visible;
+        transition-delay: 0s;
+    }
+
 }
+
 
 /* ============ desktop view .end// ============ */
 

@@ -1663,7 +1663,7 @@ async function onUpdateRecord({
     const startMilliseconds = (start * 1000).toFixed(0);
 
     // Construct the SQL
-    let whatSQL, whereSQL;
+    let whatSQL = '', whereSQL = '';
     if (what === 'ID' || what === 'birdID1') {
         // Map the field name to the one in the database
         what = 'birdID1';
@@ -1706,6 +1706,8 @@ async function onUpdateRecord({
                     if (isExplore) openFiles = [];
                     await getCachedResults({db: db, files: openFiles, species: species, explore: isExplore});
                     await getCachedSummary({db: db, files: openFiles, species: species, explore: isExplore});
+                    // Update the species list
+                    await getSpecies(db);
                     resolve(this.changes)
                 } else {
                     console.log(`No records updated in ${db.filename.replace(/.*\//, '')}`)
@@ -1819,23 +1821,15 @@ async function onChartRequest(args) {
 
 /*
 Todo: bugs
-    *** Detection end incorrect in HTML table.
-    "unable to locate source file with any supported extension mp3" when browsing files in filename list
     Confidence filter not honoured on refresh results
-    ***Table does not always expand to fit when summary table absent
-    *??Predictions requests/received not equal at end of long analyses.
-    *??Memory dumps with long analyses.
-    ***Limit 2500 files to create dataset. Limit seems to be with drag and drop.
-    ***Load folder
+    Table does not  expand to fit when operation aborted
     when current model list differs from the one used when saving records, getCachedResults gives wrong species
     when nocmig mode on, getcachedresults for daytime files prints no results, but summary printed. No warning given.
-
-
+    ***manual records entry doesn't preserve species in explore mode######################## 1
 
 Todo: Database
      Database delete: records, files (and all associated records). Use when reanalysing
      Database file path update, batch update - so we can move files around after analysis
-     Move database functions to separate file
      Compatibility with updates, esp. when num classes change
         -Create a new database for each model with appropriate num classes?
 
@@ -1851,7 +1845,8 @@ Todo cache:
 
 Todo: manual entry
     ***check creation of manual entries
-    indicate manual entry/confirmed entry
+    indicate manual entry/confirmed entry#################################### 3
+    save entire selected range as one entry. By default or as an option?
     ***get entry to appear in position among existing detections and centre on it
 
 Todo: UI
@@ -1862,21 +1857,24 @@ Todo: UI
     Better tooltips, for all options
     Sort summary by headers
     Have a panel for all analyse settings, not just nocmig mode
+    ***Delay hiding submenu on mouseout (added box-shadow)
 
 Todo: Charts
-    Allow better control of grouping (e.g) hourly over a week
+    Allow better control of aggregation (e.g) hourly over a week
     Permit inclusion of hours recorded in other date ranges
     Allow choice of chart type
-    Rip out highcharts, use chart.js?
+    Rip out highcharts, use chart.js.
     Allow multiple species comparison, e.g. compare Song Thrush and Redwing peak migration periods
 
 Todo: Explore
     Make summary range aware
 
 Todo: Performance
-    Explore spawning predictworker from UI, Shared worker??
-        => hopefully prevents  background throttling (imapact TBD)
+    Investigate background throttling when worker hidden
+        If an issue, Explore spawning predictworker from UI, Shared worker??
+            => hopefully prevents  background throttling (imapact TBD)
     Can we avoid the datasync in snr routine?
+    Smaller model faster - but retaining accuracy? Read up on Knowledge distillation
 
 Todo: model.
      Improve accuracy, accuracy accuracy!
@@ -1888,11 +1886,12 @@ Todo: model.
 Todo: Releases
      Limit features for free users
      Premium features are??
+     Upsell premium features
      Automatic updates
      Implement version protocol
+     Better way to link js model to checkpoint model ################# !
 
 Todo: IDs
-    Verified records -
     Search by label,
     Search for comment
 
