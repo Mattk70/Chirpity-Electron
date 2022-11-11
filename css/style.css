@@ -343,7 +343,7 @@ footer {
     }
 
     #primary_nav_wrap:not(:hover) ul {
-        transition: all 0.1s;
+        transition: all 0.4s;
         transition-delay: 1s;
     }
 
