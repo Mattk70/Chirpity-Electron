@@ -137,7 +137,8 @@ ul {
     max-height: 250px;
     position: absolute;
     width: 100%;
-    z-index: 10;
+    z-index: 1;
+    box-shadow:  -2px 6px 6px rgba(0,0,0,0.4);
 }
 
 .bird-list li a {

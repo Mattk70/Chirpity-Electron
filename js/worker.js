@@ -251,7 +251,7 @@ ipcRenderer.on('new-client', (event) => {
                 await loadAudioFile(args);
                 break;
             case 'filter':
-                args.db = memoryDB;
+                args.db = diskDB;
                 await getCachedResults(args);
                 await getCachedSummary(args);
                 break;
@@ -336,12 +336,12 @@ async function onAnalyse({
     // Analyse works on one file at a time
     predictWorker.postMessage({message: 'list', list: list})
     //if (!end) { // i.e. not "analyse selection"
-        //Set global OPENFILES for summary to use
-        OPENFILES = files;
-        index = 0;
-        AUDACITY = [];
-        RESULTS = [];
-        COMPLETED = [];
+    //Set global OPENFILES for summary to use
+    OPENFILES = files;
+    index = 0;
+    AUDACITY = [];
+    RESULTS = [];
+    COMPLETED = [];
     //}
     for (let i = 0; i < files.length; i++) {
         let file = files[i];
@@ -1014,7 +1014,7 @@ function spawnWorker(model, list, batchSize, warmup) {
     console.log(`spawning worker with ${list}, ${batchSize}, ${warmup}`)
     predictWorker = new Worker('./js/model.js');
     //const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
-    const modelPath = model === 'efficientnet' ? '../test_big_5/' : '../24000_v9/';
+    const modelPath = model === 'efficientnet' ? '../test_CAT_XTNRTOPY_SOFTMAX__PREPROCESS_LAYER_EfficientNetB3256x384_Data_Adam_refined_482/' : '../24000_v9/';
     console.log(modelPath);
     // Now we've loaded a new model, clear the aborted flag
     aborted = false;
@@ -1039,7 +1039,9 @@ const parsePredictions = (response) => {
             if (!response['resetResults']) {
                 // This is a selection, create a result flag to allow the UI to scroll to its position
                 activeTimestamp = result.timestamp;
-            } else {activeTimestamp = undefined}
+            } else {
+                activeTimestamp = undefined
+            }
             UI.postMessage({
                 event: 'prediction-ongoing',
                 file: file,
@@ -1260,7 +1262,7 @@ const dbSpeciesCheck = () => {
 }
 
 const getCachedResults = ({
-                              db = undefined, range = undefined, files = [], species = undefined, explore = false
+                              db = undefined, range = undefined, files = [], species = undefined, explore = false, active = undefined
                           }) => {
     // reset results table in UI
     UI.postMessage({event: 'reset-results'});
@@ -1294,7 +1296,12 @@ const getCachedResults = ({
                 reject(err)
             } else { // on each result
                 index++;
+                // Active row from analyse selection
                 if (result.timestamp === activeTimestamp) result['active'] = true;
+                // Active row from update record
+                if (active &&
+                    active.position === result.position &&
+                    active.file === result.file) result['active'] = true;
                 UI.postMessage({
                     event: 'prediction-ongoing', file: result.file, result: result, index: index, resetResults: false,
                 });
@@ -1562,12 +1569,15 @@ const getRate = (species) => {
 
 const getSpecies = (db, range) => {
     const where = Object.keys(range).length ? `WHERE dateTime BETWEEN ${range.start} AND ${range.end}` : '';
-    db.all(`SELECT DISTINCT cname, sname FROM records INNER JOIN species ON birdid1 = id ${where} ORDER BY cname`,
+    db.all(`SELECT DISTINCT cname, sname
+            FROM records
+                     INNER JOIN species ON birdid1 = id ${where}
+            ORDER BY cname`,
         (err, rows) => {
-        if (err) console.log(err); else {
-            UI.postMessage({event: 'seen-species-list', list: rows})
-        }
-    })
+            if (err) console.log(err); else {
+                UI.postMessage({event: 'seen-species-list', list: rows})
+            }
+        })
 }
 
 const getFileStart = (db, file) => {
@@ -1656,13 +1666,10 @@ async function onUpdateRecord({
                                   what = 'birdID1',
                                   isReset = false,
                                   isFiltered = false,
-                                  isExplore = false
+                                  isExplore = false,
+                                  range = {}
                               }) {
 
-
-    // Sanitize input: start is passed to the function in float seconds,
-    // but we need a millisecond integer
-    const startMilliseconds = (start * 1000).toFixed(0);
 
     // Construct the SQL
     let whatSQL = '', whereSQL = '';
@@ -1691,8 +1698,12 @@ async function onUpdateRecord({
             whereSQL += '))';
         }
     } else {
+        // Sanitize input: start is passed to the function in float seconds,
+        // but we need a millisecond integer
+        const startMilliseconds = (start * 1000).toFixed(0);
         // Single record
         whereSQL = `WHERE datetime = (SELECT filestart FROM files WHERE name = '${currentFile}') + ${startMilliseconds}`
+
     }
     const t0 = Date.now();
     return new Promise((resolve, reject) => {
@@ -1706,16 +1717,16 @@ async function onUpdateRecord({
                     console.log(`Update without transaction took ${Date.now() - t0} milliseconds`);
                     const species = isFiltered || isExplore ? from : '';
                     if (isExplore) openFiles = [];
-                    await getCachedResults({db: db, files: openFiles, species: species, explore: isExplore});
+                    await getCachedResults({db: db, files: openFiles, species: species, explore: isExplore, active: {file:currentFile, position: start}});
                     await getCachedSummary({db: db, files: openFiles, species: species, explore: isExplore});
                     // Update the species list
-                    await getSpecies(db);
+                    await getSpecies(db, range);
                     resolve(this.changes)
                 } else {
                     console.log(`No records updated in ${db.filename.replace(/.*\//, '')}`)
                     // Not in diskDB, so update memoryDB
                     if (db === diskDB) {
-                        await onUpdateRecord(//because no access to this in arrow function, and regular function replaces arguments[0]
+                        await onUpdateRecord(//because no access to 'this' in arrow function, and regular function replaces arguments[0]
                             {
                                 openFiles: openFiles,
                                 currentFile: currentFile,
@@ -1828,6 +1839,7 @@ Todo: bugs
     when current model list differs from the one used when saving records, getCachedResults gives wrong species
     when nocmig mode on, getcachedresults for daytime files prints no results, but summary printed. No warning given.
     ***manual records entry doesn't preserve species in explore mode
+    save records to db doesn't work with updaterecord! RESULTS not updated
 
 Todo: Database
      Database delete: records, files (and all associated records). Use when reanalysing
@@ -1853,7 +1865,7 @@ Todo: manual entry
 
 Todo: UI
     ***Drag folder to load audio files within (recursively)
-    Stop flickering when updating results
+    *Stop flickering when updating results
     Expose SNR feature
     Pagination? Limit table records to say, 1000
     Better tooltips, for all options
