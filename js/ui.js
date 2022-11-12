@@ -1384,7 +1384,7 @@ function updateLabel(e) {
     species = species.querySelector('.cname').innerHTML
     // Extract species cname - urgh
     species = species.replace(/^\s*<[^>]+>/m, '')
-    species = species.replace(/^(.*)\s<i.*\s*/m, "$1");
+    species = species.replace(/^(.*)\s<.*\s*/m, "$1");
 
     parent.innerHTML = tags[label];
     // Update the label record(s) in the db
@@ -2213,10 +2213,10 @@ const updateSummary = ({
                        }) => {
     let summaryHTML = `<table id="resultSummary" class="table table-striped table-dark table-hover p-1"><thead>
             <tr>
-                <th class="w-auto">Max</th>
+                <th class="">Max</th>
                 <th scope="col">Species</th>
                 <th scope="col" class="text-end">Count</th>
-                <th class="text-end w-auto">Label</th>
+                <th class="text-end">Label</th>
             </tr>
             </thead><tbody>`;
 
@@ -2233,7 +2233,12 @@ const updateSummary = ({
     }
     summaryHTML += '</tbody></table>';
     squishTable();
-    summaryTable.html(summaryHTML);
+    // Get rid of flicker...
+    const old_summary = document.getElementById('summaryTable');
+    const buffer = old_summary.cloneNode();
+    buffer.innerHTML = summaryHTML;
+    old_summary.replaceWith(buffer);
+
     const currentFilter = document.querySelector('.speciesFilter span.text-warning');
     if (currentFilter) {
         const filterRow = currentFilter.closest('tr');
@@ -2456,7 +2461,7 @@ async function renderResult(args) {
             <th scope='row'>${index}</th>
             <td class='text-start text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-end">${UI_position}</td>
-            <td name="${result.cname}" class='text-start cname'>${result.cname} <i>${result.sname}</i></td>
+            <td name="${result.cname}" class='text-start cname'>${result.cname} <br/><i>${result.sname}</i></td>
             <td class="label">${label}</td>
             <td>${iconizeScore(result.score)}</td>
             <td><span id='id${index}' title="Click for additional detections" class='material-icons-two-tone rotate pointer d-none'>sync</span></td>
