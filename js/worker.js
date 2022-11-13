@@ -55,15 +55,27 @@ const createDB = async (file) => {
     await db.runAsync('CREATE TABLE files(name TEXT,duration  REAL,filestart INTEGER, UNIQUE (name))');
     await db.runAsync('CREATE TABLE duration(day INTEGER, duration INTEGER, fileID INTEGER,UNIQUE (day, fileID))');
     await db.runAsync(`CREATE TABLE records
-    (dateTime INTEGER, birdID1  INTEGER, birdID2  INTEGER, birdID3  INTEGER, conf1 REAL, conf2 REAL, conf3 REAL,
-                       fileID   INTEGER, position INTEGER, label TEXT, comment TEXT, UNIQUE (dateTime, fileID))`);
+                       (
+                           dateTime INTEGER,
+                           birdID1  INTEGER,
+                           birdID2  INTEGER,
+                           birdID3  INTEGER,
+                           conf1    REAL,
+                           conf2    REAL,
+                           conf3    REAL,
+                           fileID   INTEGER,
+                           position INTEGER,
+                           label    TEXT,
+                           comment  TEXT,
+                           UNIQUE (dateTime, fileID)
+                       )`);
     if (archiveMode) {
         for (let i = 0; i < labels.length; i++) {
             const [sname, cname] = labels[i].replaceAll("'", "''").split('_');
-            await db.runAsync(`INSERT INTO species VALUES (${i}, '${sname}', '${cname}')`);
+            await db.runAsync(`INSERT INTO species
+                               VALUES (${i}, '${sname}', '${cname}')`);
         }
-    }
-    else {
+    } else {
         const filename = diskDB.filename;
         let {code} = await db.runAsync(`ATTACH '${filename}' as disk`);
         // If the db is not ready
@@ -233,7 +245,7 @@ ipcRenderer.on('new-client', (event) => {
                 await loadAudioFile(args);
                 break;
             case 'filter':
-                args.db = diskDB;
+                //args.db = diskDB;
                 await getCachedResults(args);
                 await getCachedSummary(args);
                 break;
@@ -812,11 +824,6 @@ async function doPrediction({
                             }) {
     predictionDone = false;
     predictionStart = new Date();
-    // if (resetResults) {
-    //     index = 0;
-    //     AUDACITY = [];
-    //     RESULTS = [];
-    // }
     predicting = true;
     await getPredictBuffers({file: file, start: start, end: end, resetResults: resetResults});
     UI.postMessage({event: 'update-audio-duration', value: metadata[file].duration});
@@ -1204,18 +1211,22 @@ const getCachedSummary = ({
                     INNER JOIN files ON fileID = files.rowid
                     ${where} ${when}
                 GROUP BY cname
-                ORDER BY max (conf1) DESC;`, function (err, summary) {
+                ORDER BY max (conf1) DESC;`, async (err, summary) => {
             if (err) {
                 reject(err)
             } else {
-                UI.postMessage({
-                    event: 'prediction-done',
-                    summary: summary,
-                    audacityLabels: AUDACITY,
-                    filterSpecies: species,
-                    activeID: activeID,
-                    batchInProgress: false,
-                })
+                if (summary.length) {
+                    UI.postMessage({
+                        event: 'prediction-done',
+                        summary: summary,
+                        audacityLabels: AUDACITY,
+                        filterSpecies: species,
+                        activeID: activeID,
+                        batchInProgress: false,
+                    })
+                } else if (db === diskDB){
+                    await getCachedSummary({db: memoryDB, range: range, species: species, files: files, activeID: activeID, explore: explore})
+                }
                 resolve(summary)
             }
         })
@@ -1244,7 +1255,7 @@ const dbSpeciesCheck = () => {
 }
 
 const getCachedResults = ({
-                              db = undefined,
+                              db = memoryDB,
                               range = undefined,
                               files = [],
                               species = undefined,
@@ -1252,7 +1263,7 @@ const getCachedResults = ({
                               active = undefined
                           }) => {
     // reset results table in UI
-    UI.postMessage({event: 'reset-results'});
+    //UI.postMessage({event: 'reset-results'});
 
     const [where, when] = setWhereWhen({
         dateRange: range, species: species, files: files, context: 'results'
@@ -1834,10 +1845,13 @@ async function onChartRequest(args) {
 Todo: bugs
     Confidence filter not honoured on refresh results
     Table does not  expand to fit when operation aborted
-    when current model list differs from the one used when saving records, getCachedResults gives wrong species
+    ***when current model list differs from the one used when saving records, getCachedResults gives wrong species
+        -solved as in there are separate databases now, so results cached in the db for another model wont register.
     when nocmig mode on, getcachedresults for daytime files prints no results, but summary printed. No warning given.
     ***manual records entry doesn't preserve species in explore mode
-    save records to db doesn't work with updaterecord! RESULTS not updated
+    save records to db doesn't work with updaterecord! RESULTS not updated ################ Must remove RESULTS
+    AUDACITY results for multiple files doesn't work well, as it puts labels in by position only. Need to make audacity an object, and return the result for the current file only
+
 
 Todo: Database
      Database delete: records, files (and all associated records). Use when reanalysing
@@ -1863,7 +1877,7 @@ Todo: manual entry
 
 Todo: UI
     ***Drag folder to load audio files within (recursively)
-    *Stop flickering when updating results
+    **Stop flickering when updating results
     Expose SNR feature
     Pagination? Limit table records to say, 1000
     Better tooltips, for all options
