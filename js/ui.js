@@ -2376,6 +2376,9 @@ function scrollResults(row) {
 
 async function renderResult(args) {
     const result = args.result, file = args.file;
+    // Deal with flicker
+    const cachedResult = args.fromDB;
+    // More to do here!
     let index = args.index;
     const subRowThreshold = 0.01;
     // Memory saver
@@ -2409,9 +2412,6 @@ async function renderResult(args) {
             * abort entirely when dawn breaks
             */
             if (!seenTheDarkness && result.dayNight === 'daytime') {
-                //
-                // tr = '<tr><td>Skipping daytime results... </td></tr>';
-                // resultTable.html(tr);
                 // Not dark yet
                 return
             }
@@ -2562,7 +2562,7 @@ function commentHandler(e) {
         worker.postMessage({
             action: 'update-record',
             openFiles: fileList,
-            currentFile: currentFile,
+            currentFile: file,
             start: start,
             from: species,
             what: 'comment',
