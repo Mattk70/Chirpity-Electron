@@ -6,6 +6,16 @@ let BATCH_SIZE;
 const adding_chirpity_additions = false;
 let labels;
 const sqlite3 = require('sqlite3').verbose();
+
+sqlite3.Database.prototype.runAsync = function (sql, ...params) {
+    return new Promise((resolve, reject) => {
+        this.run(sql, params, function (err) {
+            if (err) return reject(err);
+            resolve(this);
+        });
+    });
+};
+
 const SunCalc = require('suncalc2');
 const ffmpeg = require('fluent-ffmpeg');
 const png = require('fast-png');
@@ -26,82 +36,55 @@ let activeTimestamp = undefined;
 let COMPLETED = [], OPENFILES = [];
 let diskDB, memoryDB, NOCMIG, latitude, longitude;
 
-const createDB = (file) => {
-    return new Promise((resolve, reject) => {
-        const archiveMode = !!file;
-        if (file) {
-            fs.openSync(file, "w");
-            diskDB = new sqlite3.Database(file);
-            console.log("Created disk database", file);
-        } else {
-            memoryDB = new sqlite3.Database(':memory:');
-            console.log("Created new in-memory database");
-        }
-        const db = archiveMode ? diskDB : memoryDB;
-        db.serialize(() => {
-            db.run(`CREATE TABLE species
-                    (
-                        id    INTEGER PRIMARY KEY,
-                        sname TEXT,
-                        cname TEXT
-                    )`, function (createResult) {
-                if (createResult) throw createResult;
-            });
-            db.run(`CREATE TABLE files
-                    (
-                        name      TEXT,
-                        duration  REAL,
-                        filestart INTEGER,
-                        UNIQUE (name)
-                    )`, function (createResult) {
-                if (createResult) throw createResult;
-            });
-            db.run(`CREATE TABLE duration
-                    (
-                        day      INTEGER,
-                        duration INTEGER,
-                        fileID   INTEGER,
-                        UNIQUE (day, fileID)
-                    )`, function (createResult) {
-                if (createResult) throw createResult;
-            });
+let t0; // Application profiler
 
-            db.run(`CREATE TABLE records
-                    (
-                        dateTime INTEGER,
-                        birdID1  INTEGER,
-                        birdID2  INTEGER,
-                        birdID3  INTEGER,
-                        conf1    REAL,
-                        conf2    REAL,
-                        conf3    REAL,
-                        fileID   INTEGER,
-                        position INTEGER,
-                        label    TEXT,
-                        comment  TEXT,
-                        UNIQUE (dateTime, fileID)
-                    )`, function (createResult) {
-                if (createResult) throw createResult;
-            });
-            const stmt = db.prepare("INSERT INTO species VALUES (?, ?, ?)");
-            for (let i = 0; i < labels.length; i++) {
-                const [sname, cname] = labels[i].split('_')
-                stmt.run(i, sname, cname);
-            }
-            stmt.finalize();
-        });
-        resolve(db)
-    })
+const createDB = async (file) => {
+    const archiveMode = !!file;
+    if (file) {
+        fs.openSync(file, "w");
+        diskDB = new sqlite3.Database(file);
+        console.log("Created disk database", diskDB.filename);
+    } else {
+        memoryDB = new sqlite3.Database(':memory:');
+        console.log("Created new in-memory database");
+
+    }
+    const db = archiveMode ? diskDB : memoryDB;
+    await db.runAsync('BEGIN');
+    await db.runAsync('CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT, cname TEXT)');
+    await db.runAsync('CREATE TABLE files(name TEXT,duration  REAL,filestart INTEGER, UNIQUE (name))');
+    await db.runAsync('CREATE TABLE duration(day INTEGER, duration INTEGER, fileID INTEGER,UNIQUE (day, fileID))');
+    await db.runAsync(`CREATE TABLE records
+    (dateTime INTEGER, birdID1  INTEGER, birdID2  INTEGER, birdID3  INTEGER, conf1 REAL, conf2 REAL, conf3 REAL,
+                       fileID   INTEGER, position INTEGER, label TEXT, comment TEXT, UNIQUE (dateTime, fileID))`);
+    if (archiveMode) {
+        for (let i = 0; i < labels.length; i++) {
+            const [sname, cname] = labels[i].replaceAll("'", "''").split('_');
+            await db.runAsync(`INSERT INTO species VALUES (${i}, '${sname}', '${cname}')`);
+        }
+    }
+    else {
+        const filename = diskDB.filename;
+        let {code} = await db.runAsync(`ATTACH '${filename}' as disk`);
+        // If the db is not ready
+        while (code === "SQLITE_BUSY") {
+            setTimeout(() => {
+            }, 10);
+            let response = await db.runAsync(`ATTACH '${filename}' as disk`);
+            code = response.code;
+        }
+        let response = await db.runAsync('INSERT INTO files SELECT * FROM disk.files');
+        console.log(response.changes + ' files added to memory database')
+        response = await db.runAsync('INSERT INTO species SELECT * FROM disk.species');
+        console.log(response.changes + ' species added to memory database')
+    }
+    await db.runAsync('END');
 }
 
 async function loadDB(path) {
-    let db = path ? diskDB : memoryDB;
-    if (db) {
-        console.log('Database loaded, nothing to do');
-        return true
-    }
+    // Ensure we're using the db for the number of labels we have in the model
     if (path) {
-        const file = p.join(path, 'archive.sqlite')
+        const file = p.join(path, `archive${labels.length}.sqlite`)
         if (!fs.existsSync(file)) {
             await createDB(file);
         } else {
@@ -245,7 +228,6 @@ ipcRenderer.on('new-client', (event) => {
                 predictionsRequested = 0;
                 predictionsReceived = 0;
                 await loadAudioFile(args);
-
                 break;
             case 'update-buffer':
                 await loadAudioFile(args);
@@ -662,12 +644,14 @@ const convertTimeToBytes = (time, metadata) => {
 
 async function setupCtx(chunk, header) {
     // Deal with detached arraybuffer issue
+    let audioBufferChunk;
     try {
         chunk = Buffer.concat([header, chunk]);
+        audioBufferChunk = await audioCtx.decodeAudioData(chunk.buffer);
     } catch {
         return false
     }
-    const audioBufferChunk = await audioCtx.decodeAudioData(chunk.buffer);
+
     const source = audioCtx.createBufferSource();
     source.buffer = audioBufferChunk;
     const duration = source.buffer.duration;
@@ -728,7 +712,7 @@ const getPredictBuffers = async ({
                 // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
             });
         } else {
-            console.log('Short end chunk', chunk.length, 'skipping')
+            console.log('Short chunk', chunk.length, 'skipping')
             // Create array with 0's (short segment of silence that will trigger the finalChunk flag
             const myArray = new Float32Array(new Array(1000).fill(0));
             feedChunksToModel(myArray, chunkLength, chunkStart, file, end, resetResults);
@@ -1083,15 +1067,14 @@ async function parseMessage(e) {
         console.log(backend);
         UI.postMessage({event: 'model-ready', message: 'ready', backend: backend, labels: labels})
     } else if (response['message'] === 'labels') {
+        t0 = Date.now();
         labels = response['labels'];
         // Now we have what we need to populate a database...
-        const t0 = Date.now();
+        // Load the archive db
+        await loadDB(appPath);
         // Create in-memory database
         await loadDB();
-        // Load the archive one too
-        await loadDB(appPath);
         await dbSpeciesCheck();
-        console.log(`Databases loaded in ${(Date.now() - t0)} milliseconds.`);
     } else if (response['message'] === 'prediction' && !aborted) {
         // add filename to result for db purposes
         let [file, batchInProgress] = parsePredictions(response);
@@ -1185,7 +1168,6 @@ async function setStartEnd(file) {
     return [start, end];
 }
 
-let t1, t0;
 
 const setWhereWhen = ({dateRange, species, files, context}) => {
     let where = '';
@@ -1262,7 +1244,12 @@ const dbSpeciesCheck = () => {
 }
 
 const getCachedResults = ({
-                              db = undefined, range = undefined, files = [], species = undefined, explore = false, active = undefined
+                              db = undefined,
+                              range = undefined,
+                              files = [],
+                              species = undefined,
+                              explore = false,
+                              active = undefined
                           }) => {
     // reset results table in UI
     UI.postMessage({event: 'reset-results'});
@@ -1303,7 +1290,12 @@ const getCachedResults = ({
                     active.position === result.position &&
                     active.file === result.file) result['active'] = true;
                 UI.postMessage({
-                    event: 'prediction-ongoing', file: result.file, result: result, index: index, resetResults: false,
+                    event: 'prediction-ongoing',
+                    file: result.file,
+                    result: result,
+                    index: index,
+                    resetResults: false,
+                    fromDB: true
                 });
                 RESULTS.push(result);
                 AUDACITY.push({
@@ -1717,7 +1709,13 @@ async function onUpdateRecord({
                     console.log(`Update without transaction took ${Date.now() - t0} milliseconds`);
                     const species = isFiltered || isExplore ? from : '';
                     if (isExplore) openFiles = [];
-                    await getCachedResults({db: db, files: openFiles, species: species, explore: isExplore, active: {file:currentFile, position: start}});
+                    await getCachedResults({
+                        db: db,
+                        files: openFiles,
+                        species: species,
+                        explore: isExplore,
+                        active: {file: currentFile, position: start}
+                    });
                     await getCachedSummary({db: db, files: openFiles, species: species, explore: isExplore});
                     // Update the species list
                     await getSpecies(db, range);
