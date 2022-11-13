@@ -76,7 +76,7 @@ let waveCanvasElement, waveWaveElement,
 resultTableElement.animate({scrollTop: '300px'}, 400, 'swing');
 let contentWrapperElement = $('#contentWrapper');
 let completeDiv = $('#complete');
-const resultTable = $('#resultTableBody')
+const resultTable = document.getElementById('resultTableBody');
 const nocmigButton = document.getElementById('nocmigMode');
 const summaryTable = $('#summaryTable');
 let progressDiv = $('#progressDiv');
@@ -165,7 +165,7 @@ console.table(diagnostics);
 
 function resetResults(args) {
     summaryTable.empty();
-    resultTable.empty();
+    resultTable.innerHTML = '';
     predictions = {};
     seenTheDarkness = false;
     shownDaylightBanner = false;
@@ -719,8 +719,8 @@ function createRegion(start, end, label) {
     wavesurfer.seekAndCenter(progress);
 }
 
-const tbody = document.getElementById('resultTableBody')
-tbody.addEventListener('click', function (e) {
+const results = document.getElementById('results');
+results.addEventListener('click', function (e) {
     if (activeRow) {
         activeRow.classList.remove('table-active')
     }
@@ -730,9 +730,6 @@ tbody.addEventListener('click', function (e) {
     const params = row.attributes[2].value.split('|');
     if (e.target.classList.contains('play')) params.push('true')
     loadResultRegion(params);
-    // if (!onScreen(row)) {
-    //     scrollResults(row);
-    // }
 })
 
 
@@ -1149,9 +1146,6 @@ window.onload = async () => {
                     break;
                 case 'chart-data':
                     onChartData(args);
-                    break;
-                case 'reset-results':
-                    resetResults(args);
                     break;
                 case 'generate-alert':
                     alert(args.message)
@@ -2263,6 +2257,14 @@ async function onPredictionDone({
     } else {
         PREDICTING = false;
     }
+    if (resultsBuffer) {
+        const results = document.getElementById('resultTableBody');
+        results.replaceWith(resultsBuffer);
+        if (!config.spectrogram) $('.specFeature').hide();
+        resultsBuffer = undefined;
+        activeRow = document.getElementsByClassName('table-active')[0]
+    }
+
     updateSummary({summary: summary, filterSpecies: filterSpecies});
 
     progressDiv.hide();
@@ -2363,14 +2365,6 @@ async function onPredictionDone({
     }
 }
 
-function scrollResults(row) {
-    row.classList.add('table-active');
-    activeRow = row;
-    const container = row.closest('.overflow-auto')
-    container.scrollTop = row.offsetTop - container.offsetTop - document.getElementById('resultsHead').offsetHeight;
-}
-
-
 // TODO: limit results table to n records, paginate. Have summary contain full detection counts.
 // TODO: show every detection in the spec window as a region on the spectrogram
 
@@ -2381,8 +2375,9 @@ async function renderResult(args) {
     // More to do here!
     let index = args.index;
     const subRowThreshold = 0.01;
+    const showAlternates = result.score2 > subRowThreshold ? '' : 'd-none';
     // Memory saver
-    if (index > 3000) return
+    if (index > 1000) return
     // Convert timestamp and position to date so easier to format results in UI
     let timestamp = new Date(result.timestamp);
     const position = new Date(result.position * 1000);
@@ -2454,17 +2449,16 @@ async function renderResult(args) {
         predictions[index] = result;
         let showTimeOfDay;
         config.timeOfDay ? showTimeOfDay = '' : showTimeOfDay = 'd-none';
-
+        const active = result.active ? 'table-active' : ';'
         const label = result.label ? tags[result.label] : tags['Remove Label'];
-
-        tr += `<tr tabindex="-1" id="result${index}" name="${file}|${start}|${end}|${result.cname}${confidence}" class='border-top border-2 border-secondary top-row ${result.dayNight}'>
+        tr += `<tr tabindex="-1" id="result${index}" name="${file}|${start}|${end}|${result.cname}${confidence}" class='${active} border-top border-2 border-secondary top-row ${result.dayNight}'>
             <th scope='row'>${index}</th>
             <td class='text-start text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-end">${UI_position}</td>
             <td name="${result.cname}" class='text-start cname'>${result.cname} <br/><i>${result.sname}</i></td>
             <td class="label">${label}</td>
             <td>${iconizeScore(result.score)}</td>
-            <td><span id='id${index}' title="Click for additional detections" class='material-icons-two-tone rotate pointer d-none'>sync</span></td>
+            <td><span id='id${index}' title="Click for additional detections" class='material-icons-two-tone rotate pointer ${showAlternates}'>sync</span></td>
             <td class='specFeature'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
             <td><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:"nocturnal flight call"' target="xc">
                 <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
@@ -2472,7 +2466,7 @@ async function renderResult(args) {
             <td class="comment text-end">${comment}</td>
         </tr>`;
 
-        if (result.score2 > subRowThreshold) {
+        if (showAlternates) {
             tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" id='subrow${index}' class='subrow d-none'>
                 <th scope='row'>${index}</th>
                 <td class="timestamp ${showTimeOfDay}"> </td>
@@ -2505,22 +2499,23 @@ async function renderResult(args) {
             }
         }
     }
-    resultTable.append(tr)
-    // if (!resetResults) {
-    //     const tableRows = document.querySelectorAll('#results > tbody > tr');
-    //     scrollResults(tableRows[tableRows.length - 1])
-    // }
-    // Show the alternate detections toggle:
-    if (result.score2 > subRowThreshold) {
-        const id = `id${index}`;
-        document.getElementById(id).classList.remove('d-none')
-    }
-    if (!config.spectrogram) $('.specFeature').hide();
 
-    if (result.active) {
-        activeRow = document.getElementById(`result${index}`);
+    updateResultTable(index, tr, showAlternates, cachedResult)
+}
+
+let resultsBuffer;
+const updateResultTable = (index, row, showAlternates, fromCache) => {
+    if (fromCache) {
+        if (!resultsBuffer) resultsBuffer = resultTable.cloneNode();
+        resultsBuffer.lastElementChild ? resultsBuffer.lastElementChild.insertAdjacentHTML('afterend', row) :
+            resultsBuffer.innerHTML = row;
+    } else {
+        resultTable.lastElementChild ? resultTable.lastElementChild.insertAdjacentHTML('afterend', row) :
+            resultTable.innerHTML = row;
+        if (!config.spectrogram) $('.specFeature').hide();
     }
 }
+
 
 // Comment handling
 
