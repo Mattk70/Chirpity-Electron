@@ -80,6 +80,7 @@ const createDB = async (file) => {
         let {code} = await db.runAsync(`ATTACH '${filename}' as disk`);
         // If the db is not ready
         while (code === "SQLITE_BUSY") {
+            console.log("Disk DB busy")
             setTimeout(() => {
             }, 10);
             let response = await db.runAsync(`ATTACH '${filename}' as disk`);
@@ -268,7 +269,7 @@ ipcRenderer.on('new-client', (event) => {
                 await uploadOpus(args);
                 break;
             case 'save2db':
-                await onSave2DB(diskDB);
+                await onSave2DiskDB();
                 break;
             case 'abort':
                 onAbort(args);
@@ -562,7 +563,7 @@ function addDays(date, days) {
 }
 
 /**
- * Called by getWorkingFile, setStartEnd?, getFileStart?,
+ * Called by getWorkingFile, setStartEnd??,
  * Assigns file metadata to a metadata cache object. file is the key, and is the source file
  * proxy is required if the source file is not a wav to populate the headers
  * @param file: the file name passed to the worker
@@ -751,11 +752,6 @@ const fetchAudioBuffer = async ({
     const proxy = await getWorkingFile(file);
     if (!proxy) return false
     return new Promise(async (resolve, reject) => {
-        // Ensure max and min are within range
-        //start = Math.max(0, start);
-        // Handle no end supplied
-        //end = Math.min(metadata[file].duration, end);
-
         const byteStart = convertTimeToBytes(start, metadata[file]);
         const byteEnd = convertTimeToBytes(end, metadata[file]);
 
@@ -776,7 +772,6 @@ const fetchAudioBuffer = async ({
             offlineCtx.startRendering().then(resampled => {
                 // `resampled` contains an AudioBuffer resampled at 24000Hz.
                 // use resampled.getChannelData(x) to get an Float32Array for channel x.
-                //readStream.close();
                 readStream.resume();
                 resolve(resampled);
             }).catch((err) => {
@@ -795,10 +790,7 @@ const fetchAudioBuffer = async ({
 }
 
 function sendMessageToWorker(chunkStart, chunks, file, duration, resetResults, predictionsRequested) {
-    // - 0.25: We may not send the last quarter of a second (v. small buffers cause issues in webAudio rendering)
     const finalChunk = (chunkStart / sampleRate) + (chunks.length * 3) >= duration;
-    // const finalChunk = duration % 3 > 0 ? (chunkStart / sampleRate) + (chunks.length * 3) > duration:
-    //     chunks[chunks.length -1].length < 72000;
     const objData = {
         message: 'predict',
         fileStart: metadata[file].fileStart,
@@ -839,7 +831,6 @@ function feedChunksToModel(channelData, increment, chunkStart, file, duration, r
         if (chunks.length === BATCH_SIZE) {
             sendMessageToWorker(chunkStart, chunks, file, duration, resetResults, predictionsRequested);
             chunks = [];
-            //chunkStart += 3 * BATCH_SIZE * sampleRate;
         }
     }
     //clear up remainder less than BATCH_SIZE
@@ -1002,7 +993,6 @@ async function saveMP3(file, start, end, filename, metadata) {
 
 /// Workers  From the MDN example
 function spawnWorker(model, list, batchSize, warmup) {
-    console.log(`spawning worker with ${list}, ${batchSize}, ${warmup}`)
     predictWorker = new Worker('./js/model.js');
     //const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
     const modelPath = model === 'efficientnet' ? '../test_CAT_XTNRTOPY_SOFTMAX__PREPROCESS_LAYER_EfficientNetB3256x384_Data_Adam_refined_482/' : '../24000_v9/';
@@ -1224,8 +1214,15 @@ const getCachedSummary = ({
                         activeID: activeID,
                         batchInProgress: false,
                     })
-                } else if (db === diskDB){
-                    await getCachedSummary({db: memoryDB, range: range, species: species, files: files, activeID: activeID, explore: explore})
+                } else if (db === diskDB) {
+                    await getCachedSummary({
+                        db: memoryDB,
+                        range: range,
+                        species: species,
+                        files: files,
+                        activeID: activeID,
+                        explore: explore
+                    })
                 }
                 resolve(summary)
             }
@@ -1397,7 +1394,7 @@ const getFileIDs = (db) => {
 }
 
 const onSave2DB = async (db) => {
-    t0 = performance.now();
+    t0 = Date.now();
     return new Promise(async function (resolve, reject) {
         if (RESULTS.length) {
             let filemap = await getFileIDs(db)
@@ -1424,7 +1421,7 @@ const onSave2DB = async (db) => {
                             if (db === diskDB) {
                                 UI.postMessage({
                                     event: 'generate-alert',
-                                    message: `${db.filename.replace(/.*\//, '')} database update complete, ${i + 1} records updated in ${((performance.now() - t0) / 1000).toFixed(3)} seconds`
+                                    message: `${db.filename.replace(/.*\//, '')} database update complete, ${i + 1} records updated in ${((Date.now() - t0) / 1000)} seconds`
                                 })
                             }
                             resolve(row)
@@ -1438,6 +1435,30 @@ const onSave2DB = async (db) => {
     })
 }
 
+
+/**
+ *  Transfers data in memoryDB to diskDB
+ * @returns {Promise<unknown>}
+ */
+const onSave2DiskDB = async () => {
+    t0 = Date.now();
+    memoryDB.runAsync('BEGIN');
+    let response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.files SELECT * FROM files');
+    console.log(response.changes + ' files added to disk database')
+    // Update the duration table
+    response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.duration SELECT * FROM duration');
+    console.log(response.changes + ' date durations added to disk database')
+    response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.records SELECT * FROM records');
+    console.log(response.changes + ' records added to disk database')
+    memoryDB.runAsync('END');
+    // Clear and relaunch the memory DB
+    memoryDB.close();
+    await createDB();
+    UI.postMessage({
+        event: 'generate-alert',
+        message: `Database update complete, ${response.changes} records added to the archive in ${((Date.now() - t0) / 1000)} seconds`
+    })
+}
 
 const getSeasonRecords = async (species, season) => {
     const seasonMonth = {spring: "< '07'", autumn: " > '06'"}
@@ -1583,36 +1604,6 @@ const getSpecies = (db, range) => {
         })
 }
 
-const getFileStart = (db, file) => {
-    return new Promise(function (resolve, reject) {
-        db.get(`SELECT filestart
-                FROM files
-                WHERE name = '${file}'`, async (err, row) => {
-            if (err) {
-                reject(err)
-            } else {
-                if (row['filestart'] === null) {
-                    // This should only be needed while we catch up with the new files schema
-                    await getMetadata({file: file});
-                    db.get(`UPDATE files
-                            SET filestart = '${metadata[file].fileStart}'
-                            WHERE name = '${file}'`, (err, row) => {
-                        if (err) {
-                            console.log(err)
-                        } else {
-                            console.log(row)
-                            row = metadata[file].fileStart;
-                            resolve(row)
-                        }
-                    })
-
-                } else {
-                    resolve(row)
-                }
-            }
-        })
-    })
-}
 
 const onUpdateFileStart = async (args) => {
     let file = args.file;
@@ -1672,8 +1663,6 @@ async function onUpdateRecord({
                                   isExplore = false,
                                   range = {}
                               }) {
-
-
     // Construct the SQL
     let whatSQL = '', whereSQL = '';
     if (what === 'ID' || what === 'birdID1') {
@@ -1850,7 +1839,8 @@ Todo: bugs
     when nocmig mode on, getcachedresults for daytime files prints no results, but summary printed. No warning given.
     ***manual records entry doesn't preserve species in explore mode
     save records to db doesn't work with updaterecord! RESULTS not updated ################ Must remove RESULTS
-    AUDACITY results for multiple files doesn't work well, as it puts labels in by position only. Need to make audacity an object, and return the result for the current file only
+    AUDACITY results for multiple files doesn't work well, as it puts labels in by position only. Need to make audacity an object,
+        and return the result for the current file only
 
 
 Todo: Database
