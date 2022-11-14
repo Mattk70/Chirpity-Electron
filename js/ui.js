@@ -76,7 +76,7 @@ let waveCanvasElement, waveWaveElement,
 resultTableElement.animate({scrollTop: '300px'}, 400, 'swing');
 let contentWrapperElement = $('#contentWrapper');
 let completeDiv = $('#complete');
-const resultTable = document.getElementById('resultTableBody');
+let resultTable = document.getElementById('resultTableBody');
 const nocmigButton = document.getElementById('nocmigMode');
 const summaryTable = $('#summaryTable');
 let progressDiv = $('#progressDiv');
@@ -96,7 +96,7 @@ const summaryDiv = document.getElementById('summary');
 let batchInProgress = false;
 let activeRow;
 let predictions = {}, speciesListItems,
-    clickedIndex, speciesName, speciesFilter,
+    clickedIndex, speciesFilter,
     subRows, currentFileDuration;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
@@ -165,6 +165,7 @@ console.table(diagnostics);
 
 function resetResults(args) {
     summaryTable.empty();
+    resultTable = document.getElementById('resultTableBody');
     resultTable.innerHTML = '';
     predictions = {};
     seenTheDarkness = false;
@@ -1112,6 +1113,9 @@ window.onload = async () => {
             switch (event) {
                 case 'model-ready':
                     onModelReady(args);
+                    break;
+                case 'reset-results':
+                    resetResults(args);
                     break;
                 case 'files':
                     onOpenFiles(args);
