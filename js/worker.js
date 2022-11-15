@@ -129,7 +129,7 @@ async function loadDB(path) {
 }
 
 let metadata = {};
-let minConfidence, index = 0, AUDACITY = [], RESULTS = [], predictionStart;
+let minConfidence, index = 0, AUDACITY = {}, predictionStart;
 let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
 let predictWorker, predicting = false, predictionDone = false, aborted = false;
 
@@ -239,7 +239,7 @@ ipcRenderer.on('new-client', (event) => {
                 getSpecies(diskDB, args.range);
                 break;
             case 'create-dataset':
-                saveResults2DataSet(RESULTS);
+                saveResults2DataSet();
                 break;
             case 'load-model':
                 UI.postMessage({event: 'spawning'});
@@ -270,6 +270,7 @@ ipcRenderer.on('new-client', (event) => {
                 break;
             case 'explore':
                 args.db = diskDB;
+                args.context = 'explore';
                 args.explore = true;
                 await getCachedResults(args);
                 await getCachedSummary(args);
@@ -350,8 +351,8 @@ async function onAnalyse({
     //Set global OPENFILES for summary to use
     OPENFILES = files;
     index = 0;
-    AUDACITY = [];
-    //RESULTS = [];
+    AUDACITY = {};
+
     COMPLETED = [];
 
     UI.postMessage('reset-results');
@@ -380,9 +381,6 @@ async function onAnalyse({
                 await getCachedSummary({files: files})
             }
         } else if (!predicting) {
-            // Begin a database transaction for the results
-            await memoryDB.runAsync('BEGIN');
-            console.log('transaction started');
             predicting = true;
             await processNextFile(arguments[0]);
         }
@@ -406,7 +404,7 @@ function onAbort({
     predictionDone = true;
     predictionsReceived = 0;
     predictionsRequested = 0;
-    UI.postMessage({event: 'prediction-done', audacityLabels: AUDACITY, batchInProgress: true});
+    UI.postMessage({event: 'prediction-done', batchInProgress: true});
 }
 
 const getDuration = async (src) => {
@@ -856,12 +854,13 @@ const speciesMatch = (path, sname) => {
     return species.includes(sname)
 }
 
-const saveResults2DataSet = (results, rootDirectory) => {
+const saveResults2DataSet = (rootDirectory) => {
     if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/Amendment_temp_folder';
     let promise = Promise.resolve();
+    let promises = [];
     let count = 0;
     const t0 = Date.now();
-    results.forEach(result => {
+    memoryDB.each(db2ResultSQL, (err, result) => {
         // Check for level of ambient noise activation
         let ambient, threshold, value = 0.25;
         // adding_chirpity_additions is a flag for curated files, if true we assume every detection is correct
@@ -900,9 +899,10 @@ const saveResults2DataSet = (results, rootDirectory) => {
                 setTimeout(resolve, 5);
             });
         })
-    })
-    promise.then(() => {
-        console.log(`Dataset created. ${count} files saved in ${(Date.now() - t0) / 1000} seconds`);
+        promises.push(promise)
+    }, (err, files) => {
+        if (err) return console.log(err);
+        Promise.all(promises).then(() => console.log(`Dataset created. ${count} files saved in ${(Date.now() - t0) / 1000} seconds`) )
     })
 }
 
@@ -1021,8 +1021,6 @@ const parsePredictions = async (response) => {
     let file, batchInProgress = false;
     predictionsReceived = response['predictionsReceived'];
     const result = response['result'];
-    // Can't start a transaction within a transaction
-    // await memoryDB.runAsync('BEGIN');
     let fileSQL;
     for (let i = 0; i < result.length; i++) {
         const prediction = result[i];
@@ -1047,8 +1045,9 @@ const parsePredictions = async (response) => {
                 index: index,
                 resetResults: response['resetResults'],
             });
-            AUDACITY.push(audacity);
-            //save result to memory db
+            AUDACITY[file] ? AUDACITY[file].push(audacity) : AUDACITY[file] = [audacity];
+            //save result to memory db (N.B. tried using transactions, but was no faster.
+            // Also, transactions had to start end in other functions, which is bad style!
             fileSQL = file.replaceAll("'", "''");
             await memoryDB.runAsync(`INSERT
             OR IGNORE INTO files VALUES ( '${fileSQL}',
@@ -1078,15 +1077,15 @@ const parsePredictions = async (response) => {
             null,
             null
             )`);
-            //RESULTS.push(result);
+
         }
     }
     if (response.finished) {
         COMPLETED.push(file);
-        const {rowid} = await memoryDB.getAsync(`SELECT rowid
+        const row = await memoryDB.getAsync(`SELECT rowid
                                                  FROM files
                                                  WHERE name = '${fileSQL}'`);
-        if (rowid) {
+        if (!row) {
             const result = `No predictions found in ${file}`;
             UI.postMessage({
                 event: 'prediction-ongoing',
@@ -1133,9 +1132,6 @@ async function parseMessage(e) {
                 // This is the one time results *do not* come from the database
                 let summary;
                 if (!batchInProgress) {
-                    // Really finished, end the transaction
-                    await memoryDB.runAsync('END');
-                    console.log('transaction finished');
                     await getCachedSummary({files: OPENFILES});
                 } else {
                     UI.postMessage({
@@ -1229,7 +1225,7 @@ const setWhereWhen = ({dateRange, species, files, context}) => {
         where = where.slice(0, -1);
         where += ')';
     }
-    const cname = context === 'results' ? 's1.cname' : 'cname';
+    const cname = context !== 'summary' ? 's1.cname' : 'cname';
     if (species) where += `${files.length ? ' AND ' : ' WHERE '} ${cname} =  '${species.replaceAll("'", "''")}'`;
     const when = dateRange && dateRange.start ? `AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
     return [where, when]
@@ -1288,6 +1284,7 @@ const syncMemoryDB = async (where) => {
     // First off, pull diskDB results to memoryDB
     const rows = await memoryDB.allAsync(`SELECT rowid
                                           FROM files ${where}`);
+
     const fileIDs = rows.map(row => row.rowid).toString();
     let response = await memoryDB.runAsync(`INSERT
     OR IGNORE INTO duration
@@ -1308,44 +1305,22 @@ const getCachedResults = async ({
                                     range = undefined,
                                     files = [],
                                     species = undefined,
-                                    explore = false,
+                                    context = 'results',
                                     active = undefined,
                                     limit = 1000,
                                     offset = 0
                                 }) => {
 
     const [where, when] = setWhereWhen({
-        dateRange: range, species: species, files: files, context: 'results'
+        dateRange: range, species: species, files: files, context: context
     });
 
-    if (db === diskDB) await syncMemoryDB(where);
+    if (db === diskDB && context !== 'explore') await syncMemoryDB(where);
 
     let index = 0;
     return new Promise(function (resolve, reject) {
         // db.each doesn't call the callback if there are no results, so:
-        db.each(`SELECT dateTime AS timestamp, position AS position, 
-            s1.cname as cname, s2.cname as cname2, s3.cname as cname3, 
-            birdid1 as id_1, birdid2 as id_2, birdid3 as id_3, 
-            position as
-                 start, position + 3 as
-        end
-        , conf1 as score, conf2 as score2, conf3 as score3, 
-                s1.sname as sname, s2.sname as sname2, s3.sname as sname3,
-                files.duration, files.name as file, comment, label
-                FROM records 
-                LEFT JOIN species s1 on s1.id = birdid1 
-                LEFT JOIN species s2 on s2.id = birdid2 
-                LEFT JOIN species s3 on s3.id = birdid3 
-                INNER JOIN files on files.rowid = records.fileid
-        ${where}
-        ${when}
-        ORDER
-        BY
-        timestamp
-        LIMIT
-        ${limit}
-        OFFSET
-        ${offset}`, (err, result) => {
+        db.each(`${db2ResultSQL} ${where} ${when} ORDER BY timestamp LIMIT ${limit} OFFSET ${offset}`, (err, result) => {
             if (err) {
                 reject(err)
             } else { // on each result
@@ -1362,12 +1337,13 @@ const getCachedResults = async ({
                     resetResults: false,
                     fromDB: true
                 });
-                //RESULTS.push(result);
-                AUDACITY.push({
-                    timestamp: `${result.start}\t${result.start + 3}`, cname: result.cname, score: result.score
-                })
+                // Recreate Audacity labels
+                const file = result.file
+                AUDACITY[file] ? AUDACITY[file].push({timestamp: `${result.start}\t${result.start + 3}`, cname: result.cname, score: result.score}) :
+                    AUDACITY[file] = [{timestamp: `${result.start}\t${result.start + 3}`, cname: result.cname, score: result.score}]
             }
         }, async (err, count) => {   //on finish
+            if (err) console.log(err);
             if (!count) {  // count === 0 => no results
                 if (db.filename === ':memory:') {
                     // No results in memory? Try the archive
@@ -1670,7 +1646,7 @@ async function onUpdateRecord({
                                         WHERE name IN (${filesSQL})`);
     if (rows.length) {
         const {changes} = await diskDB.runAsync(`UPDATE records
-                                           SET ${whatSQL} ${whereSQL}`);
+                                                 SET ${whatSQL} ${whereSQL}`);
         console.log(`Updated ${changes} records for ${what} in ${diskDB.filename.replace(/.*\//, '')} database, setting them to ${value}`);
     } else {
         UI.postMessage({
@@ -1678,55 +1654,6 @@ async function onUpdateRecord({
         })
     }
 }
-
-// return new Promise((resolve, reject) => {
-//     db.run(`UPDATE records
-//             SET ${whatSQL} ${whereSQL}`, async function (err, row) {
-//         if (err) {
-//             reject(err)
-//         } else {
-//             if (this.changes) {
-//                 console.log(`Updated ${this.changes} records for ${what} in ${db.filename.replace(/.*\//, '')} database, setting them to ${value}`);
-//                 console.log(`Update without transaction took ${Date.now() - t0} milliseconds`);
-//                 const species = isFiltered || isExplore ? from : '';
-//                 if (isExplore) openFiles = [];
-//                 await getCachedResults({
-//                     db: db,
-//                     files: openFiles,
-//                     species: species,
-//                     explore: isExplore,
-//                     active: {file: currentFile, position: start}
-//                 });
-//                 await getCachedSummary({db: db, files: openFiles, species: species, explore: isExplore});
-//                 // Update the species list
-//                 await getSpecies(db, range);
-//                 resolve(this.changes)
-//             } else {
-//                 console.log(`No records updated in ${db.filename.replace(/.*\//, '')}`)
-//                 // Not in diskDB, so update memoryDB
-//                 if (db === diskDB) {
-//                     await onUpdateRecord(//because no access to 'this' in arrow function, and regular function replaces arguments[0]
-//                         {
-//                             openFiles: openFiles,
-//                             currentFile: currentFile,
-//                             start: start,
-//                             value: value,
-//                             db: memoryDB,
-//                             isBatch: isBatch,
-//                             from: from,
-//                             what: what,
-//                             isReset: isReset,
-//                             isFiltered: isFiltered
-//                         });
-//                     UI.postMessage({
-//                         event: 'generate-alert', message: 'Remember to save your records to store this change'
-//                     })
-//                 }
-//             }
-//         }
-//     })
-// })
-//}
 
 async function onChartRequest(args) {
     console.log(`Getting chart for ${args.species} starting ${args.range[0]}`);
@@ -1810,9 +1737,11 @@ async function onChartRequest(args) {
     })
 }
 
+const db2ResultSQL = 'SELECT dateTime AS timestamp, position AS position, s1.cname as cname, s2.cname as cname2, s3.cname as cname3, birdid1 as id_1, birdid2 as id_2, birdid3 as id_3, position as start, position + 3 as end, conf1 as score, conf2 as score2, conf3 as score3,s1.sname as sname, s2.sname as sname2, s3.sname as sname3,files.duration, files.name as file, comment, label FROM records LEFT JOIN species s1 on s1.id = birdid1 LEFT JOIN species s2 on s2.id = birdid2 LEFT JOIN species s3 on s3.id = birdid3 INNER JOIN files on files.rowid = records.fileid';
 
 /*
 Todo: bugs
+    Crash on abort - no crash now, but predictions resume
     ***when analysing second batch of results, the first results linger.
     Confidence filter not honoured on refresh results
     Table does not  expand to fit when operation aborted
@@ -1820,7 +1749,7 @@ Todo: bugs
         -solved as in there are separate databases now, so results cached in the db for another model wont register.
     when nocmig mode on, getcachedresults for daytime files prints no results, but summary printed. No warning given.
     ***manual records entry doesn't preserve species in explore mode
-    ***save records to db doesn't work with updaterecord! RESULTS not updated ################ Must remove RESULTS
+    ***save records to db doesn't work with updaterecord!
     AUDACITY results for multiple files doesn't work well, as it puts labels in by position only. Need to make audacity an object,
         and return the result for the current file only #######
 
@@ -1888,14 +1817,14 @@ Todo: Releases
      Upsell premium features
      Automatic updates
      Implement version protocol
-     Better way to link js model to checkpoint model ################# !
+     ***Better way to link js model to checkpoint model: USE same folder names
 
 Todo: IDs
     Search by label,
     Search for comment
 
 Todo: Tests & code quality
-    All files will either be a wav, or have a proxy wav file in tmp. So, the database should always store the wav as the filename in the database. No need to check for other duplicates.
+    All files will either be a wav, or have a proxy wav file in tmp. So, the database should always store the wav as the filename in the database. No need to check for other duplicates. ??
     Order / group functions semantically
     Investigate unit tests
     Investigate coverage

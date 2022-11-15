@@ -26,8 +26,6 @@ const establishMessageChannel =
                     worker.onmessage = e => {
                         resolve(e.data);
                     }
-                } else if (event.data.args) {
-                    onLoadResults(event.data.args)
                 }
             }
         }
@@ -63,7 +61,7 @@ window.electron.getVersion()
 
 let modelReady = false, fileLoaded = false, currentFile;
 let PREDICTING = false;
-let region, AUDACITY_LABELS = [], wavesurfer;
+let region, AUDACITY_LABELS = {}, wavesurfer;
 let summary = {};
 let fileList = [], fileStart, bufferStartTime, fileEnd;
 
@@ -492,10 +490,6 @@ async function onOpenFiles(args) {
     }
 }
 
-async function onLoadResults(args) {
-    console.log("result file received: " + args.file)
-    //await loadChirp(args.file);
-}
 
 /**
  *
@@ -503,7 +497,7 @@ async function onLoadResults(args) {
  * @returns {Promise<void>}
  */
 async function showSaveDialog() {
-    await window.electron.saveFile({currentFile: currentFile, labels: AUDACITY_LABELS});
+    await window.electron.saveFile({currentFile: currentFile, labels: AUDACITY_LABELS[currentFile]});
 }
 
 // Worker listeners
@@ -511,7 +505,7 @@ function analyseReset() {
     fileNumber.innerText = '';
     PREDICTING = true;
     delete diagnostics['Audio Duration'];
-    AUDACITY_LABELS = [];
+    AUDACITY_LABELS = {};
     completeDiv.hide();
     progressDiv.show();
     stretchTable();
@@ -722,15 +716,18 @@ function createRegion(start, end, label) {
 
 const results = document.getElementById('results');
 results.addEventListener('click', function (e) {
-    if (activeRow) {
-        activeRow.classList.remove('table-active')
-    }
+
     const row = e.target.closest('tr');
-    row.classList.add('table-active');
-    activeRow = row;
-    const params = row.attributes[2].value.split('|');
-    if (e.target.classList.contains('play')) params.push('true')
-    loadResultRegion(params);
+    if (!row.classList.contains('bg-dark')) { // That'd be the daylight banner...
+        if (activeRow) {
+            activeRow.classList.remove('table-active')
+        }
+        row.classList.add('table-active');
+        activeRow = row;
+        const params = row.attributes[2].value.split('|');
+        if (e.target.classList.contains('play')) params.push('true')
+        loadResultRegion(params);
+    }
 })
 
 
@@ -1106,6 +1103,15 @@ window.onload = async () => {
         worker.postMessage({action: 'clear-cache'})
     })
     // establish the message channel
+    setUpWorkerMessaging()
+
+    // Set footer year
+    $('#year').text(new Date().getFullYear());
+    //Cache list elements
+    speciesListItems = $('#bird-list li span');
+};
+
+const setUpWorkerMessaging = () => {
     establishMessageChannel.then((success) => {
         worker.addEventListener('message', function (e) {
             const args = e.data;
@@ -1157,12 +1163,7 @@ window.onload = async () => {
             }
         })
     })
-    // Set footer year
-    $('#year').text(new Date().getFullYear());
-    //Cache list elements
-    speciesListItems = $('#bird-list li span');
-};
-
+}
 
 function generateBirdList(store, rows) {
     let listHTML;
@@ -1893,12 +1894,12 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         if (e.ctrlKey) showOpenDialog();
     },
     KeyS: function (e) {
-        if (AUDACITY_LABELS.length) {
+        if (Object.keys(AUDACITY_LABELS).length) {
             if (e.ctrlKey) worker.postMessage({action: 'save2db'});
         }
     },
     KeyA: function (e) {
-        if (AUDACITY_LABELS.length) {
+        if (Object.keys(AUDACITY_LABELS).length) {
             if (e.ctrlKey) showSaveDialog();
         }
     },
@@ -2247,13 +2248,13 @@ const updateSummary = ({
 async function onPredictionDone({
                                     filterSpecies = undefined,
                                     batchInProgress = false,
-                                    audacityLabels = [],
+                                    audacityLabels = {},
                                     file = undefined,
                                     summary = {},
                                     activeID = undefined
                                 }) {
 
-    AUDACITY_LABELS = AUDACITY_LABELS.concat(audacityLabels);
+    AUDACITY_LABELS = audacityLabels;
     // Defer further processing until batch complete
     if (batchInProgress) {
         progressDiv.show();
@@ -2277,7 +2278,7 @@ async function onPredictionDone({
     progressBar.html(0 + '%');
     completeDiv.show();
 
-    if (AUDACITY_LABELS.length) {
+    if (Object.keys(AUDACITY_LABELS).length) {
         enableMenuItem(['saveLabels', 'save2db']);
         $('.download').removeClass('disabled');
     } else {
@@ -2418,10 +2419,11 @@ async function renderResult(args) {
         // Show the twilight bar even if nocmig mode off - cue to change of table row colour
         if (seenTheDarkness && result.dayNight === 'daytime' && shownDaylightBanner === false) {
             // Show the twilight start bar
-            resultTable.append(`<tr class="bg-dark text-white"><td colspan="20" class="text-center">
-                                        Start of civil twilight
-                                        <span class="material-icons-two-tone text-warning align-bottom">wb_twilight</span>
-                                    </td></tr>`);
+            const row = `<tr class="bg-dark" style="color: white"><td colspan="20" class="text-center">
+                Start of civil twilight <span class="material-icons-two-tone text-warning align-bottom">wb_twilight</span>
+                </td></tr>`;
+            resultTable.lastElementChild ? resultTable.lastElementChild.insertAdjacentHTML('afterend', row) :
+                resultTable.innerHTML = row;
             shownDaylightBanner = true;
         }
 
