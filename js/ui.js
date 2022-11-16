@@ -94,12 +94,10 @@ const summaryDiv = document.getElementById('summary');
 let batchInProgress = false;
 let activeRow;
 let predictions = {}, speciesListItems,
-    clickedIndex, speciesFilter,
-    subRows, currentFileDuration;
+    clickedIndex, currentFileDuration;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
 let workerHasLoadedFile = false;
-let speciesViewIsFiltered = false;
 // Set content container height
 contentWrapperElement.height(bodyElement.height() - 80);
 
@@ -979,8 +977,8 @@ function updatePrefs() {
 let appPath, tempPath;
 window.onload = async () => {
     // Set config defaults
-
-    config = {
+    const defaultConfig = {
+        UUID: uuidv4(),
         spectrogram: true,
         colormap: 'inferno',
         timeline: true,
@@ -992,124 +990,105 @@ window.onload = async () => {
         longitude: -0.4,
         nocmig: false,
         warmup: true,
-        batchSize: 1
-    }
-    config.UUID = uuidv4();
+        batchSize: 1,
+        limit: 500,
+        fullscreen: false
+    };
     // Load preferences and override defaults
     [appPath, tempPath] = await getPaths();
-    fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
-        if (err) {
-            console.log('JSON parse error ' + err);
-            // If file read error, use defaults, set new UUID
-            config.UUID = uuidv4();
-            updatePrefs();
-        } else {
-            config = JSON.parse(data);
-        }
+    await fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
+            if (err) {
+                console.log('JSON parse error ' + err);
+                // Use defaults
+                config = defaultConfig;
+            } else {
+                config = JSON.parse(data);
+            }
 
+            //fill in defaults
+            Object.keys(defaultConfig).forEach(key => {
+                if (!(key in config)) {
+                    config[key] = defaultConfig[key];
+                }
+            });
 
-        // Check for keys - in case updates have added new ones
-        if (!('UUID' in config)) {
-            config.UUID = uuidv4();
-        }
-        if (!('batchSize' in config)) {
-            config.batchSize = 1;
-        }
-        if (!('latitude' in config)) {
-            config.latitude = 51.9
-        }
-        if (!('longitude' in config)) {
-            config.longitude = -0.4
-        }
-        if (!('nocmig' in config)) {
-            config.nocmig = false;
-        }
-        if (!('list' in config)) {
-            config.list = 'migrants';
-        }
-        if (!('model' in config)) {
-            config.model = 'efficientnet';
-        }
-        if (!('warmup' in config)) {
-            config.warmup = false;
-        }
-        // Never open fullscreen to begin with and don't remember setting
-        config.fullscreen = false;
-        updatePrefs()
+            updatePrefs()
 
-        // Set UI option state
-        const batchSizeElement = document.getElementById(config.batchSize);
-        batchSizeElement.checked = true;
-        diagnostics['Batch size'] = config.batchSize;
-        const modelToUse = document.getElementById(config.model);
-        modelToUse.checked = true;
-        diagnostics['Model'] = config.model;
+            // Set UI option state
+            const batchSizeElement = document.getElementById(config.batchSize);
+            batchSizeElement.checked = true;
+            diagnostics['Batch size'] = config.batchSize;
+            const modelToUse = document.getElementById(config.model);
+            modelToUse.checked = true;
+            diagnostics['Model'] = config.model;
 
-        warmup.checked = config.warmup;
-        // Show time of day in results?
-        const timestamp = document.querySelectorAll('.timestamp');
-        if (!config.timeOfDay) {
-            timestamp.forEach(el => {
-                el.classList.add('d-none')
-            })
+            warmup.checked = config.warmup;
+            // Show time of day in results?
+            const timestamp = document.querySelectorAll('.timestamp');
+            if (!config.timeOfDay) {
+                timestamp.forEach(el => {
+                    el.classList.add('d-none')
+                })
+            }
+            // Add a checkmark to the list in use
+            window[config.list].checked = true;
+
+            if (!config.spectrogram) {
+                loadSpectrogram.checked = false;
+                timeOfDay.disabled = true;
+                timecode.disabled = true;
+                inferno.disabled = true;
+                greys.disabled = true;
+            } else {
+                loadSpectrogram.checked = true;
+            }
+            //Timeline settings
+            if (!config.timeline) {
+                timeline.checked = false;
+                timeOfDay.disabled = true;
+                timecode.disabled = true;
+            } else {
+                timeline.checked = true;
+            }
+            config.timeOfDay ? timeOfDay.checked = true : timecode.checked = true;
+            // Spectrogram colour
+            config.colormap === 'inferno' ? inferno.checked = true : greys.checked = true;
+            // Nocmig mode state
+            console.log('nocmig mode is ' + config.nocmig)
+            nocmigButton.innerText = config.nocmig ? 'bedtime' : 'bedtime_off';
+
+            thresholdLink.value = config.minConfidence * 100;
+
+            showElement([config.colormap + 'span'], true)
+            t0_warmup = Date.now();
+            worker.postMessage({
+                action: 'set-variables',
+                path: appPath,
+                temp: tempPath,
+                lat: config.latitude,
+                lon: config.longitude,
+                confidence: config.minConfidence,
+                nocmig: config.nocmig
+            });
+            worker.postMessage({
+                action: 'load-model',
+                model: config.model,
+                list: config.list,
+                batchSize: config.batchSize,
+                warmup: config.warmup,
+            });
+            worker.postMessage({action: 'clear-cache'})
         }
-        // Add a checkmark to the list in use
-        window[config.list].checked = true;
-
-        if (!config.spectrogram) {
-            loadSpectrogram.checked = false;
-            timeOfDay.disabled = true;
-            timecode.disabled = true;
-            inferno.disabled = true;
-            greys.disabled = true;
-        } else {
-            loadSpectrogram.checked = true;
-        }
-        //Timeline settings
-        if (!config.timeline) {
-            timeline.checked = false;
-            timeOfDay.disabled = true;
-            timecode.disabled = true;
-        } else {
-            timeline.checked = true;
-        }
-        config.timeOfDay ? timeOfDay.checked = true : timecode.checked = true;
-        // Spectrogram colour
-        config.colormap === 'inferno' ? inferno.checked = true : greys.checked = true;
-        // Nocmig mode state
-        console.log('nocmig mode is ' + config.nocmig)
-        nocmigButton.innerText = config.nocmig ? 'bedtime' : 'bedtime_off';
-
-        thresholdLink.value = config.minConfidence * 100;
-
-        showElement([config.colormap + 'span'], true)
-        t0_warmup = Date.now();
-        worker.postMessage({
-            action: 'set-variables',
-            path: appPath,
-            temp: tempPath,
-            lat: config.latitude,
-            lon: config.longitude,
-            confidence: config.minConfidence,
-            nocmig: config.nocmig
-        });
-        worker.postMessage({
-            action: 'load-model',
-            model: config.model,
-            list: config.list,
-            batchSize: config.batchSize,
-            warmup: config.warmup,
-        });
-        worker.postMessage({action: 'clear-cache'})
-    })
-    // establish the message channel
+    )
+// establish the message channel
     setUpWorkerMessaging()
 
-    // Set footer year
+// Set footer year
     $('#year').text(new Date().getFullYear());
-    //Cache list elements
+//Cache list elements
     speciesListItems = $('#bird-list li span');
-};
+}
+
 
 const setUpWorkerMessaging = () => {
     establishMessageChannel.then((success) => {
@@ -1315,8 +1294,9 @@ $(document).on('click', '.bird-list', function (e) {
 })
 
 
-const isSpeciesViewFiltered = () => {
-    return document.querySelector('.speciesFilter span.text-warning') !== null;
+const isSpeciesViewFiltered = (sendElement) => {
+    const filtered = document.querySelector('.speciesFilter span.text-warning');
+    return sendElement ? filtered : filtered !== null;
 }
 
 //Works for single and batch items in Explore, but not in Analyse
@@ -2251,7 +2231,9 @@ async function onPredictionDone({
                                     audacityLabels = {},
                                     file = undefined,
                                     summary = {},
-                                    activeID = undefined
+                                    activeID = undefined,
+                                    total = 0,
+                                    offset = 0
                                 }) {
 
     AUDACITY_LABELS = audacityLabels;
@@ -2272,6 +2254,11 @@ async function onPredictionDone({
 
     updateSummary({summary: summary, filterSpecies: filterSpecies});
 
+    //Pagination
+    const pagination = document.getElementById('pagination');
+    total > config.limit ? addPagination(total, offset) : pagination.innerHTML = '';
+
+
     progressDiv.hide();
     progressBar.width(0 + '%');
     progressBar.attr('aria-valuenow', 0);
@@ -2285,11 +2272,83 @@ async function onPredictionDone({
         disableMenuItem(['saveLabels', 'save2db']);
     }
     if (currentFile) enableMenuItem(['analyse', 'reanalyse'])
-    subRows = document.querySelectorAll('.subrow')
 
-    speciesFilter = document.querySelectorAll('.speciesFilter');
+    // Add speciesfilter and confidence filter handlers
+    setFilterHandlers()
+
+    // Diagnostics:
+    t1_analysis = Date.now();
+    diagnostics['Analysis Duration'] = ((t1_analysis - t0_analysis) / 1000).toFixed(2) + ' seconds';
+    diagnostics['Analysis Rate'] = (diagnostics['Audio Duration'] / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
+
+    //show summary table
+    summaryButton.click();
+    // midnight hack: arrgh, but it works...
+    if (summaryDiv.classList.contains('d-none')) {
+        summaryButton.click();
+    }
+
+    if (activeRow) {
+        // Refresh node and scroll to active row:
+        activeRow = document.getElementById(activeRow.id)
+        if (activeRow) { // because: after an edit the active row may not exist
+            activeRow.focus()
+            activeRow.click()
+        } else { // in which case...go to the last table row
+            const rows = document.getElementById('resultTableBody').querySelectorAll('.top-row')
+            if (rows.length) {
+                const lastRow = rows[rows.length - 1];
+                lastRow.focus();
+            }
+        }
+    } else {
+        document.getElementById('resultTableBody').scrollIntoView({behaviour: 'smooth'});
+    }
+}
+
+const pagination = document.getElementById('pagination');
+pagination.addEventListener('click', (e) => {
+    if (e.target.tagName === 'A') { // Did we click a link in the list?
+        let clicked = e.target.innerText;
+        let currentPage = pagination.querySelector('.active');
+        currentPage = parseInt(currentPage.innerText);
+        if (clicked === 'Previous') {
+            clicked = currentPage - 1
+        } else if (clicked === 'Next') {
+            clicked = currentPage + 1
+        } else {
+            clicked = parseInt(clicked)
+        }
+        const limit = config.limit;
+        let offset = (clicked - 1) * limit;
+        const speciesFiltered = isSpeciesViewFiltered(true);
+        const species = speciesFiltered ? speciesFiltered.innerHTML.replace(/\s<.*/, '') : '';
+        worker.postMessage({action: 'filter', species: species, files: fileList, offset: offset, limit: limit, explore: isExplore()});
+    }
+})
+
+const addPagination = (total, offset) => {
+    const limit = config.limit;
+    const pages = Math.ceil(total / limit);
+    const currentPage = (offset / limit) + 1;
+    let list = '';
+    for (let i = 1; i <= pages; i++) {
+        if (i === 1) {
+            list += i === currentPage ? '<li class="page-item disabled"><span class="page-link" href="#">Previous</span></li>'
+                : '<li class="page-item"><a class="page-link" href="#">Previous</a></li>';
+        }
+        list += i === currentPage ? '<li class="page-item active" aria-current="page"><span class="page-link" href="#">' + i + '</span></li>' :
+            '<li class="page-item"><a class="page-link" href="#">' + i + '</a></li>';
+        if (i === pages) {
+            list += i === currentPage ? '<li class="page-item disabled"><span class="page-link" href="#">Next</span></li>'
+                : '<li class="page-item"><a class="page-link" href="#">Next</a></li>';
+        }
+    }
+    pagination.innerHTML = list;
+}
+
+const setFilterHandlers = () => {
     let filterMode = null;
-
     $(resultTableElement).on('click', '#confidenceFilter', function (e) {
         if (!filterMode) {
             filterMode = 'guess';
@@ -2319,70 +2378,39 @@ async function onPredictionDone({
         // Species filtering in Explore is meaningless...
         if (isExplore()) return
         activeRow = undefined;
-        // Check if italic section was clicked
-        speciesFilter = document.querySelectorAll('.speciesFilter');
-        const target = this.querySelector('span.pointer');
-
+         // Am I trying to unfilter?
+        const target = this.querySelector('span.pointer').classList;
         // There won't be a target if the input box is clicked rather than the list
-        if (target) {
-            const targetClass = target.classList;
-            if (targetClass.contains('text-warning')) {
-                // Clicked on filtered species icon
-                worker.postMessage({action: 'filter', files: fileList});
-                speciesViewIsFiltered = false
-            } else {
-                // Clicked on unfiltered species name
-                // Remove any exclusion from the species to filter
-                const species = target.innerHTML.replace(/\s<.*/, '');
-                worker.postMessage({action: 'filter', species: species, files: fileList});
-                speciesViewIsFiltered = true;
-            }
+        if (target.contains('text-warning')) {
+            // Clicked on filtered species icon
+            worker.postMessage({action: 'filter', files: fileList});
+        } else {
+            // Clicked on unfiltered species name
+            const target = this.querySelector('span.pointer');
+            const species = target.innerHTML.replace(/\s<.*/, '');
+            worker.postMessage({action: 'filter', species: species, files: fileList});
         }
-        //scrollResults(tableRows[0]);
         document.getElementById('results').scrollTop = 0;
     })
-
-    // Diagnostics:
-    t1_analysis = Date.now();
-    diagnostics['Analysis Duration'] = ((t1_analysis - t0_analysis) / 1000).toFixed(2) + ' seconds';
-    diagnostics['Analysis Rate'] = (diagnostics['Audio Duration'] / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
-
-    //show summary table
-    summaryButton.click();
-    // midnight hack: arrgh, but it works...
-    if (summaryDiv.classList.contains('d-none')) {
-        summaryButton.click();
-    }
-
-    if (activeRow) {
-        // Refresh node and scroll to active row:
-        activeRow = document.getElementById(activeRow.id)
-        if (activeRow) { // after an edit the active row may not exist
-            activeRow.focus()
-            activeRow.click()
-        } else { // in which case...go to the last table row
-            const rows = document.getElementById('resultTableBody').querySelectorAll('.top-row')
-            if (rows.length) {
-                const lastRow = rows[rows.length - 1];
-                lastRow.focus();
-            }
-        }
-    }
 }
 
-// TODO: limit results table to n records, paginate. Have summary contain full detection counts.
+const getOffset = () => {
+    const pagination = document.getElementById('pagination')
+    const active = pagination.querySelector('.active');
+    const offset = active ? (parseInt(active.innerText) - 1) * 1000 : 0;
+    return offset || 0
+}
+
 // TODO: show every detection in the spec window as a region on the spectrogram
 
 async function renderResult(args) {
     const result = args.result, file = args.file;
     // Deal with flicker
-    const cachedResult = args.fromDB;
-    // More to do here!
+    const isFromCache = args.fromDB;
+
     let index = args.index;
     const subRowThreshold = 0.01;
-    const showAlternates = result.score2 > subRowThreshold ? '' : 'd-none';
-    // Memory saver
-    if (index > 1000) return
+    const hideAlternates = result.score2 < subRowThreshold ? 'd-none' : '';
     // Convert timestamp and position to date so easier to format results in UI
     let timestamp = new Date(result.timestamp);
     const position = new Date(result.position * 1000);
@@ -2464,7 +2492,7 @@ async function renderResult(args) {
             <td name="${result.cname}" class='text-start cname'>${result.cname} <br/><i>${result.sname}</i></td>
             <td class="label">${label}</td>
             <td>${iconizeScore(result.score)}</td>
-            <td><span id='id${index}' title="Click for additional detections" class='material-icons-two-tone rotate pointer ${showAlternates}'>sync</span></td>
+            <td><span id='id${index}' title="Click for additional detections" class='material-icons-two-tone rotate pointer ${hideAlternates}'>sync</span></td>
             <td class='specFeature'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
             <td><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:"nocturnal flight call"' target="xc">
                 <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
@@ -2472,7 +2500,7 @@ async function renderResult(args) {
             <td class="comment text-end">${comment}</td>
         </tr>`;
 
-        if (showAlternates) {
+        if (!hideAlternates) {
             tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" id='subrow${index}' class='subrow d-none'>
                 <th scope='row'>${index}</th>
                 <td class="timestamp ${showTimeOfDay}"> </td>
@@ -2506,12 +2534,12 @@ async function renderResult(args) {
         }
     }
 
-    updateResultTable(index, tr, showAlternates, cachedResult)
+    updateResultTable(tr, isFromCache);
 }
 
 let resultsBuffer;
-const updateResultTable = (index, row, showAlternates, fromCache) => {
-    if (fromCache) {
+const updateResultTable = (row, isFromCache) => {
+    if (isFromCache) {
         if (!resultsBuffer) resultsBuffer = resultTable.cloneNode();
         resultsBuffer.lastElementChild ? resultsBuffer.lastElementChild.insertAdjacentHTML('afterend', row) :
             resultsBuffer.innerHTML = row;

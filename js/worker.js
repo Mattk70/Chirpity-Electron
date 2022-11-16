@@ -265,14 +265,14 @@ ipcRenderer.on('new-client', (event) => {
                 break;
             case 'filter':
                 //args.db = diskDB;
-                await getCachedResults(args);
+                args.offset = await getCachedResults(args);
                 await getCachedSummary(args);
                 break;
             case 'explore':
                 args.db = diskDB;
                 args.context = 'explore';
                 args.explore = true;
-                await getCachedResults(args);
+                args.offset = await getCachedResults(args);
                 await getCachedSummary(args);
                 break;
             case 'analyse':
@@ -902,7 +902,7 @@ const saveResults2DataSet = (rootDirectory) => {
         promises.push(promise)
     }, (err, files) => {
         if (err) return console.log(err);
-        Promise.all(promises).then(() => console.log(`Dataset created. ${count} files saved in ${(Date.now() - t0) / 1000} seconds`) )
+        Promise.all(promises).then(() => console.log(`Dataset created. ${count} files saved in ${(Date.now() - t0) / 1000} seconds`))
     })
 }
 
@@ -1083,8 +1083,8 @@ const parsePredictions = async (response) => {
     if (response.finished) {
         COMPLETED.push(file);
         const row = await memoryDB.getAsync(`SELECT rowid
-                                                 FROM files
-                                                 WHERE name = '${fileSQL}'`);
+                                             FROM files
+                                             WHERE name = '${fileSQL}'`);
         if (!row) {
             const result = `No predictions found in ${file}`;
             UI.postMessage({
@@ -1238,9 +1238,11 @@ const getCachedSummary = async ({
                                     files = [],
                                     species = undefined,
                                     explore = false,
-                                    activeID = undefined
+                                    activeID = undefined,
+                                    offset = 0
                                 } = {}) => {
-    const [where, when] = setWhereWhen({
+
+    let [where, when] = setWhereWhen({
         dateRange: range, species: explore ? species : undefined, files: files, context: 'summary'
     });
     const summary = await db.allAsync(`
@@ -1252,15 +1254,27 @@ const getCachedSummary = async ({
             ${where} ${when}
         GROUP BY cname
         ORDER BY max (conf1) DESC;`);
-
-    if (!summary.length && db === diskDB) {
+    // need another setWhereWhen call for total
+    [where, when] = setWhereWhen({
+        dateRange: range, species: species, files: files, context: 'summary'
+    });
+    const {total} = await db.getAsync(`SELECT COUNT(*) AS total
+                                       FROM records
+                                                INNER JOIN species
+                                                           ON species.id = birdid1
+                                                INNER JOIN files ON fileID = files.rowid
+                                           ${where} ${when}`);
+    if (!summary.length && db === memoryDB) {
         await getCachedSummary({
-            db: memoryDB, range: range, species: species, files: files, activeID: activeID, explore: explore
+            db: diskDB, range: range, files: files, species: species, explore: explore, activeID: activeID, offset: offset
         })
     } else {
+        // need to send offset here?
         UI.postMessage({
             event: 'prediction-done',
             summary: summary,
+            total: total,
+            offset: offset,
             audacityLabels: AUDACITY,
             filterSpecies: species,
             activeID: activeID,
@@ -1307,7 +1321,7 @@ const getCachedResults = async ({
                                     species = undefined,
                                     context = 'results',
                                     active = undefined,
-                                    limit = 1000,
+                                    limit = 500,
                                     offset = 0
                                 }) => {
 
@@ -1315,9 +1329,9 @@ const getCachedResults = async ({
         dateRange: range, species: species, files: files, context: context
     });
 
-    if (db === diskDB && context !== 'explore') await syncMemoryDB(where);
+    //if (db === diskDB && context !== 'explore') await syncMemoryDB(where);
 
-    let index = 0;
+    let index = offset;
     return new Promise(function (resolve, reject) {
         // db.each doesn't call the callback if there are no results, so:
         db.each(`${db2ResultSQL} ${where} ${when} ORDER BY timestamp LIMIT ${limit} OFFSET ${offset}`, (err, result) => {
@@ -1339,8 +1353,12 @@ const getCachedResults = async ({
                 });
                 // Recreate Audacity labels
                 const file = result.file
-                AUDACITY[file] ? AUDACITY[file].push({timestamp: `${result.start}\t${result.start + 3}`, cname: result.cname, score: result.score}) :
-                    AUDACITY[file] = [{timestamp: `${result.start}\t${result.start + 3}`, cname: result.cname, score: result.score}]
+                const audacity = {
+                    timestamp: `${result.start}\t${result.start + 3}`,
+                    cname: result.cname,
+                    score: result.score
+                };
+                AUDACITY[file] ? AUDACITY[file].push(audacity) : AUDACITY[file] = [audacity];
             }
         }, async (err, count) => {   //on finish
             if (err) console.log(err);
@@ -1348,13 +1366,14 @@ const getCachedResults = async ({
                 if (db.filename === ':memory:') {
                     // No results in memory? Try the archive
                     console.log(`No results in ${db.filename.replace(/.*\//, '')}, trying the archive db.`);
-                    await getCachedResults({db: diskDB, species: species, range: range, files: files});
+                    await getCachedResults({db: diskDB, species: species, range: range, files: files, limit: limit, offset: offset});
                 } else {
-                    resolve(0);
+                    return resolve(offset); // 0 results on the final try
                 }
             } else {
-                resolve(count)
+                return resolve(offset) // got results on the first try
             }
+            return resolve(offset) //bust out of nested promise
         })
     })
 }
@@ -1647,7 +1666,7 @@ async function onUpdateRecord({
     if (rows.length) {
         const {changes} = await diskDB.runAsync(`UPDATE records
                                                  SET ${whatSQL} ${whereSQL}`);
-        console.log(`Updated ${changes} records for ${what} in ${diskDB.filename.replace(/.*\//, '')} database, setting them to ${value}`);
+        console.log(`Updated ${changes} records for ${what} in ${diskDB.filename.replace(/.*\//, '')} database, setting it to ${value}`);
     } else {
         UI.postMessage({
             event: 'generate-alert', message: 'Remember to save your records to store this change'
@@ -1752,6 +1771,7 @@ Todo: bugs
     ***save records to db doesn't work with updaterecord!
     AUDACITY results for multiple files doesn't work well, as it puts labels in by position only. Need to make audacity an object,
         and return the result for the current file only #######
+    In explore, editID doesn't change the label of the region to the new species
 
 
 Todo: Database
@@ -1778,13 +1798,15 @@ Todo: manual entry
 
 Todo: UI
     ***Drag folder to load audio files within (recursively)
-    **Stop flickering when updating results
+    ***Stop flickering when updating results
     Expose SNR feature
-    Pagination? Limit table records to say, 1000
+    ***Pagination? Limit table records to say, 1000
     Better tooltips, for all options
     Sort summary by headers
     Have a panel for all analyse settings, not just nocmig mode
     ***Delay hiding submenu on mouseout (added box-shadow)
+    Align the label on the spec to the right to minimize overlap with axis labels
+
 
 Todo: Charts
     Allow better control of aggregation (e.g) hourly over a week
