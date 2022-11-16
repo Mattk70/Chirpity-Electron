@@ -79,10 +79,12 @@
                             <li><a class="dropdown-item disabled" href="#" id="analyse">Analyse File</a></li>
                             <li><a class="dropdown-item disabled" href="#" id="analyseSelection">Analyse Selected
                                 Interval</a></li>
-                            <li><a class="dropdown-item disabled" href="#" id="analyseAll">Analyse All Open Files</a></li>
+                            <li><a class="dropdown-item disabled" href="#" id="analyseAll">Analyse All Open Files</a>
+                            </li>
                             <li class="dropdown-divider"></li>
                             <li><a class="dropdown-item disabled" href="#" id="reanalyse">Re-analyse File</a></li>
-                            <li><a class="dropdown-item disabled" href="#" id="reanalyseAll">Re-analyse All Open Files</a></li>
+                            <li><a class="dropdown-item disabled" href="#" id="reanalyseAll">Re-analyse All Open
+                                Files</a></li>
                         </ul>
                     </li>
                     <li class="nav-item dropdown" id="myDropdown">
@@ -132,7 +134,8 @@
                                             <li class="form-check">
                                                 <input type="radio" class="form-check-input" id="migrants"
                                                        name="list" value="migrants" checked>
-                                                <label class="form-check-label text-nowrap" for="migrants">Migrants and Owls</label>
+                                                <label class="form-check-label text-nowrap" for="migrants">Migrants and
+                                                    Owls</label>
                                             </li>
                                             <li class="form-check">
                                                 <input type="radio" class="form-check-input" id="birds" name="list"
@@ -444,8 +447,8 @@
             <div class="col pe-1">
                 <div class="btn-group float-end">
                     <span style="max-width: 70px" title="Toggle Nocmig mode&#10;(Only analyse detections at night)"
-                      id="nocmigMode"
-                      class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">bedtime</span>
+                          id="nocmigMode"
+                          class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">bedtime</span>
                     <span style="max-width: 70px" title="Toggle Fullscreen mode" id="fullscreen"
                           class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">fullscreen</span>
                 </div>
@@ -485,6 +488,10 @@
                     <tbody class="text-dark" id="resultTableBody">
                     </tbody>
                 </table>
+                <nav aria-label="Identification results">
+                    <ul id ="pagination" class="m-2 pagination justify-content-center">
+                    </ul>
+                </nav>
             </div>
         </div>
     </div>
