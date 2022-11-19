@@ -62,8 +62,9 @@ window.electron.getVersion()
 let modelReady = false, fileLoaded = false, currentFile;
 let PREDICTING = false;
 let region, AUDACITY_LABELS = {}, wavesurfer;
-let summary = {};
-let fileList = [], fileStart, bufferStartTime, fileEnd;
+// fileList is all open files, analyseList is the subset that have been analysed;
+let fileList = [], analyseList = [];
+let fileStart, bufferStartTime, fileEnd;
 
 let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
 // set up some DOM element caches
@@ -82,10 +83,8 @@ let progressBar = $('.progress .progress-bar');
 const fileNumber = document.getElementById('fileNumber');
 const timeOfDay = document.getElementById('timeOfDay');
 const timecode = document.getElementById('timecode');
-const timeline = document.getElementById('loadTimeline');
 const inferno = document.getElementById('inferno');
 const greys = document.getElementById('greys');
-const loadSpectrogram = document.getElementById('loadSpectrogram');
 const resultsDiv = document.getElementById('resultsDiv');
 const summaryButton = document.getElementById('showSummary');
 const summaryDiv = document.getElementById('summary');
@@ -161,6 +160,7 @@ console.table(diagnostics);
 
 function resetResults(args) {
     summaryTable.empty();
+    pagination.forEach(item => item.classList.add('d-none'));
     resultTable = document.getElementById('resultTableBody');
     resultTable.innerHTML = '';
     predictions = {};
@@ -289,13 +289,8 @@ function initWavesurfer(args) {
             })
         ]
     });
-    if (config.spectrogram) {
-
-        initSpectrogram()
-    }
-    if (config.timeline) {
-        createTimeline()
-    }
+    initSpectrogram()
+    createTimeline()
     wavesurfer.loadDecodedBuffer(args.audio);
     updateElementCache();
 
@@ -541,27 +536,37 @@ navbarAnalysis.addEventListener('click', async () => {
 const analyseLink = document.getElementById('analyse');
 //speciesExclude = document.querySelectorAll('speciesExclude');
 analyseLink.addEventListener('click', async () => {
-    postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: [currentFile]});
+    analyseList = [currentFile];
+    postAnalyseMessage({confidence: config.minConfidence, resetResults: true, currentFile: currentFile});
 });
 
 const reanalyseLink = document.getElementById('reanalyse');
 //speciesExclude = document.querySelectorAll('speciesExclude');
 reanalyseLink.addEventListener('click', async () => {
-    postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: [currentFile], reanalyse: true});
+    analyseList = [currentFile];
+    postAnalyseMessage({
+        confidence: config.minConfidence,
+        resetResults: true,
+        currentFile: currentFile,
+        reanalyse: true
+    });
 });
 
 const analyseAllLink = document.getElementById('analyseAll');
 analyseAllLink.addEventListener('click', async () => {
+    analyseList = undefined;
     postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: fileList});
 });
 
 const reanalyseAllLink = document.getElementById('reanalyseAll');
 reanalyseAllLink.addEventListener('click', async () => {
+    analyseList = undefined;
     postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: fileList, reanalyse: true});
 });
 
 const analyseSelectionLink = document.getElementById('analyseSelection');
 analyseSelectionLink.addEventListener('click', async () => {
+    analyseList = [currentFile];
     let start = region.start + bufferBegin;
     let end = region.end + bufferBegin;
     if (end - start < 0.5) {
@@ -571,13 +576,12 @@ analyseSelectionLink.addEventListener('click', async () => {
     postAnalyseMessage({
         confidence: 0.1,
         resetResults: false,
-        files: [currentFile],
+        currentFile: currentFile,
         // The rounding below is essential to finding record in database
         start: start.toFixed(3),
         end: end.toFixed(3),
         list: 'everything'
     });
-    summary = {};
 });
 
 function postAnalyseMessage(args) {
@@ -595,11 +599,12 @@ function postAnalyseMessage(args) {
         resetResults: args.resetResults,
         start: start,
         end: end,
-        files: args.files,
+        currentFile: args.currentFile,
+        filesInScope: analyseList || fileList,
         reanalyse: args.reanalyse,
         list: args.list || config.list
     });
-    if (args.files.length > 1) {
+    if (!args.currentFile) {
         batchInProgress = true;
     }
 }
@@ -716,7 +721,7 @@ const results = document.getElementById('results');
 results.addEventListener('click', function (e) {
 
     const row = e.target.closest('tr');
-    if (!row.classList.contains('bg-dark')) { // That'd be the daylight banner...
+    if (row && !row.classList.contains('bg-dark')) { // That'd be the daylight banner...
         if (activeRow) {
             activeRow.classList.remove('table-active')
         }
@@ -979,9 +984,7 @@ window.onload = async () => {
     // Set config defaults
     const defaultConfig = {
         UUID: uuidv4(),
-        spectrogram: true,
         colormap: 'inferno',
-        timeline: true,
         minConfidence: 0.45,
         timeOfDay: false,
         list: 'migrants',
@@ -1033,23 +1036,6 @@ window.onload = async () => {
             // Add a checkmark to the list in use
             window[config.list].checked = true;
 
-            if (!config.spectrogram) {
-                loadSpectrogram.checked = false;
-                timeOfDay.disabled = true;
-                timecode.disabled = true;
-                inferno.disabled = true;
-                greys.disabled = true;
-            } else {
-                loadSpectrogram.checked = true;
-            }
-            //Timeline settings
-            if (!config.timeline) {
-                timeline.checked = false;
-                timeOfDay.disabled = true;
-                timecode.disabled = true;
-            } else {
-                timeline.checked = true;
-            }
             config.timeOfDay ? timeOfDay.checked = true : timecode.checked = true;
             // Spectrogram colour
             config.colormap === 'inferno' ? inferno.checked = true : greys.checked = true;
@@ -1294,9 +1280,10 @@ $(document).on('click', '.bird-list', function (e) {
 })
 
 
-const isSpeciesViewFiltered = (sendElement) => {
+const isSpeciesViewFiltered = (sendSpecies) => {
     const filtered = document.querySelector('.speciesFilter span.text-warning');
-    return sendElement ? filtered : filtered !== null;
+    const species = filtered ? filtered.innerHTML.replace(/\s<.*/, '') : undefined;
+    return sendSpecies ? species : filtered !== null;
 }
 
 //Works for single and batch items in Explore, but not in Analyse
@@ -1315,7 +1302,7 @@ function editResultID(cname, sname, cell) {
         if (exploreMode) files = [];
     }
 
-    cell.innerHTML = `<span id="${cname} ${sname}" class="pointer">${cname} <i>${sname}</i></span>`;
+    cell.innerHTML = `${cname} <br><i>${sname}</i>`;
     worker.postMessage({
         action: 'update-record',
         openFiles: files,
@@ -1337,7 +1324,7 @@ function unpackNameAttr(el, cname) {
     let [file, start, end, commonName] = nameAttr.split('|');
     if (cname) commonName = cname;
     currentRow.attributes[0].value = [file, start, end, commonName].join('|');
-    return [file, start, end, currentRow];
+    return [file, parseFloat(start), parseFloat(end), currentRow];
 }
 
 
@@ -1699,30 +1686,6 @@ function enableKeyDownEvent() {
 
 ///////////// Nav bar Option handlers //////////////
 
-$(document).on('click', '#loadSpectrogram', function (e) {
-    config.spectrogram = e.target.checked;
-    updatePrefs();
-    if (config.spectrogram) {
-        $('.specFeature').show()
-        inferno.disabled = false;
-        greys.disabled = false;
-
-        if (wavesurfer && wavesurfer.isReady) {
-            showElement(['spectrogramWrapper'], false);
-        } else {
-            timeOfDay.disabled = true;
-            timecode.disabled = true;
-            if (currentFile) loadAudioFile({filePath: currentFile});
-        }
-    } else {
-        // Set menu state
-        inferno.disabled = true;
-        greys.disabled = true;
-        $('.specFeature').hide()
-        hideElement(['spectrogramWrapper']);
-    }
-})
-
 function initSpectrogram(height, fftSamples) {
     showElement(['spectrogramWrapper'], false);
     if (!fftSamples) {
@@ -1797,37 +1760,6 @@ for (let i = 0; i < modelToUse.length; i++) {
     })
 }
 
-const warmup = document.getElementById('setWarmup');
-warmup.addEventListener('click', () => {
-    config.warmup = warmup.checked;
-    updatePrefs();
-})
-
-$(document).on('click', '#loadTimeline', function (e) {
-    const timeOfDay = document.getElementById('timeOfDay');
-    const timecode = document.getElementById('timecode');
-    if (!e.target.checked) {
-        if (wavesurfer) wavesurfer.destroyPlugin('timeline');
-        config.timeline = false;
-        timeOfDay.disabled = true;
-        timecode.disabled = true;
-        updateElementCache();
-        adjustSpecDims(true);
-        updatePrefs();
-    } else {
-        config.timeline = true;
-        timeOfDay.disabled = false;
-        timecode.disabled = false;
-        if (wavesurfer) {
-            createTimeline();
-            // refresh caches
-            updateElementCache();
-            adjustSpecDims(true);
-        }
-        updatePrefs();
-    }
-})
-
 $(document).on('click', '#timeOfDay', function () {
     // set file creation time
     config.timeOfDay = true;
@@ -1846,6 +1778,7 @@ $(document).on('click', '#timeOfDay', function () {
     }
     updatePrefs();
 })
+
 $(document).on('click', '#timecode', function () {
     config.timeOfDay = false;
     const timefields = document.querySelectorAll('.timestamp')
@@ -2249,15 +2182,14 @@ async function onPredictionDone({
         results.replaceWith(resultsBuffer);
         if (!config.spectrogram) $('.specFeature').hide();
         resultsBuffer = undefined;
-        activeRow = document.getElementsByClassName('table-active')[0]
+        activeRow = document.getElementsByClassName('table-active')[0];
+        if (activeRow) activeRow.click();
     }
 
     updateSummary({summary: summary, filterSpecies: filterSpecies});
 
     //Pagination
-    const pagination = document.getElementById('pagination');
-    total > config.limit ? addPagination(total, offset) : pagination.innerHTML = '';
-
+    total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
 
     progressDiv.hide();
     progressBar.width(0 + '%');
@@ -2287,7 +2219,8 @@ async function onPredictionDone({
     if (summaryDiv.classList.contains('d-none')) {
         summaryButton.click();
     }
-
+    // Get rid of lingering regions
+    if (wavesurfer) wavesurfer.clearRegions();
     if (activeRow) {
         // Refresh node and scroll to active row:
         activeRow = document.getElementById(activeRow.id)
@@ -2306,25 +2239,33 @@ async function onPredictionDone({
     }
 }
 
-const pagination = document.getElementById('pagination');
-pagination.addEventListener('click', (e) => {
-    if (e.target.tagName === 'A') { // Did we click a link in the list?
-        let clicked = e.target.innerText;
-        let currentPage = pagination.querySelector('.active');
-        currentPage = parseInt(currentPage.innerText);
-        if (clicked === 'Previous') {
-            clicked = currentPage - 1
-        } else if (clicked === 'Next') {
-            clicked = currentPage + 1
-        } else {
-            clicked = parseInt(clicked)
+const pagination = document.querySelectorAll('.pagination');
+pagination.forEach(item => {
+    item.addEventListener('click', (e) => {
+        if (e.target.tagName === 'A') { // Did we click a link in the list?
+            let clicked = e.target.innerText;
+            let currentPage = pagination[0].querySelector('.active');
+            currentPage = parseInt(currentPage.innerText);
+            if (clicked === 'Previous') {
+                clicked = currentPage - 1
+            } else if (clicked === 'Next') {
+                clicked = currentPage + 1
+            } else {
+                clicked = parseInt(clicked)
+            }
+            const limit = config.limit;
+            let offset = (clicked - 1) * limit;
+            const species = isSpeciesViewFiltered(true);
+            worker.postMessage({
+                action: 'filter',
+                species: species,
+                files: fileList,
+                offset: offset,
+                limit: limit,
+                explore: isExplore()
+            });
         }
-        const limit = config.limit;
-        let offset = (clicked - 1) * limit;
-        const speciesFiltered = isSpeciesViewFiltered(true);
-        const species = speciesFiltered ? speciesFiltered.innerHTML.replace(/\s<.*/, '') : '';
-        worker.postMessage({action: 'filter', species: species, files: fileList, offset: offset, limit: limit, explore: isExplore()});
-    }
+    })
 })
 
 const addPagination = (total, offset) => {
@@ -2344,7 +2285,10 @@ const addPagination = (total, offset) => {
                 : '<li class="page-item"><a class="page-link" href="#">Next</a></li>';
         }
     }
-    pagination.innerHTML = list;
+    pagination.forEach(item => {
+        item.classList.remove('d-none');
+        item.innerHTML = list;
+    })
 }
 
 const setFilterHandlers = () => {
@@ -2378,7 +2322,7 @@ const setFilterHandlers = () => {
         // Species filtering in Explore is meaningless...
         if (isExplore()) return
         activeRow = undefined;
-         // Am I trying to unfilter?
+        // Am I trying to unfilter?
         const target = this.querySelector('span.pointer').classList;
         // There won't be a target if the input box is clicked rather than the list
         if (target.contains('text-warning')) {
@@ -2404,6 +2348,7 @@ const getOffset = () => {
 // TODO: show every detection in the spec window as a region on the spectrogram
 
 async function renderResult(args) {
+
     const result = args.result, file = args.file;
     // Deal with flicker
     const isFromCache = args.fromDB;
@@ -2447,20 +2392,10 @@ async function renderResult(args) {
         // Show the twilight bar even if nocmig mode off - cue to change of table row colour
         if (seenTheDarkness && result.dayNight === 'daytime' && shownDaylightBanner === false) {
             // Show the twilight start bar
-            const row = `<tr class="bg-dark" style="color: white"><td colspan="20" class="text-center">
+            tr += `<tr class="bg-dark" style="color: white"><td colspan="20" class="text-center">
                 Start of civil twilight <span class="material-icons-two-tone text-warning align-bottom">wb_twilight</span>
                 </td></tr>`;
-            resultTable.lastElementChild ? resultTable.lastElementChild.insertAdjacentHTML('afterend', row) :
-                resultTable.innerHTML = row;
             shownDaylightBanner = true;
-        }
-
-        const key = `${result.cname} <i>${result.sname}</i>`;
-        if (key in summary) {
-            if (result)
-                summary[key] += 1
-        } else {
-            summary[key] = 1
         }
 
         const start = result.start, end = result.end;
@@ -2496,7 +2431,7 @@ async function renderResult(args) {
             <td class='specFeature'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
             <td><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:"nocturnal flight call"' target="xc">
                 <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
-            <td class='specFeature download'><span class='material-icons-two-tone pointer'>file_download</span></td>
+            <td class='delete'><span class='material-icons-two-tone pointer'>delete_forever</span></td>
             <td class="comment text-end">${comment}</td>
         </tr>`;
 
@@ -2659,11 +2594,24 @@ summaryButton.addEventListener('click', (e) => {
     }
 });
 
-$(document).on('click', '.download', function (e) {
-    const mode = 'save';
-    setClickedIndex(e);
-    sendFile(mode, predictions[clickedIndex])
+$(document).on('click', '.delete', function (e) {
     e.stopImmediatePropagation();
+    setClickedIndex(e);
+    const [file, start, , currentRow] = unpackNameAttr(e.target);
+    // Since we'll remove the active row, find the next row for the UI to focus
+    let nextResultNumber = parseInt(currentRow.id.replace('result', '')) + 1;
+    const nextResult = document.getElementById('result' + (nextResultNumber).toString())
+    const [nextFile, nextStart, ,] = unpackNameAttr(nextResult);
+    const context = isExplore() ? 'explore' : 'results';
+    const species = isSpeciesViewFiltered(true);
+    worker.postMessage({
+        action: 'delete',
+        active: {file: file, position: start},
+        next: {file: nextFile, position: nextStart},
+        species: species,
+        files: analyseList || fileList,
+        context: context
+    })
 });
 
 

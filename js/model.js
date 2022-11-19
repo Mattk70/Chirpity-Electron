@@ -124,8 +124,8 @@ class Model {
         // Add channel axis
         let spec_image_resized = tf.expandDims(spectrogram, -1);
 
-        // For small images ONLY!
-        //spec_image_resized = tf.image.resizeBilinear(spec_image_resized, [128,192]);
+        // For alternative image sizes ONLY!
+        //spec_image_resized = tf.image.resizeBilinear(spec_image_resized, [300,300]);
 
         return spec_image_resized
     }
@@ -341,6 +341,7 @@ async function runPredictions(e) {
         if (readyToSend) {
             const response = {
                 message: 'prediction',
+                file: file,
                 result: myModel.result,
                 finished: finalChunk,
                 fileStart: fileStart,
