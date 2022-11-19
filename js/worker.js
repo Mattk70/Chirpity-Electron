@@ -50,11 +50,23 @@ console.log(staticFfmpeg.path);
 ffmpeg.setFfmpegPath(staticFfmpeg.path);
 
 let predictionsRequested = 0, predictionsReceived = 0;
-let activeTimestamp = undefined;
 let COMPLETED = [], OPENFILES = [];
 let diskDB, memoryDB, NOCMIG, latitude, longitude;
 
 let t0; // Application profiler
+
+//Object will hold files in the diskDB, and the active timestamp from the most recent selection analysis.
+let STATE;
+const setState = () => {
+    STATE = {
+        db: undefined,
+        saved: new Set(), // list of files requested that are in the disk database
+        activeTimestamp: undefined, // Active Timestamp from most recent selection ID / active row
+        globalOffset: 0, // Current start number for unfiltered results
+        filteredOffset: {} // Current species start number for filtered results
+    }
+}
+setState();
 
 const createDB = async (file) => {
     const archiveMode = !!file;
@@ -65,7 +77,6 @@ const createDB = async (file) => {
     } else {
         memoryDB = new sqlite3.Database(':memory:');
         console.log("Created new in-memory database");
-
     }
     const db = archiveMode ? diskDB : memoryDB;
     await db.runAsync('BEGIN');
@@ -229,8 +240,10 @@ ipcRenderer.on('new-client', (event) => {
                 await getFiles(args.files)
                 break;
             case 'update-record':
-                args.db = diskDB;
                 await onUpdateRecord(args)
+                break;
+            case 'delete':
+                await onDelete(args)
                 break;
             case 'update-file-start':
                 await onUpdateFileStart(args)
@@ -255,6 +268,7 @@ ipcRenderer.on('new-client', (event) => {
                 if (predicting) onAbort(args);
                 // Create a new memory db
                 await createDB();
+                STATE['db'] = memoryDB;
                 console.log('Worker received audio ' + args.file);
                 predictionsRequested = 0;
                 predictionsReceived = 0;
@@ -264,16 +278,15 @@ ipcRenderer.on('new-client', (event) => {
                 await loadAudioFile(args);
                 break;
             case 'filter':
-                //args.db = diskDB;
-                args.offset = await getCachedResults(args);
-                await getCachedSummary(args);
+                await getResults(args);
+                await getSummary(args);
                 break;
             case 'explore':
-                args.db = diskDB;
+                STATE['db'] = diskDB;
                 args.context = 'explore';
                 args.explore = true;
-                args.offset = await getCachedResults(args);
-                await getCachedSummary(args);
+                await getResults(args);
+                await getSummary(args);
                 break;
             case 'analyse':
                 predictionsReceived = 0;
@@ -337,7 +350,8 @@ const getFilesInDirectory = async dir => {
 
 // Not an arrow function. Async function has access to arguments - so we can pass them to processnextfile
 async function onAnalyse({
-                             files = [],
+                             filesInScope = [],
+                             currentFile = undefined,
                              start = 0,
                              end = undefined,
                              resetResults = false,
@@ -345,42 +359,45 @@ async function onAnalyse({
                              confidence = minConfidence,
                              list = 'everything'
                          }) {
-    console.log(`Worker received message: ${files}, ${confidence}, start: ${start}, end: ${end}, list ${list}`);
+
+    const selection = !!end; // if end was passed, this is a selection
+    console.log(`Worker received message: ${filesInScope}, ${confidence}, start: ${start}, end: ${end}, list ${list}`);
     minConfidence = confidence;
     predictWorker.postMessage({message: 'list', list: list})
-    //Set global OPENFILES for summary to use
-    OPENFILES = files;
+    //Set global filesInScope for summary to use
+    OPENFILES = filesInScope;
     index = 0;
     AUDACITY = {};
 
     COMPLETED = [];
-
     UI.postMessage('reset-results');
+    const toAnalyse = currentFile ? [currentFile] : filesInScope;
 
-    for (let i = 0; i < files.length; i++) {
-        let file = files[i];
+    if (!selection && !reanalyse) {
+        // check if results for the files are cached (we only consider it cached if all files have been saved to the disk DB)
+        let allCached = true;
+        for (let i = 0; i < toAnalyse.length; i++) {
+            if (!await isDuplicate(toAnalyse[i])) {
+                allCached = false;
+                break;
+            }
+        }
+        if (allCached) {
+            STATE.db = diskDB;
+            await getResults({db: diskDB, files: toAnalyse});
+            await getSummary({files: toAnalyse})
+            return
+        }
+    }
+    STATE.db = memoryDB;
+    for (let i = 0; i < toAnalyse.length; i++) {
+        let file = toAnalyse[i];
         // Set global var, for parsePredictions
         FILE_QUEUE.push(file);
         console.log(`Adding ${file} to the queue.`)
-        // check if results for the file have been saved to the disk DB
-        const cachedFile = await isDuplicate(file);
-        if (cachedFile && !end && !reanalyse) {
-            //remove the file from the queue - wherever it sits, this prevents out of
-            // sequence issues with batch analysis
-            const place = FILE_QUEUE.indexOf(file);
-            if (place > -1) { // only splice array when item is found
-                FILE_QUEUE.splice(place, 1); // 2nd parameter means remove one item only
-            }
-            file = cachedFile;
-            // Pull the results from the database
-            const resultCount = await getCachedResults({db: diskDB, files: [cachedFile], range: {}});
-            UI.postMessage({event: 'update-audio-duration', value: metadata[cachedFile].duration});
-            // last file?
-            if (i === files.length - 1) {
-                //await save2DB(memoryDB)
-                await getCachedSummary({files: files})
-            }
-        } else if (!predicting) {
+        if (!predicting) {
+            // Clear state unless analysing a selection
+            if (!selection) setState();
             predicting = true;
             await processNextFile(arguments[0]);
         }
@@ -1006,8 +1023,8 @@ async function saveMP3(file, start, end, filename, metadata) {
 /// Workers  From the MDN example
 function spawnWorker(model, list, batchSize, warmup) {
     predictWorker = new Worker('./js/model.js');
-    //const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
-    const modelPath = model === 'efficientnet' ? '../test_CAT_XTNRTOPY_SOFTMAX__PREPROCESS_LAYER_EfficientNetB3256x384_Data_Adam_refined_482/' : '../24000_v9/';
+    const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
+    //const modelPath = model === 'efficientnet' ? '../test_SF_XTNRTOPY__MOVEING_AVG_EfficientNetB3300x300_Data_Adam_482/' : '../24000_v9/';
     console.log(modelPath);
     // Now we've loaded a new model, clear the aborted flag
     aborted = false;
@@ -1021,10 +1038,13 @@ const parsePredictions = async (response) => {
     let file, batchInProgress = false;
     predictionsReceived = response['predictionsReceived'];
     const result = response['result'];
-    let fileSQL;
+    file = response.file;
+    let fileSQL = prepSQL(file);
+    // If we are working on a saved file, use the disk db
+    STATE.db = STATE.saved.has(file) ? diskDB : memoryDB;
+    const db = STATE.db;
     for (let i = 0; i < result.length; i++) {
         const prediction = result[i];
-        file = prediction[1].file;
         const position = parseFloat(prediction[0]);
         UI.postMessage({event: 'progress', progress: (position / metadata[file].duration), file: file});
         //console.log('Prediction received from worker', result);
@@ -1034,35 +1054,36 @@ const parsePredictions = async (response) => {
             index++;
             if (!response['resetResults']) {
                 // This is a selection, create a result flag to allow the UI to scroll to its position
-                activeTimestamp = result.timestamp;
+                STATE['activeTimestamp'] = result.timestamp;
             } else {
-                activeTimestamp = undefined
+                STATE['activeTimestamp'] = undefined
             }
-            UI.postMessage({
-                event: 'prediction-ongoing',
-                file: file,
-                result: result,
-                index: index,
-                resetResults: response['resetResults'],
-            });
+            if (db === memoryDB) {
+                UI.postMessage({
+                    event: 'prediction-ongoing',
+                    file: file,
+                    result: result,
+                    index: index,
+                    resetResults: response['resetResults'],
+                });
+            }
             AUDACITY[file] ? AUDACITY[file].push(audacity) : AUDACITY[file] = [audacity];
             //save result to memory db (N.B. tried using transactions, but was no faster.
             // Also, transactions had to start end in other functions, which is bad style!
-            fileSQL = file.replaceAll("'", "''");
-            await memoryDB.runAsync(`INSERT
+            await db.runAsync(`INSERT
             OR IGNORE INTO files VALUES ( '${fileSQL}',
             ${metadata[file].duration},
             ${response['fileStart']}
             )`);
-            const {rowid} = await memoryDB.getAsync(`SELECT rowid
-                                                     FROM files
-                                                     WHERE name = '${fileSQL}'`);
+            const {rowid} = await db.getAsync(`SELECT rowid
+                                               FROM files
+                                               WHERE name = '${fileSQL}'`);
             let durationSQL = Object.entries(metadata[file].dateDuration)
                 .map(entry => `(${entry.toString()},${rowid})`).join(',');
-            await memoryDB.runAsync(`INSERT
+            await db.runAsync(`INSERT
             OR IGNORE INTO duration VALUES
             ${durationSQL}`);
-            await memoryDB.runAsync(`INSERT
+            await db.runAsync(`INSERT
             OR REPLACE INTO records 
                 VALUES (
             ${result.timestamp},
@@ -1082,9 +1103,9 @@ const parsePredictions = async (response) => {
     }
     if (response.finished) {
         COMPLETED.push(file);
-        const row = await memoryDB.getAsync(`SELECT rowid
-                                             FROM files
-                                             WHERE name = '${fileSQL}'`);
+        const row = await db.getAsync(`SELECT rowid
+                                       FROM files
+                                       WHERE name = '${fileSQL}'`);
         if (!row) {
             const result = `No predictions found in ${file}`;
             UI.postMessage({
@@ -1130,9 +1151,9 @@ async function parseMessage(e) {
                 const limit = 4;
                 await clearCache(CACHE_LOCATION, limit);
                 // This is the one time results *do not* come from the database
-                let summary;
                 if (!batchInProgress) {
-                    await getCachedSummary({files: OPENFILES});
+                    if (STATE.db === diskDB) await getResults({files: OPENFILES})
+                    await getSummary({files: OPENFILES});
                 } else {
                     UI.postMessage({
                         event: 'prediction-done', batchInProgress: true,
@@ -1232,16 +1253,15 @@ const setWhereWhen = ({dateRange, species, files, context}) => {
 }
 
 
-const getCachedSummary = async ({
-                                    db = memoryDB,
-                                    range = undefined,
-                                    files = [],
-                                    species = undefined,
-                                    explore = false,
-                                    activeID = undefined,
-                                    offset = 0
-                                } = {}) => {
-
+const getSummary = async ({
+                              db = STATE.db,
+                              range = undefined,
+                              files = [],
+                              species = undefined,
+                              explore = false,
+                              activeID = undefined,
+                          } = {}) => {
+    const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
     let [where, when] = setWhereWhen({
         dateRange: range, species: explore ? species : undefined, files: files, context: 'summary'
     });
@@ -1264,23 +1284,17 @@ const getCachedSummary = async ({
                                                            ON species.id = birdid1
                                                 INNER JOIN files ON fileID = files.rowid
                                            ${where} ${when}`);
-    if (!summary.length && db === memoryDB) {
-        await getCachedSummary({
-            db: diskDB, range: range, files: files, species: species, explore: explore, activeID: activeID, offset: offset
-        })
-    } else {
-        // need to send offset here?
-        UI.postMessage({
-            event: 'prediction-done',
-            summary: summary,
-            total: total,
-            offset: offset,
-            audacityLabels: AUDACITY,
-            filterSpecies: species,
-            activeID: activeID,
-            batchInProgress: false,
-        })
-    }
+    // need to send offset here?
+    UI.postMessage({
+        event: 'prediction-done',
+        summary: summary,
+        total: total,
+        offset: offset,
+        audacityLabels: AUDACITY,
+        filterSpecies: species,
+        activeID: activeID,
+        batchInProgress: false,
+    })
 }
 
 
@@ -1294,43 +1308,33 @@ const dbSpeciesCheck = async () => {
     }
 }
 
-const syncMemoryDB = async (where) => {
-    // First off, pull diskDB results to memoryDB
-    const rows = await memoryDB.allAsync(`SELECT rowid
-                                          FROM files ${where}`);
-
-    const fileIDs = rows.map(row => row.rowid).toString();
-    let response = await memoryDB.runAsync(`INSERT
-    OR IGNORE INTO duration
-    SELECT *
-    FROM disk.duration
-    WHERE fileID IN (${fileIDs})`);
-    console.log(response.changes + ' date durations added to memory database')
-    response = await memoryDB.runAsync(`INSERT
-    OR IGNORE INTO records
-    SELECT *
-    FROM disk.records
-    WHERE fileID IN (${fileIDs})`);
-    console.log(response.changes + ' records added to memory database')
-}
-
-const getCachedResults = async ({
-                                    db = memoryDB,
-                                    range = undefined,
-                                    files = [],
-                                    species = undefined,
-                                    context = 'results',
-                                    active = undefined,
-                                    limit = 500,
-                                    offset = 0
-                                }) => {
+const getResults = async ({
+                              db = STATE.db,
+                              range = undefined,
+                              files = [],
+                              species = undefined,
+                              context = 'results',
+                              active = undefined,
+                              limit = 500,
+                              offset = undefined
+                          }) => {
+    if (offset === undefined) { // Get offset state
+        if (species) {
+            if (!STATE.filteredOffset[species]) STATE.filteredOffset[species] = 0;
+            offset = STATE.filteredOffset[species];
+        } else {
+            offset = STATE.globalOffset;
+        }
+    } else { // Set offset state
+        if (species) STATE.filteredOffset[species] = offset;
+        else STATE.globalOffset = offset;
+    }
 
     const [where, when] = setWhereWhen({
         dateRange: range, species: species, files: files, context: context
     });
 
-    //if (db === diskDB && context !== 'explore') await syncMemoryDB(where);
-
+    // TODO: mixed files: among open files, only some are saved. Merge results??
     let index = offset;
     return new Promise(function (resolve, reject) {
         // db.each doesn't call the callback if there are no results, so:
@@ -1340,7 +1344,7 @@ const getCachedResults = async ({
             } else { // on each result
                 index++;
                 // Active row from analyse selection
-                if (result.timestamp === activeTimestamp) result['active'] = true;
+                if (result.timestamp === STATE.activeTimestamp) result['active'] = true;
                 // Active row from update record
                 if (active && active.position === result.position && active.file === result.file) result['active'] = true;
                 UI.postMessage({
@@ -1362,18 +1366,7 @@ const getCachedResults = async ({
             }
         }, async (err, count) => {   //on finish
             if (err) console.log(err);
-            if (!count) {  // count === 0 => no results
-                if (db.filename === ':memory:') {
-                    // No results in memory? Try the archive
-                    console.log(`No results in ${db.filename.replace(/.*\//, '')}, trying the archive db.`);
-                    await getCachedResults({db: diskDB, species: species, range: range, files: files, limit: limit, offset: offset});
-                } else {
-                    return resolve(offset); // 0 results on the final try
-                }
-            } else {
-                return resolve(offset) // got results on the first try
-            }
-            return resolve(offset) //bust out of nested promise
+            return resolve(offset)
         })
     })
 }
@@ -1414,7 +1407,12 @@ const getFileInfo = async (file) => {
 const onSave2DiskDB = async () => {
     t0 = Date.now();
     memoryDB.runAsync('BEGIN');
-    let response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.files SELECT * FROM files');
+    const files = await memoryDB.allAsync('SELECT * FROM files');
+    const filesSQL = files.map(file => `'${prepSQL(file)}'`).toString();
+    let response = await memoryDB.runAsync(`INSERT
+    OR IGNORE INTO disk.files VALUES (
+    ${filesSQL}
+    )`);
     console.log(response.changes + ' files added to disk database')
     // Update the duration table
     response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.duration SELECT * FROM duration');
@@ -1425,6 +1423,7 @@ const onSave2DiskDB = async () => {
     // Clear and relaunch the memory DB
     memoryDB.close(); // is this necessary??
     await createDB();
+    files.forEach(file => STATE.saved.add(file));
     UI.postMessage({
         event: 'generate-alert',
         message: `Database update complete, ${response.changes} records added to the archive in ${((Date.now() - t0) / 1000)} seconds`
@@ -1599,12 +1598,27 @@ const onUpdateFileStart = async (args) => {
     console.log(`Changed ${result.changes} records associated with  ${file}`);
 }
 
+const prepSQL = (string) => string.replaceAll("'", "''");
+
+async function onDelete({active, next, species, context = 'results'}) {
+    const db = STATE.db, position = active.position;
+    const file = prepSQL(active.file);
+    const {filestart} = await db.getAsync(`SELECT filestart
+                                           from files
+                                           WHERE name = '${file}'`);
+    const datetime = filestart + (parseFloat(position) * 1000);
+    await db.runAsync('DELETE FROM records WHERE datetime = ' + datetime);
+    arguments[0].active = next;
+    await getResults(arguments[0]);
+    await getSummary(arguments[0]);
+}
+
 async function onUpdateRecord({
                                   openFiles = [],
                                   currentFile = '',
                                   start = 0,
                                   value = '',
-                                  db = memoryDB,
+                                  db = STATE.db,
                                   isBatch = false,
                                   from = '',
                                   what = 'birdID1',
@@ -1615,6 +1629,9 @@ async function onUpdateRecord({
                               }) {
     // Construct the SQL
     let whatSQL = '', whereSQL = '';
+    value = prepSQL(value);
+    from = prepSQL(from);
+    currentFile = prepSQL(currentFile);
     if (what === 'ID' || what === 'birdID1') {
         // Map the field name to the one in the database
         what = 'birdID1';
@@ -1624,7 +1641,7 @@ async function onUpdateRecord({
     } else {
         whatSQL = `comment = '${value}'`;
     }
-    const filesSQL = openFiles.map(file => `'${file.replaceAll("'", "''")}'`).toString();
+    const filesSQL = openFiles.map(file => `'${prepSQL(file)}'`).toString();
     if (isBatch) {
         //Batch update
         whereSQL = `WHERE birdID1 = (SELECT id FROM species WHERE cname = '${from}') `;
@@ -1639,21 +1656,21 @@ async function onUpdateRecord({
         whereSQL = `WHERE datetime = (SELECT filestart FROM files WHERE name = '${currentFile}') + ${startMilliseconds}`
     }
     const t0 = Date.now();
-    const {changes} = db.runAsync(`UPDATE records
+    const {changes} = await db.runAsync(`UPDATE records
                                    SET ${whatSQL} ${whereSQL}`);
     if (changes) {
         console.log(`Updated ${changes} records for ${what} in ${db.filename.replace(/.*\//, '')} database, setting them to ${value}`);
         console.log(`Update without transaction took ${Date.now() - t0} milliseconds`);
         const species = isFiltered || isExplore ? from : '';
         if (isExplore) openFiles = [];
-        await getCachedResults({
+        await getResults({
             db: db,
             files: openFiles,
             species: species,
             explore: isExplore,
             active: {file: currentFile, position: start}
         });
-        await getCachedSummary({db: db, files: openFiles, species: species, explore: isExplore});
+        await getSummary({db: db, files: openFiles, species: species, explore: isExplore});
         // Update the species list
         await getSpecies(db, range);
     } else {
@@ -1764,20 +1781,21 @@ Todo: bugs
     ***when analysing second batch of results, the first results linger.
     Confidence filter not honoured on refresh results
     Table does not  expand to fit when operation aborted
-    ***when current model list differs from the one used when saving records, getCachedResults gives wrong species
+    ***when current model list differs from the one used when saving records, getResults gives wrong species
         -solved as in there are separate databases now, so results cached in the db for another model wont register.
-    when nocmig mode on, getcachedresults for daytime files prints no results, but summary printed. No warning given.
+    when nocmig mode on, getResults for daytime files prints no results, but summary printed. No warning given.
     ***manual records entry doesn't preserve species in explore mode
     ***save records to db doesn't work with updaterecord!
-    AUDACITY results for multiple files doesn't work well, as it puts labels in by position only. Need to make audacity an object,
+    ***AUDACITY results for multiple files doesn't work well, as it puts labels in by position only. Need to make audacity an object,
         and return the result for the current file only #######
     In explore, editID doesn't change the label of the region to the new species
+    Analyse selection returns just the file in which the selection is requested
 
 
 Todo: Database
      Database delete: records, files (and all associated records). Use when reanalysing
      Database file path update, batch update - so we can move files around after analysis
-     Compatibility with updates, esp. when num classes change
+     ***Compatibility with updates, esp. when num classes change
         -Create a new database for each model with appropriate num classes?
 
 Todo: Location.
@@ -1846,7 +1864,6 @@ Todo: IDs
     Search for comment
 
 Todo: Tests & code quality
-    All files will either be a wav, or have a proxy wav file in tmp. So, the database should always store the wav as the filename in the database. No need to check for other duplicates. ??
     Order / group functions semantically
     Investigate unit tests
     Investigate coverage
