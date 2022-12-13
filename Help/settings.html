@@ -13,7 +13,8 @@
     <tr>
         <th>Set Threshold</th>
         <td>Sets the confidence above which the model will report a detection. Higher values will reduce false
-            positives, at the expense of missing genuine calls.
+            positives, although that will increase the risk of missing genuine calls. A figure around 50% gives a good
+            balance (i.e. it will detect most genuine calls while minimising false positive detections).
         </td>
     </tr>
     <tr>
@@ -26,8 +27,8 @@
     </tr>
     <tr>
         <th>Search for</th>
-        <td><p><b>Migrants and Owls</b>. Just report detections relating to these species.</p>
-            <p><b>All birds</b>. Include Local birds, including those not known to call at night.</p>
+        <td><p><b>Migrants and Owls</b>. Just report detections relating to these species' calls (song detections are excluded).</p>
+            <p><b>All birds</b>. Include birdsong as well as calls, also includes species not known to call at night.</p>
             <p><b>Everything</b>. This full list comprises 305 bird species and the following non-bird classes:</p>
             <ul>
                 <li><b>Ambient noise:</b> wind, rain, pops and bangs. Things that go bump in the night...</li>
@@ -43,27 +44,14 @@
     </tr>
     <tr>
         <th>Batch Size</th>
-        <td>Sets the number of predictions to pass to the model each time. A higher number will make predictions up to
-            3x faster on long files.
-            If set too high for your machine, the Chirpity model will crash as it runs out of memory. In that event, set
+        <td>Sets the number of three second chunks of audio to pass to the model each time a prediction is requested.
+            A higher number will make processing up to three times faster on long files.
+            If set too high for your machine, the Chirpity model may crash as it runs out of memory. In that event, set
             a lower value, close and restart Chirpity.
         </td>
     </tr>
     <tr>
-        <th>Warm Up</th>
-        <td>Because of the way the model works, the first prediction it is asked to do after Chirpity is opened will
-            take much longer to process.
-            When "Warm up" is checked, the model is passed a dummy prediction as soon as it is loaded. This happens in
-            the background.
-        </td>
-    </tr>
-    <tr>
         <td colspan="2" class="text-center bg-dark text-white"><h5>Spectrogram</h5></td>
-    </tr>
-    <tr>
-        <th>Enable</th>
-        <td>Whether to display the Spectrogram view.
-        </td>
     </tr>
     <tr>
         <td><b>Colour</b></td>
@@ -71,21 +59,20 @@
     </tr>
     <tr>
         <td><b>Grayscale</b></td>
-        <td>Displays the spectrogram in black and white.</td>
+        <td>Displays a monochrome spectrogram in shades of grey.</td>
     </tr>
     <tr>
         <th>Timeline</th>
-        <td>Whether to display a timeline above the spectrogram. The timeline has two modes.
+        <td>The spectrogram timeline has two modes:
             <ul>
                 <li>
                     <b>Time Elapsed</b> displays the time from the beginning of the file.
                 </li>
                 <li>
-                    <b>Time of Day</b> uses the file timestamp to
+                    <b>Time of Day</b> uses files timestamps to
                     calculate the actual time of the calls detected. If a file does not have a timestamp reflecting the
                     time of the recording, this will give a spurious reading. The start time of the current file can be
-                    edited
-                    by selecting the appropriate date and time on the <span
+                    edited by selecting the appropriate date and time on the <span
                         class="material-icons-two-tone align-bottom">edit_calendar</span>
                     icon next to the file name on the transport controls panel.
                 </li>

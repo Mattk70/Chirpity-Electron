@@ -27,8 +27,7 @@
 
 <!-- Navigation bar -->
 <div id="navPadding" class="position-absolute top-0 w-100">
-
-    <nav class="navbar navbar-expand-md navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark" id="primary_nav_wrap">
         <div class="container-fluid">
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main_nav"
                     aria-expanded="false" aria-label="Toggle navigation">
@@ -58,12 +57,12 @@
                            aria-haspopup="true" aria-expanded="false">
                             Records
                         </a>
-                        <div class="dropdown-menu" aria-labelledby="navbarRecords">
-                            <a class="dropdown-item disabled" href="#" id="save2db">Save Records</a>
-                            <a class="dropdown-item" href="#" id="charts">View charts</a>
-                            <a class="dropdown-item" href="#" id="explore">Explore records</a>
-                            <a class="dropdown-item" href="#" id="dataset">Create Dataset</a>
-                        </div>
+                        <ul class="dropdown-menu" aria-labelledby="navbarRecords">
+                            <li class="dropdown-item disabled" href="#" id="save2db">Save Records</li>
+                            <li class="dropdown-item" href="#" id="charts">View charts</li>
+                            <li class="dropdown-item" href="#" id="explore">Explore records</li>
+                            <li class="dropdown-item" href="#" id="dataset">Create Dataset</li>
+                        </ul>
                     </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarAnalysis" role="button"
@@ -80,17 +79,19 @@
                             <li><a class="dropdown-item disabled" href="#" id="analyse">Analyse File</a></li>
                             <li><a class="dropdown-item disabled" href="#" id="analyseSelection">Analyse Selected
                                 Interval</a></li>
-                            <li><a class="dropdown-item disabled" href="#" id="analyseAll">Analyse All Open Files</a></li>
+                            <li><a class="dropdown-item disabled" href="#" id="analyseAll">Analyse All Open Files</a>
+                            </li>
                             <li class="dropdown-divider"></li>
                             <li><a class="dropdown-item disabled" href="#" id="reanalyse">Re-analyse File</a></li>
-                            <li><a class="dropdown-item disabled" href="#" id="reanalyseAll">Re-analyse All Open Files</a></li>
+                            <li><a class="dropdown-item disabled" href="#" id="reanalyseAll">Re-analyse All Open
+                                Files</a></li>
                         </ul>
                     </li>
                     <li class="nav-item dropdown" id="myDropdown">
                         <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown"> Settings </a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="#"> Predictions &raquo; </a>
-                                <ul class="submenu dropdown-menu">
+                                <ul class=" ">
                                     <li title="Cutoff threshold for prediction confidence">
                                         <a class="dropdown-item" href="#">Set Threshold
                                             <div style="width:100px">
@@ -103,14 +104,14 @@
                                         </a>
                                     </li>
                                     <li>
-                                        <hr class="dropdown-divider"></hr>
+                                        <hr class="dropdown-divider">
                                     </li>
                                     <li>
                                         <a href="#" class="dropdown-item" data-bs-toggle="dropdown"
                                            role="button"
                                            aria-haspopup="true" aria-expanded="false"> <span
                                                 class="nav-label">Model &raquo;</span></a>
-                                        <ul class="submenu dropdown-menu ps-1">
+                                        <ul class="ps-1 pe-1">
                                             <li class="form-check">
                                                 <input type="radio" class="form-check-input" id="densenet"
                                                        name="model" value="densenet">
@@ -129,11 +130,12 @@
                                            role="button"
                                            aria-haspopup="true" aria-expanded="false"> <span
                                                 class="nav-label">Search For &raquo;</span></a>
-                                        <ul class="submenu dropdown-menu ps-1">
+                                        <ul class="p-1">
                                             <li class="form-check">
                                                 <input type="radio" class="form-check-input" id="migrants"
                                                        name="list" value="migrants" checked>
-                                                <label class="form-check-label" for="migrants">Migrants and Owls</label>
+                                                <label class="form-check-label text-nowrap" for="migrants">Migrants and
+                                                    Owls</label>
                                             </li>
                                             <li class="form-check">
                                                 <input type="radio" class="form-check-input" id="birds" name="list"
@@ -152,8 +154,7 @@
                                            role="button"
                                            aria-haspopup="true" aria-expanded="false"> <span
                                                 class="nav-label">Batch Size &raquo;</span></a>
-                                        <ul class="submenu dropdown-menu ps-1"
-                                            style="min-width: 60px !important; width: 60px !important">
+                                        <ul class="p-1">
                                             <li class="form-check">
                                                 <input type="radio" class="form-check-input" id="1"
                                                        name="batch" value="1">
@@ -215,6 +216,12 @@
                                                        for="32">32</label>
                                             </li>
                                             <li class="form-check">
+                                                <input type="radio" class="form-check-input" id="48"
+                                                       name="batch" value="64">
+                                                <label class="form-check-label"
+                                                       for="48">48</label>
+                                            </li>
+                                            <li class="form-check">
                                                 <input type="radio" class="form-check-input" id="64"
                                                        name="batch" value="64">
                                                 <label class="form-check-label"
@@ -228,34 +235,13 @@
                                             </li>
                                         </ul>
                                     </li>
-                                    <li title="Warm up the model before starting predictions">
-                                        <a class="dropdown-item" href="#">
-                                            <div class="input-group">
-                                                <div class="form-check">
-                                                    <input type="checkbox" class="form-check-input"
-                                                           id="setWarmup" name="timeline" value="warmup" checked>
-                                                    <label class="form-check-label" for="setWarmup">Warm Up</label>
-                                                </div>
-                                            </div>
-                                        </a>
-                                    </li>
                                 </ul>
                             </li>
                             <li>
                                 <a href="#" class="dropdown-item" data-bs-toggle="dropdown" role="button"
                                    aria-haspopup="true" aria-expanded="false"><span
                                         class="nav-label">Spectrogram &raquo;</span></a>
-                                <ul class="submenu dropdown-menu ps-1">
-                                    <li class="form-check">
-                                        <input type="checkbox" class="form-check-input" id="loadSpectrogram"
-                                               name="timeline" value="loadSpectrogram">
-                                        <label class="form-check-label"
-                                               for="loadSpectrogram">Enable</label>
-                                    </li>
-                                    <li>
-                                        <div class="dropdown-divider"></div>
-                                    </li>
-                                    <li>
+                                <ul class="p-1">
                                     <li class="form-check">
                                         <input type="radio" class="form-check-input speccolor" id="inferno"
                                                name="colormap" value="inferno" checked>
@@ -274,18 +260,7 @@
                                            role="button"
                                            aria-haspopup="true" aria-expanded="false"> <span
                                                 class="nav-label">Timeline &raquo;</span></a>
-                                        <ul class="submenu dropdown-menu ps-1">
-
-                                            <li class="form-check">
-                                                <input type="checkbox" class="form-check-input"
-                                                       id="loadTimeline"
-                                                       name="timeline" value="loadTimeline" checked>
-                                                <label class="form-check-label"
-                                                       for="loadTimeline">Enable</label>
-                                            </li>
-                                            <li>
-                                                <div class="dropdown-divider"></div>
-                                            </li>
+                                        <ul class="p-1">
                                             <li class="form-check">
                                                 <input type="radio" class="form-check-input"
                                                        id="timecode"
@@ -297,7 +272,7 @@
                                                 <input type="radio" class="form-check-input"
                                                        id="timeOfDay"
                                                        name="timeline" value="timeOfDay" checked>
-                                                <label class="form-check-label"
+                                                <label class="form-check-label text-nowrap"
                                                        for="timeOfDay">Time of Day</label>
                                             </li>
                                         </ul>
@@ -400,7 +375,8 @@
     <div class="w-100 d-none" id="spectrogramWrapper">
         <div>
             <div class="bg-dark border border-secondary w-100" id="timeline"></div>
-            <div class="w-100" id="spectrogram"></div>
+            <div class="w-100" id="spectrogram">                    <span style="max-width: 70px" title="Toggle Fullscreen mode" id="fullscreen"
+                          class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">fullscreen</span></div>
             <div class="w-100" id="waveform"></div>
         </div>
         <!-- Controls view -->
@@ -447,47 +423,46 @@
             <div class="col pe-1">
                 <div class="btn-group float-end">
                     <span style="max-width: 70px" title="Toggle Nocmig mode&#10;(Only analyse detections at night)"
-                      id="nocmigMode"
-                      class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">bedtime</span>
-                    <span style="max-width: 70px" title="Toggle Fullscreen mode" id="fullscreen"
-                          class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">fullscreen</span>
+                          id="nocmigMode"
+                          class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">bedtime</span>
                 </div>
             </div>
         </div>
     </div>
     <!-- Result container -->
-    <div class="d-none border-end border-4" id="resultTableContainer">
-        <div class="ps-1 row g-1 h-100">
-            <div class="col-sm-4 h-100 overflow-auto d-none" id="summary">
+    <div class="d-none" id="resultTableContainer">
+        <div class="row g-0 h-100">
+            <div class="col-sm-4 h-100 overflow-auto" id="summary">
                 <!-- Summary table -->
                 <!--                <div class="rounded-border">-->
-                <div id='summaryTable' style="display:none"></div>
+                <div id='summaryTable'></div>
                 <!--                </div>-->
             </div>
             <!-- Results table -->
-            <div class="col-sm-12 h-100 overflow-auto" id="resultsDiv">
-                <table id='results' class="text-center table table-hover">
+            <div class="ps-1 pe-1 h-100 position-relative overflow-auto" id="resultsDiv">
+                <nav aria-label="Identification results">
+                    <ul class="m-2 pagination justify-content-center"></ul>
+                </nav>
+                <table id='results' class="text-center table table-hover w-100">
                     <thead id="resultsHead">
-                    <tr>
-                        <th>#</th>
-                        <th class="col-auto timestamp">Time</th>
+                    <tr class="bg-dark">
+                        <th class="col">#</th>
+                        <th class="col timestamp">Time</th>
                         <th class="text-start">Position</th>
                         <th class="text-start">Species</th>
+                        <th class="col specFeature">Play</th>
+                        <th class="col">XC</th>
+                        <th class="col">Delete</th>
                         <th class="">Label</th>
-                        <th class="col-auto ">Confidence
-                            <span id="confidenceFilter"
-                                  class="material-icons-two-tone text-secondary align-bottom pointer">filter_list</span>
-                        </th>
-                        <th class="col-auto">Other IDs</th>
-                        <th class="col-auto specFeature">Play</th>
-                        <th class="col-auto">XC</th>
-                        <th class="col-auto specFeature">Export</th>
-                        <th class="col-auto text-end">Notes</th>
+                        <th class="col text-end">Notes</th>
                     </tr>
                     </thead>
                     <tbody class="text-dark" id="resultTableBody">
                     </tbody>
                 </table>
+                <nav aria-label="Identification results">
+                    <ul class="m-2 pagination justify-content-center"></ul>
+                </nav>
             </div>
         </div>
     </div>
