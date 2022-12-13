@@ -1,7 +1,7 @@
 html, body {
     height: 100%;
-    padding-top: 0px;
-    padding-bottom: 0px;
+    padding-top: 0;
+    padding-bottom: 0;
     min-width: 700px;
     overflow: hidden;
     transition: background 1.5s linear;
@@ -34,7 +34,7 @@ html, body {
     white-space: nowrap;
     vertical-align: top;
     direction: ltr;
-    padding-bottom: 0px;
+    padding-bottom: 0;
     /* Support for all WebKit browsers. */
     -webkit-font-smoothing: antialiased;
 }
@@ -55,8 +55,6 @@ html, body {
 /*    width: 100%;*/
 /*    text-align: center;*/
 /*}*/
-
-
 
 
 tr[id^="sub"] {
@@ -139,7 +137,8 @@ ul {
     max-height: 250px;
     position: absolute;
     width: 100%;
-    z-index: 10;
+    z-index: 12;
+    box-shadow: -2px 6px 6px rgba(0, 0, 0, 0.4);
 }
 
 .bird-list li a {
@@ -172,6 +171,10 @@ ul {
     z-index: 2;
 }
 
+#resultTableBody {
+    scroll-margin-top: 120px;
+}
+
 region.wavesurfer-region:before {
     content: attr(data-region-label);
     position: absolute;
@@ -183,7 +186,7 @@ region.wavesurfer-region:before {
 
 region.wavesurfer-region[data-region-highlight] {
     border: 1px solid rgb(86, 180, 239);
-    box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.05) inset, 2px 0px 8px rgba(266, 255, 236, 0.6);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) inset, 2px 0 8px rgba(266, 255, 236, 0.6);
 }
 
 .nighttime {
@@ -199,7 +202,7 @@ region.wavesurfer-region[data-region-highlight] {
 }
 
 .table {
-    margin-bottom: 0px;
+    margin-bottom: 0;
 }
 
 /* Disable blue selection highlight in drag */
@@ -213,22 +216,21 @@ region.wavesurfer-region[data-region-highlight] {
 
 .chart-outer {
     height: 520px;
-    margin: 0em 1em 1em;
+    margin: 0 1em 1em;
     width: 100%;
     display: flex;
 }
 
 #chart-week {
-    margin: 0em 1em 1em;
     height: 520px;
     width: 100%;
     display: flex;
     order: 1;
-    margin-top: 30px;
+    margin: 30px 1em 1em;
 }
 
 .highcharts-data-table table {
-    margin: 0em 1em 1em;
+    margin: 0 1em 1em;
     display: block;
     max-width: 280px;
     overflow: auto;
@@ -321,33 +323,48 @@ footer {
 }
 
 
-
 /* ============ desktop view ============ */
 @media all and (min-width: 768px) {
     .dropdown-menu li {
         position: relative;
     }
 
-    .nav-item .submenu {
-        display: none;
-        position: absolute;
-        left: 100%;
-        top: -7px;
-    }
-
-    .nav-item .submenu-left {
-        right: 100%;
-        left: auto;
-    }
-
-    .dropdown-menu > li:hover {
+    ul ul > li:hover {
         background-color: #f1f1f1
     }
 
     .dropdown-menu > li:hover > .submenu {
         display: block;
     }
+
+    #primary_nav_wrap ul ul {
+        visibility: hidden;
+        position: absolute;
+        top: 95%;
+        left: 0;
+        background: #fff;
+        border-radius: 5px;
+        box-shadow: 2px 6px 6px rgba(0, 0, 0, 0.4);
+
+    }
+
+    #primary_nav_wrap:not(:hover) ul {
+        transition: all 0.4s;
+        transition-delay: 1s;
+    }
+
+    #primary_nav_wrap ul ul ul {
+        top: 5px;
+        left: 100%
+    }
+
+    #primary_nav_wrap ul li:hover > ul {
+        visibility: visible;
+        transition-delay: 0s;
+    }
+
 }
+
 
 /* ============ desktop view .end// ============ */
 
@@ -371,3 +388,41 @@ footer {
 
 /* ============ small devices .end// ============ */
 
+.pagination a {
+    background-color: #999;
+    color: white;
+    box-shadow: 5px 6px 6px rgba(0, 0, 0, 0.4);
+}
+
+.pagination span {
+    background-color: #999;
+    color: white;
+    box-shadow: 5px 8px 6px rgba(0, 0, 0, 0.4);
+}
+
+.pagination a:hover:not(.active) {
+    background-color: #ddd;
+    color: #333;
+    box-shadow: 2px 8px 10px rgba(0, 0, 0, 0.4);
+}
+
+.pagination li.disabled span {
+    background: #bbb;
+    color: #666;
+    box-shadow: none;
+}
+
+.pagination li.active span {
+    background: #777;
+    color: #000;
+    border: none
+}
+
+
+/* Style the results panel*/
+
+
+#results {
+    border-radius: 15px;
+    box-shadow: -2px 8px 8px rgba(0, 0, 0, 0.4);
+}

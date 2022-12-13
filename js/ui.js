@@ -26,8 +26,6 @@ const establishMessageChannel =
                     worker.onmessage = e => {
                         resolve(e.data);
                     }
-                } else if (event.data.args) {
-                    onLoadResults(event.data.args)
                 }
             }
         }
@@ -63,20 +61,21 @@ window.electron.getVersion()
 
 let modelReady = false, fileLoaded = false, currentFile;
 let PREDICTING = false;
-let region, AUDACITY_LABELS = [], wavesurfer;
-let summary = {};
-let fileList = [], fileStart, bufferStartTime, fileEnd;
+let region, AUDACITY_LABELS = {}, wavesurfer;
+// fileList is all open files, analyseList is the subset that have been analysed;
+let fileList = [], analyseList = [];
+let fileStart, bufferStartTime, fileEnd;
 
 let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
 // set up some DOM element caches
 let bodyElement = $('body');
 let spectrogramWrapper = $('#spectrogramWrapper'), specElement, waveElement, specCanvasElement, specWaveElement;
 let waveCanvasElement, waveWaveElement,
-    resultTableElement = $('#resultTableContainer');
+    resultTableElement = $('#resultTableContainer'), dummyElement;
 resultTableElement.animate({scrollTop: '300px'}, 400, 'swing');
 let contentWrapperElement = $('#contentWrapper');
 let completeDiv = $('#complete');
-const resultTable = $('#resultTableBody')
+let resultTable = document.getElementById('resultTableBody');
 const nocmigButton = document.getElementById('nocmigMode');
 const summaryTable = $('#summaryTable');
 let progressDiv = $('#progressDiv');
@@ -84,10 +83,8 @@ let progressBar = $('.progress .progress-bar');
 const fileNumber = document.getElementById('fileNumber');
 const timeOfDay = document.getElementById('timeOfDay');
 const timecode = document.getElementById('timecode');
-const timeline = document.getElementById('loadTimeline');
 const inferno = document.getElementById('inferno');
 const greys = document.getElementById('greys');
-const loadSpectrogram = document.getElementById('loadSpectrogram');
 const resultsDiv = document.getElementById('resultsDiv');
 const summaryButton = document.getElementById('showSummary');
 const summaryDiv = document.getElementById('summary');
@@ -96,12 +93,10 @@ const summaryDiv = document.getElementById('summary');
 let batchInProgress = false;
 let activeRow;
 let predictions = {}, speciesListItems,
-    clickedIndex, speciesName, speciesFilter,
-    subRows, scrolled, currentFileDuration;
+    clickedIndex, currentFileDuration;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
 let workerHasLoadedFile = false;
-let speciesViewIsFiltered = false;
 // Set content container height
 contentWrapperElement.height(bodyElement.height() - 80);
 
@@ -165,7 +160,9 @@ console.table(diagnostics);
 
 function resetResults(args) {
     summaryTable.empty();
-    resultTable.empty();
+    pagination.forEach(item => item.classList.add('d-none'));
+    resultTable = document.getElementById('resultTableBody');
+    resultTable.innerHTML = '';
     predictions = {};
     seenTheDarkness = false;
     shownDaylightBanner = false;
@@ -292,13 +289,8 @@ function initWavesurfer(args) {
             })
         ]
     });
-    if (config.spectrogram) {
-
-        initSpectrogram()
-    }
-    if (config.timeline) {
-        createTimeline()
-    }
+    initSpectrogram()
+    createTimeline()
     wavesurfer.loadDecodedBuffer(args.audio);
     updateElementCache();
 
@@ -384,14 +376,7 @@ function zoomSpec(direction) {
 }
 
 async function showOpenDialog() {
-    const dialogConfig = {
-        filters: [{
-            name: 'Audio Files',
-            extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4']
-        }],
-        properties: ['openFile', 'multiSelections']
-    };
-    const files = await window.electron.openDialog('showOpenDialog', dialogConfig);
+    const files = await window.electron.openDialog('showOpenDialog');
     if (!files.canceled) await onOpenFiles({filePaths: files.filePaths});
 }
 
@@ -454,6 +439,16 @@ function updateFileName(files, openfile) {
     })
 }
 
+
+/**
+ * We post the list to the worker as it has node and that allows it easier access to the
+ * required filesystem routines
+ * @param filePaths
+ */
+const openFiles = ({filePaths}) => {
+    worker.postMessage({action: 'open-files', files: filePaths})
+}
+
 async function onOpenFiles(args) {
     hideAll();
     showElement(['spectrogramWrapper'], false)
@@ -461,7 +456,6 @@ async function onOpenFiles(args) {
     completeDiv.hide();
     // Store the file list and Load First audio file
     fileList = args.filePaths;
-
     // Sort file by time created (the oldest first):
     if (fileList.length > 1) {
         if (modelReady) enableMenuItem(['analyseAll', 'reanalyseAll'])
@@ -489,10 +483,6 @@ async function onOpenFiles(args) {
     }
 }
 
-async function onLoadResults(args) {
-    console.log("result file received: " + args.file)
-    //await loadChirp(args.file);
-}
 
 /**
  *
@@ -500,7 +490,7 @@ async function onLoadResults(args) {
  * @returns {Promise<void>}
  */
 async function showSaveDialog() {
-    await window.electron.saveFile({currentFile: currentFile, labels: AUDACITY_LABELS});
+    await window.electron.saveFile({currentFile: currentFile, labels: AUDACITY_LABELS[currentFile]});
 }
 
 // Worker listeners
@@ -508,7 +498,7 @@ function analyseReset() {
     fileNumber.innerText = '';
     PREDICTING = true;
     delete diagnostics['Audio Duration'];
-    AUDACITY_LABELS = [];
+    AUDACITY_LABELS = {};
     completeDiv.hide();
     progressDiv.show();
     stretchTable();
@@ -546,27 +536,37 @@ navbarAnalysis.addEventListener('click', async () => {
 const analyseLink = document.getElementById('analyse');
 //speciesExclude = document.querySelectorAll('speciesExclude');
 analyseLink.addEventListener('click', async () => {
-    postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: [currentFile]});
+    analyseList = [currentFile];
+    postAnalyseMessage({confidence: config.minConfidence, resetResults: true, currentFile: currentFile});
 });
 
 const reanalyseLink = document.getElementById('reanalyse');
 //speciesExclude = document.querySelectorAll('speciesExclude');
 reanalyseLink.addEventListener('click', async () => {
-    postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: [currentFile], reanalyse: true});
+    analyseList = [currentFile];
+    postAnalyseMessage({
+        confidence: config.minConfidence,
+        resetResults: true,
+        currentFile: currentFile,
+        reanalyse: true
+    });
 });
 
 const analyseAllLink = document.getElementById('analyseAll');
 analyseAllLink.addEventListener('click', async () => {
+    analyseList = undefined;
     postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: fileList});
 });
 
 const reanalyseAllLink = document.getElementById('reanalyseAll');
 reanalyseAllLink.addEventListener('click', async () => {
+    analyseList = undefined;
     postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: fileList, reanalyse: true});
 });
 
 const analyseSelectionLink = document.getElementById('analyseSelection');
 analyseSelectionLink.addEventListener('click', async () => {
+    analyseList = [currentFile];
     let start = region.start + bufferBegin;
     let end = region.end + bufferBegin;
     if (end - start < 0.5) {
@@ -576,18 +576,16 @@ analyseSelectionLink.addEventListener('click', async () => {
     postAnalyseMessage({
         confidence: 0.1,
         resetResults: false,
-        files: [currentFile],
-        start: start,
-        end: end,
+        currentFile: currentFile,
+        // The rounding below is essential to finding record in database
+        start: start.toFixed(3),
+        end: end.toFixed(3),
+        list: 'everything'
     });
-    summary = {};
 });
 
 function postAnalyseMessage(args) {
     let start = args.start, end = args.end;
-    // Format start / end as millisecond integers
-    //if (start) start = (start * 1000).toFixed(0);
-    //if (end) end = (end * 1000).toFixed(0)
     analyseReset();
     if (args.resetResults) {
         resetResults(args);
@@ -595,21 +593,18 @@ function postAnalyseMessage(args) {
         progressDiv.show();
         delete diagnostics['Audio Duration'];
     }
-    args.files.forEach(file => {
-        worker.postMessage({
-            action: 'analyse',
-            confidence: args.confidence,
-            resetResults: args.resetResults,
-            start: start,
-            end: end,
-            nocmig: config.nocmig,
-            lat: config.latitude,
-            lon: config.longitude,
-            files: [file],
-            reanalyse: args.reanalyse
-        });
-    })
-    if (args.files.length > 1) {
+    worker.postMessage({
+        action: 'analyse',
+        confidence: args.confidence,
+        resetResults: args.resetResults,
+        start: start,
+        end: end,
+        currentFile: args.currentFile,
+        filesInScope: analyseList || fileList,
+        reanalyse: args.reanalyse,
+        list: args.list || config.list
+    });
+    if (!args.currentFile) {
         batchInProgress = true;
     }
 }
@@ -665,17 +660,19 @@ save2dbLink.addEventListener('click', async () => {
     worker.postMessage({action: 'save2db'})
 });
 
+let chartRange = {}
 const chartsLink = document.getElementById('charts');
 chartsLink.addEventListener('click', async () => {
-    worker.postMessage({action: 'get-detected-species-list'});
+    worker.postMessage({action: 'get-detected-species-list', range: chartRange});
     hideAll();
     showElement(['recordsContainer']);
     worker.postMessage({action: 'chart', species: undefined, range: {}});
 });
 
+let exploreRange = {};
 const exploreLink = document.getElementById('explore');
 exploreLink.addEventListener('click', async () => {
-    worker.postMessage({action: 'get-detected-species-list'});
+    worker.postMessage({action: 'get-detected-species-list', range: exploreRange});
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
     hideElement(['completeDiv']);
@@ -695,6 +692,10 @@ thresholdLink.addEventListener('blur', (e) => {
     if (100 >= threshold && threshold >= 0) {
         config.minConfidence = parseFloat(e.target.value) / 100;
         updatePrefs();
+        worker.postMessage({
+            action: 'set-variables',
+            confidence: config.minConfidence,
+        });
     } else {
         e.target.value = config.minConfidence * 100;
     }
@@ -716,20 +717,20 @@ function createRegion(start, end, label) {
     wavesurfer.seekAndCenter(progress);
 }
 
-const tbody = document.getElementById('resultTableBody')
-tbody.addEventListener('click', function (e) {
-    if (activeRow) {
-        activeRow.classList.remove('table-active')
-    }
+const results = document.getElementById('results');
+results.addEventListener('click', function (e) {
+
     const row = e.target.closest('tr');
-    row.classList.add('table-active');
-    activeRow = row;
-    const params = row.attributes[2].value.split('|');
-    if (e.target.classList.contains('play')) params.push('true')
-    loadResultRegion(params);
-    // if (!onScreen(row)) {
-    //     scrollResults(row);
-    // }
+    if (row && !row.classList.contains('bg-dark')) { // That'd be the daylight banner...
+        if (activeRow) {
+            activeRow.classList.remove('table-active')
+        }
+        row.classList.add('table-active');
+        activeRow = row;
+        const params = row.attributes[2].value.split('|');
+        if (e.target.classList.contains('play')) params.push('true')
+        loadResultRegion(params);
+    }
 })
 
 
@@ -981,11 +982,9 @@ function updatePrefs() {
 let appPath, tempPath;
 window.onload = async () => {
     // Set config defaults
-
-    config = {
-        spectrogram: true,
+    const defaultConfig = {
+        UUID: uuidv4(),
         colormap: 'inferno',
-        timeline: true,
         minConfidence: 0.45,
         timeOfDay: false,
         list: 'migrants',
@@ -994,115 +993,90 @@ window.onload = async () => {
         longitude: -0.4,
         nocmig: false,
         warmup: true,
-        batchSize: 1
-    }
-    config.UUID = uuidv4();
+        batchSize: 1,
+        limit: 500,
+        fullscreen: false
+    };
     // Load preferences and override defaults
     [appPath, tempPath] = await getPaths();
-    fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
-        if (err) {
-            console.log('JSON parse error ' + err);
-            // If file read error, use defaults, set new UUID
-            config.UUID = uuidv4();
-            updatePrefs();
-        } else {
-            config = JSON.parse(data);
+    await fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
+            if (err) {
+                console.log('JSON parse error ' + err);
+                // Use defaults
+                config = defaultConfig;
+            } else {
+                config = JSON.parse(data);
+            }
+
+            //fill in defaults
+            Object.keys(defaultConfig).forEach(key => {
+                if (!(key in config)) {
+                    config[key] = defaultConfig[key];
+                }
+            });
+
+            updatePrefs()
+
+            // Set UI option state
+            const batchSizeElement = document.getElementById(config.batchSize);
+            batchSizeElement.checked = true;
+            diagnostics['Batch size'] = config.batchSize;
+            const modelToUse = document.getElementById(config.model);
+            modelToUse.checked = true;
+            diagnostics['Model'] = config.model;
+
+            warmup.checked = config.warmup;
+            // Show time of day in results?
+            const timestamp = document.querySelectorAll('.timestamp');
+            if (!config.timeOfDay) {
+                timestamp.forEach(el => {
+                    el.classList.add('d-none')
+                })
+            }
+            // Add a checkmark to the list in use
+            window[config.list].checked = true;
+
+            config.timeOfDay ? timeOfDay.checked = true : timecode.checked = true;
+            // Spectrogram colour
+            config.colormap === 'inferno' ? inferno.checked = true : greys.checked = true;
+            // Nocmig mode state
+            console.log('nocmig mode is ' + config.nocmig)
+            nocmigButton.innerText = config.nocmig ? 'bedtime' : 'bedtime_off';
+
+            thresholdLink.value = config.minConfidence * 100;
+
+            showElement([config.colormap + 'span'], true)
+            t0_warmup = Date.now();
+            worker.postMessage({
+                action: 'set-variables',
+                path: appPath,
+                temp: tempPath,
+                lat: config.latitude,
+                lon: config.longitude,
+                confidence: config.minConfidence,
+                nocmig: config.nocmig
+            });
+            worker.postMessage({
+                action: 'load-model',
+                model: config.model,
+                list: config.list,
+                batchSize: config.batchSize,
+                warmup: config.warmup,
+            });
+            worker.postMessage({action: 'clear-cache'})
         }
+    )
+// establish the message channel
+    setUpWorkerMessaging()
+
+// Set footer year
+    $('#year').text(new Date().getFullYear());
+//Cache list elements
+    speciesListItems = $('#bird-list li span');
+}
 
 
-        // Check for keys - in case updates have added new ones
-        if (!('UUID' in config)) {
-            config.UUID = uuidv4();
-        }
-        if (!('batchSize' in config)) {
-            config.batchSize = 1;
-        }
-        if (!('latitude' in config)) {
-            config.latitude = 51.9
-        }
-        if (!('longitude' in config)) {
-            config.longitude = -0.4
-        }
-        if (!('nocmig' in config)) {
-            config.nocmig = false;
-        }
-        if (!('list' in config)) {
-            config.list = 'migrants';
-        }
-        if (!('model' in config)) {
-            config.model = 'efficientnet';
-        }
-        if (!('warmup' in config)) {
-            config.warmup = false;
-        }
-        // Never open fullscreen to begin with and don't remember setting
-        config.fullscreen = false;
-        updatePrefs()
-
-        // Set UI option state
-        const batchSizeElement = document.getElementById(config.batchSize);
-        batchSizeElement.checked = true;
-        diagnostics['Batch size'] = config.batchSize;
-        const modelToUse = document.getElementById(config.model);
-        modelToUse.checked = true;
-        diagnostics['Model'] = config.model;
-
-        warmup.checked = config.warmup;
-        // Show time of day in results?
-        const timestamp = document.querySelectorAll('.timestamp');
-        if (!config.timeOfDay) {
-            timestamp.forEach(el => {
-                el.classList.add('d-none')
-            })
-        }
-        // Add a checkmark to the list in use
-        window[config.list].checked = true;
-
-        if (!config.spectrogram) {
-            loadSpectrogram.checked = false;
-            timeOfDay.disabled = true;
-            timecode.disabled = true;
-            inferno.disabled = true;
-            greys.disabled = true;
-        } else {
-            loadSpectrogram.checked = true;
-        }
-        //Timeline settings
-        if (!config.timeline) {
-            timeline.checked = false;
-            timeOfDay.disabled = true;
-            timecode.disabled = true;
-        } else {
-            timeline.checked = true;
-        }
-        config.timeOfDay ? timeOfDay.checked = true : timecode.checked = true;
-        // Spectrogram colour
-        config.colormap === 'inferno' ? inferno.checked = true : greys.checked = true;
-        // Nocmig mode state
-        console.log('nocmig mode is ' + config.nocmig)
-        nocmigButton.innerText = config.nocmig ? 'bedtime' : 'bedtime_off';
-
-        thresholdLink.value = config.minConfidence * 100;
-
-        showElement([config.colormap + 'span'], true)
-        t0_warmup = Date.now();
-        worker.postMessage({
-            action: 'init',
-            path: appPath,
-            temp: tempPath,
-            lat: config.latitude,
-            lon: config.longitude
-        });
-        worker.postMessage({
-            action: 'load-model',
-            model: config.model,
-            list: config.list,
-            batchSize: config.batchSize,
-            warmup: config.warmup,
-        });
-
-    })
-    // establish the message channel
+const setUpWorkerMessaging = () => {
     establishMessageChannel.then((success) => {
         worker.addEventListener('message', function (e) {
             const args = e.data;
@@ -1110,6 +1084,12 @@ window.onload = async () => {
             switch (event) {
                 case 'model-ready':
                     onModelReady(args);
+                    break;
+                case 'reset-results':
+                    resetResults(args);
+                    break;
+                case 'files':
+                    onOpenFiles(args);
                     break;
                 case 'seen-species-list':
                     generateBirdList('seenSpecies', args.list);
@@ -1142,21 +1122,13 @@ window.onload = async () => {
                 case 'chart-data':
                     onChartData(args);
                     break;
-                case 'reset-results':
-                    resetResults(args);
-                    break;
                 case 'generate-alert':
                     alert(args.message)
                     break;
             }
         })
     })
-    // Set footer year
-    $('#year').text(new Date().getFullYear());
-    //Cache list elements
-    speciesListItems = $('#bird-list li span');
-};
-
+}
 
 function generateBirdList(store, rows) {
     let listHTML;
@@ -1308,8 +1280,10 @@ $(document).on('click', '.bird-list', function (e) {
 })
 
 
-const isSpeciesViewFiltered = () => {
-    return document.querySelector('.speciesFilter span.text-warning') !== null;
+const isSpeciesViewFiltered = (sendSpecies) => {
+    const filtered = document.querySelector('.speciesFilter span.text-warning');
+    const species = filtered ? filtered.innerHTML.replace(/\s<.*/, '') : undefined;
+    return sendSpecies ? species : filtered !== null;
 }
 
 //Works for single and batch items in Explore, but not in Analyse
@@ -1328,7 +1302,7 @@ function editResultID(cname, sname, cell) {
         if (exploreMode) files = [];
     }
 
-    cell.innerHTML = `<span id="${cname} ${sname}" class="pointer">${cname} <i>${sname}</i></span>`;
+    cell.innerHTML = `${cname} <br><i>${sname}</i>`;
     worker.postMessage({
         action: 'update-record',
         openFiles: files,
@@ -1342,7 +1316,6 @@ function editResultID(cname, sname, cell) {
         isReset: true,
         isExplore: exploreMode
     });
-    worker.postMessage({action: 'get-detected-species-list'});
 }
 
 function unpackNameAttr(el, cname) {
@@ -1351,7 +1324,7 @@ function unpackNameAttr(el, cname) {
     let [file, start, end, commonName] = nameAttr.split('|');
     if (cname) commonName = cname;
     currentRow.attributes[0].value = [file, start, end, commonName].join('|');
-    return [file, start, end, currentRow];
+    return [file, parseFloat(start), parseFloat(end), currentRow];
 }
 
 
@@ -1377,7 +1350,7 @@ function updateLabel(e) {
     species = species.querySelector('.cname').innerHTML
     // Extract species cname - urgh
     species = species.replace(/^\s*<[^>]+>/m, '')
-    species = species.replace(/^(.*)\s<i.*\s*/m, "$1");
+    species = species.replace(/^(.*)\s<.*\s*/m, "$1");
 
     parent.innerHTML = tags[label];
     // Update the label record(s) in the db
@@ -1713,30 +1686,6 @@ function enableKeyDownEvent() {
 
 ///////////// Nav bar Option handlers //////////////
 
-$(document).on('click', '#loadSpectrogram', function (e) {
-    config.spectrogram = e.target.checked;
-    updatePrefs();
-    if (config.spectrogram) {
-        $('.specFeature').show()
-        inferno.disabled = false;
-        greys.disabled = false;
-
-        if (wavesurfer && wavesurfer.isReady) {
-            showElement(['spectrogramWrapper'], false);
-        } else {
-            timeOfDay.disabled = true;
-            timecode.disabled = true;
-            if (currentFile) loadAudioFile({filePath: currentFile});
-        }
-    } else {
-        // Set menu state
-        inferno.disabled = true;
-        greys.disabled = true;
-        $('.specFeature').hide()
-        hideElement(['spectrogramWrapper']);
-    }
-})
-
 function initSpectrogram(height, fftSamples) {
     showElement(['spectrogramWrapper'], false);
     if (!fftSamples) {
@@ -1811,37 +1760,6 @@ for (let i = 0; i < modelToUse.length; i++) {
     })
 }
 
-const warmup = document.getElementById('setWarmup');
-warmup.addEventListener('click', () => {
-    config.warmup = warmup.checked;
-    updatePrefs();
-})
-
-$(document).on('click', '#loadTimeline', function (e) {
-    const timeOfDay = document.getElementById('timeOfDay');
-    const timecode = document.getElementById('timecode');
-    if (!e.target.checked) {
-        if (wavesurfer) wavesurfer.destroyPlugin('timeline');
-        config.timeline = false;
-        timeOfDay.disabled = true;
-        timecode.disabled = true;
-        updateElementCache();
-        adjustSpecDims(true);
-        updatePrefs();
-    } else {
-        config.timeline = true;
-        timeOfDay.disabled = false;
-        timecode.disabled = false;
-        if (wavesurfer) {
-            createTimeline();
-            // refresh caches
-            updateElementCache();
-            adjustSpecDims(true);
-        }
-        updatePrefs();
-    }
-})
-
 $(document).on('click', '#timeOfDay', function () {
     // set file creation time
     config.timeOfDay = true;
@@ -1860,6 +1778,7 @@ $(document).on('click', '#timeOfDay', function () {
     }
     updatePrefs();
 })
+
 $(document).on('click', '#timecode', function () {
     config.timeOfDay = false;
     const timefields = document.querySelectorAll('.timestamp')
@@ -1888,12 +1807,12 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         if (e.ctrlKey) showOpenDialog();
     },
     KeyS: function (e) {
-        if (AUDACITY_LABELS.length) {
+        if (Object.keys(AUDACITY_LABELS).length) {
             if (e.ctrlKey) worker.postMessage({action: 'save2db'});
         }
     },
     KeyA: function (e) {
-        if (AUDACITY_LABELS.length) {
+        if (Object.keys(AUDACITY_LABELS).length) {
             if (e.ctrlKey) showSaveDialog();
         }
     },
@@ -2206,16 +2125,16 @@ const updateSummary = ({
                        }) => {
     let summaryHTML = `<table id="resultSummary" class="table table-striped table-dark table-hover p-1"><thead>
             <tr>
-                <th class="w-auto">Max</th>
+                <th class="">Max</th>
                 <th scope="col">Species</th>
                 <th scope="col" class="text-end">Count</th>
-                <th class="text-end w-auto">Label</th>
+                <th class="text-end">Label</th>
             </tr>
             </thead><tbody>`;
 
     for (let i = 0; i < summary.length; i++) {
         const selected = summary[i].cname === filterSpecies ? 'text-warning' : '';
-        summaryHTML += `<tr>
+        summaryHTML += `<tr tabindex="-1">
                         <td class="max">${iconizeScore(summary[i].max)}</td>
                         <td class="cname speciesFilter">
                             <span class="pointer ${selected}">${summary[i].cname} <i>${summary[i].sname}</i></span>
@@ -2226,18 +2145,31 @@ const updateSummary = ({
     }
     summaryHTML += '</tbody></table>';
     squishTable();
-    summaryTable.html(summaryHTML);
+    // Get rid of flicker...
+    const old_summary = document.getElementById('summaryTable');
+    const buffer = old_summary.cloneNode();
+    buffer.innerHTML = summaryHTML;
+    old_summary.replaceWith(buffer);
+
+    const currentFilter = document.querySelector('.speciesFilter span.text-warning');
+    if (currentFilter) {
+        const filterRow = currentFilter.closest('tr');
+        filterRow.focus();
+    }
 }
 
 async function onPredictionDone({
                                     filterSpecies = undefined,
                                     batchInProgress = false,
-                                    audacityLabels = [],
+                                    audacityLabels = {},
                                     file = undefined,
-                                    summary = {}
+                                    summary = {},
+                                    activeID = undefined,
+                                    total = 0,
+                                    offset = 0
                                 }) {
 
-    AUDACITY_LABELS = AUDACITY_LABELS.concat(audacityLabels);
+    AUDACITY_LABELS = audacityLabels;
     // Defer further processing until batch complete
     if (batchInProgress) {
         progressDiv.show();
@@ -2245,8 +2177,19 @@ async function onPredictionDone({
     } else {
         PREDICTING = false;
     }
+    if (resultsBuffer) {
+        const results = document.getElementById('resultTableBody');
+        results.replaceWith(resultsBuffer);
+        if (!config.spectrogram) $('.specFeature').hide();
+        resultsBuffer = undefined;
+        activeRow = document.getElementsByClassName('table-active')[0];
+        if (activeRow) activeRow.click();
+    }
+
     updateSummary({summary: summary, filterSpecies: filterSpecies});
-    scrolled = false;
+
+    //Pagination
+    total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
 
     progressDiv.hide();
     progressBar.width(0 + '%');
@@ -2254,18 +2197,102 @@ async function onPredictionDone({
     progressBar.html(0 + '%');
     completeDiv.show();
 
-    if (AUDACITY_LABELS.length) {
+    if (Object.keys(AUDACITY_LABELS).length) {
         enableMenuItem(['saveLabels', 'save2db']);
         $('.download').removeClass('disabled');
     } else {
         disableMenuItem(['saveLabels', 'save2db']);
     }
-    enableMenuItem(['analyse', 'reanalyse'])
-    subRows = document.querySelectorAll('.subrow')
+    if (currentFile) enableMenuItem(['analyse', 'reanalyse'])
 
-    speciesFilter = document.querySelectorAll('.speciesFilter');
+    // Add speciesfilter and confidence filter handlers
+    setFilterHandlers()
+
+    // Diagnostics:
+    t1_analysis = Date.now();
+    diagnostics['Analysis Duration'] = ((t1_analysis - t0_analysis) / 1000).toFixed(2) + ' seconds';
+    diagnostics['Analysis Rate'] = (diagnostics['Audio Duration'] / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
+
+    //show summary table
+    summaryButton.click();
+    // midnight hack: arrgh, but it works...
+    if (summaryDiv.classList.contains('d-none')) {
+        summaryButton.click();
+    }
+    // Get rid of lingering regions
+    if (wavesurfer) wavesurfer.clearRegions();
+    if (activeRow) {
+        // Refresh node and scroll to active row:
+        activeRow = document.getElementById(activeRow.id)
+        if (activeRow) { // because: after an edit the active row may not exist
+            activeRow.focus()
+            activeRow.click()
+        } else { // in which case...go to the last table row
+            const rows = document.getElementById('resultTableBody').querySelectorAll('.top-row')
+            if (rows.length) {
+                const lastRow = rows[rows.length - 1];
+                lastRow.focus();
+            }
+        }
+    } else {
+        document.getElementById('resultTableBody').scrollIntoView({behaviour: 'smooth'});
+    }
+}
+
+const pagination = document.querySelectorAll('.pagination');
+pagination.forEach(item => {
+    item.addEventListener('click', (e) => {
+        if (e.target.tagName === 'A') { // Did we click a link in the list?
+            let clicked = e.target.innerText;
+            let currentPage = pagination[0].querySelector('.active');
+            currentPage = parseInt(currentPage.innerText);
+            if (clicked === 'Previous') {
+                clicked = currentPage - 1
+            } else if (clicked === 'Next') {
+                clicked = currentPage + 1
+            } else {
+                clicked = parseInt(clicked)
+            }
+            const limit = config.limit;
+            let offset = (clicked - 1) * limit;
+            const species = isSpeciesViewFiltered(true);
+            worker.postMessage({
+                action: 'filter',
+                species: species,
+                files: fileList,
+                offset: offset,
+                limit: limit,
+                explore: isExplore()
+            });
+        }
+    })
+})
+
+const addPagination = (total, offset) => {
+    const limit = config.limit;
+    const pages = Math.ceil(total / limit);
+    const currentPage = (offset / limit) + 1;
+    let list = '';
+    for (let i = 1; i <= pages; i++) {
+        if (i === 1) {
+            list += i === currentPage ? '<li class="page-item disabled"><span class="page-link" href="#">Previous</span></li>'
+                : '<li class="page-item"><a class="page-link" href="#">Previous</a></li>';
+        }
+        list += i === currentPage ? '<li class="page-item active" aria-current="page"><span class="page-link" href="#">' + i + '</span></li>' :
+            '<li class="page-item"><a class="page-link" href="#">' + i + '</a></li>';
+        if (i === pages) {
+            list += i === currentPage ? '<li class="page-item disabled"><span class="page-link" href="#">Next</span></li>'
+                : '<li class="page-item"><a class="page-link" href="#">Next</a></li>';
+        }
+    }
+    pagination.forEach(item => {
+        item.classList.remove('d-none');
+        item.innerHTML = list;
+    })
+}
+
+const setFilterHandlers = () => {
     let filterMode = null;
-
     $(resultTableElement).on('click', '#confidenceFilter', function (e) {
         if (!filterMode) {
             filterMode = 'guess';
@@ -2295,78 +2322,45 @@ async function onPredictionDone({
         // Species filtering in Explore is meaningless...
         if (isExplore()) return
         activeRow = undefined;
-        // Check if italic section was clicked
-        speciesFilter = document.querySelectorAll('.speciesFilter');
-        const target = this.querySelector('span.pointer');
-
+        // Am I trying to unfilter?
+        const target = this.querySelector('span.pointer').classList;
         // There won't be a target if the input box is clicked rather than the list
-        if (target) {
-            const targetClass = target.classList;
-            if (targetClass.contains('text-warning')) {
-                // Clicked on filtered species icon
-                worker.postMessage({action: 'filter', filelist: fileList});
-                speciesViewIsFiltered = false
-            } else {
-                // Clicked on unfiltered species name
-                // Remove any exclusion from the species to filter
-                const species = target.innerHTML.replace(/\s<.*/, '');
-                worker.postMessage({action: 'filter', species: species, filelist: fileList});
-                speciesViewIsFiltered = true;
-            }
+        if (target.contains('text-warning')) {
+            // Clicked on filtered species icon
+            worker.postMessage({action: 'filter', files: fileList});
+        } else {
+            // Clicked on unfiltered species name
+            const target = this.querySelector('span.pointer');
+            const species = target.innerHTML.replace(/\s<.*/, '');
+            worker.postMessage({action: 'filter', species: species, files: fileList});
         }
-        //scrollResults(tableRows[0]);
         document.getElementById('results').scrollTop = 0;
     })
-
-    // Diagnostics:
-    t1_analysis = Date.now();
-    diagnostics['Analysis Duration'] = ((t1_analysis - t0_analysis) / 1000).toFixed(2) + ' seconds';
-    diagnostics['Analysis Rate'] = (diagnostics['Audio Duration'] / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
-
-    //show summary table
-    summaryButton.click();
-    // midnight hack: arrgh, but it works...
-    if (summaryDiv.classList.contains('d-none')) {
-        summaryButton.click();
-    }
-
-    if (activeRow) {
-        // Refresh and scroll to active row:
-        activeRow = document.getElementById(activeRow.id)
-        if (activeRow) { // after an edit the active row may not exist
-            activeRow.focus()
-            activeRow.click()
-        } else { // in which case...go to the last table row
-            const rows = document.getElementById('resultTableBody').querySelectorAll('.top-row')
-            if (rows.length) {
-                const lastRow = rows[rows.length - 1];
-                lastRow.focus();
-            }
-        }
-    }
 }
 
-function scrollResults(row) {
-    row.classList.add('table-active');
-    activeRow = row;
-    const container = row.closest('.overflow-auto')
-    container.scrollTop = row.offsetTop - container.offsetTop - document.getElementById('resultsHead').offsetHeight;
+const getOffset = () => {
+    const pagination = document.getElementById('pagination')
+    const active = pagination.querySelector('.active');
+    const offset = active ? (parseInt(active.innerText) - 1) * 1000 : 0;
+    return offset || 0
 }
 
-
-// TODO: limit results table to n records, paginate. Have summary contain full detection counts.
 // TODO: show every detection in the spec window as a region on the spectrogram
 
 async function renderResult(args) {
+
     const result = args.result, file = args.file;
+    // Deal with flicker
+    const isFromCache = args.fromDB;
+
     let index = args.index;
-    // Memory saver
-    if (index > 3000) return
+    const subRowThreshold = 0.01;
+    const hideAlternates = result.score2 < subRowThreshold ? 'd-none' : '';
     // Convert timestamp and position to date so easier to format results in UI
     let timestamp = new Date(result.timestamp);
     const position = new Date(result.position * 1000);
     // Datetime wrangling for Nocmig mode
-    if (result !== "No predictions.") {
+    if (typeof (result) !== 'string') {
         let astro = SunCalc.getTimes(timestamp, config.latitude, config.longitude);
         if (astro.dawn.setMilliseconds(0) < timestamp && astro.dusk.setMilliseconds(0) > timestamp) {
             result.dayNight = 'daytime';
@@ -2379,10 +2373,10 @@ async function renderResult(args) {
     if (index === 1 || -1) {
         showElement(['resultTableContainer'], false);
     }
-    if (result === "No predictions.") {
+    if (typeof (result) === 'string') {
         const nocturnal = config.nocmig ? '<b>during the night</b>' : '';
 
-        tr += `<tr><td>${result} (Predicting ${config.list} ${nocturnal} with at least ${config.minConfidence * 100}% confidence in the prediction)</td></tr>`;
+        tr += `<tr><td colspan="8">${result} (Predicting ${config.list} ${nocturnal} with at least ${config.minConfidence * 100}% confidence in the prediction)</td></tr>`;
     } else {
         if (config.nocmig && !region) {
             /*
@@ -2391,9 +2385,6 @@ async function renderResult(args) {
             * abort entirely when dawn breaks
             */
             if (!seenTheDarkness && result.dayNight === 'daytime') {
-                //
-                // tr = '<tr><td>Skipping daytime results... </td></tr>';
-                // resultTable.html(tr);
                 // Not dark yet
                 return
             }
@@ -2401,19 +2392,10 @@ async function renderResult(args) {
         // Show the twilight bar even if nocmig mode off - cue to change of table row colour
         if (seenTheDarkness && result.dayNight === 'daytime' && shownDaylightBanner === false) {
             // Show the twilight start bar
-            resultTable.append(`<tr class="bg-dark text-white"><td colspan="20" class="text-center">
-                                        Start of civil twilight
-                                        <span class="material-icons-two-tone text-warning align-bottom">wb_twilight</span>
-                                    </td></tr>`);
+            tr += `<tr class="bg-dark" style="color: white"><td colspan="20" class="text-center">
+                Start of civil twilight <span class="material-icons-two-tone text-warning align-bottom">wb_twilight</span>
+                </td></tr>`;
             shownDaylightBanner = true;
-        }
-
-        const key = `${result.cname} <i>${result.sname}</i>`;
-        if (key in summary) {
-            if (result)
-                summary[key] += 1
-        } else {
-            summary[key] = 1
         }
 
         const start = result.start, end = result.end;
@@ -2436,24 +2418,24 @@ async function renderResult(args) {
         predictions[index] = result;
         let showTimeOfDay;
         config.timeOfDay ? showTimeOfDay = '' : showTimeOfDay = 'd-none';
-
+        const active = result.active ? 'table-active' : ';'
         const label = result.label ? tags[result.label] : tags['Remove Label'];
-
-        tr += `<tr tabindex="-1" id="result${index}" name="${file}|${start}|${end}|${result.cname}${confidence}" class='border-top border-2 border-secondary top-row ${result.dayNight}'>
+        tr += `<tr tabindex="-1" id="result${index}" name="${file}|${start}|${end}|${result.cname}${confidence}" class='${active} border-top border-2 border-secondary top-row ${result.dayNight}'>
             <th scope='row'>${index}</th>
             <td class='text-start text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-end">${UI_position}</td>
-            <td name="${result.cname}" class='text-start cname'>${result.cname} <i>${result.sname}</i></td>
+            <td name="${result.cname}" class='text-start cname'>${result.cname} <br/><i>${result.sname}</i></td>
             <td class="label">${label}</td>
             <td>${iconizeScore(result.score)}</td>
-            <td><span id='id${index}' title="Click for additional detections" class='material-icons-two-tone rotate pointer d-none'>sync</span></td>
+            <td><span id='id${index}' title="Click for additional detections" class='material-icons-two-tone rotate pointer ${hideAlternates}'>sync</span></td>
             <td class='specFeature'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
             <td><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:"nocturnal flight call"' target="xc">
                 <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
-            <td class='specFeature download'><span class='material-icons-two-tone pointer'>file_download</span></td>
+            <td class='delete'><span class='material-icons-two-tone pointer'>delete_forever</span></td>
             <td class="comment text-end">${comment}</td>
         </tr>`;
-        if (result.score2 > 0.2) {
+
+        if (!hideAlternates) {
             tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" id='subrow${index}' class='subrow d-none'>
                 <th scope='row'>${index}</th>
                 <td class="timestamp ${showTimeOfDay}"> </td>
@@ -2468,7 +2450,7 @@ async function renderResult(args) {
                 <td> </td>
                 <td> </td>
                </tr>`;
-            if (result.score3 > 0.2) {
+            if (result.score3 > subRowThreshold) {
                 tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" id='subsubrow${index}' class='subrow d-none'>
                     <th scope='row'>${index}</th>
                     <td class='timestamp ${showTimeOfDay}'> </td>
@@ -2486,18 +2468,23 @@ async function renderResult(args) {
             }
         }
     }
-    resultTable.append(tr)
-    // if (!resetResults) {
-    //     const tableRows = document.querySelectorAll('#results > tbody > tr');
-    //     scrollResults(tableRows[tableRows.length - 1])
-    // }
-    // Show the alternate detections toggle:
-    if (result.score2 > 0.2) {
-        const id = `id${index}`;
-        document.getElementById(id).classList.remove('d-none')
-    }
-    if (!config.spectrogram) $('.specFeature').hide();
+
+    updateResultTable(tr, isFromCache);
 }
+
+let resultsBuffer;
+const updateResultTable = (row, isFromCache) => {
+    if (isFromCache) {
+        if (!resultsBuffer) resultsBuffer = resultTable.cloneNode();
+        resultsBuffer.lastElementChild ? resultsBuffer.lastElementChild.insertAdjacentHTML('afterend', row) :
+            resultsBuffer.innerHTML = row;
+    } else {
+        resultTable.lastElementChild ? resultTable.lastElementChild.insertAdjacentHTML('afterend', row) :
+            resultTable.innerHTML = row;
+        if (!config.spectrogram) $('.specFeature').hide();
+    }
+}
+
 
 // Comment handling
 
@@ -2539,7 +2526,7 @@ function commentHandler(e) {
         worker.postMessage({
             action: 'update-record',
             openFiles: fileList,
-            currentFile: currentFile,
+            currentFile: file,
             start: start,
             from: species,
             what: 'comment',
@@ -2593,12 +2580,12 @@ const squishTable = () => {
 }
 
 summaryButton.addEventListener('click', (e) => {
-    if (summaryButton.innerText.indexOf('Show') !== -1) {
+    if (summaryDiv.classList.contains('d-none')) {
         summaryButton.innerText = 'Hide Summary';
-        stretchTable()
+        squishTable()
     } else {
         summaryButton.innerText = 'Show Summary';
-        squishTable()
+        stretchTable()
     }
     if (e.isTrusted) {
         summaryTable.animate({width: 'toggle'})
@@ -2607,11 +2594,24 @@ summaryButton.addEventListener('click', (e) => {
     }
 });
 
-$(document).on('click', '.download', function (e) {
-    mode = 'save';
-    setClickedIndex(e);
-    sendFile(mode, predictions[clickedIndex])
+$(document).on('click', '.delete', function (e) {
     e.stopImmediatePropagation();
+    setClickedIndex(e);
+    const [file, start, , currentRow] = unpackNameAttr(e.target);
+    // Since we'll remove the active row, find the next row for the UI to focus
+    let nextResultNumber = parseInt(currentRow.id.replace('result', '')) + 1;
+    const nextResult = document.getElementById('result' + (nextResultNumber).toString())
+    const [nextFile, nextStart, ,] = unpackNameAttr(nextResult);
+    const context = isExplore() ? 'explore' : 'results';
+    const species = isSpeciesViewFiltered(true);
+    worker.postMessage({
+        action: 'delete',
+        active: {file: file, position: start},
+        next: {file: nextFile, position: nextStart},
+        species: species,
+        files: analyseList || fileList,
+        context: context
+    })
 });
 
 
@@ -2695,6 +2695,7 @@ const iconDict = {
     low: '<span class="confidence material-icons-two-tone score text-danger border border-2 border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
     medium: '<span class="confidence material-icons-two-tone score text-warning border border-2 border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
     high: '<span class="confidence material-icons-two-tone score text-success border border-2 border-secondary rounded" title="--%">signal_cellular_alt</span>',
+    confirmed: '<span class="confidence material-icons-two-tone score text-success border border-2 border-secondary rounded" title="confirmed">done</span>',
 }
 
 function iconizeScore(score) {
@@ -2702,7 +2703,8 @@ function iconizeScore(score) {
     if (parseFloat(score) < 0.5) return iconDict['guess'].replace('--', tooltip)
     else if (parseFloat(score) < 0.65) return iconDict['low'].replace('--', tooltip)
     else if (parseFloat(score) < 0.85) return iconDict['medium'].replace('--', tooltip)
-    else return iconDict['high'].replace('--', tooltip)
+    else if (parseFloat(score) <= 1.0) return iconDict['high'].replace('--', tooltip)
+    else return iconDict['confirmed']
 }
 
 // File menu handling
@@ -2756,6 +2758,10 @@ nocmigButton.addEventListener('click', function () {
         config.nocmig = true;
         nocmigButton.innerText = 'bedtime';
     }
+    worker.postMessage({
+        action: 'set-variables',
+        nocmig: config.nocmig,
+    });
     updatePrefs();
 })
 
@@ -2842,8 +2848,9 @@ document.addEventListener('drop', async (event) => {
         //console.log(f)
         filelist.push(f.path);
     }
-    if (filelist.length) await onOpenFiles({filePaths: filelist})
+    if (filelist.length) openFiles({filePaths: filelist})
 });
+
 
 // Prevent drag for UI elements
 bodyElement.on('dragstart', e => {
@@ -2852,7 +2859,6 @@ bodyElement.on('dragstart', e => {
 
 
 ////////// Date Picker ///////////////
-
 
 $(function () {
     const start = moment();
@@ -2885,11 +2891,21 @@ $(function () {
             $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
             const dateRange = {start: picker.startDate._d.getTime(), end: picker.endDate._d.getTime()};
             if (worker) {
-                if (this.id === 'chartRange' && chartSpecies) {
-                    t0 = Date.now();
-                    worker.postMessage({action: 'chart', species: chartSpecies, range: dateRange});
-                } else if (this.id === 'exploreRange' && exploreSpecies) {
-                    worker.postMessage({action: 'explore', species: exploreSpecies, range: dateRange});
+                // Update the seen species list
+                worker.postMessage({action: 'get-detected-species-list', range: dateRange});
+                if (this.id === 'chartRange') {
+                    chartRange = dateRange;
+                    if (chartSpecies) {
+                        t0 = Date.now();
+                        worker.postMessage({action: 'chart', species: chartSpecies, range: dateRange});
+                    }
+                } else if (this.id === 'exploreRange') {
+                    exploreRange = dateRange;
+                    if (exploreSpecies) worker.postMessage({
+                        action: 'explore',
+                        species: exploreSpecies,
+                        range: dateRange
+                    });
                 }
             }
         });
@@ -2897,6 +2913,8 @@ $(function () {
         $(this).on('cancel.daterangepicker', function () {
             $(this).children('span').html('Apply a date filter');
             if (worker) {
+                // Update the seen species list
+                worker.postMessage({action: 'get-detected-species-list'});
                 if (this.id === 'chartRange') {
                     if (chartSpecies) {
                         t0 = Date.now();
