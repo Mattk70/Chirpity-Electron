@@ -3,7 +3,8 @@ const fs = require("fs");
 const path = require('path');
 const settings = require('electron-settings');
 const p = require("path");
-
+const {readdir, lstat} = require('node:fs/promises');
+const { shell } = require('systeminformation');
 //require('update-electron-app')();
 global.sharedObject = {prop1: process.argv};
 let files = [];
@@ -32,8 +33,7 @@ let files = [];
 process.stdin.resume();//so the program will not close instantly
 
 
-
-const clearCache =  (file_cache) => {
+const clearCache = (file_cache) => {
     return new Promise((resolve) => {
         // clear & recreate file cache folder
         fs.rmSync(file_cache, {recursive: true, force: true});
@@ -48,13 +48,11 @@ async function exitHandler(options, exitCode) {
         const tmp_folder = path.join(app.getPath('temp'), 'chirpity');
         // size of cache
         const stat = fs.statSync(tmp_folder);
-        console.log('size of cache: ' + stat.size)
-        console.table(stat)
         await clearCache(tmp_folder);
         console.log('cleaned ' + tmp_folder)
     } else {
         console.log('no clean')
-        console.table(options)
+
     }
     if (exitCode || exitCode === 0) console.log(exitCode);
     if (options.exit) process.exit();
@@ -245,9 +243,11 @@ app.whenReady().then(async () => {
     })
 
 
-    mainWindow.webContents.on('new-window', function (e, url) {
-        e.preventDefault();
-        require('electron').shell.openExternal(url); // .then(r => console.log(r));
+    mainWindow.webContents.setWindowOpenHandler(({url, frameName}) => {
+        require('electron').shell.openExternal(url)
+        return {
+            action: 'deny',
+        }
     });
 
     workerWindow.webContents.on('render-process-gone', (e, details) => {
@@ -320,13 +320,17 @@ ipcMain.handle('dialog', (event, method, params) => {
     dialog[method](mainWindow, params);
 });
 
-ipcMain.handle('openFiles', async () => {
+ipcMain.handle('openFiles', async (config) => {
     // Show file dialog to select audio file
     return await dialog.showOpenDialog(mainWindow, {
         filters: [{
             name: 'Audio Files',
             extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus']
         }],
+        // From docs:
+        // Note: On Windows and Linux an open dialog can not be both a file selector and a directory selector,
+        // so if you set properties to ['openFile', 'openDirectory'] on these platforms,
+        // a directory selector will be shown.
         properties: ['openFile', 'multiSelections']
     });
 })
