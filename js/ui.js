@@ -1354,6 +1354,10 @@ function sendFeedback(file, cname, sname) {
     sendFile('incorrect', predictions[clickedIndex]);
 }
 
+function getSpecies(e){
+    let species = e.target.closest('tr');
+    return species.querySelector('.cname ul').firstElementChild.firstChild.nodeValue.trim();
+}
 
 function updateLabel(e) {
     e.stopImmediatePropagation();
@@ -1364,11 +1368,11 @@ function updateLabel(e) {
     let label = e.target.innerText.replace('Remove Label', '');
     // update the clicked badge
     const parent = e.target.parentNode;
-    let species = e.target.closest('tr');
-    species = species.querySelector('.cname').innerHTML
+    const species = getSpecies(e)
     // Extract species cname - urgh
-    species = species.replace(/^\s*<[^>]+>/m, '')
-    species = species.replace(/^(.*)\s<.*\s*/m, "$1");
+    // species =
+    // species = species.replace(/^\s*<[^>]+>/m, '')
+    // species = species.replace(/^(.*)\s<.*\s*/m, "$1");
 
     parent.innerHTML = tags[label];
     // Update the label record(s) in the db
@@ -2501,8 +2505,7 @@ function commentHandler(e) {
         let species;
         if (exploreMode) {
             // Format species before we replace the target node
-            species = e.target.closest('tr');
-            species = species.querySelector('.cname').innerHTML.replace(/(.*)\s<.*/, "$1");
+            species = getSpecies(e)
         } else {
             species = '';
         }

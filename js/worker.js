@@ -196,8 +196,8 @@ const clearCache = async (fileCache, sizeLimitInGB, message) => {
                 const stat = fs.lstatSync(proxy);
                 // Remove tmp file from metadata
                 fs.rmSync(proxy, {force: true});
-                // Unset the proxy field in metadata
-                metadata[file].proxy = undefined;
+                // Delete the metadata
+                delete metadata[file];
                 console.log(`removed ${file} from cache`);
                 size -= stat.size;
             }
