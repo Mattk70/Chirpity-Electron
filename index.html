@@ -104,7 +104,7 @@
                                         </a>
                                     </li>
                                     <li>
-                                        <hr class="dropdown-divider"></hr>
+                                        <hr class="dropdown-divider">
                                     </li>
                                     <li>
                                         <a href="#" class="dropdown-item" data-bs-toggle="dropdown"
@@ -214,6 +214,12 @@
                                                        name="batch" value="32">
                                                 <label class="form-check-label"
                                                        for="32">32</label>
+                                            </li>
+                                            <li class="form-check">
+                                                <input type="radio" class="form-check-input" id="48"
+                                                       name="batch" value="64">
+                                                <label class="form-check-label"
+                                                       for="48">48</label>
                                             </li>
                                             <li class="form-check">
                                                 <input type="radio" class="form-check-input" id="64"
@@ -369,7 +375,8 @@
     <div class="w-100 d-none" id="spectrogramWrapper">
         <div>
             <div class="bg-dark border border-secondary w-100" id="timeline"></div>
-            <div class="w-100" id="spectrogram"></div>
+            <div class="w-100" id="spectrogram">                    <span style="max-width: 70px" title="Toggle Fullscreen mode" id="fullscreen"
+                          class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">fullscreen</span></div>
             <div class="w-100" id="waveform"></div>
         </div>
         <!-- Controls view -->
@@ -418,8 +425,6 @@
                     <span style="max-width: 70px" title="Toggle Nocmig mode&#10;(Only analyse detections at night)"
                           id="nocmigMode"
                           class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">bedtime</span>
-                    <span style="max-width: 70px" title="Toggle Fullscreen mode" id="fullscreen"
-                          class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">fullscreen</span>
                 </div>
             </div>
         </div>
@@ -440,20 +445,15 @@
                 </nav>
                 <table id='results' class="text-center table table-hover w-100">
                     <thead id="resultsHead">
-                    <tr>
+                    <tr class="bg-dark">
                         <th class="col">#</th>
                         <th class="col timestamp">Time</th>
                         <th class="text-start">Position</th>
                         <th class="text-start">Species</th>
-                        <th class="">Label</th>
-                        <th class="col">Confidence
-                            <span id="confidenceFilter"
-                                  class="material-icons-two-tone text-secondary align-bottom pointer">filter_list</span>
-                        </th>
-                        <th class="col">Other IDs</th>
                         <th class="col specFeature">Play</th>
                         <th class="col">XC</th>
                         <th class="col">Delete</th>
+                        <th class="">Label</th>
                         <th class="col text-end">Notes</th>
                     </tr>
                     </thead>

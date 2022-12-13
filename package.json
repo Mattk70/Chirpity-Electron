@@ -100,7 +100,7 @@
       ]
     },
     "linux": {
-      "icon": "./img/icon/icon.png",
+      "icon": "./packages/img/icon/icon.icns",
       "target": [
         "AppImage"
       ],
@@ -111,8 +111,7 @@
         "!node_modules/ffprobe-static-electron/bin/linux/ia32${/*}",
         "!node_modules/ffprobe-static-electron/bin/win${/*}",
         "!node_modules/ffprobe-static-electron/bin/mac${/*}"
-      ],
-      "icon": "./packages/img/icon/icon.icns"
+      ]
     },
     "win": {
       "asar": true,
@@ -144,29 +143,29 @@
   },
   "homepage": "https://github.com/mattk70/Chirpity-Electron#readme",
   "devDependencies": {
-    "electron": "^21.1.0",
+    "electron": "^21.3.1",
     "electron-builder": "^23.6.0",
     "electron-wix-msi": "^4.0.0"
   },
   "dependencies": {
-    "electron-settings": "^4.0.2",
+    "@popperjs/core": "^2.9.2",
     "@tensorflow/tfjs": "3.18.0",
     "bootstrap": "^5.2.2",
     "browser-id3-writer": "^4.4.0",
     "colormap": "^2.3.2",
+    "electron-settings": "^4.0.2",
+    "fast-png": "^6.1.0",
+    "ffmpeg-static-electron": "^2.0.3",
+    "fluent-ffmpeg": "^2.1.2",
     "jquery": "^3.6.0",
     "lamejstmp": "latest",
-    "@popperjs/core": "^2.9.2",
     "seedrandom": "^3.0.5",
+    "sqlite3": "^5.0.8",
     "suncalc2": "^1.8.1",
     "systeminformation": "^5.12.6",
-    "uuid": "^8.3.2",
-    "wavesurfer.js": "^6.3.0",
-    "wavefile-reader": "^1.1.1",
-    "sqlite3": "^5.0.8",
-    "fluent-ffmpeg": "^2.1.2",
     "utimes": "5.1.1",
-    "fast-png": "^6.1.0",
-    "ffmpeg-static-electron": "^2.0.3"
+    "uuid": "^8.3.2",
+    "wavefile-reader": "^1.1.1",
+    "wavesurfer.js": "^6.3.0"
   }
 }

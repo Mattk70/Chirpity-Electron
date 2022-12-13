@@ -4,6 +4,7 @@ const path = require('path');
 const settings = require('electron-settings');
 const p = require("path");
 const {readdir, lstat} = require('node:fs/promises');
+const { shell } = require('systeminformation');
 //require('update-electron-app')();
 global.sharedObject = {prop1: process.argv};
 let files = [];
@@ -242,9 +243,11 @@ app.whenReady().then(async () => {
     })
 
 
-    mainWindow.webContents.on('new-window', function (e, url) {
-        e.preventDefault();
-        require('electron').shell.openExternal(url); // .then(r => console.log(r));
+    mainWindow.webContents.setWindowOpenHandler(({url, frameName}) => {
+        require('electron').shell.openExternal(url)
+        return {
+            action: 'deny',
+        }
     });
 
     workerWindow.webContents.on('render-process-gone', (e, details) => {
