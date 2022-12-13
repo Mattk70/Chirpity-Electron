@@ -1,6 +1,8 @@
 let firstDawn, dawn, dusk, seenTheDarkness = false, shownDaylightBanner = false;
 let labels = [];
 
+const STATE = {}
+
 // Get the modules loaded in preload.js
 const fs = window.module.fs;
 const colormap = window.module.colormap;
@@ -68,18 +70,18 @@ let fileStart, bufferStartTime, fileEnd;
 
 let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
 // set up some DOM element caches
-let bodyElement = $('body');
+const bodyElement = $('body');
 let spectrogramWrapper = $('#spectrogramWrapper'), specElement, waveElement, specCanvasElement, specWaveElement;
 let waveCanvasElement, waveWaveElement,
     resultTableElement = $('#resultTableContainer'), dummyElement;
 resultTableElement.animate({scrollTop: '300px'}, 400, 'swing');
-let contentWrapperElement = $('#contentWrapper');
-let completeDiv = $('#complete');
+const contentWrapperElement = $('#contentWrapper');
+const completeDiv = $('#complete');
 let resultTable = document.getElementById('resultTableBody');
 const nocmigButton = document.getElementById('nocmigMode');
 const summaryTable = $('#summaryTable');
-let progressDiv = $('#progressDiv');
-let progressBar = $('.progress .progress-bar');
+const progressDiv = $('#progressDiv');
+const progressBar = $('.progress .progress-bar');
 const fileNumber = document.getElementById('fileNumber');
 const timeOfDay = document.getElementById('timeOfDay');
 const timecode = document.getElementById('timecode');
@@ -387,10 +389,10 @@ function updateFileName(files, openfile) {
     let appendStr;
     if (files.length > 1) {
         appendStr = `<div id="fileContainer" class="btn-group dropup">
-        <button type="button" class="btn btn-secondary" id="dropdownMenuButton"><span id="setFileStart" title="Amend recording start time"
+        <button type="button" class="btn btn-dark" id="dropdownMenuButton"><span id="setFileStart" title="Amend recording start time"
                   class="material-icons-two-tone align-bottom pointer">edit_calendar</span> ${label}
         </button>
-        <button class="btn btn-secondary dropdown-toggle dropdown-toggle-split" type="button" 
+        <button class="btn btn-dark dropdown-toggle dropdown-toggle-split" type="button" 
                 data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
             <span class="visually-hidden">Toggle Dropdown</span>
         </button>
@@ -405,7 +407,7 @@ function updateFileName(files, openfile) {
         appendStr += `</div></div>`;
     } else {
         appendStr = `<div id="fileContainer">
-        <button class="btn btn-secondary" type="button" id="dropdownMenuButton">
+        <button class="btn btn-dark" type="button" id="dropdownMenuButton">
         <span id="setFileStart" title="Amend recording start time"
                   class="material-icons-two-tone align-bottom pointer">edit_calendar</span> ${label}
         </button></div>`;
@@ -512,8 +514,6 @@ function isEmptyObject(obj) {
 }
 
 function refreshResultsView() {
-    // // Only do this if the results are hidden...
-    // if (resultTableElement.hasClass('d-none')) {
     hideAll();
     if (fileLoaded) {
         showElement(['spectrogramWrapper'], false);
@@ -524,7 +524,6 @@ function refreshResultsView() {
         showElement(['loadFileHint', 'loadFileHintText'], true);
     }
     adjustSpecDims(true);
-    // }
 }
 
 const navbarAnalysis = document.getElementById('navbarAnalysis');
@@ -534,14 +533,12 @@ navbarAnalysis.addEventListener('click', async () => {
 });
 
 const analyseLink = document.getElementById('analyse');
-//speciesExclude = document.querySelectorAll('speciesExclude');
 analyseLink.addEventListener('click', async () => {
     analyseList = [currentFile];
     postAnalyseMessage({confidence: config.minConfidence, resetResults: true, currentFile: currentFile});
 });
 
 const reanalyseLink = document.getElementById('reanalyse');
-//speciesExclude = document.querySelectorAll('speciesExclude');
 reanalyseLink.addEventListener('click', async () => {
     analyseList = [currentFile];
     postAnalyseMessage({
@@ -566,7 +563,7 @@ reanalyseAllLink.addEventListener('click', async () => {
 
 const analyseSelectionLink = document.getElementById('analyseSelection');
 analyseSelectionLink.addEventListener('click', async () => {
-    analyseList = [currentFile];
+    analyseList = undefined; // [currentFile];
     let start = region.start + bufferBegin;
     let end = region.end + bufferBegin;
     if (end - start < 0.5) {
@@ -681,15 +678,13 @@ exploreLink.addEventListener('click', async () => {
 
 const datasetLink = document.getElementById('dataset');
 datasetLink.addEventListener('click', async () => {
-    const dataset_results = Object.values(predictions);
-    worker.postMessage({action: 'create-dataset', results: dataset_results});
-    //worker.postMessage({action: 'create-dataset', fileList: fileList});
+    worker.postMessage({action: 'create-dataset'});
 });
 
 const thresholdLink = document.getElementById('threshold');
 thresholdLink.addEventListener('blur', (e) => {
-    const threshold = e.target.value
-    if (100 >= threshold && threshold >= 0) {
+    const threshold = e.target.value;
+    if (100 >= threshold && threshold > 0) {
         config.minConfidence = parseFloat(e.target.value) / 100;
         updatePrefs();
         worker.postMessage({
@@ -717,11 +712,22 @@ function createRegion(start, end, label) {
     wavesurfer.seekAndCenter(progress);
 }
 
+// We add the handler to the whole table as the body gets replaced and the handlers on it would be wiped
 const results = document.getElementById('results');
 results.addEventListener('click', function (e) {
 
-    const row = e.target.closest('tr');
-    if (row && !row.classList.contains('bg-dark')) { // That'd be the daylight banner...
+    let row = e.target.closest('tr');
+
+    if (!row || row.classList.length === 0){ // 1. clicked and dragged, 2 no detections in file row
+        return
+    }
+    // Search for the top-row
+
+    while (!row.classList.contains('top-row')){
+        row = row.previousElementSibling
+        if (!row) return;
+    }
+    if (row && !row.classList.contains('bg-dark')) { // That'd be header or the daylight banner...
         if (activeRow) {
             activeRow.classList.remove('table-active')
         }
@@ -1132,17 +1138,23 @@ const setUpWorkerMessaging = () => {
 
 function generateBirdList(store, rows) {
     let listHTML;
+
     if (store === 'allSpecies') {
+        const excluded = ['Human', 'Vehicle', 'Animal', 'Ambient Noise'];
+        const lastSelectedSpecies = STATE['lastSelectedSpecies'];
+        const remember = lastSelectedSpecies && excluded.indexOf(lastSelectedSpecies) === -1 ?
+            `<li><a href="#">${lastSelectedSpecies}</a></li>` : '';
         listHTML = `
             <div class="bird-list all"><div class="rounded-border"><ul>
+            ${remember}
             <li><a href="#">Animal</a></li>
             <li><a href="#">Ambient Noise</a></li>
             <li><a href="#">Human</a></li>
             <li><a href="#">Vehicle</a></li>`;
-        const excluded = new Set(['Human', 'Vehicle', 'Animal', 'Ambient Noise']);
+
         for (const item in labels) {
             const [sname, cname] = labels[item].split('_');
-            if (!excluded.has(cname)) {
+            if (excluded.indexOf(cname) === -1 && cname.indexOf(lastSelectedSpecies) === -1 ) {
                 listHTML += `<li><a href="#">${cname} - ${sname}</a></li>`;
             }
         }
@@ -1158,8 +1170,6 @@ function generateBirdList(store, rows) {
 }
 
 // Search list handlers
-const fullListStore = document.getElementById('allSpecies');
-const seenListStore = document.getElementById('seenSpecies');
 
 $(document).on('focus', '.input', function () {
     document.removeEventListener('keydown', handleKeyDownDeBounce, true);
@@ -1189,8 +1199,13 @@ $(document).on('blur', '.input', function (e) {
 function hideBirdList(el) {
     const list = el.closest('.species-selector').querySelector('.bird-list');
     if (el.id === 'edit') {
-        const cname = el.closest('.cname')
-        if (cname) cname.innerHTML = restoreSpecies;
+        const cname = el.closest('.cname');
+        if (cname) {
+            const row = cname.closest('tr');
+            const restore = row.querySelector('.restore');
+            cname.replaceWith(restore);
+            restore.classList.remove('restore', 'd-none');
+        }
     } else {
         list.remove();
     }
@@ -1205,14 +1220,17 @@ resultTableElement.on('contextmenu', '.edit, .cname', editID);
 function editID(e) {
     setClickedIndex(e);
     const currentRow = e.target.closest('tr');
+    let restore = currentRow.querySelector('.cname').cloneNode(true);
+    restore.classList.add('restore', 'd-none');
+    currentRow.appendChild(restore);
     let cname = currentRow.querySelector('.cname span') || currentRow.querySelector('.cname');
     // save the original cell contents in case edit is aborted or doesn't change species
     restoreSpecies = cname.innerHTML;
     // save the original species to use in batch edit search
     const speciesTextContainer = cname.querySelector('span.pointer') || cname;
     currentID = speciesTextContainer.innerHTML;
-
-    cname.innerHTML = `<div id='edit' class="species-selector"><input type="text" class="input rounded-pill" id="editInput" 
+    generateBirdList('allSpecies');
+    cname.innerHTML = `<div id='edit' class="species-selector"><input type="text" class="input" id="editInput" 
                     placeholder="Search for a species..."><div class="editing bird-list-wrapper"></div></div>`;
 
     document.getElementById('editInput').focus();
@@ -1225,7 +1243,7 @@ $('.species-selector > input').on('focus', function () {
 })
 
 // Bird list filtering
-$(document).on('keypress', '.input:not(.form-control)', filterList);
+$(document).on('keyup', '.input:not(.form-control)', filterList);
 
 function filterList(e) {
     const input = e.target;
@@ -1271,9 +1289,9 @@ $(document).on('click', '.bird-list', function (e) {
         let [cname, sname] = species.split(' - ');
         // Handle animal, vehicle, etc.
         if (!sname) sname = cname;
+        STATE['lastSelectedSpecies'] = `${cname}`;
         const cnameCell = this.closest('.cname');
-        // Move the bird list back to its parking spot before updating the cname cell
-        //hideBirdList(container) <- remove as this will fire on blur event
+
         editResultID(cname, sname, cnameCell);
     }
 
@@ -1380,6 +1398,7 @@ function updateLabel(e) {
             from: species,
             what: 'label',
             value: label,
+            isFiltered: isSpeciesViewFiltered(),
             isBatch: true,
             isExplore: exploreMode
         });
@@ -2014,8 +2033,6 @@ function displayWarmUpMessage() {
 function onModelReady(args) {
     modelReady = true;
     labels = args.labels;
-    // Put the bird list in its parking lot
-    generateBirdList('allSpecies');
     warmupText.classList.add('d-none');
     if (workerHasLoadedFile) {
         enableMenuItem(['analyse', 'reanalyse'])
@@ -2125,10 +2142,10 @@ const updateSummary = ({
                        }) => {
     let summaryHTML = `<table id="resultSummary" class="table table-striped table-dark table-hover p-1"><thead>
             <tr>
-                <th class="">Max</th>
-                <th scope="col">Species</th>
-                <th scope="col" class="text-end">Count</th>
-                <th class="text-end">Label</th>
+                <th class="col-3" scope="col">Max</th>
+                <th class="col-5" scope="col">Species</th>
+                <th class="col-1" scope="col" class="text-end">Count</th>
+                <th class="col-3 text-end" scope="col">Label</th>
             </tr>
             </thead><tbody>`;
 
@@ -2219,19 +2236,17 @@ async function onPredictionDone({
     if (summaryDiv.classList.contains('d-none')) {
         summaryButton.click();
     }
-    // Get rid of lingering regions
-    if (wavesurfer) wavesurfer.clearRegions();
     if (activeRow) {
         // Refresh node and scroll to active row:
         activeRow = document.getElementById(activeRow.id)
         if (activeRow) { // because: after an edit the active row may not exist
             activeRow.focus()
             activeRow.click()
-        } else { // in which case...go to the last table row
+        } else { // in which case...go to the first table row
             const rows = document.getElementById('resultTableBody').querySelectorAll('.top-row')
             if (rows.length) {
-                const lastRow = rows[rows.length - 1];
-                lastRow.focus();
+                const firstRow = rows[0];
+                firstRow.focus();
             }
         }
     } else {
@@ -2293,7 +2308,8 @@ const addPagination = (total, offset) => {
 
 const setFilterHandlers = () => {
     let filterMode = null;
-    $(resultTableElement).on('click', '#confidenceFilter', function (e) {
+    $(resultTableElement).on('mousedown', '#confidenceFilter', function (e) {
+        e.stopImmediatePropagation();
         if (!filterMode) {
             filterMode = 'guess';
             $('.score.text-secondary').closest('.top-row').hide();
@@ -2314,17 +2330,19 @@ const setFilterHandlers = () => {
             e.target.classList.remove('text-success');
             e.target.classList.add('text-secondary')
         }
-        e.stopImmediatePropagation();
     });
     $(document).on('click', '.speciesFilter', function (e) {
         // Prevent crazy double firing of handler
         e.stopImmediatePropagation();
         // Species filtering in Explore is meaningless...
         if (isExplore()) return
+        // There won't be a target if the input box is clicked rather than the list
+        if (e.target.tagName === 'INPUT') return;
+
         activeRow = undefined;
         // Am I trying to unfilter?
         const target = this.querySelector('span.pointer').classList;
-        // There won't be a target if the input box is clicked rather than the list
+
         if (target.contains('text-warning')) {
             // Clicked on filtered species icon
             worker.postMessage({action: 'filter', files: fileList});
@@ -2424,49 +2442,20 @@ async function renderResult(args) {
             <th scope='row'>${index}</th>
             <td class='text-start text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-end">${UI_position}</td>
-            <td name="${result.cname}" class='text-start cname'>${result.cname} <br/><i>${result.sname}</i></td>
-            <td class="label">${label}</td>
-            <td>${iconizeScore(result.score)}</td>
-            <td><span id='id${index}' title="Click for additional detections" class='material-icons-two-tone rotate pointer ${hideAlternates}'>sync</span></td>
+            <td name="${result.cname}" class='text-start cname'>
+                <ul>
+                    <li>${result.cname} ${iconizeScore(result.score)}
+                    <li>${result.cname2} ${iconizeScore(result.score2)}
+                    <li>${result.cname3} ${iconizeScore(result.score3)}
+                </ul>
+            </td>
             <td class='specFeature'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
             <td><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:"nocturnal flight call"' target="xc">
                 <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
             <td class='delete'><span class='material-icons-two-tone pointer'>delete_forever</span></td>
+            <td class="label">${label}</td>
             <td class="comment text-end">${comment}</td>
         </tr>`;
-
-        if (!hideAlternates) {
-            tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" id='subrow${index}' class='subrow d-none'>
-                <th scope='row'>${index}</th>
-                <td class="timestamp ${showTimeOfDay}"> </td>
-                <td> </td>
-                <td class='cname2 text-start'>${result.cname2} <i>${result.sname2}</i></td>
-                <td></td>                    
-                <td>${iconizeScore(result.score2)}</td>
-                <td> </td>
-                <td class='specFeature'> </td>
-                <td><a href='https://xeno-canto.org/explore?query=${result.sname2}%20type:"nocturnal flight call"' target=\"_blank\">
-                    <img src='img/logo/XC.png' alt='Search ${result.cname2} on Xeno Canto' title='${result.cname2} NFCs on Xeno Canto'></a> </td>
-                <td> </td>
-                <td> </td>
-               </tr>`;
-            if (result.score3 > subRowThreshold) {
-                tr += `<tr name="${file}|${start}|${end}|${result.cname}${confidence}" id='subsubrow${index}' class='subrow d-none'>
-                    <th scope='row'>${index}</th>
-                    <td class='timestamp ${showTimeOfDay}'> </td>
-                    <td> </td>
-                    <td class='cname3 text-start'>${result.cname3} <i>${result.sname3}</i></td>
-                    <td></td>
-                    <td>${iconizeScore(result.score3)}</td>
-                    <td> </td>
-                    <td class='specFeature'> </td>
-                    <td><a href='https://xeno-canto.org/explore?query=${result.sname3}%20type:"nocturnal flight call"' target=\"_blank\">
-                        <img src='img/logo/XC.png' alt='Search ${result.cname3} on Xeno Canto' title='${result.cname3} NFCs on Xeno Canto'></a> </td>
-                    <td> </td>
-                    <td> </td>
-                   </tr>`;
-            }
-        }
     }
 
     updateResultTable(tr, isFromCache);
@@ -2594,14 +2583,16 @@ summaryButton.addEventListener('click', (e) => {
     }
 });
 
-$(document).on('click', '.delete', function (e) {
+$(document).on('mousedown', '.delete', function (e) {
     e.stopImmediatePropagation();
     setClickedIndex(e);
+    wavesurfer.clearRegions();
     const [file, start, , currentRow] = unpackNameAttr(e.target);
     // Since we'll remove the active row, find the next row for the UI to focus
     let nextResultNumber = parseInt(currentRow.id.replace('result', '')) + 1;
     const nextResult = document.getElementById('result' + (nextResultNumber).toString())
-    const [nextFile, nextStart, ,] = unpackNameAttr(nextResult);
+    let nextFile, nextStart;
+    if (nextResult) [nextFile, nextStart, ,] = unpackNameAttr(nextResult);
     const context = isExplore() ? 'explore' : 'results';
     const species = isSpeciesViewFiltered(true);
     worker.postMessage({
@@ -2616,6 +2607,7 @@ $(document).on('click', '.delete', function (e) {
 
 
 $(document).on('click', '.rotate', function (e) {
+    e.target.classList.contains('down') ? e.target.classList.remove('down') : e.target.classList.add('down');
     const row1 = e.target.parentNode.parentNode.nextSibling;
     const row2 = row1.nextSibling;
     row1.classList.toggle('d-none')
@@ -2690,20 +2682,28 @@ function sendFile(mode, result) {
 }
 
 // create a dict mapping score to icon
+// const iconDict = {
+//     guess: '<span class="confidence material-icons-two-tone text-secondary score border border-2 border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
+//     low: '<span class="confidence material-icons-two-tone score text-danger border border-2 border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
+//     medium: '<span class="confidence material-icons-two-tone score text-warning border border-2 border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
+//     high: '<span class="confidence material-icons-two-tone score text-success border border-2 border-secondary rounded" title="--%">signal_cellular_alt</span>',
+//     confirmed: '<span class="confidence material-icons-two-tone score text-success border border-2 border-secondary rounded" title="confirmed">done</span>',
+// }
+
 const iconDict = {
-    guess: '<span class="confidence material-icons-two-tone text-secondary score border border-2 border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
-    low: '<span class="confidence material-icons-two-tone score text-danger border border-2 border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
-    medium: '<span class="confidence material-icons-two-tone score text-warning border border-2 border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
-    high: '<span class="confidence material-icons-two-tone score text-success border border-2 border-secondary rounded" title="--%">signal_cellular_alt</span>',
-    confirmed: '<span class="confidence material-icons-two-tone score text-success border border-2 border-secondary rounded" title="confirmed">done</span>',
+    guess: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: grey">--%</span></span>',
+    low: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: rgba(255,0,0,0.5)">--%</span></span>',
+    medium: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #fd7e14">--%</span></span>',
+    high: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #198754">--%</span></span>',
+    confirmed: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: 100%; background: #198754"><span class="material-icons-two-tone">done</span></span></span>',
 }
 
 function iconizeScore(score) {
     const tooltip = (parseFloat(score) * 100).toFixed(0).toString()
-    if (parseFloat(score) < 0.5) return iconDict['guess'].replace('--', tooltip)
-    else if (parseFloat(score) < 0.65) return iconDict['low'].replace('--', tooltip)
-    else if (parseFloat(score) < 0.85) return iconDict['medium'].replace('--', tooltip)
-    else if (parseFloat(score) <= 1.0) return iconDict['high'].replace('--', tooltip)
+    if (parseFloat(score) < 0.5) return iconDict['guess'].replaceAll('--', tooltip)
+    else if (parseFloat(score) < 0.65) return iconDict['low'].replaceAll('--', tooltip)
+    else if (parseFloat(score) < 0.85) return iconDict['medium'].replaceAll('--', tooltip)
+    else if (parseFloat(score) <= 1.0) return iconDict['high'].replaceAll('--', tooltip)
     else return iconDict['confirmed']
 }
 

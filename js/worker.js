@@ -266,8 +266,7 @@ ipcRenderer.on('new-client', (event) => {
             case 'file-load-request':
                 index = 0;
                 if (predicting) onAbort(args);
-                // Create a new memory db
-                await createDB();
+
                 STATE['db'] = memoryDB;
                 console.log('Worker received audio ' + args.file);
                 predictionsRequested = 0;
@@ -289,6 +288,8 @@ ipcRenderer.on('new-client', (event) => {
                 await getSummary(args);
                 break;
             case 'analyse':
+                // Create a new memory db unless we're looking at a selection
+                if (!args.end) await createDB();
                 predictionsReceived = 0;
                 predictionsRequested = 0;
                 await onAnalyse(args);
@@ -1023,8 +1024,9 @@ async function saveMP3(file, start, end, filename, metadata) {
 /// Workers  From the MDN example
 function spawnWorker(model, list, batchSize, warmup) {
     predictWorker = new Worker('./js/model.js');
-    const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
-    //const modelPath = model === 'efficientnet' ? '../test_SF_XTNRTOPY__MOVEING_AVG_EfficientNetB3300x300_Data_Adam_482/' : '../24000_v9/';
+    //const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
+    //const modelPath = model === 'efficientnet' ? '../test_24000_v10/' : '../24000_v9/';
+    const modelPath = model === 'efficientnet' ? '../test_2022128_EfficientNetB3_wd=10xlr_sigmoid_focal_crossentropy_256x384_AdamW_447/' : '../24000_v9/';
     console.log(modelPath);
     // Now we've loaded a new model, clear the aborted flag
     aborted = false;
@@ -1048,7 +1050,7 @@ const parsePredictions = async (response) => {
         const position = parseFloat(prediction[0]);
         UI.postMessage({event: 'progress', progress: (position / metadata[file].duration), file: file});
         //console.log('Prediction received from worker', result);
-        if (prediction[1].score > minConfidence) {
+        if (!prediction[1].suppressed && prediction[1].score > minConfidence) {
             const result = prediction[1];
             const audacity = prediction[2];
             index++;
@@ -1239,7 +1241,7 @@ const setWhereWhen = ({dateRange, species, files, context}) => {
         where = 'WHERE files.name IN  (';
         // Format the file list
         files.forEach(file => {
-            file = file.replaceAll("'", "''");
+            file = prepSQL(file);
             where += `'${file}',`
         })
         // remove last comma
@@ -1247,7 +1249,7 @@ const setWhereWhen = ({dateRange, species, files, context}) => {
         where += ')';
     }
     const cname = context !== 'summary' ? 's1.cname' : 'cname';
-    if (species) where += `${files.length ? ' AND ' : ' WHERE '} ${cname} =  '${species.replaceAll("'", "''")}'`;
+    if (species) where += `${files.length ? ' AND ' : ' WHERE '} ${cname} =  '${prepSQL(species)}'`;
     const when = dateRange && dateRange.start ? `AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
     return [where, when]
 }
@@ -1366,6 +1368,7 @@ const getResults = async ({
             }
         }, async (err, count) => {   //on finish
             if (err) console.log(err);
+            if (!count && species) await getResults({files: files, range: range, context:context, limit: limit, offset: offset} )
             return resolve(offset)
         })
     })
@@ -1408,11 +1411,8 @@ const onSave2DiskDB = async () => {
     t0 = Date.now();
     memoryDB.runAsync('BEGIN');
     const files = await memoryDB.allAsync('SELECT * FROM files');
-    const filesSQL = files.map(file => `'${prepSQL(file)}'`).toString();
-    let response = await memoryDB.runAsync(`INSERT
-    OR IGNORE INTO disk.files VALUES (
-    ${filesSQL}
-    )`);
+    const filesSQL = files.map(file => `('${prepSQL(file.name)}', ${file.duration}, ${file.filestart})`).toString();
+    let response = await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.files VALUES ${filesSQL}`);
     console.log(response.changes + ' files added to disk database')
     // Update the duration table
     response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.duration SELECT * FROM duration');
@@ -1421,9 +1421,11 @@ const onSave2DiskDB = async () => {
     console.log(response.changes + ' records added to disk database')
     memoryDB.runAsync('END');
     // Clear and relaunch the memory DB
-    memoryDB.close(); // is this necessary??
+    //memoryDB.close(); // is this necessary??
     await createDB();
     files.forEach(file => STATE.saved.add(file));
+    // Now we have saved the records, set state to DiskDB
+    STATE.db = diskDB;
     UI.postMessage({
         event: 'generate-alert',
         message: `Database update complete, ${response.changes} records added to the archive in ${((Date.now() - t0) / 1000)} seconds`
@@ -1608,7 +1610,7 @@ async function onDelete({active, next, species, context = 'results'}) {
                                            WHERE name = '${file}'`);
     const datetime = filestart + (parseFloat(position) * 1000);
     await db.runAsync('DELETE FROM records WHERE datetime = ' + datetime);
-    arguments[0].active = next;
+    if (next.position) arguments[0].active = next;
     await getResults(arguments[0]);
     await getSummary(arguments[0]);
 }
@@ -1646,7 +1648,7 @@ async function onUpdateRecord({
         //Batch update
         whereSQL = `WHERE birdID1 = (SELECT id FROM species WHERE cname = '${from}') `;
         if (openFiles.length) {
-            whereSQL += `AND fileID IN (SELECT rowid from files WHERE name in (${filesSQL})`;
+            whereSQL += `AND fileID IN (SELECT rowid from files WHERE name in (${filesSQL}))`;
         }
     } else {
         // Sanitize input: start is passed to the function in float seconds,
@@ -1657,9 +1659,9 @@ async function onUpdateRecord({
     }
     const t0 = Date.now();
     const {changes} = await db.runAsync(`UPDATE records
-                                   SET ${whatSQL} ${whereSQL}`);
+                                         SET ${whatSQL} ${whereSQL}`);
     if (changes) {
-        console.log(`Updated ${changes} records for ${what} in ${db.filename.replace(/.*\//, '')} database, setting them to ${value}`);
+        console.log(`Updated ${changes} records for ${what} in ${db.filename.replace(/.*\//, '')} database, setting it to ${value}`);
         console.log(`Update without transaction took ${Date.now() - t0} milliseconds`);
         const species = isFiltered || isExplore ? from : '';
         if (isExplore) openFiles = [];
@@ -1673,28 +1675,20 @@ async function onUpdateRecord({
         await getSummary({db: db, files: openFiles, species: species, explore: isExplore});
         // Update the species list
         await getSpecies(db, range);
+        if (db === memoryDB) {
+            UI.postMessage({
+                event: 'generate-alert', message: 'Remember to save your records to store this change'
+            })
+        }
     } else {
         console.log(`No records updated in ${db.filename.replace(/.*\//, '')}`)
-    }
-    // Do we need to update diskDB too?
-    const rows = await diskDB.allAsync(`SELECT rowid
-                                        FROM files
-                                        WHERE name IN (${filesSQL})`);
-    if (rows.length) {
-        const {changes} = await diskDB.runAsync(`UPDATE records
-                                                 SET ${whatSQL} ${whereSQL}`);
-        console.log(`Updated ${changes} records for ${what} in ${diskDB.filename.replace(/.*\//, '')} database, setting it to ${value}`);
-    } else {
-        UI.postMessage({
-            event: 'generate-alert', message: 'Remember to save your records to store this change'
-        })
     }
 }
 
 async function onChartRequest(args) {
     console.log(`Getting chart for ${args.species} starting ${args.range[0]}`);
     // Escape apostrophes
-    if (args.species) args.species = args.species.replace("'", "''");
+    if (args.species) args.species = prepSQL(args.species);
     const dateRange = args.range;
     const dataRecords = {}, results = {};
     t0 = Date.now();
@@ -1777,10 +1771,10 @@ const db2ResultSQL = 'SELECT dateTime AS timestamp, position AS position, s1.cna
 
 /*
 Todo: bugs
-    Crash on abort - no crash now, but predictions resume
+    ***Crash on abort - no crash now, but predictions resume
     ***when analysing second batch of results, the first results linger.
     Confidence filter not honoured on refresh results
-    Table does not  expand to fit when operation aborted
+    ***Table does not  expand to fit when operation aborted
     ***when current model list differs from the one used when saving records, getResults gives wrong species
         -solved as in there are separate databases now, so results cached in the db for another model wont register.
     when nocmig mode on, getResults for daytime files prints no results, but summary printed. No warning given.
