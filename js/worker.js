@@ -64,6 +64,7 @@ const setState = () => {
         activeTimestamp: undefined, // Active Timestamp from most recent selection ID / active row
         globalOffset: 0, // Current start number for unfiltered results
         filteredOffset: {} // Current species start number for filtered results
+
     }
 }
 setState();
@@ -1261,7 +1262,7 @@ const getSummary = async ({
                               files = [],
                               species = undefined,
                               explore = false,
-                              activeID = undefined,
+                              active = undefined,
                           } = {}) => {
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
     let [where, when] = setWhereWhen({
@@ -1294,7 +1295,7 @@ const getSummary = async ({
         offset: offset,
         audacityLabels: AUDACITY,
         filterSpecies: species,
-        activeID: activeID,
+        active: active,
         batchInProgress: false,
     })
 }
@@ -1313,10 +1314,10 @@ const dbSpeciesCheck = async () => {
 const getResults = async ({
                               db = STATE.db,
                               range = undefined,
+                              order = 'timestamp',
                               files = [],
                               species = undefined,
                               context = 'results',
-                              active = undefined,
                               limit = 500,
                               offset = undefined
                           }) => {
@@ -1340,15 +1341,11 @@ const getResults = async ({
     let index = offset;
     return new Promise(function (resolve, reject) {
         // db.each doesn't call the callback if there are no results, so:
-        db.each(`${db2ResultSQL} ${where} ${when} ORDER BY timestamp LIMIT ${limit} OFFSET ${offset}`, (err, result) => {
+        db.each(`${db2ResultSQL} ${where} ${when} ORDER BY ${order} LIMIT ${limit} OFFSET ${offset}`, (err, result) => {
             if (err) {
                 reject(err)
             } else { // on each result
                 index++;
-                // Active row from analyse selection
-                if (result.timestamp === STATE.activeTimestamp) result['active'] = true;
-                // Active row from update record
-                if (active && active.position === result.position && active.file === result.file) result['active'] = true;
                 UI.postMessage({
                     event: 'prediction-ongoing',
                     file: result.file,
@@ -1368,7 +1365,13 @@ const getResults = async ({
             }
         }, async (err, count) => {   //on finish
             if (err) console.log(err);
-            if (!count && species) await getResults({files: files, range: range, context:context, limit: limit, offset: offset} )
+            if (!count && species) await getResults({
+                files: files,
+                range: range,
+                context: context,
+                limit: limit,
+                offset: offset
+            })
             return resolve(offset)
         })
     })
@@ -1412,7 +1415,9 @@ const onSave2DiskDB = async () => {
     memoryDB.runAsync('BEGIN');
     const files = await memoryDB.allAsync('SELECT * FROM files');
     const filesSQL = files.map(file => `('${prepSQL(file.name)}', ${file.duration}, ${file.filestart})`).toString();
-    let response = await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.files VALUES ${filesSQL}`);
+    let response = await memoryDB.runAsync(`INSERT
+    OR IGNORE INTO disk.files VALUES
+    ${filesSQL}`);
     console.log(response.changes + ' files added to disk database')
     // Update the duration table
     response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.duration SELECT * FROM duration');
@@ -1564,10 +1569,12 @@ const getRate = (species) => {
 }
 
 const getSpecies = (db, range) => {
-    const where = Object.keys(range).length ? `WHERE dateTime BETWEEN ${range.start} AND ${range.end}` : '';
-    db.all(`SELECT DISTINCT cname, sname
+    const where = range && range.start ? `WHERE dateTime BETWEEN ${range.start} AND ${range.end}` : '';
+    db.all(`SELECT DISTINCT cname, sname, COUNT(cname) as count
             FROM records
-                     INNER JOIN species ON birdid1 = id ${where}
+                INNER JOIN species
+            ON birdid1 = id ${where}
+            GROUP BY cname
             ORDER BY cname`, (err, rows) => {
         if (err) console.log(err); else {
             UI.postMessage({event: 'seen-species-list', list: rows})
@@ -1600,17 +1607,16 @@ const onUpdateFileStart = async (args) => {
     console.log(`Changed ${result.changes} records associated with  ${file}`);
 }
 
-const prepSQL = (string) => string.replaceAll("'", "''");
+const prepSQL = (string) => string.replaceAll("''", "'").replaceAll("'", "''");
 
-async function onDelete({active, next, species, context = 'results'}) {
-    const db = STATE.db, position = active.position;
-    const file = prepSQL(active.file);
+async function onDelete({start, active, file, species, context = 'results'}) {
+    const db = STATE.db;
+    file = prepSQL(file);
     const {filestart} = await db.getAsync(`SELECT filestart
                                            from files
                                            WHERE name = '${file}'`);
-    const datetime = filestart + (parseFloat(position) * 1000);
+    const datetime = filestart + (parseFloat(start) * 1000);
     await db.runAsync('DELETE FROM records WHERE datetime = ' + datetime);
-    if (next.position) arguments[0].active = next;
     await getResults(arguments[0]);
     await getSummary(arguments[0]);
 }
@@ -1624,10 +1630,11 @@ async function onUpdateRecord({
                                   isBatch = false,
                                   from = '',
                                   what = 'birdID1',
-                                  isReset = false,
+                                  order = 'timestamp',
                                   isFiltered = false,
                                   isExplore = false,
-                                  range = {}
+                                  range = {},
+                                  active = undefined
                               }) {
     // Construct the SQL
     let whatSQL = '', whereSQL = '';
@@ -1670,9 +1677,9 @@ async function onUpdateRecord({
             files: openFiles,
             species: species,
             explore: isExplore,
-            active: {file: currentFile, position: start}
+            order: order
         });
-        await getSummary({db: db, files: openFiles, species: species, explore: isExplore});
+        await getSummary({db: db, files: openFiles, species: species, explore: isExplore, active: active});
         // Update the species list
         await getSpecies(db, range);
         if (db === memoryDB) {

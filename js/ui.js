@@ -1,7 +1,16 @@
 let firstDawn, dawn, dusk, seenTheDarkness = false, shownDaylightBanner = false;
 let labels = [];
 
-const STATE = {}
+const STATE = {
+    chart: {
+        species: undefined,
+        range: {start: undefined, end: undefined}},
+    explore: {
+        species: undefined,
+        order: 'timestamp',
+        range: {start: undefined, end: undefined}},
+    birdList: {lastSelectedSpecies: undefined}
+}
 
 // Get the modules loaded in preload.js
 const fs = window.module.fs;
@@ -657,19 +666,19 @@ save2dbLink.addEventListener('click', async () => {
     worker.postMessage({action: 'save2db'})
 });
 
-let chartRange = {}
+
 const chartsLink = document.getElementById('charts');
 chartsLink.addEventListener('click', async () => {
-    worker.postMessage({action: 'get-detected-species-list', range: chartRange});
+    worker.postMessage({action: 'get-detected-species-list', range: STATE.chart.range});
     hideAll();
     showElement(['recordsContainer']);
-    worker.postMessage({action: 'chart', species: undefined, range: {}});
+    worker.postMessage({action: 'chart', species: undefined, range: {start: undefined, end: undefined}});
 });
 
-let exploreRange = {};
+
 const exploreLink = document.getElementById('explore');
 exploreLink.addEventListener('click', async () => {
-    worker.postMessage({action: 'get-detected-species-list', range: exploreRange});
+    worker.postMessage({action: 'get-detected-species-list', range: STATE.explore.range});
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
     hideElement(['completeDiv']);
@@ -718,12 +727,12 @@ results.addEventListener('click', function (e) {
 
     let row = e.target.closest('tr');
 
-    if (!row || row.classList.length === 0){ // 1. clicked and dragged, 2 no detections in file row
+    if (!row || row.classList.length === 0) { // 1. clicked and dragged, 2 no detections in file row
         return
     }
     // Search for the top-row
 
-    while (!row.classList.contains('top-row')){
+    while (!row.classList.contains('top-row')) {
         row = row.previousElementSibling
         if (!row) return;
     }
@@ -1141,7 +1150,7 @@ function generateBirdList(store, rows) {
 
     if (store === 'allSpecies') {
         const excluded = ['Human', 'Vehicle', 'Animal', 'Ambient Noise'];
-        const lastSelectedSpecies = STATE['lastSelectedSpecies'];
+        const lastSelectedSpecies = STATE.birdList.lastSelectedSpecies;
         const remember = lastSelectedSpecies && excluded.indexOf(lastSelectedSpecies) === -1 ?
             `<li><a href="#">${lastSelectedSpecies}</a></li>` : '';
         listHTML = `
@@ -1154,14 +1163,14 @@ function generateBirdList(store, rows) {
 
         for (const item in labels) {
             const [sname, cname] = labels[item].split('_');
-            if (excluded.indexOf(cname) === -1 && cname.indexOf(lastSelectedSpecies) === -1 ) {
+            if (excluded.indexOf(cname) === -1 && cname.indexOf(lastSelectedSpecies) === -1) {
                 listHTML += `<li><a href="#">${cname} - ${sname}</a></li>`;
             }
         }
     } else {
         listHTML = '<div class="bird-list seen"><div class="rounded-border"><ul class="request-bird">';
         for (const item in rows) {
-            listHTML += `<li><a href="#">${rows[item].cname} - ${rows[item].sname}</a></li>`;
+            listHTML += `<li><a href="#">${rows[item].cname} - ${rows[item].sname} (${rows[item].count})</a></li>`;
         }
     }
     const parking = document.getElementById(store);
@@ -1183,6 +1192,8 @@ $(document).on('focus', '.input', function () {
             theList = document.querySelector('#seenSpecies .bird-list')
         }
         if (theList) container.appendChild(theList.cloneNode(true));
+        theList = container.querySelector('.bird-list');
+        theList.addEventListener('click', editHandler);
     }
     if (this.id === "speciesSearch") hideElement(['dataRecords']);
 
@@ -1211,11 +1222,9 @@ function hideBirdList(el) {
     }
 }
 
-let restoreSpecies, currentID;
+let restoreSpecies;
 
 resultTableElement.on('contextmenu', '.edit, .cname', editID);
-
-//$(document).on('click', '.cname', editID);
 
 function editID(e) {
     setClickedIndex(e);
@@ -1223,12 +1232,10 @@ function editID(e) {
     let restore = currentRow.querySelector('.cname').cloneNode(true);
     restore.classList.add('restore', 'd-none');
     currentRow.appendChild(restore);
-    let cname = currentRow.querySelector('.cname span') || currentRow.querySelector('.cname');
+    let cname = currentRow.querySelector('.cname');
     // save the original cell contents in case edit is aborted or doesn't change species
-    restoreSpecies = cname.innerHTML;
+    restoreSpecies = restore;
     // save the original species to use in batch edit search
-    const speciesTextContainer = cname.querySelector('span.pointer') || cname;
-    currentID = speciesTextContainer.innerHTML;
     generateBirdList('allSpecies');
     cname.innerHTML = `<div id='edit' class="species-selector"><input type="text" class="input" id="editInput" 
                     placeholder="Search for a species..."><div class="editing bird-list-wrapper"></div></div>`;
@@ -1265,7 +1272,6 @@ function filterList(e) {
 }
 
 let t0;
-let chartSpecies, exploreSpecies;
 
 function formatInputText(species) {
     species = formatSpeciesName(species);
@@ -1277,26 +1283,28 @@ function formatInputText(species) {
 }
 
 
-$(document).on('click', '.bird-list', function (e) {
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    const [speciesLabel,] = formatInputText(e.target.innerText)
-    const input = this.closest('.species-selector').querySelector('input');
-    input.value = speciesLabel;
+//document.addEventListener('click', '.bird-list', function (e) {
+function editHandler(e) {
     const container = this.closest('.species-selector').querySelector('.bird-list-wrapper');
     if (container.classList.contains('editing')) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        const [speciesLabel,] = formatInputText(e.target.innerText)
+        const input = this.closest('.species-selector').querySelector('input');
+        input.value = speciesLabel;
         let species = e.target.innerText;
         let [cname, sname] = species.split(' - ');
         // Handle animal, vehicle, etc.
         if (!sname) sname = cname;
-        STATE['lastSelectedSpecies'] = `${cname}`;
+        STATE.birdList.lastSelectedSpecies = cname;
         const cnameCell = this.closest('.cname');
-
         editResultID(cname, sname, cnameCell);
     }
-
-})
-
+}
+const getActiveRow = () => {
+    const activeRow = document.querySelector('.table-active');
+    return activeRow ? activeRow.id : undefined;
+}
 
 const isSpeciesViewFiltered = (sendSpecies) => {
     const filtered = document.querySelector('.speciesFilter span.text-warning');
@@ -1308,8 +1316,11 @@ const isSpeciesViewFiltered = (sendSpecies) => {
 function editResultID(cname, sname, cell) {
     const exploreMode = isExplore();
     // Make sure we update the restore species
-    //restoreSpecies = cell.innerHTML;
-    let from = restoreSpecies.replace(/(.*)\s<.*/, "$1");
+    //restoreSpecies = cell;
+    let from;
+    restoreSpecies.querySelector('ul') ?
+        from = restoreSpecies.querySelector('ul').firstElementChild.firstChild.nodeValue.trim() :
+        from = restoreSpecies.firstElementChild.innerHTML.replace(/(.*)\s<.*/, "$1");
     // Are we batch editing here?
     const batch = cell.closest('table').id !== 'results';
     let start, files = fileList, file;
@@ -1319,8 +1330,9 @@ function editResultID(cname, sname, cell) {
     } else {
         if (exploreMode) files = [];
     }
-
+    let active = getActiveRow();
     cell.innerHTML = `${cname} <br><i>${sname}</i>`;
+
     worker.postMessage({
         action: 'update-record',
         openFiles: files,
@@ -1331,8 +1343,9 @@ function editResultID(cname, sname, cell) {
         from: from,
         isBatch: batch,
         isFiltered: isSpeciesViewFiltered(),
-        isReset: true,
-        isExplore: exploreMode
+        isExplore: exploreMode,
+        order: STATE.explore.order,
+        active: active
     });
 }
 
@@ -1354,7 +1367,7 @@ function sendFeedback(file, cname, sname) {
     sendFile('incorrect', predictions[clickedIndex]);
 }
 
-function getSpecies(e){
+function getSpecies(e) {
     let species = e.target.closest('tr');
     return species.querySelector('.cname ul').firstElementChild.firstChild.nodeValue.trim();
 }
@@ -1378,6 +1391,7 @@ function updateLabel(e) {
     // Update the label record(s) in the db
     const context = parent.closest('table').id;
     let file, start;
+    let active = getActiveRow();
     if (context === 'results') {
         [file, start, ,] = unpackNameAttr(activeRow);
         worker.postMessage({
@@ -1389,8 +1403,9 @@ function updateLabel(e) {
             from: species,
             value: label,
             isFiltered: isSpeciesViewFiltered(),
-            isReset: true,
-            isExplore: exploreMode
+            isExplore: exploreMode,
+            active: active,
+            order: STATE.explore.order
         });
     } else {
         // this is the summary table and a batch update is wanted
@@ -1404,7 +1419,8 @@ function updateLabel(e) {
             value: label,
             isFiltered: isSpeciesViewFiltered(),
             isBatch: true,
-            isExplore: exploreMode
+            isExplore: exploreMode,
+            order: STATE.explore.order
         });
     }
     addEvents('label');
@@ -1433,12 +1449,12 @@ $(document).on('click', '.request-bird', function (e) {
     const context = this.closest('.bird-list-wrapper').classList[0];
     let pickerEl = context + 'Range';
     t0 = Date.now();
-    context === 'chart' ? chartSpecies = cname : exploreSpecies = cname;
+    context === 'chart' ? STATE.chart.species = cname : STATE.explore.species = cname;
     const picker = $('#' + pickerEl).data('daterangepicker');
     const start = picker.startDate._d.getTime();
     const end = picker.endDate._d.getTime();
-    const dateRange = end !== start ? {start: start, end: end} : {};
-    worker.postMessage({action: context, species: cname, range: dateRange})
+    STATE[context].range = end !== start ? {start: start, end: end} : {};
+    worker.postMessage({action: context, species: cname, range: STATE[context].range, order: STATE.explore.order })
 })
 
 
@@ -2185,7 +2201,7 @@ async function onPredictionDone({
                                     audacityLabels = {},
                                     file = undefined,
                                     summary = {},
-                                    activeID = undefined,
+                                    active = undefined,
                                     total = 0,
                                     offset = 0
                                 }) {
@@ -2203,8 +2219,6 @@ async function onPredictionDone({
         results.replaceWith(resultsBuffer);
         if (!config.spectrogram) $('.specFeature').hide();
         resultsBuffer = undefined;
-        activeRow = document.getElementsByClassName('table-active')[0];
-        if (activeRow) activeRow.click();
     }
 
     updateSummary({summary: summary, filterSpecies: filterSpecies});
@@ -2240,9 +2254,9 @@ async function onPredictionDone({
     if (summaryDiv.classList.contains('d-none')) {
         summaryButton.click();
     }
-    if (activeRow) {
+    if (active) {
         // Refresh node and scroll to active row:
-        activeRow = document.getElementById(activeRow.id)
+        activeRow = document.getElementById(active)
         if (activeRow) { // because: after an edit the active row may not exist
             activeRow.focus()
             activeRow.click()
@@ -2281,7 +2295,8 @@ pagination.forEach(item => {
                 files: fileList,
                 offset: offset,
                 limit: limit,
-                explore: isExplore()
+                explore: isExplore(),
+                order: STATE.explore.order
             });
         }
     })
@@ -2349,12 +2364,12 @@ const setFilterHandlers = () => {
 
         if (target.contains('text-warning')) {
             // Clicked on filtered species icon
-            worker.postMessage({action: 'filter', files: fileList});
+            worker.postMessage({action: 'filter', files: fileList, order: STATE.explore.order});
         } else {
             // Clicked on unfiltered species name
             const target = this.querySelector('span.pointer');
             const species = target.innerHTML.replace(/\s<.*/, '');
-            worker.postMessage({action: 'filter', species: species, files: fileList});
+            worker.postMessage({action: 'filter', species: species, files: fileList, order: STATE.explore.order});
         }
         document.getElementById('results').scrollTop = 0;
     })
@@ -2515,6 +2530,7 @@ function commentHandler(e) {
             e.target.parentNode.innerHTML = `<span title="Add a comment" class="material-icons-two-tone pointer add-comment">add_comment</span>`;
         }
         let [file, start, ,] = unpackNameAttr(activeRow);
+        let active = getActiveRow();
         worker.postMessage({
             action: 'update-record',
             openFiles: fileList,
@@ -2524,7 +2540,9 @@ function commentHandler(e) {
             what: 'comment',
             value: note,
             isFiltered: isSpeciesViewFiltered(),
-            isExplore: exploreMode
+            isExplore: exploreMode,
+            active: active,
+            order: STATE.explore.order
         });
         addEvents('comment');
         document.addEventListener('keydown', handleKeyDownDeBounce, true);
@@ -2589,22 +2607,21 @@ summaryButton.addEventListener('click', (e) => {
 $(document).on('mousedown', '.delete', function (e) {
     e.stopImmediatePropagation();
     setClickedIndex(e);
-    wavesurfer.clearRegions();
+    if (wavesurfer) wavesurfer.clearRegions();
     const [file, start, , currentRow] = unpackNameAttr(e.target);
-    // Since we'll remove the active row, find the next row for the UI to focus
-    let nextResultNumber = parseInt(currentRow.id.replace('result', '')) + 1;
-    const nextResult = document.getElementById('result' + (nextResultNumber).toString())
-    let nextFile, nextStart;
-    if (nextResult) [nextFile, nextStart, ,] = unpackNameAttr(nextResult);
     const context = isExplore() ? 'explore' : 'results';
     const species = isSpeciesViewFiltered(true);
+    let active = getActiveRow();
     worker.postMessage({
         action: 'delete',
-        active: {file: file, position: start},
-        next: {file: nextFile, position: nextStart},
+        file: file,
+        start: start,
+        active: active,
         species: species,
         files: analyseList || fileList,
-        context: context
+        context: context,
+        order: STATE.explore.order,
+        explore: isExplore()
     })
 });
 
@@ -2836,6 +2853,28 @@ for (let i = 0; i < batchRadios.length; i++) {
     })
 }
 
+// Listeners to sort results table
+const speciesSort = document.getElementById('species-sort');
+speciesSort.addEventListener('click', () => {
+    postExploreMessage('score DESC ')
+})
+
+const timeSort = document.getElementById('time-sort');
+timeSort.addEventListener('click', () => {
+    postExploreMessage('timestamp')
+})
+
+const postExploreMessage = (order) => {
+    STATE.explore.order = order;
+    if (STATE.explore.species) {
+        worker.postMessage({
+            action: 'explore',
+            species: STATE.explore.species,
+            file: currentFile,
+            order: STATE.explore.order
+        })
+    }
+}
 // Drag file to app window to open
 document.addEventListener('dragover', (event) => {
     event.preventDefault();
@@ -2897,17 +2936,18 @@ $(function () {
                 // Update the seen species list
                 worker.postMessage({action: 'get-detected-species-list', range: dateRange});
                 if (this.id === 'chartRange') {
-                    chartRange = dateRange;
-                    if (chartSpecies) {
+                    STATE.chart.range = dateRange;
+                    if (STATE.chart.species) {
                         t0 = Date.now();
-                        worker.postMessage({action: 'chart', species: chartSpecies, range: dateRange});
+                        worker.postMessage({action: 'chart', species: STATE.chart.species, range: STATE.chart.range});
                     }
                 } else if (this.id === 'exploreRange') {
-                    exploreRange = dateRange;
-                    if (exploreSpecies) worker.postMessage({
+                    STATE.explore.range = dateRange;
+                    if ( STATE.explore.species) worker.postMessage({
                         action: 'explore',
-                        species: exploreSpecies,
-                        range: dateRange
+                        species: STATE.explore.species,
+                        range: STATE.explore.range,
+                        order: STATE.explore.order
                     });
                 }
             }
@@ -2919,9 +2959,12 @@ $(function () {
                 // Update the seen species list
                 worker.postMessage({action: 'get-detected-species-list'});
                 if (this.id === 'chartRange') {
-                    if (chartSpecies) {
+                    if (STATE.chart.species) {
                         t0 = Date.now();
-                        worker.postMessage({action: 'chart', species: chartSpecies, range: {}});
+                        worker.postMessage({
+                            action: 'chart',
+                            species: STATE.chart.species,
+                            range: {start: undefined, end: undefined}});
                     }
                 }
             }
