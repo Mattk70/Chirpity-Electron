@@ -2200,7 +2200,7 @@ async function onPredictionDone({
                                     batchInProgress = false,
                                     audacityLabels = {},
                                     file = undefined,
-                                    summary = {},
+                                    summary = [],
                                     active = undefined,
                                     total = 0,
                                     offset = 0
@@ -2621,7 +2621,8 @@ $(document).on('mousedown', '.delete', function (e) {
         files: analyseList || fileList,
         context: context,
         order: STATE.explore.order,
-        explore: isExplore()
+        explore: isExplore(),
+        range: STATE.explore.range
     })
 });
 

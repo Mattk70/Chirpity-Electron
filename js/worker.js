@@ -1609,7 +1609,7 @@ const onUpdateFileStart = async (args) => {
 
 const prepSQL = (string) => string.replaceAll("''", "'").replaceAll("'", "''");
 
-async function onDelete({start, active, file, species, context = 'results'}) {
+async function onDelete({file, start, active, species, files, context = 'results', order, explore, range}) {
     const db = STATE.db;
     file = prepSQL(file);
     const {filestart} = await db.getAsync(`SELECT filestart
@@ -1619,6 +1619,7 @@ async function onDelete({start, active, file, species, context = 'results'}) {
     await db.runAsync('DELETE FROM records WHERE datetime = ' + datetime);
     await getResults(arguments[0]);
     await getSummary(arguments[0]);
+    await getSpecies(db, range);
 }
 
 async function onUpdateRecord({
@@ -1639,7 +1640,7 @@ async function onUpdateRecord({
     // Construct the SQL
     let whatSQL = '', whereSQL = '';
     value = prepSQL(value);
-    from = prepSQL(from);
+    let fromSQL = prepSQL(from);
     currentFile = prepSQL(currentFile);
     if (what === 'ID' || what === 'birdID1') {
         // Map the field name to the one in the database
@@ -1653,7 +1654,7 @@ async function onUpdateRecord({
     const filesSQL = openFiles.map(file => `'${prepSQL(file)}'`).toString();
     if (isBatch) {
         //Batch update
-        whereSQL = `WHERE birdID1 = (SELECT id FROM species WHERE cname = '${from}') `;
+        whereSQL = `WHERE birdID1 = (SELECT id FROM species WHERE cname = '${fromSQL}') `;
         if (openFiles.length) {
             whereSQL += `AND fileID IN (SELECT rowid from files WHERE name in (${filesSQL}))`;
         }
