@@ -69,8 +69,6 @@ span[id^="filename_"] {
 }
 
 .rotate {
-    -moz-transition: all 0.2s linear;
-    -webkit-transition: all 0.2s linear;
     transition: all 0.2s linear;
     cursor: pointer;
 }
@@ -88,6 +86,11 @@ span[id^="filename_"] {
     cursor: pointer;
 }
 
+.delete:hover {
+    color: red;
+    font-size: 36px;
+    transition: all 0.3s ease-in-out;
+}
 #controlsWrapper .row, #transport-controls {
     min-width: 850px;
     white-space: nowrap;

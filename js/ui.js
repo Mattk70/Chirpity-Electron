@@ -4,11 +4,13 @@ let labels = [];
 const STATE = {
     chart: {
         species: undefined,
-        range: {start: undefined, end: undefined}},
+        range: {start: undefined, end: undefined}
+    },
     explore: {
         species: undefined,
         order: 'timestamp',
-        range: {start: undefined, end: undefined}},
+        range: {start: undefined, end: undefined}
+    },
     birdList: {lastSelectedSpecies: undefined}
 }
 
@@ -268,7 +270,7 @@ function initWavesurfer(args) {
     if (args.reset) {
         // Show spec and timecode containers
         hideAll();
-        showElement(['spectrogramWrapper'], false);
+        showElement(['spectrogramWrapper', 'fullscreen'], false);
     }
     if (wavesurfer) {
         wavesurfer.pause();
@@ -309,7 +311,7 @@ function initWavesurfer(args) {
     // Set click event that removes all regions
     waveElement.mousedown(function () {
         wavesurfer.clearRegions();
-        region = false;
+        region = undefined;
         disableMenuItem(['analyseSelection', 'exportMP3']);
         if (workerHasLoadedFile) enableMenuItem(['analyse']);
     });
@@ -336,6 +338,13 @@ function initWavesurfer(args) {
             wavesurfer.play()
         }
     });
+    // Double buffer the next audio window
+    // todo: try promises for the buffer.  requesting the new buffer while
+    // the current buffer is playing causes a pause in playback
+    wavesurfer.on('audioprocess', () => {
+    })
+
+
     // Show controls
     showElement(['controlsWrapper']);
     updateElementCache();
@@ -462,7 +471,7 @@ const openFiles = ({filePaths}) => {
 
 async function onOpenFiles(args) {
     hideAll();
-    showElement(['spectrogramWrapper'], false)
+    showElement(['spectrogramWrapper', 'fullscreen'], false);
     resetResults(args);
     completeDiv.hide();
     // Store the file list and Load First audio file
@@ -525,7 +534,7 @@ function isEmptyObject(obj) {
 function refreshResultsView() {
     hideAll();
     if (fileLoaded) {
-        showElement(['spectrogramWrapper'], false);
+        showElement(['spectrogramWrapper', 'fullscreen'], false);
         if (!isEmptyObject(predictions)) {
             showElement(['resultTableContainer'], false);
         }
@@ -634,15 +643,24 @@ function disableMenuItem(id_list) {
     })
 }
 
+
+function setHeight(el, val) {
+    if (typeof val === 'function') val = val();
+    if (typeof val === 'string') el.style.height = val;
+    else el.style.height = val + 'px';
+}
+
 function showElement(id_list, makeFlex = true, empty = false) {
     id_list.forEach(id => {
-        const thisElement = $('#' + id);
+        //const thisElement = $('#' + id);
+        const thisElement = document.getElementById(id);
         //thisElement.show();
-        thisElement.removeClass('d-none');
-        if (makeFlex) thisElement.addClass('d-flex');
+        //thisElement.removeClass('d-none');
+        thisElement.classList.remove('d-none');
+        if (makeFlex) thisElement.classList.add('d-flex');
         if (empty) {
-            thisElement.height(0);
-            thisElement.empty()
+            setHeight(thisElement, 0);
+            thisElement.replaceChildren(); // empty
         }
     })
 }
@@ -658,7 +676,7 @@ function hideElement(id_list) {
 function hideAll() {
     // File hint div,  Waveform, timeline and spec, controls and result table
     hideElement(['loadFileHint', 'loadFileHintText', 'loadFileHintSpinner', 'exploreWrapper',
-        'spectrogramWrapper', 'resultTableContainer', 'recordsContainer']);
+        'spectrogramWrapper', 'resultTableContainer', 'recordsContainer', 'fullscreen']);
 }
 
 const save2dbLink = document.getElementById('save2db');
@@ -680,7 +698,7 @@ const exploreLink = document.getElementById('explore');
 exploreLink.addEventListener('click', async () => {
     worker.postMessage({action: 'get-detected-species-list', range: STATE.explore.range});
     hideAll();
-    showElement(['exploreWrapper', 'spectrogramWrapper'], false);
+    showElement(['exploreWrapper', 'spectrogramWrapper', 'fullscreen'], false);
     hideElement(['completeDiv']);
     adjustSpecDims(true);
 });
@@ -764,7 +782,7 @@ function loadResultRegion(paramlist) {
 
     bufferBegin = Math.max(0, start - (windowLength / 2) + 1.5)
     if (!wavesurfer) {
-        spectrogramWrapper.removeClass('d-none');
+        hideElement(['spectrogramWrapper', 'fullscreen']);
         adjustSpecDims(true)
     }
     worker.postMessage({
@@ -1060,7 +1078,7 @@ window.onload = async () => {
 
             thresholdLink.value = config.minConfidence * 100;
 
-            showElement([config.colormap + 'span'], true)
+            showElement([config.colormap], true)
             t0_warmup = Date.now();
             worker.postMessage({
                 action: 'set-variables',
@@ -1301,6 +1319,7 @@ function editHandler(e) {
         editResultID(cname, sname, cnameCell);
     }
 }
+
 const getActiveRow = () => {
     const activeRow = document.querySelector('.table-active');
     return activeRow ? activeRow.id : undefined;
@@ -1368,8 +1387,9 @@ function sendFeedback(file, cname, sname) {
 }
 
 function getSpecies(e) {
-    let species = e.target.closest('tr');
-    return species.querySelector('.cname ul').firstElementChild.firstChild.nodeValue.trim();
+    const row = e.target.closest('tr');
+    const speciesCell = row.querySelector('.cname ul') || row.querySelector('.cname');
+    return speciesCell.firstElementChild.firstChild.nodeValue.trim();
 }
 
 function updateLabel(e) {
@@ -1382,11 +1402,6 @@ function updateLabel(e) {
     // update the clicked badge
     const parent = e.target.parentNode;
     const species = getSpecies(e)
-    // Extract species cname - urgh
-    // species =
-    // species = species.replace(/^\s*<[^>]+>/m, '')
-    // species = species.replace(/^(.*)\s<.*\s*/m, "$1");
-
     parent.innerHTML = tags[label];
     // Update the label record(s) in the db
     const context = parent.closest('table').id;
@@ -1429,7 +1444,7 @@ function updateLabel(e) {
 function addEvents(element) {
     $(document).on('mouseenter', '.' + element, function () {
 
-        $(this).children(`span.add-${element}`).removeClass("d-none");
+        $(this).children(`span.add-${element}`).removeClass("invisible");
     })
 
     $(document).on('mouseleave', '.' + element, function (e) {
@@ -1438,7 +1453,7 @@ function addEvents(element) {
         if (hasElement) return;
 
         this.innerHTML = element === 'comment' ?
-            `<span title="Add a ${element}" class="material-icons-two-tone pointer add-${element} d-none">add_${element}</span>` :
+            `<span title="Add a ${element}" class="material-icons-two-tone pointer add-${element} invisible">add_${element}</span>` :
             tags['Remove Label'];
     })
 }
@@ -1454,7 +1469,7 @@ $(document).on('click', '.request-bird', function (e) {
     const start = picker.startDate._d.getTime();
     const end = picker.endDate._d.getTime();
     STATE[context].range = end !== start ? {start: start, end: end} : {};
-    worker.postMessage({action: context, species: cname, range: STATE[context].range, order: STATE.explore.order })
+    worker.postMessage({action: context, species: cname, range: STATE[context].range, order: STATE.explore.order})
 })
 
 
@@ -1726,7 +1741,7 @@ function enableKeyDownEvent() {
 ///////////// Nav bar Option handlers //////////////
 
 function initSpectrogram(height, fftSamples) {
-    showElement(['spectrogramWrapper'], false);
+    showElement(['spectrogramWrapper', 'fullscreen'], false);
     if (!fftSamples) {
         if (windowLength < 5) {
             fftSamples = 256;
@@ -1941,7 +1956,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         const skip = windowLength / 100;
         if (wavesurfer) {
             wavesurfer.skipForward(skip);
-            const position = wavesurfer.getCurrentTime() / windowLength;
+            const position = Math.max(wavesurfer.getCurrentTime() / windowLength, 1);
             if (wavesurfer.getCurrentTime() > windowLength - skip) {
                 bufferBegin = Math.min(currentFileDuration - windowLength, bufferBegin += skip)
                 worker.postMessage({
@@ -2082,13 +2097,18 @@ function onModelReady(args) {
 // })
 
 async function onWorkerLoadedAudio(args) {
+    if (args.doubleBuffer) {
+        workerHasLoadedFile = true;
+        console.log('received next buffer')
+        return
+    }
     if (args.preserveResults) completeDiv.hide();
     console.log('UI received worker-loaded-audio: ' + args.file)
     currentBuffer = new AudioBuffer({length: args.length, numberOfChannels: 1, sampleRate: 24000});
     currentBuffer.copyToChannel(args.contents, 0);
     // Show the current file name in the UI
     updateFileName(fileList, args.file);
-    workerHasLoadedFile = true;
+
     currentFile = args.file;
     bufferBegin = args.bufferBegin;
     currentFileDuration = args.sourceDuration;
@@ -2154,8 +2174,6 @@ function onProgress(args) {
     if (parseFloat(progress) === 100.0) progressDiv.hide();
 }
 
-
-// todo: stop flickering
 const updateSummary = ({
                            summary = [],
                            filterSpecies = ''
@@ -2369,6 +2387,7 @@ const setFilterHandlers = () => {
             // Clicked on unfiltered species name
             const target = this.querySelector('span.pointer');
             const species = target.innerHTML.replace(/\s<.*/, '');
+            STATE.explore.species = species;
             worker.postMessage({action: 'filter', species: species, files: fileList, order: STATE.explore.order});
         }
         document.getElementById('results').scrollTop = 0;
@@ -2438,7 +2457,7 @@ async function renderResult(args) {
         const start = result.start, end = result.end;
         const comment = result.comment ?
             `<span title="${result.comment}" class='material-icons-two-tone pointer edit-comment'>comment</span>` :
-            "<span title='Add a comment' class='material-icons-two-tone pointer d-none add-comment'>add_comment</span>";
+            "<span title='Add a comment' class='material-icons-two-tone pointer invisible add-comment'>add_comment</span>";
         let confidence = '';
         if (result.score < 0.65) {
             confidence = '&#63;';
@@ -2471,7 +2490,7 @@ async function renderResult(args) {
             <td class='specFeature'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
             <td><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:"nocturnal flight call"' target="xc">
                 <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
-            <td class='delete'><span class='material-icons-two-tone pointer'>delete_forever</span></td>
+            <td><span class='delete material-icons-two-tone pointer'>delete_forever</span></td>
             <td class="label">${label}</td>
             <td class="comment text-end">${comment}</td>
         </tr>`;
@@ -2567,7 +2586,7 @@ const tags = {
     Local: '<span class="badge bg-success rounded-pill edit-label pointer">Local</span>',
     Nocmig: '<span class="badge bg-dark rounded-pill edit-label pointer">Nocmig</span>',
     // If remove label is clicked, we want to replace with *add* label
-    'Remove Label': '<span class="badge rounded-pill bg-secondary add-label pointer d-none">Add Label</span>'
+    'Remove Label': '<span class="badge rounded-pill bg-secondary add-label pointer invisible">Add Label</span>'
 }
 
 // Results event handlers
@@ -2604,37 +2623,30 @@ summaryButton.addEventListener('click', (e) => {
     }
 });
 
-$(document).on('mousedown', '.delete', function (e) {
-    e.stopImmediatePropagation();
-    setClickedIndex(e);
-    if (wavesurfer) wavesurfer.clearRegions();
-    const [file, start, , currentRow] = unpackNameAttr(e.target);
-    const context = isExplore() ? 'explore' : 'results';
-    const species = isSpeciesViewFiltered(true);
-    let active = getActiveRow();
-    worker.postMessage({
-        action: 'delete',
-        file: file,
-        start: start,
-        active: active,
-        species: species,
-        files: analyseList || fileList,
-        context: context,
-        order: STATE.explore.order,
-        explore: isExplore(),
-        range: STATE.explore.range
-    })
+$(document).on('click', '.delete', function (e) {
+    if (confirm("Delete record?")) {
+        e.stopImmediatePropagation();
+        if (wavesurfer) wavesurfer.clearRegions();
+        region = undefined;
+        setClickedIndex(e);
+        const [file, start, , currentRow] = unpackNameAttr(e.target);
+        const context = isExplore() ? 'explore' : 'results';
+        const species = isSpeciesViewFiltered(true);
+        let active = getActiveRow();
+        worker.postMessage({
+            action: 'delete',
+            file: file,
+            start: start,
+            active: active,
+            species: species,
+            files: analyseList || fileList,
+            context: context,
+            order: STATE.explore.order,
+            explore: isExplore(),
+            range: STATE.explore.range
+        })
+    }
 });
-
-
-$(document).on('click', '.rotate', function (e) {
-    e.target.classList.contains('down') ? e.target.classList.remove('down') : e.target.classList.add('down');
-    const row1 = e.target.parentNode.parentNode.nextSibling;
-    const row2 = row1.nextSibling;
-    row1.classList.toggle('d-none')
-    if (row2 && !row2.classList.contains('top-row')) row2.classList.toggle('d-none')
-    e.stopImmediatePropagation();
-})
 
 
 function formatSpeciesName(filename) {
@@ -2940,11 +2952,15 @@ $(function () {
                     STATE.chart.range = dateRange;
                     if (STATE.chart.species) {
                         t0 = Date.now();
-                        worker.postMessage({action: 'chart', species: STATE.chart.species, range: STATE.chart.range});
+                        worker.postMessage({
+                            action: 'chart',
+                            species: STATE.chart.species,
+                            range: STATE.chart.range
+                        });
                     }
                 } else if (this.id === 'exploreRange') {
                     STATE.explore.range = dateRange;
-                    if ( STATE.explore.species) worker.postMessage({
+                    if (STATE.explore.species) worker.postMessage({
                         action: 'explore',
                         species: STATE.explore.species,
                         range: STATE.explore.range,
@@ -2965,7 +2981,8 @@ $(function () {
                         worker.postMessage({
                             action: 'chart',
                             species: STATE.chart.species,
-                            range: {start: undefined, end: undefined}});
+                            range: {start: undefined, end: undefined}
+                        });
                     }
                 }
             }
