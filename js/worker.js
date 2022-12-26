@@ -3,7 +3,7 @@ const fs = require('fs');
 const wavefileReader = require('wavefile-reader');
 const p = require('path');
 let BATCH_SIZE;
-const adding_chirpity_additions = false;
+const adding_chirpity_additions = true;
 let labels;
 const sqlite3 = require('sqlite3').verbose();
 
@@ -534,7 +534,9 @@ async function locateFile(file) {
     // Ordered from the highest likely quality to lowest
     const supported_files = ['.wav', '.flac', '.opus', '.m4a', '.mp3', '.mpga', '.ogg', '.aac', '.mpeg', '.mp4'];
     const dir = p.parse(file).dir, name = p.parse(file).name;
-    let [, folderInfo] = await dirInfo({folder: dir, recursive: false});
+    // Check folder exists before trying to traverse it. If not, return empty list
+    let [, folderInfo] = fs.existsSync(dir) ?
+        await dirInfo({folder: dir, recursive: false}) : ['', []];
     let filesInFolder = [];
     folderInfo.forEach(item => {
         filesInFolder.push(item[0])
@@ -557,7 +559,7 @@ async function locateFile(file) {
 }
 
 async function loadAudioFile({
-                                 file = '', start = 0, end = 20, position = 0, region = false
+                                 file = '', start = 0, end = 20, position = 0, region = false, doubleBuffer = false
                              }) {
     const found = await getWorkingFile(file);
     if (found) {
@@ -574,7 +576,8 @@ async function loadAudioFile({
                     position: position,
                     length: length,
                     contents: myArray,
-                    region: region
+                    region: region,
+                    doubleBuffer: doubleBuffer
                 });
             })
             .catch(e => {
@@ -899,8 +902,9 @@ const saveResults2DataSet = (rootDirectory) => {
         }
         promise = promise.then(async function (resolve) {
             if (result.score >= threshold) {
+                let end = Math.min(result.end, result.duration);
                 const AudioBuffer = await fetchAudioBuffer({
-                    start: result.start, end: result.end, file: result.file
+                    start: result.start, end: end, file: result.file
                 })
                 if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
                     const buffer = AudioBuffer.getChannelData(0);
@@ -1027,7 +1031,8 @@ function spawnWorker(model, list, batchSize, warmup) {
     predictWorker = new Worker('./js/model.js');
     //const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
     //const modelPath = model === 'efficientnet' ? '../test_24000_v10/' : '../24000_v9/';
-    const modelPath = model === 'efficientnet' ? '../test_2022128_EfficientNetB3_wd=10xlr_sigmoid_focal_crossentropy_256x384_AdamW_447/' : '../24000_v9/';
+    //const modelPath = model === 'efficientnet' ? '../test_2022128_EfficientNetB3_wd=10xlr_sigmoid_focal_crossentropy_256x384_AdamW_447/' : '../24000_v9/';
+     const modelPath = model === 'efficientnet' ? '../test_20221222_EfficientNetB3_wd=10xlr_sigmoid_focal_crossentropy_256x384_AdamW_447/' : '../24000_v9/';
     console.log(modelPath);
     // Now we've loaded a new model, clear the aborted flag
     aborted = false;
@@ -1151,7 +1156,7 @@ async function parseMessage(e) {
         if (response['finished']) {
             process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, Prediction requests ${predictionsRequested}, predictions received ${predictionsReceived}    \r`)
             if (predictionsReceived === predictionsRequested) {
-                const limit = 4;
+                const limit = 10;
                 await clearCache(CACHE_LOCATION, limit);
                 // This is the one time results *do not* come from the database
                 if (!batchInProgress) {
