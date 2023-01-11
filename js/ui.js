@@ -11,7 +11,8 @@ const STATE = {
         order: 'timestamp',
         range: {start: undefined, end: undefined}
     },
-    birdList: {lastSelectedSpecies: undefined}
+    birdList: {lastSelectedSpecies: undefined},
+    mode: 'analyse'
 }
 
 // Get the modules loaded in preload.js
@@ -193,6 +194,7 @@ async function loadAudioFile(args) {
         worker.postMessage({
             action: 'file-load-request',
             file: filePath,
+            preserveResults: args.preserveResults,
             position: 0,
             list: config.list,
             warmup: config.warmup
@@ -552,12 +554,14 @@ navbarAnalysis.addEventListener('click', async () => {
 
 const analyseLink = document.getElementById('analyse');
 analyseLink.addEventListener('click', async () => {
+    STATE.mode = 'analyse';
     analyseList = [currentFile];
     postAnalyseMessage({confidence: config.minConfidence, resetResults: true, currentFile: currentFile});
 });
 
 const reanalyseLink = document.getElementById('reanalyse');
 reanalyseLink.addEventListener('click', async () => {
+    STATE.mode = 'analyse';
     analyseList = [currentFile];
     postAnalyseMessage({
         confidence: config.minConfidence,
@@ -569,18 +573,21 @@ reanalyseLink.addEventListener('click', async () => {
 
 const analyseAllLink = document.getElementById('analyseAll');
 analyseAllLink.addEventListener('click', async () => {
+    STATE.mode = 'analyse';
     analyseList = undefined;
     postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: fileList});
 });
 
 const reanalyseAllLink = document.getElementById('reanalyseAll');
 reanalyseAllLink.addEventListener('click', async () => {
+    STATE.mode = 'analyse';
     analyseList = undefined;
     postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: fileList, reanalyse: true});
 });
 
 const analyseSelectionLink = document.getElementById('analyseSelection');
 analyseSelectionLink.addEventListener('click', async () => {
+    STATE.mode = 'analyse';
     analyseList = undefined; // [currentFile];
     let start = region.start + bufferBegin;
     let end = region.end + bufferBegin;
@@ -687,6 +694,7 @@ save2dbLink.addEventListener('click', async () => {
 
 const chartsLink = document.getElementById('charts');
 chartsLink.addEventListener('click', async () => {
+    STATE.mode = 'chart';
     worker.postMessage({action: 'get-detected-species-list', range: STATE.chart.range});
     hideAll();
     showElement(['recordsContainer']);
@@ -696,6 +704,8 @@ chartsLink.addEventListener('click', async () => {
 
 const exploreLink = document.getElementById('explore');
 exploreLink.addEventListener('click', async () => {
+    analyseList = undefined;
+    STATE.mode = 'explore';
     worker.postMessage({action: 'get-detected-species-list', range: STATE.explore.range});
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper', 'fullscreen'], false);
@@ -782,17 +792,17 @@ function loadResultRegion(paramlist) {
 
     bufferBegin = Math.max(0, start - (windowLength / 2) + 1.5)
     if (!wavesurfer) {
-        hideElement(['spectrogramWrapper', 'fullscreen']);
-        adjustSpecDims(true)
+        loadAudioFile({filePath: currentFile, preserveResults: true});
+    } else {
+        worker.postMessage({
+            action: 'update-buffer',
+            file: file,
+            position: wavesurfer.getCurrentTime() / windowLength,
+            start: bufferBegin,
+            end: bufferBegin + windowLength,
+            region: {start: Math.max(start - bufferBegin, 0), end: end - bufferBegin, label: label, play: play}
+        });
     }
-    worker.postMessage({
-        action: 'update-buffer',
-        file: file,
-        position: wavesurfer.getCurrentTime() / windowLength,
-        start: bufferBegin,
-        end: bufferBegin + windowLength,
-        region: {start: Math.max(start - bufferBegin, 0), end: end - bufferBegin, label: label, play: play}
-    });
 }
 
 /**
@@ -1099,12 +1109,12 @@ window.onload = async () => {
             worker.postMessage({action: 'clear-cache'})
         }
     )
-// establish the message channel
+    // establish the message channel
     setUpWorkerMessaging()
 
-// Set footer year
+    // Set footer year
     $('#year').text(new Date().getFullYear());
-//Cache list elements
+    //Cache list elements
     speciesListItems = $('#bird-list li span');
 }
 
@@ -1458,7 +1468,7 @@ function addEvents(element) {
     })
 }
 
-
+// Bird list form  click handler
 $(document).on('click', '.request-bird', function (e) {
     const [, cname] = formatInputText(e.target.innerText)
     const context = this.closest('.bird-list-wrapper').classList[0];
@@ -2097,8 +2107,8 @@ function onModelReady(args) {
 // })
 
 async function onWorkerLoadedAudio(args) {
+    workerHasLoadedFile = true;
     if (args.doubleBuffer) {
-        workerHasLoadedFile = true;
         console.log('received next buffer')
         return
     }
@@ -2144,7 +2154,7 @@ async function onWorkerLoadedAudio(args) {
             audio: currentBuffer,
             backend: 'WebAudio',
             alpha: 0,
-            reset: true
+            reset: false
         });
     } else {
         if (wavesurfer) wavesurfer.clearRegions();
@@ -2383,6 +2393,8 @@ const setFilterHandlers = () => {
         if (target.contains('text-warning')) {
             // Clicked on filtered species icon
             worker.postMessage({action: 'filter', files: fileList, order: STATE.explore.order});
+            // Clear species from STATE
+            STATE.explore.species = undefined;
         } else {
             // Clicked on unfiltered species name
             const target = this.querySelector('span.pointer');
@@ -2527,7 +2539,8 @@ $(document).on('click', '.add-comment, .edit-comment', function (e) {
 })
 
 const isExplore = () => {
-    return !document.getElementById('exploreWrapper').classList.contains('d-none');
+    return STATE.mode === 'explore';
+    //return !document.getElementById('exploreWrapper').classList.contains('d-none');
 }
 
 function commentHandler(e) {
@@ -2869,12 +2882,16 @@ for (let i = 0; i < batchRadios.length; i++) {
 // Listeners to sort results table
 const speciesSort = document.getElementById('species-sort');
 speciesSort.addEventListener('click', () => {
-    postExploreMessage('score DESC ')
+    if (isExplore()) {
+        postExploreMessage('score DESC ')
+    }
 })
 
 const timeSort = document.getElementById('time-sort');
 timeSort.addEventListener('click', () => {
-    postExploreMessage('timestamp')
+    if (isExplore()) {
+        postExploreMessage('timestamp')
+    }
 })
 
 const postExploreMessage = (order) => {
@@ -2900,7 +2917,6 @@ document.addEventListener('drop', async (event) => {
     let filelist = []
     for (const f of event.dataTransfer.files) {
         // Using the path attribute to get absolute file path
-        //console.log(f)
         filelist.push(f.path);
     }
     if (filelist.length) openFiles({filePaths: filelist})
@@ -2995,7 +3011,7 @@ document.addEventListener("DOMContentLoaded", function () {
     enableKeyDownEvent();
     addEvents('comment');
     addEvents('label');
-// make menu an accordion for smaller screens
+    // make menu an accordion for smaller screens
     if (window.innerWidth < 768) {
 
         // close all inner dropdowns when parent is closed
@@ -3025,5 +3041,5 @@ document.addEventListener("DOMContentLoaded", function () {
             });
         })
     }
-// end if innerWidth
+    // end if innerWidth
 });

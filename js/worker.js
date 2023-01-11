@@ -329,6 +329,12 @@ const getFiles = async (files) => {
             file_list.push(files[i])
         }
     }
+    // filter out unsupported files
+    const supported_files = ['.wav', '.flac', '.opus', '.m4a', '.mp3', '.mpga', '.ogg', '.aac', '.mpeg', '.mp4'];
+    file_list = file_list.filter((file) => {
+            return supported_files.some(ext => file.endsWith(ext))
+        }
+    )
     UI.postMessage({event: 'files', filePaths: file_list});
 }
 
@@ -559,7 +565,13 @@ async function locateFile(file) {
 }
 
 async function loadAudioFile({
-                                 file = '', start = 0, end = 20, position = 0, region = false, doubleBuffer = false
+                                 file = '',
+                                 start = 0,
+                                 end = 20,
+                                 position = 0,
+                                 region = false,
+                                 doubleBuffer = false,
+                                 preserveResults = false
                              }) {
     const found = await getWorkingFile(file);
     if (found) {
@@ -577,6 +589,7 @@ async function loadAudioFile({
                     length: length,
                     contents: myArray,
                     region: region,
+                    preserveResults: preserveResults,
                     doubleBuffer: doubleBuffer
                 });
             })
@@ -939,20 +952,20 @@ const onSpectrogram = async (filepath, file, width, height, data, channels) => {
 
 async function uploadOpus({file, start, end, defaultName, metadata, mode}) {
     const Blob = await bufferToAudio({file: file, start: start, end: end, format: 'opus', meta: metadata});
-// Populate a form with the file (blob) and filename
+    // Populate a form with the file (blob) and filename
     const formData = new FormData();
     //const timestamp = Date.now()
     formData.append("thefile", Blob, defaultName);
     // Was the prediction a correct one?
     formData.append("Chirpity_assessment", mode);
-// post form data
+    // post form data
     const xhr = new XMLHttpRequest();
     xhr.responseType = 'text';
-// log response
+    // log response
     xhr.onload = () => {
         console.log(xhr.response);
     };
-// create and send the reqeust
+    // create and send the reqeust
     xhr.open('POST', 'https://birds.mattkirkland.co.uk/upload');
     xhr.send(formData);
 }
@@ -1030,9 +1043,9 @@ async function saveMP3(file, start, end, filename, metadata) {
 function spawnWorker(model, list, batchSize, warmup) {
     predictWorker = new Worker('./js/model.js');
     //const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
-    //const modelPath = model === 'efficientnet' ? '../test_24000_v10/' : '../24000_v9/';
+    const modelPath = model === 'efficientnet' ? '../test_24000_v10/' : '../24000_v9/';
     //const modelPath = model === 'efficientnet' ? '../test_2022128_EfficientNetB3_wd=10xlr_sigmoid_focal_crossentropy_256x384_AdamW_447/' : '../24000_v9/';
-     const modelPath = model === 'efficientnet' ? '../test_20221222_EfficientNetB3_wd=10xlr_sigmoid_focal_crossentropy_256x384_AdamW_447/' : '../24000_v9/';
+    //const modelPath = model === 'efficientnet' ? '../test_20221222_EfficientNetB3_wd=10xlr_sigmoid_focal_crossentropy_256x384_AdamW_447/' : '../24000_v9/';
     console.log(modelPath);
     // Now we've loaded a new model, clear the aborted flag
     aborted = false;
@@ -1443,6 +1456,8 @@ const onSave2DiskDB = async () => {
 }
 
 const getSeasonRecords = async (species, season) => {
+    // Because we're using stmt.prepare, we need to unescape quotes
+    species = species.replaceAll("''", "'");
     const seasonMonth = {spring: "< '07'", autumn: " > '06'"}
     return new Promise(function (resolve, reject) {
         const stmt = diskDB.prepare(`
@@ -1700,38 +1715,39 @@ async function onUpdateRecord({
 
 async function onChartRequest(args) {
     console.log(`Getting chart for ${args.species} starting ${args.range[0]}`);
+    const dateRange = args.range, results = {},  dataRecords = {};
     // Escape apostrophes
-    if (args.species) args.species = prepSQL(args.species);
-    const dateRange = args.range;
-    const dataRecords = {}, results = {};
-    t0 = Date.now();
-    await getSeasonRecords(args.species, 'spring')
-        .then((result) => {
-            dataRecords.earliestSpring = result['minDate'];
-            dataRecords.latestSpring = result['maxDate'];
-        }).catch((message) => {
-            console.log(message)
-        })
+    if (args.species) {
+        args.species = prepSQL(args.species);
+        t0 = Date.now();
+        await getSeasonRecords(args.species, 'spring')
+            .then((result) => {
+                dataRecords.earliestSpring = result['minDate'];
+                dataRecords.latestSpring = result['maxDate'];
+            }).catch((message) => {
+                console.log(message)
+            })
 
-    await getSeasonRecords(args.species, 'autumn')
-        .then((result) => {
-            dataRecords.earliestAutumn = result['minDate'];
-            dataRecords.latestAutumn = result['maxDate'];
-        }).catch((message) => {
-            console.log(message)
-        })
+        await getSeasonRecords(args.species, 'autumn')
+            .then((result) => {
+                dataRecords.earliestAutumn = result['minDate'];
+                dataRecords.latestAutumn = result['maxDate'];
+            }).catch((message) => {
+                console.log(message)
+            })
 
-    console.log(`Season chart generation took ${(Date.now() - t0) / 1000} seconds`)
-    t0 = Date.now();
-    await getMostCalls(args.species)
-        .then((row) => {
-            row ? dataRecords.mostDetections = [row.count, row.date] : dataRecords.mostDetections = ['N/A', 'Not detected'];
-        }).catch((message) => {
-            console.log(message)
-        })
+        console.log(`Season chart generation took ${(Date.now() - t0) / 1000} seconds`)
+        t0 = Date.now();
+        await getMostCalls(args.species)
+            .then((row) => {
+                row ? dataRecords.mostDetections = [row.count, row.date] : dataRecords.mostDetections = ['N/A', 'Not detected'];
+            }).catch((message) => {
+                console.log(message)
+            })
 
-    console.log(`Most calls  chart generation took ${(Date.now() - t0) / 1000} seconds`)
-    t0 = Date.now();
+        console.log(`Most calls  chart generation took ${(Date.now() - t0) / 1000} seconds`)
+        t0 = Date.now();
+    }
     const [dataPoints, aggregation] = await getChartTotals(args)
         .then(([rows, dataPoints, aggregation, startDay]) => {
             for (let i = 0; i < rows.length; i++) {
@@ -1795,7 +1811,7 @@ Todo: bugs
     ***save records to db doesn't work with updaterecord!
     ***AUDACITY results for multiple files doesn't work well, as it puts labels in by position only. Need to make audacity an object,
         and return the result for the current file only #######
-    In explore, editID doesn't change the label of the region to the new species
+    ***In explore, editID doesn't change the label of the region to the new species
     Analyse selection returns just the file in which the selection is requested
 
 
@@ -1806,7 +1822,7 @@ Todo: Database
         -Create a new database for each model with appropriate num classes?
 
 Todo: Location.
-     Associate lat lon with files, expose lat lon settings in UI. Allow for editing once saved
+     Associate lat lon with files, expose lat lon settings in UI. Allow for editing once saved. Filter Explore by location
 
 Todo cache:
     ***Clear cache on application exit, as well as start
@@ -1814,6 +1830,7 @@ Todo cache:
     ***Cache fills before analyse complete. So it fills up ahead of predictions, and files get deleted
         before they're done with
     ***Now cache is limited, need to re-open file when browsing and file not present
+    Control cache size in settings
 
 Todo: manual entry
     ***check creation of manual entries
@@ -1824,10 +1841,10 @@ Todo: manual entry
 Todo: UI
     ***Drag folder to load audio files within (recursively)
     ***Stop flickering when updating results
-    Expose SNR feature
+    Expose SNR feature in settings
     ***Pagination? Limit table records to say, 1000
     Better tooltips, for all options
-    Sort summary by headers
+    ***Sort summary by headers (click on species or header)
     Have a panel for all analyse settings, not just nocmig mode
     ***Delay hiding submenu on mouseout (added box-shadow)
     Align the label on the spec to the right to minimize overlap with axis labels
