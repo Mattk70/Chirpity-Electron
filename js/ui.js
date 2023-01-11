@@ -498,11 +498,6 @@ async function onOpenFiles(args) {
     // Reset the buffer playhead and zoom:
     bufferBegin = 0;
     windowLength = 20;
-    if (!config.spectrogram) {
-        // Show controls
-        showElement(['controlsWrapper']);
-        $('.specFeature').hide()
-    }
 }
 
 
@@ -2149,7 +2144,7 @@ async function onWorkerLoadedAudio(args) {
     }
     fileLoaded = true;
 
-    if (!wavesurfer && config.spectrogram) {
+    if (!wavesurfer) {
         initWavesurfer({
             audio: currentBuffer,
             backend: 'WebAudio',
@@ -2245,7 +2240,6 @@ async function onPredictionDone({
     if (resultsBuffer) {
         const results = document.getElementById('resultTableBody');
         results.replaceWith(resultsBuffer);
-        if (!config.spectrogram) $('.specFeature').hide();
         resultsBuffer = undefined;
     }
 
@@ -2406,12 +2400,12 @@ const setFilterHandlers = () => {
     })
 }
 
-const getOffset = () => {
-    const pagination = document.getElementById('pagination')
-    const active = pagination.querySelector('.active');
-    const offset = active ? (parseInt(active.innerText) - 1) * 1000 : 0;
-    return offset || 0
-}
+// const getOffset = () => {
+//     const pagination = document.getElementById('pagination')
+//     const active = pagination.querySelector('.active');
+//     const offset = active ? (parseInt(active.innerText) - 1) * 1000 : 0;
+//     return offset || 0
+// }
 
 // TODO: show every detection in the spec window as a region on the spectrogram
 
@@ -2499,7 +2493,7 @@ async function renderResult(args) {
                     <li>${result.cname3} ${iconizeScore(result.score3)}
                 </ul>
             </td>
-            <td class='specFeature'><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
+            <td><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
             <td><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:"nocturnal flight call"' target="xc">
                 <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
             <td><span class='delete material-icons-two-tone pointer'>delete_forever</span></td>
@@ -2520,7 +2514,6 @@ const updateResultTable = (row, isFromCache) => {
     } else {
         resultTable.lastElementChild ? resultTable.lastElementChild.insertAdjacentHTML('afterend', row) :
             resultTable.innerHTML = row;
-        if (!config.spectrogram) $('.specFeature').hide();
     }
 }
 
@@ -2928,7 +2921,7 @@ bodyElement.on('dragstart', e => {
     e.preventDefault()
 })
 
-
+// Make modals draggable
 $(".modal-header").on("mousedown", function(mousedownEvt) {
     var $draggable = $(this);
     var x = mousedownEvt.pageX - $draggable.offset().left,
@@ -2946,6 +2939,7 @@ $(".modal-header").on("mousedown", function(mousedownEvt) {
         $("body").off("mousemove.draggable");
     });
 });
+
 ////////// Date Picker ///////////////
 
 $(function () {
