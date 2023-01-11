@@ -143,7 +143,7 @@
   },
   "homepage": "https://github.com/mattk70/Chirpity-Electron#readme",
   "devDependencies": {
-    "electron": "^21.3.1",
+    "electron": "^22.0.1",
     "electron-builder": "^23.6.0",
     "electron-wix-msi": "^4.0.0"
   },
@@ -157,15 +157,14 @@
     "fast-png": "^6.1.0",
     "ffmpeg-static-electron": "^2.0.3",
     "fluent-ffmpeg": "^2.1.2",
-    "jquery": "^3.6.0",
-    "lamejstmp": "latest",
+    "jquery": "^3.6.3",
     "seedrandom": "^3.0.5",
     "sqlite3": "^5.0.8",
     "suncalc2": "^1.8.1",
-    "systeminformation": "^5.12.6",
+    "systeminformation": "^5.17.1",
     "utimes": "5.1.1",
     "uuid": "^8.3.2",
     "wavefile-reader": "^1.1.1",
-    "wavesurfer.js": "^6.3.0"
+    "wavesurfer.js": "^6.4.0",
   }
 }
