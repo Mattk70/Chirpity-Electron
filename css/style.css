@@ -467,3 +467,10 @@ footer {
 .vala {
     background: rgba(255,128,0,0.5)
 }
+
+/*
+Move cursor on modal header
+ */
+.modal-header {
+    cursor: move;
+}
