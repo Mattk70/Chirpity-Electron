@@ -12,6 +12,7 @@ const STATE = {
         range: {start: undefined, end: undefined}
     },
     birdList: {lastSelectedSpecies: undefined},
+    selection: {start: undefined, end: undefined},
     mode: 'analyse'
 }
 
@@ -74,7 +75,7 @@ window.electron.getVersion()
     });
 
 let modelReady = false, fileLoaded = false, currentFile;
-let PREDICTING = false;
+let PREDICTING = false, t0;
 let region, AUDACITY_LABELS = {}, wavesurfer;
 // fileList is all open files, analyseList is the subset that have been analysed;
 let fileList = [], analyseList = [];
@@ -90,6 +91,7 @@ resultTableElement.animate({scrollTop: '300px'}, 400, 'swing');
 const contentWrapperElement = $('#contentWrapper');
 const completeDiv = $('#complete');
 let resultTable = document.getElementById('resultTableBody');
+const selectionTable = document.getElementById('selectionResultTableBody');
 const nocmigButton = document.getElementById('nocmigMode');
 const summaryTable = $('#summaryTable');
 const progressDiv = $('#progressDiv');
@@ -590,21 +592,23 @@ analyseSelectionLink.addEventListener('click', async () => {
         region.end = region.start + 0.5;
         end = start + 0.5
     }
+    STATE['selection']['start'] = start.toFixed(3);
+    STATE['selection']['end'] = end.toFixed(3);
     postAnalyseMessage({
         confidence: 0.1,
         resetResults: false,
         currentFile: currentFile,
         // The rounding below is essential to finding record in database
-        start: start.toFixed(3),
-        end: end.toFixed(3),
+        start: STATE['selection']['start'] ,
+        end: STATE['selection']['end'] ,
         list: 'everything'
     });
 });
 
 function postAnalyseMessage(args) {
-    let start = args.start, end = args.end;
-    analyseReset();
+
     if (args.resetResults) {
+        analyseReset();
         resetResults(args);
     } else {
         progressDiv.show();
@@ -614,8 +618,8 @@ function postAnalyseMessage(args) {
         action: 'analyse',
         confidence: args.confidence,
         resetResults: args.resetResults,
-        start: start,
-        end: end,
+        start: args.start,
+        end: args.end,
         currentFile: args.currentFile,
         filesInScope: analyseList || fileList,
         reanalyse: args.reanalyse,
@@ -746,15 +750,15 @@ function createRegion(start, end, label) {
 
 // We add the handler to the whole table as the body gets replaced and the handlers on it would be wiped
 const results = document.getElementById('results');
-results.addEventListener('click', function (e) {
+results.addEventListener('click', resultClick);
+selectionTable.addEventListener('click', resultClick);
 
+function resultClick(e) {
     let row = e.target.closest('tr');
-
     if (!row || row.classList.length === 0) { // 1. clicked and dragged, 2 no detections in file row
         return
     }
     // Search for the top-row
-
     while (!row.classList.contains('top-row')) {
         row = row.previousElementSibling
         if (!row) return;
@@ -769,8 +773,7 @@ results.addEventListener('click', function (e) {
         if (e.target.classList.contains('play')) params.push('true')
         loadResultRegion(params);
     }
-})
-
+}
 
 function loadResultRegion(paramlist) {
     // Accepts global start and end timecodes from model detections
@@ -1162,7 +1165,10 @@ const setUpWorkerMessaging = () => {
                     break;
                 case 'generate-alert':
                     alert(args.message)
-                    break;
+                    break
+                case 'no-detections-remain':
+                    detectionsModal.hide();
+                    break
             }
         })
     })
@@ -1247,9 +1253,9 @@ function hideBirdList(el) {
 
 let restoreSpecies;
 
-resultTableElement.on('contextmenu', '.edit, .cname', editID);
+$(document).on('contextmenu', '.edit, .cname', setEditID);
 
-function editID(e) {
+function setEditID(e) {
     setClickedIndex(e);
     const currentRow = e.target.closest('tr');
     let restore = currentRow.querySelector('.cname').cloneNode(true);
@@ -1294,8 +1300,6 @@ function filterList(e) {
     }
 }
 
-let t0;
-
 function formatInputText(species) {
     species = formatSpeciesName(species);
     let [cname, latin] = species.split('~');
@@ -1305,8 +1309,6 @@ function formatInputText(species) {
     return [speciesLabel, cname];
 }
 
-
-//document.addEventListener('click', '.bird-list', function (e) {
 function editHandler(e) {
     const container = this.closest('.species-selector').querySelector('.bird-list-wrapper');
     if (container.classList.contains('editing')) {
@@ -1321,7 +1323,7 @@ function editHandler(e) {
         if (!sname) sname = cname;
         STATE.birdList.lastSelectedSpecies = cname;
         const cnameCell = this.closest('.cname');
-        editResultID(cname, sname, cnameCell);
+        editID(cname, sname, cnameCell);
     }
 }
 
@@ -1337,8 +1339,7 @@ const isSpeciesViewFiltered = (sendSpecies) => {
 }
 
 //Works for single and batch items in Explore, but not in Analyse
-function editResultID(cname, sname, cell) {
-    const exploreMode = isExplore();
+function editID(cname, sname, cell) {
     // Make sure we update the restore species
     //restoreSpecies = cell;
     let from;
@@ -1346,31 +1347,19 @@ function editResultID(cname, sname, cell) {
         from = restoreSpecies.querySelector('ul').firstElementChild.firstChild.nodeValue.trim() :
         from = restoreSpecies.firstElementChild.innerHTML.replace(/(.*)\s<.*/, "$1");
     // Are we batch editing here?
-    const batch = cell.closest('table').id !== 'results';
+    const context = getDetectionContext(cell)
+    const batch = context === 'resultSummary';
     let start, files = fileList, file;
     if (!batch) {
         [file, start, end, currentRow] = unpackNameAttr(cell, cname);
         sendFeedback(file, cname, sname);
-    } else {
-        if (exploreMode) files = [];
+    } else { // May not need this, updateRecord clears filelist if explore mode
+        if (isExplore()) files = [];
     }
-    let active = getActiveRow();
-    cell.innerHTML = `${cname} <br><i>${sname}</i>`;
-
-    worker.postMessage({
-        action: 'update-record',
-        openFiles: files,
-        currentFile: currentFile,
-        what: 'ID',
-        start: start,
-        value: cname,
-        from: from,
-        isBatch: batch,
-        isFiltered: isSpeciesViewFiltered(),
-        isExplore: exploreMode,
-        order: STATE.explore.order,
-        active: active
-    });
+    //let active = getActiveRow();
+    //cell.innerHTML = `${cname} <br><i>${sname}</i>`;
+    const range = context === 'selectionResults' ? getSelectionRange(): undefined;
+    updateRecord('ID', range, start, from, cname, context, batch)
 }
 
 function unpackNameAttr(el, cname) {
@@ -1398,50 +1387,26 @@ function getSpecies(e) {
 }
 
 function updateLabel(e) {
-    e.stopImmediatePropagation();
-    const exploreMode = isExplore();
-    // ??
-    //if (this.childElementCount < 2) return
-
+    // Below is required so we don't post an update when an existing  label is clicked
+    if (this.childElementCount < 2) return
+    // context can be one of: results, selectionResults, resultSummary
+    const detectionContext = getDetectionContext(e.target);
     let label = e.target.innerText.replace('Remove Label', '');
     // update the clicked badge
     const parent = e.target.parentNode;
     const species = getSpecies(e)
-    parent.innerHTML = tags[label];
-    // Update the label record(s) in the db
-    const context = parent.closest('table').id;
+    parent.innerHTML =  label ? tags[label] : '';
     let file, start;
-    let active = getActiveRow();
-    if (context === 'results') {
+    if (detectionContext === 'results' || detectionContext === 'selectionResults' ) {
         [file, start, ,] = unpackNameAttr(activeRow);
-        worker.postMessage({
-            action: 'update-record',
-            openFiles: fileList,
-            currentFile: currentFile,
-            start: start,
-            what: 'label',
-            from: species,
-            value: label,
-            isFiltered: isSpeciesViewFiltered(),
-            isExplore: exploreMode,
-            active: active,
-            order: STATE.explore.order
-        });
+        const range = detectionContext === 'selectionResults' ?
+            getSelectionRange(): undefined;
+        updateRecord('label', range, start, species, label, detectionContext)
     } else {
         // this is the summary table and a batch update is wanted
         //are we in Explore mode?
-        const files = exploreMode ? [] : fileList;
-        worker.postMessage({
-            action: 'update-record',
-            openFiles: files,
-            from: species,
-            what: 'label',
-            value: label,
-            isFiltered: isSpeciesViewFiltered(),
-            isBatch: true,
-            isExplore: exploreMode,
-            order: STATE.explore.order
-        });
+        const files = isExplore() ? [] : fileList;
+        updateRecord('label', undefined, species, label, detectionContext, true)
     }
     addEvents('label');
 }
@@ -1463,8 +1428,12 @@ function addEvents(element) {
     })
 }
 
+const getDetectionContext = (target) =>  target.closest('table').id;
+
 // Bird list form  click handler
 $(document).on('click', '.request-bird', function (e) {
+    // Clear the results table
+    resultTable.innerHTML = '';
     const [, cname] = formatInputText(e.target.innerText)
     const context = this.closest('.bird-list-wrapper').classList[0];
     let pickerEl = context + 'Range';
@@ -2283,15 +2252,16 @@ async function onPredictionDone({
             activeRow.focus()
             activeRow.click()
         } else { // in which case...go to the first table row
-            const rows = document.getElementById('resultTableBody').querySelectorAll('.top-row')
+            const rows = resultTable.querySelectorAll('.top-row')
             if (rows.length) {
                 const firstRow = rows[0];
                 firstRow.focus();
             }
         }
-    } else {
-        document.getElementById('resultTableBody').scrollIntoView({behaviour: 'smooth'});
     }
+    // else {
+    //     document.getElementById('resultTableBody').scrollIntoView({behaviour: 'smooth'});
+    // }
 }
 
 const pagination = document.querySelectorAll('.pagination');
@@ -2400,120 +2370,127 @@ const setFilterHandlers = () => {
     })
 }
 
-// const getOffset = () => {
-//     const pagination = document.getElementById('pagination')
-//     const active = pagination.querySelector('.active');
-//     const offset = active ? (parseInt(active.innerText) - 1) * 1000 : 0;
-//     return offset || 0
-// }
+const checkDayNight = (timestamp) => {
+    let astro = SunCalc.getTimes(timestamp, config.latitude, config.longitude);
+    return (astro.dawn.setMilliseconds(0) < timestamp && astro.dusk.setMilliseconds(0) > timestamp) ? 'daytime' : 'nighttime';
+}
 
 // TODO: show every detection in the spec window as a region on the spectrogram
 
-async function renderResult(args) {
-
-    const result = args.result, file = args.file;
-    // Deal with flicker
-    const isFromCache = args.fromDB;
-
-    let index = args.index;
-    const subRowThreshold = 0.01;
-    const hideAlternates = result.score2 < subRowThreshold ? 'd-none' : '';
-    // Convert timestamp and position to date so easier to format results in UI
-    let timestamp = new Date(result.timestamp);
-    const position = new Date(result.position * 1000);
-    // Datetime wrangling for Nocmig mode
-    if (typeof (result) !== 'string') {
-        let astro = SunCalc.getTimes(timestamp, config.latitude, config.longitude);
-        if (astro.dawn.setMilliseconds(0) < timestamp && astro.dusk.setMilliseconds(0) > timestamp) {
-            result.dayNight = 'daytime';
-        } else {
-            result.dayNight = 'nighttime';
-            seenTheDarkness = true;
-        }
-    }
+async function renderResult({
+                                index = 1,
+                                result = {},
+                                file = undefined,
+                                isFromDB = false,
+                                resetResults = true
+                            }) {
+    const isFromCache = isFromDB, isSelection = !resetResults;
     let tr = '';
-    if (index === 1 || -1) {
+    if (index === 1 && resetResults) {
         showElement(['resultTableContainer'], false);
     }
     if (typeof (result) === 'string') {
         const nocturnal = config.nocmig ? '<b>during the night</b>' : '';
-
         tr += `<tr><td colspan="8">${result} (Predicting ${config.list} ${nocturnal} with at least ${config.minConfidence * 100}% confidence in the prediction)</td></tr>`;
     } else {
-        if (config.nocmig && !region) {
-            /*
-            * We want to skip results recorded before dark
-            * process results during the night
-            * abort entirely when dawn breaks
-            */
-            if (!seenTheDarkness && result.dayNight === 'daytime') {
-                // Not dark yet
-                return
-            }
-        }
-        // Show the twilight bar even if nocmig mode off - cue to change of table row colour
-        if (seenTheDarkness && result.dayNight === 'daytime' && shownDaylightBanner === false) {
-            // Show the twilight start bar
-            tr += `<tr class="bg-dark" style="color: white"><td colspan="20" class="text-center">
+        const {
+            start,
+            end,
+            timestamp,
+            position,
+            active,
+            sname,
+            cname,
+            cname2,
+            cname3,
+            score,
+            score2,
+            score3,
+            label,
+            comment
+        } = result;
+        const dayNight = checkDayNight(timestamp);
+        if (dayNight === 'nighttime') seenTheDarkness = true;
+        // Todo: move this logic so pre dark sections of file are not even analysed
+        if (config.nocmig && !isSelection && dayNight === 'daytime') return
+
+        // Show twilight indicator when  nocmig mode off (except when analysing a selection)
+        if (shownDaylightBanner === false && dayNight === 'daytime') {
+            // Only do this if change starts midway through a file
+            if (index !== 1) {
+                // Show the twilight start bar
+                tr += `<tr class="bg-dark"><td colspan="20" class="text-center text-white">
                 Start of civil twilight <span class="material-icons-two-tone text-warning align-bottom">wb_twilight</span>
                 </td></tr>`;
+            }
             shownDaylightBanner = true;
         }
-
-        const start = result.start, end = result.end;
-        const comment = result.comment ?
-            `<span title="${result.comment}" class='material-icons-two-tone pointer edit-comment'>comment</span>` :
+        const commentHTML = comment ?
+            `<span title="${comment}" class='material-icons-two-tone pointer edit-comment'>comment</span>` :
             "<span title='Add a comment' class='material-icons-two-tone pointer invisible add-comment'>add_comment</span>";
-        let confidence = '';
-        if (result.score < 0.65) {
-            confidence = '&#63;';
-        }
+        const isUncertain = score < 0.65 ? '&#63;' : '';
+        // result.filename  and result.date used for feedback
         result.date = timestamp;
-        timestamp = timestamp.toString()
-        timestamp = timestamp.split(' ');
-        const UI_timestamp = `${timestamp[2]} ${timestamp[1]} ${timestamp[3].substring(2)}<br/>${timestamp[4]}`;
-        result.filename = result.cname.replace(/'/g, "\\'") + ' ' + timestamp + '.mp3';
-        let spliceStart;
-        result.position < 3600000 ? spliceStart = 14 : spliceStart = 11;
-        const UI_position = position.toISOString().substring(spliceStart, 19);
-
+        result.filename = cname.replace(/'/g, "\\'") + ' ' + timestamp + '.mp3';
+        // store result for feedback function to use
         predictions[index] = result;
-        let showTimeOfDay;
-        config.timeOfDay ? showTimeOfDay = '' : showTimeOfDay = 'd-none';
-        const active = result.active ? 'table-active' : ';'
-        const label = result.label ? tags[result.label] : tags['Remove Label'];
-        tr += `<tr tabindex="-1" id="result${index}" name="${file}|${start}|${end}|${result.cname}${confidence}" class='${active} border-top border-2 border-secondary top-row ${result.dayNight}'>
+        // Format date and position for  UI
+        const tsArray = new Date(timestamp).toString().split(' ');
+        const UI_timestamp = `${tsArray[2]} ${tsArray[1]} ${tsArray[3].substring(2)}<br/>${tsArray[4]}`;
+        const spliceStart = position < 3600 ? 14 : 11;
+        const UI_position = new Date(position * 1000).toISOString().substring(spliceStart, 19);
+        const showTimeOfDay = config.timeOfDay ? '' : 'd-none';
+        const activeTable = active ? 'table-active' : '';
+        const labelHTML = label ? tags[label] : tags['Remove Label'];
+        tr += `<tr tabindex="-1" id="result${index}" name="${file}|${start}|${end}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary top-row ${dayNight}'>
             <th scope='row'>${index}</th>
             <td class='text-start text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-end">${UI_position}</td>
-            <td name="${result.cname}" class='text-start cname'>
-                <ul>
-                    <li>${result.cname} ${iconizeScore(result.score)}
-                    <li>${result.cname2} ${iconizeScore(result.score2)}
-                    <li>${result.cname3} ${iconizeScore(result.score3)}
-                </ul>
-            </td>
+            <td name="${cname}" class='text-start cname'><ul>
+                    <li>${cname} ${iconizeScore(score)}
+                    <li>${cname2} ${iconizeScore(score2)}
+                    <li>${cname3} ${iconizeScore(score3)}
+                </ul></td>
             <td><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
-            <td><a href='https://xeno-canto.org/explore?query=${result.sname}%20type:"nocturnal flight call"' target="xc">
-                <img src='img/logo/XC.png' alt='Search ${result.cname} on Xeno Canto' title='${result.cname} NFCs on Xeno Canto'></a></td>
+            <td><a href='https://xeno-canto.org/explore?query=${sname}%20type:"nocturnal flight call"' target="xc">
+                <img src='img/logo/XC.png' alt='Search ${cname} on Xeno Canto' title='${cname} NFCs on Xeno Canto'></a></td>
             <td><span class='delete material-icons-two-tone pointer'>delete_forever</span></td>
-            <td class="label">${label}</td>
-            <td class="comment text-end">${comment}</td>
+            <td class="label">${labelHTML}</td>
+            <td class="comment text-end">${commentHTML}</td>
         </tr>`;
     }
-
-    updateResultTable(tr, isFromCache);
+    updateResultTable(tr, isFromCache, isSelection);
 }
 
-let resultsBuffer;
-const updateResultTable = (row, isFromCache) => {
-    if (isFromCache) {
-        if (!resultsBuffer) resultsBuffer = resultTable.cloneNode();
-        resultsBuffer.lastElementChild ? resultsBuffer.lastElementChild.insertAdjacentHTML('afterend', row) :
+
+let resultsBuffer, detectionsModal, detectionsModalOpen = false;
+const detectionsModalDiv = document.getElementById('detectionsModal')
+detectionsModalDiv.addEventListener('show.bs.modal', event => {
+    detectionsModalOpen = true
+})
+
+detectionsModalDiv.addEventListener('hidden.bs.modal', event => {
+    detectionsModalOpen = false;
+    const results = document.getElementById('selectionResultTableBody');
+    results.innerHTML = '';
+})
+
+const updateResultTable = (row, isFromCache, isSelection) => {
+    const table = isSelection ? selectionTable : resultTable;
+    if (isFromCache && !isSelection) {
+        if (!resultsBuffer) resultsBuffer = table.cloneNode();
+        resultsBuffer.lastElementChild ?
+            resultsBuffer.lastElementChild.insertAdjacentHTML('afterend', row) :
             resultsBuffer.innerHTML = row;
     } else {
-        resultTable.lastElementChild ? resultTable.lastElementChild.insertAdjacentHTML('afterend', row) :
-            resultTable.innerHTML = row;
+        if (isSelection) {
+            if (!detectionsModalOpen) {
+                detectionsModal = new bootstrap.Modal('#detectionsModal', {backdrop: 'static'});
+                detectionsModal.show();
+            }
+        }
+        table.lastElementChild ? table.lastElementChild.insertAdjacentHTML('afterend', row) :
+            table.innerHTML = row;
     }
 }
 
@@ -2539,11 +2516,10 @@ const isExplore = () => {
 function commentHandler(e) {
     if (e.code === 'Enter') {
         e.stopImmediatePropagation();
+        const context = getDetectionContext(e.target)
         const note = e.target.value;
-        //are we in Explore Mode?
-        const exploreMode = isExplore();
         let species;
-        if (exploreMode) {
+        if (isExplore()) {
             // Format species before we replace the target node
             species = getSpecies(e)
         } else {
@@ -2555,25 +2531,33 @@ function commentHandler(e) {
             e.target.parentNode.innerHTML = `<span title="Add a comment" class="material-icons-two-tone pointer add-comment">add_comment</span>`;
         }
         let [file, start, ,] = unpackNameAttr(activeRow);
-        let active = getActiveRow();
-        worker.postMessage({
-            action: 'update-record',
-            openFiles: fileList,
-            currentFile: file,
-            start: start,
-            from: species,
-            what: 'comment',
-            value: note,
-            isFiltered: isSpeciesViewFiltered(),
-            isExplore: exploreMode,
-            active: active,
-            order: STATE.explore.order
-        });
+        const range = getSelectionRange()
+        // let active = getActiveRow();
+        updateRecord('comment', undefined, start, species, note, context)
         addEvents('comment');
         document.addEventListener('keydown', handleKeyDownDeBounce, true);
     }
 }
 
+const updateRecord = (what, range, start, from, to, context, batchUpdate)  => {
+    if (context === 'selectionResults') selectionTable.innerHTML = '';
+    worker.postMessage({
+        action: 'update-record',
+        openFiles: fileList,
+        currentFile: currentFile,
+        start: start,
+        from: from,
+        value: to,
+        what: what,
+        isFiltered: isSpeciesViewFiltered(),
+        isExplore: isExplore(),
+        isBatch: batchUpdate,
+        context: context,
+        active: getActiveRow(),
+        oder: STATE.explore.order,
+        range: range
+    })
+}
 
 $(document).on('click', '.add-label, .edit-label', labelHandler);
 
@@ -2635,8 +2619,20 @@ $(document).on('click', '.delete', function (e) {
         if (wavesurfer) wavesurfer.clearRegions();
         region = undefined;
         setClickedIndex(e);
-        const [file, start, , currentRow] = unpackNameAttr(e.target);
-        const context = isExplore() ? 'explore' : 'results';
+        const target = e.target;
+        const [file, start, , ] = unpackNameAttr(target);
+        const setting = target.closest('table');
+        let context = isExplore() ? 'explore' : 'results';
+        let range;
+        if (setting.id === 'selectionResults') {
+            range = getSelectionRange();
+            context = 'selection';
+            // Clear the modal of detections
+            setting.querySelector('tbody').innerHTML = '';
+        } else {
+            range = STATE.explore.range
+        }
+
         const species = isSpeciesViewFiltered(true);
         let active = getActiveRow();
         worker.postMessage({
@@ -2649,12 +2645,14 @@ $(document).on('click', '.delete', function (e) {
             context: context,
             order: STATE.explore.order,
             explore: isExplore(),
-            range: STATE.explore.range
+            range: range
         })
     }
 });
 
-
+const getSelectionRange = () => {
+    return {start: (STATE.selection.start * 1000) + fileStart , end: (STATE.selection.end * 1000) + fileStart}
+}
 function formatSpeciesName(filename) {
     filename = filename.replace(' - ', '~').replace(/\s+/g, '_',);
     if (!filename.includes('~')) filename = filename + '~' + filename; // dummy latin
@@ -2922,20 +2920,20 @@ bodyElement.on('dragstart', e => {
 })
 
 // Make modals draggable
-$(".modal-header").on("mousedown", function(mousedownEvt) {
-    var $draggable = $(this);
-    var x = mousedownEvt.pageX - $draggable.offset().left,
+$(".modal-header").on("mousedown", function (mousedownEvt) {
+    const $draggable = $(this);
+    const x = mousedownEvt.pageX - $draggable.offset().left,
         y = mousedownEvt.pageY - $draggable.offset().top;
-    $("body").on("mousemove.draggable", function(mousemoveEvt) {
+    $("body").on("mousemove.draggable", function (mousemoveEvt) {
         $draggable.closest(".modal-content").offset({
             "left": mousemoveEvt.pageX - x,
             "top": mousemoveEvt.pageY - y
         });
     });
-    $("body").one("mouseup", function() {
+    $("body").one("mouseup", function () {
         $("body").off("mousemove.draggable");
     });
-    $draggable.closest(".modal").one("bs.modal.hide", function() {
+    $draggable.closest(".modal").one("bs.modal.hide", function () {
         $("body").off("mousemove.draggable");
     });
 });

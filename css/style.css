@@ -91,6 +91,7 @@ span[id^="filename_"] {
     font-size: 36px;
     transition: all 0.3s ease-in-out;
 }
+
 #controlsWrapper .row, #transport-controls {
     min-width: 850px;
     white-space: nowrap;
@@ -301,9 +302,10 @@ region.wavesurfer-region[data-region-highlight] {
     background: slategray;
     border-radius: 0.25em;
 }
+
 /* Handle on hover */
 ::-webkit-scrollbar-thumb:hover {
-  background: orangered;
+    background: orangered;
 }
 
 footer {
@@ -316,8 +318,8 @@ footer {
 }
 
 #fullscreen {
-    margin:5px;
-    position:absolute;
+    margin: 5px;
+    position: absolute;
     z-index: 10;
     right: 0em;
 }
@@ -465,12 +467,28 @@ footer {
 }
 
 .vala {
-    background: rgba(255,128,0,0.5)
+    background: rgba(255, 128, 0, 0.5)
 }
 
 /*
-Move cursor on modal header
+Modal customisations
  */
-.modal-header {
+/* Move header */
+.modal-header:active {
     cursor: move;
+}
+
+#detectionsModalBody {
+    background: #dbe2ed url(../img/Redwing-flight.png);
+    min-height: 220px;
+    max-height: 550px;
+}
+
+/* Remove darken effect */
+.modal-backdrop {
+    opacity: 0.0 !important;
+}
+
+.modal-content {
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
 }

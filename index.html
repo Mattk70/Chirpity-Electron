@@ -8,15 +8,15 @@
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' https:">
 
     <!-- Bootstrap & CSS-->
-    <script src="./node_modules/jquery/dist/jquery.min.js"></script>
+    <script defer src="./node_modules/jquery/dist/jquery.min.js"></script>
     <link rel="stylesheet" href="./node_modules/bootstrap/dist/css/bootstrap.min.css"/>
-    <script src="./node_modules/@popperjs/core/dist/umd/popper.min.js"></script>
-    <script src="./node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
+    <script defer src="./node_modules/@popperjs/core/dist/umd/popper.min.js"></script>
+    <script defer src="./node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
     <!-- Additional JavaScript & CSS -->
     <link rel="stylesheet" href="css/style.css"/>
     <link rel="stylesheet" href="css/daterangepicker.css"/>
-    <script src="js/moment.min.js"></script>
-    <script src="js/daterangepicker.js"></script>
+    <script defer src="js/moment.min.js"></script>
+    <script defer src="js/daterangepicker.js"></script>
 
     <!-- App title -->
     <title>Chirpity Bird Call Detection</title>
@@ -47,7 +47,7 @@
                             <li><a class="dropdown-item disabled" id="exportMP3" href="#">
                                 Export Selected Audio</a></li>
                             <li>
-                                <hr class="dropdown-divider"></hr>
+                                <hr class="dropdown-divider">
                             <li><a class="dropdown-item" href="#" id="exit">Exit</a></li>
                         </ul>
                     </li>
@@ -277,9 +277,6 @@
                                             </li>
                                         </ul>
                                     </li>
-
-                                    </li>
-
                                 </ul>
                             </li>
                         </ul>
@@ -308,7 +305,7 @@
 </div>
 <!-- Content wrapper -->
 <div id="contentWrapper">
-    <!-- DIV to Hold the bird list (its parking lot!) -->
+    <!-- DIV to Hold the bird list  -->
     <div id="allSpecies" class="d-none"></div>
     <div id="seenSpecies" class="d-none"></div>
 
@@ -344,6 +341,40 @@
             </div>
         </div>
     </div>
+    <!-- Analyse selection modal -->
+    <div class="modal fade" id="detectionsModal" tabindex="-1" aria-labelledby="detectionsModalLabel"
+         aria-hidden="true">
+        <div class="modal-dialog  modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center text-bg-dark">
+                    <h5 class="modal-title" id="detectionsModalLabel">Audio Selection Analysis</h5>
+                </div>
+                <div id="detectionsModalBody" class="modal-body p-0 ">
+                    <table id='selectionResults' class="text-center table table-hover w-100">
+                        <thead id="selectionResultsHead">
+                        <tr class="text-bg-dark">
+                            <th class="col">#</th>
+                            <th class="col timestamp">Time</th>
+                            <th class="text-start">Position</th>
+                            <th class="text-start">Species</th>
+                            <th class="col">Play</th>
+                            <th class="col">XC</th>
+                            <th class="col">Delete</th>
+                            <th class="">Label</th>
+                            <th class="col text-end">Notes</th>
+                        </tr>
+                        </thead>
+                        <tbody class="text-dark" id="selectionResultTableBody">
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-success" data-bs-dismiss="modal">Add Detections</button>
+                    <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Discard Detections</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <!-- Load audio file hint -->
     <div class="d-flex h-100 flex-column text-dark align-items-center justify-content-center" id="loadFileHint">
         <div class="">
@@ -375,12 +406,15 @@
     <div class="w-100 d-none" id="spectrogramWrapper">
         <div>
             <div class="bg-dark border border-secondary w-100" id="timeline"></div>
-            <div class="w-100" id="spectrogram">                    <span style="max-width: 70px" title="Toggle Fullscreen mode" id="fullscreen"
-                          class="material-icons-two-tone btn btn-outline-secondary p-1 pointer d-none">fullscreen</span></div>
+            <div class="w-100" id="spectrogram">
+                <span style="max-width: 70px;visibility: inherit"
+                      title="Toggle Fullscreen mode" id="fullscreen"
+                      class="material-icons-two-tone btn btn-outline-secondary p-1 pointer d-none">fullscreen</span>
+            </div>
             <div class="w-100" id="waveform"></div>
         </div>
         <!-- Controls view -->
-        <div class="container-fluid p-1 bg-dark text-white d-inline-flex" id="controlsWrapper"
+        <div class="container-fluid p-1 text-bg-dark d-inline-flex" id="controlsWrapper"
              style="max-height: 50px">
 
             <div id="filename" class="col-5 ps-1 overflow-visible flex-nowrap"></div>
@@ -526,23 +560,22 @@
     </div>
 </div>
 
-</script>
 
 <!-- Footer -->
-<footer class="p-1 bg-primary text-white" id="footer">
+<footer class="p-1 text-bg-primary" id="footer">
     <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span></small>
 </footer>
-<script src="node_modules/wavesurfer.js/dist/wavesurfer.min.js"></script>
-<script src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js"></script>
-<script src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js"></script>
-<script src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.regions.min.js"></script>
-<script src="js/highcharts.js"></script>
-<script src="js/series-label.js"></script>
-<script src="js/exporting.js"></script>
-<script src="js/export-data.js"></script>
-<script src="js/accessibility.js"></script>
-<script src="js/no-data-to-display.js"></script>
+<script defer src="node_modules/wavesurfer.js/dist/wavesurfer.min.js"></script>
+<script defer src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js"></script>
+<script defer src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js"></script>
+<script defer src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.regions.min.js"></script>
+<script defer src="js/highcharts.js"></script>
+<script defer src="js/series-label.js"></script>
+<script defer src="js/exporting.js"></script>
+<script defer src="js/export-data.js"></script>
+<script defer src="js/accessibility.js"></script>
+<script defer src="js/no-data-to-display.js"></script>
 
-<script src="./js/ui.js"></script>
+<script defer src="./js/ui.js"></script>
 </body>
 </html>

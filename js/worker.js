@@ -250,7 +250,7 @@ ipcRenderer.on('new-client', (event) => {
                 await onUpdateFileStart(args)
                 break;
             case 'get-detected-species-list':
-                getSpecies(diskDB, args.range);
+                getSpecies(args.range);
                 break;
             case 'create-dataset':
                 saveResults2DataSet();
@@ -1174,7 +1174,7 @@ async function parseMessage(e) {
                 // This is the one time results *do not* come from the database
                 if (!batchInProgress) {
                     if (STATE.db === diskDB) await getResults({files: OPENFILES})
-                    await getSummary({files: OPENFILES});
+                    if (response['resetResults']) await getSummary({files: OPENFILES});
                 } else {
                     UI.postMessage({
                         event: 'prediction-done', batchInProgress: true,
@@ -1205,7 +1205,7 @@ async function processNextFile({
                 const result = `No predictions.for ${file}. It has no period within it where predictions would be given`;
                 if (!FILE_QUEUE.length) {
                     UI.postMessage({
-                        event: 'prediction-ongoing', file: file, result: result, index: -1, resetResults: false,
+                        event: 'prediction-ongoing', file: file, result: result, index: -1, resetResults: true,
                     });
                 }
                 UI.postMessage({
@@ -1337,7 +1337,8 @@ const getResults = async ({
                               species = undefined,
                               context = 'results',
                               limit = 500,
-                              offset = undefined
+                              offset = undefined,
+                              resetResults = true
                           }) => {
     if (offset === undefined) { // Get offset state
         if (species) {
@@ -1369,8 +1370,8 @@ const getResults = async ({
                     file: result.file,
                     result: result,
                     index: index,
-                    resetResults: false,
-                    fromDB: true
+                    resetResults: resetResults,
+                    isFromDB: true
                 });
                 // Recreate Audacity labels
                 const file = result.file
@@ -1383,6 +1384,10 @@ const getResults = async ({
             }
         }, async (err, count) => {   //on finish
             if (err) console.log(err);
+            if (!count && !resetResults) {
+                // No more detections in the selection
+                UI.postMessage({event: 'no-detections-remain'})
+            }
             if (!count && species) await getResults({
                 files: files,
                 range: range,
@@ -1588,14 +1593,14 @@ const getRate = (species) => {
     })
 }
 
-const getSpecies = (db, range) => {
+const getSpecies = (range) => {
     const where = range && range.start ? `WHERE dateTime BETWEEN ${range.start} AND ${range.end}` : '';
-    db.all(`SELECT DISTINCT cname, sname, COUNT(cname) as count
-            FROM records
-                INNER JOIN species
-            ON birdid1 = id ${where}
-            GROUP BY cname
-            ORDER BY cname`, (err, rows) => {
+    diskDB.all(`SELECT DISTINCT cname, sname, COUNT(cname) as count
+                FROM records
+                    INNER JOIN species
+                ON birdid1 = id ${where}
+                GROUP BY cname
+                ORDER BY cname`, (err, rows) => {
         if (err) console.log(err); else {
             UI.postMessage({event: 'seen-species-list', list: rows})
         }
@@ -1630,16 +1635,24 @@ const onUpdateFileStart = async (args) => {
 const prepSQL = (string) => string.replaceAll("''", "'").replaceAll("'", "''");
 
 async function onDelete({file, start, active, species, files, context = 'results', order, explore, range}) {
-    const db = STATE.db;
+    const db = explore  ? diskDB : STATE.db;
     file = prepSQL(file);
     const {filestart} = await db.getAsync(`SELECT filestart
                                            from files
                                            WHERE name = '${file}'`);
     const datetime = filestart + (parseFloat(start) * 1000);
     await db.runAsync('DELETE FROM records WHERE datetime = ' + datetime);
-    await getResults(arguments[0]);
-    await getSummary(arguments[0]);
-    await getSpecies(db, range);
+    if (context === 'selection') {
+        // Add resetResults to arguments[0]
+        arguments[0].resetResults = false;
+        await getResults(arguments[0]);
+    } else {
+        await getResults(arguments[0]);
+        await getSummary(arguments[0]);
+        if (db === diskDB) {
+            await getSpecies(range);
+        }
+    }
 }
 
 async function onUpdateRecord({
@@ -1647,16 +1660,17 @@ async function onUpdateRecord({
                                   currentFile = '',
                                   start = 0,
                                   value = '',
-                                  db = STATE.db,
                                   isBatch = false,
                                   from = '',
                                   what = 'birdID1',
                                   order = 'timestamp',
                                   isFiltered = false,
                                   isExplore = false,
+                                  context = 'results',
                                   range = {},
                                   active = undefined
                               }) {
+    const db = isExplore && context !== "selectionResults" ? diskDB : STATE.db;
     // Construct the SQL
     let whatSQL = '', whereSQL = '';
     value = prepSQL(value);
@@ -1693,16 +1707,20 @@ async function onUpdateRecord({
         console.log(`Update without transaction took ${Date.now() - t0} milliseconds`);
         const species = isFiltered || isExplore ? from : '';
         if (isExplore) openFiles = [];
+
         await getResults({
             db: db,
+            range: range,
             files: openFiles,
             species: species,
             explore: isExplore,
-            order: order
+            order: order,
+            resetResults: context !== 'selectionResults'
         });
-        await getSummary({db: db, files: openFiles, species: species, explore: isExplore, active: active});
-        // Update the species list
-        await getSpecies(db, range);
+        if (context !== 'selectionResults') {
+            await getSummary({db: db, files: openFiles, species: species, explore: isExplore, active: active});// Update the species list
+            await getSpecies(range);
+        }
         if (db === memoryDB) {
             UI.postMessage({
                 event: 'generate-alert', message: 'Remember to save your records to store this change'
@@ -1715,7 +1733,7 @@ async function onUpdateRecord({
 
 async function onChartRequest(args) {
     console.log(`Getting chart for ${args.species} starting ${args.range[0]}`);
-    const dateRange = args.range, results = {},  dataRecords = {};
+    const dateRange = args.range, results = {}, dataRecords = {};
     // Escape apostrophes
     if (args.species) {
         args.species = prepSQL(args.species);
