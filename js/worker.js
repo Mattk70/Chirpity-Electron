@@ -6,7 +6,6 @@ let BATCH_SIZE;
 const adding_chirpity_additions = true;
 let labels;
 const sqlite3 = require('sqlite3').verbose();
-
 sqlite3.Database.prototype.runAsync = function (sql, ...params) {
     return new Promise((resolve, reject) => {
         this.run(sql, params, function (err) {
@@ -46,6 +45,7 @@ let TEMP, appPath, CACHE_LOCATION;
 const staticFfmpeg = require('ffmpeg-static-electron');
 const {stat} = require("fs/promises");
 const {mem} = require("systeminformation");
+const {reset} = require("electron-settings");
 console.log(staticFfmpeg.path);
 ffmpeg.setFfmpegPath(staticFfmpeg.path);
 
@@ -57,17 +57,16 @@ let t0; // Application profiler
 
 //Object will hold files in the diskDB, and the active timestamp from the most recent selection analysis.
 let STATE;
-const setState = () => {
+const resetState = (db) => {
     STATE = {
-        db: undefined,
+        db: db,
         saved: new Set(), // list of files requested that are in the disk database
-        activeTimestamp: undefined, // Active Timestamp from most recent selection ID / active row
         globalOffset: 0, // Current start number for unfiltered results
-        filteredOffset: {} // Current species start number for filtered results
-
+        filteredOffset: {}, // Current species start number for filtered results
+        selection: false
     }
 }
-setState();
+resetState();
 
 const createDB = async (file) => {
     const archiveMode = !!file;
@@ -308,6 +307,9 @@ ipcRenderer.on('new-client', (event) => {
             case 'abort':
                 onAbort(args);
                 break;
+            case 'selection-off':
+                STATE.selection = false;
+                break;
             case 'chart':
                 await onChartRequest(args);
                 break;
@@ -367,8 +369,8 @@ async function onAnalyse({
                              confidence = minConfidence,
                              list = 'everything'
                          }) {
-
     const selection = !!end; // if end was passed, this is a selection
+    STATE.selection = selection;
     console.log(`Worker received message: ${filesInScope}, ${confidence}, start: ${start}, end: ${end}, list ${list}`);
     minConfidence = confidence;
     predictWorker.postMessage({message: 'list', list: list})
@@ -376,28 +378,27 @@ async function onAnalyse({
     OPENFILES = filesInScope;
     index = 0;
     AUDACITY = {};
-
     COMPLETED = [];
     UI.postMessage('reset-results');
     const toAnalyse = currentFile ? [currentFile] : filesInScope;
 
-    if (!selection && !reanalyse) {
-        // check if results for the files are cached (we only consider it cached if all files have been saved to the disk DB)
-        let allCached = true;
-        for (let i = 0; i < toAnalyse.length; i++) {
-            if (!await isDuplicate(toAnalyse[i])) {
-                allCached = false;
-                break;
-            }
+    STATE.db = memoryDB;
+    // check if results for the files are cached (we only consider it cached if all files have been saved to the disk DB)
+    let allCached = true;
+    for (let i = 0; i < toAnalyse.length; i++) {
+        if (!await isDuplicate(toAnalyse[i])) {
+            allCached = false;
+            break;
         }
-        if (allCached) {
-            STATE.db = diskDB;
+    }
+    if (allCached && !reanalyse) {
+        STATE.db = diskDB;
+        if (!selection) {
             await getResults({db: diskDB, files: toAnalyse});
             await getSummary({files: toAnalyse})
             return
         }
     }
-    STATE.db = memoryDB;
     for (let i = 0; i < toAnalyse.length; i++) {
         let file = toAnalyse[i];
         // Set global var, for parsePredictions
@@ -405,7 +406,7 @@ async function onAnalyse({
         console.log(`Adding ${file} to the queue.`)
         if (!predicting) {
             // Clear state unless analysing a selection
-            if (!selection) setState();
+            if (!selection) resetState(STATE.db);
             predicting = true;
             await processNextFile(arguments[0]);
         }
@@ -570,15 +571,16 @@ async function loadAudioFile({
                                  end = 20,
                                  position = 0,
                                  region = false,
-                                 doubleBuffer = false,
-                                 preserveResults = false
+                                 preserveResults = false,
+                                 play = false,
+                                 resetSpec = true
                              }) {
     const found = await getWorkingFile(file);
     if (found) {
         await fetchAudioBuffer({file, start, end})
             .then((buffer) => {
                 const length = buffer.length;
-                const myArray = buffer.getChannelData(0);
+                const audioArray = buffer.getChannelData(0);
                 UI.postMessage({
                     event: 'worker-loaded-audio',
                     fileStart: metadata[file].fileStart,
@@ -587,10 +589,11 @@ async function loadAudioFile({
                     file: file,
                     position: position,
                     length: length,
-                    contents: myArray,
-                    region: region,
+                    contents: audioArray,
+                    fileRegion: region,
                     preserveResults: preserveResults,
-                    doubleBuffer: doubleBuffer
+                    play: play,
+                    resetSpec: resetSpec
                 });
             })
             .catch(e => {
@@ -737,10 +740,10 @@ const getPredictBuffers = async ({
     // Ensure max and min are within range
     start = Math.max(0, start);
     end = Math.min(metadata[file].duration, end);
-
     if (start > metadata[file].duration) {
         return
     }
+    const duration = end - start;
     const byteStart = convertTimeToBytes(start, metadata[file]);
     const byteEnd = convertTimeToBytes(end, metadata[file]);
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
@@ -761,7 +764,7 @@ const getPredictBuffers = async ({
                 const myArray = resampled.getChannelData(0);
                 const samples = parseInt(((end - start) * sampleRate).toFixed(0));
                 const increment = samples < chunkLength ? samples : chunkLength;
-                feedChunksToModel(myArray, increment, chunkStart, file, end, resetResults);
+                feedChunksToModel(myArray, increment, chunkStart, file, duration, resetResults);
                 chunkStart += 3 * BATCH_SIZE * sampleRate;
                 // Now the async stuff is done ==>
                 readStream.resume();
@@ -773,7 +776,7 @@ const getPredictBuffers = async ({
             console.log('Short chunk', chunk.length, 'skipping')
             // Create array with 0's (short segment of silence that will trigger the finalChunk flag
             const myArray = new Float32Array(new Array(1000).fill(0));
-            feedChunksToModel(myArray, chunkLength, chunkStart, file, end, resetResults);
+            feedChunksToModel(myArray, chunkLength, chunkStart, file, duration, resetResults);
             readStream.resume();
         }
     })
@@ -848,10 +851,16 @@ function sendMessageToWorker(chunkStart, chunks, file, duration, resetResults, p
     let chunkBuffers = {};
     // Key chunks by their position
     let position = chunkStart;
-    chunks.forEach(chunk => {
-        chunkBuffers[position] = chunk;
+    for (let i = 0; i < chunks.length; i++) {
+        // Use  1 second min chunk duration  if > 1 chunk
+        if (i && chunks[i].length < 24000) break;
+        chunkBuffers[position] = chunks[i];
         position += sampleRate * 3;
-    })
+    }
+    // chunks.forEach(chunk => {
+    //     chunkBuffers[position] = chunk;
+    //     position += sampleRate * 3;
+    // })
     objData['chunks'] = chunkBuffers;
     predictWorker.postMessage(objData, chunkBuffers);
 }
@@ -1043,8 +1052,8 @@ async function saveMP3(file, start, end, filename, metadata) {
 function spawnWorker(model, list, batchSize, warmup) {
     predictWorker = new Worker('./js/model.js');
     //const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
-    const modelPath = model === 'efficientnet' ? '../test_24000_v10/' : '../24000_v9/';
-    //const modelPath = model === 'efficientnet' ? '../test_2022128_EfficientNetB3_wd=10xlr_sigmoid_focal_crossentropy_256x384_AdamW_447/' : '../24000_v9/';
+    //const modelPath = model === 'efficientnet' ? '../test_24000_v10/' : '../24000_v9/';
+    const modelPath = model === 'efficientnet' ? '../test_2022128_EfficientNetB3_wd=10xlr_sigmoid_focal_crossentropy_256x384_AdamW_447/' : '../24000_v9/';
     //const modelPath = model === 'efficientnet' ? '../test_20221222_EfficientNetB3_wd=10xlr_sigmoid_focal_crossentropy_256x384_AdamW_447/' : '../24000_v9/';
     console.log(modelPath);
     // Now we've loaded a new model, clear the aborted flag
@@ -1061,8 +1070,6 @@ const parsePredictions = async (response) => {
     const result = response['result'];
     file = response.file;
     let fileSQL = prepSQL(file);
-    // If we are working on a saved file, use the disk db
-    STATE.db = STATE.saved.has(file) ? diskDB : memoryDB;
     const db = STATE.db;
     for (let i = 0; i < result.length; i++) {
         const prediction = result[i];
@@ -1073,21 +1080,14 @@ const parsePredictions = async (response) => {
             const result = prediction[1];
             const audacity = prediction[2];
             index++;
-            if (!response['resetResults']) {
-                // This is a selection, create a result flag to allow the UI to scroll to its position
-                STATE['activeTimestamp'] = result.timestamp;
-            } else {
-                STATE['activeTimestamp'] = undefined
-            }
-            if (db === memoryDB) {
-                UI.postMessage({
-                    event: 'prediction-ongoing',
-                    file: file,
-                    result: result,
-                    index: index,
-                    resetResults: response['resetResults'],
-                });
-            }
+            UI.postMessage({
+                event: 'prediction-ongoing',
+                file: file,
+                result: result,
+                index: index,
+                resetResults: response['resetResults'],
+                selection: STATE.selection
+            });
             AUDACITY[file] ? AUDACITY[file].push(audacity) : AUDACITY[file] = [audacity];
             //save result to memory db (N.B. tried using transactions, but was no faster.
             // Also, transactions had to start end in other functions, which is bad style!
@@ -1134,7 +1134,8 @@ const parsePredictions = async (response) => {
                 file: file,
                 result: result,
                 index: 1,
-                resetResults: response['resetResults']
+                resetResults: response['resetResults'],
+                selection: STATE.selection
             });
         }
         console.log(`Prediction done ${FILE_QUEUE.length} files to go`);
@@ -1173,8 +1174,10 @@ async function parseMessage(e) {
                 await clearCache(CACHE_LOCATION, limit);
                 // This is the one time results *do not* come from the database
                 if (!batchInProgress) {
-                    if (STATE.db === diskDB) await getResults({files: OPENFILES})
-                    if (response['resetResults']) await getSummary({files: OPENFILES});
+                    if (!STATE.selection) {
+                        if (STATE.db === diskDB) await getResults({files: OPENFILES})
+                        await getSummary({files: OPENFILES});
+                    }
                 } else {
                     UI.postMessage({
                         event: 'prediction-done', batchInProgress: true,
@@ -1329,6 +1332,20 @@ const dbSpeciesCheck = async () => {
     }
 }
 
+/**
+ *
+ * @param db: whether to use memory or disk db for searches
+ * @param range: a datetime start and end to use in a where clause
+ * @param order: sort order for explore
+ * @param files: files to query for detections
+ * @param species: filter for SQL query
+ * @param context: can be 'results', 'resultSummary' or 'selectionResults
+ * @param limit: thee pagination limit
+ * @param offset: is the SQL query offset to use
+ * @param resetResults: is false when mid-way through a multi-file analysis, and during selection analysis
+ *
+ * @returns {Promise<integer> } A count orf the records retrieved
+ */
 const getResults = async ({
                               db = STATE.db,
                               range = undefined,
@@ -1340,7 +1357,8 @@ const getResults = async ({
                               offset = undefined,
                               resetResults = true
                           }) => {
-    if (offset === undefined) { // Get offset state
+    if (STATE.selection) offset = 0;
+    else if (offset === undefined) { // Get offset state
         if (species) {
             if (!STATE.filteredOffset[species]) STATE.filteredOffset[species] = 0;
             offset = STATE.filteredOffset[species];
@@ -1371,7 +1389,8 @@ const getResults = async ({
                     result: result,
                     index: index,
                     resetResults: resetResults,
-                    isFromDB: true
+                    isFromDB: true,
+                    selection: STATE.selection
                 });
                 // Recreate Audacity labels
                 const file = result.file
@@ -1384,9 +1403,10 @@ const getResults = async ({
             }
         }, async (err, count) => {   //on finish
             if (err) console.log(err);
-            if (!count && !resetResults) {
+            if (!count && STATE.selection) {
                 // No more detections in the selection
-                UI.postMessage({event: 'no-detections-remain'})
+                UI.postMessage({event: 'no-detections-remain'});
+                STATE.selection = false
             }
             if (!count && species) await getResults({
                 files: files,
@@ -1395,7 +1415,7 @@ const getResults = async ({
                 limit: limit,
                 offset: offset
             })
-            return resolve(offset)
+            return resolve(count)
         })
     })
 }
@@ -1634,8 +1654,19 @@ const onUpdateFileStart = async (args) => {
 
 const prepSQL = (string) => string.replaceAll("''", "'").replaceAll("'", "''");
 
-async function onDelete({file, start, active, species, files, context = 'results', order, explore, range}) {
-    const db = explore  ? diskDB : STATE.db;
+async function onDelete({
+                            file,
+                            start,
+                            active,
+                            species,
+                            files,
+                            context = 'results',
+                            order,
+                            explore,
+                            range,
+                            batch = false
+                        }) {
+    const db = explore ? diskDB : STATE.db;
     file = prepSQL(file);
     const {filestart} = await db.getAsync(`SELECT filestart
                                            from files
@@ -1643,9 +1674,12 @@ async function onDelete({file, start, active, species, files, context = 'results
     const datetime = filestart + (parseFloat(start) * 1000);
     await db.runAsync('DELETE FROM records WHERE datetime = ' + datetime);
     if (context === 'selection') {
-        // Add resetResults to arguments[0]
-        arguments[0].resetResults = false;
-        await getResults(arguments[0]);
+        // Is this the last of  multiple deletions?
+        if (!batch) {
+            // Add resetResults to arguments[0]
+            arguments[0].resetResults = false;
+            await getResults(arguments[0]);
+        }
     } else {
         await getResults(arguments[0]);
         await getSummary(arguments[0]);
