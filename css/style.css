@@ -47,6 +47,9 @@ html, body {
     position: absolute;
     width: 100%;
 }
+.spec-labels {
+    width: 55px!important;
+}
 
 /*#fileNotLoaded {*/
 /*    position: relative;*/
@@ -486,7 +489,7 @@ Modal customisations
 
 /* Remove darken effect */
 .modal-backdrop {
-    opacity: 0.0 !important;
+    opacity: 0.1 !important;
 }
 
 .modal-content {

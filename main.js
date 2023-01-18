@@ -1,13 +1,11 @@
-const {app, dialog, ipcMain, MessageChannelMain, BrowserWindow} = require('electron');
+const {app, dialog, ipcMain, MessageChannelMain, BrowserWindow, powerSaveBlocker} = require('electron');
 const fs = require("fs");
 const path = require('path');
 const settings = require('electron-settings');
-const p = require("path");
-const {readdir, lstat} = require('node:fs/promises');
-const { shell } = require('systeminformation');
 //require('update-electron-app')();
 global.sharedObject = {prop1: process.argv};
 let files = [];
+
 //Updater
 //const server = 'https://chirpity-electron-releases.vercel.app';
 //console.log('process platform ' + process.platform)
@@ -32,7 +30,8 @@ let files = [];
 //})
 process.stdin.resume();//so the program will not close instantly
 
-
+// Stop system sleep
+ powerSaveBlocker.start('prevent-app-suspension');
 const clearCache = (file_cache) => {
     return new Promise((resolve) => {
         // clear & recreate file cache folder
@@ -364,3 +363,4 @@ ipcMain.handle('saveFile', (event, arg) => {
     });
     mainWindow.webContents.send('saveFile', {message: 'file saved!'});
 })
+
