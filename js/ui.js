@@ -123,18 +123,18 @@ const sampleRate = 24000;
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
 
 
-//////// Collect Diagnostics Information ////////
-// Diagnostics keys:
-// GPUx - name of GPU(s)
-// backend: tensorflow backend in use
-// warmup: time to warm up model (seconds)
-// "Analysis Duration": time on detections (seconds)
-// "Audio Duration": length of audio (seconds)
-// "Chirpity Version": app version
-// "Model": model in use
-// "Tensorflow Backend"
-// Analysis Rate: x real time performance
-
+/** Collect Diagnostics Information
+ Diagnostics keys:
+ GPUx - name of GPU(s)
+ backend: tensorflow backend in use
+ warmup: time to warm up model (seconds)
+ "Analysis Duration": time on detections (seconds)
+ "Audio Duration": length of audio (seconds)
+ "Chirpity Version": app version
+ "Model": model in use
+ "Tensorflow Backend"
+ Analysis Rate: x real time performance
+ */
 // Timers
 let t0_warmup, t1_warmup, t0_analysis, t1_analysis;
 
@@ -2300,9 +2300,12 @@ async function renderResult({
                             }) {
     const isFromCache = isFromDB;
     let tr = '';
-    if (index === 1) {
-        //if (wavesurfer) resetRegions()
-        selection ? selectionTable.innerHTML = '' : showElement(['resultTableContainer'], false);
+    if (index <= 1) {
+        if (selection) selectionTable.innerHTML = '';
+        else {
+           showElement(['resultTableContainer'], false);
+           resultTable.innerHTML = '';
+        }
     } else if (!isFromCache && index > config.limit) {
         if (index % (config.limit + 1) === 0) addPagination(index, 0);
         return
@@ -2387,15 +2390,24 @@ const detectionsModalDiv = document.getElementById('detectionsModal')
 detectionsModalDiv.addEventListener('hide.bs.modal', () => {
     resetRegions();
     worker.postMessage({action: "selection-off"})
+    worker.postMessage({
+        action: 'filter',
+        species: isSpeciesViewFiltered(true),
+        files: fileList,
+        explore: isExplore(),
+        order: STATE.explore.order
+    });
     analyseList = undefined;
 })
 
 const detectionsDismiss = document.getElementById('detections-dismiss');
 detectionsDismiss.addEventListener('click', event => {
     const rows = detectionsModalDiv.querySelectorAll('tr');
+    let count = 0;
     rows.forEach(row => {
+        count++;
         if (!row.classList.contains('text-bg-dark')) {
-            deleteRecord(row, true);
+            deleteRecord(row, rows.length - count);
         }
     })
 })
