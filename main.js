@@ -46,7 +46,6 @@ async function exitHandler(options, exitCode) {
     if (options.cleanup) {
         const tmp_folder = path.join(app.getPath('temp'), 'chirpity');
         // size of cache
-        const stat = fs.statSync(tmp_folder);
         await clearCache(tmp_folder);
         console.log('cleaned ' + tmp_folder)
     } else {
