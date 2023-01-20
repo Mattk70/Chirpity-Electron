@@ -437,7 +437,7 @@
                         style="max-width: 70px"><span class="material-icons-two-tone zoom align-middle">zoom_out</span>
                 </button>
             </div>
-            <div id="progressDiv" class="col-3" style="display:none"><span>Processing...</span><span
+            <div id="progressDiv" class="col-2" style="display:none"><span
                     id="fileNumber"></span><br>
                 <div class="progress w-100">
                     <div class="progress-bar progress-bar-striped active" role="progressbar" aria-valuenow="0"
@@ -447,7 +447,7 @@
                 </div>
             </div>
 
-            <div id="complete" class="col-3 pe-2" style="display:none">
+            <div id="complete" class="col-2 pe-2" style="display:none">
                 <!-- Button trigger modal -->
                 <button type="button" class="float-end text-nowrap btn btn-primary align-bottom"
                         id="showSummary">
@@ -456,9 +456,15 @@
             </div>
             <div class="col pe-1">
                 <div class="btn-group float-end">
-                    <span style="max-width: 70px" title="Toggle Nocmig mode&#10;(Only analyse detections at night)"
+                    <span style="max-width: 70px" title="Nocmig mode on"
                           id="nocmigMode"
                           class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">bedtime</span>
+                    <span style="max-width: 70px"
+                          id="list-icon"
+                          class="btn btn-outline-secondary p-1 pointer icon-container"><img class="icon" src="img/migrants.png"></span>
+                    <span style="max-width: 70px" title="Prediction confidence threshold"
+                          id="threshold-value"
+                          class="btn  btn-outline-secondary p-1 fs-5 pointer icon-container"><b>50%</b></span>
                 </div>
             </div>
         </div>
@@ -563,7 +569,7 @@
 
 <!-- Footer -->
 <footer class="p-1 text-bg-primary" id="footer">
-    <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span></small>
+    <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span><br><a href="https://www.flaticon.com/free-icons/">Some icons created by Freepik - Flaticon</a></small>
 </footer>
 <script defer src="node_modules/wavesurfer.js/dist/wavesurfer.min.js"></script>
 <script defer src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js"></script>

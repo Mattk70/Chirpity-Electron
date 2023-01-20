@@ -50,15 +50,15 @@ html, body {
 .spec-labels {
     width: 55px!important;
 }
+.icon{
+    max-height: 30px;
+    max-width:  30px;
+    filter: invert(45%);
+}
 
-/*#fileNotLoaded {*/
-/*    position: relative;*/
-/*    font-size: calc(100% + 4vw);*/
-/*    z-index: 0;*/
-/*    width: 100%;*/
-/*    text-align: center;*/
-/*}*/
-
+#list-icon:hover > img{
+    filter: invert(100%);
+}
 
 tr[id^="sub"] {
     font-size: 12px;

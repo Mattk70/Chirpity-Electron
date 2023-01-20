@@ -727,6 +727,7 @@ thresholdLink.addEventListener('blur', (e) => {
     const threshold = e.target.value;
     if (100 >= threshold && threshold > 0) {
         config.minConfidence = parseFloat(e.target.value) / 100;
+        thresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
         updatePrefs();
         worker.postMessage({
             action: 'set-variables',
@@ -1069,15 +1070,17 @@ window.onload = async () => {
             }
             // Add a checkmark to the list in use
             window[config.list].checked = true;
-
+            // And update the icon
+            updateListIcon();
             config.timeOfDay ? timeOfDay.checked = true : timecode.checked = true;
             // Spectrogram colour
             config.colormap === 'inferno' ? inferno.checked = true : greys.checked = true;
             // Nocmig mode state
             console.log('nocmig mode is ' + config.nocmig)
             nocmigButton.innerText = config.nocmig ? 'bedtime' : 'bedtime_off';
-
+            nocmigButton.title = config.nocmig ? 'Nocmig mode on' : 'Nocmig mode off';
             thresholdLink.value = config.minConfidence * 100;
+            thresholdDisplay.innerHTML = `<b>${config.minConfidence * 100}%</b>`;
 
             showElement([config.colormap], true)
             t0_warmup = Date.now();
@@ -1756,6 +1759,7 @@ const listToUse = document.getElementsByName('list');
 for (let i = 0; i < listToUse.length; i++) {
     listToUse[i].addEventListener('click', function (e) {
         config.list = e.target.value;
+        updateListIcon();
         updatePrefs();
         worker.postMessage({action: 'update-model', list: config.list})
     })
@@ -2071,7 +2075,7 @@ function onProgress(args) {
         fileNumber.innerText = args.text;
     } else {
         const count = fileList.indexOf(args.file) + 1;
-        fileNumber.innerText = `(File ${count} of ${fileList.length})`;
+        fileNumber.innerText = `${count} / ${fileList.length}`;
     }
     let progress = (args.progress * 100).toFixed(1);
     progressBar.width(progress + '%');
@@ -2183,9 +2187,10 @@ async function onPredictionDone({
         // Refresh node and scroll to active row:
         activeRow = document.getElementById(active)
         if (activeRow === null) { // because: after an edit the active row may not exist
-            const rows = resultTable.querySelectorAll('.daytime, .nighttime')
+            resultTable = document.getElementById('resultTableBody');
+            const rows = resultTable.querySelectorAll('tr.daytime, tr.nighttime')
             if (rows.length) {
-                activeRow = rows[0];
+                activeRow = rows[rows.length - 1];
             }
         }
         activeRow.focus();
@@ -2303,8 +2308,8 @@ async function renderResult({
     if (index <= 1) {
         if (selection) selectionTable.innerHTML = '';
         else {
-           showElement(['resultTableContainer'], false);
-           resultTable.innerHTML = '';
+            showElement(['resultTableContainer'], false);
+            resultTable.innerHTML = '';
         }
     } else if (!isFromCache && index > config.limit) {
         if (index % (config.limit + 1) === 0) addPagination(index, 0);
@@ -2734,9 +2739,11 @@ nocmigButton.addEventListener('click', function () {
     if (config.nocmig) {
         config.nocmig = false;
         nocmigButton.innerText = 'bedtime_off';
+        nocmigButton.title = 'Nocmig mode off';
     } else {
         config.nocmig = true;
         nocmigButton.innerText = 'bedtime';
+        nocmigButton.title = 'Nocmig mode on';
     }
     worker.postMessage({
         action: 'set-variables',
@@ -2995,3 +3002,41 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     // end if innerWidth
 });
+
+// list mode icons
+const listIcon = document.getElementById('list-icon')
+const updateListIcon = () => {
+    const icon = listIcon.querySelector('img');
+    icon.src = icon.src.replace(/\w+\.png$/, config.list + '.png');
+    const states = {
+        migrants: 'Searching for migrants and owls',
+        birds: 'Searching for all birds',
+        everything: 'Searching for everything'
+    };
+    icon.title = states[config.list];
+}
+listIcon.addEventListener('click', () => {
+    let img = listIcon.querySelector('img')
+    const states = {
+        migrants: 'Searching for migrants and owls',
+        birds: 'Searching for all birds',
+        everything: 'Searching for everything'
+    };
+    const keys = Object.keys(states);
+    for (let key in Object.keys(states)) {
+        key = parseInt(key);
+        if (img.src.indexOf(keys[key]) !== -1) {
+            const replace = (key === keys.length - 1) ? 0 : key + 1;
+            img.src = img.src.replace(keys[key], keys[replace]);
+            img.title = states[keys[replace]];
+            window[keys[replace]].checked = true;
+            config.list = keys[replace];
+            updatePrefs();
+            worker.postMessage({action: 'update-model', list: config.list})
+            break
+        }
+    }
+
+})
+// threshold value
+const thresholdDisplay = document.getElementById('threshold-value');
