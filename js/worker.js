@@ -479,7 +479,7 @@ const convertFileFormat = (file, destination, size, error) => {
                 const percent = (time / totalTime) * 100
                 console.log('Processing: ' + percent + ' % converted');
                 UI.postMessage({
-                    event: 'progress', text: 'Decompressing file', progress: percent / 100
+                    event: 'progress', text: 'Extracting file', progress: percent / 100
                 })
             })
             .on('end', () => {
@@ -1907,7 +1907,7 @@ Todo: UI
     ***Pagination? Limit table records to say, 1000
     Better tooltips, for all options
     ***Sort summary by headers (click on species or header)
-    Have a panel for all analyse settings, not just nocmig mode
+    ***Have a panel for all analyse settings, not just nocmig mode
     ***Delay hiding submenu on mouseout (added box-shadow)
     Align the label on the spec to the right to minimize overlap with axis labels
 
