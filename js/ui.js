@@ -86,7 +86,7 @@ let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
 const bodyElement = $('body');
 let spectrogramWrapper = $('#spectrogramWrapper'), specElement, waveElement, specCanvasElement, specWaveElement;
 let waveCanvasElement, waveWaveElement,
-    resultTableElement = $('#resultTableContainer'), dummyElement;
+    resultTableElement = $('#resultTableContainer');
 resultTableElement.animate({scrollTop: '300px'}, 400, 'swing');
 const contentWrapperElement = $('#contentWrapper');
 const completeDiv = $('#complete');
@@ -246,6 +246,7 @@ $(document).on("click", ".openFiles", async function (e) {
 function updateSpec({buffer, play = false, resetSpec = false}) {
     updateElementCache();
     wavesurfer.loadDecodedBuffer(buffer);
+    showElement(['fullscreen']);
     waveCanvasElement.width('100%');
     specCanvasElement.width('100%');
     $('.spec-labels').width('55px');
@@ -369,9 +370,7 @@ const initWavesurfer = ({
 function updateElementCache() {
     t0 = Date.now();
     // Update element caches
-    dummyElement = $('#dummy');
     waveElement = $('#waveform');
-
     specElement = $('spectrogram');
     specCanvasElement = $('#spectrogram canvas');
     waveCanvasElement = $('#waveform canvas');
@@ -480,7 +479,7 @@ const openFiles = ({filePaths}) => {
 
 async function onOpenFiles(args) {
     hideAll();
-    showElement(['spectrogramWrapper', 'fullscreen'], false);
+    showElement(['spectrogramWrapper'], false);
     resetResults();
     completeDiv.hide();
     // Store the file list and Load First audio file
@@ -712,7 +711,7 @@ exploreLink.addEventListener('click', async () => {
     STATE.mode = 'explore';
     worker.postMessage({action: 'get-detected-species-list', range: STATE.explore.range});
     hideAll();
-    showElement(['exploreWrapper', 'spectrogramWrapper', 'fullscreen'], false);
+    showElement(['exploreWrapper', 'spectrogramWrapper'], false);
     hideElement(['completeDiv']);
     adjustSpecDims(true);
 });
@@ -2023,7 +2022,6 @@ async function onWorkerLoadedAudio({
     currentBuffer.copyToChannel(contents, 0);
     // Show the current file name in the UI
     updateFileName(fileList, file);
-
     currentFile = file;
     // bufferBegin = bufferBegin;
     currentFileDuration = sourceDuration;
