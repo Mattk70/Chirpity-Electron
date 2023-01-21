@@ -325,6 +325,7 @@ footer {
     position: absolute;
     z-index: 10;
     right: 0em;
+    max-width: 70px;
 }
 
 /* Flip comment icons */
