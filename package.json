@@ -20,6 +20,8 @@
       "!*git*${/*}",
       "!package-lock.json",
       "!.idea",
+      "!node_modules/@tensorflow/tfjs-converter",
+      "!node_modules/@tensorflow/tfjs-data",
       "node_modules/ffmpeg-static-electron/bin/${os}/${arch}/ffmpeg",
       "node_modules/ffmpeg-static-electron/index.js",
       "node_modules/ffmpeg-static-electron/package.json",
@@ -145,7 +147,8 @@
   "devDependencies": {
     "electron": "^22.0.1",
     "electron-builder": "^23.6.0",
-    "electron-wix-msi": "^4.0.0"
+    "electron-wix-msi": "^4.0.0",
+    "@tensorflow/tfjs-converter": "^4.2.0"
   },
   "dependencies": {
     "@popperjs/core": "^2.9.2",
