@@ -2,9 +2,19 @@ const {ipcRenderer} = require('electron');
 const fs = require('fs');
 const wavefileReader = require('wavefile-reader');
 const p = require('path');
-let BATCH_SIZE;
+const SunCalc = require('suncalc2');
+const ffmpeg = require('fluent-ffmpeg');
+const png = require('fast-png');
+const {writeFile, mkdir, readdir} = require('node:fs/promises');
+const {utimes} = require('utimes');
+const stream = require("stream");
+const staticFfmpeg = require('ffmpeg-static-electron');
+const {stat} = require("fs/promises");
+
+let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS;
 const adding_chirpity_additions = true;
-let labels;
+
+
 const sqlite3 = require('sqlite3').verbose();
 sqlite3.Database.prototype.runAsync = function (sql, ...params) {
     return new Promise((resolve, reject) => {
@@ -33,17 +43,6 @@ sqlite3.Database.prototype.getAsync = function (sql, ...params) {
     });
 };
 
-const SunCalc = require('suncalc2');
-const ffmpeg = require('fluent-ffmpeg');
-const png = require('fast-png');
-const {writeFile, mkdir, readdir} = require('node:fs/promises');
-const {utimes} = require('utimes');
-const stream = require("stream");
-const file_cache = 'chirpity';
-let TEMP, appPath, CACHE_LOCATION;
-
-const staticFfmpeg = require('ffmpeg-static-electron');
-const {stat} = require("fs/promises");
 
 console.log(staticFfmpeg.path);
 ffmpeg.setFfmpegPath(staticFfmpeg.path);
@@ -101,8 +100,8 @@ const createDB = async (file) => {
                            UNIQUE (dateTime, fileID)
                        )`);
     if (archiveMode) {
-        for (let i = 0; i < labels.length; i++) {
-            const [sname, cname] = labels[i].replaceAll("'", "''").split('_');
+        for (let i = 0; i < LABELS.length; i++) {
+            const [sname, cname] = LABELS[i].replaceAll("'", "''").split('_');
             await db.runAsync(`INSERT INTO species
                                VALUES (${i}, '${sname}', '${cname}')`);
         }
@@ -128,7 +127,7 @@ const createDB = async (file) => {
 async function loadDB(path) {
     // Ensure we're using the db for the number of labels we have in the model
     if (path) {
-        const file = p.join(path, `archive${labels.length}.sqlite`)
+        const file = p.join(path, `archive${LABELS.length}.sqlite`)
         if (!fs.existsSync(file)) {
             await createDB(file);
         } else {
@@ -144,7 +143,7 @@ async function loadDB(path) {
 let metadata = {};
 let minConfidence, index = 0, AUDACITY = {}, predictionStart;
 let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
-let predictWorker, predicting = false, predictionDone = false, aborted = false;
+let predictWorker, predictionDone = true, aborted = false;
 
 // Set up the audio context:
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
@@ -184,7 +183,7 @@ const dirInfo = async ({folder = undefined, recursive = false}) => {
 
 const clearCache = async (fileCache, sizeLimitInGB) => {
     // Cache size
-    let [size, ] = await dirInfo({folder: fileCache});
+    let [size,] = await dirInfo({folder: fileCache});
     const requiredSpace = sizeLimitInGB * 1024 ** 3;
     // If Full, clear at least 25% of cache, so we're not doing this too frequently
     if (size > requiredSpace) {
@@ -266,7 +265,7 @@ ipcRenderer.on('new-client', (event) => {
                 break;
             case 'file-load-request':
                 index = 0;
-                if (predicting) onAbort(args);
+                if (!predictionDone) onAbort(args);
 
                 STATE['db'] = memoryDB;
                 console.log('Worker received audio ' + args.file);
@@ -406,10 +405,9 @@ async function onAnalyse({
         // Set global var, for parsePredictions
         FILE_QUEUE.push(file);
         console.log(`Adding ${file} to the queue.`)
-        if (!predicting) {
+        if (predictionDone) {
             // Clear state unless analysing a selection
             if (!STATE.selection) resetState(STATE.db);
-            predicting = true;
             await processNextFile(arguments[0]);
         }
     }
@@ -422,13 +420,12 @@ function onAbort({
     FILE_QUEUE = [];
     index = 0;
     console.log("abort received")
-    if (predicting) {
+    if (!predictionDone) {
         //restart the worker
         UI.postMessage({event: 'spawning'});
         predictWorker.terminate()
         spawnWorker(model, list, BATCH_SIZE, warmup)
     }
-    predicting = false;
     predictionDone = true;
     predictionsReceived = 0;
     predictionsRequested = 0;
@@ -501,7 +498,7 @@ const convertFileFormat = (file, destination, size, error) => {
  * @returns {Promise<boolean|*>}
  */
 async function getWorkingFile(file) {
-    if (metadata[file] && metadata[file].isComplete && metadata[file].proxy) return metadata[file].proxy;
+    if (metadata[file]?.isComplete && metadata[file]?.proxy) return metadata[file].proxy;
     // find the file
     const source_file = fs.existsSync(file) ? file : await locateFile(file);
     if (!source_file) return false;
@@ -509,8 +506,8 @@ async function getWorkingFile(file) {
 
     if (!source_file.endsWith('.wav')) {
         const pc = p.parse(source_file);
-        const filename = pc.base +  '.wav';
-        const destination = p.join(TEMP, file_cache, filename);
+        const filename = pc.base + '.wav';
+        const destination = p.join(CACHE_LOCATION, filename);
         if (fs.existsSync(destination)) {
             proxy = destination;
         } else {
@@ -575,27 +572,23 @@ async function loadAudioFile({
                                  region = false,
                                  preserveResults = false,
                                  play = false,
-                                 resetSpec = true
                              }) {
     const found = await getWorkingFile(file);
     if (found) {
         await fetchAudioBuffer({file, start, end})
             .then((buffer) => {
-                const length = buffer.length;
                 const audioArray = buffer.getChannelData(0);
                 UI.postMessage({
                     event: 'worker-loaded-audio',
-                    fileStart: metadata[file].fileStart,
+                    start: metadata[file].fileStart,
                     sourceDuration: metadata[file].duration,
                     bufferBegin: start,
                     file: file,
                     position: position,
-                    length: length,
                     contents: audioArray,
                     fileRegion: region,
                     preserveResults: preserveResults,
                     play: play,
-                    resetSpec: resetSpec
                 });
             })
             .catch(e => {
@@ -627,11 +620,11 @@ const getMetadata = async ({file, proxy = file, source_file = file}) => {
     metadata[file].duration = savedMeta && savedMeta.duration ? savedMeta.duration : await getDuration(proxy);
 
     return new Promise((resolve) => {
-        if (metadata[file] && metadata[file].isComplete) {
+        if (metadata[file]?.isComplete) {
             resolve(metadata[file])
         } else {
             let fileStart, fileEnd;
-            if (savedMeta && savedMeta.filestart) {
+            if (savedMeta?.filestart) {
                 fileStart = new Date(savedMeta.filestart);
                 fileEnd = new Date(fileStart.getTime() + (metadata[file].duration * 1000));
             } else {
@@ -854,7 +847,7 @@ function sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predic
     let position = chunkStart;
     for (let i = 0; i < chunks.length; i++) {
         // Use  1 second min chunk duration  if > 1 chunk
-       if (i && chunks[i].length < 24000) break;
+        if (i && chunks[i].length < 24000) break;
         chunkBuffers[position] = chunks[i];
         position += sampleRate * 3;
     }
@@ -871,7 +864,6 @@ async function doPrediction({
                             }) {
     predictionDone = false;
     predictionStart = new Date();
-    predicting = true;
     await getPredictBuffers({file: file, start: start, end: end, resetResults: resetResults});
     UI.postMessage({event: 'update-audio-duration', value: metadata[file].duration});
 }
@@ -1051,7 +1043,7 @@ async function saveMP3(file, start, end, filename, metadata) {
 
 /// Workers  From the MDN example
 function spawnWorker(model, list, batchSize, warmup) {
-    predictWorker = new Worker('./js/model.js');
+    predictWorker = new Worker('./js/model.js', {type: 'module'});
     //const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
     //const modelPath = model === 'efficientnet' ? '../test_24000_v10/' : '../24000_v9/';
     const modelPath = model === 'efficientnet' ? '../test_2022128_EfficientNetB3_wd=10xlr_sigmoid_focal_crossentropy_256x384_AdamW_447/' : '../24000_v9/';
@@ -1080,16 +1072,17 @@ const parsePredictions = async (response) => {
         if (!prediction[1].suppressed && prediction[1].score > minConfidence) {
             const result = prediction[1];
             const audacity = prediction[2];
-            index++;
-            UI.postMessage({
-                event: 'prediction-ongoing',
-                file: file,
-                result: result,
-                index: index,
-                resetResults: response['resetResults'],
-                selection: STATE.selection
-            });
-            AUDACITY[file] ? AUDACITY[file].push(audacity) : AUDACITY[file] = [audacity];
+            if (!STATE.selection.start) {
+                index++;
+                UI.postMessage({
+                    event: 'prediction-ongoing',
+                    file: file,
+                    result: result,
+                    index: index,
+                    selection: STATE.selection
+                });
+                AUDACITY[file] ? AUDACITY[file].push(audacity) : AUDACITY[file] = [audacity];
+            }
             //save result to  db (N.B. tried using transactions, but was no faster.
             // Also, transactions had to start end in other functions, which is bad style!
             await db.runAsync(`INSERT
@@ -1120,7 +1113,6 @@ const parsePredictions = async (response) => {
             null,
             null
             )`);
-
         }
     }
     if (response.finished) {
@@ -1134,8 +1126,7 @@ const parsePredictions = async (response) => {
                 event: 'prediction-ongoing',
                 file: file,
                 result: result,
-                index: 1,
-                resetResults: response['resetResults'],
+                index: index,
                 selection: STATE.selection
             });
         }
@@ -1154,10 +1145,10 @@ async function parseMessage(e) {
         sampleRate = response['sampleRate'];
         const backend = response['backend'];
         console.log(backend);
-        UI.postMessage({event: 'model-ready', message: 'ready', backend: backend, labels: labels})
+        UI.postMessage({event: 'model-ready', message: 'ready', backend: backend, labels: LABELS})
     } else if (response['message'] === 'labels') {
         t0 = Date.now();
-        labels = response['labels'];
+        LABELS = response['labels'];
         // Now we have what we need to populate a database...
         // Load the archive db
         await loadDB(appPath);
@@ -1173,16 +1164,15 @@ async function parseMessage(e) {
                 const limit = 10;
                 await clearCache(CACHE_LOCATION, limit);
                 // This is the one time results *do not* come from the database
-                if (!batchInProgress) {
-                    //if (STATE.db === diskDB) await getResults({files: OPENFILES})
+                if (STATE.selection) {
+                    //i Get results here to fill in any previous detections in the range
                     await getResults({files: OPENFILES})
-                    if (!STATE.selection) {
-                        await getSummary({files: OPENFILES});
-                    }
-                } else {
+                } else if (batchInProgress) {
                     UI.postMessage({
                         event: 'prediction-done', batchInProgress: true,
                     })
+                } else {
+                    await getSummary({files: OPENFILES});
                 }
             }
             await processNextFile();
@@ -1197,6 +1187,7 @@ async function processNextFile({
                                    start = undefined, end = undefined, resetResults = false,
                                } = {}) {
     if (FILE_QUEUE.length) {
+        predictionDone = false;
         let file = FILE_QUEUE.shift()
         const found = await getWorkingFile(file);
         if (found) {
@@ -1209,13 +1200,19 @@ async function processNextFile({
                 const result = `No predictions.for ${file}. It has no period within it where predictions would be given`;
                 if (!FILE_QUEUE.length) {
                     UI.postMessage({
-                        event: 'prediction-ongoing', file: file, result: result, index: -1, resetResults: true,
+                        event: 'prediction-ongoing', file: file, result: result, index: index
                     });
+                    await getSummary();
+                    predictionDone = true;
+                } else {
+                    UI.postMessage({
+                        event: 'prediction-done',
+                        file: file,
+                        audacityLabels: AUDACITY,
+                        batchInProgress: FILE_QUEUE.length
+                    });
+                    await processNextFile(arguments[0]);
                 }
-                UI.postMessage({
-                    event: 'prediction-done', file: file, audacityLabels: AUDACITY, batchInProgress: FILE_QUEUE.length
-                });
-                await processNextFile(arguments[0]);
             } else {
                 await doPrediction({
                     start: start, end: end, file: file, resetResults: resetResults,
@@ -1225,8 +1222,7 @@ async function processNextFile({
             await processNextFile(arguments[0]);
         }
     } else {
-        predicting = false;
-        return true
+        predictionDone = true;
     }
 }
 
@@ -1325,10 +1321,10 @@ const getSummary = async ({
 
 const dbSpeciesCheck = async () => {
     const {speciesCount} = await diskDB.getAsync('SELECT COUNT(*) as speciesCount FROM species');
-    if (speciesCount !== labels.length) {
+    if (speciesCount !== LABELS.length) {
         UI.postMessage({
             event: 'generate-alert',
-            message: `Warning:\nThe ${speciesCount} species in the archive database does not match the ${labels.length} species being used by the model.`
+            message: `Warning:\nThe ${speciesCount} species in the archive database does not match the ${LABELS.length} species being used by the model.`
         })
     }
 }
@@ -1356,13 +1352,11 @@ const getResults = async ({
                               context = 'results',
                               limit = 500,
                               offset = undefined,
-                              resetResults = true
                           }) => {
     if (STATE.selection) {
         offset = 0;
         range = STATE.selection;
-    }
-    else if (offset === undefined) { // Get offset state
+    } else if (offset === undefined) { // Get offset state
         if (species) {
             if (!STATE.filteredOffset[species]) STATE.filteredOffset[species] = 0;
             offset = STATE.filteredOffset[species];
@@ -1392,7 +1386,6 @@ const getResults = async ({
                     file: result.file,
                     result: result,
                     index: index,
-                    resetResults: resetResults,
                     isFromDB: true,
                     selection: STATE.selection
                 });
@@ -1406,19 +1399,22 @@ const getResults = async ({
                 AUDACITY[file] ? AUDACITY[file].push(audacity) : AUDACITY[file] = [audacity];
             }
         }, async (err, count) => {   //on finish
-            if (err) console.log(err);
-            if (!count && STATE.selection) {
-                // No more detections in the selection
-                UI.postMessage({event: 'no-detections-remain'});
-                STATE.selection = undefined
+            if (err) return reject(err);
+            if (!count) { // no results
+                if (context === 'selection') {
+                    // No more detections in the selection
+                    UI.postMessage({event: 'no-detections-remain'});
+                    STATE.selection = undefined
+                } else if (species) { // Remove the species filter
+                    await getResults({
+                        files: files,
+                        range: range,
+                        context: context,
+                        limit: limit,
+                        offset: offset
+                    })
+                }
             }
-            if (!count && species) await getResults({
-                files: files,
-                range: range,
-                context: context,
-                limit: limit,
-                offset: offset
-            })
             return resolve(count)
         })
     })
@@ -1681,11 +1677,10 @@ async function onDelete({
         // Is this the last of  multiple deletions?
         if (batch === false) {
             // Add resetResults to arguments[0]
-            arguments[0].resetResults = false;
+
             await getResults(arguments[0]);
-            await getSummary(arguments[0]);
-        } else if (batch === 0 ){
-            arguments[0].resetResults = true;
+        } else if (batch === 0) {
+            arguments[0].context = 'results';
             STATE.selection = undefined;
             await getResults(arguments[0]);
             await getSummary(arguments[0]);

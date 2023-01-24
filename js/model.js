@@ -1,6 +1,4 @@
-//const tf = require('@tensorflow/tfjs');
-
-importScripts('../node_modules/@tensorflow/tfjs/dist/tf.min.js');
+import   '../node_modules/@tensorflow/tfjs/dist/tf.min.js';
 
 //tf.ENV.set('WEBGL_FORCE_F16_TEXTURES', true)
 tf.enableProdMode();
@@ -55,6 +53,7 @@ class Model {
     }
 
     async loadModel() {
+        console.log('loading model')
         if (this.model_loaded === false) {
             // Model files must be in a different folder than the js, assets files
             console.log('loading model from ', this.appPath)
@@ -342,7 +341,6 @@ async function runPredictions(e) {
                 result: myModel.result,
                 finished: finalChunk,
                 fileStart: fileStart,
-                resetResults: e.data.resetResults,
                 predictionsReceived: e.data.predictionsRequested
             }
             postMessage(response);

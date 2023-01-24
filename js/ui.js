@@ -1,4 +1,4 @@
-let firstDawn, dawn, dusk, seenTheDarkness = false, shownDaylightBanner = false;
+let seenTheDarkness = false, shownDaylightBanner = false;
 let labels = [];
 
 const STATE = {
@@ -246,11 +246,11 @@ $(document).on("click", ".openFiles", async function (e) {
 function updateSpec({buffer, play = false, resetSpec = false}) {
     updateElementCache();
     wavesurfer.loadDecodedBuffer(buffer);
-    showElement(['fullscreen']);
     waveCanvasElement.width('100%');
     specCanvasElement.width('100%');
     $('.spec-labels').width('55px');
     if (resetSpec) adjustSpecDims(true);
+    showElement(['fullscreen']);
     if (play) wavesurfer.play()
 }
 
@@ -450,7 +450,6 @@ function updateFileName(files, openfile) {
         $('#setFileStart').daterangepicker({
             singleDatePicker: true,
             showDropdowns: true,
-            // file start is undefined at this point
             startDate: moment(fileStart),
             minYear: 2015,
             maxDate: moment(),
@@ -496,9 +495,9 @@ async function onOpenFiles(args) {
     } else {
         disableMenuItem(['analyseAll', 'reanalyseAll'])
     }
-    updateFileName(fileList, fileList[0]);
-    await loadAudioFile({filePath: fileList[0]});
 
+    await loadAudioFile({filePath: fileList[0]});
+    updateFileName(fileList, fileList[0]);
 
     disableMenuItem(['analyseSelection', 'analyse', 'analyseAll', 'reanalyse', 'reanalyseAll'])
     // Reset the buffer playhead and zoom:
@@ -544,7 +543,7 @@ function refreshResultsView() {
     } else {
         showElement(['loadFileHint', 'loadFileHintText'], true);
     }
-    adjustSpecDims(true);
+    //adjustSpecDims(true);
 }
 
 const navbarAnalysis = document.getElementById('navbarAnalysis');
@@ -713,7 +712,7 @@ exploreLink.addEventListener('click', async () => {
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
     hideElement(['completeDiv']);
-    adjustSpecDims(true);
+    //adjustSpecDims(true);
 });
 
 const datasetLink = document.getElementById('dataset');
@@ -746,7 +745,7 @@ function createRegion(start, end, label) {
         end: end,
         color: "rgba(255, 255, 255, 0.2)",
         attributes: {
-            label: label
+            label: label || ''
         }
     });
     const progress = start / wavesurfer.getDuration();
@@ -784,7 +783,7 @@ function loadResultRegion(paramlist) {
     // 3 second detections
     let [file, start, end, label, play] = paramlist;
     // Let the UI know what file's being loaded
-    currentFile = file;
+    //currentFile = file;
     start = parseFloat(start);
     end = parseFloat(end);
     // ensure region doesn't spread across the whole window
@@ -792,7 +791,7 @@ function loadResultRegion(paramlist) {
     bufferBegin = Math.max(0, start - (windowLength / 2) + 1.5)
     const position = wavesurfer.getCurrentTime() / windowLength;
     const region = {start: Math.max(start - bufferBegin, 0), end: end - bufferBegin, label: label, play: play};
-    postBufferUpdate({begin: bufferBegin, position: position, region: region})
+    postBufferUpdate({file: file, begin: bufferBegin, position: position, region: region})
 }
 
 /**
@@ -1466,7 +1465,7 @@ function onChartData(args) {
     const records = args.records;
     for (const [key, value] of Object.entries(records)) {
         const element = document.getElementById(key);
-        if (value && value.constructor === Array) {
+        if (value?.constructor === Array) {
             if (isNaN(value[0])) element.innerText = 'N/A';
             else {
                 element.innerText = value[0].toString() + ' on ' +
@@ -1890,7 +1889,8 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             if (wavesurfer.spectrogram.fftSamples > 64) {
                 wavesurfer.spectrogram.fftSamples /= 2;
                 const position = wavesurfer.getCurrentTime() / windowLength;
-                postBufferUpdate({begin: bufferBegin, position: position})
+                const currentRegion = region ? {start: region.start, end: region.end, label: region.attributes?.label} : undefined;
+                postBufferUpdate({begin: bufferBegin, position: position, region: currentRegion})
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
@@ -1902,7 +1902,8 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             if (wavesurfer.spectrogram.fftSamples > 64) {
                 wavesurfer.spectrogram.fftSamples /= 2;
                 const position = wavesurfer.getCurrentTime() / windowLength;
-                postBufferUpdate({begin: bufferBegin, position: position})
+                const currentRegion = region ? {start: region.start, end: region.end, label: region.attributes?.label} : undefined;
+                postBufferUpdate({begin: bufferBegin, position: position, region: currentRegion})
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
@@ -1914,7 +1915,8 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             if (wavesurfer.spectrogram.fftSamples <= 2048) {
                 wavesurfer.spectrogram.fftSamples *= 2;
                 const position = wavesurfer.getCurrentTime() / windowLength;
-                postBufferUpdate({begin: bufferBegin, position: position})
+                const currentRegion = region ? {start: region.start, end: region.end, label: region.attributes?.label} : undefined;
+                postBufferUpdate({begin: bufferBegin, position: position, region: currentRegion})
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
@@ -1926,7 +1928,8 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             if (wavesurfer.spectrogram.fftSamples <= 2048) {
                 wavesurfer.spectrogram.fftSamples *= 2;
                 const position = wavesurfer.getCurrentTime() / windowLength;
-                postBufferUpdate({begin: bufferBegin, position: position})
+                const currentRegion = region ? {start: region.start, end: region.end, label: region.attributes?.label} : undefined;
+                postBufferUpdate({begin: bufferBegin, position: position, region: currentRegion})
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
@@ -1951,10 +1954,10 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     }
 };
 
-const postBufferUpdate = ({begin = 0, position = 0, play = false, resetSpec = false, region = undefined}) => {
+const postBufferUpdate = ({file = currentFile, begin = 0, position = 0, play = false, resetSpec = false, region = undefined}) => {
     worker.postMessage({
         action: 'update-buffer',
-        file: currentFile,
+        file: file,
         position: position,
         start: begin,
         end: begin + windowLength,
@@ -2002,67 +2005,62 @@ function onModelReady(args) {
 //     console.log('update downloaded' + args.releaseNotes)
 // })
 
+/***
+ *  Called when a new file or buffer is loaded by the worker
+ * @param fileStart  Unix epoch in ms for the start of the file
+ * @param sourceDuration a float: number of seconds audio in the file
+ * @param bufferBegin a float: the start position of the file in seconds
+ * @param file full path to the audio file
+ * @param position the position to place the play head: between  0-1
+ * @param contents the audio buffer
+ * @param fileRegion an object {start, end} with the positions in seconds from the beginning of the buffer
+ * @param preserveResults boolean determines whether to clear the result table
+ * @param play whether to auto-play the audio
+ * @returns {Promise<void>}
+ */
 async function onWorkerLoadedAudio({
-                                       fileStart = 0,
+                                       start = 0,
                                        sourceDuration = 0,
                                        bufferBegin = 0,
                                        file = '',
                                        position = 0,
-                                       length = 0,
                                        contents = undefined,
                                        fileRegion = {},
                                        preserveResults = false,
-                                       play = false,
-                                       resetSpec = true
+                                       play = false
                                    }) {
     workerHasLoadedFile = true;
+    const resetSpec = !currentFile;
+    currentFileDuration = sourceDuration;
     if (preserveResults) completeDiv.hide();
     console.log('UI received worker-loaded-audio: ' + file)
-    currentBuffer = new AudioBuffer({length: length, numberOfChannels: 1, sampleRate: 24000});
+    currentBuffer = new AudioBuffer({length: contents.length, numberOfChannels: 1, sampleRate: 24000});
     currentBuffer.copyToChannel(contents, 0);
-    // Show the current file name in the UI
-    updateFileName(fileList, file);
-    currentFile = file;
-    // bufferBegin = bufferBegin;
-    currentFileDuration = sourceDuration;
-    //fileStart = args.fileStart;
-    fileEnd = new Date(fileStart + (currentFileDuration * 1000));
-
+    if (currentFile !== file) {
+        currentFile = file;
+        fileStart = start;
+        fileEnd = new Date(fileStart + (currentFileDuration * 1000));
+        // Update the current file name in the UI
+        updateFileName(fileList, file);
+    }
     if (config.timeOfDay) {
         bufferStartTime = new Date(fileStart + (bufferBegin * 1000))
     } else {
         bufferStartTime = new Date(zero.getTime() + (bufferBegin * 1000))
     }
-
     if (windowLength > currentFileDuration) windowLength = currentFileDuration;
-    let astro = SunCalc.getTimes(fileStart, config.latitude, config.longitude);
-    dusk = astro.dusk.getTime();
-    firstDawn = astro.dawn.getTime();
-    // calculate dawn for following day
-    let astro2 = SunCalc.getTimes(fileStart + 8.64e+7, config.latitude, config.longitude);
-    dawn = astro2.dawn.getTime();
-
-    // if (config.nocmig && fileEnd.getTime() < dusk && fileStart > firstDawn) {
-    //     alert(`All timestamps in this file are during daylight hours. \n\nNocmig mode will be disabled.`)
-    //     $('#nocmigButton').click();
-    // }
     if (modelReady) {
         enableMenuItem(['analyse', 'reanalyse']);
         if (fileList.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
     }
     fileLoaded = true;
-
-    if (!wavesurfer) {
-        initWavesurfer({audio: currentBuffer});
-    } else {
-        resetRegions();
-        updateSpec({buffer: currentBuffer, play: play, resetSpec: resetSpec})
-        wavesurfer.seekTo(position);
-        if (fileRegion) {
-            createRegion(fileRegion.start, fileRegion.end, fileRegion.label)
-            if (fileRegion.play) {
-                region.play()
-            }
+    resetRegions();
+    updateSpec({buffer: currentBuffer, play: play, resetSpec: resetSpec})
+    wavesurfer.seekTo(position);
+    if (fileRegion) {
+        createRegion(fileRegion.start, fileRegion.end, fileRegion.label)
+        if (fileRegion.play) {
+            region.play()
         }
     }
 }
@@ -2343,7 +2341,7 @@ async function renderResult({
             // Only do this if change starts midway through a file
             if ((index - 1) % config.limit !== 0) {
                 // Show the twilight start bar
-                tr += `<tr class="bg-dark"><td colspan="20" class="text-center text-white">
+                tr += `<tr class="text-bg-dark"><td colspan="20" class="text-center">
                 Start of civil twilight <span class="material-icons-two-tone text-warning align-bottom">wb_twilight</span>
                 </td></tr>`;
             }
@@ -2390,9 +2388,9 @@ async function renderResult({
 let resultsBuffer, detectionsModal;
 const detectionsModalDiv = document.getElementById('detectionsModal')
 
-detectionsModalDiv.addEventListener('hide.bs.modal', () => {
+detectionsModalDiv.addEventListener('hidden.bs.modal', () => {
     resetRegions();
-    worker.postMessage({action: "selection-off"})
+    worker.postMessage({action: 'selection-off'});
     worker.postMessage({
         action: 'filter',
         species: isSpeciesViewFiltered(true),
@@ -2413,11 +2411,13 @@ detectionsDismiss.addEventListener('click', event => {
             deleteRecord(row, rows.length - count);
         }
     })
+    STATE.selection = {start: undefined, end: undefined};
+
 })
 
 const detectionsAdd = document.getElementById('detections-add');
 detectionsAdd.addEventListener('click', event => {
-
+    STATE.selection = {start: undefined, end: undefined};
 })
 
 const updateResultTable = (row, isFromCache, isSelection) => {
@@ -2439,19 +2439,20 @@ const updateResultTable = (row, isFromCache, isSelection) => {
     }
 }
 
-
+let restoreComment; // saves the current comment node
 // Comment handling
 
 $(document).on('click', '.add-comment, .edit-comment', function (e) {
+    restoreComment = e.target.closest('td').cloneNode(true);
     const note = e.target.title === "Add a comment" ? '' : e.target.title;
-    $(document).off('mouseleave', '.comment');
-    $(document).off('mouseenter', '.comment');
+    $(document).off('mouseleave mouseenter', '.comment');
     document.removeEventListener('keydown', handleKeyDownDeBounce, true);
     const parent = this.parentNode;
     parent.innerHTML = `<textarea class="h-100 rounded-3 comment-textarea" placeholder="Enter notes...">${note}</textarea>`;
-    $('.comment-textarea').on('keydown', commentHandler);
+    $('.comment-textarea').on('keydown blur', commentHandler);
     parent.firstChild.focus();
 })
+
 
 const isExplore = () => {
     return STATE.mode === 'explore';
@@ -2459,7 +2460,7 @@ const isExplore = () => {
 }
 
 function commentHandler(e) {
-    if (e.code === 'Enter') {
+    if (e?.code === 'Enter') {
         e.stopImmediatePropagation();
         const context = getDetectionContext(e.target)
         const note = e.target.value;
@@ -2468,19 +2469,21 @@ function commentHandler(e) {
             // Format species before we replace the target node
             species = getSpecies(e)
         } else {
-            species = '';
+            species = isSpeciesViewFiltered(true);
         }
         if (note) {
-            e.target.parentNode.innerHTML = `<span title="${note}" class="material-icons-two-tone pointer edit-comment">comment</span>`;
+            e.target.parentNode.innerHTML = `${note} <span title="Edit comment" class="material-icons-two-tone pointer edit-comment">comment</span>`;
         } else {
             e.target.parentNode.innerHTML = `<span title="Add a comment" class="material-icons-two-tone pointer add-comment">add_comment</span>`;
         }
         let [file, start, ,] = unpackNameAttr(activeRow);
-        const range = getSelectionRange()
-        // let active = getActiveRow();
+         // let active = getActiveRow();
         updateRecord('comment', undefined, start, species, note, context)
         addEvents('comment');
         document.addEventListener('keydown', handleKeyDownDeBounce, true);
+    } else if (e.type === 'blur') {
+        e.target.closest('td').replaceWith(restoreComment);
+        addEvents('comment');
     }
 }
 
@@ -2613,7 +2616,7 @@ function sendFile(mode, result) {
         end = result.end || start + 3;
         filename = result.filename;
     }
-    if (!start && start !== 0) {
+    if (start  !== undefined) {
         if (!region.start) {
             start = 0;
             end = currentBuffer.duration;
@@ -2985,7 +2988,7 @@ document.addEventListener("DOMContentLoaded", function () {
         document.querySelectorAll('.dropdown-menu a').forEach(function (element) {
             element.addEventListener('click', function (e) {
                 let nextEl = this.nextElementSibling;
-                if (nextEl && nextEl.classList.contains('submenu')) {
+                if (nextEl?.classList.contains('submenu')) {
                     // prevent opening link if link needs to open dropdown
                     e.preventDefault();
                     if (nextEl.style.display === 'block') {
