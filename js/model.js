@@ -1,11 +1,11 @@
-import   '../node_modules/@tensorflow/tfjs/dist/tf.min.js';
-
-//tf.ENV.set('WEBGL_FORCE_F16_TEXTURES', true)
+const tf = require('@tensorflow/tfjs');
+let DEBUG = false;
+tf.ENV.set('WEBGL_FORCE_F16_TEXTURES', true)
 tf.enableProdMode();
-// Removed this to re-enable all webgl features
-//tf.ENV.set('WEBGL_PACK', false)
-
-//console.log(tf.env().features);
+if (DEBUG){
+console.log(tf.env().features);
+console.log(tf.env().getFlags());
+}
 
 // https://www.tensorflow.org/js/guide/platform_environment#flags
 //tf.enableDebugMode()
@@ -155,9 +155,9 @@ class Model {
             this.batch = tf.concat([this.batch, padding], 0)
         }
         // console.log(`padding took ${performance.now() - t0} milliseconds`)
-        //t0 = performance.now();
-        const prediction = this.model.predict(this.batch, {batchSize: this.batchSize})
-        //console.log(`model predict took ${performance.now() - t0} milliseconds`)
+        let t0 = performance.now();
+        const prediction =  this.model.predict(this.batch, {batchSize: this.batchSize})
+        console.log(`model predict took ${performance.now() - t0} milliseconds`)
         // Get label
         let top3, top3scores;
         //t0 = performance.now();
@@ -193,10 +193,10 @@ class Model {
             let count = 0;
             while (blocked_IDs.indexOf(item.index[0]) !== -1 && count !== item.index.length) {
                 // If and while the first result is blocked, move it to the end
-                    count++;
-                    item.index.push(item.index.shift());
-                    // And do the same for the score
-                    item.score.push(item.score.shift());
+                count++;
+                item.index.push(item.index.shift());
+                // And do the same for the score
+                item.score.push(item.score.shift());
             }
             let suppressed = count === item.index.length;
 
@@ -225,10 +225,11 @@ class Model {
                 cname: this.labels[item.index[0]].split('_')[1],
                 score: Math.round(item.score[0] * 1000) / 1000,
             })
-            //prepare summary
-            let hour = Math.floor(key / 3600), minute = Math.floor(key % 3600 / 60),
-                second = Math.floor(key % 3600 % 60)
-            console.log(file, `${hour}:${minute}:${second}`, item.index[0], this.labels[item.index[0]], Math.round(item.score[0] * 1000) / 1000, item.index[1], this.labels[item.index[1]], Math.round(item.score[1] * 1000) / 1000, item.index[2], this.labels[item.index[2]], Math.round(item.score[2] * 1000) / 1000);
+            if (DEBUG) {//prepare summary
+                let hour = Math.floor(key / 3600), minute = Math.floor(key % 3600 / 60),
+                    second = Math.floor(key % 3600 % 60)
+                console.log(file, `${hour}:${minute}:${second}`, item.index[0], this.labels[item.index[0]], Math.round(item.score[0] * 1000) / 1000, item.index[1], this.labels[item.index[1]], Math.round(item.score[1] * 1000) / 1000, item.index[2], this.labels[item.index[2]], Math.round(item.score[2] * 1000) / 1000);
+            }
             batched_results.push([key, result, audacity]);
         }
         this.result = this.result.concat(batched_results);

@@ -172,7 +172,7 @@ async function createWorker() {
         height: mainWindowStateKeeper.height,
         webPreferences: {
             nodeIntegration: true,
-            nodeIntegrationInWorker: false,
+            nodeIntegrationInWorker: true,
             contextIsolation: false,
             backgroundThrottling: false
         }
