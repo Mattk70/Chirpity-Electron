@@ -1,16 +1,17 @@
 {
   "name": "Chirpity",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "export": "electron-builder build -w  --x64"
+    "export": "electron-builder build -w  --x64 --mac"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mattk70/Chirpity-Electron.git"
   },
+
   "build": {
     "files": [
       "**/*",
@@ -72,9 +73,10 @@
       }
     ],
     "mac": {
-      "target": [
-        "pkg"
-      ],
+      "target": {
+        "target": "pkg",
+        "arch": "arm64"
+      },
       "files": [
         "!node_modules/ffmpeg-static-electron/bin/win${/*}",
         "!node_modules/ffmpeg-static-electron/bin/linux${/*}",
@@ -147,7 +149,6 @@
   "devDependencies": {
     "electron": "^22.0.1",
     "electron-builder": "^23.6.0",
-    "electron-wix-msi": "^4.0.0",
     "@tensorflow/tfjs-converter": "^4.2.0"
   },
   "dependencies": {
