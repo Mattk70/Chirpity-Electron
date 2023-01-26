@@ -31,7 +31,7 @@ let files = [];
 process.stdin.resume();//so the program will not close instantly
 
 // Stop system sleep
- powerSaveBlocker.start('prevent-app-suspension');
+powerSaveBlocker.start('prevent-app-suspension');
 const clearCache = (file_cache) => {
     return new Promise((resolve) => {
         // clear & recreate file cache folder
@@ -88,6 +88,26 @@ async function windowStateKeeper(windowName) {
         }
     }
 
+    const waitForFinalEvent = (function () {
+        let timers = {};
+        return function (callback, ms, uniqueId) {
+            if (!uniqueId) {
+                uniqueId = "Don't call this twice without a uniqueId";
+            }
+            if (timers[uniqueId]) {
+                clearTimeout(timers[uniqueId]);
+            }
+            timers[uniqueId] = setTimeout(callback, ms);
+        };
+    })();
+
+    function handleStateDeBounce(e) {
+        e.preventDefault();
+        waitForFinalEvent(async function () {
+            await saveState();
+        }, 100, 'sizehandler');
+    }
+
     async function saveState() {
         if (!windowState.isMaximized) {
             windowState = window.getBounds();
@@ -98,8 +118,8 @@ async function windowStateKeeper(windowName) {
 
     function track(win) {
         window = win;
-        ['resize', 'move', 'close'].forEach(event => {
-            win.on(event, saveState);
+        ['resize', 'move'].forEach(event => {
+            win.on(event, handleStateDeBounce);
         });
     }
 
@@ -165,7 +185,7 @@ async function createWorker() {
     // Get window state
     const mainWindowStateKeeper = await windowStateKeeper('worker');
     workerWindow = new BrowserWindow({
-        show: true,
+        show: false,
         x: mainWindowStateKeeper.x,
         y: mainWindowStateKeeper.y,
         width: mainWindowStateKeeper.width,
