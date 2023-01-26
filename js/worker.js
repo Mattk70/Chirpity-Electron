@@ -381,13 +381,13 @@ async function onAnalyse({
     AUDACITY = {};
     COMPLETED = [];
     UI.postMessage('reset-results');
-    const toAnalyse = currentFile ? [currentFile] : filesInScope;
+    FILE_QUEUE = currentFile ? [currentFile] : filesInScope;
 
     STATE.db = memoryDB;
     // check if results for the files are cached (we only consider it cached if all files have been saved to the disk DB)
     let allCached = true;
-    for (let i = 0; i < toAnalyse.length; i++) {
-        if (!await isDuplicate(toAnalyse[i])) {
+    for (let i = 0; i < FILE_QUEUE.length; i++) {
+        if (!await isDuplicate(FILE_QUEUE[i])) {
             allCached = false;
             break;
         }
@@ -395,15 +395,14 @@ async function onAnalyse({
     if (allCached && !reanalyse) {
         STATE.db = diskDB;
         if (!STATE.selection) {
-            await getResults({db: diskDB, files: toAnalyse});
-            await getSummary({files: toAnalyse})
+            await getResults({db: diskDB, files: FILE_QUEUE});
+            await getSummary({files: FILE_QUEUE})
             return
         }
     }
-    for (let i = 0; i < toAnalyse.length; i++) {
-        let file = toAnalyse[i];
+    for (let i = 0; i < FILE_QUEUE.length; i++) {
+        let file = FILE_QUEUE[i];
         // Set global var, for parsePredictions
-        FILE_QUEUE.push(file);
         console.log(`Adding ${file} to the queue.`)
         if (predictionDone) {
             // Clear state unless analysing a selection
@@ -1197,22 +1196,24 @@ async function processNextFile({
             if (start === undefined) [start, end] = await setStartEnd(file);
             if (start === 0 && end === 0) {
                 // Nothing to do for this file
+                COMPLETED.push(file);
                 const result = `No predictions.for ${file}. It has no period within it where predictions would be given`;
+                index++;
+                UI.postMessage({
+                    event: 'prediction-ongoing', file: file, result: result, index: index
+                });
                 if (!FILE_QUEUE.length) {
-                    UI.postMessage({
-                        event: 'prediction-ongoing', file: file, result: result, index: index
-                    });
                     await getSummary();
                     predictionDone = true;
-                } else {
-                    UI.postMessage({
-                        event: 'prediction-done',
-                        file: file,
-                        audacityLabels: AUDACITY,
-                        batchInProgress: FILE_QUEUE.length
-                    });
-                    await processNextFile(arguments[0]);
                 }
+                UI.postMessage({
+                    event: 'prediction-done',
+                    file: file,
+                    audacityLabels: AUDACITY,
+                    batchInProgress: FILE_QUEUE.length
+                });
+                await processNextFile(arguments[0]);
+
             } else {
                 await doPrediction({
                     start: start, end: end, file: file, resetResults: resetResults,
