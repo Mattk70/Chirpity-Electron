@@ -2313,7 +2313,7 @@ async function renderResult({
     }
     if (typeof (result) === 'string') {
         const nocturnal = config.nocmig ? '<b>during the night</b>' : '';
-        tr += `<tr><td colspan="8">${result} (Predicting ${config.list} ${nocturnal} with at least ${config.minConfidence * 100}% confidence in the prediction)</td></tr>`;
+        tr += `<tr><th scope='row'>${index}</th><td colspan="8">${result} (Predicting ${config.list} ${nocturnal} with at least ${config.minConfidence * 100}% confidence in the prediction)</td></tr>`;
     } else {
         const {
             start,
@@ -2771,13 +2771,19 @@ const diagnosticMenu = document.getElementById('diagnostics')
 diagnosticMenu.addEventListener('click', function () {
     let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
     for (let [key, value] of Object.entries(diagnostics)) {
-        if (key === 'Audio Duration') {
+        if (key === 'Audio Duration') { // Format duration as days, hours,minutes, etc.
             if (value < 3600) {
-                value = new Date(value * 1000).toISOString().substring(14, 19)
+                value = new Date(value * 1000).toISOString().substring(14, 19);
+                value = value.replace(':',  ' minutes ').concat(' seconds');
             } else if (value < 86400) {
                 value = new Date(value * 1000).toISOString().substring(11, 19)
+                value = value.replace(':',  ' hours ').replace(':',  ' minutes ').concat(' seconds')
             } else {
-                value = new Date(value * 1000).toISOString().substring(8, 19)
+                value = new Date(value * 1000).toISOString().substring(8, 19);
+                const day = parseInt(value.slice(0,2)) -1;
+                const daysString = day === 1 ? '1 day ' : day.toString() + ' days ';
+                const dateString = daysString + value.slice(3);
+                value = dateString.replace(':', ' hours ').replace(':', ' minutes ').concat(' seconds');
             }
         }
         diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
