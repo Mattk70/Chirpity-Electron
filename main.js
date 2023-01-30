@@ -1,4 +1,4 @@
-const {app, dialog, ipcMain, MessageChannelMain, BrowserWindow, powerSaveBlocker} = require('electron');
+const {app, dialog, ipcMain, MessageChannelMain, BrowserWindow, powerSaveBlocker, globalShortcut} = require('electron');
 const fs = require("fs");
 const path = require('path');
 const settings = require('electron-settings');
@@ -177,6 +177,12 @@ async function createWindow() {
     mainWindow.on('closed', () => {
         app.quit()
     })
+    // Close app on Command+Q on OSX
+    if (process.platform === 'darwin') {
+        globalShortcut.register('Command+Q', () => {
+            app.quit();
+        })
+    }
 }
 
 
