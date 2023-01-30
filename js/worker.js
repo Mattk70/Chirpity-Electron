@@ -437,7 +437,7 @@ const getDuration = async (src) => {
         audio = new Audio();
         audio.src = src;
         audio.addEventListener("loadedmetadata", function () {
-            const duration = audio.duration
+            const duration = audio.duration;
             audio = null;
             // Tidy up - cloning removes event listeners
             const old_element = document.getElementById("audio");
