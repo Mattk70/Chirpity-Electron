@@ -626,7 +626,8 @@ function postAnalyseMessage(args) {
         currentFile: args.currentFile,
         filesInScope: analyseList || fileList,
         reanalyse: args.reanalyse,
-        list: args.list || config.list
+        list: args.list || config.list,
+        snr: config.snr
     });
     if (!args.currentFile) {
         batchInProgress = true;
@@ -782,8 +783,6 @@ function loadResultRegion(paramlist) {
     // Need to find and centre a view of the detection in the spectrogram
     // 3 second detections
     let [file, start, end, label, play] = paramlist;
-    // Let the UI know what file's being loaded
-    //currentFile = file;
     start = parseFloat(start);
     end = parseFloat(end);
     // ensure region doesn't spread across the whole window
@@ -1023,6 +1022,7 @@ window.onload = async () => {
         latitude: 51.9,
         longitude: -0.4,
         nocmig: false,
+        snr: 0,
         warmup: true,
         batchSize: 1,
         limit: 500,
@@ -1057,8 +1057,6 @@ window.onload = async () => {
             const modelToUse = document.getElementById(config.model);
             modelToUse.checked = true;
             diagnostics['Model'] = config.model;
-
-            warmup.checked = config.warmup;
             // Show time of day in results?
             const timestamp = document.querySelectorAll('.timestamp');
             if (!config.timeOfDay) {
@@ -1079,6 +1077,8 @@ window.onload = async () => {
             nocmigButton.title = config.nocmig ? 'Nocmig mode on' : 'Nocmig mode off';
             thresholdLink.value = config.minConfidence * 100;
             thresholdDisplay.innerHTML = `<b>${config.minConfidence * 100}%</b>`;
+            SNRSlider.value = config.snr;
+            SNRThreshold.innerText = config.snr;
 
             showElement([config.colormap], true)
             t0_warmup = Date.now();
@@ -1324,7 +1324,7 @@ function editHandler(e) {
 const getActiveRow = () => {
     const activeRow = document.querySelector('.table-active');
     return activeRow ? activeRow.id : undefined;
-}
+};
 
 const isSpeciesViewFiltered = (sendSpecies) => {
     const filtered = document.querySelector('.speciesFilter span.text-warning');
@@ -1424,7 +1424,7 @@ const getDetectionContext = (target) => target.closest('table').id;
 // Bird list form  click handler
 $(document).on('click', '.request-bird', function (e) {
     // Clear the results table
-    resultTable.innerHTML = '';
+    resultTable.innerText = '';
     const [, cname] = formatInputText(e.target.innerText)
     const context = this.closest('.bird-list-wrapper').classList[0];
     let pickerEl = context + 'Range';
@@ -1560,7 +1560,7 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
                 title: {text: 'Hourly Detection Rate'},
                 accessibility: {description: 'Hourly rate of records'},
                 opposite: true
-            })
+            });
             chartOptions.series.push({
                 name: 'Average hourly call rate',
                 marker: {enabled: false},
@@ -2399,7 +2399,7 @@ detectionsModalDiv.addEventListener('hidden.bs.modal', () => {
         order: STATE.explore.order
     });
     analyseList = undefined;
-})
+});
 
 const detectionsDismiss = document.getElementById('detections-dismiss');
 detectionsDismiss.addEventListener('click', event => {
@@ -2410,15 +2410,15 @@ detectionsDismiss.addEventListener('click', event => {
         if (!row.classList.contains('text-bg-dark')) {
             deleteRecord(row, rows.length - count);
         }
-    })
+    });
     STATE.selection = {start: undefined, end: undefined};
 
-})
+});
 
 const detectionsAdd = document.getElementById('detections-add');
 detectionsAdd.addEventListener('click', event => {
     STATE.selection = {start: undefined, end: undefined};
-})
+});
 
 const updateResultTable = (row, isFromCache, isSelection) => {
     const table = isSelection ? selectionTable : resultTable;
@@ -2437,7 +2437,7 @@ const updateResultTable = (row, isFromCache, isSelection) => {
         table.lastElementChild ? table.lastElementChild.insertAdjacentHTML('afterend', row) :
             table.innerHTML = row;
     }
-}
+};
 
 let restoreComment; // saves the current comment node
 // Comment handling
@@ -2451,13 +2451,13 @@ $(document).on('click', '.add-comment, .edit-comment', function (e) {
     parent.innerHTML = `<textarea class="h-100 rounded-3 comment-textarea" placeholder="Enter notes...">${note}</textarea>`;
     $('.comment-textarea').on('keydown blur', commentHandler);
     parent.firstChild.focus();
-})
+});
 
 
 const isExplore = () => {
     return STATE.mode === 'explore';
     //return !document.getElementById('exploreWrapper').classList.contains('d-none');
-}
+};
 
 function commentHandler(e) {
     if (e?.code === 'Enter') {
@@ -2505,7 +2505,7 @@ const updateRecord = (what, range, start, from, to, context, batchUpdate) => {
         oder: STATE.explore.order,
         range: range
     })
-}
+};
 
 $(document).on('click', '.add-label, .edit-label', labelHandler);
 
@@ -2515,7 +2515,7 @@ function labelHandler(e) {
     cell.innerHTML = `<span class="badge bg-dark rounded-pill pointer">Nocmig</span> 
                                 <span class="badge bg-success rounded-pill pointer">Local</span>
                                 <span class="badge bg-secondary rounded-pill pointer">Remove Label</span>`;
-    cell.addEventListener('click', updateLabel)
+    cell.addEventListener('click', updateLabel);
 }
 
 const tags = {
@@ -2833,14 +2833,14 @@ speciesSort.addEventListener('click', () => {
     if (isExplore()) {
         postExploreMessage('score DESC ')
     }
-})
+});
 
 const timeSort = document.getElementById('time-sort');
 timeSort.addEventListener('click', () => {
     if (isExplore()) {
         postExploreMessage('timestamp')
     }
-})
+});
 
 const postExploreMessage = (order) => {
     STATE.explore.order = order;
@@ -2857,12 +2857,12 @@ const postExploreMessage = (order) => {
 document.addEventListener('dragover', (event) => {
     event.preventDefault();
     event.stopPropagation();
-})
+});
 
 document.addEventListener('drop', async (event) => {
     event.preventDefault();
     event.stopPropagation();
-    let filelist = []
+    let filelist = [];
     for (const f of event.dataTransfer.files) {
         // Using the path attribute to get absolute file path
         filelist.push(f.path);
@@ -3047,3 +3047,13 @@ listIcon.addEventListener('click', () => {
 })
 // threshold value
 const thresholdDisplay = document.getElementById('threshold-value');
+
+const SNRThreshold = document.getElementById('SNR-threshold');
+const SNRSlider = document.getElementById('snrValue');
+SNRSlider.addEventListener('input', () => {
+    SNRThreshold.innerText = SNRSlider.value;
+});
+SNRSlider.addEventListener('mouseup', () => {
+    config.snr = parseFloat(SNRSlider.value);
+    updatePrefs();
+});

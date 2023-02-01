@@ -149,6 +149,19 @@
                                             </li>
                                         </ul>
                                     </li>
+                                    <li>
+                                        <a href="#" class="dropdown-item" data-bs-toggle="dropdown"
+                                           role="button"
+                                           aria-haspopup="true" aria-expanded="false"> <span
+                                                class="nav-label">SNR Threshold&raquo;</span></a>
+                                        <ul class="p-1" style="width: 225px">
+                                            <li class="form-check">
+                                                <label for="snrValue" class="form-label" title="Ignore samples with just background noise. Value is the minimum signal strength to look at.">Signal to Noise Threshold</label>
+                                                <input type="range" class="form-range" min="0" max="25" step="0.5"
+                                                       id="snrValue"><span class="border rounded-2 align-baseline" id="SNR-threshold"></span>
+                                            </li>
+                                        </ul>
+                                    </li>
                                     <li title="Optimising the batch size can increase the prediction speed by 2-3x on longer files.&#10;If it is too large, the model will terminate.&#10;If that happens, set a lower batch size and restart Chirpity">
                                         <a href="#" class="dropdown-item" data-bs-toggle="dropdown"
                                            role="button"
@@ -369,8 +382,12 @@
                     </table>
                 </div>
                 <div class="modal-footer justify-content-center">
-                    <button id="detections-add" type="button" class="btn btn-success" data-bs-dismiss="modal">Confirm Detections</button>
-                    <button id="detections-dismiss" type="button" class="btn btn-danger" data-bs-dismiss="modal">Discard Detections</button>
+                    <button id="detections-add" type="button" class="btn btn-success" data-bs-dismiss="modal">Confirm
+                        Detections
+                    </button>
+                    <button id="detections-dismiss" type="button" class="btn btn-danger" data-bs-dismiss="modal">Discard
+                        Detections
+                    </button>
                 </div>
             </div>
         </div>
@@ -460,7 +477,8 @@
                           class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">bedtime</span>
                     <span style="max-width: 70px"
                           id="list-icon"
-                          class="btn btn-outline-secondary p-1 pointer icon-container"><img class="icon" src="img/migrants.png"></span>
+                          class="btn btn-outline-secondary p-1 pointer icon-container"><img class="icon"
+                                                                                            src="img/migrants.png"></span>
                     <span style="max-width: 70px" title="Prediction confidence threshold"
                           id="threshold-value"
                           class="btn  btn-outline-secondary p-1 fs-5 pointer icon-container"><b>50%</b></span>
@@ -568,7 +586,8 @@
 
 <!-- Footer -->
 <footer class="p-1 text-bg-primary" id="footer">
-    <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span><br><a href="https://www.flaticon.com/free-icons/">Some icons created by Freepik - Flaticon</a></small>
+    <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span><br><a
+            href="https://www.flaticon.com/free-icons/">Some icons created by Freepik - Flaticon</a></small>
 </footer>
 <script defer src="node_modules/wavesurfer.js/dist/wavesurfer.min.js"></script>
 <script defer src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js"></script>

@@ -1,5 +1,5 @@
 const tf = require('@tensorflow/tfjs');
-let DEBUG = false;
+let DEBUG = true;
 tf.ENV.set('WEBGL_FORCE_F16_TEXTURES', true)
 tf.enableProdMode();
 if (DEBUG){
@@ -135,7 +135,7 @@ class Model {
         const warmupResult = this.model.predict(
             tf.zeros([this.batchSize, this.inputShape[1], this.inputShape[2], this.inputShape[3]])
         );
-        warmupResult.dataSync();
+        warmupResult.arraySync();
         warmupResult.dispose();
         ready = true;
         return true;
@@ -159,13 +159,13 @@ class Model {
         const prediction =  this.model.predict(this.batch, {batchSize: this.batchSize})
         console.log(`model predict took ${performance.now() - t0} milliseconds`)
         // Get label
-        let top3, top3scores;
         //t0 = performance.now();
         const {indices, values} = prediction.topk(3);
         //console.log(`topk took ${performance.now() - t0} milliseconds`)
         //t0 = performance.now();
-        top3 = indices.arraySync();
-        top3scores = values.arraySync();
+        const top3 = indices.arraySync();
+        const test = indices.dataSync();
+        const top3scores = values.arraySync();
         //console.log(`sync took ${performance.now() - t0} milliseconds`)
         //t0 = performance.now();
         const batch = {};
@@ -238,7 +238,7 @@ class Model {
         return true
     }
 
-    predictChunk(chunks, fileStart, file, finalchunk) {
+    predictChunk(chunks, fileStart, file, finalchunk, snr) {
         return tf.tidy(() => {
             let readyToSend = false;
             for (const [key, value] of Object.entries(chunks)) {
@@ -250,9 +250,8 @@ class Model {
                     chunk = chunk.concat(padding);
                 }
                 const spectrogram = this.makeSpectrogram(chunk);
-                const useSNR = false;
-                if (useSNR) {
-                    const ok = this.SNRok(spectrogram, 15).dataSync();
+                if (snr) {
+                    const ok = this.SNRok(spectrogram, snr).dataSync();
 
                     if (ok > 0) {
                         this.goodTensors[key] = tf.keep(spectrogram);
@@ -334,7 +333,8 @@ async function runPredictions(e) {
         //const t0 = performance.now();
         let chunks = e.data.chunks;
         const fileStart = e.data.fileStart;
-        const readyToSend = myModel.predictChunk(chunks, fileStart, file, finalChunk);
+        const snr = e.data.snr;
+        const readyToSend = myModel.predictChunk(chunks, fileStart, file, finalChunk, snr);
         if (readyToSend) {
             const response = {
                 message: 'prediction',
