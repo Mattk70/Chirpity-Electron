@@ -141,7 +141,7 @@ async function loadDB(path) {
 }
 
 let metadata = {};
-let minConfidence, index = 0, AUDACITY = {}, predictionStart;
+let minConfidence, index = 0, AUDACITY = {}, predictionStart, SNR = 0;
 let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
 let predictWorker, predictionDone = true, aborted = false;
 
@@ -367,13 +367,15 @@ async function onAnalyse({
                              resetResults = false,
                              reanalyse = false,
                              confidence = minConfidence,
-                             list = 'everything'
+                             list = 'everything',
+                             snr = 0
                          }) {
     // if end was passed, this is a selection
     if (end) STATE.selection = getSelectionRange(currentFile, start, end);
 
     console.log(`Worker received message: ${filesInScope}, ${confidence}, start: ${start}, end: ${end}, list ${list}`);
     minConfidence = confidence;
+    SNR = snr;
     predictWorker.postMessage({message: 'list', list: list})
     //Set global filesInScope for summary to use
     OPENFILES = filesInScope;
@@ -839,8 +841,9 @@ function sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predic
         duration: end,
         resetResults: resetResults,
         finalChunk: finalChunk,
-        predictionsRequested: predictionsRequested
-    }
+        predictionsRequested: predictionsRequested,
+        snr: SNR
+    };
     let chunkBuffers = {};
     // Key chunks by their position
     let position = chunkStart;
@@ -952,11 +955,11 @@ const onSpectrogram = async (filepath, file, width, height, data, channels) => {
 };
 
 async function uploadOpus({file, start, end, defaultName, metadata, mode}) {
-    const Blob = await bufferToAudio({file: file, start: start, end: end, format: 'opus', meta: metadata});
+    const blob = await bufferToAudio({file: file, start: start, end: end, format: 'opus', meta: metadata});
     // Populate a form with the file (blob) and filename
     const formData = new FormData();
     //const timestamp = Date.now()
-    formData.append("thefile", Blob, defaultName);
+    formData.append("thefile", blob, defaultName);
     // Was the prediction a correct one?
     formData.append("Chirpity_assessment", mode);
     // post form data
@@ -1014,7 +1017,7 @@ const bufferToAudio = ({
         const buffers = [];
         bufferStream.on('data', (buf) => {
             buffers.push(buf);
-        })
+        });
         bufferStream.on('end', function () {
             const outputBuffer = Buffer.concat(buffers);
             let audio = [];
@@ -1023,7 +1026,7 @@ const bufferToAudio = ({
             resolve(blob);
         });
     })
-}
+};
 
 async function saveMP3(file, start, end, filename, metadata) {
     const MP3Blob = await bufferToAudio({
@@ -1057,12 +1060,9 @@ function spawnWorker(model, list, batchSize, warmup) {
 }
 
 const parsePredictions = async (response) => {
-    let file, batchInProgress = false;
+    let file = response.file, batchInProgress = false;
     predictionsReceived = response['predictionsReceived'];
-    const result = response['result'];
-    file = response.file;
-    let fileSQL = prepSQL(file);
-    const db = STATE.db;
+    const result = response.result, fileSQL = prepSQL(file), db = STATE.db;
     for (let i = 0; i < result.length; i++) {
         const prediction = result[i];
         const position = parseFloat(prediction[0]);
@@ -1092,7 +1092,7 @@ const parsePredictions = async (response) => {
             const {rowid} = await db.getAsync(`SELECT rowid
                                                FROM files
                                                WHERE name = '${fileSQL}'`);
-            let durationSQL = Object.entries(metadata[file].dateDuration)
+            const durationSQL = Object.entries(metadata[file].dateDuration)
                 .map(entry => `(${entry.toString()},${rowid})`).join(',');
             await db.runAsync(`INSERT
             OR IGNORE INTO duration VALUES
@@ -1140,44 +1140,51 @@ const parsePredictions = async (response) => {
 
 async function parseMessage(e) {
     const response = e.data;
-    if (response['message'] === 'model-ready') {
-        sampleRate = response['sampleRate'];
-        const backend = response['backend'];
-        console.log(backend);
-        UI.postMessage({event: 'model-ready', message: 'ready', backend: backend, labels: LABELS})
-    } else if (response['message'] === 'labels') {
-        t0 = Date.now();
-        LABELS = response['labels'];
-        // Now we have what we need to populate a database...
-        // Load the archive db
-        await loadDB(appPath);
-        // Create in-memory database
-        await loadDB();
-        await dbSpeciesCheck();
-    } else if (response['message'] === 'prediction' && !aborted) {
-        // add filename to result for db purposes
-        let [, batchInProgress] = await parsePredictions(response);
-        if (response['finished']) {
-            process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, Prediction requests ${predictionsRequested}, predictions received ${predictionsReceived}    \r`)
-            if (predictionsReceived === predictionsRequested) {
-                const limit = 10;
-                await clearCache(CACHE_LOCATION, limit);
-                // This is the one time results *do not* come from the database
-                if (STATE.selection) {
-                    //i Get results here to fill in any previous detections in the range
-                    await getResults({files: OPENFILES})
-                } else if (batchInProgress) {
-                    UI.postMessage({
-                        event: 'prediction-done', batchInProgress: true,
-                    })
-                } else {
-                    await getSummary({files: OPENFILES});
+    switch (response['message']) {
+        case 'model-ready':
+            sampleRate = response['sampleRate'];
+            const backend = response['backend'];
+            console.log(backend);
+            UI.postMessage({event: 'model-ready', message: 'ready', backend: backend, labels: LABELS})
+            break;
+        case 'labels':
+            t0 = Date.now();
+            LABELS = response['labels'];
+            // Now we have what we need to populate a database...
+            // Load the archive db
+            await loadDB(appPath);
+            // Create in-memory database
+            await loadDB();
+            await dbSpeciesCheck();
+            break;
+        case 'prediction':
+            if (!aborted) {
+                // add filename to result for db purposes
+                let [, batchInProgress] = await parsePredictions(response);
+                if (response['finished']) {
+                    process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, Prediction requests ${predictionsRequested}, predictions received ${predictionsReceived}    \r`)
+                    if (predictionsReceived === predictionsRequested) {
+                        const limit = 10;
+                        await clearCache(CACHE_LOCATION, limit);
+                        // This is the one time results *do not* come from the database
+                        if (STATE.selection) {
+                            //i Get results here to fill in any previous detections in the range
+                            await getResults({files: OPENFILES})
+                        } else if (batchInProgress) {
+                            UI.postMessage({
+                                event: 'prediction-done', batchInProgress: true,
+                            })
+                        } else {
+                            await getSummary({files: OPENFILES});
+                        }
+                    }
+                    await processNextFile();
                 }
             }
-            await processNextFile();
-        }
-    } else if (response['message'] === 'spectrogram') {
-        await onSpectrogram(response['filepath'], response['file'], response['width'], response['height'], response['image'], response['channels'])
+            break;
+        case 'spectrogram':
+            await onSpectrogram(response['filepath'], response['file'], response['width'], response['height'], response['image'], response['channels'])
+            break;
     }
 }
 
@@ -1194,7 +1201,7 @@ async function processNextFile({
                 // If we have an end value already, we're analysing a selection
             }
             if (start === undefined) [start, end] = await setStartEnd(file);
-            if (start === 0 && end === 0) {
+            if (start === end) {
                 // Nothing to do for this file
                 COMPLETED.push(file);
                 const result = `No predictions.for ${file}. It has no period within it where predictions would be given`;
@@ -1268,7 +1275,7 @@ const setWhereWhen = ({dateRange, species, files, context}) => {
         where = where.slice(0, -1);
         where += ')';
     }
-    const cname = context !== 'summary' ? 's1.cname' : 'cname';
+    const cname = context === 'summary' ? 'cname' : 's1.cname';
     if (species) where += `${files.length ? ' AND ' : ' WHERE '} ${cname} =  '${prepSQL(species)}'`;
     const when = dateRange && dateRange.start ? `AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
     return [where, when]
@@ -1899,7 +1906,7 @@ Todo: manual entry
 Todo: UI
     ***Drag folder to load audio files within (recursively)
     ***Stop flickering when updating results
-    Expose SNR feature in settings
+    ***Expose SNR feature in settings
     ***Pagination? Limit table records to say, 1000
     Better tooltips, for all options
     ***Sort summary by headers (click on species or header)

@@ -496,3 +496,8 @@ Modal customisations
 .modal-content {
     box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
 }
+
+input[type="range"] {
+  width: 150px;
+  margin: 3px;
+}

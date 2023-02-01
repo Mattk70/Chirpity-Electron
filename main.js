@@ -6,6 +6,8 @@ const settings = require('electron-settings');
 global.sharedObject = {prop1: process.argv};
 let files = [];
 
+
+const DEBUG = true;
 //Updater
 //const server = 'https://chirpity-electron-releases.vercel.app';
 //console.log('process platform ' + process.platform)
@@ -167,22 +169,16 @@ async function createWindow() {
     mainWindow.loadFile('index.html')
 
     // Open the DevTools. Comment out for release
-    mainWindow.webContents.openDevTools()
+    if (DEBUG) mainWindow.webContents.openDevTools()
 
     mainWindow.once('ready-to-show', () => {
         mainWindow.show()
     })
 
     // Emitted when the window is closed.
-    mainWindow.on('closed', () => {
-        app.quit()
-    })
-    // Close app on Command+Q on OSX
-    if (process.platform === 'darwin') {
-        globalShortcut.register('Command+Q', () => {
-            app.quit();
-        })
-    }
+    // mainWindow.on('closed', () => {
+    //     app.quit()
+    // })
 }
 
 
@@ -191,7 +187,7 @@ async function createWorker() {
     // Get window state
     const mainWindowStateKeeper = await windowStateKeeper('worker');
     workerWindow = new BrowserWindow({
-        show: false,
+        show: DEBUG,
         x: mainWindowStateKeeper.x,
         y: mainWindowStateKeeper.y,
         width: mainWindowStateKeeper.width,
@@ -211,7 +207,7 @@ async function createWorker() {
     workerWindow.on('closed', () => {
         workerWindow = null;
     });
-    workerWindow.webContents.openDevTools();
+    if (DEBUG) workerWindow.webContents.openDevTools();
     console.log("worker created");
 }
 
@@ -257,18 +253,35 @@ app.whenReady().then(async () => {
         //const appIcon = new Tray('./img/icon/icon.png')
         app.dock.setIcon(__dirname + '/img/icon/icon.png');
         app.dock.bounce();
+        // Close app on Command+Q on OSX
+        globalShortcut.register('Command+Q', () => {
+            app.quit();
+        })
+    } else {
+        // Quit when all windows are closed.
+        app.on('window-all-closed', () => {
+            app.quit()
+        })
     }
 
     app.on('activate', async () => {
-        if (BrowserWindow.getAllWindows().length === 0) {
+        console.log(BrowserWindow.getAllWindows());
+        const windowsOpen = BrowserWindow.getAllWindows().length
+        if (!windowsOpen) {
             await createWorker();
             await createWindow();
+        } else if (windowsOpen === 1){
+            await createWindow();
         }
-    })
+    });
+
+    app.on('open-file', (event, path) => {
+        files.push(path);
+    });
 
 
     mainWindow.webContents.setWindowOpenHandler(({url, frameName}) => {
-        require('electron').shell.openExternal(url)
+        require('electron').shell.openExternal(url);
         return {
             action: 'deny',
         }
@@ -311,17 +324,6 @@ app.whenReady().then(async () => {
 //    })
 });
 
-
-app.on('open-file', (event, path) => {
-    files.push(path);
-});
-
-// Quit when all windows are closed.
-app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-        app.quit();
-    }
-})
 
 // app.on('before-quit', async () =>
 // {
