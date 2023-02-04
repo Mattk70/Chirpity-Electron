@@ -46,16 +46,20 @@ const clearCache = (file_cache) => {
 
 async function exitHandler(options, exitCode) {
     if (options.cleanup) {
-        const tmp_folder = path.join(app.getPath('temp'), 'chirpity');
+        const tmp = path.join(app.getPath('temp'), 'chirpity');
         // size of cache
-        await clearCache(tmp_folder);
-        console.log('cleaned ' + tmp_folder)
+        await clearCache(tmp);
+        console.log('cleaned ' + tmp)
     } else {
         console.log('no clean')
 
     }
-    if (exitCode || exitCode === 0) console.log(exitCode);
-    if (options.exit) process.exit();
+    if (exitCode || exitCode === 0) {
+        console.log(exitCode);
+    }
+    if (options.exit) {
+        process.exit();
+    }
 }
 
 //do something when app is closing
@@ -90,7 +94,7 @@ async function windowStateKeeper(windowName) {
         }
     }
 
-    const waitForFinalEvent = (function () {
+    const waitForFinalEvent = () => {
         let timers = {};
         return function (callback, ms, uniqueId) {
             if (!uniqueId) {
@@ -101,29 +105,29 @@ async function windowStateKeeper(windowName) {
             }
             timers[uniqueId] = setTimeout(callback, ms);
         };
-    })();
+    };
 
-    function handleStateDeBounce(e) {
+    const handleStateDeBounce = (e) => {
         e.preventDefault();
         waitForFinalEvent(async function () {
             await saveState();
         }, 100, 'sizehandler');
-    }
+    };
 
-    async function saveState() {
+    const saveState = async () => {
         if (!windowState.isMaximized) {
             windowState = window.getBounds();
         }
         windowState.isMaximized = window.isMaximized();
         await settings.set(`windowState.${windowName}`, windowState);
-    }
+    };
 
-    function track(win) {
+    const track = (win) => {
         window = win;
         ['resize', 'move'].forEach(event => {
             win.on(event, handleStateDeBounce);
         });
-    }
+    };
 
     await setBounds();
     return ({
@@ -155,7 +159,7 @@ async function createWindow() {
             contextIsolation: true,
             backgroundThrottling: false
         }
-    })
+    });
     // Track window state
     mainWindowStateKeeper.track(mainWindow);
 
@@ -166,15 +170,15 @@ async function createWindow() {
     mainWindow.setMenuBarVisibility(false);
 
     // and load the index.html of the app.
-    mainWindow.loadFile('index.html')
+    mainWindow.loadFile('index.html');
 
     // Open the DevTools. Comment out for release
-    if (DEBUG) mainWindow.webContents.openDevTools()
+    if (DEBUG) mainWindow.webContents.openDevTools();
 
     mainWindow.once('ready-to-show', () => {
         mainWindow.show()
     })
-
+    console.log("main window created");
     // Emitted when the window is closed.
     // mainWindow.on('closed', () => {
     //     app.quit()
@@ -265,7 +269,6 @@ app.whenReady().then(async () => {
     }
 
     app.on('activate', async () => {
-        console.log(BrowserWindow.getAllWindows());
         const windowsOpen = BrowserWindow.getAllWindows().length
         if (!windowsOpen) {
             await createWorker();
@@ -294,7 +297,7 @@ app.whenReady().then(async () => {
             type: 'warning',
             title: 'Crash report',
             detail: 'Oh no! The model had crashed, restarting Chirpity'
-        }
+        };
 
         dialog.showMessageBox(dialogOpts).then((returnValue) => {
             if (returnValue.response === 0) {
@@ -371,7 +374,7 @@ ipcMain.handle('saveFile', (event, arg) => {
         //console.log(file.canceled);
         if (!file.canceled) {
             const AUDACITY_LABELS = arg.labels;
-            let str = ""
+            let str = "";
             // Format results
             for (let i = 0; i < AUDACITY_LABELS.length; i++) {
                 str += AUDACITY_LABELS[i].timestamp + "\t";
@@ -389,5 +392,5 @@ ipcMain.handle('saveFile', (event, arg) => {
         console.log(err)
     });
     mainWindow.webContents.send('saveFile', {message: 'file saved!'});
-})
+});
 
