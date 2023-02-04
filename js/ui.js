@@ -138,40 +138,45 @@ const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampl
 // Timers
 let t0_warmup, t1_warmup, t0_analysis, t1_analysis;
 
-const si = window.module.si;
+const getSystemInformation = () => {
+    const si = window.module.si;
+    // promises style - new since version 3
+    return new Promise((resolve, reject) => {
+        const graphics = si.graphics()
+            .then(data => {
+                let count = 0;
+                //console.log(data)
+                data.controllers.forEach(gpu => {
+                    const key = `GPU[${count}]`;
+                    const vram = key + ' Memory';
+                    diagnostics[key] = gpu.name || gpu.vendor || gpu.model;
+                    diagnostics[vram] = gpu.vram ? gpu.vram + ' MB' : 'Dynamic';
+                    count += 1;
+                })
+            })
+            .catch(error => console.error(error));
 
-// promises style - new since version 3
-si.graphics()
-    .then(data => {
-        let count = 0;
-        //console.log(data)
-        data.controllers.forEach(gpu => {
-            const key = `GPU[${count}]`;
-            const vram = key + ' Memory';
-            diagnostics[key] = gpu.name || gpu.vendor || gpu.model;
-            diagnostics[vram] = gpu.vram ? gpu.vram + ' MB' : 'Dynamic';
-            count += 1;
+        const cpu = si.cpu()
+            .then(data => {
+                //console.log(data)
+                const key = 'CPU';
+                diagnostics[key] = `${data.manufacturer} ${data.brand}`;
+                diagnostics['Cores'] = `${data.cores}`;
+            })
+            .catch(error => console.error(error));
+
+        const mem = si.mem()
+            .then(data => {
+                //console.log(data)
+                const key = 'System Memory';
+                diagnostics[key] = `${(data.total / (1024 * 1024 * 1000)).toFixed(0)} GB`;
+            })
+            .catch(error => console.error(error));
+        Promise.all([graphics, cpu, mem]).then(() => {
+            resolve(console.table(diagnostics))
         })
     })
-    .catch(error => console.error(error));
-
-si.cpu()
-    .then(data => {
-        //console.log(data)
-        const key = 'CPU';
-        diagnostics[key] = `${data.manufacturer} ${data.brand}`;
-        diagnostics['Cores'] = `${data.cores}`;
-    })
-    .catch(error => console.error(error));
-
-si.mem()
-    .then(data => {
-        //console.log(data)
-        const key = 'System Memory';
-        diagnostics[key] = `${(data.total / (1024 * 1024 * 1000)).toFixed(0)} GB`;
-    })
-    .catch(error => console.error(error));
-console.table(diagnostics);
+}
 
 
 function resetResults() {
@@ -236,6 +241,15 @@ async function loadAudioFile(args) {
     }
 }
 
+// const openFilesList = document.getElementsByClassName('openFiles');
+// for (const file of openFilesList){
+//     file.addEventListener('click', async (e) => {
+//     if (!PREDICTING) {
+//         await loadAudioFile({filePath: e.target.id, preserveResults: true})
+//     }
+//     e.stopImmediatePropagation()
+//     })
+// }
 $(document).on("click", ".openFiles", async function (e) {
     if (!PREDICTING) {
         await loadAudioFile({filePath: e.target.id, preserveResults: true})
@@ -379,10 +393,13 @@ function updateElementCache() {
 }
 
 function zoomSpec(direction) {
+    if (typeof direction !== 'string'){ // then it's an event
+        direction = direction.target.closest('button').id
+    }
     let offsetSeconds = wavesurfer.getCurrentTime();
     let position = offsetSeconds / windowLength;
     let timeNow = bufferBegin + offsetSeconds;
-    if (direction === 'in') {
+    if (direction === 'zoomIn') {
         if (windowLength < 1.5) return;
         windowLength /= 2;
         bufferBegin += windowLength * position;
@@ -1333,7 +1350,7 @@ const isSpeciesViewFiltered = (sendSpecies) => {
 }
 
 //Works for single and batch items in Explore, but not in Analyse
-function editID(cname, sname, cell) {
+const editID = (cname, sname, cell) => {
     // Make sure we update the restore species
     //restoreSpecies = cell;
     let from;
@@ -1352,7 +1369,7 @@ function editID(cname, sname, cell) {
     //cell.innerHTML = `${cname} <br><i>${sname}</i>`;
     const range = context === 'selectionResults' ? getSelectionRange() : undefined;
     updateRecord('ID', range, start, from, cname, context, batch)
-}
+};
 
 function unpackNameAttr(el, cname) {
     const currentRow = el.closest("tr");
@@ -1780,32 +1797,22 @@ for (let i = 0; i < modelToUse.length; i++) {
     })
 }
 
-$(document).on('click', '#timeOfDay', function () {
+const timelineToggle = (e) =>{
     // set file creation time
-    config.timeOfDay = true;
+    config.timeOfDay = e.target.id === 'timeOfDay'; //toggle setting
     const timeFields = document.querySelectorAll('.timestamp')
     timeFields.forEach(time => {
-        time.classList.remove('d-none');
-    })
+        config.timeOfDay ? time.classList.remove('d-none') :
+            time.classList.add('d-none');
+    });
     if (fileLoaded) {
         const position = wavesurfer.getCurrentTime() / windowLength;
         postBufferUpdate({begin: bufferBegin, position: position})
     }
     updatePrefs();
-})
-
-$(document).on('click', '#timecode', function () {
-    config.timeOfDay = false;
-    const timeFields = document.querySelectorAll('.timestamp')
-    timeFields.forEach(time => {
-        time.classList.add('d-none');
-    })
-    if (fileLoaded) {
-        const position = wavesurfer.getCurrentTime() / windowLength;
-        postBufferUpdate({begin: bufferBegin, position: position})
-    }
-    updatePrefs();
-})
+};
+document.getElementById('timeOfDay').addEventListener('click', timelineToggle);
+document.getElementById('timecode').addEventListener('click', timelineToggle);
 
 /////////// Keyboard Shortcuts  ////////////
 
@@ -1889,12 +1896,16 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             if (wavesurfer.spectrogram.fftSamples > 64) {
                 wavesurfer.spectrogram.fftSamples /= 2;
                 const position = wavesurfer.getCurrentTime() / windowLength;
-                const currentRegion = region ? {start: region.start, end: region.end, label: region.attributes?.label} : undefined;
+                const currentRegion = region ? {
+                    start: region.start,
+                    end: region.end,
+                    label: region.attributes?.label
+                } : undefined;
                 postBufferUpdate({begin: bufferBegin, position: position, region: currentRegion})
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
-            zoomSpec('in')
+            zoomSpec('zoomIn')
         }
     },
     NumpadAdd: function (e) {
@@ -1902,12 +1913,16 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             if (wavesurfer.spectrogram.fftSamples > 64) {
                 wavesurfer.spectrogram.fftSamples /= 2;
                 const position = wavesurfer.getCurrentTime() / windowLength;
-                const currentRegion = region ? {start: region.start, end: region.end, label: region.attributes?.label} : undefined;
+                const currentRegion = region ? {
+                    start: region.start,
+                    end: region.end,
+                    label: region.attributes?.label
+                } : undefined;
                 postBufferUpdate({begin: bufferBegin, position: position, region: currentRegion})
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
-            zoomSpec('in')
+            zoomSpec('zoomIn')
         }
     },
     Minus: function (e) {
@@ -1915,12 +1930,16 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             if (wavesurfer.spectrogram.fftSamples <= 2048) {
                 wavesurfer.spectrogram.fftSamples *= 2;
                 const position = wavesurfer.getCurrentTime() / windowLength;
-                const currentRegion = region ? {start: region.start, end: region.end, label: region.attributes?.label} : undefined;
+                const currentRegion = region ? {
+                    start: region.start,
+                    end: region.end,
+                    label: region.attributes?.label
+                } : undefined;
                 postBufferUpdate({begin: bufferBegin, position: position, region: currentRegion})
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
-            zoomSpec('out')
+            zoomSpec('zoomOut')
         }
     },
     NumpadSubtract: function (e) {
@@ -1928,12 +1947,16 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             if (wavesurfer.spectrogram.fftSamples <= 2048) {
                 wavesurfer.spectrogram.fftSamples *= 2;
                 const position = wavesurfer.getCurrentTime() / windowLength;
-                const currentRegion = region ? {start: region.start, end: region.end, label: region.attributes?.label} : undefined;
+                const currentRegion = region ? {
+                    start: region.start,
+                    end: region.end,
+                    label: region.attributes?.label
+                } : undefined;
                 postBufferUpdate({begin: bufferBegin, position: position, region: currentRegion})
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
-            zoomSpec('out')
+            zoomSpec('zoomOut')
         }
 
     },
@@ -1954,7 +1977,14 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     }
 };
 
-const postBufferUpdate = ({file = currentFile, begin = 0, position = 0, play = false, resetSpec = false, region = undefined}) => {
+const postBufferUpdate = ({
+                              file = currentFile,
+                              begin = 0,
+                              position = 0,
+                              play = false,
+                              resetSpec = false,
+                              region = undefined
+                          }) => {
     worker.postMessage({
         action: 'update-buffer',
         file: file,
@@ -2477,7 +2507,7 @@ function commentHandler(e) {
             e.target.parentNode.innerHTML = `<span title="Add a comment" class="material-icons-two-tone pointer add-comment">add_comment</span>`;
         }
         let [file, start, ,] = unpackNameAttr(activeRow);
-         // let active = getActiveRow();
+        // let active = getActiveRow();
         updateRecord('comment', undefined, start, species, note, context)
         addEvents('comment');
         document.addEventListener('keydown', handleKeyDownDeBounce, true);
@@ -2616,13 +2646,13 @@ function sendFile(mode, result) {
         end = result.end || start + 3;
         filename = result.filename;
     }
-    if (start  !== undefined) {
-        if (!region.start) {
-            start = 0;
-            end = currentBuffer.duration;
-        } else {
+    if (start !== undefined) {
+        if (region.start) {
             start = region.start + bufferBegin;
             end = region.end + bufferBegin;
+        } else {
+            start = 0;
+            end = currentBuffer.duration;
         }
         filename = 'export.mp3'
     }
@@ -2684,58 +2714,41 @@ const iconDict = {
     confirmed: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: 100%; background: #198754"><span class="material-icons-two-tone">done</span></span></span>',
 }
 
-function iconizeScore(score) {
-    const tooltip = (parseFloat(score) * 100).toFixed(0).toString()
-    if (parseFloat(score) < 0.5) return iconDict['guess'].replaceAll('--', tooltip)
-    else if (parseFloat(score) < 0.65) return iconDict['low'].replaceAll('--', tooltip)
-    else if (parseFloat(score) < 0.85) return iconDict['medium'].replaceAll('--', tooltip)
-    else if (parseFloat(score) <= 1.0) return iconDict['high'].replaceAll('--', tooltip)
+const  iconizeScore = (score) => {
+    score = parseFloat(score);
+    const tooltip = (score * 100).toFixed(0).toString();
+    if (score < 0.5) return iconDict['guess'].replaceAll('--', tooltip);
+    else if (score < 0.65) return iconDict['low'].replaceAll('--', tooltip);
+    else if (score < 0.85) return iconDict['medium'].replaceAll('--', tooltip);
+    else if (score <= 1.0) return iconDict['high'].replaceAll('--', tooltip);
     else return iconDict['confirmed']
 }
 
 // File menu handling
-const open = document.getElementById('open');
-open.addEventListener('click', async function () {
-    await showOpenDialog();
-});
-
-$('#saveLabels').on('click', async function () {
-    await showSaveDialog();
-});
-
-$('#exportMP3').on('click', function () {
-    sendFile('save');
-});
-
-$('#exit').on('click', function () {
-    exitApplication();
-});
+document.getElementById('open').addEventListener('click', showOpenDialog);
+document.getElementById('saveLabels').addEventListener('click', showSaveDialog);
+document.getElementById('saveLabels').addEventListener('click',  () => {sendFile('save')});
+document.getElementById('exit').addEventListener('click', exitApplication);
 
 // Help menu handling
-
-$('#keyboard').on('click', function () {
-    $('#helpModalLabel').text('Keyboard shortcuts');
-    $('#helpModalBody').load('Help/keyboard.html', function () {
-        const help = new bootstrap.Modal(document.getElementById('helpModal'));
-        help.show()
-    });
+document.getElementById('keyboard').addEventListener('click',  async() => {
+    await populateHelpModal('Help/keyboard.html', 'Keyboard shortcuts');
+});
+document.getElementById('settings').addEventListener('click',  async() => {
+    await populateHelpModal('Help/settings.html', 'Settings Help');
+});
+document.getElementById('usage').addEventListener('click',  async() => {
+    await populateHelpModal('Help/usage.html', 'Usage Guide');
 });
 
-$('#settings').on('click', function () {
-    $('#helpModalLabel').text('Settings Help');
-    $('#helpModalBody').load('Help/settings.html', function () {
-        const help = new bootstrap.Modal(document.getElementById('helpModal'));
-        help.show()
-    });
-});
+const populateHelpModal = async (file, label) => {
+    document.getElementById('helpModalLabel').innerText = label;
+    const response = await fetch(file);
+    document.getElementById('helpModalBody').innerHTML = await response.text();
+    const help = new bootstrap.Modal(document.getElementById('helpModal'));
+    help.show();
+}
 
-$('#usage').on('click', function () {
-    $('#helpModalLabel').text('Usage Guide');
-    $('#helpModalBody').load('Help/usage.html', function () {
-        const help = new bootstrap.Modal(document.getElementById('helpModal'));
-        help.show()
-    });
-});
 nocmigButton.addEventListener('click', function () {
     if (config.nocmig) {
         config.nocmig = false;
@@ -2751,7 +2764,7 @@ nocmigButton.addEventListener('click', function () {
         nocmig: config.nocmig,
     });
     updatePrefs();
-})
+});
 
 const fullscreen = document.getElementById('fullscreen');
 
@@ -2764,23 +2777,24 @@ fullscreen.addEventListener('click', function () {
         fullscreen.innerText = 'fullscreen_exit';
     }
     adjustSpecDims(true);
-})
+});
 
 
-const diagnosticMenu = document.getElementById('diagnostics')
-diagnosticMenu.addEventListener('click', function () {
+const diagnosticMenu = document.getElementById('diagnostics');
+diagnosticMenu.addEventListener('click', async function () {
+    await getSystemInformation();
     let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
     for (let [key, value] of Object.entries(diagnostics)) {
         if (key === 'Audio Duration') { // Format duration as days, hours,minutes, etc.
             if (value < 3600) {
                 value = new Date(value * 1000).toISOString().substring(14, 19);
-                value = value.replace(':',  ' minutes ').concat(' seconds');
+                value = value.replace(':', ' minutes ').concat(' seconds');
             } else if (value < 86400) {
                 value = new Date(value * 1000).toISOString().substring(11, 19)
-                value = value.replace(':',  ' hours ').replace(':',  ' minutes ').concat(' seconds')
+                value = value.replace(':', ' hours ').replace(':', ' minutes ').concat(' seconds')
             } else {
                 value = new Date(value * 1000).toISOString().substring(8, 19);
-                const day = parseInt(value.slice(0,2)) -1;
+                const day = parseInt(value.slice(0, 2)) - 1;
                 const daysString = day === 1 ? '1 day ' : day.toString() + ' days ';
                 const dateString = daysString + value.slice(3);
                 value = dateString.replace(':', ' hours ').replace(':', ' minutes ').concat(' seconds');
@@ -2795,18 +2809,12 @@ diagnosticMenu.addEventListener('click', function () {
 });
 
 // Transport controls handling
-
-$('#playToggle').on('mousedown', async function () {
+document.getElementById('playToggle').addEventListener('mousedown', async () => {
     await wavesurfer.playPause();
 });
 
-$('#zoomIn').on('click', function () {
-    zoomSpec('in');
-});
-
-$('#zoomOut').on('click', function () {
-    zoomSpec('out');
-});
+document.getElementById('zoomIn').addEventListener('click',  zoomSpec);
+document.getElementById('zoomOut').addEventListener('click', zoomSpec);
 
 // Listeners to set batch size
 const batchRadios = document.getElementsByName('batch');
@@ -2872,9 +2880,9 @@ document.addEventListener('drop', async (event) => {
 
 
 // Prevent drag for UI elements
-bodyElement.on('dragstart', e => {
+document.body.addEventListener('dragstart', e => {
     e.preventDefault()
-})
+});
 
 // Make modals draggable
 $(".modal-header").on("mousedown", function (mousedownEvt) {
