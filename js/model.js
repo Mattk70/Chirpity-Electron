@@ -309,7 +309,7 @@ async function runPredictions(e) {
         const list = e.data[2];
         const batch = e.data[3];
         const warmup = e.data[4]
-        labels = appPath.indexOf('test') !== -1 ? new_labels : old_labels;
+        labels = appPath.indexOf('447') !== -1 ? new_labels : old_labels;
         postMessage({message: 'labels', labels: labels})
         console.log(`model received load instruction. Using list: ${list}, batch size ${batch}, warmup: ${warmup}`)
         myModel = new Model(appPath, list);
