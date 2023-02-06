@@ -241,21 +241,6 @@ async function loadAudioFile(args) {
     }
 }
 
-// const openFilesList = document.getElementsByClassName('openFiles');
-// for (const file of openFilesList){
-//     file.addEventListener('click', async (e) => {
-//     if (!PREDICTING) {
-//         await loadAudioFile({filePath: e.target.id, preserveResults: true})
-//     }
-//     e.stopImmediatePropagation()
-//     })
-// }
-$(document).on("click", ".openFiles", async function (e) {
-    if (!PREDICTING) {
-        await loadAudioFile({filePath: e.target.id, preserveResults: true})
-    }
-    e.stopImmediatePropagation()
-});
 
 function updateSpec({buffer, play = false, resetSpec = false}) {
     updateElementCache();
@@ -393,7 +378,7 @@ function updateElementCache() {
 }
 
 function zoomSpec(direction) {
-    if (typeof direction !== 'string'){ // then it's an event
+    if (typeof direction !== 'string') { // then it's an event
         direction = direction.target.closest('button').id
     }
     let offsetSeconds = wavesurfer.getCurrentTime();
@@ -424,6 +409,14 @@ async function showOpenDialog() {
     const files = await window.electron.openDialog('showOpenDialog');
     if (!files.canceled) await onOpenFiles({filePaths: files.filePaths});
 }
+
+const openFileInList = async (e) => {
+    if (!PREDICTING && e.target.type !== 'button') {
+        await loadAudioFile({filePath: e.target.id, preserveResults: true})
+    }
+}
+const filename = document.getElementById('filename');
+filename.addEventListener('click', openFileInList);
 
 function updateFileName(files, openfile) {
     let filenameElement = document.getElementById('filename');
@@ -795,11 +788,11 @@ function resultClick(e) {
 
 }
 
-function loadResultRegion(paramlist) {
+function loadResultRegion(params) {
     // Accepts global start and end timecodes from model detections
     // Need to find and centre a view of the detection in the spectrogram
     // 3 second detections
-    let [file, start, end, label, play] = paramlist;
+    let [file, start, end, label, play] = params;
     start = parseFloat(start);
     end = parseFloat(end);
     // ensure region doesn't spread across the whole window
@@ -1797,7 +1790,7 @@ for (let i = 0; i < modelToUse.length; i++) {
     })
 }
 
-const timelineToggle = (e) =>{
+const timelineToggle = (e) => {
     // set file creation time
     config.timeOfDay = e.target.id === 'timeOfDay'; //toggle setting
     const timeFields = document.querySelectorAll('.timestamp')
@@ -2714,7 +2707,7 @@ const iconDict = {
     confirmed: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: 100%; background: #198754"><span class="material-icons-two-tone">done</span></span></span>',
 }
 
-const  iconizeScore = (score) => {
+const iconizeScore = (score) => {
     score = parseFloat(score);
     const tooltip = (score * 100).toFixed(0).toString();
     if (score < 0.5) return iconDict['guess'].replaceAll('--', tooltip);
@@ -2727,17 +2720,19 @@ const  iconizeScore = (score) => {
 // File menu handling
 document.getElementById('open').addEventListener('click', showOpenDialog);
 document.getElementById('saveLabels').addEventListener('click', showSaveDialog);
-document.getElementById('saveLabels').addEventListener('click',  () => {sendFile('save')});
+document.getElementById('saveLabels').addEventListener('click', () => {
+    sendFile('save')
+});
 document.getElementById('exit').addEventListener('click', exitApplication);
 
 // Help menu handling
-document.getElementById('keyboard').addEventListener('click',  async() => {
+document.getElementById('keyboard').addEventListener('click', async () => {
     await populateHelpModal('Help/keyboard.html', 'Keyboard shortcuts');
 });
-document.getElementById('settings').addEventListener('click',  async() => {
+document.getElementById('settings').addEventListener('click', async () => {
     await populateHelpModal('Help/settings.html', 'Settings Help');
 });
-document.getElementById('usage').addEventListener('click',  async() => {
+document.getElementById('usage').addEventListener('click', async () => {
     await populateHelpModal('Help/usage.html', 'Usage Guide');
 });
 
@@ -2813,7 +2808,7 @@ document.getElementById('playToggle').addEventListener('mousedown', async () => 
     await wavesurfer.playPause();
 });
 
-document.getElementById('zoomIn').addEventListener('click',  zoomSpec);
+document.getElementById('zoomIn').addEventListener('click', zoomSpec);
 document.getElementById('zoomOut').addEventListener('click', zoomSpec);
 
 // Listeners to set batch size
