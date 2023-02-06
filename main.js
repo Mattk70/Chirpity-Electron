@@ -180,9 +180,11 @@ async function createWindow() {
     })
     console.log("main window created");
     // Emitted when the window is closed.
-    // mainWindow.on('closed', () => {
-    //     app.quit()
-    // })
+    if (process.platform !== 'darwin') {
+        mainWindow.on('closed', () => {
+            app.quit()
+        })
+    }
 }
 
 
@@ -273,7 +275,7 @@ app.whenReady().then(async () => {
         if (!windowsOpen) {
             await createWorker();
             await createWindow();
-        } else if (windowsOpen === 1){
+        } else if (windowsOpen === 1) {
             await createWindow();
         }
     });
