@@ -12,7 +12,7 @@ const staticFfmpeg = require('ffmpeg-static-electron');
 const {stat} = require("fs/promises");
 
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS;
-const adding_chirpity_additions = true;
+const adding_chirpity_additions = false;
 
 
 const sqlite3 = require('sqlite3').verbose();
@@ -888,9 +888,10 @@ function feedChunksToModel(channelData, increment, chunkStart, file, end, resetR
 
 const speciesMatch = (path, sname) => {
     const pathElements = path.split(p.sep);
-    const species = pathElements[pathElements.length - 2];
+    const species = pathElements[pathElements.length - 3];
     sname = sname.replaceAll(' ', '_');
-    return species.includes(sname)
+    //return species.includes(sname)
+    return sname.includes('Anthus')
 }
 
 const saveResults2DataSet = (rootDirectory) => {
@@ -1048,7 +1049,8 @@ function spawnWorker(model, list, batchSize, warmup) {
     predictWorker = new Worker('./js/model.js', {type: 'module'});
     //const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
     //const modelPath = model === 'efficientnet' ? '../test_24000_v10/' : '../24000_v9/';
-    const modelPath = model === 'efficientnet' ? '../2022128_EfficientNetB3_wd=10xlr_sigmoid_focal_crossentropy_256x384_AdamW_447/' : '../24000_v9/';
+    //const modelPath = model === 'efficientnet' ? '../2022128_EfficientNetB3_wd=10xlr_sigmoid_focal_crossentropy_256x384_AdamW_447/' : '../24000_v9/';
+    const modelPath = model === 'efficientnet' ? '../202325_EfficientNetB3_wd=10xlr_sigmoid_focal_crossentropy_256x384_AdamW_448/' : '../24000_v9/';
     //const modelPath = model === 'efficientnet' ? '../test_20221222_EfficientNetB3_wd=10xlr_sigmoid_focal_crossentropy_256x384_AdamW_447/' : '../24000_v9/';
     console.log(modelPath);
     // Now we've loaded a new model, clear the aborted flag
