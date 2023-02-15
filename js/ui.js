@@ -1224,12 +1224,13 @@ $(document).on('focus', '.input', function () {
         } else {
             theList = document.querySelector('#seenSpecies .bird-list')
         }
-        if (theList) container.appendChild(theList.cloneNode(true));
-        theList = container.querySelector('.bird-list');
-        theList.addEventListener('click', editHandler);
+        if (theList) {  //there won't be a seenSpecies list until some records are saved
+            container.appendChild(theList.cloneNode(true));
+            theList = container.querySelector('.bird-list');
+            theList.addEventListener('click', editHandler);
+        }
     }
     if (this.id === "speciesSearch") hideElement(['dataRecords']);
-
 })
 
 $(document).on('blur', '.input', function (e) {
