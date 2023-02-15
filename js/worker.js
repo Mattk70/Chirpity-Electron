@@ -1047,15 +1047,10 @@ async function saveMP3(file, start, end, filename, metadata) {
 /// Workers  From the MDN example
 function spawnWorker(model, list, batchSize, warmup) {
     predictWorker = new Worker('./js/model.js', {type: 'module'});
-    //const modelPath = model === 'efficientnet' ? '../24000_B3/' : '../24000_v9/';
-    //const modelPath = model === 'efficientnet' ? '../test_24000_v10/' : '../24000_v9/';
-    //const modelPath = model === 'efficientnet' ? '../2022128_EfficientNetB3_wd=10xlr_sigmoid_focal_crossentropy_256x384_AdamW_447/' : '../24000_v9/';
-    const modelPath = model === 'efficientnet' ? '../202325_EfficientNetB3_wd=10xlr_sigmoid_focal_crossentropy_256x384_AdamW_448/' : '../24000_v9/';
-    //const modelPath = model === 'efficientnet' ? '../test_20221222_EfficientNetB3_wd=10xlr_sigmoid_focal_crossentropy_256x384_AdamW_447/' : '../24000_v9/';
-    console.log(modelPath);
+    console.log('loading a worker')
     // Now we've loaded a new model, clear the aborted flag
     aborted = false;
-    predictWorker.postMessage(['load', modelPath, list, batchSize, warmup])
+    predictWorker.postMessage(['load',  list, batchSize, warmup])
     predictWorker.onmessage = async (e) => {
         await parseMessage(e)
     }
