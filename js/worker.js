@@ -13,7 +13,7 @@ const {stat} = require("fs/promises");
 
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS;
 const adding_chirpity_additions = false;
-
+const dataset_database = true
 
 const sqlite3 = require('sqlite3').verbose();
 sqlite3.Database.prototype.runAsync = function (sql, ...params) {
@@ -127,7 +127,7 @@ const createDB = async (file) => {
 async function loadDB(path) {
     // Ensure we're using the db for the number of labels we have in the model
     if (path) {
-        const file = p.join(path, `archive${LABELS.length}.sqlite`)
+        const file = dataset_database ? p.join(path, `archive_dataset${LABELS.length}.sqlite`) : p.join(path, `archive${LABELS.length}.sqlite`)
         if (!fs.existsSync(file)) {
             await createDB(file);
         } else {
@@ -888,21 +888,21 @@ function feedChunksToModel(channelData, increment, chunkStart, file, end, resetR
 
 const speciesMatch = (path, sname) => {
     const pathElements = path.split(p.sep);
-    const species = pathElements[pathElements.length - 3];
+    const species = pathElements[pathElements.length - 2];
     sname = sname.replaceAll(' ', '_');
-    //return species.includes(sname)
-    return sname.includes('Anthus')
+    return species.includes(sname)
+    //return sname.includes('Anthus')
 }
 
 const saveResults2DataSet = (rootDirectory) => {
-    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/Amendment_temp_folder';
+    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/FFT-256';
+    let t0 = Date.now()
     let promise = Promise.resolve();
     let promises = [];
     let count = 0;
-    const t0 = Date.now();
     memoryDB.each(db2ResultSQL, (err, result) => {
         // Check for level of ambient noise activation
-        let ambient, threshold, value = 0.25;
+        let ambient, threshold, value = 0.5;
         // adding_chirpity_additions is a flag for curated files, if true we assume every detection is correct
         if (!adding_chirpity_additions) {
             ambient = (result.sname2 === 'Ambient Noise' ? result.score2 : result.sname3 === 'Ambient Noise' ? result.score3 : false)
@@ -920,20 +920,25 @@ const saveResults2DataSet = (rootDirectory) => {
         }
         promise = promise.then(async function () {
             if (result.score >= threshold) {
-                let end = Math.min(result.end, result.duration);
-                const AudioBuffer = await fetchAudioBuffer({
-                    start: result.start, end: end, file: result.file
-                })
-                if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
-                    const buffer = AudioBuffer.getChannelData(0);
-                    const [_, folder] = p.dirname(result.file).match(/^.*\/(.*)$/)
-                    // filename format: <source file>_<confidence>_<start>.png
-                    const file = `${p.basename(result.file).replace(p.extname(result.file), '')}_${result['score'].toFixed(2)}_${result.start}-${result.end}.png`;
-                    const filepath = p.join(rootDirectory, folder)
-                    predictWorker.postMessage({
-                        message: 'get-spectrogram', filepath: filepath, file: file, buffer: buffer
+                const [_, folder] = p.dirname(result.file).match(/^.*\/(.*)$/)
+                // filename format: <source file>_<confidence>_<start>.png
+                const file = `${p.basename(result.file).replace(p.extname(result.file), '')}_${result['score'].toFixed(2)}_${result.start}-${result.end}.png`;
+                const filepath = p.join(rootDirectory, folder)
+                const file_to_save = p.join(filepath, file)
+                if (fs.existsSync(file_to_save)) {
+                    console.log("skipping file as it is already saved")
+                } else {
+                    let end = Math.min(result.end, result.duration);
+                    const AudioBuffer = await fetchAudioBuffer({
+                        start: result.start, end: end, file: result.file
                     })
-                    count++;
+                    if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
+                        const buffer = AudioBuffer.getChannelData(0);
+                        predictWorker.postMessage({
+                            message: 'get-spectrogram', filepath: filepath, file: file, buffer: buffer
+                        })
+                        count++;
+                    }
                 }
             }
             return new Promise(function (resolve) {
@@ -1050,7 +1055,7 @@ function spawnWorker(model, list, batchSize, warmup) {
     console.log('loading a worker')
     // Now we've loaded a new model, clear the aborted flag
     aborted = false;
-    predictWorker.postMessage(['load',  list, batchSize, warmup])
+    predictWorker.postMessage(['load', list, batchSize, warmup])
     predictWorker.onmessage = async (e) => {
         await parseMessage(e)
     }
@@ -1059,14 +1064,15 @@ function spawnWorker(model, list, batchSize, warmup) {
 const parsePredictions = async (response) => {
     let file = response.file, batchInProgress = false;
     predictionsReceived = response['predictionsReceived'];
-    const result = response.result, fileSQL = prepSQL(file), db = STATE.db;
-    for (let i = 0; i < result.length; i++) {
-        const prediction = result[i];
+    const latestResult = response.result, fileSQL = prepSQL(file), db = STATE.db;
+    for (let i = 0; i < latestResult.length; i++) {
+        const prediction = latestResult[i];
         const position = parseFloat(prediction[0]);
         UI.postMessage({event: 'progress', progress: (position / metadata[file].duration), file: file});
-        //console.log('Prediction received from worker', result);
+        const result = prediction[1];
+        // Only send live results matching minConfidence
         if (!prediction[1].suppressed && prediction[1].score > minConfidence) {
-            const result = prediction[1];
+
             const audacity = prediction[2];
             if (!STATE.selection.start) {
                 index++;
@@ -1079,37 +1085,37 @@ const parsePredictions = async (response) => {
                 });
                 AUDACITY[file] ? AUDACITY[file].push(audacity) : AUDACITY[file] = [audacity];
             }
-            //save result to  db (N.B. tried using transactions, but was no faster.
-            // Also, transactions had to start end in other functions, which is bad style!
-            await db.runAsync(`INSERT
-            OR IGNORE INTO files VALUES ( '${fileSQL}',
-            ${metadata[file].duration},
-            ${response['fileStart']}
-            )`);
-            const {rowid} = await db.getAsync(`SELECT rowid
-                                               FROM files
-                                               WHERE name = '${fileSQL}'`);
-            const durationSQL = Object.entries(metadata[file].dateDuration)
-                .map(entry => `(${entry.toString()},${rowid})`).join(',');
-            await db.runAsync(`INSERT
-            OR IGNORE INTO duration VALUES
-            ${durationSQL}`);
-            await db.runAsync(`INSERT
-            OR REPLACE INTO records 
-                VALUES (
-            ${result.timestamp},
-            ${result.id_1},
-            ${result.id_2},
-            ${result.id_3},
-            ${result.score},
-            ${result.score2},
-            ${result.score3},
-            ${rowid},
-            ${result.position},
-            null,
-            null
-            )`);
         }
+        //save all results to  db, regardless of minConfidence
+        await db.runAsync(`INSERT
+        OR IGNORE INTO files VALUES ( '${fileSQL}',
+        ${metadata[file].duration},
+        ${response['fileStart']}
+        )`);
+        const {rowid} = await db.getAsync(`SELECT rowid
+                                           FROM files
+                                           WHERE name = '${fileSQL}'`);
+        const durationSQL = Object.entries(metadata[file].dateDuration)
+            .map(entry => `(${entry.toString()},${rowid})`).join(',');
+        await db.runAsync(`INSERT
+        OR IGNORE INTO duration VALUES
+        ${durationSQL}`);
+        await db.runAsync(`INSERT
+        OR REPLACE INTO records 
+                VALUES (
+        ${result.timestamp},
+        ${result.id_1},
+        ${result.id_2},
+        ${result.id_3},
+        ${result.score},
+        ${result.score2},
+        ${result.score3},
+        ${rowid},
+        ${result.position},
+        null,
+        null
+        )`);
+
     }
     if (response.finished) {
         COMPLETED.push(file);
@@ -1260,9 +1266,9 @@ async function setStartEnd(file) {
 
 
 const setWhereWhen = ({dateRange, species, files, context}) => {
-    let where = '';
+    let where = `WHERE conf1 >= ${minConfidence}`;
     if (files.length) {
-        where = 'WHERE files.name IN  (';
+        where += ' AND files.name IN  (';
         // Format the file list
         files.forEach(file => {
             file = prepSQL(file);
@@ -1272,9 +1278,10 @@ const setWhereWhen = ({dateRange, species, files, context}) => {
         where = where.slice(0, -1);
         where += ')';
     }
+
     const cname = context === 'summary' ? 'cname' : 's1.cname';
-    if (species) where += `${files.length ? ' AND ' : ' WHERE '} ${cname} =  '${prepSQL(species)}'`;
-    const when = dateRange && dateRange.start ? `AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
+    if (species) where += ` AND ${cname} =  '${prepSQL(species)}'`;
+    const when = dateRange && dateRange.start ? ` AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
     return [where, when]
 }
 
