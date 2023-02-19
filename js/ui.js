@@ -742,6 +742,7 @@ thresholdLink.addEventListener('blur', (e) => {
             action: 'set-variables',
             confidence: config.minConfidence,
         });
+        setFilter(e);
     } else {
         e.target.value = config.minConfidence * 100;
     }
@@ -2190,7 +2191,7 @@ async function onPredictionDone({
     if (currentFile) enableMenuItem(['analyse', 'reanalyse'])
 
     // Add speciesfilter  filter handler
-    setFilterHandler()
+    // setFilterHandler()
 
     // Diagnostics:
     t1_analysis = Date.now();
@@ -2276,38 +2277,40 @@ const addPagination = (total, offset) => {
     })
 }
 
-const setFilterHandler = () => {
-    $(document).on('click', '.speciesFilter', function (e) {
-        // Prevent crazy double firing of handler
-        e.stopImmediatePropagation();
-        // Species filtering in Explore is meaningless...
-        // There won't be a target if the input box is clicked rather than the list
-        if (isExplore() || e.target.tagName === 'INPUT') return
-        activeRow = undefined;
-        // Am I trying to unfilter?
-        const target = this.querySelector('span.pointer').classList;
-        if (target.contains('text-warning')) {
-            // Clicked on filtered species icon
-            worker.postMessage({action: 'filter', files: analyseList || fileList, order: STATE.explore.order});
-            // Clear species from STATE
-            STATE.explore.species = undefined;
-        } else {
-            // Clicked on unfiltered species name
-            const target = this.querySelector('span.pointer');
-            const species = target.innerHTML.replace(/\s<.*/, '');
-            STATE.explore.species = species;
-            worker.postMessage({
-                action: 'filter',
-                species: species,
-                files: analyseList || fileList,
-                order: STATE.explore.order
-            });
-        }
-        seenTheDarkness = false;
-        shownDaylightBanner = false;
-        document.getElementById('results').scrollTop = 0;
-    })
+
+
+function setFilter(e) {
+    // Prevent crazy double firing of handler
+    //e.stopImmediatePropagation();
+    // Species filtering in Explore is meaningless...
+    // There won't be a target if the input box is clicked rather than the list
+    if (isExplore()) return
+    activeRow = undefined;
+    // Am I trying to unfilter?
+    const target = this.location ? undefined : this.querySelector('span.pointer') ;
+    if (target?.classList.contains('text-warning')) {
+        // Clicked on filtered species icon
+        worker.postMessage({action: 'filter', files: analyseList || fileList, order: STATE.explore.order});
+        // Clear species from STATE
+        STATE.explore.species = undefined;
+    } else {
+        // Clicked on unfiltered species name
+        const species = target ? target.innerHTML.replace(/\s<.*/, '') : undefined;
+        STATE.explore.species = species;
+        worker.postMessage({
+            action: 'filter',
+            species: species,
+            files: analyseList || fileList,
+            order: STATE.explore.order
+        });
+    }
+    seenTheDarkness = false;
+    shownDaylightBanner = false;
+    document.getElementById('results').scrollTop = 0;
 }
+
+
+$(document).on('click', '.speciesFilter', setFilter)
 
 const checkDayNight = (timestamp) => {
     let astro = SunCalc.getTimes(timestamp, config.latitude, config.longitude);
