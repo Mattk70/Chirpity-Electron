@@ -895,7 +895,7 @@ const speciesMatch = (path, sname) => {
 }
 
 const saveResults2DataSet = (rootDirectory) => {
-    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/FFT-256';
+    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/test';
     let t0 = Date.now()
     let promise = Promise.resolve();
     let promises = [];
