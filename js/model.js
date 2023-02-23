@@ -121,23 +121,18 @@ class Model {
 
     }
 
-    fixUpSpecBatch(buffers, h, w) {
+    fixUpSpecBatch(specBatch, h, w) {
         const img_height = h || height;
         const img_width = w || width;
-        let spec = this.makeSpectrogram(buffers);
         // Swap axes to fit output shape
-        spec = tf.transpose(spec, [1,0]);
-        spec = tf.reverse(spec, [0]);
-        spec = tf.abs(spec);
-        //Slice spec and batch
-        let specBatch = tf.stack(tf.split(spec, this.batchSize, 1))
-        // let specBatch = tf.reshape(spec,
-        //     [this.batchSize, spec.shape[0], spec.shape[1] / this.batchSize])
+        specBatch = tf.transpose(specBatch, [0,2,1]);
+        specBatch = tf.reverse(specBatch, [1]);
+        specBatch = tf.abs(specBatch);
+        // Fix specBatch shape
         specBatch = this._normalize(specBatch);
         // Add channel axis
         specBatch = tf.expandDims(specBatch, -1);
-        specBatch = tf.image.resizeBilinear(specBatch, [img_height, img_width]);
-        return tf.image.grayscaleToRGB(specBatch)
+        return tf.image.resizeBilinear(specBatch, [img_height, img_width]);
     }
 
     predictBatch(file, fileStart) {
@@ -145,14 +140,17 @@ class Model {
         let result;
         let audacity;
         //let t0 = performance.now();
-        this.batch = tf.concat(Object.values(this.goodTensors))
-        const desired_shape =   this.batchSize * 72000;
-        if (this.batch.size < desired_shape) {
+        this.batch = tf.stack(Object.values(this.goodTensors))
+        this.batch = this.fixUpSpecBatch(this.batch)
+        //         console.log(`stacking took ${performance.now() - t0} milliseconds`)
+        // t0 = performance.now();
+        if (this.batch.shape[0] < this.batchSize) {
             console.log(`Adding ${this.batchSize - this.batch.shape[0]} tensors to the batch`)
-            const padding = tf.zeros([desired_shape - this.batch.size]);
+            const shape = [...this.batch.shape];
+            shape[0] = this.batchSize - shape[0];
+            const padding = tf.zeros(shape);
             this.batch = tf.concat([this.batch, padding], 0)
         }
-        this.batch = this.fixUpSpecBatch(this.batch);
         // console.log(`padding took ${performance.now() - t0} milliseconds`)
         let t0 = performance.now();
         const prediction = this.model.predict(this.batch, {batchSize: this.batchSize})
@@ -248,7 +246,7 @@ class Model {
                     let padding = tf.zeros([this.chunkLength - chunk.shape[0]]);
                     chunk = chunk.concat(padding);
                 }
-                const spectrogram = chunk; //this.makeSpectrogram(chunk);
+                const spectrogram = this.makeSpectrogram(chunk);
                 if (threshold) {
                     const SNR = this.getSNR(spectrogram);
 
