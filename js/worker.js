@@ -10,12 +10,13 @@ const {utimes} = require('utimes');
 const stream = require("stream");
 const staticFfmpeg = require('ffmpeg-static-electron');
 const {stat} = require("fs/promises");
+const {memory} = require("@tensorflow/tfjs");
 
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS;
-const adding_chirpity_additions = false;
+const adding_chirpity_additions = true;
 const dataset_database = true
 
-const sqlite3 = require('sqlite3').verbose();
+const sqlite3 = require('sqlite3') // .verbose();
 sqlite3.Database.prototype.runAsync = function (sql, ...params) {
     return new Promise((resolve, reject) => {
         this.run(sql, params, function (err) {
@@ -61,7 +62,8 @@ const resetState = (db) => {
         saved: new Set(), // list of files requested that are in the disk database
         globalOffset: 0, // Current start number for unfiltered results
         filteredOffset: {}, // Current species start number for filtered results
-        selection: false
+        selection: false,
+        blocked: []
     }
 }
 resetState();
@@ -895,7 +897,8 @@ const speciesMatch = (path, sname) => {
 }
 
 const saveResults2DataSet = (rootDirectory) => {
-    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/test';
+    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/FFT-256-256x384';
+    const height = 256, width = 384
     let t0 = Date.now()
     let promise = Promise.resolve();
     let promises = [];
@@ -935,7 +938,12 @@ const saveResults2DataSet = (rootDirectory) => {
                     if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
                         const buffer = AudioBuffer.getChannelData(0);
                         predictWorker.postMessage({
-                            message: 'get-spectrogram', filepath: filepath, file: file, buffer: buffer
+                            message: 'get-spectrogram',
+                            filepath: filepath,
+                            file: file,
+                            buffer: buffer,
+                            height: height,
+                            width: width
                         })
                         count++;
                     }
@@ -954,7 +962,7 @@ const saveResults2DataSet = (rootDirectory) => {
 
 const onSpectrogram = async (filepath, file, width, height, data, channels) => {
     await mkdir(filepath, {recursive: true});
-    let image = await png.encode({width: width, height: height, data: data, channels: channels})
+    let image = await png.encode({width: 384, height: 256, data: data, channels: channels})
     const file_to_save = p.join(filepath, file);
     await writeFile(file_to_save, image);
     console.log('saved:', file_to_save);
@@ -1115,7 +1123,7 @@ const parsePredictions = async (response) => {
         null,
         null
         )`);
-
+        await getSummary({interim: true, files: OPENFILES});
     }
     if (response.finished) {
         COMPLETED.push(file);
@@ -1144,6 +1152,12 @@ const parsePredictions = async (response) => {
 async function parseMessage(e) {
     const response = e.data;
     switch (response['message']) {
+        case 'update-list':
+            STATE.blocked = response.blocked || STATE.blocked;
+            STATE.globalOffset = 0;
+            await getResults();
+            await getSummary();
+            break;
         case 'model-ready':
             sampleRate = response['sampleRate'];
             const backend = response['backend'];
@@ -1267,6 +1281,10 @@ async function setStartEnd(file) {
 
 const setWhereWhen = ({dateRange, species, files, context}) => {
     let where = `WHERE conf1 >= ${minConfidence}`;
+    if (STATE.blocked.length) {
+        const blocked = STATE.blocked
+        where += ` AND  birdID1 NOT IN (${blocked.toString()})`
+    }
     if (files.length) {
         where += ' AND files.name IN  (';
         // Format the file list
@@ -1293,6 +1311,7 @@ const getSummary = async ({
                               species = undefined,
                               explore = false,
                               active = undefined,
+                              interim = false
                           } = {}) => {
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
     let [where, when] = setWhereWhen({
@@ -1306,7 +1325,7 @@ const getSummary = async ({
             INNER JOIN files ON fileID = files.rowid
             ${where} ${when}
         GROUP BY cname
-        ORDER BY max (conf1) DESC;`);
+        ORDER BY count DESC;`);
     // need another setWhereWhen call for total
     [where, when] = setWhereWhen({
         dateRange: range, species: species, files: files, context: 'summary'
@@ -1318,8 +1337,9 @@ const getSummary = async ({
                                                 INNER JOIN files ON fileID = files.rowid
                                            ${where} ${when}`);
     // need to send offset here?
+    const event = interim ? 'update-summary' : 'prediction-done'
     UI.postMessage({
-        event: 'prediction-done',
+        event: event,
         summary: summary,
         total: total,
         offset: offset,
@@ -1364,7 +1384,7 @@ const getResults = async ({
                               context = 'results',
                               limit = 500,
                               offset = undefined,
-                          }) => {
+                          } = {}) => {
     if (STATE.selection) {
         offset = 0;
         range = STATE.selection;
