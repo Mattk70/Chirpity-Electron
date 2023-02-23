@@ -89,7 +89,7 @@ let waveCanvasElement, waveWaveElement,
     resultTableElement = $('#resultTableContainer');
 resultTableElement.animate({scrollTop: '300px'}, 400, 'swing');
 const contentWrapperElement = $('#contentWrapper');
-const completeDiv = $('#complete');
+//const completeDiv = $('#complete');
 let resultTable = document.getElementById('resultTableBody');
 const selectionTable = document.getElementById('selectionResultTableBody');
 const nocmigButton = document.getElementById('nocmigMode');
@@ -102,7 +102,7 @@ const timecode = document.getElementById('timecode');
 const inferno = document.getElementById('inferno');
 const greys = document.getElementById('greys');
 const resultsDiv = document.getElementById('resultsDiv');
-const summaryButton = document.getElementById('showSummary');
+//const summaryButton = document.getElementById('showSummary');
 const summaryDiv = document.getElementById('summary');
 
 
@@ -490,7 +490,7 @@ async function onOpenFiles(args) {
     hideAll();
     showElement(['spectrogramWrapper'], false);
     resetResults();
-    completeDiv.hide();
+    //completeDiv.hide();
     // Store the file list and Load First audio file
     fileList = args.filePaths;
     // Sort file by time created (the oldest first):
@@ -531,7 +531,7 @@ function analyseReset() {
     PREDICTING = true;
     delete diagnostics['Audio Duration'];
     AUDACITY_LABELS = {};
-    completeDiv.hide();
+    //completeDiv.hide();
     progressDiv.show();
     stretchTable();
     // Diagnostics
@@ -722,7 +722,7 @@ exploreLink.addEventListener('click', async () => {
     worker.postMessage({action: 'get-detected-species-list', range: STATE.explore.range});
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
-    hideElement(['completeDiv']);
+    //hideElement(['completeDiv']);
     //adjustSpecDims(true);
 });
 
@@ -742,7 +742,7 @@ thresholdLink.addEventListener('blur', (e) => {
             action: 'set-variables',
             confidence: config.minConfidence,
         });
-        setFilter(e);
+        setFilter();
     } else {
         e.target.value = config.minConfidence * 100;
     }
@@ -1133,6 +1133,9 @@ const setUpWorkerMessaging = () => {
                     break;
                 case 'reset-results':
                     resetResults(args);
+                    break;
+                case 'update-summary':
+                    updateSummary(args);
                     break;
                 case 'files':
                     onOpenFiles(args);
@@ -1772,6 +1775,7 @@ for (let i = 0; i < listToUse.length; i++) {
         updateListIcon();
         updatePrefs();
         worker.postMessage({action: 'update-model', list: config.list})
+        setFilter();
     })
 }
 
@@ -2057,7 +2061,7 @@ async function onWorkerLoadedAudio({
     workerHasLoadedFile = true;
     const resetSpec = !currentFile;
     currentFileDuration = sourceDuration;
-    if (preserveResults) completeDiv.hide();
+    //if (preserveResults) completeDiv.hide();
     console.log('UI received worker-loaded-audio: ' + file)
     currentBuffer = new AudioBuffer({length: contents.length, numberOfChannels: 1, sampleRate: 24000});
     currentBuffer.copyToChannel(contents, 0);
@@ -2180,7 +2184,7 @@ async function onPredictionDone({
     progressBar.width(0 + '%');
     progressBar.attr('aria-valuenow', 0);
     progressBar.html(0 + '%');
-    completeDiv.show();
+    //completeDiv.show();
 
     if (Object.keys(AUDACITY_LABELS).length) {
         enableMenuItem(['saveLabels', 'save2db']);
@@ -2199,11 +2203,11 @@ async function onPredictionDone({
     diagnostics['Analysis Rate'] = (diagnostics['Audio Duration'] / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
 
     //show summary table
-    summaryButton.click();
+    //summaryButton.click();
     // midnight hack: arrgh, but it works...
-    if (summaryDiv.classList.contains('d-none')) {
-        summaryButton.click();
-    }
+    // if (summaryDiv.classList.contains('d-none')) {
+    //     summaryButton.click();
+    // }
     if (active) {
         // Refresh node and scroll to active row:
         activeRow = document.getElementById(active)
@@ -2279,7 +2283,7 @@ const addPagination = (total, offset) => {
 
 
 
-function setFilter(e) {
+function setFilter() {
     // Prevent crazy double firing of handler
     //e.stopImmediatePropagation();
     // Species filtering in Explore is meaningless...
@@ -2418,6 +2422,7 @@ const detectionsModalDiv = document.getElementById('detectionsModal')
 detectionsModalDiv.addEventListener('hidden.bs.modal', () => {
     resetRegions();
     worker.postMessage({action: 'selection-off'});
+    worker.postMessage({action: 'set-variables', confidence: config.minConfidence})
     worker.postMessage({
         action: 'filter',
         species: isSpeciesViewFiltered(true),
@@ -2571,20 +2576,20 @@ const squishTable = () => {
     resultsDiv.classList.remove('col-sm-12');
 }
 
-summaryButton.addEventListener('click', (e) => {
-    if (summaryDiv.classList.contains('d-none')) {
-        summaryButton.innerText = 'Hide Summary';
-        squishTable()
-    } else {
-        summaryButton.innerText = 'Show Summary';
-        stretchTable()
-    }
-    if (e.isTrusted) {
-        summaryTable.animate({width: 'toggle'})
-    } else {
-        summaryTable.animate({width: 'show'})
-    }
-});
+// summaryButton.addEventListener('click', (e) => {
+//     if (summaryDiv.classList.contains('d-none')) {
+//         summaryButton.innerText = 'Hide Summary';
+//         squishTable()
+//     } else {
+//         summaryButton.innerText = 'Show Summary';
+//         stretchTable()
+//     }
+//     if (e.isTrusted) {
+//         summaryTable.animate({width: 'toggle'})
+//     } else {
+//         summaryTable.animate({width: 'show'})
+//     }
+// });
 
 $(document).on('click', '.delete', function (e) {
     e.stopImmediatePropagation();
@@ -2643,7 +2648,7 @@ function sendFile(mode, result) {
         end = result.end || start + 3;
         filename = result.filename;
     }
-    if (start !== undefined) {
+    else if (start === undefined) {
         if (region.start) {
             start = region.start + bufferBegin;
             end = region.end + bufferBegin;
@@ -2724,7 +2729,7 @@ const iconizeScore = (score) => {
 // File menu handling
 document.getElementById('open').addEventListener('click', showOpenDialog);
 document.getElementById('saveLabels').addEventListener('click', showSaveDialog);
-document.getElementById('saveLabels').addEventListener('click', () => {
+document.getElementById('exportMP3').addEventListener('click', () => {
     sendFile('save')
 });
 document.getElementById('exit').addEventListener('click', exitApplication);
@@ -3047,6 +3052,7 @@ listIcon.addEventListener('click', () => {
             config.list = keys[replace];
             updatePrefs();
             worker.postMessage({action: 'update-model', list: config.list})
+            // setTimeout(setFilter, 10);
             break
         }
     }
