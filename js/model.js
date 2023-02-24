@@ -86,17 +86,18 @@ class Model {
         return spec;
     }
 
-    getSNR(spectrogram) {
+    getSNR(spectrograms) {
         //threshold = tf.scalar(threshold);
         // check signal noise threshold
-        const max = tf.max(spectrogram, 1);
+
+        const max = tf.max(spectrograms, 2);
         //const max_tmp = max.dataSync();
-        const mean = tf.mean(spectrogram, 1);
+        const mean = tf.mean(spectrograms, 2);
         //const mean_tmp = mean.dataSync();
         const ratio = tf.divNoNan(max, mean);
         //const ratio_tmp = ratio.dataSync();
-        const snr = tf.max(ratio);
-        return snr.dataSync()[0];
+        const snr = tf.squeeze(tf.max(ratio, 1));
+        return snr //.dataSync()
     }
 
     makeSpectrogram(audioBuffer) {
@@ -125,7 +126,7 @@ class Model {
         const img_height = h || height;
         const img_width = w || width;
         // Swap axes to fit output shape
-        specBatch = tf.transpose(specBatch, [0,2,1]);
+        specBatch = tf.transpose(specBatch, [0, 2, 1]);
         specBatch = tf.reverse(specBatch, [1]);
         specBatch = tf.abs(specBatch);
         // Fix specBatch shape
@@ -135,15 +136,28 @@ class Model {
         return tf.image.resizeBilinear(specBatch, [img_height, img_width]);
     }
 
-    predictBatch(file, fileStart) {
+    predictBatch(file, fileStart, threshold) {
         let batched_results = [];
         let result;
         let audacity;
         //let t0 = performance.now();
         this.batch = tf.stack(Object.values(this.goodTensors))
         this.batch = this.fixUpSpecBatch(this.batch)
-        //         console.log(`stacking took ${performance.now() - t0} milliseconds`)
-        // t0 = performance.now();
+        if (threshold) {
+            const SNR = this.getSNR(this.batch);
+            let condition = tf.greater(SNR, threshold);
+            condition = tf.reshape(condition, [condition.shape[0], 1, 1, 1])
+            //this.batch = tf.squeeze(this.batch);
+            const blackTensor = tf.zerosLike(this.batch);
+            this.batch = tf.where(condition, blackTensor, this.batch)
+            //this.batch = tf.expandDims(this.batch,-1)
+        //     if (SNR > threshold) {
+        //         this.goodTensors[key] = tf.keep(spectrogram);
+        //         console.log("chunk with SNR of ", SNR.toString())
+        //     } else {
+        //         console.log("skipping chunk with SNR of ", SNR.toString())
+        //     }
+        }
         if (this.batch.shape[0] < this.batchSize) {
             console.log(`Adding ${this.batchSize - this.batch.shape[0]} tensors to the batch`)
             const shape = [...this.batch.shape];
@@ -151,7 +165,6 @@ class Model {
             const padding = tf.zeros(shape);
             this.batch = tf.concat([this.batch, padding], 0)
         }
-        // console.log(`padding took ${performance.now() - t0} milliseconds`)
         let t0 = performance.now();
         const prediction = this.model.predict(this.batch, {batchSize: this.batchSize})
         console.log(`model predict took ${performance.now() - t0} milliseconds`)
@@ -247,27 +260,12 @@ class Model {
                     chunk = chunk.concat(padding);
                 }
                 const spectrogram = this.makeSpectrogram(chunk);
-                if (threshold) {
-                    const SNR = this.getSNR(spectrogram);
-
-                    if (SNR > threshold) {
-                        this.goodTensors[key] = tf.keep(spectrogram);
-                        console.log("chunk with SNR of ", SNR.toString())
-                    } else {
-                        console.log("skipping chunk with SNR of ", SNR.toString())
-                    }
-                } else {
-                    // this.goodTensors['key'].push(key)
-                    //this.goodTensors['batch'] ?
-                    //  tf.stack(this.goodTensors['batch'], spectrogram]:
-                    //this.goodTensors['batch'] = spectrogram;
-                    this.goodTensors[key] = tf.keep(spectrogram);
-                }
+                this.goodTensors[key] = tf.keep(spectrogram);
 
                 //Loop will continue
                 if (Object.keys(this.goodTensors).length === this.batchSize) {
                     // There's a new batch of predictions to make
-                    readyToSend = this.predictBatch(file, fileStart)
+                    readyToSend = this.predictBatch(file, fileStart, threshold)
                 }
             }
             if (finalchunk) {
@@ -323,12 +321,9 @@ async function runPredictions(e) {
             chunkLength: myModel.chunkLength,
             backend: tf.getBackend(),
             labels: labels
-        });
+        })
+        postMessage({message: 'update-list', blocked: blocked_IDs, updateResults: false});
     } else if (modelRequest === 'predict') {
-        if (!ready) {
-            console.log("ain't ready")
-            return
-        }
         const file = e.data.file;
         const finalChunk = e.data.finalChunk;
         if (finalChunk) console.log('Received final chunks')
@@ -383,6 +378,6 @@ async function runPredictions(e) {
         myModel.list = e.data.list;
         console.log(`Setting list to ${myModel.list}`);
         myModel.setList();
-        postMessage({message: 'update-list', blocked: blocked_IDs})
+        postMessage({message: 'update-list', blocked: blocked_IDs, updateResults: true});
     }
 }
