@@ -27,7 +27,6 @@ let blocked_IDs = [];
 let suppressed_IDs = [];
 let enhanced_IDs = [];
 let ready = false;
-
 const CONFIG = {
     sampleRate: 24000, specLength: 3, sigmoid: 1.0,
 }
@@ -46,6 +45,7 @@ class Model {
         this.appPath = appPath;
         this.list = list;
         this.goodTensors = {};
+        this.silence = null;
     }
 
     async loadModel() {
@@ -59,6 +59,18 @@ class Model {
             this.setList();
             this.inputShape = [...this.model.inputs[0].shape];
         }
+    }
+
+    warmUp(batchSize) {
+        this.batchSize = parseInt(batchSize);
+        this.inputShape[0] = this.batchSize;
+        const warmupResult = this.model.predict(tf.zeros(this.inputShape));
+        const {indices, values} = warmupResult.topk(3);
+        indices.arraySync();
+        const silence = values.arraySync();
+        this.silence = silence[0].toString()
+        ready = true;
+        return true;
     }
 
     setList() {
@@ -86,40 +98,16 @@ class Model {
         return spec;
     }
 
-    getSNR(spectrograms) {
-        //threshold = tf.scalar(threshold);
-        // check signal noise threshold
-
+    getSNR(spectrograms, threshold) {
         const max = tf.max(spectrograms, 2);
-        //const max_tmp = max.dataSync();
         const mean = tf.mean(spectrograms, 2);
-        //const mean_tmp = mean.dataSync();
         const ratio = tf.divNoNan(max, mean);
-        //const ratio_tmp = ratio.dataSync();
-        const snr = tf.squeeze(tf.max(ratio, 1));
-        return snr //.dataSync()
+        return tf.squeeze(tf.max(ratio, 1));
     }
 
     makeSpectrogram(audioBuffer) {
-        // const s0 = performance.now();
-        /*
-        Would batch here but in tfjs audioBuffer has to be a 1D tensor
-        */
         const spec = tf.signal.stft(audioBuffer, this.frame_length, this.frame_step);
         return tf.cast(spec, 'float32');
-        // Cast from complex to float
-
-    }
-
-    warmUp(batchSize) {
-        this.batchSize = parseInt(batchSize);
-        this.inputShape[0] = this.batchSize;
-        const warmupResult = this.model.predict(tf.zeros(this.inputShape));
-        warmupResult.arraySync();
-        warmupResult.dispose();
-        ready = true;
-        return true;
-
     }
 
     fixUpSpecBatch(specBatch, h, w) {
@@ -140,23 +128,14 @@ class Model {
         let batched_results = [];
         let result;
         let audacity;
-        //let t0 = performance.now();
         this.batch = tf.stack(Object.values(this.goodTensors))
         this.batch = this.fixUpSpecBatch(this.batch)
         if (threshold) {
             const SNR = this.getSNR(this.batch);
-            let condition = tf.greater(SNR, threshold);
+            let condition = tf.less(SNR, threshold);
             condition = tf.reshape(condition, [condition.shape[0], 1, 1, 1])
-            //this.batch = tf.squeeze(this.batch);
             const blackTensor = tf.zerosLike(this.batch);
             this.batch = tf.where(condition, blackTensor, this.batch)
-            //this.batch = tf.expandDims(this.batch,-1)
-        //     if (SNR > threshold) {
-        //         this.goodTensors[key] = tf.keep(spectrogram);
-        //         console.log("chunk with SNR of ", SNR.toString())
-        //     } else {
-        //         console.log("skipping chunk with SNR of ", SNR.toString())
-        //     }
         }
         if (this.batch.shape[0] < this.batchSize) {
             console.log(`Adding ${this.batchSize - this.batch.shape[0]} tensors to the batch`)
@@ -176,8 +155,12 @@ class Model {
 
         const top3 = indices.arraySync();
         const top3scores = values.arraySync();
-        //console.log(`sync took ${performance.now() - t0} milliseconds`)
-        //t0 = performance.now();
+        //check for silence (look for values, make them zero
+        for (let i = 0; i < top3scores.length; i++){
+            if (top3scores[i].toString() === this.silence ){
+                top3scores[i] = [0.0, 0.0, 0.0]
+            }
+        }
         const batch = {};
         const keys = Object.keys(this.goodTensors);
         for (let i = 0; i < keys.length; i++) {
