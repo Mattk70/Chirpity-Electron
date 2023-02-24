@@ -16,7 +16,7 @@ let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS;
 const adding_chirpity_additions = true;
 const dataset_database = true
 
-const sqlite3 = require('sqlite3') // .verbose();
+const sqlite3 = require('sqlite3').verbose();
 sqlite3.Database.prototype.runAsync = function (sql, ...params) {
     return new Promise((resolve, reject) => {
         this.run(sql, params, function (err) {
@@ -49,7 +49,7 @@ console.log(staticFfmpeg.path);
 ffmpeg.setFfmpegPath(staticFfmpeg.path);
 
 let predictionsRequested = 0, predictionsReceived = 0;
-let COMPLETED = [], OPENFILES = [];
+let COMPLETED = [], PENDING_FILES = [];
 let diskDB, memoryDB, NOCMIG, latitude, longitude;
 
 let t0; // Application profiler
@@ -380,7 +380,7 @@ async function onAnalyse({
     SNR = snr;
     predictWorker.postMessage({message: 'list', list: list})
     //Set global filesInScope for summary to use
-    OPENFILES = filesInScope;
+    PENDING_FILES = filesInScope;
     index = 0;
     AUDACITY = {};
     COMPLETED = [];
@@ -1095,19 +1095,28 @@ const parsePredictions = async (response) => {
             }
         }
         //save all results to  db, regardless of minConfidence
-        await db.runAsync(`INSERT
-        OR IGNORE INTO files VALUES ( '${fileSQL}',
-        ${metadata[file].duration},
-        ${response['fileStart']}
-        )`);
-        const {rowid} = await db.getAsync(`SELECT rowid
-                                           FROM files
-                                           WHERE name = '${fileSQL}'`);
-        const durationSQL = Object.entries(metadata[file].dateDuration)
-            .map(entry => `(${entry.toString()},${rowid})`).join(',');
-        await db.runAsync(`INSERT
-        OR IGNORE INTO duration VALUES
-        ${durationSQL}`);
+        let changes, rowid;
+        let res = await db.getAsync(`SELECT rowid
+                                     FROM files
+                                     WHERE name = '${fileSQL}'`);
+        if (!res) {
+            let res = await db.runAsync(`INSERT
+            OR IGNORE INTO files VALUES ( '${fileSQL}',
+            ${metadata[file].duration},
+            ${response['fileStart']}
+            )`);
+            rowid = res.lastID;
+            changes = 1;
+        } else {
+            rowid = res.rowid;
+        }
+        if (changes) {
+            const durationSQL = Object.entries(metadata[file].dateDuration)
+                .map(entry => `(${entry.toString()},${rowid})`).join(',');
+            // No "OR IGNORE" in this statement because it should only run when the file is new
+            await db.runAsync(`INSERT INTO duration
+                               VALUES ${durationSQL}`);
+        }
         await db.runAsync(`INSERT
         OR REPLACE INTO records 
                 VALUES (
@@ -1123,7 +1132,6 @@ const parsePredictions = async (response) => {
         null,
         null
         )`);
-        await getSummary({interim: true, files: OPENFILES});
     }
     if (response.finished) {
         COMPLETED.push(file);
@@ -1145,6 +1153,8 @@ const parsePredictions = async (response) => {
         UI.postMessage({event: 'progress', progress: 1.0, text: '...'});
         batchInProgress = FILE_QUEUE.length ? true : predictionsRequested - predictionsReceived;
         predictionDone = true;
+    } else {
+        await getSummary({interim: true, files: []});
     }
     return [file, batchInProgress]
 }
@@ -1186,13 +1196,13 @@ async function parseMessage(e) {
                         // This is the one time results *do not* come from the database
                         if (STATE.selection) {
                             //i Get results here to fill in any previous detections in the range
-                            await getResults({files: OPENFILES})
+                            await getResults({files: PENDING_FILES})
                         } else if (batchInProgress) {
                             UI.postMessage({
                                 event: 'prediction-done', batchInProgress: true,
                             })
                         } else {
-                            await getSummary({files: OPENFILES});
+                            await getSummary({files: PENDING_FILES});
                         }
                     }
                     await processNextFile();
@@ -1330,12 +1340,16 @@ const getSummary = async ({
     [where, when] = setWhereWhen({
         dateRange: range, species: species, files: files, context: 'summary'
     });
-    const {total} = await db.getAsync(`SELECT COUNT(*) AS total
+    let total;
+    if (!interim) {
+        const res = await db.getAsync(`SELECT COUNT(*) AS total
                                        FROM records
                                                 INNER JOIN species
                                                            ON species.id = birdid1
                                                 INNER JOIN files ON fileID = files.rowid
                                            ${where} ${when}`);
+        total = res.total;
+    }
     // need to send offset here?
     const event = interim ? 'update-summary' : 'prediction-done'
     UI.postMessage({
