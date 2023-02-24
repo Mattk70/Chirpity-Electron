@@ -614,7 +614,7 @@ analyseSelectionLink.addEventListener('click', async () => {
         // The rounding below is essential to finding record in database
         start: STATE['selection']['start'],
         end: STATE['selection']['end'],
-        list: 'everything'
+
     });
 });
 
@@ -636,7 +636,6 @@ function postAnalyseMessage(args) {
         currentFile: args.currentFile,
         filesInScope: analyseList || fileList,
         reanalyse: args.reanalyse,
-        list: args.list || config.list,
         snr: config.snr
     });
     if (!args.currentFile) {
@@ -732,7 +731,8 @@ datasetLink.addEventListener('click', async () => {
 });
 
 const thresholdLink = document.getElementById('threshold');
-thresholdLink.addEventListener('blur', (e) => {
+const handleThresholdChange = (e) => {
+    if (e.code && e.code !== 'Enter') return
     const threshold = e.target.value;
     if (100 >= threshold && threshold > 0) {
         config.minConfidence = parseFloat(e.target.value) / 100;
@@ -746,7 +746,9 @@ thresholdLink.addEventListener('blur', (e) => {
     } else {
         e.target.value = config.minConfidence * 100;
     }
-});
+}
+thresholdLink.addEventListener('blur', handleThresholdChange );
+// thresholdLink.addEventListener('keypress', handleThresholdChange );
 
 
 function createRegion(start, end, label) {
@@ -1057,9 +1059,7 @@ window.onload = async () => {
                 }
             });
 
-            updatePrefs()
-
-            // Initialise Spectrogram
+            // Initialize Spectrogram
             initWavesurfer({});
             // Set UI option state
             const batchSizeElement = document.getElementById(config.batchSize);
@@ -1774,7 +1774,7 @@ for (let i = 0; i < listToUse.length; i++) {
         config.list = e.target.value;
         updateListIcon();
         updatePrefs();
-        worker.postMessage({action: 'update-model', list: config.list})
+        worker.postMessage({action: 'update-list', list: config.list})
         setFilter();
     })
 }
@@ -3051,7 +3051,7 @@ listIcon.addEventListener('click', () => {
             window[keys[replace]].checked = true;
             config.list = keys[replace];
             updatePrefs();
-            worker.postMessage({action: 'update-model', list: config.list})
+            worker.postMessage({action: 'update-list', list: config.list})
             // setTimeout(setFilter, 10);
             break
         }

@@ -94,40 +94,20 @@ async function windowStateKeeper(windowName) {
         }
     }
 
-    const waitForFinalEvent = () => {
-        let timers = {};
-        return function (callback, ms, uniqueId) {
-            if (!uniqueId) {
-                uniqueId = "Don't call this twice without a uniqueId";
-            }
-            if (timers[uniqueId]) {
-                clearTimeout(timers[uniqueId]);
-            }
-            timers[uniqueId] = setTimeout(callback, ms);
-        };
-    };
-
-    const handleStateDeBounce = (e) => {
-        e.preventDefault();
-        waitForFinalEvent(async function () {
-            await saveState();
-        }, 100, 'sizehandler');
-    };
-
-    const saveState = async () => {
+    async function saveState() {
         if (!windowState.isMaximized) {
             windowState = window.getBounds();
         }
         windowState.isMaximized = window.isMaximized();
         await settings.set(`windowState.${windowName}`, windowState);
-    };
+    }
 
-    const track = (win) => {
+    function track(win) {
         window = win;
-        ['resize', 'move'].forEach(event => {
-            win.on(event, handleStateDeBounce);
+        ['resize', 'move', 'close'].forEach(event => {
+            win.on(event, saveState);
         });
-    };
+    }
 
     await setBounds();
     return ({

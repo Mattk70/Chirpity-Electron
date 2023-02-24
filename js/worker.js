@@ -16,7 +16,7 @@ let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS;
 const adding_chirpity_additions = true;
 const dataset_database = true
 
-const sqlite3 = require('sqlite3').verbose();
+const sqlite3 = require('sqlite3'); //.verbose();
 sqlite3.Database.prototype.runAsync = function (sql, ...params) {
     return new Promise((resolve, reject) => {
         this.run(sql, params, function (err) {
@@ -63,7 +63,7 @@ const resetState = (db) => {
         globalOffset: 0, // Current start number for unfiltered results
         filteredOffset: {}, // Current species start number for filtered results
         selection: false,
-        blocked: []
+        blocked: STATE ? STATE.blocked : [] // don't reset blocked IDs
     }
 }
 resetState();
@@ -262,7 +262,7 @@ ipcRenderer.on('new-client', (event) => {
                 if (predictWorker) predictWorker.terminate();
                 spawnWorker(args.model, args.list, BATCH_SIZE, args.warmup);
                 break;
-            case 'update-model':
+            case 'update-list':
                 predictWorker.postMessage({message: 'list', list: args.list})
                 break;
             case 'file-load-request':
@@ -369,16 +369,14 @@ async function onAnalyse({
                              resetResults = false,
                              reanalyse = false,
                              confidence = minConfidence,
-                             list = 'everything',
                              snr = 0
                          }) {
     // if end was passed, this is a selection
     if (end) STATE.selection = getSelectionRange(currentFile, start, end);
 
-    console.log(`Worker received message: ${filesInScope}, ${confidence}, start: ${start}, end: ${end}, list ${list}`);
+    console.log(`Worker received message: ${filesInScope}, ${confidence}, start: ${start}, end: ${end}`);
     minConfidence = confidence;
     SNR = snr;
-    predictWorker.postMessage({message: 'list', list: list})
     //Set global filesInScope for summary to use
     PENDING_FILES = filesInScope;
     index = 0;
@@ -897,7 +895,7 @@ const speciesMatch = (path, sname) => {
 }
 
 const saveResults2DataSet = (rootDirectory) => {
-    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/FFT-256-256x384';
+    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/Additions-256';
     const height = 256, width = 384
     let t0 = Date.now()
     let promise = Promise.resolve();
@@ -1163,10 +1161,12 @@ async function parseMessage(e) {
     const response = e.data;
     switch (response['message']) {
         case 'update-list':
-            STATE.blocked = response.blocked || STATE.blocked;
+            STATE.blocked = response.blocked;
             STATE.globalOffset = 0;
-            await getResults();
-            await getSummary();
+            if (response['updateResults']) {
+                await getResults();
+                await getSummary();
+            }
             break;
         case 'model-ready':
             sampleRate = response['sampleRate'];
@@ -1291,7 +1291,7 @@ async function setStartEnd(file) {
 
 const setWhereWhen = ({dateRange, species, files, context}) => {
     let where = `WHERE conf1 >= ${minConfidence}`;
-    if (STATE.blocked.length) {
+    if (!STATE.selection && STATE.blocked.length) {
         const blocked = STATE.blocked
         where += ` AND  birdID1 NOT IN (${blocked.toString()})`
     }
