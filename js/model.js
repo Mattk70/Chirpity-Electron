@@ -1,4 +1,4 @@
-const tf = require('@tensorflow/tfjs-node-gpu');
+const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs');
 const {parse} = require("uuid");
 const model_config = JSON.parse(fs.readFileSync('model_config.json', 'utf8'));
@@ -151,24 +151,20 @@ class Model {
     }
 
     async predictBatch(goodTensors, file, fileStart, threshold) {
-        console.log('predictBatch begin', tf.memory().numTensors)
         let batched_results = [];
         let result;
         let audacity;
         let rawTensorBatch = tf.stack(Object.values(goodTensors))
-        console.log('created rawTensorbatch +1' , tf.memory().numTensors)
         let TensorBatch = tf.tidy(() => {
             return this.fixUpSpecBatch(rawTensorBatch)
         })
         rawTensorBatch.dispose();
-        console.log('rawTensorBatch (-)  Tensorbatch (+), expect same', tf.memory().numTensors)
         let intKeys = Object.keys(goodTensors).map((str) => {
             return parseInt(str)
         });
         let keysTensor, maskedKeysTensor, maskedTensorBatch;
         if (threshold) {
             keysTensor = tf.stack(intKeys);
-            console.log('KeysTensor expect +1', tf.memory().numTensors)
 
             const SNR = tf.tidy(() => {
                 return this.getSNR(TensorBatch)
@@ -184,11 +180,9 @@ class Model {
             keysTensor.dispose();
             SNR.dispose();
             condition.dispose();
-            console.log('after - SNR, condition disposed - expect + 2', tf.memory().numTensors)
             if (!maskedTensorBatch.size) {
                 maskedTensorBatch.dispose();
                 maskedKeysTensor.dispose();
-                console.log('killed 2 masked tensors, expect -2', tf.memory().numTensors)
                 return false
             } else {
                 console.log("surviving tensors in batch", maskedTensorBatch.shape[0])
@@ -198,7 +192,6 @@ class Model {
         // Build up a batch
         // [TensorBatch, keysTensor] = this.buildBatch(TensorBatch, keysTensor);
         // if (TensorBatch.shape[0] < this.batchSize) return false;
-        console.log('Into loop expect, same', tf.memory().numTensors)
         let [keys, top3, top3scores] = tf.tidy(() => {
             let prediction;
             if (maskedTensorBatch) {
@@ -209,26 +202,21 @@ class Model {
                 TensorBatch.dispose()
             }
             TensorBatch.dispose();
-            console.log(`model predict took ${performance.now() - t0} milliseconds`);
             const {indices, values} = prediction.topk(3);
-            console.log('Inside tidy expect +3', tf.memory().numTensors)
             let keys = intKeys;
             if (maskedKeysTensor) {
                 keys = maskedKeysTensor.arraySync()
                 maskedKeysTensor.dispose();
-                console.log('killed  masked key tensor, expect -1', tf.memory().numTensors)
             }
 
             const top3 = indices.arraySync();
             const top3scores = values.arraySync();
             return [keys, top3, top3scores];
         })
-        console.log('Outside tidy expect -3', tf.memory().numTensors)
         const batch = {};
         for (let i = 0; i < keys.length; i++) {
             batch[keys[i]] = ({index: top3[i], score: top3scores[i], end: parseInt(keys[i]) + this.chunkLength});
         }
-
         // Try this method of adjusting results
         for (let [key, item] of Object.entries(batch)) {
             // turn the key back to a number and convert from samples to seconds:

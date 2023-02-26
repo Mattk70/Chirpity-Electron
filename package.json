@@ -153,7 +153,7 @@
   },
   "dependencies": {
     "@popperjs/core": "^2.9.2",
-    "@tensorflow/tfjs-node-gpu": "^4.2.0",
+    "@tensorflow/tfjs-node": "^4.2.0",
     "bootstrap": "^5.2.2",
     "browser-id3-writer": "^4.4.0",
     "colormap": "^2.3.2",
