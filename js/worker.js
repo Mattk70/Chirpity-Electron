@@ -10,7 +10,6 @@ const {utimes} = require('utimes');
 const stream = require("stream");
 const staticFfmpeg = require('ffmpeg-static-electron');
 const {stat} = require("fs/promises");
-const {memory} = require("@tensorflow/tfjs");
 
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS;
 const adding_chirpity_additions = true;
@@ -1419,7 +1418,7 @@ const getResults = async ({
     });
 
     // TODO: mixed files: among open files, only some are saved. Merge results??
-    let index = offset;
+    let index = offset; AUDACITY = {};
     return new Promise(function (resolve, reject) {
         // db.each doesn't call the callback if there are no results, so:
         db.each(`${db2ResultSQL} ${where} ${when} ORDER BY ${order} LIMIT ${limit} OFFSET ${offset}`, (err, result) => {
