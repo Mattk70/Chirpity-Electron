@@ -1097,7 +1097,7 @@ const parsePredictions = async (response) => {
                                      FROM files
                                      WHERE name = '${fileSQL}'`);
         if (!res) {
-            let res = await db.runAsync(`INSERT
+            res = await db.runAsync(`INSERT
             OR IGNORE INTO files VALUES ( '${fileSQL}',
             ${metadata[file].duration},
             ${response['fileStart']}
@@ -1111,7 +1111,7 @@ const parsePredictions = async (response) => {
             const durationSQL = Object.entries(metadata[file].dateDuration)
                 .map(entry => `(${entry.toString()},${rowid})`).join(',');
             // No "OR IGNORE" in this statement because it should only run when the file is new
-            await db.runAsync(`INSERT INTO duration
+            await db.runAsync(`INSERT OR IGNORE INTO duration
                                VALUES ${durationSQL}`);
         }
         await db.runAsync(`INSERT
@@ -1320,7 +1320,8 @@ const getSummary = async ({
                               species = undefined,
                               explore = false,
                               active = undefined,
-                              interim = false
+                              interim = false,
+                             action = undefined
                           } = {}) => {
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
     let [where, when] = setWhereWhen({
@@ -1360,6 +1361,7 @@ const getSummary = async ({
         filterSpecies: species,
         active: active,
         batchInProgress: false,
+        action: action
     })
 }
 
