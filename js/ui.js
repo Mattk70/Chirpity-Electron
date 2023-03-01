@@ -747,7 +747,8 @@ const handleThresholdChange = (e) => {
         e.target.value = config.minConfidence * 100;
     }
 }
-thresholdLink.addEventListener('blur', handleThresholdChange );
+thresholdLink.addEventListener('blur', handleThresholdChange);
+
 // thresholdLink.addEventListener('keypress', handleThresholdChange );
 
 
@@ -2158,7 +2159,8 @@ async function onPredictionDone({
                                     summary = [],
                                     active = undefined,
                                     total = 0,
-                                    offset = 0
+                                    offset = 0,
+                                    action = undefined
                                 }) {
 
     AUDACITY_LABELS = audacityLabels;
@@ -2179,29 +2181,29 @@ async function onPredictionDone({
 
     //Pagination
     total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
+    if (action !== 'filter') {
+        progressDiv.hide();
+        progressBar.width(0 + '%');
+        progressBar.attr('aria-valuenow', 0);
+        progressBar.html(0 + '%');
+        //completeDiv.show();
 
-    progressDiv.hide();
-    progressBar.width(0 + '%');
-    progressBar.attr('aria-valuenow', 0);
-    progressBar.html(0 + '%');
-    //completeDiv.show();
+        if (Object.keys(AUDACITY_LABELS).length) {
+            enableMenuItem(['saveLabels', 'save2db']);
+            $('.download').removeClass('disabled');
+        } else {
+            disableMenuItem(['saveLabels', 'save2db']);
+        }
+        if (currentFile) enableMenuItem(['analyse', 'reanalyse'])
 
-    if (Object.keys(AUDACITY_LABELS).length) {
-        enableMenuItem(['saveLabels', 'save2db']);
-        $('.download').removeClass('disabled');
-    } else {
-        disableMenuItem(['saveLabels', 'save2db']);
+        // Add speciesfilter  filter handler
+        // setFilterHandler()
+
+        // Diagnostics:
+        t1_analysis = Date.now();
+        diagnostics['Analysis Duration'] = ((t1_analysis - t0_analysis) / 1000).toFixed(2) + ' seconds';
+        diagnostics['Analysis Rate'] = (diagnostics['Audio Duration'] / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
     }
-    if (currentFile) enableMenuItem(['analyse', 'reanalyse'])
-
-    // Add speciesfilter  filter handler
-    // setFilterHandler()
-
-    // Diagnostics:
-    t1_analysis = Date.now();
-    diagnostics['Analysis Duration'] = ((t1_analysis - t0_analysis) / 1000).toFixed(2) + ' seconds';
-    diagnostics['Analysis Rate'] = (diagnostics['Audio Duration'] / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
-
     //show summary table
     //summaryButton.click();
     // midnight hack: arrgh, but it works...
@@ -2282,7 +2284,6 @@ const addPagination = (total, offset) => {
 }
 
 
-
 function setFilter() {
     // Prevent crazy double firing of handler
     //e.stopImmediatePropagation();
@@ -2291,7 +2292,7 @@ function setFilter() {
     if (isExplore()) return
     activeRow = undefined;
     // Am I trying to unfilter?
-    const target = this.location ? undefined : this.querySelector('span.pointer') ;
+    const target = this.location ? undefined : this.querySelector('span.pointer');
     if (target?.classList.contains('text-warning')) {
         // Clicked on filtered species icon
         worker.postMessage({action: 'filter', files: analyseList || fileList, order: STATE.explore.order});
@@ -2305,7 +2306,7 @@ function setFilter() {
             action: 'filter',
             species: species,
             files: analyseList || fileList,
-            order: STATE.explore.order
+            order: STATE.explore.order,
         });
     }
     seenTheDarkness = false;
@@ -2647,8 +2648,7 @@ function sendFile(mode, result) {
         start = result.start;
         end = result.end || start + 3;
         filename = result.filename;
-    }
-    else if (start === undefined) {
+    } else if (start === undefined) {
         if (region.start) {
             start = region.start + bufferBegin;
             end = region.end + bufferBegin;
