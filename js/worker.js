@@ -11,10 +11,11 @@ const stream = require("stream");
 const staticFfmpeg = require('ffmpeg-static-electron');
 const {stat} = require("fs/promises");
 
-let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS;
+let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, WE_ARE_DONE;
 const adding_chirpity_additions = true;
 const dataset_database = true
 
+let NUM_WORKERS;
 const sqlite3 = require('sqlite3'); //.verbose();
 sqlite3.Database.prototype.runAsync = function (sql, ...params) {
     return new Promise((resolve, reject) => {
@@ -144,7 +145,7 @@ async function loadDB(path) {
 let metadata = {};
 let minConfidence, index = 0, AUDACITY = {}, predictionStart, SNR = 0;
 let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
-let predictWorker, predictionDone = true, aborted = false;
+let predictWorkers = [], predictionDone = true, aborted = false;
 
 // Set up the audio context:
 const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
@@ -258,11 +259,12 @@ ipcRenderer.on('new-client', (event) => {
             case 'load-model':
                 UI.postMessage({event: 'spawning'});
                 BATCH_SIZE = parseInt(args.batchSize);
-                if (predictWorker) predictWorker.terminate();
-                spawnWorker(args.model, args.list, BATCH_SIZE, args.warmup);
+                if (predictWorkers.length) terminateWorkers();
+                spawnWorkers(args.model, args.list, BATCH_SIZE, args.threads);
                 break;
             case 'update-list':
-                predictWorker.postMessage({message: 'list', list: args.list})
+                predictWorkers.forEach(worker =>
+                    worker.postMessage({message: 'list', list: args.list}))
                 break;
             case 'file-load-request':
                 index = 0;
@@ -423,8 +425,8 @@ function onAbort({
     if (!predictionDone) {
         //restart the worker
         UI.postMessage({event: 'spawning'});
-        predictWorker.terminate()
-        spawnWorker(model, list, BATCH_SIZE, warmup)
+        terminateWorkers()
+        spawnWorkers(model, list, BATCH_SIZE, warmup)
     }
     predictionDone = true;
     predictionsReceived = 0;
@@ -748,7 +750,7 @@ const getPredictBuffers = async ({
     });
     let chunkStart = start * sampleRate;
     //const fileDuration = end - start;
-
+    let workerInstance = 0
     readStream.on('data', async chunk => {
         // Ensure data is processed in order
         readStream.pause();
@@ -758,7 +760,10 @@ const getPredictBuffers = async ({
                 const myArray = resampled.getChannelData(0);
                 const samples = parseInt(((end - start) * sampleRate).toFixed(0));
                 const increment = samples < chunkLength ? samples : chunkLength;
-                feedChunksToModel(myArray, increment, chunkStart, file, end, resetResults);
+                if (++workerInstance === NUM_WORKERS) {
+                    workerInstance = 0;
+                }
+                feedChunksToModel(myArray, increment, chunkStart, file, end, resetResults, workerInstance);
                 chunkStart += 3 * BATCH_SIZE * sampleRate;
                 // Now the async stuff is done ==>
                 readStream.resume();
@@ -770,7 +775,7 @@ const getPredictBuffers = async ({
             console.log('Short chunk', chunk.length, 'skipping')
             // Create array with 0's (short segment of silence that will trigger the finalChunk flag
             const myArray = new Float32Array(new Array(1000).fill(0));
-            feedChunksToModel(myArray, chunkLength, chunkStart, file, end, resetResults);
+            feedChunksToModel(myArray, chunkLength, chunkStart, file, end, resetResults, workerInstance);
             readStream.resume();
         }
     })
@@ -831,7 +836,7 @@ const fetchAudioBuffer = async ({
     });
 }
 
-function sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predictionsRequested) {
+function sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predictionsRequested, worker) {
     const finalChunk = (chunkStart / sampleRate) + (chunks.length * 3) >= end;
     const objData = {
         message: 'predict',
@@ -857,7 +862,7 @@ function sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predic
     //     position += sampleRate * 3;
     // })
     objData['chunks'] = chunkBuffers;
-    predictWorker.postMessage(objData, chunkBuffers);
+    predictWorkers[worker].postMessage(objData, chunkBuffers);
 }
 
 async function doPrediction({
@@ -869,7 +874,7 @@ async function doPrediction({
     UI.postMessage({event: 'update-audio-duration', value: metadata[file].duration});
 }
 
-function feedChunksToModel(channelData, increment, chunkStart, file, end, resetResults) {
+function feedChunksToModel(channelData, increment, chunkStart, file, end, resetResults, worker) {
     let chunks = [];
     for (let i = 0; i < channelData.length; i += increment) {
         let chunk = channelData.slice(i, i + increment);
@@ -877,12 +882,12 @@ function feedChunksToModel(channelData, increment, chunkStart, file, end, resetR
         predictionsRequested++;
         chunks.push(chunk);
         if (chunks.length === BATCH_SIZE) {
-            sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predictionsRequested);
+            sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predictionsRequested, worker);
             chunks = [];
         }
     }
     //clear up remainder less than BATCH_SIZE
-    if (chunks.length) sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predictionsRequested);
+    if (chunks.length) sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predictionsRequested, worker);
 }
 
 const speciesMatch = (path, sname) => {
@@ -894,8 +899,9 @@ const speciesMatch = (path, sname) => {
 }
 
 const saveResults2DataSet = (rootDirectory) => {
-    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/Additions-256';
-    const height = 256, width = 384
+    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/Additions-SNR-filtered';
+    const height = 256, width = 384;
+    let workerInstance = 0;
     let t0 = Date.now()
     let promise = Promise.resolve();
     let promises = [];
@@ -920,6 +926,7 @@ const saveResults2DataSet = (rootDirectory) => {
         }
         promise = promise.then(async function () {
             if (result.score >= threshold) {
+
                 const [_, folder] = p.dirname(result.file).match(/^.*\/(.*)$/)
                 // filename format: <source file>_<confidence>_<start>.png
                 const file = `${p.basename(result.file).replace(p.extname(result.file), '')}_${result['score'].toFixed(2)}_${result.start}-${result.end}.png`;
@@ -933,8 +940,11 @@ const saveResults2DataSet = (rootDirectory) => {
                         start: result.start, end: end, file: result.file
                     })
                     if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
+                        if (++workerInstance === NUM_WORKERS) {
+                            workerInstance = 0;
+                        }
                         const buffer = AudioBuffer.getChannelData(0);
-                        predictWorker.postMessage({
+                        predictWorkers[workerInstance].postMessage({
                             message: 'get-spectrogram',
                             filepath: filepath,
                             file: file,
@@ -1055,15 +1065,27 @@ async function saveMP3(file, start, end, filename, metadata) {
 
 
 /// Workers  From the MDN example
-function spawnWorker(model, list, batchSize, warmup) {
-    predictWorker = new Worker('./js/model.js', {type: 'module'});
-    console.log('loading a worker')
-    // Now we've loaded a new model, clear the aborted flag
-    aborted = false;
-    predictWorker.postMessage(['load', list, batchSize, warmup])
-    predictWorker.onmessage = async (e) => {
-        await parseMessage(e)
+function spawnWorkers(model, list, batchSize, threads) {
+    NUM_WORKERS = threads;
+    for (let i = 0; i < threads; i++) {
+        const worker = new Worker('./js/model.js', {type: 'module'});
+        predictWorkers.push(worker)
+        console.log('loading a worker')
+        // Now we've loaded a new model, clear the aborted flag
+        aborted = false;
+        worker.postMessage(['load', list, batchSize])
+        worker.onmessage = async (e) => {
+            await parseMessage(e)
+        }
     }
+}
+
+const terminateWorkers = () => {
+    predictWorkers.forEach(worker => {
+        worker.postMessage({message: 'abort'})
+        worker.terminate()
+    })
+    predictWorkers = [];
 }
 
 const parsePredictions = async (response) => {
@@ -1111,8 +1133,10 @@ const parsePredictions = async (response) => {
             const durationSQL = Object.entries(metadata[file].dateDuration)
                 .map(entry => `(${entry.toString()},${rowid})`).join(',');
             // No "OR IGNORE" in this statement because it should only run when the file is new
-            await db.runAsync(`INSERT OR IGNORE INTO duration
-                               VALUES ${durationSQL}`);
+            await db.runAsync(`INSERT
+            OR IGNORE INTO duration
+                               VALUES
+            ${durationSQL}`);
         }
         await db.runAsync(`INSERT
         OR REPLACE INTO records 
@@ -1130,7 +1154,8 @@ const parsePredictions = async (response) => {
         null
         )`);
     }
-    if (response.finished) {
+    if (response.finished || WE_ARE_DONE) {
+        WE_ARE_DONE = true
         COMPLETED.push(file);
         const row = await db.getAsync(`SELECT rowid
                                        FROM files
@@ -1184,7 +1209,9 @@ async function parseMessage(e) {
             await dbSpeciesCheck();
             break;
         case 'prediction':
-            if (!aborted) {
+            if (aborted) {
+                WE_ARE_DONE = true
+            } else {
                 // add filename to result for db purposes
                 let [, batchInProgress] = await parsePredictions(response);
                 if (response['finished']) {
@@ -1204,6 +1231,7 @@ async function parseMessage(e) {
                             await getSummary({files: PENDING_FILES});
                         }
                     }
+                    WE_ARE_DONE = false;
                     await processNextFile();
                 }
             }
@@ -1220,6 +1248,7 @@ async function processNextFile({
                                } = {}) {
     if (FILE_QUEUE.length) {
         predictionDone = false;
+        WE_ARE_DONE = false;
         let file = FILE_QUEUE.shift()
         const found = await getWorkingFile(file);
         if (found) {
@@ -1256,6 +1285,7 @@ async function processNextFile({
             await processNextFile(arguments[0]);
         }
     } else {
+        WE_ARE_DONE = true;
         predictionDone = true;
     }
 }
@@ -1321,7 +1351,7 @@ const getSummary = async ({
                               explore = false,
                               active = undefined,
                               interim = false,
-                             action = undefined
+                              action = undefined
                           } = {}) => {
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
     let [where, when] = setWhereWhen({
@@ -1420,7 +1450,8 @@ const getResults = async ({
     });
 
     // TODO: mixed files: among open files, only some are saved. Merge results??
-    let index = offset; AUDACITY = {};
+    let index = offset;
+    AUDACITY = {};
     return new Promise(function (resolve, reject) {
         // db.each doesn't call the callback if there are no results, so:
         db.each(`${db2ResultSQL} ${where} ${when} ORDER BY ${order} LIMIT ${limit} OFFSET ${offset}`, (err, result) => {
@@ -1967,7 +1998,7 @@ Todo: Explore
 
 Todo: Performance
     Investigate background throttling when worker hidden
-        If an issue, Explore spawning predictworker from UI, Shared worker??
+        If an issue, Explore spawning predictWorkers from UI, Shared worker??
             => hopefully prevents  background throttling (imapact TBD)
     Can we avoid the datasync in snr routine?
     Smaller model faster - but retaining accuracy? Read up on Knowledge distillation
