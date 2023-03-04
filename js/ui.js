@@ -1036,7 +1036,8 @@ window.onload = async () => {
         latitude: 51.9,
         longitude: -0.4,
         nocmig: false,
-        snr: 0,
+        threads: 1,
+        snr: 5,
         warmup: true,
         batchSize: 1,
         limit: 500,
@@ -1091,7 +1092,8 @@ window.onload = async () => {
             thresholdDisplay.innerHTML = `<b>${config.minConfidence * 100}%</b>`;
             SNRSlider.value = config.snr;
             SNRThreshold.innerText = config.snr;
-
+            ThreadSlider.value = config.threads;
+            numberOfThreads.innerText = config.threads;
             showElement([config.colormap], true)
             t0_warmup = Date.now();
             worker.postMessage({
@@ -1109,6 +1111,7 @@ window.onload = async () => {
                 list: config.list,
                 batchSize: config.batchSize,
                 warmup: config.warmup,
+                threads: config.threads
             });
             worker.postMessage({action: 'clear-cache'})
         }
@@ -1792,7 +1795,7 @@ for (let i = 0; i < modelToUse.length; i++) {
             model: config.model,
             list: config.list,
             batchSize: config.batchSize,
-            warmup: config.warmup,
+            threads: config.threads
         });
     })
 }
@@ -2833,7 +2836,7 @@ for (let i = 0; i < batchRadios.length; i++) {
             model: config.model,
             list: config.list,
             batchSize: config.batchSize,
-            warmup: config.warmup,
+            threads: config.threads
         });
         updatePrefs();
     })
@@ -3068,5 +3071,16 @@ SNRSlider.addEventListener('input', () => {
 });
 SNRSlider.addEventListener('mouseup', () => {
     config.snr = parseFloat(SNRSlider.value);
+    updatePrefs();
+});
+
+// number of threads
+const numberOfThreads = document.getElementById('threads');
+const ThreadSlider = document.getElementById('number-of-threads');
+ThreadSlider.addEventListener('input', () => {
+    numberOfThreads.innerText = ThreadSlider.value;
+});
+ThreadSlider.addEventListener('mouseup', () => {
+    config.threads = parseInt(ThreadSlider.value);
     updatePrefs();
 });

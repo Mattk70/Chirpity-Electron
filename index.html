@@ -153,12 +153,31 @@
                                         <a href="#" class="dropdown-item" data-bs-toggle="dropdown"
                                            role="button"
                                            aria-haspopup="true" aria-expanded="false"> <span
+                                                class="nav-label">Threads&raquo;</span></a>
+                                        <ul class="p-1" style="width: 225px">
+                                            <li class="form-check">
+                                                <label for="number-of-threads" class="form-label"
+                                                       title="Number of parallel predictions to run.">Number of
+                                                    threads</label>
+                                                <input type="range" class="form-range" min="1" max="6"
+                                                       id="number-of-threads"><span
+                                                    class="border rounded-2 align-baseline" id="threads"></span>
+                                            </li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        <a href="#" class="dropdown-item" data-bs-toggle="dropdown"
+                                           role="button"
+                                           aria-haspopup="true" aria-expanded="false"> <span
                                                 class="nav-label">SNR Threshold&raquo;</span></a>
                                         <ul class="p-1" style="width: 225px">
                                             <li class="form-check">
-                                                <label for="snrValue" class="form-label" title="Ignore samples with just background noise. Value is the minimum signal strength to look at.">Signal to Noise Threshold</label>
+                                                <label for="snrValue" class="form-label"
+                                                       title="Ignore samples with just background noise. Value is the minimum signal strength to look at.">Signal
+                                                    to Noise Threshold</label>
                                                 <input type="range" class="form-range" min="0" max="10" step="0.5"
-                                                       id="snrValue"><span class="border rounded-2 align-baseline" id="SNR-threshold"></span>
+                                                       id="snrValue"><span class="border rounded-2 align-baseline"
+                                                                           id="SNR-threshold"></span>
                                             </li>
                                         </ul>
                                     </li>
@@ -317,7 +336,7 @@
     </nav>
 </div>
 <!-- Content wrapper -->
-<div id="contentWrapper" >
+<div id="contentWrapper">
     <!-- DIV to Hold the bird list  -->
     <div id="allSpecies" class="d-none"></div>
     <div id="seenSpecies" class="d-none"></div>
@@ -465,10 +484,10 @@
 
             <div id="complete" class="col-2 pe-2" style="display:none">
                 <!-- Button trigger modal -->
-<!--                <button type="button" class="float-end text-nowrap btn btn-primary align-bottom"-->
-<!--                        id="showSummary">-->
-<!--                    Show Summary-->
-<!--                </button>-->
+                <!--                <button type="button" class="float-end text-nowrap btn btn-primary align-bottom"-->
+                <!--                        id="showSummary">-->
+                <!--                    Show Summary-->
+                <!--                </button>-->
             </div>
             <div class="col pe-1">
                 <div class="btn-group float-end">
