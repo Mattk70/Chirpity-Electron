@@ -1,4 +1,4 @@
-const tf = require('@tensorflow/tfjs');
+const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs');
 const {parse} = require("uuid");
 const model_config = JSON.parse(fs.readFileSync('model_config.json', 'utf8'));
@@ -99,7 +99,7 @@ class Model {
         goldenlist.forEach(species => enhanced_IDs.push(labels.indexOf(species)))
     }
 
-    _normalize(spec) {
+    normalize(spec) {
         let spec_max = tf.max(spec, [1, 2]);
         spec_max = tf.reshape(spec_max, [-1, 1, 1, 1])
         spec = spec.mul(255);
@@ -134,7 +134,7 @@ class Model {
         specBatch = tf.image.resizeBilinear(specBatch, [img_height, img_width]);
         // Fix specBatch shape
         return tf.tidy(() => {
-            return this._normalize(specBatch);
+            return this.normalize(specBatch);
         })
     }
 
