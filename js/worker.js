@@ -1221,24 +1221,24 @@ async function parseMessage(e) {
             } else {
                 // add filename to result for db purposes
                 let [, batchInProgress] = await parsePredictions(response);
-                 //if (response['finished']) {
-                    process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, Prediction requests ${predictionsRequested}, predictions received ${predictionsReceived}    \r`)
-                    if (predictionsReceived === predictionsRequested) {
-                        const limit = 10;
-                        await clearCache(CACHE_LOCATION, limit);
-                        // This is the one time results *do not* come from the database
-                        if (STATE.selection) {
-                            //i Get results here to fill in any previous detections in the range
-                            await getResults({files: PENDING_FILES})
-                        } else if (batchInProgress) {
-                            UI.postMessage({
-                                event: 'prediction-done', batchInProgress: true,
-                            })
-                        } else {
-                            await getSummary({files: PENDING_FILES});
-                        }
+                //if (response['finished']) {
+                process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, Prediction requests ${predictionsRequested}, predictions received ${predictionsReceived}    \r`)
+                if (predictionsReceived === predictionsRequested) {
+                    const limit = 10;
+                    await clearCache(CACHE_LOCATION, limit);
+                    // This is the one time results *do not* come from the database
+                    if (STATE.selection) {
+                        //i Get results here to fill in any previous detections in the range
+                        await getResults({files: PENDING_FILES})
+                    } else if (batchInProgress) {
+                        UI.postMessage({
+                            event: 'prediction-done', batchInProgress: true,
+                        })
                         await processNextFile();
+                    } else {
+                        await getSummary({files: PENDING_FILES});
                     }
+                }
 
                 //}
             }
