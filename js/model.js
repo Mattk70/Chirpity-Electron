@@ -47,11 +47,8 @@ class Model {
         this.appPath = null;
         this.frame_length = 512;
         this.frame_step = 186;
-        this.result = [];
         this.appPath = appPath;
         this.list = list;
-        this.pendingBatch = 0;
-        this.pendingKeys = null;
     }
 
     async loadModel() {
@@ -68,9 +65,8 @@ class Model {
     }
 
     warmUp(batchSize) {
-        console.log('WarmUp begin', tf.memory().numTensors)
         this.batchSize = parseInt(batchSize);
-        this.inputShape[0] = this.batchSize;
+        this.inputShape[0] = 1;
         const result = tf.tidy(() => {
             const warmupResult = this.model.predict(tf.zeros(this.inputShape));
             warmupResult.arraySync();
@@ -107,9 +103,9 @@ class Model {
     getSNR(spectrograms) {
         const max = tf.max(spectrograms, 2);
         const mean = tf.mean(spectrograms, 2);
-            const peak = tf.sub(max, mean);
-            let snr = tf.squeeze(tf.max(peak, 1));
-            snr = tf.sub(255, snr)  // bigger number, less signal
+        const peak = tf.sub(max, mean);
+        let snr = tf.squeeze(tf.max(peak, 1));
+        snr = tf.sub(255, snr)  // bigger number, less signal
         return snr
     }
 
@@ -160,94 +156,94 @@ class Model {
         let result;
         let audacity;
         let rawTensorBatch = tf.stack(Object.values(goodTensors))
-            let fixedTensorBatch = tf.tidy(() => {
+        let fixedTensorBatch = tf.tidy(() => {
             return this.fixUpSpecBatch(rawTensorBatch)
         })
         rawTensorBatch.dispose();
-        console.log('rawTensorBatch (-)  Tensorbatch (+), expect same', tf.memory().numTensors)
+        //console.log('rawTensorBatch (-)  Tensorbatch (+), expect same', tf.memory().numTensors)
         let intKeys = Object.keys(goodTensors).map((str) => {
             return parseInt(str)
         });
-            let keysTensor, TensorBatch, maskedKeysTensor, maskedTensorBatch;
-            if (BACKEND === 'webgl') {
-                if (fixedTensorBatch[0] < this.batchSize) {
-                    // WebGL works best when all batches are the same size
-                    console.log(`Adding ${this.batchSize - fixedTensorBatch.shape[0]} tensors to the batch`)
-                    const shape = [...fixedTensorBatch.shape];
-                    shape[0] = this.batchSize - shape[0];
-                    const padding = tf.zeros(shape);
-                    TensorBatch = tf.concat([fixedTensorBatch, padding], 0)
-                    padding.dispose();
-                    fixedTensorBatch.dispose()
-                } else {
-                    TensorBatch = fixedTensorBatch;
-                    //fixedTensorBatch.dispose()
-                }
-            } else if (threshold) {
+        let keysTensor, TensorBatch, maskedKeysTensor, maskedTensorBatch;
+        if (BACKEND === 'webgl') {
+            if (fixedTensorBatch[0] < this.batchSize) {
+                // WebGL works best when all batches are the same size
+                console.log(`Adding ${this.batchSize - fixedTensorBatch.shape[0]} tensors to the batch`)
+                const shape = [...fixedTensorBatch.shape];
+                shape[0] = this.batchSize - shape[0];
+                const padding = tf.zeros(shape);
+                TensorBatch = tf.concat([fixedTensorBatch, padding], 0)
+                padding.dispose();
+                fixedTensorBatch.dispose()
+            } else {
+                TensorBatch = fixedTensorBatch;
+                //fixedTensorBatch.dispose()
+            }
+        } else if (threshold) {
             keysTensor = tf.stack(intKeys);
             console.log('KeysTensor expect +1', tf.memory().numTensors)
 
             const SNR = tf.tidy(() => {
-                    return this.getSNR(fixedTensorBatch)
+                return this.getSNR(fixedTensorBatch)
             })
-                let condition = tf.less(SNR, (10 - threshold) * 10);
+            let condition = tf.less(SNR, (10 - threshold) * 10);
             // Avoid mask cannot be scalar error at end of predictions
-                let newCondition;
+            let newCondition;
             if (condition.rankType === "0") {
-                    newCondition = tf.expandDims(condition)
-                    condition.dispose()
+                newCondition = tf.expandDims(condition)
+                condition.dispose()
             }
-                if (newCondition) {
-                    maskedTensorBatch = await tf.booleanMaskAsync(fixedTensorBatch, newCondition);
-                    maskedKeysTensor = await tf.booleanMaskAsync(keysTensor, newCondition)
-                    newCondition.dispose();
-                } else {
-                    maskedTensorBatch = await tf.booleanMaskAsync(fixedTensorBatch, condition);
-                    maskedKeysTensor = await tf.booleanMaskAsync(keysTensor, condition);
-                    condition.dispose();
-                }
-                fixedTensorBatch.dispose();
+            if (newCondition) {
+                maskedTensorBatch = await tf.booleanMaskAsync(fixedTensorBatch, newCondition);
+                maskedKeysTensor = await tf.booleanMaskAsync(keysTensor, newCondition)
+                newCondition.dispose();
+            } else {
+                maskedTensorBatch = await tf.booleanMaskAsync(fixedTensorBatch, condition);
+                maskedKeysTensor = await tf.booleanMaskAsync(keysTensor, condition);
+                condition.dispose();
+            }
+            fixedTensorBatch.dispose();
             keysTensor.dispose();
             SNR.dispose();
 
             if (!maskedTensorBatch.size) {
                 maskedTensorBatch.dispose();
                 maskedKeysTensor.dispose();
-                return [false, []]
+                return []
             } else {
                 console.log("surviving tensors in batch", maskedTensorBatch.shape[0])
             }
-            } else {
-                TensorBatch = fixedTensorBatch;
+        } else {
+            TensorBatch = fixedTensorBatch;
         }
         let t0 = performance.now();
         // Build up a batch
         // [TensorBatch, keysTensor] = this.buildBatch(TensorBatch, keysTensor);
         // if (TensorBatch.shape[0] < this.batchSize) return false;
-            //console.log('Prior predictions expect same', tf.memory().numTensors)
-            let prediction;
-            if (maskedTensorBatch) {
-                prediction = this.model.predict(maskedTensorBatch, {batchSize: this.batchSize})
-                maskedTensorBatch.dispose()
-            } else {
-                prediction = this.model.predict(TensorBatch, {batchSize: this.batchSize})
-                TensorBatch.dispose()
-            }
-            const {indices, values} = prediction.topk(3);
-            prediction.dispose()
-            let keys = intKeys;
-            if (maskedKeysTensor) {
-                keys = maskedKeysTensor.dataSync()
-                maskedKeysTensor.dispose();
-            }
+        //console.log('Prior predictions expect same', tf.memory().numTensors)
+        let prediction;
+        if (maskedTensorBatch) {
+            prediction = this.model.predict(maskedTensorBatch, {batchSize: this.batchSize})
+            maskedTensorBatch.dispose()
+        } else {
+            prediction = this.model.predict(TensorBatch, {batchSize: this.batchSize})
+            TensorBatch.dispose()
+        }
+        const {indices, values} = prediction.topk(3);
+        prediction.dispose()
+        let keys = intKeys;
+        if (maskedKeysTensor) {
+            keys = maskedKeysTensor.dataSync()
+            maskedKeysTensor.dispose();
+        }
 
-            const top3 = indices.arraySync();
-            const top3scores = values.arraySync();
-            indices.dispose();
-            values.dispose()
-            //return [keys, top3, top3scores];
+        const top3 = indices.arraySync();
+        const top3scores = values.arraySync();
+        indices.dispose();
+        values.dispose()
+        //return [keys, top3, top3scores];
 
-            //console.log('Post  predictions', tf.memory().numTensors)
+        //console.log('Post  predictions', tf.memory().numTensors)
         const batch = {};
         for (let i = 0; i < keys.length; i++) {
             batch[keys[i]] = ({index: top3[i], score: top3scores[i], end: keys[i] + this.chunkLength});
@@ -312,31 +308,48 @@ class Model {
         }
 
 
-        return [true, batched_results]
+        return batched_results
+    }
+
+    compute_spectrogram(chunk, h, w) {
+        return tf.tidy(() => {
+            let spec = tf.signal.stft(chunk, this.frame_length, this.frame_step)
+            const img_height = h || height;
+            const img_width = w || width;
+            // Swap axes to fit output shape
+            spec = tf.transpose(spec, [2, 1]);
+            spec = tf.reverse(spec, [0]);
+            spec = tf.abs(spec);
+            // Add channel axis
+            spec = tf.expandDims(spec, -1);
+            spec = tf.image.resizeBilinear(spec, [img_height, img_width]);
+            // Fix specBatch shape
+            return this.normalize(spec);
+        })
     }
 
     async predictChunk(chunks, fileStart, file, finalchunk, threshold) {
-        let readyToSend = false, results = [];
+        let results = [];
         let goodTensors = {}
         for (const [key, value] of Object.entries(chunks)) {
             let chunk = tf.tensor1d(value);
             // if the chunk is too short, pad with zeroes.
             // Min length is 0.5s, set in UI.js - a wavesurfer region option
-                let paddedChunk;
+            let paddedChunk;
             if (chunk.shape[0] < this.chunkLength) {
                 let padding = tf.zeros([this.chunkLength - chunk.shape[0]]);
                     paddedChunk = chunk.concat(padding);
                     padding.dispose();
             }
-                const spectrogram = paddedChunk ?
-                    this.makeSpectrogram(paddedChunk) : this.makeSpectrogram(chunk);
+            const spectrogram = paddedChunk ?
+                this.makeSpectrogram(paddedChunk) : this.makeSpectrogram(chunk);
             chunk.dispose();
-                if (paddedChunk) paddedChunk.dispose();
+            if (paddedChunk) paddedChunk.dispose();
             goodTensors[key] = spectrogram;
             //Loop will continue
             if (Object.keys(goodTensors).length === this.batchSize) {
                 // There's a new batch of predictions to make
-                [readyToSend, results] = await this.predictBatch(goodTensors, file, fileStart, threshold)
+                results = await this.predictBatch(goodTensors, file, fileStart, threshold)
                 this.clearTensorArray(goodTensors)
                 goodTensors = {}
             }
@@ -344,12 +357,12 @@ class Model {
         if (finalchunk) {
             // Top up results with any final tensor predictions
             if (Object.keys(goodTensors).length) {
-                [readyToSend, results] = await this.predictBatch(goodTensors, file, fileStart, threshold)
+                results = await this.predictBatch(goodTensors, file, fileStart, threshold)
                 this.clearTensorArray(goodTensors)
-                readyToSend = true
+                //readyToSend = true
             }
         }
-        return [readyToSend, results]
+        return results
     }
 
     clearTensorArray(goodTensors) {
@@ -385,7 +398,7 @@ async function runPredictions(e) {
         myModel = new Model(appPath, list);
         await myModel.loadModel();
         myModel.warmUp(batch);
-            BACKEND = tf.getBackend()
+        BACKEND = tf.getBackend()
         postMessage({
             message: 'model-ready',
             sampleRate: myModel.config.sampleRate,
@@ -403,23 +416,19 @@ async function runPredictions(e) {
         const fileStart = e.data.fileStart;
         const SNRThreshold = e.data.snr;
         myModel.frame_length = 512
-        const [readyToSend, result] = await myModel.predictChunk(chunks, fileStart, file, finalChunk, SNRThreshold);
-
-        if (readyToSend) {
-            const response = {
-                message: 'prediction',
-                file: file,
-                result: result,
-                finished: finalChunk,
-                fileStart: fileStart,
-                predictionsReceived: e.data.predictionsRequested
-            }
-            postMessage(response);
-            // reset the results
-            myModel.result = [];
-            //let t1 = performance.now();
-            //console.log(`receive to post took: ${t1 - t0} milliseconds`)
+        const result = await myModel.predictChunk(chunks, fileStart, file, finalChunk, SNRThreshold);
+        const response = {
+            message: 'prediction',
+            file: file,
+            result: result,
+            fileStart: fileStart,
         }
+        postMessage(response);
+        // reset the results
+        myModel.result = [];
+        //let t1 = performance.now();
+        //console.log(`receive to post took: ${t1 - t0} milliseconds`)
+
     } else if (modelRequest === 'get-spectrogram') {
         myModel.frame_length = 512;
         const buffer = e.data.buffer;
@@ -430,15 +439,15 @@ async function runPredictions(e) {
         const height = e.data.height;
         const width = e.data.width
         let image;
-            const bufferTensor = tf.tensor1d(buffer);
-            const imageTensor = tf.tidy(() => {
-                return myModel.makeSpectrogram(bufferTensor);
+        const bufferTensor = tf.tensor1d(buffer);
+        const imageTensor = tf.tidy(() => {
+            return myModel.makeSpectrogram(bufferTensor);
         })
-            image = tf.tidy(() => {
-                return myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), height, width).dataSync();
-            })
-            bufferTensor.dispose()
-            imageTensor.dispose()
+        image = tf.tidy(() => {
+            return myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), height, width).dataSync();
+        })
+        bufferTensor.dispose()
+        imageTensor.dispose()
         let response = {
             message: 'spectrogram',
             width: myModel.inputShape[2],

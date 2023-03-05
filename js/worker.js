@@ -11,7 +11,7 @@ const stream = require("stream");
 const staticFfmpeg = require('ffmpeg-static-electron');
 const {stat} = require("fs/promises");
 
-let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, WE_ARE_DONE;
+let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS;
 const adding_chirpity_additions = true;
 const dataset_database = true
 
@@ -272,8 +272,8 @@ ipcRenderer.on('new-client', (event) => {
 
                 STATE['db'] = memoryDB;
                 console.log('Worker received audio ' + args.file);
-                predictionsRequested = 0;
-                predictionsReceived = 0;
+                // predictionsRequested = 0;
+                // predictionsReceived = 0;
                 await loadAudioFile(args);
                 break;
             case 'update-buffer':
@@ -426,11 +426,11 @@ function onAbort({
         //restart the worker
         UI.postMessage({event: 'spawning'});
         terminateWorkers()
-        spawnWorkers(model, list, BATCH_SIZE, warmup)
+        spawnWorkers(model, list, BATCH_SIZE, NUM_WORKERS)
     }
     predictionDone = true;
-    predictionsReceived = 0;
-    predictionsRequested = 0;
+    // predictionsReceived = 0;
+    // predictionsRequested = 0;
     UI.postMessage({event: 'prediction-done', batchInProgress: true});
 }
 
@@ -879,15 +879,19 @@ function feedChunksToModel(channelData, increment, chunkStart, file, end, resetR
     for (let i = 0; i < channelData.length; i += increment) {
         let chunk = channelData.slice(i, i + increment);
         // Batch predictions
-        predictionsRequested++;
+
         chunks.push(chunk);
         if (chunks.length === BATCH_SIZE) {
+            predictionsRequested++;
             sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predictionsRequested, worker);
             chunks = [];
         }
     }
     //clear up remainder less than BATCH_SIZE
-    if (chunks.length) sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predictionsRequested, worker);
+    if (chunks.length) {
+        predictionsRequested++;
+        sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predictionsRequested, worker);
+    }
 }
 
 const speciesMatch = (path, sname) => {
@@ -1090,72 +1094,73 @@ const terminateWorkers = () => {
 
 const parsePredictions = async (response) => {
     let file = response.file, batchInProgress = false;
-    predictionsReceived = response['predictionsReceived'];
+    predictionsReceived++;  // = response['predictionsReceived'];
     const latestResult = response.result, fileSQL = prepSQL(file), db = STATE.db;
-    for (let i = 0; i < latestResult.length; i++) {
-        const prediction = latestResult[i];
-        const position = parseFloat(prediction[0]);
-        UI.postMessage({event: 'progress', progress: (position / metadata[file].duration), file: file});
-        const result = prediction[1];
-        // Only send live results matching minConfidence
-        if (!prediction[1].suppressed && prediction[1].score > minConfidence) {
+    if (latestResult.length) {
+        for (let i = 0; i < latestResult.length; i++) {
+            const prediction = latestResult[i];
+            const position = parseFloat(prediction[0]);
+            UI.postMessage({event: 'progress', progress: (position / metadata[file].duration), file: file});
+            const result = prediction[1];
+            // Only send live results matching minConfidence
+            if (!prediction[1].suppressed && prediction[1].score > minConfidence) {
 
-            const audacity = prediction[2];
-            if (!STATE.selection.start) {
-                index++;
-                UI.postMessage({
-                    event: 'prediction-ongoing',
-                    file: file,
-                    result: result,
-                    index: index,
-                    selection: STATE.selection
-                });
-                AUDACITY[file] ? AUDACITY[file].push(audacity) : AUDACITY[file] = [audacity];
+                const audacity = prediction[2];
+                if (!STATE.selection.start) {
+                    index++;
+                    UI.postMessage({
+                        event: 'prediction-ongoing',
+                        file: file,
+                        result: result,
+                        index: index,
+                        selection: STATE.selection
+                    });
+                    AUDACITY[file] ? AUDACITY[file].push(audacity) : AUDACITY[file] = [audacity];
+                }
             }
-        }
-        //save all results to  db, regardless of minConfidence
-        let changes, rowid;
-        let res = await db.getAsync(`SELECT rowid
-                                     FROM files
-                                     WHERE name = '${fileSQL}'`);
-        if (!res) {
-            res = await db.runAsync(`INSERT
-            OR IGNORE INTO files VALUES ( '${fileSQL}',
-            ${metadata[file].duration},
-            ${response['fileStart']}
-            )`);
-            rowid = res.lastID;
-            changes = 1;
-        } else {
-            rowid = res.rowid;
-        }
-        if (changes) {
-            const durationSQL = Object.entries(metadata[file].dateDuration)
-                .map(entry => `(${entry.toString()},${rowid})`).join(',');
-            // No "OR IGNORE" in this statement because it should only run when the file is new
-            await db.runAsync(`INSERT
-            OR IGNORE INTO duration
+            //save all results to  db, regardless of minConfidence
+            let changes, rowid;
+            let res = await db.getAsync(`SELECT rowid
+                                         FROM files
+                                         WHERE name = '${fileSQL}'`);
+            if (!res) {
+                res = await db.runAsync(`INSERT
+                OR IGNORE INTO files VALUES ( '${fileSQL}',
+                ${metadata[file].duration},
+                ${response['fileStart']}
+                )`);
+                rowid = res.lastID;
+                changes = 1;
+            } else {
+                rowid = res.rowid;
+            }
+            if (changes) {
+                const durationSQL = Object.entries(metadata[file].dateDuration)
+                    .map(entry => `(${entry.toString()},${rowid})`).join(',');
+                // No "OR IGNORE" in this statement because it should only run when the file is new
+                await db.runAsync(`INSERT
+                OR IGNORE INTO duration
                                VALUES
-            ${durationSQL}`);
-        }
-        await db.runAsync(`INSERT
-        OR REPLACE INTO records 
+                ${durationSQL}`);
+            }
+            await db.runAsync(`INSERT
+            OR REPLACE INTO records 
                 VALUES (
-        ${result.timestamp},
-        ${result.id_1},
-        ${result.id_2},
-        ${result.id_3},
-        ${result.score},
-        ${result.score2},
-        ${result.score3},
-        ${rowid},
-        ${result.position},
-        null,
-        null
-        )`);
+            ${result.timestamp},
+            ${result.id_1},
+            ${result.id_2},
+            ${result.id_3},
+            ${result.score},
+            ${result.score2},
+            ${result.score3},
+            ${rowid},
+            ${result.position},
+            null,
+            null
+            )`);
+        }
     }
-    if (response.finished || WE_ARE_DONE) {
-        WE_ARE_DONE = true
+    if (predictionsRequested === predictionsReceived) {
         COMPLETED.push(file);
         const row = await db.getAsync(`SELECT rowid
                                        FROM files
@@ -1203,18 +1208,20 @@ async function parseMessage(e) {
             LABELS = response['labels'];
             // Now we have what we need to populate a database...
             // Load the archive db
-            await loadDB(appPath);
+            if (!diskDB) await loadDB(appPath);
             // Create in-memory database
-            await loadDB();
-            await dbSpeciesCheck();
+            if (!memoryDB) {
+                await loadDB();
+                await dbSpeciesCheck();
+            }
             break;
         case 'prediction':
             if (aborted) {
-                WE_ARE_DONE = true
+
             } else {
                 // add filename to result for db purposes
                 let [, batchInProgress] = await parsePredictions(response);
-                if (response['finished']) {
+                 //if (response['finished']) {
                     process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, Prediction requests ${predictionsRequested}, predictions received ${predictionsReceived}    \r`)
                     if (predictionsReceived === predictionsRequested) {
                         const limit = 10;
@@ -1230,10 +1237,10 @@ async function parseMessage(e) {
                         } else {
                             await getSummary({files: PENDING_FILES});
                         }
+                        await processNextFile();
                     }
-                    WE_ARE_DONE = false;
-                    await processNextFile();
-                }
+
+                //}
             }
             break;
         case 'spectrogram':
@@ -1248,7 +1255,7 @@ async function processNextFile({
                                } = {}) {
     if (FILE_QUEUE.length) {
         predictionDone = false;
-        WE_ARE_DONE = false;
+
         let file = FILE_QUEUE.shift()
         const found = await getWorkingFile(file);
         if (found) {
@@ -1285,7 +1292,6 @@ async function processNextFile({
             await processNextFile(arguments[0]);
         }
     } else {
-        WE_ARE_DONE = true;
         predictionDone = true;
     }
 }

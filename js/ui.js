@@ -138,7 +138,7 @@ const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampl
 // Timers
 let t0_warmup, t1_warmup, t0_analysis, t1_analysis;
 
-const getSystemInformation = () => {
+const getSystemInformation = async () => {
     const si = window.module.si;
     // promises style - new since version 3
     return new Promise((resolve, reject) => {
@@ -177,7 +177,7 @@ const getSystemInformation = () => {
         })
     })
 }
-
+getSystemInformation();
 
 function resetResults() {
     summaryTable.empty();
@@ -1093,6 +1093,8 @@ window.onload = async () => {
             SNRSlider.value = config.snr;
             SNRThreshold.innerText = config.snr;
             ThreadSlider.value = config.threads;
+            ThreadSlider.ariaValueMax = '8';
+            ThreadSlider.max = '8';
             numberOfThreads.innerText = config.threads;
             showElement([config.colormap], true)
             t0_warmup = Date.now();
@@ -2789,7 +2791,6 @@ fullscreen.addEventListener('click', function () {
 
 const diagnosticMenu = document.getElementById('diagnostics');
 diagnosticMenu.addEventListener('click', async function () {
-    await getSystemInformation();
     let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
     for (let [key, value] of Object.entries(diagnostics)) {
         if (key === 'Audio Duration') { // Format duration as days, hours,minutes, etc.
