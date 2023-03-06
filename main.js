@@ -1,9 +1,9 @@
 const {app, dialog, ipcMain, MessageChannelMain, BrowserWindow, powerSaveBlocker, globalShortcut} = require('electron');
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
 const fs = require("fs");
 const path = require('path');
 const settings = require('electron-settings');
 //require('update-electron-app')();
-global.sharedObject = {prop1: process.argv};
 let files = [];
 
 
@@ -224,16 +224,7 @@ app.whenReady().then(async () => {
             // without going through the main process!
         }
     });
-    // ipcMain.on('file-to-load', (event) => {
-    //     // THe UI has asked for it, so now is a good time to ask the UI to load a results file if needed:
-    //     if (event.senderFrame === mainWindow.webContents.mainFrame) {
-    //         const args = sharedObject.prop1;
-    //         if (args.length > 2 || (process.platform === 'darwin' && args.length > 0)) {
-    //             console.log('Asking UI to load a file', args)
-    //             event.senderFrame.postMessage('load-results', {file: args[args.length - 1]});
-    //         }
-    //     }
-    // });
+
 
     if (process.platform === 'darwin') {
         //const appIcon = new Tray('./img/icon/icon.png')
@@ -376,3 +367,7 @@ ipcMain.handle('saveFile', (event, arg) => {
     mainWindow.webContents.send('saveFile', {message: 'file saved!'});
 });
 
+// function showMemory(){
+//     console.log(`${process.memoryUsage().rss / 1024 / 1024} MB`)
+// }
+// setInterval(showMemory, 2000)

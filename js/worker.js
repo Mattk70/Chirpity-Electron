@@ -1094,7 +1094,6 @@ const terminateWorkers = () => {
 
 const parsePredictions = async (response) => {
     let file = response.file, batchInProgress = false;
-    predictionsReceived++;  // = response['predictionsReceived'];
     const latestResult = response.result, fileSQL = prepSQL(file), db = STATE.db;
     if (latestResult.length) {
         for (let i = 0; i < latestResult.length; i++) {
@@ -1160,6 +1159,7 @@ const parsePredictions = async (response) => {
             )`);
         }
     }
+    predictionsReceived++
     if (predictionsRequested === predictionsReceived) {
         COMPLETED.push(file);
         const row = await db.getAsync(`SELECT rowid
@@ -1209,20 +1209,21 @@ async function parseMessage(e) {
             // Now we have what we need to populate a database...
             // Load the archive db
             if (!diskDB) await loadDB(appPath);
-            // Create in-memory database
-            if (!memoryDB) {
-                await loadDB();
-                await dbSpeciesCheck();
-            }
+            //Create in-memory database
+            // if (!memoryDB) {
+            //     await loadDB();
+            //     //await dbSpeciesCheck();
+            // }
             break;
         case 'prediction':
             if (aborted) {
 
             } else {
-                // add filename to result for db purposes
+
                 let [, batchInProgress] = await parsePredictions(response);
                 //if (response['finished']) {
-                process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, Prediction requests ${predictionsRequested}, predictions received ${predictionsReceived}    \r`)
+
+                process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, Prediction requests ${predictionsRequested}, predictions received ${predictionsReceived}    \n`)
                 if (predictionsReceived === predictionsRequested) {
                     const limit = 10;
                     await clearCache(CACHE_LOCATION, limit);
@@ -1402,15 +1403,15 @@ const getSummary = async ({
 }
 
 
-const dbSpeciesCheck = async () => {
-    const {speciesCount} = await diskDB.getAsync('SELECT COUNT(*) as speciesCount FROM species');
-    if (speciesCount !== LABELS.length) {
-        UI.postMessage({
-            event: 'generate-alert',
-            message: `Warning:\nThe ${speciesCount} species in the archive database does not match the ${LABELS.length} species being used by the model.`
-        })
-    }
-}
+// const dbSpeciesCheck = async () => {
+//     const {speciesCount} = await diskDB.getAsync('SELECT COUNT(*) as speciesCount FROM species');
+//     if (speciesCount !== LABELS.length) {
+//         UI.postMessage({
+//             event: 'generate-alert',
+//             message: `Warning:\nThe ${speciesCount} species in the archive database does not match the ${LABELS.length} species being used by the model.`
+//         })
+//     }
+// }
 
 /**
  *
