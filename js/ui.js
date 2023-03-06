@@ -162,6 +162,8 @@ const getSystemInformation = async () => {
                 const key = 'CPU';
                 diagnostics[key] = `${data.manufacturer} ${data.brand}`;
                 diagnostics['Cores'] = `${data.cores}`;
+                ThreadSlider.ariaValueMax = `${data.cores}` || '6';
+                ThreadSlider.max = `${data.cores}` || '6';
             })
             .catch(error => console.error(error));
 
@@ -625,7 +627,7 @@ function postAnalyseMessage(args) {
         resetResults();
     } else {
         progressDiv.show();
-        progressBar.width( '0%');
+        progressBar.width('0%');
         progressBar.attr('aria-valuenow', 0);
         progressBar.html('0%');
         delete diagnostics['Audio Duration'];
@@ -1096,8 +1098,8 @@ window.onload = async () => {
             SNRSlider.value = config.snr;
             SNRThreshold.innerText = config.snr;
             ThreadSlider.value = config.threads;
-            ThreadSlider.ariaValueMax = '8';
-            ThreadSlider.max = '8';
+            ThreadSlider.ariaValueMax = '6';
+            ThreadSlider.max = '6';
             numberOfThreads.innerText = config.threads;
             showElement([config.colormap], true)
             t0_warmup = Date.now();
@@ -3087,5 +3089,12 @@ ThreadSlider.addEventListener('input', () => {
 });
 ThreadSlider.addEventListener('mouseup', () => {
     config.threads = parseInt(ThreadSlider.value);
+    worker.postMessage({
+        action: 'load-model',
+        model: config.model,
+        list: config.list,
+        batchSize: config.batchSize,
+        threads: config.threads
+    });
     updatePrefs();
 });
