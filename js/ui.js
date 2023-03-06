@@ -625,6 +625,9 @@ function postAnalyseMessage(args) {
         resetResults();
     } else {
         progressDiv.show();
+        progressBar.width( '0%');
+        progressBar.attr('aria-valuenow', 0);
+        progressBar.html('0%');
         delete diagnostics['Audio Duration'];
     }
     worker.postMessage({
@@ -1848,6 +1851,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     },
     Home: function () {
         if (currentBuffer) {
+            bufferBegin = 0;
             postBufferUpdate({})
         }
     },
@@ -2106,7 +2110,7 @@ function onProgress(args) {
         fileNumber.innerText = args.text;
     } else {
         const count = fileList.indexOf(args.file) + 1;
-        fileNumber.innerText = `${count} / ${fileList.length}`;
+        fileNumber.innerText = `File ${count} of ${fileList.length}`;
     }
     let progress = (args.progress * 100).toFixed(1);
     progressBar.width(progress + '%');

@@ -1,10 +1,8 @@
 const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs');
-const {parse} = require("uuid");
 const model_config = JSON.parse(fs.readFileSync('model_config.json', 'utf8'));
 const {height, width, labels, location} = model_config;
-
-let DEBUG = true;
+let DEBUG = false;
 let BACKEND;
 tf.env().set('WEBGL_FORCE_F16_TEXTURES', true)
 tf.env().set('WEBGL_PACK', true)
@@ -131,25 +129,6 @@ class Model {
         })
     }
 
-    // buildBatch(batch, keys) {
-    //     if (batch.shape[0] < this.batchSize) {
-    //         if (this.pendingBatch && this.pendingBatch.shape[0] > 0) {
-    //             this.pendingBatch = tf.concat4d([this.pendingBatch, batch], 0);
-    //             this.pendingKeys = tf.concat4d([this.pendingKeys, keys], 0)
-    //         } else {
-    //             this.pendingBatch = batch;
-    //             this.pendingKeys = keys;
-    //         }
-    //         return [this.pendingBatch, this.pendingKeys];
-    //     } else {
-    //         const readyBatch = batch.slice([0, 0, 0, 0], [this.batchSize, batch.shape[1], batch.shape[2], batch.shape[3]]);
-    //         this.pendingBatch = batch.slice([this.batchSize, 0, 0, 0]);
-    //         const readyKeys = keys.slice([0], [this.batchSize]);
-    //         this.pendingKeys = keys.slice([this.batchSize]);
-    //         return [readyBatch, readyKeys]
-    //     }
-    // }
-
     async predictBatch(goodTensors, file, fileStart, threshold) {
         console.log('predictBatch begin', tf.memory().numTensors)
         let batched_results = [];
@@ -181,7 +160,7 @@ class Model {
             }
         } else if (threshold) {
             keysTensor = tf.stack(intKeys);
-            console.log('KeysTensor expect +1', tf.memory().numTensors)
+            //console.log('KeysTensor expect +1', tf.memory().numTensors)
 
             const SNR = tf.tidy(() => {
                 return this.getSNR(fixedTensorBatch)
@@ -217,10 +196,7 @@ class Model {
             TensorBatch = fixedTensorBatch;
         }
         let t0 = performance.now();
-        // Build up a batch
-        // [TensorBatch, keysTensor] = this.buildBatch(TensorBatch, keysTensor);
-        // if (TensorBatch.shape[0] < this.batchSize) return false;
-        //console.log('Prior predictions expect same', tf.memory().numTensors)
+
         let prediction;
         if (maskedTensorBatch) {
             prediction = this.model.predict(maskedTensorBatch, {batchSize: this.batchSize})
@@ -311,20 +287,21 @@ class Model {
         return batched_results
     }
 
-    compute_spectrogram(chunk, h, w) {
+    async compute_spectrogram(chunk, h, w) {
         return tf.tidy(() => {
+            chunk = tf.tensor1d(chunk)
             let spec = tf.signal.stft(chunk, this.frame_length, this.frame_step)
             const img_height = h || height;
             const img_width = w || width;
             // Swap axes to fit output shape
-            spec = tf.transpose(spec, [2, 1]);
+            spec = tf.transpose(spec, [1, 0]);
             spec = tf.reverse(spec, [0]);
             spec = tf.abs(spec);
             // Add channel axis
             spec = tf.expandDims(spec, -1);
             spec = tf.image.resizeBilinear(spec, [img_height, img_width]);
             // Fix specBatch shape
-            return this.normalize(spec);
+            return this.normalize_test(spec);
         })
     }
 
@@ -336,10 +313,9 @@ class Model {
             // if the chunk is too short, pad with zeroes.
             // Min length is 0.5s, set in UI.js - a wavesurfer region option
             let paddedChunk;
-            if (chunk.shape[0] < this.chunkLength) {
-                let padding = tf.zeros([this.chunkLength - chunk.shape[0]]);
-                    paddedChunk = chunk.concat(padding);
-                    padding.dispose();
+            const  shape = chunk.shape[0]
+            if (shape < this.chunkLength) {
+                    paddedChunk = chunk.pad([[0, this.chunkLength - shape]]);
             }
             const spectrogram = paddedChunk ?
                 this.makeSpectrogram(paddedChunk) : this.makeSpectrogram(chunk);
@@ -415,7 +391,6 @@ async function runPredictions(e) {
         let chunks = e.data.chunks;
         const fileStart = e.data.fileStart;
         const SNRThreshold = e.data.snr;
-        myModel.frame_length = 512
         const result = await myModel.predictChunk(chunks, fileStart, file, finalChunk, SNRThreshold);
         const response = {
             message: 'prediction',
@@ -430,7 +405,6 @@ async function runPredictions(e) {
         //console.log(`receive to post took: ${t1 - t0} milliseconds`)
 
     } else if (modelRequest === 'get-spectrogram') {
-        myModel.frame_length = 512;
         const buffer = e.data.buffer;
         // Only consider full specs
         if (buffer.length < 72000) return
