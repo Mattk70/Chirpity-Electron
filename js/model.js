@@ -68,7 +68,6 @@ class Model {
         const result = tf.tidy(() => {
             const warmupResult = this.model.predict(tf.zeros(this.inputShape));
             warmupResult.arraySync();
-            warmupResult.dispose()
             return true;
         })
         console.log('WarmUp end', tf.memory().numTensors)
@@ -195,6 +194,22 @@ class Model {
         } else {
             TensorBatch = fixedTensorBatch;
         }
+
+        // Create a set of images from the batch, offset by half the width of the original images
+        const [batchSize, height, width, channel] = TensorBatch.shape;
+        let slidPrediction;
+        if (!threshold && batchSize > 1) {
+            slidPrediction = tf.tidy(() => {
+                const firstHalf = TensorBatch.slice([0, 0, 0, 0], [-1, -1, width / 2, -1]);
+                const secondHalf = TensorBatch.slice([0, 0, width / 2, 0], [-1, -1, width / 2, -1]);
+                const paddedSecondHalf =  tf.concat([tf.zeros([1, height, width / 2, channel]), secondHalf], 0);
+                 // prepend padding tensor
+                const droppedSecondHalf = paddedSecondHalf.slice([0, 0, 0, 0], [paddedSecondHalf.shape[0] - 1, -1, -1, -1]);  // drop first tensor
+                const combined = tf.concat([firstHalf, droppedSecondHalf], 2);  // concatenate adjacent pairs along the width dimension
+                return this.model.predict(combined)
+            })
+        }
+
         let t0 = performance.now();
 
         let prediction;
@@ -205,8 +220,30 @@ class Model {
             prediction = this.model.predict(TensorBatch, {batchSize: this.batchSize})
             TensorBatch.dispose()
         }
-        const {indices, values} = prediction.topk(3);
-        prediction.dispose()
+        let merged;
+        if (!threshold && batchSize > 1) {
+            // now we have predictions for both the original and rolled images
+            const reverseSlidPrediction = tf.tidy(() => {
+                const [padding, remainder] = tf.split(slidPrediction, [1, -1]);
+                return tf.concat([remainder, padding]);
+            })
+            merged = tf.tidy(() => {
+                return tf.add(prediction, slidPrediction).add(reverseSlidPrediction).div(3)
+            })
+            reverseSlidPrediction.dispose();
+            slidPrediction.dispose()
+        }
+        let newPrediction;
+        if (merged) {
+            newPrediction = merged;
+        } else {
+            newPrediction = prediction;
+        }
+
+        const {indices, values} = newPrediction.topk(3);
+        prediction.dispose();
+        newPrediction.dispose()
+        if (merged) merged.dispose();
         let keys = intKeys;
         if (maskedKeysTensor) {
             keys = maskedKeysTensor.dataSync()
@@ -313,9 +350,9 @@ class Model {
             // if the chunk is too short, pad with zeroes.
             // Min length is 0.5s, set in UI.js - a wavesurfer region option
             let paddedChunk;
-            const  shape = chunk.shape[0]
+            const shape = chunk.shape[0]
             if (shape < this.chunkLength) {
-                    paddedChunk = chunk.pad([[0, this.chunkLength - shape]]);
+                paddedChunk = chunk.pad([[0, this.chunkLength - shape]]);
             }
             const spectrogram = paddedChunk ?
                 this.makeSpectrogram(paddedChunk) : this.makeSpectrogram(chunk);

@@ -22,6 +22,7 @@ const colormap = window.module.colormap;
 const p = window.module.p;
 const SunCalc = window.module.SunCalc;
 const uuidv4 = window.module.uuidv4;
+const os = window.module.os;
 
 /// Set up communication channel between UI and worker window
 
@@ -138,48 +139,9 @@ const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampl
 // Timers
 let t0_warmup, t1_warmup, t0_analysis, t1_analysis;
 
-const getSystemInformation = async () => {
-    const si = window.module.si;
-    // promises style - new since version 3
-    return new Promise((resolve, reject) => {
-        const graphics = si.graphics()
-            .then(data => {
-                let count = 0;
-                //console.log(data)
-                data.controllers.forEach(gpu => {
-                    const key = `GPU[${count}]`;
-                    const vram = key + ' Memory';
-                    diagnostics[key] = gpu.name || gpu.vendor || gpu.model;
-                    diagnostics[vram] = gpu.vram ? gpu.vram + ' MB' : 'Dynamic';
-                    count += 1;
-                })
-            })
-            .catch(error => console.error(error));
-
-        const cpu = si.cpu()
-            .then(data => {
-                //console.log(data)
-                const key = 'CPU';
-                diagnostics[key] = `${data.manufacturer} ${data.brand}`;
-                diagnostics['Cores'] = `${data.cores}`;
-                ThreadSlider.ariaValueMax = `${data.cores}` || '6';
-                ThreadSlider.max = `${data.cores}` || '6';
-            })
-            .catch(error => console.error(error));
-
-        const mem = si.mem()
-            .then(data => {
-                //console.log(data)
-                const key = 'System Memory';
-                diagnostics[key] = `${(data.total / (1024 * 1024 * 1000)).toFixed(0)} GB`;
-            })
-            .catch(error => console.error(error));
-        Promise.all([graphics, cpu, mem]).then(() => {
-            resolve(console.table(diagnostics))
-        })
-    })
-}
-getSystemInformation();
+diagnostics['CPU'] = os.cpus()[0].model;
+diagnostics['Cores'] = os.cpus().length;
+diagnostics['System Memory'] = (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) + ' GB';
 
 function resetResults() {
     summaryTable.empty();
@@ -735,24 +697,6 @@ datasetLink.addEventListener('click', async () => {
     worker.postMessage({action: 'create-dataset'});
 });
 
-const thresholdLink = document.getElementById('threshold');
-const handleThresholdChange = (e) => {
-    if (e.code && e.code !== 'Enter') return
-    const threshold = e.target.value;
-    if (100 >= threshold && threshold > 0) {
-        config.minConfidence = parseFloat(e.target.value) / 100;
-        thresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
-        updatePrefs();
-        worker.postMessage({
-            action: 'set-variables',
-            confidence: config.minConfidence,
-        });
-        setFilter();
-    } else {
-        e.target.value = config.minConfidence * 100;
-    }
-}
-thresholdLink.addEventListener('blur', handleThresholdChange);
 
 // thresholdLink.addEventListener('keypress', handleThresholdChange );
 
@@ -1097,9 +1041,8 @@ window.onload = async () => {
             thresholdDisplay.innerHTML = `<b>${config.minConfidence * 100}%</b>`;
             SNRSlider.value = config.snr;
             SNRThreshold.innerText = config.snr;
+            ThreadSlider.max = diagnostics['Cores'];
             ThreadSlider.value = config.threads;
-            ThreadSlider.ariaValueMax = '6';
-            ThreadSlider.max = '6';
             numberOfThreads.innerText = config.threads;
             showElement([config.colormap], true)
             t0_warmup = Date.now();
@@ -1847,7 +1790,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         if (PREDICTING) {
             console.log('Operation aborted');
             PREDICTING = false;
-            worker.postMessage({action: 'abort', model: config.model, warmup: config.warmup, list: config.list});
+            worker.postMessage({action: 'abort', model: config.model, threads: config.threads, list: config.list});
             alert('Operation cancelled');
         }
     },
@@ -2026,7 +1969,7 @@ function onModelReady(args) {
     if (region) enableMenuItem(['analyseSelection'])
     t1_warmup = Date.now();
     diagnostics['Warm Up'] = ((t1_warmup - t0_warmup) / 1000).toFixed(2) + ' seconds';
-    diagnostics['Tensorflow Backend'] = args.backend;
+    diagnostics['Backend'] = args.backend;
 }
 
 
@@ -3070,7 +3013,53 @@ listIcon.addEventListener('click', () => {
 })
 // threshold value
 const thresholdDisplay = document.getElementById('threshold-value');
+const confidenceSliderDisplay = document.getElementById('confidenceSliderContainer');
+const confidenceSlider = document.getElementById('confidenceValue');
+thresholdDisplay.addEventListener('click', () => {
+    confidenceSliderDisplay.classList.remove('d-none');
+    confidenceTimerTimeout = setTimeout(hideConfidenceSlider, 750)
+})
 
+const hideConfidenceSlider = () => {
+    confidenceSliderDisplay.classList.add('d-none');
+}
+let confidenceTimerTimeout;
+confidenceSliderDisplay.addEventListener('mouseout', () => {
+    confidenceTimerTimeout = setTimeout(hideConfidenceSlider, 1000)
+})
+
+confidenceSliderDisplay.addEventListener('mouseenter', () => {
+    if (confidenceTimerTimeout)  clearTimeout( confidenceTimerTimeout)
+})
+const setConfidence = (e) => {
+    hideConfidenceSlider()
+    thresholdLink.value = e.target.value;
+    handleThresholdChange(e);
+}
+confidenceSliderDisplay.addEventListener('mouseup', setConfidence);
+confidenceSliderDisplay.addEventListener('input', (e) =>{
+    thresholdDisplay.innerHTML = `<b>${e.target.value}%</b>`;
+});
+
+const thresholdLink = document.getElementById('threshold');
+const handleThresholdChange = (e) => {
+    if (e.code && e.code !== 'Enter') return
+    const threshold = e.target.value;
+    if (100 >= threshold && threshold >= 0) {
+        config.minConfidence = parseFloat(e.target.value) / 100;
+        thresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
+        confidenceSlider.value = e.target.value;
+        updatePrefs();
+        worker.postMessage({
+            action: 'set-variables',
+            confidence: config.minConfidence,
+        });
+        if (!PREDICTING && !resultTableElement[0].hidden) setFilter();
+    } else {
+        e.target.value = config.minConfidence * 100;
+    }
+}
+thresholdLink.addEventListener('blur', handleThresholdChange);
 const SNRThreshold = document.getElementById('SNR-threshold');
 const SNRSlider = document.getElementById('snrValue');
 SNRSlider.addEventListener('input', () => {

@@ -4,7 +4,7 @@
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "electron  .",
     "export": "electron-builder build -w  --x64 "
   },
   "repository": {
@@ -147,13 +147,13 @@
   },
   "homepage": "https://github.com/mattk70/Chirpity-Electron#readme",
   "devDependencies": {
-    "electron": "^22.0.1",
-    "electron-builder": "^23.6.0",
+    "electron": "^23.1.2",
+    "electron-builder": "^24.0.0",
     "@tensorflow/tfjs-converter": "^4.2.0"
   },
   "dependencies": {
     "@popperjs/core": "^2.9.2",
-    "@tensorflow/tfjs-node": "^4.2.0",
+    "@tensorflow/tfjs-node": "4.2.0",
     "bootstrap": "^5.2.2",
     "browser-id3-writer": "^4.4.0",
     "colormap": "^2.3.2",
@@ -162,10 +162,8 @@
     "ffmpeg-static-electron": "^2.0.3",
     "fluent-ffmpeg": "^2.1.2",
     "jquery": "^3.6.3",
-    "seedrandom": "^3.0.5",
     "sqlite3": "^5.0.8",
     "suncalc2": "^1.8.1",
-    "systeminformation": "^5.12.6",
     "utimes": "^5.1.1",
     "uuid": "^8.3.2",
     "wavefile-reader": "^1.1.1",
