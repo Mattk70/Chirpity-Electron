@@ -1,10 +1,12 @@
 const {app, dialog, ipcMain, MessageChannelMain, BrowserWindow, powerSaveBlocker, globalShortcut} = require('electron');
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
 const fs = require("fs");
+const os = require('os');
 const path = require('path');
 const settings = require('electron-settings');
 //require('update-electron-app')();
 let files = [];
+
 
 
 const DEBUG = true;
@@ -32,8 +34,9 @@ const DEBUG = true;
 //})
 process.stdin.resume();//so the program will not close instantly
 
-// Stop system sleep
-powerSaveBlocker.start('prevent-app-suspension');
+// Stop system sleep - not needed as GPU no longer used
+// powerSaveBlocker.start('prevent-app-suspension');
+
 const clearCache = (file_cache) => {
     return new Promise((resolve) => {
         // clear & recreate file cache folder

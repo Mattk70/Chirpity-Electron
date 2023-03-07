@@ -47,16 +47,18 @@ html, body {
     position: absolute;
     width: 100%;
 }
+
 .spec-labels {
-    width: 55px!important;
+    width: 55px !important;
 }
-.icon{
+
+.icon {
     max-height: 30px;
-    max-width:  30px;
+    max-width: 30px;
     filter: invert(45%);
 }
 
-#list-icon:hover > img{
+#list-icon:hover > img {
     filter: invert(100%);
 }
 
@@ -498,6 +500,26 @@ Modal customisations
 }
 
 input[type="range"] {
-  width: 150px;
-  margin: 3px;
+    width: 150px;
+    margin: 3px;
+}
+
+input[type="range"].vertical {
+    position: absolute;
+    height: 150px;
+    width: 18px;
+    margin: 3px;
+    -webkit-appearance: slider-vertical;
+    top: -160px;
+    right: 15px;
+}
+
+.form-range.vertical::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 0.5rem;
+    color: transparent;
+    cursor: pointer;
+    background-color: #111;
+    border-color: #999;
+    border-radius: 1rem;
 }

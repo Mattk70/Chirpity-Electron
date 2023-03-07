@@ -15,6 +15,9 @@ let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS;
 const adding_chirpity_additions = true;
 const dataset_database = true
 
+let WINDOW_SIZE = 3;
+let OVERLAP = 1.5;
+
 let NUM_WORKERS;
 const sqlite3 = require('sqlite3'); //.verbose();
 sqlite3.Database.prototype.runAsync = function (sql, ...params) {
@@ -416,7 +419,7 @@ async function onAnalyse({
 }
 
 function onAbort({
-                     model = 'efficientnet', list = 'migrants', warmup = true
+                     model = 'efficientnet', list = 'migrants', threads = 1
                  }) {
     aborted = true;
     FILE_QUEUE = [];
@@ -742,8 +745,8 @@ const getPredictBuffers = async ({
     }
     const byteStart = convertTimeToBytes(start, metadata[file]);
     const byteEnd = convertTimeToBytes(end, metadata[file]);
-    // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
-    const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * 3;
+    // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for WINDOW_SIZE second chunks
+    const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * WINDOW_SIZE;
     const proxy = metadata[file].proxy;
     const readStream = fs.createReadStream(proxy, {
         start: byteStart, end: byteEnd, highWaterMark: highWaterMark
@@ -764,7 +767,7 @@ const getPredictBuffers = async ({
                     workerInstance = 0;
                 }
                 feedChunksToModel(myArray, increment, chunkStart, file, end, resetResults, workerInstance);
-                chunkStart += 3 * BATCH_SIZE * sampleRate;
+                chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
                 // Now the async stuff is done ==>
                 readStream.resume();
             }).catch((err) => {
@@ -837,7 +840,7 @@ const fetchAudioBuffer = async ({
 }
 
 function sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predictionsRequested, worker) {
-    const finalChunk = (chunkStart / sampleRate) + (chunks.length * 3) >= end;
+    const finalChunk = (chunkStart / sampleRate) + (chunks.length * WINDOW_SIZE) >= end;
     const objData = {
         message: 'predict',
         fileStart: metadata[file].fileStart,
@@ -845,7 +848,6 @@ function sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predic
         duration: end,
         resetResults: resetResults,
         finalChunk: finalChunk,
-        predictionsRequested: predictionsRequested,
         snr: SNR
     };
     let chunkBuffers = {};
@@ -855,11 +857,11 @@ function sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predic
         // Use  1 second min chunk duration  if > 1 chunk
         if (i && chunks[i].length < 24000) break;
         chunkBuffers[position] = chunks[i];
-        position += sampleRate * 3;
+        position += sampleRate * WINDOW_SIZE;
     }
     // chunks.forEach(chunk => {
     //     chunkBuffers[position] = chunk;
-    //     position += sampleRate * 3;
+    //     position += sampleRate * WINDOW_SIZE;
     // })
     objData['chunks'] = chunkBuffers;
     predictWorkers[worker].postMessage(objData, chunkBuffers);
@@ -1477,7 +1479,7 @@ const getResults = async ({
                 // Recreate Audacity labels
                 const file = result.file
                 const audacity = {
-                    timestamp: `${result.start}\t${result.start + 3}`,
+                    timestamp: `${result.start}\t${result.start + WINDOW_SIZE}`,
                     cname: result.cname,
                     score: result.score
                 };
@@ -1941,7 +1943,7 @@ async function onChartRequest(args) {
 const db2ResultSQL = 'SELECT dateTime AS timestamp, position AS position, s1.cname as cname, s2.cname as cname2, s3.cname as cname3, birdid1 as id_1, birdid2 as id_2, birdid3 as id_3, position as start, position + 3 as end, conf1 as score, conf2 as score2, conf3 as score3,s1.sname as sname, s2.sname as sname2, s3.sname as sname3,files.duration, files.name as file, comment, label FROM records LEFT JOIN species s1 on s1.id = birdid1 LEFT JOIN species s2 on s2.id = birdid2 LEFT JOIN species s3 on s3.id = birdid3 INNER JOIN files on files.rowid = records.fileid';
 
 /*
-Todo: bugs
+todo: bugs
     ***Crash on abort - no crash now, but predictions resume
     ***when analysing second batch of results, the first results linger.
     Confidence filter not honoured on refresh results
@@ -1967,11 +1969,7 @@ Todo: Location.
      Associate lat lon with files, expose lat lon settings in UI. Allow for editing once saved. Filter Explore by location
 
 Todo cache:
-    ***Clear cache on application exit, as well as start
-    ***Set max cache size
-    ***Cache fills before analyse complete. So it fills up ahead of predictions, and files get deleted
-        before they're done with
-    ***Now cache is limited, need to re-open file when browsing and file not present
+    Set cache location
     Control cache size in settings
 
 Todo: manual entry
@@ -1981,14 +1979,9 @@ Todo: manual entry
     ***get entry to appear in position among existing detections and centre on it
 
 Todo: UI
-    ***Drag folder to load audio files within (recursively)
-    ***Stop flickering when updating results
-    ***Expose SNR feature in settings
-    ***Pagination? Limit table records to say, 1000
     Better tooltips, for all options
-    ***Sort summary by headers (click on species or header)
+    Sort summary by headers (click on species or header)
     ***Have a panel for all analyse settings, not just nocmig mode
-    ***Delay hiding submenu on mouseout (added box-shadow)
     Align the label on the spec to the right to minimize overlap with axis labels
 
 
@@ -2004,11 +1997,8 @@ Todo: Explore
     ***Make seen species list range aware
 
 Todo: Performance
-    Investigate background throttling when worker hidden
-        If an issue, Explore spawning predictWorkers from UI, Shared worker??
-            => hopefully prevents  background throttling (imapact TBD)
-    Can we avoid the datasync in snr routine?
-    Smaller model faster - but retaining accuracy? Read up on Knowledge distillation
+    ***Smaller model faster - but retaining accuracy? Read up on Knowledge distillation
+    *** Spawn several prediction workers
 
 Todo: model.
      Improve accuracy, accuracy accuracy!
