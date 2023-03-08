@@ -320,7 +320,7 @@ class Model {
                     second = Math.floor(key % 3600 % 60)
                 console.log(file, `${hour}:${minute}:${second}`, item.index[0], this.labels[item.index[0]], Math.round(item.score[0] * 1000) / 1000, item.index[1], this.labels[item.index[1]], Math.round(item.score[1] * 1000) / 1000, item.index[2], this.labels[item.index[2]], Math.round(item.score[2] * 1000) / 1000);
             }
-            batched_results.push([key, result, audacity]);
+            batched_results.push([result, audacity]);
         }
 
 
