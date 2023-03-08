@@ -294,9 +294,10 @@ class Model {
         }
 
         // Create a set of images from the batch, offset by half the width of the original images
-        const [batchSize, height, width, channel] = TensorBatch.shape;
+        const [batchSize, height, width, channel] = TensorBatch ? TensorBatch.shape : maskedTensorBatch.shape;
         let rshiftPrediction;
-        if (!threshold && batchSize > 1) {
+        const contextAware = (BACKEND === 'webgl' || threshold === 0) && batchSize > 1;
+        if (contextAware) {
             rshiftPrediction = tf.tidy(() => {
                 const firstHalf = TensorBatch.slice([0, 0, 0, 0], [-1, -1, width / 2, -1]);
                 const secondHalf = TensorBatch.slice([0, 0, width / 2, 0], [-1, -1, width / 2, -1]);
@@ -307,9 +308,6 @@ class Model {
                 return this.model.predict(combined, {batchSize: this.batchSize})
             })
         }
-
-        let t0 = performance.now();
-
         let prediction;
         if (maskedTensorBatch) {
             prediction = this.model.predict(maskedTensorBatch, {batchSize: this.batchSize})
@@ -319,7 +317,7 @@ class Model {
             TensorBatch.dispose()
         }
         let merged;
-        if (!threshold && batchSize > 1) {
+        if (contextAware) {
             // now we have predictions for both the original and rolled images
             const lshiftPrediction = tf.tidy(() => {
                 const [padding, remainder] = tf.split(rshiftPrediction, [1, -1]);

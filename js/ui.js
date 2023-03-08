@@ -1042,12 +1042,9 @@ window.onload = async () => {
             nocmigButton.title = config.nocmig ? 'Nocmig mode on' : 'Nocmig mode off';
             thresholdLink.value = config.minConfidence * 100;
             thresholdDisplay.innerHTML = `<b>${config.minConfidence * 100}%</b>`;
-            if (config.backend === 'tensorflow') {
-                SNRSlider.value = config.snr;
-                SNRThreshold.innerText = config.snr;
-            } else {
-                SNRSlider.disabled = true;
-            }
+            SNRSlider.value = config.snr;
+            SNRThreshold.innerText = config.snr;
+            SNRSlider.disabled = config.backend === 'webgl';
             ThreadSlider.max = diagnostics['Cores'];
             ThreadSlider.value = config[config.backend].threads;
             numberOfThreads.innerText = config[config.backend].threads;
@@ -1761,6 +1758,7 @@ for (let i = 0; i < backend.length; i++) {
     backend[i].addEventListener('click', function (e) {
         config.backend = e.target.value;
         SNRSlider.disabled = config.backend === 'webgl';
+        SNRThreshold.innerText = config.snr.toString();
         // Update threads and batch Size in UI
         ThreadSlider.value = config[config.backend].threads;
         numberOfThreads.innerText = config[config.backend].threads;
