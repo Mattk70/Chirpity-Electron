@@ -985,14 +985,15 @@ window.onload = async () => {
         latitude: 51.9,
         longitude: -0.4,
         nocmig: false,
-        threads: 1,
         snr: 5,
         warmup: true,
-        batchSize: 1,
+        backend: 'tensorflow',
+        tensorflow: {threads: diagnostics['Cores'], batchSize: 2},
+        webgl: {threads: 1, batchSize: 2},
         limit: 500,
         fullscreen: false
     };
-    // Load preferences and override defaults
+// Load preferences and override defaults
     [appPath, tempPath] = await getPaths();
     await fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
             if (err) {
@@ -1013,12 +1014,14 @@ window.onload = async () => {
             // Initialize Spectrogram
             initWavesurfer({});
             // Set UI option state
-            const batchSizeElement = document.getElementById(config.batchSize);
+            const batchSizeElement = document.getElementById(config[config.backend].batchSize);
             batchSizeElement.checked = true;
-            diagnostics['Batch size'] = config.batchSize;
+            diagnostics['Batch size'] = config[config.backend].batchSize;
             const modelToUse = document.getElementById(config.model);
             modelToUse.checked = true;
             diagnostics['Model'] = config.model;
+            const backend = document.getElementById(config.backend);
+            backend.checked = true;
             // Show time of day in results?
             const timestamp = document.querySelectorAll('.timestamp');
             if (!config.timeOfDay) {
@@ -1039,11 +1042,15 @@ window.onload = async () => {
             nocmigButton.title = config.nocmig ? 'Nocmig mode on' : 'Nocmig mode off';
             thresholdLink.value = config.minConfidence * 100;
             thresholdDisplay.innerHTML = `<b>${config.minConfidence * 100}%</b>`;
-            SNRSlider.value = config.snr;
-            SNRThreshold.innerText = config.snr;
+            if (config.backend === 'tensorflow') {
+                SNRSlider.value = config.snr;
+                SNRThreshold.innerText = config.snr;
+            } else {
+                SNRSlider.disabled = true;
+            }
             ThreadSlider.max = diagnostics['Cores'];
-            ThreadSlider.value = config.threads;
-            numberOfThreads.innerText = config.threads;
+            ThreadSlider.value = config[config.backend].threads;
+            numberOfThreads.innerText = config[config.backend].threads;
             showElement([config.colormap], true)
             t0_warmup = Date.now();
             worker.postMessage({
@@ -1055,23 +1062,16 @@ window.onload = async () => {
                 confidence: config.minConfidence,
                 nocmig: config.nocmig
             });
-            worker.postMessage({
-                action: 'load-model',
-                model: config.model,
-                list: config.list,
-                batchSize: config.batchSize,
-                warmup: config.warmup,
-                threads: config.threads
-            });
+            loadModel();
             worker.postMessage({action: 'clear-cache'})
         }
     )
-    // establish the message channel
+// establish the message channel
     setUpWorkerMessaging()
 
-    // Set footer year
+// Set footer year
     $('#year').text(new Date().getFullYear());
-    //Cache list elements
+//Cache list elements
     speciesListItems = $('#bird-list li span');
 }
 
@@ -1733,6 +1733,18 @@ for (let i = 0; i < listToUse.length; i++) {
     })
 }
 
+const loadModel = () => {
+    worker.postMessage({
+        action: 'load-model',
+        model: config.model,
+        list: config.list,
+        batchSize: config[config.backend].batchSize,
+        warmup: config.warmup,
+        threads: config[config.backend].threads,
+        backend: config.backend
+    });
+}
+
 const modelToUse = document.getElementsByName('model');
 for (let i = 0; i < modelToUse.length; i++) {
     modelToUse[i].addEventListener('click', function (e) {
@@ -1740,13 +1752,23 @@ for (let i = 0; i < modelToUse.length; i++) {
         updatePrefs();
         diagnostics['Model'] = config.model;
         t0_warmup = Date.now();
-        worker.postMessage({
-            action: 'load-model',
-            model: config.model,
-            list: config.list,
-            batchSize: config.batchSize,
-            threads: config.threads
-        });
+        loadModel();
+    })
+}
+
+const backend = document.getElementsByName('backend');
+for (let i = 0; i < backend.length; i++) {
+    backend[i].addEventListener('click', function (e) {
+        config.backend = e.target.value;
+        SNRSlider.disabled = config.backend === 'webgl';
+        // Update threads and batch Size in UI
+        ThreadSlider.value = config[config.backend].threads;
+        numberOfThreads.innerText = config[config.backend].threads;
+        const activeBatchSizeRadio = document.getElementById(config[config.backend].batchSize);
+        activeBatchSizeRadio.checked = true;
+        updatePrefs();
+        t0_warmup = Date.now();
+        loadModel();
     })
 }
 
@@ -1790,7 +1812,12 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         if (PREDICTING) {
             console.log('Operation aborted');
             PREDICTING = false;
-            worker.postMessage({action: 'abort', model: config.model, threads: config.threads, list: config.list});
+            worker.postMessage({
+                action: 'abort',
+                model: config.model,
+                threads: config[config.backend].threads,
+                list: config.list
+            });
             alert('Operation cancelled');
         }
     },
@@ -2052,7 +2079,7 @@ async function onWorkerLoadedAudio({
 function onProgress(args) {
     progressDiv.show();
     if (args.text) {
-        fileNumber.innerText = args.text;
+        fileNumber.innerHTML = args.text;
     } else {
         const count = fileList.indexOf(args.file) + 1;
         fileNumber.innerText = `File ${count} of ${fileList.length}`;
@@ -2778,16 +2805,10 @@ const batchRadios = document.getElementsByName('batch');
 
 for (let i = 0; i < batchRadios.length; i++) {
     batchRadios[i].addEventListener('click', (e) => {
-        config.batchSize = e.target.value;
-        diagnostics['Batch size'] = config.batchSize;
+        config[config.backend].batchSize = e.target.value;
+        diagnostics['Batch size'] = config[config.backend].batchSize;
         t0_warmup = Date.now();
-        worker.postMessage({
-            action: 'load-model',
-            model: config.model,
-            list: config.list,
-            batchSize: config.batchSize,
-            threads: config.threads
-        });
+        loadModel();
         updatePrefs();
     })
 }
@@ -3029,7 +3050,7 @@ confidenceSliderDisplay.addEventListener('mouseout', () => {
 })
 
 confidenceSliderDisplay.addEventListener('mouseenter', () => {
-    if (confidenceTimerTimeout)  clearTimeout( confidenceTimerTimeout)
+    if (confidenceTimerTimeout) clearTimeout(confidenceTimerTimeout)
 })
 const setConfidence = (e) => {
     hideConfidenceSlider()
@@ -3037,7 +3058,7 @@ const setConfidence = (e) => {
     handleThresholdChange(e);
 }
 confidenceSliderDisplay.addEventListener('mouseup', setConfidence);
-confidenceSliderDisplay.addEventListener('input', (e) =>{
+confidenceSliderDisplay.addEventListener('input', (e) => {
     thresholdDisplay.innerHTML = `<b>${e.target.value}%</b>`;
 });
 
@@ -3077,13 +3098,7 @@ ThreadSlider.addEventListener('input', () => {
     numberOfThreads.innerText = ThreadSlider.value;
 });
 ThreadSlider.addEventListener('mouseup', () => {
-    config.threads = parseInt(ThreadSlider.value);
-    worker.postMessage({
-        action: 'load-model',
-        model: config.model,
-        list: config.list,
-        batchSize: config.batchSize,
-        threads: config.threads
-    });
+    config[config.backend].threads = parseInt(ThreadSlider.value);
+    loadModel();
     updatePrefs();
 });

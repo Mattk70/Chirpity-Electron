@@ -10,15 +10,13 @@ const {utimes} = require('utimes');
 const stream = require("stream");
 const staticFfmpeg = require('ffmpeg-static-electron');
 const {stat} = require("fs/promises");
-
-let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS;
-const adding_chirpity_additions = true;
-const dataset_database = true
-
 let WINDOW_SIZE = 3;
-let OVERLAP = 1.5;
-
 let NUM_WORKERS;
+let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend;
+
+const adding_chirpity_additions = true;
+const dataset_database = true;
+
 const sqlite3 = require('sqlite3'); //.verbose();
 sqlite3.Database.prototype.runAsync = function (sql, ...params) {
     return new Promise((resolve, reject) => {
@@ -262,6 +260,7 @@ ipcRenderer.on('new-client', (event) => {
             case 'load-model':
                 UI.postMessage({event: 'spawning'});
                 BATCH_SIZE = parseInt(args.batchSize);
+                BACKEND = args.backend;
                 if (predictWorkers.length) terminateWorkers();
                 spawnWorkers(args.model, args.list, BATCH_SIZE, args.threads);
                 break;
@@ -419,7 +418,8 @@ async function onAnalyse({
 }
 
 function onAbort({
-                     model = 'efficientnet', list = 'migrants', threads = 1
+                     model = 'efficientnet',
+                     list = 'migrants',
                  }) {
     aborted = true;
     FILE_QUEUE = [];
@@ -428,7 +428,7 @@ function onAbort({
     if (!predictionDone) {
         //restart the worker
         UI.postMessage({event: 'spawning'});
-        terminateWorkers()
+        terminateWorkers();
         spawnWorkers(model, list, BATCH_SIZE, NUM_WORKERS)
     }
     predictionDone = true;
@@ -743,6 +743,7 @@ const getPredictBuffers = async ({
     if (start > metadata[file].duration) {
         return
     }
+    batchChunksToSend = Math.ceil(end / (BATCH_SIZE * WINDOW_SIZE));
     const byteStart = convertTimeToBytes(start, metadata[file]);
     const byteEnd = convertTimeToBytes(end, metadata[file]);
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for WINDOW_SIZE second chunks
@@ -1080,7 +1081,11 @@ function spawnWorkers(model, list, batchSize, threads) {
         console.log('loading a worker')
         // Now we've loaded a new model, clear the aborted flag
         aborted = false;
-        worker.postMessage(['load', list, batchSize])
+        worker.postMessage({
+            message: 'load',
+            list: list,
+            batchSize: batchSize,
+            backend: BACKEND})
         worker.onmessage = async (e) => {
             await parseMessage(e)
         }
@@ -1161,7 +1166,7 @@ const parsePredictions = async (response) => {
         }
     }
     predictionsReceived++;
-    UI.postMessage({event: 'progress', progress: (predictionsReceived / predictionsRequested), file: file});
+    UI.postMessage({event: 'progress', progress: (predictionsReceived / batchChunksToSend), file: file});
     if (predictionsRequested === predictionsReceived) {
         COMPLETED.push(file);
         const row = await db.getAsync(`SELECT rowid
