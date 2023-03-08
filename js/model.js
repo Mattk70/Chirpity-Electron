@@ -65,13 +65,16 @@ class Model {
     warmUp(batchSize) {
         this.batchSize = parseInt(batchSize);
         this.inputShape[0] = this.batchSize;
-        const result = tf.tidy(() => {
-            const warmupResult = this.model.predict(tf.zeros(this.inputShape));
-            warmupResult.arraySync();
-            return true;
-        })
+        if (tf.getBackend() === 'webgl') {
+
+            const result = tf.tidy(() => {
+                const warmupResult = this.model.predict(tf.zeros(this.inputShape), {batchSize: this.batchSize});
+                warmupResult.arraySync();
+                return true;
+            })
+        }
         console.log('WarmUp end', tf.memory().numTensors)
-        return result;
+        return true;
     }
 
     setList() {
@@ -202,11 +205,11 @@ class Model {
             rshiftPrediction = tf.tidy(() => {
                 const firstHalf = TensorBatch.slice([0, 0, 0, 0], [-1, -1, width / 2, -1]);
                 const secondHalf = TensorBatch.slice([0, 0, width / 2, 0], [-1, -1, width / 2, -1]);
-                const paddedSecondHalf =  tf.concat([tf.zeros([1, height, width / 2, channel]), secondHalf], 0);
-                 // prepend padding tensor
+                const paddedSecondHalf = tf.concat([tf.zeros([1, height, width / 2, channel]), secondHalf], 0);
+                // prepend padding tensor
                 const droppedSecondHalf = paddedSecondHalf.slice([0, 0, 0, 0], [paddedSecondHalf.shape[0] - 1, -1, -1, -1]);  // drop first tensor
                 const combined = tf.concat([firstHalf, droppedSecondHalf], 2);  // concatenate adjacent pairs along the width dimension
-                return this.model.predict(combined)
+                return this.model.predict(combined, {batchSize: this.batchSize})
             })
         }
 
