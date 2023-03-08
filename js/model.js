@@ -6,9 +6,9 @@ let DEBUG = false;
 let BACKEND;
 tf.env().set('WEBGL_FORCE_F16_TEXTURES', true)
 tf.env().set('WEBGL_PACK', true)
-tf.env().set('WEBGL_EXP_CONV', false)
-// tf.env().set('TOPK_K_CPU_HANDOFF_THRESHOLD', 128)
-// tf.env().set('TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD', 0);
+tf.env().set('WEBGL_EXP_CONV', true)
+//tf.env().set('TOPK_K_CPU_HANDOFF_THRESHOLD', 128)
+tf.env().set('TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD', 10240);
 
 
 tf.enableProdMode();
@@ -64,7 +64,7 @@ class Model {
 
     warmUp(batchSize) {
         this.batchSize = parseInt(batchSize);
-        this.inputShape[0] = 1;
+        this.inputShape[0] = this.batchSize;
         const result = tf.tidy(() => {
             const warmupResult = this.model.predict(tf.zeros(this.inputShape));
             warmupResult.arraySync();
@@ -197,9 +197,9 @@ class Model {
 
         // Create a set of images from the batch, offset by half the width of the original images
         const [batchSize, height, width, channel] = TensorBatch.shape;
-        let slidPrediction;
+        let rshiftPrediction;
         if (!threshold && batchSize > 1) {
-            slidPrediction = tf.tidy(() => {
+            rshiftPrediction = tf.tidy(() => {
                 const firstHalf = TensorBatch.slice([0, 0, 0, 0], [-1, -1, width / 2, -1]);
                 const secondHalf = TensorBatch.slice([0, 0, width / 2, 0], [-1, -1, width / 2, -1]);
                 const paddedSecondHalf =  tf.concat([tf.zeros([1, height, width / 2, channel]), secondHalf], 0);
@@ -223,15 +223,15 @@ class Model {
         let merged;
         if (!threshold && batchSize > 1) {
             // now we have predictions for both the original and rolled images
-            const reverseSlidPrediction = tf.tidy(() => {
-                const [padding, remainder] = tf.split(slidPrediction, [1, -1]);
+            const lshiftPrediction = tf.tidy(() => {
+                const [padding, remainder] = tf.split(rshiftPrediction, [1, -1]);
                 return tf.concat([remainder, padding]);
             })
             merged = tf.tidy(() => {
-                return tf.add(prediction, slidPrediction).add(reverseSlidPrediction).div(3)
+                return tf.add(prediction, rshiftPrediction).add(lshiftPrediction).div(3)
             })
-            reverseSlidPrediction.dispose();
-            slidPrediction.dispose()
+            lshiftPrediction.dispose();
+            rshiftPrediction.dispose()
         }
         let newPrediction;
         if (merged) {
