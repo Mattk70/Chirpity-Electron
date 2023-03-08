@@ -432,8 +432,8 @@ function onAbort({
         spawnWorkers(model, list, BATCH_SIZE, NUM_WORKERS)
     }
     predictionDone = true;
-    // predictionsReceived = 0;
-    // predictionsRequested = 0;
+    predictionsReceived = 0;
+    predictionsRequested = 0;
     UI.postMessage({event: 'prediction-done', batchInProgress: true});
 }
 
@@ -783,7 +783,8 @@ const getPredictBuffers = async ({
         }
     })
     readStream.on('end', function () {
-        readStream.close()
+        readStream.close();
+        // processNextFile();
     })
     readStream.on('error', err => {
         console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`)
@@ -1100,13 +1101,11 @@ const parsePredictions = async (response) => {
     if (latestResult.length) {
         for (let i = 0; i < latestResult.length; i++) {
             const prediction = latestResult[i];
-            const position = parseFloat(prediction[0]);
-            UI.postMessage({event: 'progress', progress: (position / metadata[file].duration), file: file});
-            const result = prediction[1];
+            const result = prediction[0];
             // Only send live results matching minConfidence
-            if (!prediction[1].suppressed && prediction[1].score > minConfidence) {
+            if (!prediction[0].suppressed && prediction[0].score > minConfidence) {
 
-                const audacity = prediction[2];
+                const audacity = prediction[1];
                 if (!STATE.selection.start) {
                     index++;
                     UI.postMessage({
@@ -1161,7 +1160,8 @@ const parsePredictions = async (response) => {
             )`);
         }
     }
-    predictionsReceived++
+    predictionsReceived++;
+    UI.postMessage({event: 'progress', progress: (predictionsReceived / predictionsRequested), file: file});
     if (predictionsRequested === predictionsReceived) {
         COMPLETED.push(file);
         const row = await db.getAsync(`SELECT rowid
@@ -1287,6 +1287,7 @@ async function processNextFile({
                 await processNextFile(arguments[0]);
 
             } else {
+                UI.postMessage({event: 'progress', text: "<span class='loading'>Awaiting detections</span>", file: file});
                 await doPrediction({
                     start: start, end: end, file: file, resetResults: resetResults,
                 });
