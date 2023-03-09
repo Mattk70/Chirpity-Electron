@@ -96,7 +96,7 @@ const selectionTable = document.getElementById('selectionResultTableBody');
 const nocmigButton = document.getElementById('nocmigMode');
 const summaryTable = $('#summaryTable');
 const progressDiv = $('#progressDiv');
-const progressBar = $('.progress .progress-bar');
+const progressBar = document.getElementById('progress-bar');
 const fileNumber = document.getElementById('fileNumber');
 const timeOfDay = document.getElementById('timeOfDay');
 const timecode = document.getElementById('timecode');
@@ -152,9 +152,17 @@ function resetResults() {
     seenTheDarkness = false;
     shownDaylightBanner = false;
     progressDiv.hide();
-    progressBar.width(0 + '%');
-    progressBar.attr('aria-valuenow', 0);
-    progressBar.html(0 + '%');
+    updateProgress(0)
+}
+
+/***
+ *
+ * @param val: float between 0 and 1
+ */
+function updateProgress(val) {
+    val = val.toString();
+    progressBar.value = val;
+    progressBar.innerText = val + '%';
 }
 
 async function loadAudioFile(args) {
@@ -589,9 +597,7 @@ function postAnalyseMessage(args) {
         resetResults();
     } else {
         progressDiv.show();
-        progressBar.width('0%');
-        progressBar.attr('aria-valuenow', 0);
-        progressBar.html('0%');
+        updateProgress(0);
         delete diagnostics['Audio Duration'];
     }
     worker.postMessage({
@@ -2077,19 +2083,19 @@ async function onWorkerLoadedAudio({
 function onProgress(args) {
     progressDiv.show();
     if (args.text) {
+        updateProgress(0)
         fileNumber.innerHTML = args.text;
     } else {
         const count = fileList.indexOf(args.file) + 1;
         fileNumber.innerText = `File ${count} of ${fileList.length}`;
-    }
-    let progress = (args.progress * 100).toFixed(1);
-    progressBar.width(progress + '%');
-    progressBar.attr('aria-valuenow', progress);
-    progressBar.html(progress + '%');
-    if (parseFloat(progress) === 100.0) {
-        progressDiv.hide();
+        let progress = Math.round(args.progress * 1000) / 10;
+        updateProgress(progress)
+        if (progress === 100.0) {
+            progressDiv.hide();
+        }
     }
 }
+
 
 const updateSummary = ({
                            summary = [],
@@ -2162,9 +2168,8 @@ async function onPredictionDone({
     total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
     if (action !== 'filter') {
         progressDiv.hide();
-        progressBar.width(0 + '%');
-        progressBar.attr('aria-valuenow', 0);
-        progressBar.html(0 + '%');
+        updateProgress(0)
+
         //completeDiv.show();
 
         if (Object.keys(AUDACITY_LABELS).length) {
