@@ -2083,16 +2083,19 @@ async function onWorkerLoadedAudio({
 function onProgress(args) {
     progressDiv.show();
     if (args.text) {
-        updateProgress(0)
         fileNumber.innerHTML = args.text;
     } else {
         const count = fileList.indexOf(args.file) + 1;
         fileNumber.innerText = `File ${count} of ${fileList.length}`;
+    }
+    if (args.progress){
         let progress = Math.round(args.progress * 1000) / 10;
         updateProgress(progress)
         if (progress === 100.0) {
             progressDiv.hide();
         }
+    } else {
+        updateProgress(0)
     }
 }
 

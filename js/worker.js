@@ -471,17 +471,20 @@ const convertFileFormat = (file, destination, size, error) => {
             // Handle progress % being undefined
             .on('codecData', async data => {
                 // HERE YOU GET THE TOTAL TIME
-                totalTime = parseInt(data.duration.replace(/:/g, ''))
+                const a = data.duration.split(':');
+                totalTime = parseInt(a[0]) * 3600 + parseInt(a[1]) * 60 + parseFloat(a[2]);
+                //totalTime = parseInt(data.duration.replace(/:/g, ''))
             })
             .on('progress', (progress) => {
                 // HERE IS THE CURRENT TIME
-                const time = parseInt(progress.timemark.replace(/:/g, ''))
-
+                //const time = parseInt(progress.timemark.replace(/:/g, ''))
+                const a = progress.timemark.split(':');
+                const time = parseInt(a[0]) * 3600 + parseInt(a[1]) * 60 + parseFloat(a[2]);
                 // AND HERE IS THE CALCULATION
-                const percent = (time / totalTime) * 100
-                console.log('Processing: ' + percent + ' % converted');
+                const extractionProgress = time / totalTime;
+                console.log(`Processing: ${(time / totalTime) * 100 }% converted`);
                 UI.postMessage({
-                    event: 'progress', text: 'Extracting file', progress: percent / 100
+                    event: 'progress', text: 'Extracting file', progress: extractionProgress
                 })
             })
             .on('end', () => {
