@@ -385,7 +385,6 @@ async function onAnalyse({
     index = 0;
     AUDACITY = {};
     COMPLETED = [];
-    UI.postMessage('reset-results');
     FILE_QUEUE = currentFile ? [currentFile] : filesInScope;
 
     STATE.db = memoryDB;
@@ -746,7 +745,7 @@ const getPredictBuffers = async ({
     if (start > metadata[file].duration) {
         return
     }
-    batchChunksToSend = Math.ceil(end / (BATCH_SIZE * WINDOW_SIZE));
+    batchChunksToSend = Math.ceil((end - start) / (BATCH_SIZE * WINDOW_SIZE));
     predictionsReceived = 0;
     predictionsRequested = 0;
     const byteStart = convertTimeToBytes(start, metadata[file]);
@@ -1191,7 +1190,7 @@ const parsePredictions = async (response) => {
         console.log(`Prediction done ${FILE_QUEUE.length} files to go`);
         console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
         UI.postMessage({event: 'progress', progress: 1.0, text: '...'});
-        batchInProgress = FILE_QUEUE.length ? true : predictionsRequested - predictionsReceived;
+        batchInProgress = FILE_QUEUE.length;
         predictionDone = true;
     } else {
         await getSummary({interim: true, files: []});
