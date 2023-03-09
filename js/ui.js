@@ -503,9 +503,7 @@ function analyseReset() {
     PREDICTING = true;
     delete diagnostics['Audio Duration'];
     AUDACITY_LABELS = {};
-    //completeDiv.hide();
     progressDiv.show();
-    stretchTable();
     // Diagnostics
     t0_analysis = Date.now();
 }
@@ -1048,6 +1046,7 @@ window.onload = async () => {
             nocmigButton.title = config.nocmig ? 'Nocmig mode on' : 'Nocmig mode off';
             thresholdLink.value = config.minConfidence * 100;
             thresholdDisplay.innerHTML = `<b>${config.minConfidence * 100}%</b>`;
+            confidenceSliderDisplay.value = config.minConfidence * 100;
             SNRSlider.value = config.snr;
             SNRThreshold.innerText = config.snr;
             SNRSlider.disabled = config.backend === 'webgl';
@@ -1087,9 +1086,6 @@ const setUpWorkerMessaging = () => {
             switch (event) {
                 case 'model-ready':
                     onModelReady(args);
-                    break;
-                case 'reset-results':
-                    resetResults(args);
                     break;
                 case 'update-summary':
                     updateSummary(args);
@@ -1133,7 +1129,9 @@ const setUpWorkerMessaging = () => {
                     break
                 case 'no-detections-remain':
                     detectionsModal.hide();
-                    break
+                    break;
+                default:
+                        alert(`Unrecognised message from worker:${args.event}`)
             }
         })
     })
@@ -2125,7 +2123,6 @@ const updateSummary = ({
 
     }
     summaryHTML += '</tbody></table>';
-    squishTable();
     // Get rid of flicker...
     const old_summary = document.getElementById('summaryTable');
     const buffer = old_summary.cloneNode();
@@ -2552,32 +2549,6 @@ function setClickedIndex(target) {
     clickedIndex = clickedNode.querySelector('th') ? clickedNode.querySelector('th').innerText : null;
 }
 
-const stretchTable = () => {
-    summaryDiv.classList.add('d-none');
-    resultsDiv.classList.remove('col-sm-8');
-    resultsDiv.classList.add('col-sm-12');
-}
-
-const squishTable = () => {
-    summaryDiv.classList.remove('d-none');
-    resultsDiv.classList.add('col-sm-8');
-    resultsDiv.classList.remove('col-sm-12');
-}
-
-// summaryButton.addEventListener('click', (e) => {
-//     if (summaryDiv.classList.contains('d-none')) {
-//         summaryButton.innerText = 'Hide Summary';
-//         squishTable()
-//     } else {
-//         summaryButton.innerText = 'Show Summary';
-//         stretchTable()
-//     }
-//     if (e.isTrusted) {
-//         summaryTable.animate({width: 'toggle'})
-//     } else {
-//         summaryTable.animate({width: 'show'})
-//     }
-// });
 
 $(document).on('click', '.delete', function (e) {
     e.stopImmediatePropagation();
