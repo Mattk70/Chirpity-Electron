@@ -141,6 +141,7 @@ class Model {
         this.frame_step = 186;
         this.appPath = appPath;
         this.list = list;
+        this.previousChunk = tf.zeros([1, height, width / 2, 1]);
     }
 
     async loadModel() {
@@ -301,9 +302,12 @@ class Model {
             rshiftPrediction = tf.tidy(() => {
                 const firstHalf = TensorBatch.slice([0, 0, 0, 0], [-1, -1, width / 2, -1]);
                 const secondHalf = TensorBatch.slice([0, 0, width / 2, 0], [-1, -1, width / 2, -1]);
-                const paddedSecondHalf = tf.concat([tf.zeros([1, height, width / 2, channel]), secondHalf], 0);
+                const paddedSecondHalf = tf.concat([this.previousChunk, secondHalf], 0);
+                this.previousChunk.dispose();
                 // prepend padding tensor
-                const droppedSecondHalf = paddedSecondHalf.slice([0, 0, 0, 0], [paddedSecondHalf.shape[0] - 1, -1, -1, -1]);  // drop first tensor
+                let droppedSecondHalf;
+                [droppedSecondHalf, this.previousChunk]= paddedSecondHalf.split([paddedSecondHalf.shape[0] - 1, 1]);  // shift last tensor
+                tf.keep(this.previousChunk); // save this for the next batch
                 const combined = tf.concat([firstHalf, droppedSecondHalf], 2);  // concatenate adjacent pairs along the width dimension
                 return this.model.predict(combined, {batchSize: this.batchSize})
             })
