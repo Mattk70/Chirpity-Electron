@@ -744,6 +744,8 @@ const getPredictBuffers = async ({
         return
     }
     batchChunksToSend = Math.ceil(end / (BATCH_SIZE * WINDOW_SIZE));
+    predictionsReceived = 0;
+    predictionsRequested = 0;
     const byteStart = convertTimeToBytes(start, metadata[file]);
     const byteEnd = convertTimeToBytes(end, metadata[file]);
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for WINDOW_SIZE second chunks
@@ -1166,8 +1168,9 @@ const parsePredictions = async (response) => {
         }
     }
     predictionsReceived++;
-    UI.postMessage({event: 'progress', progress: (predictionsReceived / batchChunksToSend), file: file});
-    if (predictionsRequested === predictionsReceived) {
+    const progress = predictionsReceived / batchChunksToSend;
+    UI.postMessage({event: 'progress', progress: progress, file: file});
+    if (progress === 1) {
         COMPLETED.push(file);
         const row = await db.getAsync(`SELECT rowid
                                        FROM files
@@ -1962,7 +1965,7 @@ todo: bugs
     ***AUDACITY results for multiple files doesn't work well, as it puts labels in by position only. Need to make audacity an object,
         and return the result for the current file only #######
     ***In explore, editID doesn't change the label of the region to the new species
-    Analyse selection returns just the file in which the selection is requested
+    ***Analyse selection returns just the file in which the selection is requested
 
 
 Todo: Database
