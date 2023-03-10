@@ -854,7 +854,8 @@ function sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predic
         duration: end,
         resetResults: resetResults,
         finalChunk: finalChunk,
-        snr: SNR
+        snr: SNR,
+        minConfidence: minConfidence
     };
     let chunkBuffers = {};
     // Key chunks by their position
