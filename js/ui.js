@@ -1046,7 +1046,7 @@ window.onload = async () => {
             nocmigButton.title = config.nocmig ? 'Nocmig mode on' : 'Nocmig mode off';
             thresholdLink.value = config.minConfidence * 100;
             thresholdDisplay.innerHTML = `<b>${config.minConfidence * 100}%</b>`;
-            confidenceSliderDisplay.value = config.minConfidence * 100;
+            confidenceSlider.value = config.minConfidence * 100;
             SNRSlider.value = config.snr;
             SNRThreshold.innerText = config.snr;
             SNRSlider.disabled = config.backend === 'webgl';
