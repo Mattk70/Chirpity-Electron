@@ -2,7 +2,7 @@ const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs');
 const model_config = JSON.parse(fs.readFileSync('model_config.json', 'utf8'));
 const {height, width, labels, location} = model_config;
-let DEBUG = false;
+let DEBUG = true;
 let BACKEND;
 
 //GLOBALS
@@ -302,13 +302,10 @@ class Model {
             rshiftPrediction = tf.tidy(() => {
                 const firstHalf = TensorBatch.slice([0, 0, 0, 0], [-1, -1, width / 2, -1]);
                 const secondHalf = TensorBatch.slice([0, 0, width / 2, 0], [-1, -1, width / 2, -1]);
-                const paddedSecondHalf = tf.concat([this.previousChunk, secondHalf], 0);
-                this.previousChunk.dispose();
+                const paddedSecondHalf = tf.concat([tf.zeros([1, height, width / 2, channel]), secondHalf], 0);
                 // prepend padding tensor
-                let droppedSecondHalf;
-                [droppedSecondHalf, this.previousChunk]= paddedSecondHalf.split([paddedSecondHalf.shape[0] - 1, 1]);  // shift last tensor
-                tf.keep(this.previousChunk); // save this for the next batch
-                const combined = tf.concat([firstHalf, droppedSecondHalf], 2);  // concatenate adjacent pairs along the width dimension
+                const [droppedSecondHalf, _]= paddedSecondHalf.split([paddedSecondHalf.shape[0] - 1, 1]);  // pop last tensor
+                const combined = tf.concat([droppedSecondHalf, firstHalf], 2);  // concatenate adjacent pairs along the width dimension
                 return this.model.predict(combined, {batchSize: this.batchSize})
             })
         }
