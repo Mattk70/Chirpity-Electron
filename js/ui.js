@@ -2386,8 +2386,8 @@ async function renderResult({
             <td class="text-end">${UI_position}</td>
             <td name="${cname}" class='text-start cname'><ul>
                     <li>${cname} ${iconizeScore(score)}
-                    <li>${cname2} ${iconizeScore(score2)}
-                    <li>${cname3} ${iconizeScore(score3)}
+                    ${score2 > config.minConfidence ? `<li> ${cname2} ${iconizeScore(score2)}`: ' '}
+                    ${score3 > config.minConfidence ? `<li> ${cname3} ${iconizeScore(score3)}`: ' '}
                 </ul></td>
             <td><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
             <td><a href='https://xeno-canto.org/explore?query=${sname}%20type:"nocturnal flight call"' target="xc">
@@ -3023,7 +3023,7 @@ const hideConfidenceSlider = () => {
 }
 let confidenceTimerTimeout;
 confidenceSliderDisplay.addEventListener('mouseout', () => {
-    confidenceTimerTimeout = setTimeout(hideConfidenceSlider, 1000)
+    confidenceTimerTimeout = setTimeout(hideConfidenceSlider, 2000)
 })
 
 confidenceSliderDisplay.addEventListener('mouseenter', () => {
