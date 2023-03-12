@@ -1054,7 +1054,6 @@ window.onload = async () => {
             ThreadSlider.value = config[config.backend].threads;
             numberOfThreads.innerText = config[config.backend].threads;
             showElement([config.colormap], true)
-            t0_warmup = Date.now();
             worker.postMessage({
                 action: 'set-variables',
                 path: appPath,
@@ -1735,6 +1734,7 @@ for (let i = 0; i < listToUse.length; i++) {
 }
 
 const loadModel = () => {
+    t0_warmup = Date.now();;
     worker.postMessage({
         action: 'load-model',
         model: config.model,
@@ -1752,7 +1752,6 @@ for (let i = 0; i < modelToUse.length; i++) {
         config.model = e.target.value;
         updatePrefs();
         diagnostics['Model'] = config.model;
-        t0_warmup = Date.now();
         loadModel();
     })
 }
@@ -1769,7 +1768,6 @@ for (let i = 0; i < backend.length; i++) {
         const activeBatchSizeRadio = document.getElementById(config[config.backend].batchSize);
         activeBatchSizeRadio.checked = true;
         updatePrefs();
-        t0_warmup = Date.now();
         loadModel();
     })
 }
@@ -2784,7 +2782,6 @@ for (let i = 0; i < batchRadios.length; i++) {
     batchRadios[i].addEventListener('click', (e) => {
         config[config.backend].batchSize = e.target.value;
         diagnostics['Batch size'] = config[config.backend].batchSize;
-        t0_warmup = Date.now();
         loadModel();
         updatePrefs();
     })
