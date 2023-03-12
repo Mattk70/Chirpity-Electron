@@ -14,10 +14,10 @@ let WINDOW_SIZE = 3;
 let NUM_WORKERS;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend;
 
-const adding_chirpity_additions = true;
+const adding_chirpity_additions = false;
 const dataset_database = true;
 
-const sqlite3 = require('sqlite3'); //.verbose();
+const sqlite3 = require('sqlite3').verbose();
 sqlite3.Database.prototype.runAsync = function (sql, ...params) {
     return new Promise((resolve, reject) => {
         this.run(sql, params, function (err) {
@@ -375,7 +375,7 @@ async function onAnalyse({
                              snr = 0
                          }) {
     // if end was passed, this is a selection
-    if (end) STATE.selection = getSelectionRange(currentFile, start, end);
+    STATE.selection = end ? getSelectionRange(currentFile, start, end) : undefined;
 
     console.log(`Worker received message: ${filesInScope}, ${confidence}, start: ${start}, end: ${end}`);
     minConfidence = confidence;
@@ -624,15 +624,15 @@ const getMetadata = async ({file, proxy = file, source_file = file}) => {
     metadata[file] = {proxy: proxy};
     // CHeck the database first, so we honour any manual update.
     const savedMeta = await getFileInfo(file);
-    metadata[file].duration = savedMeta && savedMeta.duration ? savedMeta.duration : await getDuration(proxy);
+    metadata[file].duration = savedMeta?.duration ? savedMeta.duration : await getDuration(proxy);
 
     return new Promise((resolve) => {
         if (metadata[file]?.isComplete) {
             resolve(metadata[file])
         } else {
             let fileStart, fileEnd;
-            if (savedMeta?.filestart) {
-                fileStart = new Date(savedMeta.filestart);
+            if (savedMeta?.fileStart) {
+                fileStart = new Date(savedMeta.fileStart);
                 fileEnd = new Date(fileStart.getTime() + (metadata[file].duration * 1000));
             } else {
                 metadata[file].stat = fs.statSync(source_file);
@@ -782,7 +782,7 @@ const getPredictBuffers = async ({
         } else {
             console.log('Short chunk', chunk.length, 'skipping')
             // Create array with 0's (short segment of silence that will trigger the finalChunk flag
-            const myArray = new Float32Array(new Array(1000).fill(0));
+            const myArray = new Float32Array(new Array(chunkLength).fill(0));
             feedChunksToModel(myArray, chunkLength, chunkStart, file, end, resetResults, workerInstance);
             readStream.resume();
         }
@@ -912,7 +912,7 @@ const speciesMatch = (path, sname) => {
 }
 
 const saveResults2DataSet = (rootDirectory) => {
-    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/Additions-SNR-filtered';
+    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/test_png_dataset';
     const height = 256, width = 384;
     let workerInstance = 0;
     let t0 = Date.now()
@@ -1160,9 +1160,9 @@ const parsePredictions = async (response) => {
             ${result.id_1},
             ${result.id_2},
             ${result.id_3},
-            ${result.score},
-            ${result.score2},
-            ${result.score3},
+            ${result.score || 0},
+            ${result.score2 || 0},
+            ${result.score3 || 0},
             ${rowid},
             ${result.position},
             null,
