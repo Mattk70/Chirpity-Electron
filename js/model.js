@@ -22,7 +22,7 @@ const CONFIG = {
 
 onmessage = async (e) => {
     const modelRequest = e.data.message;
-    let file, response;
+    let response;
     try {
         switch (modelRequest) {
             case 'load':
@@ -38,7 +38,7 @@ onmessage = async (e) => {
                         tf.env().set('WEBGL_FORCE_F16_TEXTURES', true)
                         tf.env().set('WEBGL_PACK', true)
                         tf.env().set('WEBGL_EXP_CONV', true)
-                        tf.env().set('TOPK_K_CPU_HANDOFF_THRESHOLD', 128)
+                        //tf.env().set('TOPK_K_CPU_HANDOFF_THRESHOLD', 0)
                         tf.env().set('TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD', 0);
                     }
                     tf.enableProdMode();
@@ -61,15 +61,9 @@ onmessage = async (e) => {
                 })
                 break;
             case 'predict':
-                file = e.data.file;
-                const finalChunk = e.data.finalChunk;
-                if (finalChunk) console.log('Received final chunks')
                 //const t0 = performance.now();
-                let chunks = e.data.chunks;
-                const fileStart = e.data.fileStart;
-                const SNRThreshold = e.data.snr;
-                const confidence = e.data.minConfidence;
-                const result = await myModel.predictChunk(chunks, fileStart, file, finalChunk, SNRThreshold, confidence);
+                const {chunks, start, fileStart, file, snr, minConfidence, finalChunk} = e.data;
+                const result = await myModel.predictChunk(chunks, start, fileStart, file, snr, minConfidence);
                 response = {
                     message: 'prediction',
                     file: file,
@@ -79,14 +73,12 @@ onmessage = async (e) => {
                 postMessage(response);
                 // reset the results
                 myModel.result = [];
-                //let t1 = performance.now();
-                //console.log(`receive to post took: ${t1 - t0} milliseconds`)
                 break;
             case 'get-spectrogram':
                 const buffer = e.data.buffer;
                 // Only consider full specs
                 if (buffer.length < 72000) return
-                file = e.data.file;
+                const specFile = e.data.file;
                 const filepath = e.data.filepath;
                 const height = e.data.height;
                 const width = e.data.width
@@ -106,7 +98,7 @@ onmessage = async (e) => {
                     height: myModel.inputShape[1],
                     channels: myModel.inputShape[3],
                     image: image,
-                    file: file,
+                    file: specFile,
                     filepath: filepath
                 }
                 postMessage(response)
@@ -274,14 +266,13 @@ class Model {
     }
 
     async predictBatch(goodTensors, file, fileStart, threshold, confidence) {
-        console.log('predictBatch begin', tf.memory().numTensors)
         let batched_results = [];
         let result;
         let audacity;
         let fixedTensorBatch = tf.tidy(() => {
-            return this.fixUpSpecBatch(tf.stack(Object.values(goodTensors)))
+            const batch = tf.stack(Object.values(goodTensors));
+            return this.fixUpSpecBatch(batch);
         })
-        //console.log('rawTensorBatch (-)  Tensorbatch (+), expect same', tf.memory().numTensors)
         let intKeys = Object.keys(goodTensors).map((str) => {
             return parseInt(str)
         });
@@ -293,7 +284,6 @@ class Model {
                 fixedTensorBatch.dispose();
             } else {
                 TensorBatch = fixedTensorBatch;
-                //fixedTensorBatch.dispose()
             }
         } else if (threshold) {
             keysTensor = tf.stack(intKeys);
@@ -304,15 +294,11 @@ class Model {
                 newCondition = tf.expandDims(condition)
                 condition.dispose()
             }
-            if (newCondition) {
-                maskedTensorBatch = await tf.booleanMaskAsync(fixedTensorBatch, newCondition);
-                maskedKeysTensor = await tf.booleanMaskAsync(keysTensor, newCondition)
-                newCondition.dispose();
-            } else {
-                maskedTensorBatch = await tf.booleanMaskAsync(fixedTensorBatch, condition);
-                maskedKeysTensor = await tf.booleanMaskAsync(keysTensor, condition);
-                condition.dispose();
-            }
+            const c = newCondition || condition;
+            maskedTensorBatch = await tf.booleanMaskAsync(fixedTensorBatch, c);
+            maskedKeysTensor = await tf.booleanMaskAsync(keysTensor, c)
+            c.dispose();
+
             fixedTensorBatch.dispose();
             keysTensor.dispose();
 
@@ -328,17 +314,12 @@ class Model {
             TensorBatch = fixedTensorBatch;
         }
 
+        const tb =  maskedTensorBatch || TensorBatch;
         let prediction;
-        if (maskedTensorBatch) {
-            prediction = this.model.predict(maskedTensorBatch, {batchSize: this.batchSize})
-        } else {
-            prediction = this.model.predict(TensorBatch, {batchSize: this.batchSize})
-        }
-        const updatedTensor = maskedTensorBatch || TensorBatch;
-        let newPrediction = this.checkAddContext(prediction, updatedTensor, confidence, threshold);
-        if (TensorBatch) TensorBatch.dispose();
-        if (maskedTensorBatch) maskedTensorBatch.dispose();
-        updatedTensor.dispose();
+        prediction = this.model.predict(tb, {batchSize: this.batchSize})
+
+        let newPrediction = this.checkAddContext(prediction, tb, confidence, threshold);
+        tb.dispose();
         const {indices, values} = newPrediction ? newPrediction.topk(3) : prediction.topk(3);
         if (newPrediction) newPrediction.dispose();
         prediction.dispose();
@@ -353,9 +334,7 @@ class Model {
         const top3scores = values.arraySync();
         indices.dispose();
         values.dispose()
-        //return [keys, top3, top3scores];
 
-        //console.log('Post  predictions', tf.memory().numTensors)
         const batch = {};
         for (let i = 0; i < keys.length; i++) {
             batch[keys[i]] = ({index: top3[i], score: top3scores[i], end: keys[i] + this.chunkLength});
@@ -417,8 +396,8 @@ class Model {
             }
             batched_results.push([result, audacity]);
         }
-
-
+        //this.clearTensorArray(goodTensors);
+        // console.log('predictBatch end', tf.memory().numTensors)
         return batched_results
     }
 
@@ -440,46 +419,36 @@ class Model {
         })
     }
 
-    async predictChunk(chunks, fileStart, file, finalchunk, threshold, confidence) {
-        let results = [];
-        let goodTensors = {}
-        for (const [key, value] of Object.entries(chunks)) {
-            let chunk = tf.tensor1d(value);
-            // if the chunk is too short, pad with zeroes.
-            // Min length is 0.5s, set in UI.js - a wavesurfer region option
-            let paddedChunk;
-            const shape = chunk.shape[0]
-            if (shape < this.chunkLength) {
-                paddedChunk = chunk.pad([[0, this.chunkLength - shape]]);
-            }
-            const spectrogram = paddedChunk ?
-                this.makeSpectrogram(paddedChunk) : this.makeSpectrogram(chunk);
-            chunk.dispose();
-            if (paddedChunk) paddedChunk.dispose();
-            goodTensors[key] = spectrogram;
-            //Loop will continue
-            if (Object.keys(goodTensors).length === this.batchSize) {
-                // There's a new batch of predictions to make
-                results = await this.predictBatch(goodTensors, file, fileStart, threshold, confidence)
-                this.clearTensorArray(goodTensors)
-                goodTensors = {}
-            }
+    async predictChunk(audioBuffer, start, fileStart, file, threshold, confidence) {
+        console.log('predictCunk begin', tf.memory().numTensors)
+        audioBuffer = tf.tensor1d(audioBuffer);
+        // check if we need to pad
+        const remainder = audioBuffer.shape % 72000;
+        let paddedBuffer;
+        if (remainder !== 0) {  // If the buffer isn't divisible by batch size, we must be at the end of the file
+            paddedBuffer = audioBuffer.pad([[0, this.chunkLength - remainder]]);
+            audioBuffer.dispose();
+            console.log('Received final chunks')
         }
-        if (finalchunk) {
-            // Top up results with any final tensor predictions
-            if (Object.keys(goodTensors).length) {
-                results = await this.predictBatch(goodTensors, file, fileStart, threshold, confidence)
-                this.clearTensorArray(goodTensors)
-                //readyToSend = true
-            }
+        const buffer = paddedBuffer || audioBuffer;
+        const numSamples = buffer.shape / 72000;
+        const bufferList = tf.split(buffer, numSamples);
+        buffer.dispose();
+        const batchKeys = [...Array(numSamples).keys()].map(i => start + 72000 * i);
+        // recreate the object...
+        let specBatch = {}
+
+        for (let i = 0; i < batchKeys.length; i++) {
+            specBatch[batchKeys[i]] = this.makeSpectrogram(bufferList[i]);
+            bufferList[i].dispose();
         }
-        return results
+        const result = await this.predictBatch(specBatch, file, fileStart, threshold, confidence)
+        this.clearTensorArray(specBatch);
+        return result
     }
 
-    clearTensorArray(goodTensors) {
+    clearTensorArray(tensorObj) {
         // Dispose of accumulated kept tensors in model tensor array
-        for (const tensor of Object.values(goodTensors)) {
-            tensor.dispose()
-        }
+        Object.values(tensorObj).forEach(tensor => tensor.dispose());
     }
 }

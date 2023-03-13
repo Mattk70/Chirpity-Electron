@@ -408,11 +408,9 @@ async function onAnalyse({
         let file = FILE_QUEUE[i];
         // Set global var, for parsePredictions
         console.log(`Adding ${file} to the queue.`)
-        if (predictionDone) {
             // Clear state unless analysing a selection
             if (!STATE.selection) resetState(STATE.db);
             await processNextFile(arguments[0]);
-        }
     }
 }
 
@@ -481,7 +479,7 @@ const convertFileFormat = (file, destination, size, error) => {
                 const time = parseInt(a[0]) * 3600 + parseInt(a[1]) * 60 + parseFloat(a[2]);
                 // AND HERE IS THE CALCULATION
                 const extractionProgress = time / totalTime;
-                console.log(`Processing: ${(time / totalTime) * 100 }% converted`);
+                console.log(`Processing: ${(time / totalTime) * 100}% converted`);
                 UI.postMessage({
                     event: 'progress', text: 'Extracting file', progress: extractionProgress
                 })
@@ -771,7 +769,7 @@ const getPredictBuffers = async ({
                 if (++workerInstance === NUM_WORKERS) {
                     workerInstance = 0;
                 }
-                feedChunksToModel(myArray, increment, chunkStart, file, end, resetResults, workerInstance);
+                feedChunksToModel(myArray, chunkStart, file, end, resetResults, workerInstance);
                 chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
                 // Now the async stuff is done ==>
                 readStream.resume();
@@ -783,7 +781,7 @@ const getPredictBuffers = async ({
             console.log('Short chunk', chunk.length, 'skipping')
             // Create array with 0's (short segment of silence that will trigger the finalChunk flag
             const myArray = new Float32Array(new Array(chunkLength).fill(0));
-            feedChunksToModel(myArray, chunkLength, chunkStart, file, end, resetResults, workerInstance);
+            feedChunksToModel(myArray, chunkStart, file, end, resetResults, workerInstance);
             readStream.resume();
         }
     })
@@ -845,33 +843,20 @@ const fetchAudioBuffer = async ({
     });
 }
 
-function sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predictionsRequested, worker) {
-    const finalChunk = (chunkStart / sampleRate) + (chunks.length * WINDOW_SIZE) >= end;
+function feedChunksToModel(channelData, chunkStart, file, end, resetResults, worker) {
+    predictionsRequested++;
     const objData = {
         message: 'predict',
         fileStart: metadata[file].fileStart,
         file: file,
+        start: chunkStart,
         duration: end,
         resetResults: resetResults,
-        finalChunk: finalChunk,
         snr: SNR,
-        minConfidence: minConfidence
+        minConfidence: minConfidence,
+        chunks: channelData
     };
-    let chunkBuffers = {};
-    // Key chunks by their position
-    let position = chunkStart;
-    for (let i = 0; i < chunks.length; i++) {
-        // Use  1 second min chunk duration  if > 1 chunk
-        if (i && chunks[i].length < 24000) break;
-        chunkBuffers[position] = chunks[i];
-        position += sampleRate * WINDOW_SIZE;
-    }
-    // chunks.forEach(chunk => {
-    //     chunkBuffers[position] = chunk;
-    //     position += sampleRate * WINDOW_SIZE;
-    // })
-    objData['chunks'] = chunkBuffers;
-    predictWorkers[worker].postMessage(objData, chunkBuffers);
+    predictWorkers[worker].postMessage(objData, [objData.chunks.buffer]);
 }
 
 async function doPrediction({
@@ -881,26 +866,6 @@ async function doPrediction({
     predictionStart = new Date();
     await getPredictBuffers({file: file, start: start, end: end, resetResults: resetResults});
     UI.postMessage({event: 'update-audio-duration', value: metadata[file].duration});
-}
-
-function feedChunksToModel(channelData, increment, chunkStart, file, end, resetResults, worker) {
-    let chunks = [];
-    for (let i = 0; i < channelData.length; i += increment) {
-        let chunk = channelData.slice(i, i + increment);
-        // Batch predictions
-
-        chunks.push(chunk);
-        if (chunks.length === BATCH_SIZE) {
-            predictionsRequested++;
-            sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predictionsRequested, worker);
-            chunks = [];
-        }
-    }
-    //clear up remainder less than BATCH_SIZE
-    if (chunks.length) {
-        predictionsRequested++;
-        sendMessageToWorker(chunkStart, chunks, file, end, resetResults, predictionsRequested, worker);
-    }
 }
 
 const speciesMatch = (path, sname) => {
@@ -1090,7 +1055,8 @@ function spawnWorkers(model, list, batchSize, threads) {
             message: 'load',
             list: list,
             batchSize: batchSize,
-            backend: BACKEND})
+            backend: BACKEND
+        })
         worker.onmessage = async (e) => {
             await parseMessage(e)
         }
@@ -1298,7 +1264,11 @@ async function processNextFile({
                 await processNextFile(arguments[0]);
 
             } else {
-                UI.postMessage({event: 'progress', text: "<span class='loading'>Awaiting detections</span>", file: file});
+                UI.postMessage({
+                    event: 'progress',
+                    text: "<span class='loading'>Awaiting detections</span>",
+                    file: file
+                });
                 await doPrediction({
                     start: start, end: end, file: file, resetResults: resetResults,
                 });
