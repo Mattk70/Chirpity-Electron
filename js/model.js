@@ -336,7 +336,7 @@ class Model {
         }
         const updatedTensor = maskedTensorBatch || TensorBatch;
         let newPrediction = this.checkAddContext(prediction, updatedTensor, confidence, threshold);
-        TensorBatch.dispose();
+        if (TensorBatch) TensorBatch.dispose();
         if (maskedTensorBatch) maskedTensorBatch.dispose();
         updatedTensor.dispose();
         const {indices, values} = newPrediction ? newPrediction.topk(3) : prediction.topk(3);
