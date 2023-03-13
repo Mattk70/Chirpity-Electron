@@ -14,7 +14,7 @@ let WINDOW_SIZE = 3;
 let NUM_WORKERS;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend;
 
-const adding_chirpity_additions = false;
+const adding_chirpity_additions = true;
 const dataset_database = true;
 
 const sqlite3 = require('sqlite3').verbose();
@@ -912,7 +912,7 @@ const speciesMatch = (path, sname) => {
 }
 
 const saveResults2DataSet = (rootDirectory) => {
-    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/test_png_dataset';
+    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/animal_dataset';
     const height = 256, width = 384;
     let workerInstance = 0;
     let t0 = Date.now()
@@ -1205,7 +1205,7 @@ async function parseMessage(e) {
         case 'update-list':
             STATE.blocked = response.blocked;
             STATE.globalOffset = 0;
-            if (response['updateResults']) {
+            if (response['updateResults'] && STATE.db) {  // update-results called after setting migrants list, so DB may not be initialized
                 await getResults();
                 await getSummary();
             }
