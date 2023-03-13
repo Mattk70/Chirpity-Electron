@@ -196,12 +196,14 @@ class Model {
     }
 
     getSNR(spectrograms) {
-        const max = tf.max(spectrograms, 2);
-        const mean = tf.mean(spectrograms, 2);
-        const peak = tf.sub(max, mean);
-        let snr = tf.squeeze(tf.max(peak, 1));
-        snr = tf.sub(255, snr)  // bigger number, less signal
-        return snr
+        return tf.tidy(() => {
+            const max = tf.max(spectrograms, 2);
+            const mean = tf.mean(spectrograms, 2);
+            const peak = tf.sub(max, mean);
+            let snr = tf.squeeze(tf.max(peak, 1));
+            snr = tf.sub(255, snr)  // bigger number, less signal
+            return snr
+        })
     }
 
     makeSpectrogram(audioBuffer) {
@@ -238,7 +240,7 @@ class Model {
     }
 
     checkAddContext(prediction, tensor, confidence, SNRthreshold) {
-                // Create a set of images from the batch, offset by half the width of the original images
+        // Create a set of images from the batch, offset by half the width of the original images
         const [batchSize, height, width, channel] = tensor.shape;
         const makeContextAware = (BACKEND === 'webgl' || SNRthreshold === 0) && batchSize > 1;
         if (makeContextAware) {
@@ -246,15 +248,22 @@ class Model {
                 const firstHalf = tensor.slice([0, 0, 0, 0], [-1, -1, width / 2, -1]);
                 const secondHalf = tensor.slice([0, 0, width / 2, 0], [-1, -1, width / 2, -1]);
                 const paddedSecondHalf = tf.concat([tf.zeros([1, height, width / 2, channel]), secondHalf], 0);
+                secondHalf.dispose();
                 // prepend padding tensor
                 const [droppedSecondHalf, _] = paddedSecondHalf.split([paddedSecondHalf.shape[0] - 1, 1]);  // pop last tensor
+                paddedSecondHalf.dispose();
                 const combined = tf.concat([droppedSecondHalf, firstHalf], 2);  // concatenate adjacent pairs along the width dimension
-                const rshiftPrediction = this.model.predict(combined, {batchSize: this.batchSize})
+                firstHalf.dispose();
+                droppedSecondHalf.dispose();
+                const rshiftPrediction = this.model.predict(combined, {batchSize: this.batchSize});
+                combined.dispose();
                 // now we have predictions for both the original and rolled images
                 const [padding, remainder] = tf.split(rshiftPrediction, [1, -1]);
                 const lshiftPrediction = tf.concat([remainder, padding]);
                 // Get the highest predictions from the overlapping images
                 const surround = tf.maximum(rshiftPrediction, lshiftPrediction);
+                lshiftPrediction.dispose();
+                rshiftPrediction.dispose();
                 // Mask out where these are below the threshold
                 const indices = tf.greater(surround, confidence);
                 return prediction.where(indices, 0);
@@ -269,11 +278,9 @@ class Model {
         let batched_results = [];
         let result;
         let audacity;
-        let rawTensorBatch = tf.stack(Object.values(goodTensors))
         let fixedTensorBatch = tf.tidy(() => {
-            return this.fixUpSpecBatch(rawTensorBatch)
+            return this.fixUpSpecBatch(tf.stack(Object.values(goodTensors)))
         })
-        rawTensorBatch.dispose();
         //console.log('rawTensorBatch (-)  Tensorbatch (+), expect same', tf.memory().numTensors)
         let intKeys = Object.keys(goodTensors).map((str) => {
             return parseInt(str)
@@ -290,12 +297,7 @@ class Model {
             }
         } else if (threshold) {
             keysTensor = tf.stack(intKeys);
-            //console.log('KeysTensor expect +1', tf.memory().numTensors)
-
-            const SNR = tf.tidy(() => {
-                return this.getSNR(fixedTensorBatch)
-            })
-            let condition = tf.less(SNR, (10 - threshold) * 10);
+            let condition = tf.less(this.getSNR(fixedTensorBatch), (10 - threshold) * 10);
             // Avoid mask cannot be scalar error at end of predictions
             let newCondition;
             if (condition.rankType === "0") {
@@ -313,7 +315,7 @@ class Model {
             }
             fixedTensorBatch.dispose();
             keysTensor.dispose();
-            SNR.dispose();
+
 
             if (!maskedTensorBatch.size) {
                 maskedTensorBatch.dispose();
@@ -333,7 +335,7 @@ class Model {
             prediction = this.model.predict(TensorBatch, {batchSize: this.batchSize})
         }
         const updatedTensor = maskedTensorBatch || TensorBatch;
-        let newPrediction =  this.checkAddContext(prediction, updatedTensor, confidence, threshold);
+        let newPrediction = this.checkAddContext(prediction, updatedTensor, confidence, threshold);
         TensorBatch.dispose();
         if (maskedTensorBatch) maskedTensorBatch.dispose();
         updatedTensor.dispose();
