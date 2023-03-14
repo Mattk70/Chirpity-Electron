@@ -13,11 +13,11 @@ const {stat} = require("fs/promises");
 let WINDOW_SIZE = 3;
 let NUM_WORKERS;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend;
-
+const DEBUG = true;
 const adding_chirpity_additions = true;
 const dataset_database = true;
 
-const sqlite3 = require('sqlite3').verbose();
+const sqlite3 = DEBUG ? require('sqlite3').verbose() : require('sqlite3');
 sqlite3.Database.prototype.runAsync = function (sql, ...params) {
     return new Promise((resolve, reject) => {
         this.run(sql, params, function (err) {
