@@ -1809,8 +1809,9 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         }
     },
     KeyA: async function (e) {
-        if (Object.keys(AUDACITY_LABELS).length) {
-            if (e.ctrlKey) await showSaveDialog();
+        if (e.ctrlKey) {
+                if (e.shiftKey && Object.keys(AUDACITY_LABELS).length) await showSaveDialog();
+                else if (currentFile) analyseLink.click()
         }
     },
     Escape: function () {
