@@ -1,13 +1,13 @@
 const {app, dialog, ipcMain, MessageChannelMain, BrowserWindow, powerSaveBlocker, globalShortcut} = require('electron');
-app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
+//app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
+
 const fs = require("fs");
 const os = require('os');
 const path = require('path');
 const settings = require('electron-settings');
 //require('update-electron-app')();
 let files = [];
-
-
+let blockerID = 1;
 
 const DEBUG = true;
 //Updater
@@ -34,8 +34,6 @@ const DEBUG = true;
 //})
 process.stdin.resume();//so the program will not close instantly
 
-// Stop system sleep - not needed as GPU no longer used
-// powerSaveBlocker.start('prevent-app-suspension');
 
 const clearCache = (file_cache) => {
     return new Promise((resolve) => {
@@ -324,6 +322,17 @@ app.on('activate', async () => {
 ipcMain.handle('dialog', (event, method, params) => {
     dialog[method](mainWindow, params);
 });
+
+ipcMain.handle('powerSaveBlocker', (event, on) => {
+    //Stop system sleep
+    if (on) {
+        blockerID = powerSaveBlocker.start('prevent-app-suspension');
+        console.log("Power save blocked", blockerID);
+    } else if (powerSaveBlocker.isStarted(blockerID)) {
+        powerSaveBlocker.stop(blockerID);
+        console.log("Power save resumed", blockerID);
+    }
+})
 
 ipcMain.handle('openFiles', async (config) => {
     // Show file dialog to select audio file

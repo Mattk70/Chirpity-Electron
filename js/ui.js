@@ -382,6 +382,10 @@ async function showOpenDialog() {
     if (!files.canceled) await onOpenFiles({filePaths: files.filePaths});
 }
 
+function powerSave(on) {
+     return window.electron.powerSaveBlocker(on);
+}
+
 const openFileInList = async (e) => {
     if (!PREDICTING && e.target.type !== 'button') {
         await loadAudioFile({filePath: e.target.id, preserveResults: true})
@@ -1767,6 +1771,7 @@ for (let i = 0; i < backend.length; i++) {
         numberOfThreads.innerText = config[config.backend].threads;
         const activeBatchSizeRadio = document.getElementById(config[config.backend].batchSize);
         activeBatchSizeRadio.checked = true;
+        config.backend === 'webgl' ? powerSave(true) : powerSave(false);
         updatePrefs();
         loadModel();
     })
