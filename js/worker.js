@@ -408,9 +408,11 @@ async function onAnalyse({
         let file = FILE_QUEUE[i];
         // Set global var, for parsePredictions
         console.log(`Adding ${file} to the queue.`)
+        if (predictionDone) {
             // Clear state unless analysing a selection
             if (!STATE.selection) resetState(STATE.db);
             await processNextFile(arguments[0]);
+        }
     }
 }
 
