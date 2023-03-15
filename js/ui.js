@@ -1797,21 +1797,24 @@ document.getElementById('timecode').addEventListener('click', timelineToggle);
 /////////// Keyboard Shortcuts  ////////////
 
 const GLOBAL_ACTIONS = { // eslint-disable-line
-    Space: function () {
-        if (wavesurfer) wavesurfer.playPause();
-    },
-    KeyO: function (e) {
-        if (e.ctrlKey) showOpenDialog();
-    },
-    KeyS: function (e) {
-        if (Object.keys(AUDACITY_LABELS).length) {
-            if (e.ctrlKey) worker.postMessage({action: 'save2db'});
-        }
-    },
     KeyA: async function (e) {
         if (e.ctrlKey) {
                 if (e.shiftKey && Object.keys(AUDACITY_LABELS).length) await showSaveDialog();
                 else if (currentFile) analyseLink.click()
+        }
+    },
+    KeyE: function (e) {
+        if (e.ctrlKey) sendFile('save');
+    },
+    KeyO: async function (e) {
+        if (e.ctrlKey) await showOpenDialog();
+    },
+    KeyP: function () {
+        (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
+    },
+    KeyS: function (e) {
+        if (Object.keys(AUDACITY_LABELS).length) {
+            if (e.ctrlKey) worker.postMessage({action: 'save2db'});
         }
     },
     Escape: function () {
@@ -1874,9 +1877,6 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
                 postBufferUpdate({begin: bufferBegin, position: position})
             }
         }
-    },
-    KeyP: function () {
-        (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
     },
     Equal: function (e) {
         if (e.shiftKey) {
@@ -1945,7 +1945,9 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         } else {
             zoomSpec('zoomOut')
         }
-
+    },
+    Space: function () {
+        if (wavesurfer) wavesurfer.playPause();
     },
     Tab: function (e) {
         if (activeRow) {
