@@ -328,84 +328,19 @@ class Model {
 
         let newPrediction = this.checkAddContext(prediction, tb, confidence, threshold);
         tb.dispose();
-        const {indices, values} = newPrediction ? newPrediction.topk(3) : prediction.topk(3);
-        if (newPrediction) newPrediction.dispose();
-        prediction.dispose();
+        const finalPrediction = newPrediction || prediction;
+        const array_of_predictions = finalPrediction.arraySync()
+        finalPrediction.dispose();
 
         if (maskedKeysTensor) {
             keys = maskedKeysTensor.dataSync()
             maskedKeysTensor.dispose();
         }
-
-        const top3 = indices.arraySync();
-        const top3scores = values.arraySync();
-        indices.dispose();
-        values.dispose()
-
-        const batch = {};
-        for (let i = 0; i < keys.length; i++) {
-            batch[keys[i]] = ({index: top3[i], score: top3scores[i], end: keys[i] + this.chunkLength});
-        }
-        // Try this method of adjusting results
-        for (let [key, item] of Object.entries(batch)) {
-            // turn the key back to a number and convert from samples to seconds:
-            key = parseInt(key) / this.config.sampleRate;
-            const end = item.end / this.config.sampleRate;
-            for (let i = 0; i < item.index.length; i++) {
-                if (SUPPRESSED_IDS.includes(item.index[i])) {
-                    item.score[i] = item.score[i] ** 3;
-                } else if (ENHANCED_IDS.includes(item.index[i])) {
-                    item.score[i] = Math.pow(item.score[i], 0.5);
-                }
-            }
-
-            // If using the whitelist, we want to promote allowed IDs above any blocked IDs, so they will be visible
-            // if they meet the confidence threshold.
-            let count = 0;
-            while (BLOCKED_IDS.indexOf(item.index[0]) !== -1 && count !== item.index.length) {
-                // If and while the first result is blocked, move it to the end
-                count++;
-                item.index.push(item.index.shift());
-                // And do the same for the score
-                item.score.push(item.score.shift());
-            }
-            let suppressed = count === item.index.length;
-
-            result = ({
-                file: file,
-                start: key,
-                end: end,
-                timestamp: key * 1000 + fileStart,
-                position: key,
-                id_1: item.index[0],
-                id_2: item.index[1],
-                id_3: item.index[2],
-                sname: this.labels[item.index[0]].split('_')[0],
-                cname: this.labels[item.index[0]].split('_')[1],
-                score: Math.round(item.score[0] * 1000) / 1000,
-                sname2: this.labels[item.index[1]].split('_')[0],
-                cname2: this.labels[item.index[1]].split('_')[1],
-                score2: Math.round(item.score[1] * 1000) / 1000,
-                sname3: this.labels[item.index[2]].split('_')[0],
-                cname3: this.labels[item.index[2]].split('_')[1],
-                score3: Math.round(item.score[2] * 1000) / 1000,
-                suppressed: suppressed
-            });
-            audacity = ({
-                timestamp: key + '\t' + end,
-                cname: this.labels[item.index[0]].split('_')[1],
-                score: Math.round(item.score[0] * 1000) / 1000,
-            })
-            if (DEBUG) {//prepare summary
-                let hour = Math.floor(key / 3600), minute = Math.floor(key % 3600 / 60),
-                    second = Math.floor(key % 3600 % 60)
-                console.log(file, `${hour}:${minute}:${second}`, item.index[0], this.labels[item.index[0]], Math.round(item.score[0] * 1000) / 1000, item.index[1], this.labels[item.index[1]], Math.round(item.score[1] * 1000) / 1000, item.index[2], this.labels[item.index[2]], Math.round(item.score[2] * 1000) / 1000);
-            }
-            batched_results.push([result, audacity]);
-        }
-        //this.clearTensorArray(goodTensors);
-        // console.log('predictBatch end', tf.memory().numTensors)
-        return batched_results
+        const keyed_predictions = keys.reduce((acc, key, index) => {
+            acc[key] = array_of_predictions[index];
+            return acc;
+        } , {});
+        return keyed_predictions
     }
 
     compute_spectrogram(chunk, h, w) {

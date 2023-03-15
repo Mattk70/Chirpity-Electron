@@ -85,23 +85,9 @@ const createDB = async (file) => {
     const db = archiveMode ? diskDB : memoryDB;
     await db.runAsync('BEGIN');
     await db.runAsync('CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT, cname TEXT)');
+    await db.runAsync('CREATE TABLE records(dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence REAL, label  TEXT, comment  TEXT)');
     await db.runAsync('CREATE TABLE files(name TEXT,duration  REAL,filestart INTEGER, UNIQUE (name))');
     await db.runAsync('CREATE TABLE duration(day INTEGER, duration INTEGER, fileID INTEGER,UNIQUE (day, fileID))');
-    await db.runAsync(`CREATE TABLE records
-                       (
-                           dateTime INTEGER,
-                           birdID1  INTEGER,
-                           birdID2  INTEGER,
-                           birdID3  INTEGER,
-                           conf1    REAL,
-                           conf2    REAL,
-                           conf3    REAL,
-                           fileID   INTEGER,
-                           position INTEGER,
-                           label    TEXT,
-                           comment  TEXT,
-                           UNIQUE (dateTime, fileID)
-                       )`);
     if (archiveMode) {
         for (let i = 0; i < LABELS.length; i++) {
             const [sname, cname] = LABELS[i].replaceAll("'", "''").split('_');
@@ -767,8 +753,6 @@ const getPredictBuffers = async ({
         if (offlineCtx) {
             offlineCtx.startRendering().then((resampled) => {
                 const myArray = resampled.getChannelData(0);
-                const samples = parseInt(((end - start) * sampleRate).toFixed(0));
-                const increment = samples < chunkLength ? samples : chunkLength;
                 if (++workerInstance === NUM_WORKERS) {
                     workerInstance = 0;
                 }
@@ -1074,76 +1058,89 @@ const terminateWorkers = () => {
     predictWorkers = [];
 }
 
+const insertRecord = async (key, speciesID, confidence, file) => {
+    let changes, fileID;
+    const fileSQL = prepSQL(file);
+    const db = STATE.db;
+    let res = await db.getAsync(`SELECT rowid
+                                 FROM files
+                                 WHERE name = '${fileSQL}'`);
+    if (!res) {
+        res = await db.runAsync(`INSERT
+        OR IGNORE INTO files VALUES ( '${fileSQL}',
+        ${metadata[file].duration},
+        ${metadata[file].fileStart}
+        )`);
+        fileID = res.lastID;
+        changes = 1;
+    } else {
+        fileID = res.rowid;
+    }
+    if (changes) {
+        const durationSQL = Object.entries(metadata[file].dateDuration)
+            .map(entry => `(${entry.toString()},${fileID})`).join(',');
+        // No "OR IGNORE" in this statement because it should only run when the file is new
+        await db.runAsync(`INSERT
+        OR IGNORE INTO duration
+                               VALUES
+        ${durationSQL}`);
+    }
+    await db.runAsync(`INSERT
+    OR REPLACE INTO records 
+                VALUES (
+    ${metadata[file].fileStart + key},
+    ${key},
+    ${fileID},
+    ${speciesID},
+    ${confidence},
+    null,
+    null
+    )`);
+}
+
+
 const parsePredictions = async (response) => {
     let file = response.file, batchInProgress = false;
-    const latestResult = response.result, fileSQL = prepSQL(file), db = STATE.db;
-    if (latestResult.length) {
-        for (let i = 0; i < latestResult.length; i++) {
-            const prediction = latestResult[i];
-            const result = prediction[0];
-            // Only send live results matching minConfidence
-            if (!prediction[0].suppressed && prediction[0].score > minConfidence) {
-
-                const audacity = prediction[1];
-                if (!STATE.selection.start) {
-                    index++;
-                    UI.postMessage({
-                        event: 'prediction-ongoing',
-                        file: file,
-                        result: result,
-                        index: index,
-                        selection: STATE.selection
-                    });
-                    AUDACITY[file] ? AUDACITY[file].push(audacity) : AUDACITY[file] = [audacity];
+    const latestResult = response.result, db = STATE.db;
+    for (let [key, predictions] of Object.entries(latestResult)) {
+        let updateUI = false, resultsToSend = [];
+        for (let id = 0; id < predictions.length; id++) {
+            if (predictions[id] > 0) {
+                const speciesID = id + 1;
+                const confidence = predictions[id];
+                if (confidence > minConfidence) {
+                    updateUI = true;
+                    resultsToSend.push({id: speciesID, confidence: confidence})
                 }
+                key = parseInt(key);
+                //save all results to  db, regardless of minConfidence
+                await insertRecord(key, speciesID, confidence, file)
             }
-            //save all results to  db, regardless of minConfidence
-            let changes, rowid;
-            let res = await db.getAsync(`SELECT rowid
-                                         FROM files
-                                         WHERE name = '${fileSQL}'`);
-            if (!res) {
-                res = await db.runAsync(`INSERT
-                OR IGNORE INTO files VALUES ( '${fileSQL}',
-                ${metadata[file].duration},
-                ${response['fileStart']}
-                )`);
-                rowid = res.lastID;
-                changes = 1;
-            } else {
-                rowid = res.rowid;
-            }
-            if (changes) {
-                const durationSQL = Object.entries(metadata[file].dateDuration)
-                    .map(entry => `(${entry.toString()},${rowid})`).join(',');
-                // No "OR IGNORE" in this statement because it should only run when the file is new
-                await db.runAsync(`INSERT
-                OR IGNORE INTO duration
-                               VALUES
-                ${durationSQL}`);
-            }
-            await db.runAsync(`INSERT
-            OR REPLACE INTO records 
-                VALUES (
-            ${result.timestamp},
-            ${result.id_1},
-            ${result.id_2},
-            ${result.id_3},
-            ${result.score || 0},
-            ${result.score2 || 0},
-            ${result.score3 || 0},
-            ${rowid},
-            ${result.position},
-            null,
-            null
-            )`);
+        }
+        if (updateUI && !STATE.selection.start) {
+            index++;
+            const start = key / 1000;
+            resultsToSend.forEach(result =>{
+                //console.log(result);
+                //query the db for sname,  cname
+            })
+            const result = {start: start, end: start + WINDOW_SIZE, timestamp: metadata[file].fileStart + key, position: key / 1000, cname: 'test', sname: 'more test', score: 0.7 }
+            UI.postMessage({
+                event: 'prediction-ongoing',
+                file: file,
+                result: result,
+                index: index,
+                selection: STATE.selection
+            });
         }
     }
+
     predictionsReceived++;
     const progress = predictionsReceived / batchChunksToSend;
     UI.postMessage({event: 'progress', progress: progress, file: file});
     if (progress === 1) {
         COMPLETED.push(file);
+        let fileSQL = prepSQL(file)
         const row = await db.getAsync(`SELECT rowid
                                        FROM files
                                        WHERE name = '${fileSQL}'`);
@@ -1163,7 +1160,8 @@ const parsePredictions = async (response) => {
         batchInProgress = FILE_QUEUE.length;
         predictionDone = true;
     } else {
-        await getSummary({interim: true, files: []});
+      // ############# Fix this
+        //  await getSummary({interim: true, files: []});
     }
     return [file, batchInProgress]
 }
