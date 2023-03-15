@@ -293,8 +293,9 @@ ipcRenderer.on('new-client', (event) => {
                 await getSummary(args);
                 break;
             case 'analyse':
-                // Create a new memory db unless we're looking at a selection
-                if (!args.end) await createDB();
+                // Create a new memory db if one doesn't exist, or wipe it if one does,
+                // unless we're looking at a selection
+                if (!memoryDB || !args.end) await createDB();
                 predictionsReceived = 0;
                 predictionsRequested = 0;
                 await onAnalyse(args);
