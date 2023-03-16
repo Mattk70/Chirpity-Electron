@@ -527,24 +527,35 @@ input[type="range"].vertical {
 /* Animate Ellipsis */
 
 .loading:after {
-  overflow: hidden;
-  display: inline-block;
-  vertical-align: bottom;
-  -webkit-animation: ellipsis steps(4, end) 1500ms infinite;
-  animation: ellipsis steps(4, end) 1500ms infinite;
-  content: "\2026";
-  /* ascii code for the ellipsis character */
-  width: 0px;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: bottom;
+    -webkit-animation: ellipsis steps(4, end) 1500ms infinite;
+    animation: ellipsis steps(4, end) 1500ms infinite;
+    content: "\2026";
+    /* ascii code for the ellipsis character */
+    width: 0px;
 }
 
 @keyframes ellipsis {
-  to {
-    width: 15px;
-  }
+    to {
+        width: 15px;
+    }
 }
 
 @-webkit-keyframes ellipsis {
-  to {
-    width: 15px;
-  }
+    to {
+        width: 15px;
+    }
+}
+
+.circle {
+    display: inline-block;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background-color: gray;
+    color: white;
+    text-align: center;
+    line-height: 22px
 }

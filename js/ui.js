@@ -2251,27 +2251,32 @@ pagination.forEach(item => {
 })
 
 const addPagination = (total, offset) => {
-    const limit = config.limit;
-    const pages = Math.ceil(total / limit);
-    const currentPage = (offset / limit) + 1;
-    let list = '';
-    for (let i = 1; i <= pages; i++) {
-        if (i === 1) {
-            list += i === currentPage ? '<li class="page-item disabled"><span class="page-link" href="#">Previous</span></li>'
-                : '<li class="page-item"><a class="page-link" href="#">Previous</a></li>';
-        }
-        list += i === currentPage ? '<li class="page-item active" aria-current="page"><span class="page-link" href="#">' + i + '</span></li>' :
-            '<li class="page-item"><a class="page-link" href="#">' + i + '</a></li>';
-        if (i === pages) {
-            list += i === currentPage ? '<li class="page-item disabled"><span class="page-link" href="#">Next</span></li>'
-                : '<li class="page-item"><a class="page-link" href="#">Next</a></li>';
-        }
+  const limit = config.limit;
+  const pages = Math.ceil(total / limit);
+  const currentPage = (offset / limit) + 1;
+  let list = '';
+  for (let i = 1; i <= pages; i++) {
+    if (i === 1) {
+      list += i === currentPage ? '<li class="page-item disabled"><span class="page-link" href="#">Previous</span></li>'
+          : '<li class="page-item"><a class="page-link" href="#">Previous</a></li>';
     }
-    pagination.forEach(item => {
-        item.classList.remove('d-none');
-        item.innerHTML = list;
-    })
+    if (i <= 2 || i > pages - 2 || (i >= currentPage - 2 && i <= currentPage + 2)) {
+      list += i === currentPage ? '<li class="page-item active" aria-current="page"><span class="page-link" href="#">' + i + '</span></li>' :
+          '<li class="page-item"><a class="page-link" href="#">' + i + '</a></li>';
+    } else if (i === 3 || i === pages - 3) {
+      list += '<li class="page-item disabled"><span class="page-link" href="#">...</span></li>';
+    }
+    if (i === pages) {
+      list += i === currentPage ? '<li class="page-item disabled"><span class="page-link" href="#">Next</span></li>'
+          : '<li class="page-item"><a class="page-link" href="#">Next</a></li>';
+    }
+  }
+  pagination.forEach(item => {
+    item.classList.remove('d-none');
+    item.innerHTML = list;
+  })
 }
+
 
 
 function setFilter() {
@@ -2381,12 +2386,14 @@ async function renderResult({
         const showTimeOfDay = config.timeOfDay ? '' : 'd-none';
         const activeTable = active ? 'table-active' : '';
         const labelHTML = label ? tags[label] : tags['Remove Label'];
+        const countIcon = count > 1 ? `<span class="circle">${count}</span>` : '';
+
         tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${position + 3}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
             <th scope='row'>${index}</th>
             <td class='text-start text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
-            <td class="text-end">${UI_position} ${count > 1 ? count : ''}</td>
+            <td class="text-end">${UI_position} </td>
             <td name="${cname}" class='text-start cname'>
-            ${cname} ${iconizeScore(score)}
+            ${cname} ${countIcon} ${iconizeScore(score)}
              </td>
             <td><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
             <td><a href='https://xeno-canto.org/explore?query=${sname}%20type:"nocturnal flight call"' target="xc">
@@ -2672,6 +2679,7 @@ const iconDict = {
     high: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #198754">--%</span></span>',
     confirmed: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: 100%; background: #198754"><span class="material-icons-two-tone">done</span></span></span>',
 }
+
 
 const iconizeScore = (score) => {
    const tooltip = score.toString();
