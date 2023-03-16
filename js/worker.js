@@ -85,7 +85,7 @@ const createDB = async (file) => {
     const db = archiveMode ? diskDB : memoryDB;
     await db.runAsync('BEGIN');
     await db.runAsync('CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT, cname TEXT)');
-    await db.runAsync('CREATE TABLE records(dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence REAL, label  TEXT, comment  TEXT)');
+    await db.runAsync('CREATE TABLE records(dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT, comment  TEXT)');
     await db.runAsync('CREATE TABLE files(name TEXT,duration  REAL,filestart INTEGER, UNIQUE (name))');
     await db.runAsync('CREATE TABLE duration(day INTEGER, duration INTEGER, fileID INTEGER,UNIQUE (day, fileID))');
     if (archiveMode) {
@@ -1060,6 +1060,7 @@ const terminateWorkers = () => {
 
 const insertRecord = async (key, speciesID, confidence, file) => {
     let changes, fileID;
+    confidence = Math.round(confidence * 100);
     const fileSQL = prepSQL(file);
     const db = STATE.db;
     let res = await db.getAsync(`SELECT rowid
@@ -1106,25 +1107,46 @@ const parsePredictions = async (response) => {
         let updateUI = false, resultsToSend = [];
         for (let id = 0; id < predictions.length; id++) {
             if (predictions[id] > 0) {
-                const speciesID = id + 1;
+                const speciesID = id;
                 const confidence = predictions[id];
-                if (confidence > minConfidence) {
+                if (confidence > minConfidence && STATE.blocked.indexOf(speciesID) === -1) {
                     updateUI = true;
                     resultsToSend.push({id: speciesID, confidence: confidence})
                 }
                 key = parseInt(key);
                 //save all results to  db, regardless of minConfidence
+
                 await insertRecord(key, speciesID, confidence, file)
             }
         }
         if (updateUI && !STATE.selection.start) {
+            const timestamp = metadata[file].fileStart + key;
             index++;
             const start = key / 1000;
-            resultsToSend.forEach(result =>{
-                //console.log(result);
-                //query the db for sname,  cname
-            })
-            const result = {start: start, end: start + WINDOW_SIZE, timestamp: metadata[file].fileStart + key, position: key / 1000, cname: 'test', sname: 'more test', score: 0.7 }
+            //console.log(result);
+            //query the db for sname,  cname
+            const species = await db.allAsync(`SELECT species.cname, species.sname, records.confidence
+                                         FROM species
+                                                  INNER JOIN records ON species.id = records.speciesID
+                                         WHERE records.dateTime = ${timestamp}
+                                         ORDER BY records.confidence DESC`)
+
+            const result = {
+                start: start,
+                end: start + WINDOW_SIZE,
+                timestamp: timestamp,
+                position: key / 1000,
+                cname: species[0].cname,
+                sname: species[0].sname,
+                score: species[0].confidence,
+                cname2: species[1]?.cname,
+                sname2: species[1]?.sname,
+                score2: species[1]?.confidence,
+                cname3: species[2]?.cname,
+                sname3: species[2]?.sname,
+                score3: species[2]?.confidence,
+
+            }
             UI.postMessage({
                 event: 'prediction-ongoing',
                 file: file,
@@ -1160,7 +1182,7 @@ const parsePredictions = async (response) => {
         batchInProgress = FILE_QUEUE.length;
         predictionDone = true;
     } else {
-      // ############# Fix this
+        // ############# Fix this
         //  await getSummary({interim: true, files: []});
     }
     return [file, batchInProgress]
@@ -1311,10 +1333,10 @@ async function setStartEnd(file) {
 
 
 const setWhereWhen = ({dateRange, species, files, context}) => {
-    let where = `WHERE conf1 >= ${minConfidence}`;
+    let where = `WHERE confidence >= ${minConfidence}`;
     if (!STATE.selection && STATE.blocked.length) {
         const blocked = STATE.blocked
-        where += ` AND  birdID1 NOT IN (${blocked.toString()})`
+        where += ` AND  speciesID NOT IN (${blocked})`
     }
     if (files.length) {
         where += ' AND files.name IN  (';
@@ -1350,10 +1372,10 @@ const getSummary = async ({
         dateRange: range, species: explore ? species : undefined, files: files, context: 'summary'
     });
     const summary = await db.allAsync(`
-        SELECT MAX(conf1) as max, cname, sname, COUNT(cname) as count
+        SELECT MAX(confidence) as max, cname, sname, COUNT(cname) as count
         FROM records
             INNER JOIN species
-        ON species.id = birdid1
+        ON species.id = speciesID
             INNER JOIN files ON fileID = files.rowid
             ${where} ${when}
         GROUP BY cname
@@ -1367,7 +1389,7 @@ const getSummary = async ({
         const res = await db.getAsync(`SELECT COUNT(*) AS total
                                        FROM records
                                                 INNER JOIN species
-                                                           ON species.id = birdid1
+                                                           ON species.id = speciesID
                                                 INNER JOIN files ON fileID = files.rowid
                                            ${where} ${when}`);
         total = res.total;

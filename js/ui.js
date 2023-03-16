@@ -2681,12 +2681,11 @@ const iconDict = {
 }
 
 const iconizeScore = (score) => {
-    score = parseFloat(score);
-    const tooltip = (score * 100).toFixed(0).toString();
-    if (score < 0.5) return iconDict['guess'].replaceAll('--', tooltip);
-    else if (score < 0.65) return iconDict['low'].replaceAll('--', tooltip);
-    else if (score < 0.85) return iconDict['medium'].replaceAll('--', tooltip);
-    else if (score <= 1.0) return iconDict['high'].replaceAll('--', tooltip);
+   const tooltip = score.toString();
+    if (score < 50) return iconDict['guess'].replaceAll('--', tooltip);
+    else if (score < 65) return iconDict['low'].replaceAll('--', tooltip);
+    else if (score < 85) return iconDict['medium'].replaceAll('--', tooltip);
+    else if (score <= 100) return iconDict['high'].replaceAll('--', tooltip);
     else return iconDict['confirmed']
 }
 
