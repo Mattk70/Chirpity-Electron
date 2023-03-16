@@ -1122,7 +1122,7 @@ const parsePredictions = async (response) => {
         if (updateUI && !STATE.selection.start) {
             const timestamp = metadata[file].fileStart + key;
             index++;
-            const start = key / 1000;
+            const start = key;
             //console.log(result);
             //query the db for sname,  cname
             const species = await db.allAsync(`SELECT species.cname, species.sname, records.confidence
@@ -1133,9 +1133,9 @@ const parsePredictions = async (response) => {
 
             const result = {
                 start: start,
-                end: start + WINDOW_SIZE,
+                end: start + WINDOW_SIZE * 1000,
                 timestamp: timestamp,
-                position: key / 1000,
+                position: key,
                 cname: species[0].cname,
                 sname: species[0].sname,
                 score: species[0].confidence,
@@ -1350,8 +1350,8 @@ const setWhereWhen = ({dateRange, species, files, context}) => {
         where += ')';
     }
 
-    const cname = context === 'summary' ? 'cname' : 's1.cname';
-    if (species) where += ` AND ${cname} =  '${prepSQL(species)}'`;
+    //const cname = context === 'summary' ? 'cname' : 's1.cname';
+    if (species) where += ` AND cname =  '${prepSQL(species)}'`;
     const when = dateRange && dateRange.start ? ` AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
     return [where, when]
 }
@@ -1437,7 +1437,7 @@ const getSummary = async ({
 const getResults = async ({
                               db = STATE.db,
                               range = undefined,
-                              order = 'timestamp',
+                              order = 'dateTime',
                               files = [],
                               species = undefined,
                               context = 'results',
@@ -1794,7 +1794,7 @@ async function onUpdateRecord({
                                   isBatch = false,
                                   from = '',
                                   what = 'birdID1',
-                                  order = 'timestamp',
+                                  order = 'dateTime',
                                   isFiltered = false,
                                   isExplore = false,
                                   context = 'results',
@@ -1945,7 +1945,20 @@ async function onChartRequest(args) {
     })
 }
 
-const db2ResultSQL = 'SELECT dateTime AS timestamp, position AS position, s1.cname as cname, s2.cname as cname2, s3.cname as cname3, birdid1 as id_1, birdid2 as id_2, birdid3 as id_3, position as start, position + 3 as end, conf1 as score, conf2 as score2, conf3 as score3,s1.sname as sname, s2.sname as sname2, s3.sname as sname3,files.duration, files.name as file, comment, label FROM records LEFT JOIN species s1 on s1.id = birdid1 LEFT JOIN species s2 on s2.id = birdid2 LEFT JOIN species s3 on s3.id = birdid3 INNER JOIN files on files.rowid = records.fileid';
+//const db2ResultSQL = 'SELECT dateTime AS timestamp, position AS position, s1.cname as cname, s2.cname as cname2, s3.cname as cname3, birdid1 as id_1, birdid2 as id_2, birdid3 as id_3, position as start, position + 3 as end, conf1 as score, conf2 as score2, conf3 as score3,s1.sname as sname, s2.sname as sname2, s3.sname as sname3,files.duration, files.name as file, comment, label FROM records LEFT JOIN species s1 on s1.id = birdid1 LEFT JOIN species s2 on s2.id = birdid2 LEFT JOIN species s3 on s3.id = birdid3 INNER JOIN files on files.rowid = records.fileid';
+const db2ResultSQL = `SELECT DISTINCT 
+  records.dateTime AS timestamp, 
+  files.duration, 
+  files.name, 
+  records.position,
+  species.sname, 
+  species.cname, 
+  records.confidence AS score, 
+  records.label, 
+  records.comment
+FROM records
+INNER JOIN species ON records.speciesID = species.id
+INNER JOIN files ON records.fileID = files.rowid`;
 
 /*
 todo: bugs
