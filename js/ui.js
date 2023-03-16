@@ -986,7 +986,7 @@ window.onload = async () => {
     const defaultConfig = {
         UUID: uuidv4(),
         colormap: 'inferno',
-        minConfidence: 0.45,
+        minConfidence: 45,
         timeOfDay: false,
         list: 'migrants',
         model: 'efficientnet',
@@ -1048,9 +1048,9 @@ window.onload = async () => {
             console.log('nocmig mode is ' + config.nocmig)
             nocmigButton.innerText = config.nocmig ? 'bedtime' : 'bedtime_off';
             nocmigButton.title = config.nocmig ? 'Nocmig mode on' : 'Nocmig mode off';
-            thresholdLink.value = config.minConfidence * 100;
-            thresholdDisplay.innerHTML = `<b>${config.minConfidence * 100}%</b>`;
-            confidenceSlider.value = config.minConfidence * 100;
+            thresholdLink.value = config.minConfidence;
+            thresholdDisplay.innerHTML = `<b>${config.minConfidence}%</b>`;
+            confidenceSlider.value = config.minConfidence;
             SNRSlider.value = config.snr;
             SNRThreshold.innerText = config.snr;
             SNRSlider.disabled = config.backend === 'webgl';
@@ -2335,23 +2335,18 @@ async function renderResult({
     }
     if (typeof (result) === 'string') {
         const nocturnal = config.nocmig ? '<b>during the night</b>' : '';
-        tr += `<tr><th scope='row'>${index}</th><td colspan="8">${result} (Predicting ${config.list} ${nocturnal} with at least ${config.minConfidence * 100}% confidence in the prediction)</td></tr>`;
+        tr += `<tr><th scope='row'>${index}</th><td colspan="8">${result} (Predicting ${config.list} ${nocturnal} with at least ${config.minConfidence}% confidence in the prediction)</td></tr>`;
     } else {
         const {
-            start,
-            end,
             timestamp,
             position,
             active,
             sname,
             cname,
-            cname2,
-            cname3,
             score,
-            score2,
-            score3,
             label,
-            comment
+            comment,
+            count
         } = result;
         const dayNight = checkDayNight(timestamp);
         if (dayNight === 'nighttime') seenTheDarkness = true;
@@ -2372,7 +2367,7 @@ async function renderResult({
         const commentHTML = comment ?
             `<span title="${comment}" class='material-icons-two-tone pointer edit-comment'>comment</span>` :
             "<span title='Add a comment' class='material-icons-two-tone pointer invisible add-comment'>add_comment</span>";
-        const isUncertain = score < 0.65 ? '&#63;' : '';
+        const isUncertain = score < 65 ? '&#63;' : '';
         // result.filename  and result.date used for feedback
         result.date = timestamp;
         result.filename = cname.replace(/'/g, "\\'") + ' ' + timestamp + '.mp3';
@@ -2382,19 +2377,17 @@ async function renderResult({
         const tsArray = new Date(timestamp).toString().split(' ');
         const UI_timestamp = `${tsArray[2]} ${tsArray[1]} ${tsArray[3].substring(2)}<br/>${tsArray[4]}`;
         const spliceStart = position < 3600 ? 14 : 11;
-        const UI_position = new Date(position).toISOString().substring(spliceStart, 19);
+        const UI_position = new Date(position * 1000).toISOString().substring(spliceStart, 19);
         const showTimeOfDay = config.timeOfDay ? '' : 'd-none';
         const activeTable = active ? 'table-active' : '';
         const labelHTML = label ? tags[label] : tags['Remove Label'];
-        tr += `<tr tabindex="-1" id="result${index}" name="${file}|${start}|${end}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
+        tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${position + 3}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
             <th scope='row'>${index}</th>
             <td class='text-start text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
-            <td class="text-end">${UI_position}</td>
-            <td name="${cname}" class='text-start cname'><ul>
-                    <li>${cname} ${iconizeScore(score)}
-                    ${score2 > config.minConfidence ? `<li> ${cname2} ${iconizeScore(score2)}`: ' '}
-                    ${score3 > config.minConfidence ? `<li> ${cname3} ${iconizeScore(score3)}`: ' '}
-                </ul></td>
+            <td class="text-end">${UI_position} ${count > 1 ? count : ''}</td>
+            <td name="${cname}" class='text-start cname'>
+            ${cname} ${iconizeScore(score)}
+             </td>
             <td><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
             <td><a href='https://xeno-canto.org/explore?query=${sname}%20type:"nocturnal flight call"' target="xc">
                 <img src='img/logo/XC.png' alt='Search ${cname} on Xeno Canto' title='${cname} NFCs on Xeno Canto'></a></td>
@@ -3048,7 +3041,7 @@ const handleThresholdChange = (e) => {
     if (e.code && e.code !== 'Enter') return
     const threshold = e.target.value;
     if (100 >= threshold && threshold >= 0) {
-        config.minConfidence = parseFloat(e.target.value) / 100;
+        config.minConfidence = parseInt(e.target.value);
         thresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
         confidenceSlider.value = e.target.value;
         updatePrefs();
@@ -3058,7 +3051,7 @@ const handleThresholdChange = (e) => {
         });
         if (!PREDICTING && !resultTableElement[0].hidden) setFilter();
     } else {
-        e.target.value = config.minConfidence * 100;
+        e.target.value = config.minConfidence;
     }
 }
 thresholdLink.addEventListener('blur', handleThresholdChange);

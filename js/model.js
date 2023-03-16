@@ -63,7 +63,7 @@ onmessage = async (e) => {
             case 'predict':
                 //const t0 = performance.now();
                 const {chunks, start, fileStart, file, snr, minConfidence, finalChunk} = e.data;
-                const result = await myModel.predictChunk(chunks, start, fileStart, file, snr, minConfidence);
+                const result = await myModel.predictChunk(chunks, start, fileStart, file, snr, minConfidence / 100);
                 response = {
                     message: 'prediction',
                     file: file,
@@ -268,7 +268,7 @@ class Model {
                 lshiftPrediction.dispose();
                 rshiftPrediction.dispose();
                 // Mask out where these are below the threshold
-                const indices = tf.greater(surround, confidence);
+                const indices = tf.greater(surround, confidence / 2);
                 return prediction.where(indices, 0);
             })
         } else {
@@ -338,7 +338,7 @@ class Model {
         }
         const keyed_predictions = keys.reduce((acc, key, index) => {
             // convert key (samples) to milliseconds
-            const position = (key * 1000) / CONFIG.sampleRate;
+            const position = key / CONFIG.sampleRate;
             acc[position] = array_of_predictions[index];
             return acc;
         } , {});
