@@ -1,6 +1,6 @@
 {
   "name": "Chirpity",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
