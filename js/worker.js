@@ -1462,11 +1462,17 @@ const getResults = async ({
     AUDACITY = {};
     return new Promise(function (resolve, reject) {
         // db.each doesn't call the callback if there are no results, so:
-        db.each(`${db2ResultSQL} ${where} ${when} GROUP BY r1.datetime ORDER BY r2.${order}, r2.confidence  DESC  LIMIT ${limit} OFFSET ${offset}`, (err, result) => {
+        db.each(`${db2ResultSQL} ${where} ${when} GROUP BY r2.datetime, r2.speciesID ORDER BY r2.${order}, r2.confidence  DESC  LIMIT ${limit} OFFSET ${offset}`, async (err, result) => {
             if (err) {
                 reject(err)
             } else { // on each result
                 index++;
+                if (species) {
+                    const {count} = await db.getAsync(`SELECT count(*)  as count
+                        FROM records WHERE datetime = ${result.timestamp} 
+                        AND confidence >= ${minConfidence}`)
+                    result.count = count;
+                }
                 UI.postMessage({
                     event: 'prediction-ongoing',
                     file: result.file,
@@ -1947,16 +1953,9 @@ const db2ResultSQL = `SELECT DISTINCT r2.dateTime AS timestamp,
   species.cname, 
   r2.confidence AS score, 
   r2.label, 
-  r2.comment,
-  COUNT (*) as count FROM (
-          SELECT  
-            records.datetime
-          FROM records
-          WHERE  records.confidence > ${minConfidence || 45}
-        )  r1
-          INNER JOIN records r2 ON r1.datetime = r2.datetime 
-          INNER JOIN species
-            ON r2.speciesID = species.id
+  r2.comment
+FROM species
+          INNER JOIN records r2 ON species.id = r2.speciesID 
           INNER JOIN files ON r2.fileID = files.rowid`;
 
 
