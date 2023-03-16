@@ -8,7 +8,7 @@ const STATE = {
     },
     explore: {
         species: undefined,
-        order: 'timestamp',
+        order: 'dateTime',
         range: {start: undefined, end: undefined}
     },
     birdList: {lastSelectedSpecies: undefined},
@@ -2382,7 +2382,7 @@ async function renderResult({
         const tsArray = new Date(timestamp).toString().split(' ');
         const UI_timestamp = `${tsArray[2]} ${tsArray[1]} ${tsArray[3].substring(2)}<br/>${tsArray[4]}`;
         const spliceStart = position < 3600 ? 14 : 11;
-        const UI_position = new Date(position * 1000).toISOString().substring(spliceStart, 19);
+        const UI_position = new Date(position).toISOString().substring(spliceStart, 19);
         const showTimeOfDay = config.timeOfDay ? '' : 'd-none';
         const activeTable = active ? 'table-active' : '';
         const labelHTML = label ? tags[label] : tags['Remove Label'];
@@ -2805,7 +2805,7 @@ speciesSort.addEventListener('click', () => {
 const timeSort = document.getElementById('time-sort');
 timeSort.addEventListener('click', () => {
     if (isExplore()) {
-        postExploreMessage('timestamp')
+        postExploreMessage('dateTime')
     }
 });
 

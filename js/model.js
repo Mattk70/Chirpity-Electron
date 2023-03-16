@@ -337,7 +337,9 @@ class Model {
             maskedKeysTensor.dispose();
         }
         const keyed_predictions = keys.reduce((acc, key, index) => {
-            acc[key] = array_of_predictions[index];
+            // convert key (samples) to milliseconds
+            const position = (key * 1000) / CONFIG.sampleRate;
+            acc[position] = array_of_predictions[index];
             return acc;
         } , {});
         return keyed_predictions
