@@ -13,7 +13,8 @@ const {stat} = require("fs/promises");
 let WINDOW_SIZE = 3;
 let NUM_WORKERS;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend;
-const DEBUG = true;
+let SEEN_LIST_UPDATE = false
+const DEBUG = false;
 const adding_chirpity_additions = true;
 const dataset_database = true;
 
@@ -251,6 +252,7 @@ ipcRenderer.on('new-client', (event) => {
                 spawnWorkers(args.model, args.list, BATCH_SIZE, args.threads);
                 break;
             case 'update-list':
+                SEEN_LIST_UPDATE = false;
                 predictWorkers.forEach(worker =>
                     worker.postMessage({message: 'list', list: args.list}))
                 break;
@@ -1131,7 +1133,7 @@ const parsePredictions = async (response) => {
                                                             INNER JOIN records ON species.id = records.speciesID
                                                    WHERE records.dateTime = ${timestamp}
                                                      AND confidence > ${minConfidence}
-                                                   AND speciesID NOT IN (${STATE.blocked})
+                                                     AND speciesID NOT IN (${STATE.blocked})
                                                    ORDER BY records.confidence DESC`)
             speciesList.forEach(species => {
                 const result = {
@@ -1186,11 +1188,14 @@ async function parseMessage(e) {
     const response = e.data;
     switch (response['message']) {
         case 'update-list':
-            STATE.blocked = response.blocked;
-            STATE.globalOffset = 0;
-            if (response['updateResults'] && STATE.db) {  // update-results called after setting migrants list, so DB may not be initialized
-                await getResults();
-                await getSummary();
+            if (!SEEN_LIST_UPDATE) {
+                SEEN_LIST_UPDATE = true;
+                STATE.blocked = response.blocked;
+                STATE.globalOffset = 0;
+                if (response['updateResults'] && STATE.db) {  // update-results called after setting migrants list, so DB may not be initialized
+                    await getResults();
+                    await getSummary();
+                }
             }
             break;
         case 'model-ready':
@@ -1327,7 +1332,7 @@ async function setStartEnd(file) {
 
 
 const setWhereWhen = ({dateRange, species, files, context}) => {
-    let where = `WHERE r2.confidence >= ${minConfidence}`;
+    let where = `WHERE confidence >= ${minConfidence}`;
     if (!STATE.selection && STATE.blocked.length) {
         const blocked = STATE.blocked
         where += ` AND  speciesID NOT IN (${blocked})`
@@ -1346,7 +1351,7 @@ const setWhereWhen = ({dateRange, species, files, context}) => {
 
     //const cname = context === 'summary' ? 'cname' : 's1.cname';
     if (species) where += ` AND cname =  '${prepSQL(species)}'`;
-    const when = dateRange && dateRange.start ? ` AND r2.datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
+    const when = dateRange && dateRange.start ? ` AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
     return [where, when]
 }
 
@@ -1366,8 +1371,8 @@ const getSummary = async ({
         dateRange: range, species: explore ? species : undefined, files: files, context: 'summary'
     });
     const summary = await db.allAsync(`
-        SELECT MAX(r2.confidence) as max, cname, sname, COUNT(cname) as count
-        FROM records r2
+        SELECT MAX(confidence) as max, cname, sname, COUNT(cname) as count
+        FROM records
             INNER JOIN species
         ON species.id = speciesID
             INNER JOIN files ON fileID = files.rowid
@@ -1381,7 +1386,7 @@ const getSummary = async ({
     let total;
     if (!interim) {
         const res = await db.getAsync(`SELECT COUNT(*) AS total
-                                       FROM records r2
+                                       FROM records
                                                 INNER JOIN species
                                                            ON species.id = speciesID
                                                 INNER JOIN files ON fileID = files.rowid
@@ -1452,64 +1457,61 @@ const getResults = async ({
         if (species) STATE.filteredOffset[species] = offset;
         else STATE.globalOffset = offset;
     }
-
     const [where, when] = setWhereWhen({
         dateRange: range, species: species, files: files, context: context
     });
-
-    // TODO: mixed files: among open files, only some are saved. Merge results??
     let index = offset;
     AUDACITY = {};
-    return new Promise(function (resolve, reject) {
-        // db.each doesn't call the callback if there are no results, so:
-        db.each(`${db2ResultSQL} ${where} ${when} GROUP BY r2.datetime, r2.speciesID ORDER BY r2.${order}, r2.confidence  DESC  LIMIT ${limit} OFFSET ${offset}`, async (err, result) => {
-            if (err) {
-                reject(err)
-            } else { // on each result
-                index++;
-                if (species) {
-                    const {count} = await db.getAsync(`SELECT count(*)  as count
-                        FROM records WHERE datetime = ${result.timestamp} 
-                        AND confidence >= ${minConfidence}`)
-                    result.count = count;
-                }
-                UI.postMessage({
-                    event: 'prediction-ongoing',
-                    file: result.file,
-                    result: result,
-                    index: index,
-                    isFromDB: true,
-                    selection: STATE.selection
-                });
-                // Recreate Audacity labels
-                const file = result.file
-                const audacity = {
-                    timestamp: `${result.start}\t${result.start + WINDOW_SIZE}`,
-                    cname: result.cname,
-                    score: result.score
-                };
-                AUDACITY[file] ? AUDACITY[file].push(audacity) : AUDACITY[file] = [audacity];
-            }
-        }, async (err, count) => {   //on finish
-            if (err) return reject(err);
-            if (!count) { // no results
-                if (context === 'selection') {
-                    // No more detections in the selection
-                    UI.postMessage({event: 'no-detections-remain'});
-                    STATE.selection = undefined
-                } else if (species) { // Remove the species filter
-                    await getResults({
-                        files: files,
-                        range: range,
-                        context: context,
-                        limit: limit,
-                        offset: offset
-                    })
-                }
-            }
-            return resolve(count)
-        })
-    })
+    let t0 = Date.now()
+    const result = await db.allAsync(`${db2ResultSQL} ${where} ${when} ORDER BY ${order} LIMIT ${limit} OFFSET ${offset}`);
+    for (let i = 0; i < result.length; i++) {
+        if (species) {
+            const {count} = await db.getAsync(`SELECT count(*) as count
+                                               FROM records
+                                               WHERE datetime = ${result[i].timestamp}
+                                                 AND confidence >= ${minConfidence}`)
+            result.count = count;
+            sendResult(index++, result[i]);
+        } else {
+            sendResult(index++, result[i])
+        }
+    }
+    console.log("database took", Date.now() - t0, " seconds")
+    if (!result.length) {
+        if (context === 'selection') {
+            // No more detections in the selection
+            UI.postMessage({event: 'no-detections-remain'});
+            STATE.selection = undefined
+        } else if (species) { // Remove the species filter
+            await getResults({
+                files: files,
+                range: range,
+                context: context,
+                limit: limit,
+                offset: offset
+            })
+        }
+    }
+}
+
+const sendResult = (index, result) => {
+    const file = result.file;
+    index++;
+    UI.postMessage({
+        event: 'prediction-ongoing',
+        file: file,
+        result: result,
+        index: index,
+        isFromDB: true,
+        selection: STATE.selection
+    });
+    // Recreate Audacity labels
+    const audacity = {
+        timestamp: `${result.start}\t${result.start + WINDOW_SIZE}`,
+        cname: result.cname,
+        score: result.score
+    };
+    AUDACITY[file] ? AUDACITY[file].push(audacity) : AUDACITY[file] = [audacity];
 }
 
 const isDuplicate = async (file) => {
@@ -1828,7 +1830,7 @@ async function onUpdateRecord({
         // but we need a millisecond integer
         const startMilliseconds = (start * 1000).toFixed(0);
         // Single record
-        whereSQL = `WHERE r2.datetime = (SELECT filestart FROM files WHERE name = '${currentFile}') + ${startMilliseconds}`
+        whereSQL = `WHERE datetime = (SELECT filestart FROM files WHERE name = '${currentFile}') + ${startMilliseconds}`
     }
     const t0 = Date.now();
     const {changes} = await db.runAsync(`UPDATE records
@@ -1945,20 +1947,19 @@ async function onChartRequest(args) {
     })
 }
 
-const db2ResultSQL = `SELECT DISTINCT r2.dateTime AS timestamp, 
+const db2ResultSQL = `SELECT DISTINCT dateTime AS timestamp, 
   files.duration, 
   files.name AS file, 
-  r2.position,
+  position,
   species.sname, 
   species.cname, 
-  r2.confidence AS score, 
-  r2.label, 
-  r2.comment
-FROM species
-          INNER JOIN records r2 ON species.id = r2.speciesID 
-          INNER JOIN files ON r2.fileID = files.rowid`;
-
-
+  confidence AS score, 
+  label, 
+  comment
+                      FROM species
+                          INNER JOIN records
+                      ON species.id = records.speciesID
+                          INNER JOIN files ON records.fileID = files.rowid`;
 
 
 /*
