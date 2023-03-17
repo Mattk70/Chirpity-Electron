@@ -1799,7 +1799,7 @@ document.getElementById('timecode').addEventListener('click', timelineToggle);
 const GLOBAL_ACTIONS = { // eslint-disable-line
     KeyA: async function (e) {
         if (e.ctrlKey) {
-                if (e.shiftKey && Object.keys(AUDACITY_LABELS).length) await showSaveDialog();
+                if (e.shiftKey && AUDACITY_LABELS !== {}) await showSaveDialog();
                 else if (currentFile) analyseLink.click()
         }
     },
@@ -1813,9 +1813,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
     },
     KeyS: function (e) {
-        if (Object.keys(AUDACITY_LABELS).length) {
             if (e.ctrlKey) worker.postMessage({action: 'save2db'});
-        }
     },
     Escape: function () {
         if (PREDICTING) {
@@ -2155,6 +2153,7 @@ async function onPredictionDone({
                                 }) {
 
     AUDACITY_LABELS = audacityLabels;
+    enableMenuItem(['save2db']);
     // Defer further processing until batch complete
     if (batchInProgress) {
         progressDiv.show();
@@ -2178,11 +2177,11 @@ async function onPredictionDone({
 
         //completeDiv.show();
 
-        if (Object.keys(AUDACITY_LABELS).length) {
-            enableMenuItem(['saveLabels', 'save2db']);
+        if (AUDACITY_LABELS !== {}) {
+            enableMenuItem(['saveLabels']);
             $('.download').removeClass('disabled');
         } else {
-            disableMenuItem(['saveLabels', 'save2db']);
+            disableMenuItem(['saveLabels']);
         }
         if (currentFile) enableMenuItem(['analyse', 'reanalyse'])
 
@@ -2194,12 +2193,7 @@ async function onPredictionDone({
         diagnostics['Analysis Duration'] = ((t1_analysis - t0_analysis) / 1000).toFixed(2) + ' seconds';
         diagnostics['Analysis Rate'] = (diagnostics['Audio Duration'] / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
     }
-    //show summary table
-    //summaryButton.click();
-    // midnight hack: arrgh, but it works...
-    // if (summaryDiv.classList.contains('d-none')) {
-    //     summaryButton.click();
-    // }
+
     if (active) {
         // Refresh node and scroll to active row:
         activeRow = document.getElementById(active)
