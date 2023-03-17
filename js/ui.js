@@ -383,7 +383,7 @@ async function showOpenDialog() {
 }
 
 function powerSave(on) {
-     return window.electron.powerSaveBlocker(on);
+    return window.electron.powerSaveBlocker(on);
 }
 
 const openFileInList = async (e) => {
@@ -1135,7 +1135,7 @@ const setUpWorkerMessaging = () => {
                     detectionsModal.hide();
                     break;
                 default:
-                        alert(`Unrecognised message from worker:${args.event}`)
+                    alert(`Unrecognised message from worker:${args.event}`)
             }
         })
     })
@@ -1733,13 +1733,14 @@ for (let i = 0; i < listToUse.length; i++) {
         config.list = e.target.value;
         updateListIcon();
         updatePrefs();
-        worker.postMessage({action: 'update-list', list: config.list})
+        worker.postMessage({action: 'update-list', list: config.list, explore: isExplore()})
         setFilter();
     })
 }
 
 const loadModel = () => {
-    t0_warmup = Date.now();;
+    t0_warmup = Date.now();
+    ;
     worker.postMessage({
         action: 'load-model',
         model: config.model,
@@ -1800,8 +1801,8 @@ document.getElementById('timecode').addEventListener('click', timelineToggle);
 const GLOBAL_ACTIONS = { // eslint-disable-line
     KeyA: async function (e) {
         if (e.ctrlKey) {
-                if (e.shiftKey && AUDACITY_LABELS !== {}) await showSaveDialog();
-                else if (currentFile) analyseLink.click()
+            if (e.shiftKey && AUDACITY_LABELS !== {}) await showSaveDialog();
+            else if (currentFile) analyseLink.click()
         }
     },
     KeyE: function (e) {
@@ -1814,7 +1815,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
     },
     KeyS: function (e) {
-            if (e.ctrlKey) worker.postMessage({action: 'save2db'});
+        if (e.ctrlKey) worker.postMessage({action: 'save2db'});
     },
     Escape: function () {
         if (PREDICTING) {
@@ -2091,7 +2092,7 @@ function onProgress(args) {
         const count = fileList.indexOf(args.file) + 1;
         fileNumber.innerText = `File ${count} of ${fileList.length}`;
     }
-    if (args.progress){
+    if (args.progress) {
         let progress = Math.round(args.progress * 1000) / 10;
         updateProgress(progress)
         if (progress === 100.0) {
@@ -2246,32 +2247,31 @@ pagination.forEach(item => {
 })
 
 const addPagination = (total, offset) => {
-  const limit = config.limit;
-  const pages = Math.ceil(total / limit);
-  const currentPage = (offset / limit) + 1;
-  let list = '';
-  for (let i = 1; i <= pages; i++) {
-    if (i === 1) {
-      list += i === currentPage ? '<li class="page-item disabled"><span class="page-link" href="#">Previous</span></li>'
-          : '<li class="page-item"><a class="page-link" href="#">Previous</a></li>';
+    const limit = config.limit;
+    const pages = Math.ceil(total / limit);
+    const currentPage = (offset / limit) + 1;
+    let list = '';
+    for (let i = 1; i <= pages; i++) {
+        if (i === 1) {
+            list += i === currentPage ? '<li class="page-item disabled"><span class="page-link" href="#">Previous</span></li>'
+                : '<li class="page-item"><a class="page-link" href="#">Previous</a></li>';
+        }
+        if (i <= 2 || i > pages - 2 || (i >= currentPage - 2 && i <= currentPage + 2)) {
+            list += i === currentPage ? '<li class="page-item active" aria-current="page"><span class="page-link" href="#">' + i + '</span></li>' :
+                '<li class="page-item"><a class="page-link" href="#">' + i + '</a></li>';
+        } else if (i === 3 || i === pages - 3) {
+            list += '<li class="page-item disabled"><span class="page-link" href="#">...</span></li>';
+        }
+        if (i === pages) {
+            list += i === currentPage ? '<li class="page-item disabled"><span class="page-link" href="#">Next</span></li>'
+                : '<li class="page-item"><a class="page-link" href="#">Next</a></li>';
+        }
     }
-    if (i <= 2 || i > pages - 2 || (i >= currentPage - 2 && i <= currentPage + 2)) {
-      list += i === currentPage ? '<li class="page-item active" aria-current="page"><span class="page-link" href="#">' + i + '</span></li>' :
-          '<li class="page-item"><a class="page-link" href="#">' + i + '</a></li>';
-    } else if (i === 3 || i === pages - 3) {
-      list += '<li class="page-item disabled"><span class="page-link" href="#">...</span></li>';
-    }
-    if (i === pages) {
-      list += i === currentPage ? '<li class="page-item disabled"><span class="page-link" href="#">Next</span></li>'
-          : '<li class="page-item"><a class="page-link" href="#">Next</a></li>';
-    }
-  }
-  pagination.forEach(item => {
-    item.classList.remove('d-none');
-    item.innerHTML = list;
-  })
+    pagination.forEach(item => {
+        item.classList.remove('d-none');
+        item.innerHTML = list;
+    })
 }
-
 
 
 function setFilter() {
@@ -2677,7 +2677,7 @@ const iconDict = {
 
 
 const iconizeScore = (score) => {
-   const tooltip = score.toString();
+    const tooltip = score.toString();
     if (score < 50) return iconDict['guess'].replaceAll('--', tooltip);
     else if (score < 65) return iconDict['low'].replaceAll('--', tooltip);
     else if (score < 85) return iconDict['medium'].replaceAll('--', tooltip);
@@ -3002,7 +3002,7 @@ listIcon.addEventListener('click', () => {
             window[keys[replace]].checked = true;
             config.list = keys[replace];
             updatePrefs();
-            worker.postMessage({action: 'update-list', list: config.list})
+            worker.postMessage({action: 'update-list', list: config.list, explore: isExplore()})
             // setTimeout(setFilter, 10);
             break
         }
