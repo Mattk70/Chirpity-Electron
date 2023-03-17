@@ -14,7 +14,7 @@ let WINDOW_SIZE = 3;
 let NUM_WORKERS;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend;
 let SEEN_LIST_UPDATE = false
-const DEBUG = false;
+const DEBUG = true;
 const adding_chirpity_additions = true;
 const dataset_database = true;
 
@@ -89,6 +89,8 @@ const createDB = async (file) => {
     await db.runAsync('CREATE TABLE records(dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT, comment  TEXT)');
     await db.runAsync('CREATE TABLE files(name TEXT,duration  REAL,filestart INTEGER, UNIQUE (name))');
     await db.runAsync('CREATE TABLE duration(day INTEGER, duration INTEGER, fileID INTEGER,UNIQUE (day, fileID))');
+    await db.runAsync('CREATE INDEX idx_datetime ON records(dateTime)');
+
     if (archiveMode) {
         for (let i = 0; i < LABELS.length; i++) {
             const [sname, cname] = LABELS[i].replaceAll("'", "''").split('_');
@@ -115,7 +117,6 @@ const createDB = async (file) => {
 }
 
 async function loadDB(path) {
-    // Ensure we're using the db for the number of labels we have in the model
     if (path) {
         const file = dataset_database ? p.join(path, `archive_dataset${LABELS.length}.sqlite`) : p.join(path, `archive${LABELS.length}.sqlite`)
         if (!fs.existsSync(file)) {
@@ -123,7 +124,10 @@ async function loadDB(path) {
         } else {
             diskDB = new sqlite3.Database(file);
             STATE.db = diskDB;
-            console.log("Opened disk db " + file)
+            await diskDB.runAsync('VACUUM');
+            await diskDB.runAsync('VACUUM');
+            await diskDB.runAsync('ANALYZE');
+            console.log("Opened and cleaned disk db " + file)
         }
     } else {
         await createDB();
@@ -1193,6 +1197,7 @@ async function parseMessage(e) {
                 SEEN_LIST_UPDATE = true;
                 STATE.blocked = response.blocked;
                 STATE.globalOffset = 0;
+                getSpecies(STATE.explore?.range);
                 if (response['updateResults'] && STATE.db) {  // update-results called after setting migrants list, so DB may not be initialized
                     await getResults();
                     await getSummary();
@@ -1386,7 +1391,7 @@ const getSummary = async ({
     });
     let total;
     if (!interim) {
-        const res = await db.getAsync(`SELECT COUNT(*) AS total
+        const res = await db.getAsync(`SELECT COUNT(dateTime) AS total
                                        FROM records
                                                 INNER JOIN species
                                                            ON species.id = speciesID
@@ -1458,6 +1463,7 @@ const getResults = async ({
         if (species) STATE.filteredOffset[species] = offset;
         else STATE.globalOffset = offset;
     }
+    if (context === 'explore') db = diskDB;
     const [where, when] = setWhereWhen({
         dateRange: range, species: species, files: files, context: context
     });
@@ -1467,7 +1473,7 @@ const getResults = async ({
     const result = await db.allAsync(`${db2ResultSQL} ${where} ${when} ORDER BY ${order} LIMIT ${limit} OFFSET ${offset}`);
     for (let i = 0; i < result.length; i++) {
         if (species && context !== 'explore') {
-            const {count} = await db.getAsync(`SELECT count(*) as count
+            const {count} = await db.getAsync(`SELECT COUNT(dateTime) as count
                                                FROM records
                                                WHERE datetime = ${result[i].timestamp}
                                                  AND confidence >= ${minConfidence}`)
@@ -1477,7 +1483,7 @@ const getResults = async ({
             sendResult(index++, result[i])
         }
     }
-    console.log("database took", Date.now() - t0, " seconds")
+    console.log("database took", (Date.now() - t0) / 1000, " seconds")
     if (!result.length) {
         if (context === 'selection') {
             // No more detections in the selection
@@ -1602,7 +1608,7 @@ const getSeasonRecords = async (species, season) => {
 const getMostCalls = (species) => {
     return new Promise(function (resolve, reject) {
         diskDB.get(`
-            SELECT count(*) as count, 
+            SELECT COUNT(dateTime) as count, 
             DATE(dateTime/1000, 'unixepoch', 'localtime') as date
             FROM records INNER JOIN species
             on species.id = records.speciesID
@@ -1656,7 +1662,7 @@ const getChartTotals = ({
             STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Week,
             STRFTIME('%j', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Day, 
             STRFTIME('%H', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Hour,    
-            COUNT(*) as count
+            COUNT(dateTime) as count
                     FROM records
                         INNER JOIN species
                     on species.id = speciesID
@@ -1681,7 +1687,7 @@ const getRate = (species) => {
         const total = new Array(52).fill(0);
 
 
-        diskDB.all(`select STRFTIME('%W', DATE(dateTime / 1000, 'unixepoch', 'localtime')) as week, count(*) as calls
+        diskDB.all(`select STRFTIME('%W', DATE(dateTime / 1000, 'unixepoch', 'localtime')) as week, COUNT(dateTime) as calls
                     from records
                              INNER JOIN species ON species.id = records.speciesID
                     WHERE species.cname = '${species}'
@@ -1957,8 +1963,8 @@ const db2ResultSQL = `SELECT DISTINCT dateTime AS timestamp,
   confidence AS score, 
   label, 
   comment
-                      FROM species
-                          INNER JOIN records
+                      FROM records
+                          INNER JOIN species
                       ON species.id = records.speciesID
                           INNER JOIN files ON records.fileID = files.rowid`;
 
