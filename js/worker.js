@@ -122,6 +122,7 @@ async function loadDB(path) {
             await createDB(file);
         } else {
             diskDB = new sqlite3.Database(file);
+            STATE.db = diskDB;
             console.log("Opened disk db " + file)
         }
     } else {
@@ -1337,7 +1338,7 @@ const setWhereWhen = ({dateRange, species, files, context}) => {
         const blocked = STATE.blocked
         where += ` AND  speciesID NOT IN (${blocked})`
     }
-    if (files.length) {
+    if (files?.length) {
         where += ' AND files.name IN  (';
         // Format the file list
         files.forEach(file => {
@@ -1351,7 +1352,7 @@ const setWhereWhen = ({dateRange, species, files, context}) => {
 
     //const cname = context === 'summary' ? 'cname' : 's1.cname';
     if (species) where += ` AND cname =  '${prepSQL(species)}'`;
-    const when = dateRange && dateRange.start ? ` AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
+    const when = dateRange?.start ? ` AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
     return [where, when]
 }
 
@@ -1378,7 +1379,7 @@ const getSummary = async ({
             INNER JOIN files ON fileID = files.rowid
             ${where} ${when}
         GROUP BY cname
-        ORDER BY count DESC;`);
+        ORDER BY cname;`);
     // need another setWhereWhen call for total
     [where, when] = setWhereWhen({
         dateRange: range, species: species, files: files, context: 'summary'
@@ -1465,12 +1466,12 @@ const getResults = async ({
     let t0 = Date.now()
     const result = await db.allAsync(`${db2ResultSQL} ${where} ${when} ORDER BY ${order} LIMIT ${limit} OFFSET ${offset}`);
     for (let i = 0; i < result.length; i++) {
-        if (species) {
+        if (species && context !== 'explore') {
             const {count} = await db.getAsync(`SELECT count(*) as count
                                                FROM records
                                                WHERE datetime = ${result[i].timestamp}
                                                  AND confidence >= ${minConfidence}`)
-            result.count = count;
+            result[i].count = count;
             sendResult(index++, result[i]);
         } else {
             sendResult(index++, result[i])
@@ -1482,7 +1483,7 @@ const getResults = async ({
             // No more detections in the selection
             UI.postMessage({event: 'no-detections-remain'});
             STATE.selection = undefined
-        } else if (species) { // Remove the species filter
+        } else if (species && context !== 'explore') { // Remove the species filter
             await getResults({
                 files: files,
                 range: range,
@@ -1708,11 +1709,11 @@ const getRate = (species) => {
 }
 
 const getSpecies = (range) => {
-    const where = range && range.start ? `WHERE dateTime BETWEEN ${range.start} AND ${range.end}` : '';
+    const [where, when] = setWhereWhen({range: STATE.explore?.range});
     diskDB.all(`SELECT DISTINCT cname, sname, COUNT(cname) as count
                 FROM records
                     INNER JOIN species
-                ON speciesID = id ${where}
+                ON speciesID = id ${where} ${when}
                 GROUP BY cname
                 ORDER BY cname`, (err, rows) => {
         if (err) console.log(err); else {

@@ -696,6 +696,7 @@ exploreLink.addEventListener('click', async () => {
     worker.postMessage({action: 'get-detected-species-list', range: STATE.explore.range});
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
+    setFilter();
     //hideElement(['completeDiv']);
     //adjustSpecDims(true);
 });
@@ -2278,7 +2279,7 @@ function setFilter() {
     //e.stopImmediatePropagation();
     // Species filtering in Explore is meaningless...
     // There won't be a target if the input box is clicked rather than the list
-    if (isExplore()) return
+    // if (isExplore()) return
     activeRow = undefined;
     // Am I trying to unfilter?
     const target = this.location ? undefined : this.querySelector('span.pointer');

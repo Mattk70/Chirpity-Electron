@@ -48,6 +48,7 @@ onmessage = async (e) => {
                     }
                     myModel = new Model(appPath, list);
                     await myModel.loadModel();
+                    postMessage({message: 'update-list', blocked: BLOCKED_IDS, updateResults: false});
                     myModel.warmUp(batch);
                     BACKEND = tf.getBackend();
                     postMessage({
@@ -57,7 +58,7 @@ onmessage = async (e) => {
                         backend: tf.getBackend(),
                         labels: labels
                     })
-                    postMessage({message: 'update-list', blocked: BLOCKED_IDS, updateResults: false});
+
                 })
                 break;
             case 'predict':
