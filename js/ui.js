@@ -2440,12 +2440,13 @@ detectionsAdd.addEventListener('click', event => {
 
 const updateResultTable = (row, isFromCache, isSelection) => {
     const table = isSelection ? selectionTable : resultTable;
-    if (isFromCache && !isSelection) {
-        if (!resultsBuffer) resultsBuffer = table.cloneNode();
-        resultsBuffer.lastElementChild ?
-            resultsBuffer.lastElementChild.insertAdjacentHTML('afterend', row) :
-            resultsBuffer.innerHTML = row;
-    } else {
+    // if (isFromCache && !isSelection) {
+    //     if (!resultsBuffer) resultsBuffer = table.cloneNode();
+    //     resultsBuffer.lastElementChild ?
+    //         resultsBuffer.lastElementChild.insertAdjacentHTML('afterend', row) :
+    //         resultsBuffer.innerHTML = row;
+    //     table.replaceWith(resultsBuffer);
+    // } else {
         if (isSelection) {
             if (!detectionsModal || !detectionsModal._isShown) {
                 detectionsModal = new bootstrap.Modal('#detectionsModal', {backdrop: 'static'});
@@ -2454,7 +2455,7 @@ const updateResultTable = (row, isFromCache, isSelection) => {
         }
         table.lastElementChild ? table.lastElementChild.insertAdjacentHTML('afterend', row) :
             table.innerHTML = row;
-    }
+    // }
 };
 
 let restoreComment; // saves the current comment node

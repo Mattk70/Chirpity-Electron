@@ -1,6 +1,6 @@
 const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs');
-const model_config = JSON.parse(fs.readFileSync('model_config.json', 'utf8'));
+const model_config = JSON.parse(fs.readFileSync('./model_config.json', 'utf8'));
 const {height, width, labels, location} = model_config;
 let DEBUG = false;
 let BACKEND;

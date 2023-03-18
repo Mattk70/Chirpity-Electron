@@ -125,8 +125,6 @@ async function loadDB(path) {
             diskDB = new sqlite3.Database(file);
             STATE.db = diskDB;
             await diskDB.runAsync('VACUUM');
-            await diskDB.runAsync('VACUUM');
-            await diskDB.runAsync('ANALYZE');
             console.log("Opened and cleaned disk db " + file)
         }
     } else {
@@ -276,16 +274,18 @@ ipcRenderer.on('new-client', (event) => {
                 break;
             case 'filter':
                 if (STATE.db) {
-                    await getResults(args);
-                    await getSummary(args);
+                    const results = getResults(args);
+                    const summary = getSummary(args);
+                    await Promise.all([results, summary]);
                 }
                 break;
             case 'explore':
                 STATE['db'] = diskDB;
                 args.context = 'explore';
                 args.explore = true;
-                await getResults(args);
-                await getSummary(args);
+                const results = getResults(args);
+                const summary = getSummary(args);
+                await Promise.all([results, summary]);
                 break;
             case 'analyse':
                 // Create a new memory db if one doesn't exist, or wipe it if one does,
@@ -395,8 +395,9 @@ async function onAnalyse({
     if (allCached && !reanalyse) {
         STATE.db = diskDB;
         if (!STATE.selection) {
-            await getResults({db: diskDB, files: FILE_QUEUE});
-            await getSummary({files: FILE_QUEUE})
+            const results = getResults({db: diskDB, files: FILE_QUEUE});
+            const summary = getSummary({files: FILE_QUEUE})
+            await Promise.all([results, summary]);
             return
         }
     }
@@ -1130,7 +1131,6 @@ const parsePredictions = async (response) => {
         }
         if (updateUI && !STATE.selection.start) {
             const timestamp = metadata[file].fileStart + key * 1000;
-            index++;
             //console.log(result);
             //query the db for sname,  cname
             const speciesList = await db.allAsync(`SELECT species.cname, species.sname, records.confidence
@@ -1152,7 +1152,7 @@ const parsePredictions = async (response) => {
                     event: 'prediction-ongoing',
                     file: file,
                     result: result,
-                    index: index,
+                    index: index++,
                     selection: STATE.selection
                 });
             })
@@ -1199,8 +1199,9 @@ async function parseMessage(e) {
                 STATE.globalOffset = 0;
                 getSpecies(STATE.explore?.range);
                 if (response['updateResults'] && STATE.db) {  // update-results called after setting migrants list, so DB may not be initialized
-                    await getResults();
-                    await getSummary();
+                    const results = getResults();
+                    const summary = getSummary();
+                    await Promise.all([results, summary]);
                 }
             }
             break;
@@ -1391,7 +1392,7 @@ const getSummary = async ({
     });
     let total;
     if (!interim) {
-        const res = await db.getAsync(`SELECT COUNT(dateTime) AS total
+        const res = await db.getAsync(`SELECT COUNT(*) AS total
                                        FROM records
                                                 INNER JOIN species
                                                            ON species.id = speciesID
@@ -1473,7 +1474,7 @@ const getResults = async ({
     const result = await db.allAsync(`${db2ResultSQL} ${where} ${when} ORDER BY ${order} LIMIT ${limit} OFFSET ${offset}`);
     for (let i = 0; i < result.length; i++) {
         if (species && context !== 'explore') {
-            const {count} = await db.getAsync(`SELECT COUNT(dateTime) as count
+            const {count} = await db.getAsync(`SELECT COUNT(*) as count
                                                FROM records
                                                WHERE datetime = ${result[i].timestamp}
                                                  AND confidence >= ${minConfidence}`)
@@ -1608,7 +1609,7 @@ const getSeasonRecords = async (species, season) => {
 const getMostCalls = (species) => {
     return new Promise(function (resolve, reject) {
         diskDB.get(`
-            SELECT COUNT(dateTime) as count, 
+            SELECT COUNT(*) as count, 
             DATE(dateTime/1000, 'unixepoch', 'localtime') as date
             FROM records INNER JOIN species
             on species.id = records.speciesID
@@ -1662,7 +1663,7 @@ const getChartTotals = ({
             STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Week,
             STRFTIME('%j', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Day, 
             STRFTIME('%H', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Hour,    
-            COUNT(dateTime) as count
+            COUNT(*) as count
                     FROM records
                         INNER JOIN species
                     on species.id = speciesID
@@ -1687,7 +1688,7 @@ const getRate = (species) => {
         const total = new Array(52).fill(0);
 
 
-        diskDB.all(`select STRFTIME('%W', DATE(dateTime / 1000, 'unixepoch', 'localtime')) as week, COUNT(dateTime) as calls
+        diskDB.all(`select STRFTIME('%W', DATE(dateTime / 1000, 'unixepoch', 'localtime')) as week, COUNT(*) as calls
                     from records
                              INNER JOIN species ON species.id = records.speciesID
                     WHERE species.cname = '${species}'
@@ -1726,6 +1727,7 @@ const getSpecies = (range) => {
             UI.postMessage({event: 'seen-species-list', list: rows})
         }
     })
+    return true
 }
 
 
@@ -1783,14 +1785,16 @@ async function onDelete({
         } else if (batch === 0) {
             arguments[0].context = 'results';
             STATE.selection = undefined;
-            await getResults(arguments[0]);
-            await getSummary(arguments[0]);
+            const results = getResults(arguments[0]);
+            const summary = getSummary(arguments[0]);
+            await Promise.all([results, summary]);
         }
     } else {
-        await getResults(arguments[0]);
-        await getSummary(arguments[0]);
+        const results = getResults(arguments[0]);
+        const summary = getSummary(arguments[0]);
+        await Promise.all([results, summary]);
         if (db === diskDB) {
-            await getSpecies(range);
+            getSpecies(range);
         }
     }
 }
@@ -1858,8 +1862,9 @@ async function onUpdateRecord({
             resetResults: context !== 'selectionResults'
         });
         if (context !== 'selectionResults') {
-            await getSummary({db: db, files: openFiles, species: species, explore: isExplore, active: active});// Update the species list
-            await getSpecies(range);
+            const summary = getSummary({db: db, files: openFiles, species: species, explore: isExplore, active: active});// Update the species list
+            const species = getSpecies(range);
+            await Promise.all([species, summary]);
         }
         if (db === memoryDB) {
             UI.postMessage({
