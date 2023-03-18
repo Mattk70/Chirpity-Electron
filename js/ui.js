@@ -2285,7 +2285,7 @@ function setFilter() {
     const target = this.location ? undefined : this.querySelector('span.pointer');
     if (target?.classList.contains('text-warning')) {
         // Clicked on filtered species icon
-        worker.postMessage({action: 'filter', files: analyseList || fileList, order: STATE.explore.order});
+        worker.postMessage({action: 'filter', files: isExplore() ? [] : analyseList || fileList, order: STATE.explore.order});
         // Clear species from STATE
         STATE.explore.species = undefined;
     } else {
@@ -2295,7 +2295,7 @@ function setFilter() {
         worker.postMessage({
             action: 'filter',
             species: species,
-            files: analyseList || fileList,
+            files: isExplore() ? [] : analyseList || fileList,
             order: STATE.explore.order,
         });
     }
@@ -2440,13 +2440,13 @@ detectionsAdd.addEventListener('click', event => {
 
 const updateResultTable = (row, isFromCache, isSelection) => {
     const table = isSelection ? selectionTable : resultTable;
-    // if (isFromCache && !isSelection) {
-    //     if (!resultsBuffer) resultsBuffer = table.cloneNode();
-    //     resultsBuffer.lastElementChild ?
-    //         resultsBuffer.lastElementChild.insertAdjacentHTML('afterend', row) :
-    //         resultsBuffer.innerHTML = row;
-    //     table.replaceWith(resultsBuffer);
-    // } else {
+    if (isFromCache && !isSelection) {
+        if (!resultsBuffer) resultsBuffer = table.cloneNode();
+        resultsBuffer.lastElementChild ?
+            resultsBuffer.lastElementChild.insertAdjacentHTML('afterend', row) :
+            resultsBuffer.innerHTML = row;
+        table.replaceWith(resultsBuffer);
+    } else {
         if (isSelection) {
             if (!detectionsModal || !detectionsModal._isShown) {
                 detectionsModal = new bootstrap.Modal('#detectionsModal', {backdrop: 'static'});
@@ -2455,7 +2455,7 @@ const updateResultTable = (row, isFromCache, isSelection) => {
         }
         table.lastElementChild ? table.lastElementChild.insertAdjacentHTML('afterend', row) :
             table.innerHTML = row;
-    // }
+    }
 };
 
 let restoreComment; // saves the current comment node

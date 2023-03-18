@@ -63,7 +63,7 @@ onmessage = async (e) => {
                 break;
             case 'predict':
                 //const t0 = performance.now();
-                const {chunks, start, fileStart, file, snr, minConfidence, finalChunk} = e.data;
+                const {chunks, start, fileStart, file, snr, minConfidence} = e.data;
                 const result = await myModel.predictChunk(chunks, start, fileStart, file, snr, minConfidence / 100);
                 response = {
                     message: 'prediction',
@@ -86,7 +86,8 @@ onmessage = async (e) => {
                 let image;
                 const bufferTensor = tf.tensor1d(buffer);
                 const imageTensor = tf.tidy(() => {
-                    return myModel.makeSpectrogram(bufferTensor);
+                    const specs = myModel.compute_spectrogram(bufferTensor);
+                    return tf.expandDims(specs, -1)
                 })
                 image = tf.tidy(() => {
                     return myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), height, width).dataSync();
@@ -154,11 +155,9 @@ class Model {
         this.batchSize = parseInt(batchSize);
         this.inputShape[0] = this.batchSize;
         if (tf.getBackend() === 'webgl') {
-
-            const result = tf.tidy(() => {
+            tf.tidy(() => {
                 const warmupResult = this.model.predict(tf.zeros(this.inputShape), {batchSize: this.batchSize});
                 warmupResult.arraySync();
-                return true;
             })
         }
         console.log('WarmUp end', tf.memory().numTensors)
@@ -207,12 +206,6 @@ class Model {
             let snr = tf.squeeze(tf.max(peak, 1));
             snr = tf.sub(255, snr)  // bigger number, less signal
             return snr
-        })
-    }
-
-    makeSpectrogram(audioBuffer) {
-        return tf.tidy(() => {
-            return tf.signal.stft(audioBuffer, this.frame_length, this.frame_step).cast('float32');
         })
     }
 
@@ -278,9 +271,6 @@ class Model {
     }
 
     async predictBatch(specs, keys, file, fileStart, threshold, confidence) {
-        let batched_results = [];
-        let result;
-        let audacity;
         let fixedTensorBatch = tf.tidy(() => {
             return this.fixUpSpecBatch(specs);
         })
@@ -323,7 +313,7 @@ class Model {
             TensorBatch = fixedTensorBatch;
         }
 
-        const tb =  maskedTensorBatch || TensorBatch;
+        const tb = maskedTensorBatch || TensorBatch;
         let prediction;
         prediction = this.model.predict(tb, {batchSize: this.batchSize})
 
@@ -337,16 +327,15 @@ class Model {
             keys = maskedKeysTensor.dataSync()
             maskedKeysTensor.dispose();
         }
-        const keyed_predictions = keys.reduce((acc, key, index) => {
+        return keys.reduce((acc, key, index) => {
             // convert key (samples) to milliseconds
             const position = key / CONFIG.sampleRate;
             acc[position] = array_of_predictions[index];
             return acc;
-        } , {});
-        return keyed_predictions
+        }, {});
     }
 
-    compute_spectrogram(chunk, h, w) {
+    compute_spectrogram(chunk) {
         return tf.tidy(() => {
             let spec = tf.signal.stft(chunk, this.frame_length, this.frame_step).cast('float32')
             chunk.dispose();
@@ -380,7 +369,9 @@ class Model {
         const numSamples = buffer.shape / 72000;
         let bufferList = tf.split(buffer, numSamples);
         buffer.dispose();
-        bufferList = bufferList.map(x => {return this.compute_spectrogram(x)});
+        bufferList = bufferList.map(x => {
+            return this.compute_spectrogram(x)
+        });
         const specBatch = tf.stack(bufferList);
         const batchKeys = [...Array(numSamples).keys()].map(i => start + 72000 * i);
         // recreate the object...

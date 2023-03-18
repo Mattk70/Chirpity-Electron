@@ -274,18 +274,16 @@ ipcRenderer.on('new-client', (event) => {
                 break;
             case 'filter':
                 if (STATE.db) {
-                    const results = getResults(args);
-                    const summary = getSummary(args);
-                    await Promise.all([results, summary]);
+                    await getResults(args);
+                    await getSummary(args);
                 }
                 break;
             case 'explore':
                 STATE['db'] = diskDB;
                 args.context = 'explore';
                 args.explore = true;
-                const results = getResults(args);
-                const summary = getSummary(args);
-                await Promise.all([results, summary]);
+                await getResults(args);
+                await getSummary(args);
                 break;
             case 'analyse':
                 // Create a new memory db if one doesn't exist, or wipe it if one does,
@@ -395,9 +393,8 @@ async function onAnalyse({
     if (allCached && !reanalyse) {
         STATE.db = diskDB;
         if (!STATE.selection) {
-            const results = getResults({db: diskDB, files: FILE_QUEUE});
-            const summary = getSummary({files: FILE_QUEUE})
-            await Promise.all([results, summary]);
+            await getResults({db: diskDB, files: FILE_QUEUE});
+            await getSummary({files: FILE_QUEUE})
             return
         }
     }
@@ -1199,9 +1196,8 @@ async function parseMessage(e) {
                 STATE.globalOffset = 0;
                 getSpecies(STATE.explore?.range);
                 if (response['updateResults'] && STATE.db) {  // update-results called after setting migrants list, so DB may not be initialized
-                    const results = getResults();
-                    const summary = getSummary();
-                    await Promise.all([results, summary]);
+                    await getResults();
+                    await getSummary();
                 }
             }
             break;
@@ -1785,14 +1781,12 @@ async function onDelete({
         } else if (batch === 0) {
             arguments[0].context = 'results';
             STATE.selection = undefined;
-            const results = getResults(arguments[0]);
-            const summary = getSummary(arguments[0]);
-            await Promise.all([results, summary]);
+            await getResults(arguments[0]);
+            await getSummary(arguments[0]);
         }
     } else {
-        const results = getResults(arguments[0]);
-        const summary = getSummary(arguments[0]);
-        await Promise.all([results, summary]);
+        await getResults(arguments[0]);
+        await getSummary(arguments[0]);
         if (db === diskDB) {
             getSpecies(range);
         }
@@ -1862,9 +1856,8 @@ async function onUpdateRecord({
             resetResults: context !== 'selectionResults'
         });
         if (context !== 'selectionResults') {
-            const summary = getSummary({db: db, files: openFiles, species: species, explore: isExplore, active: active});// Update the species list
-            const species = getSpecies(range);
-            await Promise.all([species, summary]);
+            await getSummary({db: db, files: openFiles, species: species, explore: isExplore, active: active});// Update the species list
+            getSpecies(range);
         }
         if (db === memoryDB) {
             UI.postMessage({
