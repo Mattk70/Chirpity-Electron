@@ -1,6 +1,6 @@
 const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs');
-const model_config = JSON.parse(fs.readFileSync('./model_config.json', 'utf8'));
+const model_config = JSON.parse(fs.readFileSync('model_config.json', 'utf8'));
 const {height, width, labels, location} = model_config;
 let DEBUG = false;
 let BACKEND;
@@ -86,11 +86,12 @@ onmessage = async (e) => {
                 let image;
                 const bufferTensor = tf.tensor1d(buffer);
                 const imageTensor = tf.tidy(() => {
-                    const specs = myModel.compute_spectrogram(bufferTensor);
-                    return tf.expandDims(specs, -1)
+                    return myModel.makeSpectrogram(bufferTensor);
                 })
                 image = tf.tidy(() => {
-                    return myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), height, width).dataSync();
+                   let spec =  myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), height, width);
+                   // rescale to 0-255
+                    return tf.mul(spec, tf.scalar(255)).dataSync();;
                 })
                 bufferTensor.dispose()
                 imageTensor.dispose()
@@ -206,6 +207,18 @@ class Model {
             let snr = tf.squeeze(tf.max(peak, 1));
             snr = tf.sub(255, snr)  // bigger number, less signal
             return snr
+        })
+    }
+
+    makeSpectrogram(audioBuffer) {
+        return tf.tidy(() => {
+            let spec = tf.abs(tf.signal.stft(audioBuffer, this.frame_length, this.frame_step))
+            const power = tf.square(spec);
+            const log_spec = tf.mul(tf.scalar(10.0), tf.div(tf.log(power), tf.log(tf.scalar(10.0))));
+            const maxLogSpec = tf.max(log_spec);
+            const log_spec_adjusted = tf.maximum(log_spec, tf.sub(maxLogSpec, tf.scalar(80)));
+            audioBuffer.dispose();
+            return log_spec_adjusted;
         })
     }
 

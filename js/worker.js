@@ -15,7 +15,7 @@ let NUM_WORKERS;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend;
 let SEEN_LIST_UPDATE = false
 const DEBUG = true;
-const adding_chirpity_additions = true;
+const adding_chirpity_additions = false;
 const dataset_database = true;
 
 const sqlite3 = DEBUG ? require('sqlite3').verbose() : require('sqlite3');
@@ -871,14 +871,14 @@ const speciesMatch = (path, sname) => {
 }
 
 const saveResults2DataSet = (rootDirectory) => {
-    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/animal_dataset';
+    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/db_scaled';
     const height = 256, width = 384;
     let workerInstance = 0;
     let t0 = Date.now()
     let promise = Promise.resolve();
     let promises = [];
     let count = 0;
-    memoryDB.each(db2ResultSQL, (err, result) => {
+    memoryDB.each(db2ResultSQL, async  (err, result) => {
         // Check for level of ambient noise activation
         let ambient, threshold, value = 0.5;
         // adding_chirpity_additions is a flag for curated files, if true we assume every detection is correct
@@ -896,20 +896,24 @@ const saveResults2DataSet = (rootDirectory) => {
         } else {
             threshold = 0;
         }
-        promise = promise.then(async function () {
-            if (result.score >= threshold) {
-
+        //promise = promise.then(async function () {
+            let score = result.score / 100;
+            if (score >= threshold) {
                 const [_, folder] = p.dirname(result.file).match(/^.*\/(.*)$/)
+                // get start and end from timestamp
+                const start = (result.timestamp - metadata[result.file].fileStart) / 1000;
+                let end = start + 3;
+
                 // filename format: <source file>_<confidence>_<start>.png
-                const file = `${p.basename(result.file).replace(p.extname(result.file), '')}_${result['score'].toFixed(2)}_${result.start}-${result.end}.png`;
+                const file = `${p.basename(result.file).replace(p.extname(result.file), '')}_${score}_${start}-${end}.png`;
                 const filepath = p.join(rootDirectory, folder)
                 const file_to_save = p.join(filepath, file)
                 if (fs.existsSync(file_to_save)) {
                     console.log("skipping file as it is already saved")
                 } else {
-                    let end = Math.min(result.end, result.duration);
+                    end = Math.min(end, metadata[result.file].duration);
                     const AudioBuffer = await fetchAudioBuffer({
-                        start: result.start, end: end, file: result.file
+                        start: start, end: end, file: result.file
                     })
                     if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
                         if (++workerInstance === NUM_WORKERS) {
@@ -928,11 +932,11 @@ const saveResults2DataSet = (rootDirectory) => {
                     }
                 }
             }
-            return new Promise(function (resolve) {
-                setTimeout(resolve, 5);
-            });
-        })
-        promises.push(promise)
+            // return new Promise(function (resolve) {
+            //     setTimeout(resolve, 5);
+            // });
+        // })
+        // promises.push(promise)
     }, (err) => {
         if (err) return console.log(err);
         Promise.all(promises).then(() => console.log(`Dataset created. ${count} files saved in ${(Date.now() - t0) / 1000} seconds`))
