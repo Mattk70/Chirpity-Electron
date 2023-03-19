@@ -63,13 +63,14 @@ onmessage = async (e) => {
                 break;
             case 'predict':
                 //const t0 = performance.now();
-                const {chunks, start, fileStart, file, snr, minConfidence} = e.data;
+                const {chunks, start, fileStart, file, snr, minConfidence, worker} = e.data;
                 const result = await myModel.predictChunk(chunks, start, fileStart, file, snr, minConfidence / 100);
                 response = {
                     message: 'prediction',
                     file: file,
                     result: result,
                     fileStart: fileStart,
+                    worker: worker
                 }
                 postMessage(response);
                 // reset the results
