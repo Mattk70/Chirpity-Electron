@@ -12,9 +12,11 @@ const staticFfmpeg = require('ffmpeg-static-electron');
 const {stat} = require("fs/promises");
 let WINDOW_SIZE = 3;
 let NUM_WORKERS;
-let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend;
+let workerInstance = 0;
+let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let SEEN_LIST_UPDATE = false
 const DEBUG = true;
+const DATASET = true;
 const adding_chirpity_additions = false;
 const dataset_database = true;
 
@@ -50,7 +52,7 @@ sqlite3.Database.prototype.getAsync = function (sql, ...params) {
 console.log(staticFfmpeg.path);
 ffmpeg.setFfmpegPath(staticFfmpeg.path);
 
-let predictionsRequested = 0, predictionsReceived = 0;
+let predictionsRequested = {}, predictionsReceived = {}
 let COMPLETED = [], PENDING_FILES = [];
 let diskDB, memoryDB, NOCMIG, latitude, longitude;
 
@@ -89,7 +91,7 @@ const createDB = async (file) => {
     await db.runAsync('CREATE TABLE records(dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT, comment  TEXT)');
     await db.runAsync('CREATE TABLE files(name TEXT,duration  REAL,filestart INTEGER, UNIQUE (name))');
     await db.runAsync('CREATE TABLE duration(day INTEGER, duration INTEGER, fileID INTEGER,UNIQUE (day, fileID))');
-    await db.runAsync('CREATE INDEX idx_datetime ON records(dateTime)');
+    if (db === diskDB) await db.runAsync('CREATE INDEX idx_datetime ON records(dateTime)');
 
     if (archiveMode) {
         for (let i = 0; i < LABELS.length; i++) {
@@ -289,8 +291,8 @@ ipcRenderer.on('new-client', (event) => {
                 // Create a new memory db if one doesn't exist, or wipe it if one does,
                 // unless we're looking at a selection
                 if (!memoryDB || !args.end) await createDB();
-                predictionsReceived = 0;
-                predictionsRequested = 0;
+                predictionsReceived = {};
+                predictionsRequested = {};
                 await onAnalyse(args);
                 break;
             case 'save':
@@ -381,7 +383,10 @@ async function onAnalyse({
     COMPLETED = [];
     FILE_QUEUE = currentFile ? [currentFile] : filesInScope;
 
+
     STATE.db = memoryDB;
+
+
     // check if results for the files are cached (we only consider it cached if all files have been saved to the disk DB)
     let allCached = true;
     for (let i = 0; i < FILE_QUEUE.length; i++) {
@@ -399,14 +404,28 @@ async function onAnalyse({
         }
     }
     for (let i = 0; i < FILE_QUEUE.length; i++) {
+        if (DATASET) {
+            //STATE.db = diskDB;
+            const fileSQL = prepSQL(FILE_QUEUE[i]);
+            const row = await diskDB.getAsync(`SELECT rowid
+                                               FROM files
+                                               WHERE name = "${fileSQL}"`);
+            if (row) {
+                console.log(`Skipping ${FILE_QUEUE[i]}, already analysed`)
+                FILE_QUEUE.splice(i, 1)
+                continue;
+            }
+        }
         let file = FILE_QUEUE[i];
         // Set global var, for parsePredictions
         console.log(`Adding ${file} to the queue.`)
-        if (predictionDone) {
-            // Clear state unless analysing a selection
-            if (!STATE.selection) resetState(STATE.db);
-            await processNextFile(arguments[0]);
-        }
+    }
+    if (predictionDone) {
+        // Clear state unless analysing a selection
+        if (!STATE.selection) resetState(STATE.db);
+    }
+    for (let i = 0; i < NUM_WORKERS; i++) {
+        processNextFile({start: start, end: end, resetResults: resetResults, worker: i});
     }
 }
 
@@ -425,8 +444,8 @@ function onAbort({
         spawnWorkers(model, list, BATCH_SIZE, NUM_WORKERS)
     }
     predictionDone = true;
-    predictionsReceived = 0;
-    predictionsRequested = 0;
+    predictionsReceived = {};
+    predictionsRequested = {};
     UI.postMessage({event: 'prediction-done', batchInProgress: true});
 }
 
@@ -729,7 +748,7 @@ async function setupCtx(chunk, header) {
  * @returns {Promise<void>}
  */
 const getPredictBuffers = async ({
-                                     file = '', start = 0, end = undefined, resetResults = false
+                                     file = '', start = 0, end = undefined, resetResults = false, worker = undefined
                                  }) => {
     //let start = args.start, end = args.end, resetResults = args.resetResults, file = args.file;
     let chunkLength = 72000;
@@ -739,9 +758,9 @@ const getPredictBuffers = async ({
     if (start > metadata[file].duration) {
         return
     }
-    batchChunksToSend = Math.ceil((end - start) / (BATCH_SIZE * WINDOW_SIZE));
-    predictionsReceived = 0;
-    predictionsRequested = 0;
+    batchChunksToSend[file] = Math.ceil((end - start) / (BATCH_SIZE * WINDOW_SIZE));
+    predictionsReceived[file] = 0;
+    predictionsRequested[file] = 0;
     const byteStart = convertTimeToBytes(start, metadata[file]);
     const byteEnd = convertTimeToBytes(end, metadata[file]);
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for WINDOW_SIZE second chunks
@@ -752,7 +771,7 @@ const getPredictBuffers = async ({
     });
     let chunkStart = start * sampleRate;
     //const fileDuration = end - start;
-    let workerInstance = 0
+
     readStream.on('data', async chunk => {
         // Ensure data is processed in order
         readStream.pause();
@@ -760,10 +779,13 @@ const getPredictBuffers = async ({
         if (offlineCtx) {
             offlineCtx.startRendering().then((resampled) => {
                 const myArray = resampled.getChannelData(0);
-                if (++workerInstance === NUM_WORKERS) {
-                    workerInstance = 0;
+                if (worker === undefined) {
+                    if (++workerInstance === NUM_WORKERS) {
+                        workerInstance = 0;
+                    }
+                    worker = workerInstance;
                 }
-                feedChunksToModel(myArray, chunkStart, file, end, resetResults, workerInstance);
+                feedChunksToModel(myArray, chunkStart, file, end, resetResults, worker);
                 chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
                 // Now the async stuff is done ==>
                 readStream.resume();
@@ -773,9 +795,15 @@ const getPredictBuffers = async ({
             });
         } else {
             console.log('Short chunk', chunk.length, 'skipping')
+            if (worker === undefined) {
+                if (++workerInstance === NUM_WORKERS) {
+                    workerInstance = 0;
+                }
+                worker = workerInstance;
+            }
             // Create array with 0's (short segment of silence that will trigger the finalChunk flag
             const myArray = new Float32Array(new Array(chunkLength).fill(0));
-            feedChunksToModel(myArray, chunkStart, file, end, resetResults, workerInstance);
+            feedChunksToModel(myArray, chunkStart, file, end, resetResults, worker);
             readStream.resume();
         }
     })
@@ -838,9 +866,10 @@ const fetchAudioBuffer = async ({
 }
 
 function feedChunksToModel(channelData, chunkStart, file, end, resetResults, worker) {
-    predictionsRequested++;
+    predictionsRequested[file]++;
     const objData = {
         message: 'predict',
+        worker: worker,
         fileStart: metadata[file].fileStart,
         file: file,
         start: chunkStart,
@@ -850,15 +879,20 @@ function feedChunksToModel(channelData, chunkStart, file, end, resetResults, wor
         minConfidence: minConfidence,
         chunks: channelData
     };
+    predictWorkers[worker].isAvailable = false;
     predictWorkers[worker].postMessage(objData, [objData.chunks.buffer]);
 }
 
 async function doPrediction({
-                                file = '', start = 0, end = metadata[file].duration, resetResults = false
+                                file = '',
+                                start = 0,
+                                end = metadata[file].duration,
+                                resetResults = false,
+                                worker = undefined
                             }) {
     predictionDone = false;
     predictionStart = new Date();
-    await getPredictBuffers({file: file, start: start, end: end, resetResults: resetResults});
+    await getPredictBuffers({file: file, start: start, end: end, resetResults: resetResults, worker: worker});
     UI.postMessage({event: 'update-audio-duration', value: metadata[file].duration});
 }
 
@@ -873,12 +907,10 @@ const speciesMatch = (path, sname) => {
 const saveResults2DataSet = (rootDirectory) => {
     if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/db_scaled';
     const height = 256, width = 384;
-    let workerInstance = 0;
     let t0 = Date.now()
-    let promise = Promise.resolve();
-    let promises = [];
     let count = 0;
-    memoryDB.each(db2ResultSQL, async  (err, result) => {
+
+    diskDB.each(db2ResultSQL, async (err, result) => {
         // Check for level of ambient noise activation
         let ambient, threshold, value = 0.5;
         // adding_chirpity_additions is a flag for curated files, if true we assume every detection is correct
@@ -897,44 +929,44 @@ const saveResults2DataSet = (rootDirectory) => {
             threshold = 0;
         }
         //promise = promise.then(async function () {
-            let score = result.score / 100;
-            if (score >= threshold) {
-                const [_, folder] = p.dirname(result.file).match(/^.*\/(.*)$/)
-                // get start and end from timestamp
-                const start = (result.timestamp - metadata[result.file].fileStart) / 1000;
-                let end = start + 3;
+        let score = result.score / 100;
+        if (score >= threshold) {
+            const [_, folder] = p.dirname(result.file).match(/^.*\/(.*)$/)
+            // get start and end from timestamp
+            const start = (result.timestamp - metadata[result.file].fileStart) / 1000;
+            let end = start + 3;
 
-                // filename format: <source file>_<confidence>_<start>.png
-                const file = `${p.basename(result.file).replace(p.extname(result.file), '')}_${score}_${start}-${end}.png`;
-                const filepath = p.join(rootDirectory, folder)
-                const file_to_save = p.join(filepath, file)
-                if (fs.existsSync(file_to_save)) {
-                    console.log("skipping file as it is already saved")
-                } else {
-                    end = Math.min(end, metadata[result.file].duration);
-                    const AudioBuffer = await fetchAudioBuffer({
-                        start: start, end: end, file: result.file
-                    })
-                    if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
-                        if (++workerInstance === NUM_WORKERS) {
-                            workerInstance = 0;
-                        }
-                        const buffer = AudioBuffer.getChannelData(0);
-                        predictWorkers[workerInstance].postMessage({
-                            message: 'get-spectrogram',
-                            filepath: filepath,
-                            file: file,
-                            buffer: buffer,
-                            height: height,
-                            width: width
-                        })
-                        count++;
+            // filename format: <source file>_<confidence>_<start>.png
+            const file = `${p.basename(result.file).replace(p.extname(result.file), '')}_${score}_${start}-${end}.png`;
+            const filepath = p.join(rootDirectory, folder)
+            const file_to_save = p.join(filepath, file)
+            if (fs.existsSync(file_to_save)) {
+                console.log("skipping file as it is already saved")
+            } else {
+                end = Math.min(end, metadata[result.file].duration);
+                const AudioBuffer = await fetchAudioBuffer({
+                    start: start, end: end, file: result.file
+                })
+                if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
+                    if (++workerInstance === NUM_WORKERS) {
+                        workerInstance = 0;
                     }
+                    const buffer = AudioBuffer.getChannelData(0);
+                    predictWorkers[workerInstance].postMessage({
+                        message: 'get-spectrogram',
+                        filepath: filepath,
+                        file: file,
+                        buffer: buffer,
+                        height: height,
+                        width: width
+                    })
+                    count++;
                 }
             }
-            // return new Promise(function (resolve) {
-            //     setTimeout(resolve, 5);
-            // });
+        }
+        // return new Promise(function (resolve) {
+        //     setTimeout(resolve, 5);
+        // });
         // })
         // promises.push(promise)
     }, (err) => {
@@ -1045,6 +1077,7 @@ function spawnWorkers(model, list, batchSize, threads) {
     NUM_WORKERS = threads;
     for (let i = 0; i < threads; i++) {
         const worker = new Worker('./js/model.js', {type: 'module'});
+        worker.isAvailable = true;
         predictWorkers.push(worker)
         console.log('loading a worker')
         // Now we've loaded a new model, clear the aborted flag
@@ -1160,8 +1193,8 @@ const parsePredictions = async (response) => {
         }
     }
 
-    predictionsReceived++;
-    const progress = predictionsReceived / batchChunksToSend;
+    predictionsReceived[file]++;
+    const progress = predictionsReceived[file] / batchChunksToSend[file];
     UI.postMessage({event: 'progress', progress: progress, file: file});
     if (progress === 1) {
         COMPLETED.push(file);
@@ -1187,7 +1220,7 @@ const parsePredictions = async (response) => {
     } else {
         await getSummary({interim: true, files: []});
     }
-    return [file, batchInProgress]
+    return [file, batchInProgress, response.worker]
 }
 
 async function parseMessage(e) {
@@ -1227,12 +1260,12 @@ async function parseMessage(e) {
             if (aborted) {
 
             } else {
-
-                let [, batchInProgress] = await parsePredictions(response);
+                predictWorkers[response.worker].isAvailable = true;
+                let [, batchInProgress, worker] = await parsePredictions(response);
                 //if (response['finished']) {
 
-                process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, Prediction requests ${predictionsRequested}, predictions received ${predictionsReceived}    \n`)
-                if (predictionsReceived === predictionsRequested) {
+                process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, ${response.file},  Prediction requests ${predictionsRequested[response.file]}, predictions received ${predictionsReceived[response.file]}    \n`)
+                if (predictionsReceived[response.file] === predictionsRequested[response.file]) {
                     const limit = 10;
                     await clearCache(CACHE_LOCATION, limit);
                     // This is the one time results *do not* come from the database
@@ -1243,7 +1276,7 @@ async function parseMessage(e) {
                         UI.postMessage({
                             event: 'prediction-done', batchInProgress: true,
                         })
-                        await processNextFile();
+                        await processNextFile(worker);
                     } else {
                         await getSummary({files: PENDING_FILES});
                     }
@@ -1260,12 +1293,16 @@ async function parseMessage(e) {
 
 // Optional Arguments
 async function processNextFile({
-                                   start = undefined, end = undefined, resetResults = false,
+                                   start = undefined, end = undefined, resetResults = false, worker = undefined
                                } = {}) {
     if (FILE_QUEUE.length) {
         predictionDone = false;
 
         let file = FILE_QUEUE.shift()
+        if (DATASET && FILE_QUEUE.length % 1000 === 0) {
+            await onSave2DiskDB();
+            console.log("Saved results to disk db", FILE_QUEUE.length, "files remaining")
+        }
         const found = await getWorkingFile(file);
         if (found) {
             if (end) {
@@ -1299,7 +1336,7 @@ async function processNextFile({
                     file: file
                 });
                 await doPrediction({
-                    start: start, end: end, file: file, resetResults: resetResults,
+                    start: start, end: end, file: file, resetResults: resetResults, worker: worker
                 });
             }
         } else {
@@ -1572,14 +1609,17 @@ const onSave2DiskDB = async () => {
     memoryDB.runAsync('END');
     // Clear and relaunch the memory DB
     //memoryDB.close(); // is this necessary??
-    await createDB();
-    files.forEach(file => STATE.saved.add(file));
-    // Now we have saved the records, set state to DiskDB
-    STATE.db = diskDB;
-    UI.postMessage({
-        event: 'generate-alert',
-        message: `Database update complete, ${response.changes} records added to the archive in ${((Date.now() - t0) / 1000)} seconds`
-    })
+    if (!DATASET) {
+        await createDB();
+        files.forEach(file => STATE.saved.add(file));
+        // Now we have saved the records, set state to DiskDB
+        STATE.db = diskDB;
+        UI.postMessage({
+            event: 'generate-alert',
+            message: `Database update complete, ${response.changes} records added to the archive in ${((Date.now() - t0) / 1000)} seconds`
+        })
+    }
+
 }
 
 const getSeasonRecords = async (species, season) => {
