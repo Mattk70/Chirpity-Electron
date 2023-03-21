@@ -90,9 +90,9 @@ onmessage = async (e) => {
                     return myModel.makeSpectrogram(bufferTensor);
                 })
                 image = tf.tidy(() => {
-                   let spec =  myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), height, width);
-                   // rescale to 0-255
-                    return tf.mul(spec, tf.scalar(255)).dataSync();;
+                    let spec = myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), height, width);
+                    // rescale to 0-255
+                    return tf.mul(spec, tf.scalar(255)).dataSync();
                 })
                 bufferTensor.dispose()
                 imageTensor.dispose()
@@ -184,10 +184,10 @@ class Model {
     normalize(spec) {
         // console.log('Pre-norm### Min is: ', spec.min().dataSync(), 'Max is: ', spec.max().dataSync())
         const spec_max = tf.max(spec, [1, 2]).reshape([-1, 1, 1, 1])
-        const spec_min = tf.min(spec, [1, 2]).reshape([-1, 1, 1, 1])
-        // spec = spec.mul(255);
-        // spec = spec.div(spec_max);
-        spec = tf.sub(spec, spec_min).div(tf.sub(spec_max, spec_min));
+        // const spec_min = tf.min(spec, [1, 2]).reshape([-1, 1, 1, 1])
+        spec = spec.mul(255);
+        spec = spec.div(spec_max);
+        // spec = tf.sub(spec, spec_min).div(tf.sub(spec_max, spec_min));
         // console.log('{Post norm#### Min is: ', spec.min().dataSync(), 'Max is: ', spec.max().dataSync())
         return spec
     }
@@ -211,31 +211,19 @@ class Model {
         })
     }
 
-    makeSpectrogram(audioBuffer) {
-        return tf.tidy(() => {
-            let spec = tf.abs(tf.signal.stft(audioBuffer, this.frame_length, this.frame_step))
-            const power = tf.square(spec);
-            const log_spec = tf.mul(tf.scalar(10.0), tf.div(tf.log(power), tf.log(tf.scalar(10.0))));
-            const maxLogSpec = tf.max(log_spec);
-            const log_spec_adjusted = tf.maximum(log_spec, tf.sub(maxLogSpec, tf.scalar(80)));
-            audioBuffer.dispose();
-            return log_spec_adjusted;
-        })
-    }
 
     fixUpSpecBatch(specBatch, h, w) {
         const img_height = h || height;
         const img_width = w || width;
-        // Swap axes to fit output shape
-        specBatch = tf.transpose(specBatch, [0, 2, 1]);
-        specBatch = tf.reverse(specBatch, [1]);
-        //specBatch = tf.slice3d(specBatch, [0, 1, 1], [-1, height, width]);
-        specBatch = tf.abs(specBatch);
-        // Add channel axis
-        specBatch = tf.expandDims(specBatch, -1);
-        specBatch = tf.image.resizeBilinear(specBatch, [img_height, img_width], false);
-
         return tf.tidy(() => {
+            // Swap axes to fit output shape
+            specBatch = tf.transpose(specBatch, [0, 2, 1]);
+            specBatch = tf.reverse(specBatch, [1]);
+            //specBatch = tf.slice3d(specBatch, [0, 1, 1], [-1, height, width]);
+            specBatch = tf.abs(specBatch);
+            // Add channel axis
+            specBatch = tf.expandDims(specBatch, -1);
+            specBatch = tf.image.resizeBilinear(specBatch, [img_height, img_width], false);
             return this.normalize(specBatch);
         })
     }
@@ -285,9 +273,7 @@ class Model {
     }
 
     async predictBatch(specs, keys, file, fileStart, threshold, confidence) {
-        let fixedTensorBatch = tf.tidy(() => {
-            return this.fixUpSpecBatch(specs);
-        })
+        let fixedTensorBatch = this.fixUpSpecBatch(specs);
         specs.dispose();
         let keysTensor, TensorBatch, maskedKeysTensor, maskedTensorBatch;
         if (BACKEND === 'webgl') {
@@ -308,8 +294,9 @@ class Model {
                 condition.dispose()
             }
             const c = newCondition || condition;
-            maskedTensorBatch = await tf.booleanMaskAsync(fixedTensorBatch, c);
-            maskedKeysTensor = await tf.booleanMaskAsync(keysTensor, c)
+            maskedTensorBatch = tf.booleanMaskAsync(fixedTensorBatch, c);
+            maskedKeysTensor = tf.booleanMaskAsync(keysTensor, c)
+            await Promise.all([maskedTensorBatch, maskedKeysTensor])
             c.dispose();
 
             fixedTensorBatch.dispose();
@@ -354,17 +341,19 @@ class Model {
             let spec = tf.signal.stft(chunk, this.frame_length, this.frame_step).cast('float32')
             chunk.dispose();
             return spec
-            // const img_height = h || height;
-            // const img_width = w || width;
-            // // Swap axes to fit output shape
-            // spec = tf.transpose(spec, [1, 0]);
-            // spec = tf.reverse(spec, [0]);
-            // spec = tf.abs(spec);
-            // // Add channel axis
-            // spec = tf.expandDims(spec, -1);
-            // spec = tf.image.resizeBilinear(spec, [img_height, img_width]);
-            // // Fix specBatch shape
-            // return this.normalize_test(spec);
+        })
+    }
+
+
+    makeSpectrogram(audioBuffer) {
+        return tf.tidy(() => {
+            let spec = tf.abs(tf.signal.stft(audioBuffer, this.frame_length, this.frame_step))
+            const power = tf.square(spec);
+            const log_spec = tf.mul(tf.scalar(10.0), tf.div(tf.log(power), tf.log(tf.scalar(10.0))));
+            const maxLogSpec = tf.max(log_spec);
+            const log_spec_adjusted = tf.maximum(log_spec, tf.sub(maxLogSpec, tf.scalar(80)));
+            audioBuffer.dispose();
+            return log_spec_adjusted;
         })
     }
 
@@ -384,7 +373,7 @@ class Model {
         let bufferList = tf.split(buffer, numSamples);
         buffer.dispose();
         bufferList = bufferList.map(x => {
-            return this.compute_spectrogram(x)
+            return this.makeSpectrogram(x)
         });
         const specBatch = tf.stack(bufferList);
         const batchKeys = [...Array(numSamples).keys()].map(i => start + 72000 * i);

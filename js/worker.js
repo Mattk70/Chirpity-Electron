@@ -14,11 +14,13 @@ let WINDOW_SIZE = 3;
 let NUM_WORKERS;
 let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
-let SEEN_LIST_UPDATE = false
+let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on every change
+let  select_records_stmt;
 const DEBUG = true;
-const DATASET = true;
-const adding_chirpity_additions = false;
-const dataset_database = true;
+
+const DATASET = false;
+const adding_chirpity_additions = true;
+const dataset_database = DATASET;
 
 const sqlite3 = DEBUG ? require('sqlite3').verbose() : require('sqlite3');
 sqlite3.Database.prototype.runAsync = function (sql, ...params) {
@@ -88,7 +90,7 @@ const createDB = async (file) => {
     const db = archiveMode ? diskDB : memoryDB;
     await db.runAsync('BEGIN');
     await db.runAsync('CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT, cname TEXT)');
-    await db.runAsync('CREATE TABLE records(dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT, comment  TEXT)');
+    await db.runAsync('CREATE TABLE records(dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT, comment  TEXT, UNIQUE (dateTime, fileID, speciesID))');
     await db.runAsync('CREATE TABLE files(name TEXT,duration  REAL,filestart INTEGER, UNIQUE (name))');
     await db.runAsync('CREATE TABLE duration(day INTEGER, duration INTEGER, fileID INTEGER,UNIQUE (day, fileID))');
     if (db === diskDB) await db.runAsync('CREATE INDEX idx_datetime ON records(dateTime)');
@@ -114,9 +116,22 @@ const createDB = async (file) => {
         console.log(response.changes + ' files added to memory database')
         response = await db.runAsync('INSERT INTO species SELECT * FROM disk.species');
         console.log(response.changes + ' species added to memory database')
+        prepare_statements(db);
     }
     await db.runAsync('END');
+    return true
 }
+
+const prepare_statements = (db) => {
+     select_records_stmt = db.prepare(`SELECT species.cname, species.sname, records.confidence
+                                                   FROM species
+                                                            INNER JOIN records ON species.id = records.speciesID
+                                                   WHERE records.dateTime = (?)
+                                                     AND confidence > (?)
+                                                     AND speciesID NOT IN ((?))
+                                                   ORDER BY records.confidence DESC`);
+}
+
 
 async function loadDB(path) {
     if (path) {
@@ -130,10 +145,12 @@ async function loadDB(path) {
             console.log("Opened and cleaned disk db " + file)
         }
     } else {
-        await createDB();
+        const db = await createDB();
     }
     return true
 }
+
+
 
 let metadata = {};
 let minConfidence, index = 0, AUDACITY = {}, predictionStart, SNR = 0;
@@ -387,39 +404,43 @@ async function onAnalyse({
     STATE.db = memoryDB;
 
 
-    // check if results for the files are cached (we only consider it cached if all files have been saved to the disk DB)
-    let allCached = true;
-    for (let i = 0; i < FILE_QUEUE.length; i++) {
-        if (!await isDuplicate(FILE_QUEUE[i])) {
-            allCached = false;
-            break;
-        }
-    }
-    if (allCached && !reanalyse) {
-        STATE.db = diskDB;
-        if (!STATE.selection) {
-            await getResults({db: diskDB, files: FILE_QUEUE});
-            await getSummary({files: FILE_QUEUE})
-            return
-        }
-    }
-    for (let i = 0; i < FILE_QUEUE.length; i++) {
+    let count = 0;
+    for (let i = FILE_QUEUE.length - 1; i >= 0; i--) {
+        let file = FILE_QUEUE[i];
         if (DATASET) {
             //STATE.db = diskDB;
-            const fileSQL = prepSQL(FILE_QUEUE[i]);
-            const row = await diskDB.getAsync(`SELECT rowid
+            const fileSQL = prepSQL(file);
+            const row = await diskDB.getAsync(`SELECT name
                                                FROM files
                                                WHERE name = "${fileSQL}"`);
             if (row) {
-                console.log(`Skipping ${FILE_QUEUE[i]}, already analysed`)
+                console.log(`Skipping ${row.name}, already analysed`)
                 FILE_QUEUE.splice(i, 1)
+                count++
                 continue;
             }
+        } else {
+            // check if results for the files are cached (we only consider it cached if all files have been saved to the disk DB)
+            let allCached = true;
+            for (let i = 0; i < FILE_QUEUE.length; i++) {
+                if (!await getSavedFileInfo(FILE_QUEUE[i])) {
+                    allCached = false;
+                    break;
+                }
+            }
+            if (allCached && !reanalyse) {
+                STATE.db = diskDB;
+                if (!STATE.selection) {
+                    await getResults({db: diskDB, files: FILE_QUEUE});
+                    await getSummary({files: FILE_QUEUE})
+                    return
+                }
+            }
         }
-        let file = FILE_QUEUE[i];
-        // Set global var, for parsePredictions
+
         console.log(`Adding ${file} to the queue.`)
     }
+    console.log("FILE_QUEUE has ", FILE_QUEUE.length, 'files', count, 'files ignored')
     if (predictionDone) {
         // Clear state unless analysing a selection
         if (!STATE.selection) resetState(STATE.db);
@@ -636,8 +657,8 @@ function addDays(date, days) {
 const getMetadata = async ({file, proxy = file, source_file = file}) => {
     metadata[file] = {proxy: proxy};
     // CHeck the database first, so we honour any manual update.
-    const savedMeta = await getFileInfo(file);
-    metadata[file].duration = savedMeta?.duration ? savedMeta.duration : await getDuration(proxy);
+    const savedMeta = await getSavedFileInfo(file);
+    metadata[file].duration = savedMeta?.duration || await getDuration(proxy);
 
     return new Promise((resolve) => {
         if (metadata[file]?.isComplete) {
@@ -905,70 +926,73 @@ const speciesMatch = (path, sname) => {
 }
 
 const saveResults2DataSet = (rootDirectory) => {
-    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/db_scaled';
+    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/Additions_dbscale';
     const height = 256, width = 384;
     let t0 = Date.now()
+    let promise = Promise.resolve();
+    let promises = [];
     let count = 0;
 
-    diskDB.each(db2ResultSQL, async (err, result) => {
+
+    diskDB.each(`${db2ResultSQL} `, async (err, result) => {
         // Check for level of ambient noise activation
-        let ambient, threshold, value = 0.5;
+        let ambient, threshold, value = 50;
         // adding_chirpity_additions is a flag for curated files, if true we assume every detection is correct
         if (!adding_chirpity_additions) {
-            ambient = (result.sname2 === 'Ambient Noise' ? result.score2 : result.sname3 === 'Ambient Noise' ? result.score3 : false)
-            console.log('Ambient', ambient)
-            // If we have a high level of ambient noise activation, insist on a high threshold for species detection
-            if (ambient && ambient > 0.2) {
-                value = 0.7
-            }
+            //     ambient = (result.sname2 === 'Ambient Noise' ? result.score2 : result.sname3 === 'Ambient Noise' ? result.score3 : false)
+            //     console.log('Ambient', ambient)
+            //     // If we have a high level of ambient noise activation, insist on a high threshold for species detection
+            //     if (ambient && ambient > 0.2) {
+            //         value = 0.7
+            //     }
             // Check whether top predicted species matches folder (i.e. the searched for species)
             // species not matching the top prediction sets threshold to 2, effectively doing nothing with results
             // that don't match the searched for species
-            threshold = speciesMatch(result.file, result.sname) ? value : 2.0;
+            threshold = speciesMatch(result.file, result.sname) ? value : 200;
         } else {
             threshold = 0;
         }
-        //promise = promise.then(async function () {
-        let score = result.score / 100;
-        if (score >= threshold) {
-            const [_, folder] = p.dirname(result.file).match(/^.*\/(.*)$/)
-            // get start and end from timestamp
-            const start = (result.timestamp - metadata[result.file].fileStart) / 1000;
-            let end = start + 3;
+        promise = promise.then(async function () {
+            let score = result.score;
+            if (score >= threshold) {
+                const [_, folder] = p.dirname(result.file).match(/^.*\/(.*)$/)
+                // get start and end from timestamp
+                const start = (result.timestamp - result.filestart) / 1000;
+                let end = start + 3;
 
-            // filename format: <source file>_<confidence>_<start>.png
-            const file = `${p.basename(result.file).replace(p.extname(result.file), '')}_${score}_${start}-${end}.png`;
-            const filepath = p.join(rootDirectory, folder)
-            const file_to_save = p.join(filepath, file)
-            if (fs.existsSync(file_to_save)) {
-                console.log("skipping file as it is already saved")
-            } else {
-                end = Math.min(end, metadata[result.file].duration);
-                const AudioBuffer = await fetchAudioBuffer({
-                    start: start, end: end, file: result.file
-                })
-                if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
-                    if (++workerInstance === NUM_WORKERS) {
-                        workerInstance = 0;
-                    }
-                    const buffer = AudioBuffer.getChannelData(0);
-                    predictWorkers[workerInstance].postMessage({
-                        message: 'get-spectrogram',
-                        filepath: filepath,
-                        file: file,
-                        buffer: buffer,
-                        height: height,
-                        width: width
+                // filename format: <source file>_<confidence>_<start>.png
+                const file = `${p.basename(result.file).replace(p.extname(result.file), '')}_${start}-${end}.png`;
+                const filepath = p.join(rootDirectory, folder)
+                const file_to_save = p.join(filepath, file)
+                if (fs.existsSync(file_to_save)) {
+                    console.log("skipping file as it is already saved")
+                } else {
+                    end = Math.min(end, result.duration);
+                    const AudioBuffer = await fetchAudioBuffer({
+                        start: start, end: end, file: result.file
                     })
-                    count++;
+                    if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
+                        if (++workerInstance === NUM_WORKERS) {
+                            workerInstance = 0;
+                        }
+                        const buffer = AudioBuffer.getChannelData(0);
+                        predictWorkers[workerInstance].postMessage({
+                            message: 'get-spectrogram',
+                            filepath: filepath,
+                            file: file,
+                            buffer: buffer,
+                            height: height,
+                            width: width
+                        })
+                        count++;
+                    }
                 }
             }
-        }
-        // return new Promise(function (resolve) {
-        //     setTimeout(resolve, 5);
-        // });
-        // })
-        // promises.push(promise)
+            return new Promise(function (resolve) {
+                setTimeout(resolve, 0.1);
+            });
+        })
+        promises.push(promise)
     }, (err) => {
         if (err) return console.log(err);
         Promise.all(promises).then(() => console.log(`Dataset created. ${count} files saved in ${(Date.now() - t0) / 1000} seconds`))
@@ -1163,32 +1187,27 @@ const parsePredictions = async (response) => {
                 await insertRecord(key, speciesID, confidence, file)
             }
         }
-        if (updateUI && !STATE.selection.start) {
+        if (updateUI && !STATE.selection?.start) {
             const timestamp = metadata[file].fileStart + key * 1000;
             //console.log(result);
             //query the db for sname,  cname
-            const speciesList = await db.allAsync(`SELECT species.cname, species.sname, records.confidence
-                                                   FROM species
-                                                            INNER JOIN records ON species.id = records.speciesID
-                                                   WHERE records.dateTime = ${timestamp}
-                                                     AND confidence > ${minConfidence}
-                                                     AND speciesID NOT IN (${STATE.blocked})
-                                                   ORDER BY records.confidence DESC`)
-            speciesList.forEach(species => {
-                const result = {
-                    timestamp: timestamp,
-                    position: key,
-                    cname: species.cname,
-                    sname: species.sname,
-                    score: species.confidence,
-                }
-                UI.postMessage({
-                    event: 'prediction-ongoing',
-                    file: file,
-                    result: result,
-                    index: index++,
-                    selection: STATE.selection
-                });
+            select_records_stmt.all(timestamp, minConfidence, STATE.blocked, (err, speciesList) => {
+                speciesList.forEach(species => {
+                    const result = {
+                        timestamp: timestamp,
+                        position: key,
+                        cname: species.cname,
+                        sname: species.sname,
+                        score: species.confidence,
+                    }
+                    UI.postMessage({
+                        event: 'prediction-ongoing',
+                        file: file,
+                        result: result,
+                        index: index++,
+                        selection: STATE.selection
+                    });
+                })
             })
         }
     }
@@ -1199,19 +1218,21 @@ const parsePredictions = async (response) => {
     if (progress === 1) {
         COMPLETED.push(file);
         let fileSQL = prepSQL(file)
-        const row = await db.getAsync(`SELECT rowid
-                                       FROM files
-                                       WHERE name = '${fileSQL}'`);
-        if (!row) {
-            const result = `No predictions found in ${file}`;
-            UI.postMessage({
-                event: 'prediction-ongoing',
-                file: file,
-                result: result,
-                index: index,
-                selection: STATE.selection
-            });
-        }
+        db.getAsync(`SELECT rowid
+                     FROM files
+                     WHERE name = '${fileSQL}'`)
+            .then(row => {
+                if (!row) {
+                    const result = `No predictions found in ${file}`;
+                    UI.postMessage({
+                        event: 'prediction-ongoing',
+                        file: file,
+                        result: result,
+                        index: index,
+                        selection: STATE.selection
+                    });
+                }
+            })
         console.log(`Prediction done ${FILE_QUEUE.length} files to go`);
         console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
         UI.postMessage({event: 'progress', progress: 1.0, text: '...'});
@@ -1267,18 +1288,18 @@ async function parseMessage(e) {
                 process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, ${response.file},  Prediction requests ${predictionsRequested[response.file]}, predictions received ${predictionsReceived[response.file]}    \n`)
                 if (predictionsReceived[response.file] === predictionsRequested[response.file]) {
                     const limit = 10;
-                    await clearCache(CACHE_LOCATION, limit);
+                    clearCache(CACHE_LOCATION, limit);
                     // This is the one time results *do not* come from the database
                     if (STATE.selection) {
                         //i Get results here to fill in any previous detections in the range
-                        await getResults({files: PENDING_FILES})
+                        getResults({files: PENDING_FILES})
                     } else if (batchInProgress) {
                         UI.postMessage({
                             event: 'prediction-done', batchInProgress: true,
                         })
-                        await processNextFile(worker);
+                        processNextFile(worker);
                     } else {
-                        await getSummary({files: PENDING_FILES});
+                        getSummary({files: PENDING_FILES});
                     }
                 }
 
@@ -1286,7 +1307,7 @@ async function parseMessage(e) {
             }
             break;
         case 'spectrogram':
-            await onSpectrogram(response['filepath'], response['file'], response['width'], response['height'], response['image'], response['channels'])
+            onSpectrogram(response['filepath'], response['file'], response['width'], response['height'], response['image'], response['channels'])
             break;
     }
 }
@@ -1299,7 +1320,7 @@ async function processNextFile({
         predictionDone = false;
 
         let file = FILE_QUEUE.shift()
-        if (DATASET && FILE_QUEUE.length % 1000 === 0) {
+        if (DATASET && FILE_QUEUE.length % 100 === 0) {
             await onSave2DiskDB();
             console.log("Saved results to disk db", FILE_QUEUE.length, "files remaining")
         }
@@ -1308,7 +1329,7 @@ async function processNextFile({
             if (end) {
                 // If we have an end value already, we're analysing a selection
             }
-            if (start === undefined) [start, end] = await setStartEnd(file);
+            if  ( ! start) [start, end] = await setStartEnd(file);
             if (start === end) {
                 // Nothing to do for this file
                 COMPLETED.push(file);
@@ -1516,9 +1537,9 @@ const getResults = async ({
                                                WHERE datetime = ${result[i].timestamp}
                                                  AND confidence >= ${minConfidence}`)
             result[i].count = count;
-            sendResult(index++, result[i]);
+            sendResult(++index, result[i]);
         } else {
-            sendResult(index++, result[i])
+            sendResult(++index, result[i])
         }
     }
     console.log("database took", (Date.now() - t0) / 1000, " seconds")
@@ -1541,7 +1562,6 @@ const getResults = async ({
 
 const sendResult = (index, result) => {
     const file = result.file;
-    index++;
     UI.postMessage({
         event: 'prediction-ongoing',
         file: file,
@@ -1559,25 +1579,13 @@ const sendResult = (index, result) => {
     AUDACITY[file] ? AUDACITY[file].push(audacity) : AUDACITY[file] = [audacity];
 }
 
-const isDuplicate = async (file) => {
-    const baseName = file.replace(/^(.*)\..*$/g, '$1').replace("'", "''");
-    const row = await diskDB.getAsync(`SELECT *
-                                       FROM files
-                                       WHERE name LIKE '${baseName}%'`);
-    if (row) {
-        metadata[row.name] = {fileStart: row.filestart, duration: row.duration}
-        return row.name
-    }
-    return false
-}
 
-const getFileInfo = async (file) => {
+const getSavedFileInfo = async (file) => {
     // look for file in the disk DB, ignore extension
-    const baseName = file.replace(/^(.*)\..*$/g, '$1').replace("'", "''");
     return new Promise(function (resolve) {
-        diskDB.get(`SELECT *
-                    FROM files
-                    WHERE name LIKE '${baseName}%'`, (err, row) => {
+        const baseName = file.replace(/^(.*)\..*$/g, '$1');
+        const stmt = diskDB.prepare('SELECT * FROM files WHERE name LIKE  (?)');
+        stmt.get(baseName, (err, row) => {
             if (err) {
                 console.log('There was an error ', err)
             } else {
@@ -1606,11 +1614,12 @@ const onSave2DiskDB = async () => {
     console.log(response.changes + ' date durations added to disk database')
     response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.records SELECT * FROM records');
     console.log(response.changes + ' records added to disk database')
-    memoryDB.runAsync('END');
+    await memoryDB.runAsync('END');
+
+
     // Clear and relaunch the memory DB
     //memoryDB.close(); // is this necessary??
     if (!DATASET) {
-        await createDB();
         files.forEach(file => STATE.saved.add(file));
         // Now we have saved the records, set state to DiskDB
         STATE.db = diskDB;
@@ -1619,7 +1628,6 @@ const onSave2DiskDB = async () => {
             message: `Database update complete, ${response.changes} records added to the archive in ${((Date.now() - t0) / 1000)} seconds`
         })
     }
-
 }
 
 const getSeasonRecords = async (species, season) => {
@@ -1998,6 +2006,7 @@ async function onChartRequest(args) {
 
 const db2ResultSQL = `SELECT DISTINCT dateTime AS timestamp, 
   files.duration, 
+  files.filestart,
   files.name AS file, 
   position,
   species.sname, 
@@ -2009,6 +2018,7 @@ const db2ResultSQL = `SELECT DISTINCT dateTime AS timestamp,
                           INNER JOIN species
                       ON species.id = records.speciesID
                           INNER JOIN files ON records.fileID = files.rowid`;
+
 
 
 /*
