@@ -2553,12 +2553,10 @@ function setClickedIndex(target) {
 }
 
 
-$(document).on('click', '.delete', function (e) {
+$(document).on('dblclick', '.delete', function (e) {
     e.stopImmediatePropagation();
-    if (confirm("Delete record?")) {
-        deleteRecord(e.target);
-    }
-});
+            deleteRecord(e.target);
+    });
 
 const deleteRecord = (target, isBatch) => {
     resetRegions();
@@ -2566,16 +2564,12 @@ const deleteRecord = (target, isBatch) => {
     const [file, start, ,] = unpackNameAttr(target);
     const setting = target.closest('table');
     let context = isExplore() ? 'explore' : 'results';
-    let range, species;
+    let range, species = getSpecies(target);
     if (setting.id === 'selectionResults') {
         range = getSelectionRange();
         context = 'selection';
-        // Clear the modal of detections
-        //setting.querySelector('tbody').innerHTML = '';
-        species = getSpecies(target);
     } else {
         range = STATE.explore.range
-        species = isSpeciesViewFiltered(true);
     }
 
     let active = getActiveRow();
