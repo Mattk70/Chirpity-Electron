@@ -574,7 +574,7 @@ analyseSelectionLink.addEventListener('click', async () => {
     STATE.mode = 'analyse';
     analyseList = [currentFile];
     let start = region.start + bufferBegin;
-    let end = region.end + bufferBegin;
+    let end = region.end + bufferBegin - 0.001;
     if (end - start < 0.5) {
         region.end = region.start + 0.5;
         end = start + 0.5
@@ -582,7 +582,7 @@ analyseSelectionLink.addEventListener('click', async () => {
     STATE['selection']['start'] = start.toFixed(3);
     STATE['selection']['end'] = end.toFixed(3);
     postAnalyseMessage({
-        confidence: 0.1,
+        confidence: 2,
         resetResults: false,
         currentFile: currentFile,
         // The rounding below is essential to finding record in database
@@ -994,11 +994,11 @@ window.onload = async () => {
         latitude: 51.9,
         longitude: -0.4,
         nocmig: false,
-        snr: 5,
+        snr: 0,
         warmup: true,
         backend: 'tensorflow',
-        tensorflow: {threads: diagnostics['Cores'], batchSize: 2},
-        webgl: {threads: 1, batchSize: 2},
+        tensorflow: {threads: diagnostics['Cores'], batchSize: 4},
+        webgl: {threads: 1, batchSize: 4},
         limit: 500,
         fullscreen: false
     };
@@ -1346,10 +1346,11 @@ function sendFeedback(file, cname, sname) {
     sendFile('incorrect', predictions[clickedIndex]);
 }
 
-function getSpecies(e) {
-    const row = e.target.closest('tr');
-    const speciesCell = row.querySelector('.cname ul') || row.querySelector('.cname');
-    return speciesCell.firstElementChild.firstChild.nodeValue.trim();
+function getSpecies(target) {
+    const row = target.closest('tr');
+    const speciesCell = row.querySelector('.cname');
+    const species = speciesCell.innerText.split('\n')[0];
+    return species;
 }
 
 function updateLabel(e) {
@@ -1360,7 +1361,7 @@ function updateLabel(e) {
     let label = e.target.innerText.replace('Remove Label', '');
     // update the clicked badge
     const parent = e.target.parentNode;
-    const species = getSpecies(e)
+    const species = getSpecies(e.target)
     parent.innerHTML = label ? tags[label] : '';
     if (detectionContext === 'results' || detectionContext === 'selectionResults') {
         const [, start, ,] = unpackNameAttr(activeRow);
@@ -2486,7 +2487,7 @@ function commentHandler(e) {
         let species;
         if (isExplore()) {
             // Format species before we replace the target node
-            species = getSpecies(e)
+            species = getSpecies(e.target)
         } else {
             species = isSpeciesViewFiltered(true);
         }
@@ -2565,16 +2566,18 @@ const deleteRecord = (target, isBatch) => {
     const [file, start, ,] = unpackNameAttr(target);
     const setting = target.closest('table');
     let context = isExplore() ? 'explore' : 'results';
-    let range;
+    let range, species;
     if (setting.id === 'selectionResults') {
         range = getSelectionRange();
         context = 'selection';
         // Clear the modal of detections
         //setting.querySelector('tbody').innerHTML = '';
+        species = getSpecies(target);
     } else {
         range = STATE.explore.range
+        species = isSpeciesViewFiltered(true);
     }
-    const species = isSpeciesViewFiltered(true);
+
     let active = getActiveRow();
     worker.postMessage({
         action: 'delete',

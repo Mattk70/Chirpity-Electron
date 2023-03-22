@@ -15,7 +15,7 @@ let NUM_WORKERS;
 let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on every change
-let  select_records_stmt;
+let select_records_stmt;
 const DEBUG = true;
 
 const DATASET = false;
@@ -123,13 +123,13 @@ const createDB = async (file) => {
 }
 
 const prepare_statements = (db) => {
-     select_records_stmt = db.prepare(`SELECT species.cname, species.sname, records.confidence
-                                                   FROM species
-                                                            INNER JOIN records ON species.id = records.speciesID
-                                                   WHERE records.dateTime = (?)
-                                                     AND confidence > (?)
-                                                     AND speciesID NOT IN ((?))
-                                                   ORDER BY records.confidence DESC`);
+    select_records_stmt = db.prepare(`SELECT species.cname, species.sname, records.confidence
+                                      FROM species
+                                               INNER JOIN records ON species.id = records.speciesID
+                                      WHERE records.dateTime = (?)
+                                        AND confidence > (?)
+                                        AND speciesID NOT IN ((?))
+                                      ORDER BY records.confidence DESC`);
 }
 
 
@@ -149,7 +149,6 @@ async function loadDB(path) {
     }
     return true
 }
-
 
 
 let metadata = {};
@@ -1329,7 +1328,7 @@ async function processNextFile({
             if (end) {
                 // If we have an end value already, we're analysing a selection
             }
-            if  ( ! start) [start, end] = await setStartEnd(file);
+            if (!start) [start, end] = await setStartEnd(file);
             if (start === end) {
                 // Nothing to do for this file
                 COMPLETED.push(file);
@@ -1529,7 +1528,7 @@ const getResults = async ({
     let index = offset;
     AUDACITY = {};
     let t0 = Date.now()
-    const result = await db.allAsync(`${db2ResultSQL} ${where} ${when} ORDER BY ${order} LIMIT ${limit} OFFSET ${offset}`);
+    const result = await db.allAsync(`${db2ResultSQL} ${where} ${when} ORDER BY ${order}, confidence DESC LIMIT ${limit} OFFSET ${offset}`);
     for (let i = 0; i < result.length; i++) {
         if (species && context !== 'explore') {
             const {count} = await db.getAsync(`SELECT COUNT(*) as count
@@ -1823,12 +1822,17 @@ async function onDelete({
                                            from files
                                            WHERE name = '${file}'`);
     const datetime = filestart + (parseFloat(start) * 1000);
-    await db.runAsync('DELETE FROM records WHERE datetime = ' + datetime);
+    const speciesSQL= prepSQL(species);
+    await db.runAsync(`DELETE FROM records WHERE datetime = ${datetime} 
+                      AND speciesID  =  
+                          (SELECT id FROM species WHERE  cname = '${speciesSQL}')
+                      `)
+
     if (context === 'selection') {
         // Is this the last of  multiple deletions?
         if (batch === false) {
             // Add resetResults to arguments[0]
-
+            arguments[0].species = undefined;
             await getResults(arguments[0]);
         } else if (batch === 0) {
             arguments[0].context = 'results';
@@ -1843,6 +1847,8 @@ async function onDelete({
             getSpecies(range);
         }
     }
+
+
 }
 
 async function onUpdateRecord({
@@ -2018,7 +2024,6 @@ const db2ResultSQL = `SELECT DISTINCT dateTime AS timestamp,
                           INNER JOIN species
                       ON species.id = records.speciesID
                           INNER JOIN files ON records.fileID = files.rowid`;
-
 
 
 /*
