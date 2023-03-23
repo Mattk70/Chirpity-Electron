@@ -569,11 +569,11 @@ reanalyseAllLink.addEventListener('click', async () => {
     postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: fileList, reanalyse: true});
 });
 
-const analyseSelectionLink = document.getElementById('analyseSelection');
-analyseSelectionLink.addEventListener('click', async () => {
+const getSelectionResults = () => {
     STATE.mode = 'analyse';
     analyseList = [currentFile];
     let start = region.start + bufferBegin;
+    // Remove small amount of region to avoid pulling in results from 'end'
     let end = region.end + bufferBegin - 0.001;
     if (end - start < 0.5) {
         region.end = region.start + 0.5;
@@ -582,15 +582,16 @@ analyseSelectionLink.addEventListener('click', async () => {
     STATE['selection']['start'] = start.toFixed(3);
     STATE['selection']['end'] = end.toFixed(3);
     postAnalyseMessage({
-        confidence: 2,
+        confidence: config.minConfidence,
         resetResults: false,
         currentFile: currentFile,
-        // The rounding below is essential to finding record in database
         start: STATE['selection']['start'],
         end: STATE['selection']['end'],
-
     });
-});
+}
+
+const analyseSelectionLink = document.getElementById('analyseSelection');
+analyseSelectionLink.addEventListener('click', getSelectionResults);
 
 function postAnalyseMessage(args) {
 
@@ -747,7 +748,9 @@ function resultClick(e) {
     const params = row.attributes[2].value.split('|');
     if (e.target.classList.contains('play')) params.push('true')
     loadResultRegion(params);
-
+    if (e.target.classList.contains('circle')){
+        getSelectionResults()
+    }
 }
 
 function loadResultRegion(params) {
@@ -2074,7 +2077,6 @@ async function onWorkerLoadedAudio({
         if (fileList.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
     }
     fileLoaded = true;
-    resetRegions();
     updateSpec({buffer: currentBuffer, play: play, resetSpec: resetSpec})
     wavesurfer.seekTo(position);
     if (fileRegion) {
@@ -2082,6 +2084,8 @@ async function onWorkerLoadedAudio({
         if (fileRegion.play) {
             region.play()
         }
+    } else {
+        resetRegions();
     }
 }
 
@@ -2201,11 +2205,13 @@ async function onPredictionDone({
         // Refresh node and scroll to active row:
         activeRow = document.getElementById(active)
         if (activeRow === null) { // because: after an edit the active row may not exist
-            resultTable = document.getElementById('resultTableBody');
+            resultTable = resultTableElement.getElementById('resultTableBody');
             const rows = resultTable.querySelectorAll('tr.daytime, tr.nighttime')
             if (rows.length) {
                 activeRow = rows[rows.length - 1];
             }
+        } else {
+            activeRow.classList.add('table-active');
         }
         activeRow.focus();
         activeRow.click();
@@ -2286,7 +2292,11 @@ function setFilter() {
     const target = this.location ? undefined : this.querySelector('span.pointer');
     if (target?.classList.contains('text-warning')) {
         // Clicked on filtered species icon
-        worker.postMessage({action: 'filter', files: isExplore() ? [] : analyseList || fileList, order: STATE.explore.order});
+        worker.postMessage({
+            action: 'filter',
+            files: isExplore() ? [] : analyseList || fileList,
+            order: STATE.explore.order
+        });
         // Clear species from STATE
         STATE.explore.species = undefined;
     } else {
@@ -2382,7 +2392,7 @@ async function renderResult({
         const showTimeOfDay = config.timeOfDay ? '' : 'd-none';
         const activeTable = active ? 'table-active' : '';
         const labelHTML = label ? tags[label] : tags['Remove Label'];
-        const countIcon = count > 1 ? `<span class="circle">${count}</span>` : '';
+        const countIcon = count > 1 ? `<span class="circle pointer">${count}</span>` : '';
 
         tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${position + 3}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
             <th scope='row'>${index}</th>
@@ -2407,13 +2417,14 @@ let resultsBuffer, detectionsModal;
 const detectionsModalDiv = document.getElementById('detectionsModal')
 
 detectionsModalDiv.addEventListener('hidden.bs.modal', () => {
-    resetRegions();
+    //resetRegions();
     worker.postMessage({action: 'selection-off'});
     worker.postMessage({action: 'set-variables', confidence: config.minConfidence})
     worker.postMessage({
         action: 'filter',
         species: isSpeciesViewFiltered(true),
         files: fileList,
+        active: getActiveRow(),
         explore: isExplore(),
         order: STATE.explore.order
     });
@@ -2431,12 +2442,13 @@ detectionsDismiss.addEventListener('click', event => {
         }
     });
     STATE.selection = {start: undefined, end: undefined};
-
+    selectionTable.innerText = '';
 });
 
 const detectionsAdd = document.getElementById('detections-add');
 detectionsAdd.addEventListener('click', event => {
     STATE.selection = {start: undefined, end: undefined};
+    selectionTable.innerText = '';
 });
 
 const updateResultTable = (row, isFromCache, isSelection) => {
@@ -2473,6 +2485,7 @@ $(document).on('click', '.add-comment, .edit-comment', function (e) {
     parent.firstChild.focus();
 });
 
+//$(document).on('click', ".circle", getSelectionResults)
 
 const isExplore = () => {
     return STATE.mode === 'explore';
@@ -2555,21 +2568,23 @@ function setClickedIndex(target) {
 
 $(document).on('dblclick', '.delete', function (e) {
     e.stopImmediatePropagation();
-            deleteRecord(e.target);
-    });
+    deleteRecord(e.target);
+});
 
 const deleteRecord = (target, isBatch) => {
-    resetRegions();
+    //resetRegions();
     setClickedIndex(target);
     const [file, start, ,] = unpackNameAttr(target);
     const setting = target.closest('table');
     let context = isExplore() ? 'explore' : 'results';
-    let range, species = getSpecies(target);
+    let range, species;
     if (setting.id === 'selectionResults') {
         range = getSelectionRange();
         context = 'selection';
+        species = getSpecies(target);
     } else {
         range = STATE.explore.range
+        species = isSpeciesViewFiltered(true)
     }
 
     let active = getActiveRow();
