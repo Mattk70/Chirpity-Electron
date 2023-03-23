@@ -799,12 +799,10 @@ const getPredictBuffers = async ({
         if (offlineCtx) {
             offlineCtx.startRendering().then((resampled) => {
                 const myArray = resampled.getChannelData(0);
-                if (worker === undefined) {
-                    if (++workerInstance === NUM_WORKERS) {
-                        workerInstance = 0;
-                    }
-                    worker = workerInstance;
+                if (++workerInstance === NUM_WORKERS) {
+                    workerInstance = 0;
                 }
+                worker = workerInstance;
                 feedChunksToModel(myArray, chunkStart, file, end, resetResults, worker);
                 chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
                 // Now the async stuff is done ==>
@@ -816,7 +814,7 @@ const getPredictBuffers = async ({
         } else {
             console.log('Short chunk', chunk.length, 'skipping')
             if (worker === undefined) {
-                if (++workerInstance === NUM_WORKERS) {
+                if (++workerInstance >= NUM_WORKERS) {
                     workerInstance = 0;
                 }
                 worker = workerInstance;
@@ -912,7 +910,7 @@ async function doPrediction({
                             }) {
     predictionDone = false;
     predictionStart = new Date();
-    await getPredictBuffers({file: file, start: start, end: end, resetResults: resetResults, worker: worker});
+    await getPredictBuffers({file: file, start: start, end: end, resetResults: resetResults, worker: undefined});
     UI.postMessage({event: 'update-audio-duration', value: metadata[file].duration});
 }
 
@@ -1822,11 +1820,13 @@ async function onDelete({
                                            from files
                                            WHERE name = '${file}'`);
     const datetime = filestart + (parseFloat(start) * 1000);
-    const speciesSQL= prepSQL(species);
-    await db.runAsync(`DELETE FROM records WHERE datetime = ${datetime} 
-                      AND speciesID  =  
-                          (SELECT id FROM species WHERE  cname = '${speciesSQL}')
-                      `)
+    const speciesSQL = prepSQL(species);
+    await db.runAsync(`DELETE
+                       FROM records
+                       WHERE datetime = ${datetime}
+                         AND speciesID =
+                             (SELECT id FROM species WHERE cname = '${speciesSQL}')
+    `)
 
     if (context === 'selection') {
         // Is this the last of  multiple deletions?
