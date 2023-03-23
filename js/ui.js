@@ -533,19 +533,17 @@ function refreshResultsView() {
 const navbarAnalysis = document.getElementById('navbarAnalysis');
 navbarAnalysis.addEventListener('click', async () => {
     refreshResultsView();
-
+    STATE.mode = 'analyse';
 });
 
 const analyseLink = document.getElementById('analyse');
 analyseLink.addEventListener('click', async () => {
-    STATE.mode = 'analyse';
     analyseList = [currentFile];
     postAnalyseMessage({confidence: config.minConfidence, resetResults: true, currentFile: currentFile});
 });
 
 const reanalyseLink = document.getElementById('reanalyse');
 reanalyseLink.addEventListener('click', async () => {
-    STATE.mode = 'analyse';
     analyseList = [currentFile];
     postAnalyseMessage({
         confidence: config.minConfidence,
@@ -557,14 +555,12 @@ reanalyseLink.addEventListener('click', async () => {
 
 const analyseAllLink = document.getElementById('analyseAll');
 analyseAllLink.addEventListener('click', async () => {
-    STATE.mode = 'analyse';
     analyseList = undefined;
     postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: fileList});
 });
 
 const reanalyseAllLink = document.getElementById('reanalyseAll');
 reanalyseAllLink.addEventListener('click', async () => {
-    STATE.mode = 'analyse';
     analyseList = undefined;
     postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: fileList, reanalyse: true});
 });
@@ -697,7 +693,7 @@ exploreLink.addEventListener('click', async () => {
     worker.postMessage({action: 'get-detected-species-list', range: STATE.explore.range});
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
-    setFilter();
+    //setFilter();
     //hideElement(['completeDiv']);
     //adjustSpecDims(true);
 });
@@ -748,7 +744,7 @@ function resultClick(e) {
     const params = row.attributes[2].value.split('|');
     if (e.target.classList.contains('play')) params.push('true')
     loadResultRegion(params);
-    if (e.target.classList.contains('circle')){
+    if (e.target.classList.contains('circle')) {
         getSelectionResults()
     }
 }
@@ -2578,13 +2574,15 @@ const deleteRecord = (target, isBatch) => {
     const setting = target.closest('table');
     let context = isExplore() ? 'explore' : 'results';
     let range, species;
-    if (setting.id === 'selectionResults') {
-        range = getSelectionRange();
-        context = 'selection';
-        species = getSpecies(target);
-    } else {
+    if (setting.id === 'summary') {
         range = STATE.explore.range
         species = isSpeciesViewFiltered(true)
+    } else {
+        if (setting.id === 'selection') {
+            range = getSelectionRange();
+            context = 'selection';
+        }
+        species = getSpecies(target);
     }
 
     let active = getActiveRow();
@@ -2604,7 +2602,9 @@ const deleteRecord = (target, isBatch) => {
 }
 
 const getSelectionRange = () => {
-    return {start: (STATE.selection.start * 1000) + fileStart, end: (STATE.selection.end * 1000) + fileStart}
+    return STATE.selection ?
+        {start: (STATE.selection.start * 1000) + fileStart, end: (STATE.selection.end * 1000) + fileStart} :
+        undefined
 }
 
 function formatSpeciesName(filename) {
