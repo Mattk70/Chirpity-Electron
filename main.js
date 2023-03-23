@@ -270,12 +270,12 @@ app.whenReady().then(async () => {
         const dialogOpts = {
             type: 'warning',
             title: 'Crash report',
-            detail: 'Oh no! The model had crashed, restarting Chirpity'
+            detail: 'Oh no! The model has crashed'
         };
 
         dialog.showMessageBox(dialogOpts).then((returnValue) => {
             if (returnValue.response === 0) {
-                app.relaunch();
+                //app.relaunch();
                 app.quit();
             }
         })
