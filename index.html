@@ -89,250 +89,139 @@
                     </li>
                     <li class="nav-item dropdown" id="myDropdown">
                         <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown"> Settings </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#"> Predictions &raquo; </a>
-                                <ul class=" ">
-                                    <li title="Cutoff threshold for prediction confidence">
-                                        <a class="dropdown-item" href="#">Set Threshold
-                                            <div style="width:100px">
-                                            <span class="input-group">
-                                                  <input type="text" class="input form-control" id="threshold"
-                                                         aria-label="Cutoff threshold for prediction confidence"><span
-                                                    class="input-group-text">%</span>
-                                            </span>
-                                            </div>
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <hr class="dropdown-divider">
-                                    </li>
-                                    <li>
-                                        <a href="#" class="dropdown-item" data-bs-toggle="dropdown"
-                                           role="button"
-                                           aria-haspopup="true" aria-expanded="false"> <span
-                                                class="nav-label">Model &raquo;</span></a>
-                                        <ul class="ps-1 pe-1">
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="densenet"
-                                                       name="model" value="densenet">
-                                                <label class="form-check-label" for="densenet">DenseNet</label>
-                                            </li>
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="efficientnet"
-                                                       name="model" value="efficientnet">
-                                                <label class="form-check-label" for="efficientnet">EfficientNet</label>
-                                            </li>
-                                        </ul>
-                                    </li>
-                                    <li>
-                                        <a href="#" class="dropdown-item" data-bs-toggle="dropdown"
-                                           role="button"
-                                           aria-haspopup="true" aria-expanded="false"> <span
-                                                class="nav-label">Backend &raquo;</span></a>
-                                        <ul class="ps-1 pe-1">
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="tensorflow"
-                                                       name="backend" value="tensorflow">
-                                                <label class="form-check-label" for="tensorflow">CPU</label>
-                                            </li>
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="webgl"
-                                                       name="backend" value="webgl">
-                                                <label class="form-check-label" for="webgl">GPU</label>
-                                            </li>
-                                        </ul>
-                                    </li>
-                                    <li>
-                                        <a href="#" class="dropdown-item" data-bs-toggle="dropdown"
-                                           role="button"
-                                           aria-haspopup="true" aria-expanded="false"> <span
-                                                class="nav-label">Search For &raquo;</span></a>
-                                        <ul class="p-1">
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="migrants"
-                                                       name="list" value="migrants" checked>
-                                                <label class="form-check-label text-nowrap" for="migrants">Migrants and
-                                                    Owls</label>
-                                            </li>
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="birds" name="list"
-                                                       value="birds">
-                                                <label class="form-check-label" for="birds">All Birds</label>
-                                            </li>
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="everything"
-                                                       name="list" value="everything">
-                                                <label class="form-check-label" for="everything">Everything</label>
-                                            </li>
-                                        </ul>
-                                    </li>
-                                    <li>
-                                        <a href="#" class="dropdown-item" data-bs-toggle="dropdown"
-                                           role="button"
-                                           aria-haspopup="true" aria-expanded="false"> <span
-                                                class="nav-label">Threads&raquo;</span></a>
-                                        <ul class="p-1" style="width: 225px">
-                                            <li class="form-check">
-                                                <label for="number-of-threads" class="form-label"
-                                                       title="Number of parallel predictions to run.">Number of
-                                                    threads</label>
-                                                <input type="range" class="form-range" min="1" max="6"
-                                                       id="number-of-threads"><span
-                                                    class="border rounded-2 align-baseline" id="threads"></span>
-                                            </li>
-                                        </ul>
-                                    </li>
-                                    <li>
-                                        <a href="#" class="dropdown-item" data-bs-toggle="dropdown"
-                                           role="button"
-                                           aria-haspopup="true" aria-expanded="false"> <span
-                                                class="nav-label">SNR Threshold&raquo;</span></a>
-                                        <ul class="p-1" style="width: 225px">
-                                            <li class="form-check">
-                                                <label for="snrValue" class="form-label"
-                                                       title="Ignore samples with just background noise. Value is the minimum signal strength to look at.">Signal
-                                                    to Noise Threshold</label>
-                                                <input type="range" class="form-range" min="0" max="10" step="0.5"
-                                                       id="snrValue"><span class="border rounded-2 align-baseline"
-                                                                           id="SNR-threshold"></span>
-                                            </li>
-                                        </ul>
-                                    </li>
-                                    <li title="Optimising the batch size can increase the prediction speed by 2-3x on longer files.&#10;If it is too large, the model will terminate.&#10;If that happens, set a lower batch size and restart Chirpity">
-                                        <a href="#" class="dropdown-item" data-bs-toggle="dropdown"
-                                           role="button"
-                                           aria-haspopup="true" aria-expanded="false"> <span
-                                                class="nav-label">Batch Size &raquo;</span></a>
-                                        <ul class="p-1">
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="1"
-                                                       name="batch" value="1">
-                                                <label class="form-check-label"
-                                                       for="1">1</label>
-                                            </li>
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="2"
-                                                       name="batch" value="2">
-                                                <label class="form-check-label"
-                                                       for="2">2</label>
-                                            </li>
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="3"
-                                                       name="batch" value="3">
-                                                <label class="form-check-label"
-                                                       for="3">3</label>
-                                            </li>
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="4"
-                                                       name="batch" value="4">
-                                                <label class="form-check-label"
-                                                       for="4">4</label>
-                                            </li>
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="6"
-                                                       name="batch" value="6">
-                                                <label class="form-check-label"
-                                                       for="6">6</label>
-                                            </li>
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="8"
-                                                       name="batch" value="8">
-                                                <label class="form-check-label"
-                                                       for="8">8</label>
-                                            </li>
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="12"
-                                                       name="batch" value="12">
-                                                <label class="form-check-label"
-                                                       for="12">12</label>
-                                            </li>
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="16"
-                                                       name="batch" value="16">
-                                                <label class="form-check-label"
-                                                       for="16">16</label>
-                                            </li>
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="24"
-                                                       name="batch" value="24">
-                                                <label class="form-check-label"
-                                                       for="24">24</label>
-                                            </li>
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="32"
-                                                       name="batch" value="32">
-                                                <label class="form-check-label"
-                                                       for="32">32</label>
-                                            </li>
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="36"
-                                                       name="batch" value="36">
-                                                <label class="form-check-label"
-                                                       for="36">36</label>
-                                            </li>
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="48"
-                                                       name="batch" value="48">
-                                                <label class="form-check-label"
-                                                       for="48">48</label>
-                                            </li>
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="64"
-                                                       name="batch" value="64">
-                                                <label class="form-check-label"
-                                                       for="64">64</label>
-                                            </li>
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input" id="128"
-                                                       name="batch" value="128">
-                                                <label class="form-check-label"
-                                                       for="128">128</label>
-                                            </li>
-                                        </ul>
-                                    </li>
-                                </ul>
-                            </li>
+                        <ul class="navbar-nav dropdown-menu">
                             <li>
-                                <a href="#" class="dropdown-item" data-bs-toggle="dropdown" role="button"
-                                   aria-haspopup="true" aria-expanded="false"><span
-                                        class="nav-label">Spectrogram &raquo;</span></a>
-                                <ul class="p-1">
-                                    <li class="form-check">
-                                        <input type="radio" class="form-check-input speccolor" id="inferno"
-                                               name="colormap" value="inferno" checked>
-                                        <label class="form-check-label"
-                                               for="inferno">Colour</label>
-                                    </li>
-                                    <li class="form-check">
-                                        <input type="radio" class="form-check-input speccolor" id="greys"
-                                               name="colormap" value="greys" checked>
-                                        <label class="form-check-label"
-                                               for="greys">Greyscale</label>
-                                    </li>
-                                    <li>
-                                        <a href="#" class="dropdown-item" id="timelineFeatures"
-                                           data-bs-toggle="dropdown"
-                                           role="button"
-                                           aria-haspopup="true" aria-expanded="false"> <span
-                                                class="nav-label">Timeline &raquo;</span></a>
-                                        <ul class="p-1">
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input"
-                                                       id="timecode"
-                                                       name="timeline" value="timecode" checked>
-                                                <label class="form-check-label"
-                                                       for="timecode">Timecode</label>
-                                            </li>
-                                            <li class="form-check">
-                                                <input type="radio" class="form-check-input"
-                                                       id="timeOfDay"
-                                                       name="timeline" value="timeOfDay" checked>
-                                                <label class="form-check-label text-nowrap"
-                                                       for="timeOfDay">Time of Day</label>
-                                            </li>
-                                        </ul>
-                                    </li>
-                                </ul>
+                                <form style="width: 540px;">
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <fieldset class="border rounded m-2 p-1">
+                                                <legend style="font-size: 18px">Predictions</legend>
+                                                <div class="form-group rounded p-2 mb-2 bg-light">
+                                                    <label for="confidence">Set threshold:</label>
+                                                    <div class="input-group">
+                                                        <input type="range" class="form-control-range" id="confidence"
+                                                               min="5"
+                                                               max="100"
+                                                        step="5">
+                                                        <div class="input-group-append">
+                                                            <span class="input-group-text"
+                                                                  id="confidence-value">50%</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="form-group rounded p-2 mb-2 bg-light">
+                                                    <label for="list-to-use">Search For:</label>
+                                                    <select class="form-control" id="list-to-use">
+                                                        <option value="migrants">Migrants and Owls</option>
+                                                        <option value="birds">Birds</option>
+                                                        <option value="everything">Everything</option>
+                                                    </select>
+                                                </div>
+                                            </fieldset>
+                                        </div>
+                                        <div class="col-6">
+                                            <fieldset class="border rounded m-2 p-1">
+                                                <legend style="font-size: 18px">Spectrogram</legend>
+                                                <div class="form-group rounded p-2 mb-2 bg-light">
+                                                    <label for="colourmap">Colourmap:</label>
+                                                    <select class="form-control" id="colourmap">
+                                                        <option value="greys">Greyscale</option>
+                                                        <option value="inferno">Colour</option>
+                                                    </select>
+                                                </div>
+                                                <div class="form-group rounded p-2 mb-2 bg-light">
+                                                    <label for="timeline">Timeline:</label>
+                                                    <select class="form-control" id="timelineSetting">
+                                                        <option value="timecode">Timecode</option>
+                                                        <option value="timeOfDay">Time of day</option>
+                                                    </select>
+                                                </div>
+                                            </fieldset>
+                                        </div>
+                                    </div>
+                                    <fieldset class="border rounded m-2 p-1">
+                                        <legend style="font-size: 18px">System</legend>
+                                        <div class="container">
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="form-group rounded p-2 mb-2 bg-light">
+                                                        <label>Backend:</label>
+                                                        <div class="form-check form-check-inline">
+                                                            <input class="form-check-input" type="radio" name="backend"
+                                                                   id="tensorflow"
+                                                                   value="tensorflow" checked>
+                                                            <label class="form-check-label" for="tensorflow">
+                                                                CPU
+                                                            </label>
+                                                        </div>
+                                                        <div class="form-check form-check-inline">
+                                                            <input class="form-check-input" type="radio" name="backend"
+                                                                   id="webgl"
+                                                                   value="webgl">
+                                                            <label class="form-check-label" for="webgl">
+                                                                GPU
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col">
+                                                    <div class="form-group rounded p-2 mb-2 bg-light">
+                                                        <label for="thread-slider"
+                                                               title="Number of parallel predictions to run.">Threads:</label>
+                                                        <div class="input-group">
+                                                            <input type="range" class="form-control-range"
+                                                                   id="thread-slider" min="1"
+                                                                   max="24">
+                                                            <div class="input-group-append">
+                                                                    <span class="input-group-text"
+                                                                          id="threads-value">12</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col me-auto">
+                                                        <div class="form-group rounded p-2 mb-2 bg-light">
+                                                            <label for="snrValue" class="form-label"
+                                                                   title="Ignore samples with just background noise. Value is the minimum signal strength to look at.">Signal
+                                                                to Noise Threshold:</label>
+                                                            <div class="input-group">
+                                                                <input type="range" class="form-control-range" min="0"
+                                                                       max="10"
+                                                                       step="0.5"
+                                                                       id="snrValue">
+                                                                <div class="input-group-append">
+                                                                <span class="input-group-text"
+                                                                      id="SNR-threshold">0</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                    </div>
+                                                    <div class="col ">
+                                                        <div class="form-group rounded p-2 mb-2 bg-light">
+                                                            <label for="batch-size"
+                                                                   title="Optimising the batch size can increase the prediction speed by 2-3x on longer files.&#10;If it is too large, the model will terminate.&#10;If that happens, set a lower batch size and restart Chirpity">Batch
+                                                                Size:</label>
+                                                            <div class="input-group">
+                                                                <input type="range" class="form-control-range"
+                                                                       id="batch-size"
+                                                                       min="0"
+                                                                       max="7">
+                                                                <div class="input-group-append">
+                                                            <span class="input-group-text"
+                                                                  id="batch-size-value">2</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                        </div>
+                                    </fieldset>
+                                </form>
                             </li>
                         </ul>
                     </li>
@@ -497,7 +386,7 @@
             </div>
             <div id="progressDiv" class="col-2" style="display:none"><span
                     id="fileNumber"></span><br>
-                    <progress id="progress-bar" max="100"></progress>
+                <progress id="progress-bar" max="100"></progress>
             </div>
 
             <div id="complete" class="col-2 pe-2" style="display:none">

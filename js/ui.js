@@ -16,6 +16,9 @@ const STATE = {
     mode: 'analyse'
 }
 
+// Batch size map for slider
+const BATCH_SIZE_LIST = [1, 2, 4, 8, 16, 32, 36, 48, 64, 128];
+
 // Get the modules loaded in preload.js
 const fs = window.module.fs;
 const colormap = window.module.colormap;
@@ -98,13 +101,10 @@ const summaryTable = $('#summaryTable');
 const progressDiv = $('#progressDiv');
 const progressBar = document.getElementById('progress-bar');
 const fileNumber = document.getElementById('fileNumber');
-const timeOfDay = document.getElementById('timeOfDay');
-const timecode = document.getElementById('timecode');
-const inferno = document.getElementById('inferno');
-const greys = document.getElementById('greys');
-const resultsDiv = document.getElementById('resultsDiv');
-//const summaryButton = document.getElementById('showSummary');
-const summaryDiv = document.getElementById('summary');
+const timelineSetting = document.getElementById('timelineSetting');
+const colourmap = document.getElementById('colourmap');
+const thresholdLink = document.getElementById('threshold');
+const batchSizeValue = document.getElementById('batch-size-value');
 
 
 let batchInProgress = false;
@@ -289,7 +289,7 @@ const initWavesurfer = ({
     initSpectrogram();
     createTimeline();
     if (audio) wavesurfer.loadDecodedBuffer(audio);
-    config.colormap === 'greys' ? greys.clicked = true : inferno.clicked = true;
+    colourmap.value = config.colormap === 'greys' ? 'greys' : 'inferno';
     // Set click event that removes all regions
 
     waveElement.mousedown(function () {
@@ -693,9 +693,6 @@ exploreLink.addEventListener('click', async () => {
     worker.postMessage({action: 'get-detected-species-list', range: STATE.explore.range});
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
-    //setFilter();
-    //hideElement(['completeDiv']);
-    //adjustSpecDims(true);
 });
 
 const datasetLink = document.getElementById('dataset');
@@ -964,6 +961,8 @@ function primaryLabelInterval(pxPerSec) {
  * @param pxPerSec
  */
 function secondaryLabelInterval(pxPerSec) {
+    const mulFactor = window.devicePixelRatio || 1;
+    const threshold = pxPerSec / mulFactor;
     // draw one every 1s as an example
     return Math.floor(1 / timeInterval(threshold));
 }
@@ -1022,12 +1021,15 @@ window.onload = async () => {
             // Initialize Spectrogram
             initWavesurfer({});
             // Set UI option state
-            const batchSizeElement = document.getElementById(config[config.backend].batchSize);
-            batchSizeElement.checked = true;
+            const batchSizeSlider = document.getElementById('batch-size');
+            // Map slider value to batch size
+            batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
+            batchSizeSlider.max = (BATCH_SIZE_LIST.length - 1).toString();
+            batchSizeValue.innerText = config[config.backend].batchSize;
             diagnostics['Batch size'] = config[config.backend].batchSize;
-            const modelToUse = document.getElementById(config.model);
-            modelToUse.checked = true;
-            diagnostics['Model'] = config.model;
+            // const modelToUse = document.getElementById(config.model);
+            // modelToUse.checked = true;
+            // diagnostics['Model'] = config.model;
             const backend = document.getElementById(config.backend);
             backend.checked = true;
             // Show time of day in results?
@@ -1037,27 +1039,29 @@ window.onload = async () => {
                     el.classList.add('d-none')
                 })
             }
-            // Add a checkmark to the list in use
-            window[config.list].checked = true;
+            // Show the list in use
+            document.getElementById('list-to-use').value = config.list;
             // And update the icon
             updateListIcon();
-            config.timeOfDay ? timeOfDay.checked = true : timecode.checked = true;
+            timelineSetting.value = config.timeOfDay ? 'timeOfDay' : 'timecode';
             // Spectrogram colour
-            config.colormap === 'inferno' ? inferno.checked = true : greys.checked = true;
+            colourmap.value = config.colormap === 'greys' ? 'greys' : 'inferno';
             // Nocmig mode state
             console.log('nocmig mode is ' + config.nocmig)
             nocmigButton.innerText = config.nocmig ? 'bedtime' : 'bedtime_off';
             nocmigButton.title = config.nocmig ? 'Nocmig mode on' : 'Nocmig mode off';
-            thresholdLink.value = config.minConfidence;
+            confidenceRange.value = config.minConfidence;
             thresholdDisplay.innerHTML = `<b>${config.minConfidence}%</b>`;
             confidenceSlider.value = config.minConfidence;
+            confidenceDisplay.innerText = config.minConfidence;
+            confidenceRange.value = config.minConfidence;
             SNRSlider.value = config.snr;
             SNRThreshold.innerText = config.snr;
             SNRSlider.disabled = config.backend === 'webgl';
             ThreadSlider.max = diagnostics['Cores'];
             ThreadSlider.value = config[config.backend].threads;
             numberOfThreads.innerText = config[config.backend].threads;
-            showElement([config.colormap], true)
+            //showElement([config.colormap], true)
             worker.postMessage({
                 action: 'set-variables',
                 path: appPath,
@@ -1716,8 +1720,8 @@ function initSpectrogram(height, fftSamples) {
     updateElementCache();
 }
 
-$(document).on('click', '.speccolor', function (e) {
-    config.colormap = e.target.id;
+colourmap.addEventListener('change', (e) =>{
+    config.colormap = e.target.value;
     updatePrefs();
     if (wavesurfer) {
         initSpectrogram();
@@ -1727,20 +1731,55 @@ $(document).on('click', '.speccolor', function (e) {
     }
 })
 
-const listToUse = document.getElementsByName('list');
-for (let i = 0; i < listToUse.length; i++) {
-    listToUse[i].addEventListener('click', function (e) {
-        config.list = e.target.value;
-        updateListIcon();
-        updatePrefs();
-        worker.postMessage({action: 'update-list', list: config.list, explore: isExplore()})
-        setFilter();
-    })
+
+// list mode icons
+const listIcon = document.getElementById('list-icon')
+const updateListIcon = () => {
+    const icon = listIcon.querySelector('img');
+    icon.src = icon.src.replace(/\w+\.png$/, config.list + '.png');
+    const states = {
+        migrants: 'Searching for migrants and owls',
+        birds: 'Searching for all birds',
+        everything: 'Searching for everything'
+    };
+    icon.title = states[config.list];
 }
+listIcon.addEventListener('click', () => {
+    let img = listIcon.querySelector('img')
+    const states = {
+        migrants: 'Searching for migrants and owls',
+        birds: 'Searching for all birds',
+        everything: 'Searching for everything'
+    };
+    const keys = Object.keys(states);
+    for (let key in Object.keys(states)) {
+        key = parseInt(key);
+        if (img.src.indexOf(keys[key]) !== -1) {
+            const replace = (key === keys.length - 1) ? 0 : key + 1;
+            img.src = img.src.replace(keys[key], keys[replace]);
+            img.title = states[keys[replace]];
+            listToUse.value = keys[replace];
+            config.list = keys[replace];
+            updatePrefs();
+            worker.postMessage({action: 'update-list', list: config.list, explore: isExplore()})
+            // setTimeout(setFilter, 10);
+            break
+        }
+    }
+})
+
+
+const listToUse = document.getElementById('list-to-use');
+listToUse.addEventListener('change', function (e) {
+    config.list = e.target.value;
+    updateListIcon();
+    updatePrefs();
+    worker.postMessage({action: 'update-list', list: config.list, explore: isExplore()})
+    setFilter();
+})
 
 const loadModel = () => {
     t0_warmup = Date.now();
-    ;
     worker.postMessage({
         action: 'load-model',
         model: config.model,
@@ -1771,8 +1810,8 @@ for (let i = 0; i < backend.length; i++) {
         // Update threads and batch Size in UI
         ThreadSlider.value = config[config.backend].threads;
         numberOfThreads.innerText = config[config.backend].threads;
-        const activeBatchSizeRadio = document.getElementById(config[config.backend].batchSize);
-        activeBatchSizeRadio.checked = true;
+        batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
+        batchSizeValue.innerText = BATCH_SIZE_LIST[batchSizeSlider.value].toString();
         config.backend === 'webgl' ? powerSave(true) : powerSave(false);
         updatePrefs();
         loadModel();
@@ -1781,7 +1820,7 @@ for (let i = 0; i < backend.length; i++) {
 
 const timelineToggle = (e) => {
     // set file creation time
-    config.timeOfDay = e.target.id === 'timeOfDay'; //toggle setting
+    config.timeOfDay = e.target.value === 'timeOfDay'; //toggle setting
     const timeFields = document.querySelectorAll('.timestamp')
     timeFields.forEach(time => {
         config.timeOfDay ? time.classList.remove('d-none') :
@@ -1793,8 +1832,7 @@ const timelineToggle = (e) => {
     }
     updatePrefs();
 };
-document.getElementById('timeOfDay').addEventListener('click', timelineToggle);
-document.getElementById('timecode').addEventListener('click', timelineToggle);
+document.getElementById('timelineSetting').addEventListener('change', timelineToggle);
 
 /////////// Keyboard Shortcuts  ////////////
 
@@ -2791,17 +2829,19 @@ document.getElementById('playToggle').addEventListener('mousedown', async () => 
 document.getElementById('zoomIn').addEventListener('click', zoomSpec);
 document.getElementById('zoomOut').addEventListener('click', zoomSpec);
 
-// Listeners to set batch size
-const batchRadios = document.getElementsByName('batch');
+// Listeners to set and display  batch size
+const batchSizeSlider = document.getElementById('batch-size');
 
-for (let i = 0; i < batchRadios.length; i++) {
-    batchRadios[i].addEventListener('click', (e) => {
-        config[config.backend].batchSize = e.target.value;
-        diagnostics['Batch size'] = config[config.backend].batchSize;
-        loadModel();
-        updatePrefs();
-    })
-}
+batchSizeSlider.addEventListener('input', (e) => {
+    batchSizeValue.innerText = BATCH_SIZE_LIST[batchSizeSlider.value].toString();
+})
+batchSizeSlider.addEventListener('change', (e) => {
+    config[config.backend].batchSize = BATCH_SIZE_LIST[e.target.value];
+    diagnostics['Batch size'] = config[config.backend].batchSize;
+    loadModel();
+    updatePrefs();
+})
+
 
 // Listeners to sort results table
 const speciesSort = document.getElementById('species-sort');
@@ -2986,46 +3026,21 @@ document.addEventListener("DOMContentLoaded", function () {
     // end if innerWidth
 });
 
-// list mode icons
-const listIcon = document.getElementById('list-icon')
-const updateListIcon = () => {
-    const icon = listIcon.querySelector('img');
-    icon.src = icon.src.replace(/\w+\.png$/, config.list + '.png');
-    const states = {
-        migrants: 'Searching for migrants and owls',
-        birds: 'Searching for all birds',
-        everything: 'Searching for everything'
-    };
-    icon.title = states[config.list];
-}
-listIcon.addEventListener('click', () => {
-    let img = listIcon.querySelector('img')
-    const states = {
-        migrants: 'Searching for migrants and owls',
-        birds: 'Searching for all birds',
-        everything: 'Searching for everything'
-    };
-    const keys = Object.keys(states);
-    for (let key in Object.keys(states)) {
-        key = parseInt(key);
-        if (img.src.indexOf(keys[key]) !== -1) {
-            const replace = (key === keys.length - 1) ? 0 : key + 1;
-            img.src = img.src.replace(keys[key], keys[replace]);
-            img.title = states[keys[replace]];
-            window[keys[replace]].checked = true;
-            config.list = keys[replace];
-            updatePrefs();
-            worker.postMessage({action: 'update-list', list: config.list, explore: isExplore()})
-            // setTimeout(setFilter, 10);
-            break
-        }
-    }
 
-})
-// threshold value
+// Confidence thresholds
 const thresholdDisplay = document.getElementById('threshold-value');
+const confidenceDisplay = document.getElementById('confidence-value');
 const confidenceSliderDisplay = document.getElementById('confidenceSliderContainer');
 const confidenceSlider = document.getElementById('confidenceValue');
+const confidenceRange = document.getElementById('confidence');
+
+
+const setConfidence = (e) => {
+    hideConfidenceSlider()
+    confidenceRange.value = e.target.value;
+    handleThresholdChange(e);
+}
+
 thresholdDisplay.addEventListener('click', () => {
     confidenceSliderDisplay.classList.remove('d-none');
     confidenceTimerTimeout = setTimeout(hideConfidenceSlider, 750)
@@ -3042,52 +3057,46 @@ confidenceSliderDisplay.addEventListener('mouseout', () => {
 confidenceSliderDisplay.addEventListener('mouseenter', () => {
     if (confidenceTimerTimeout) clearTimeout(confidenceTimerTimeout)
 })
-const setConfidence = (e) => {
-    hideConfidenceSlider()
-    thresholdLink.value = e.target.value;
-    handleThresholdChange(e);
-}
+
 confidenceSliderDisplay.addEventListener('mouseup', setConfidence);
 confidenceSliderDisplay.addEventListener('input', (e) => {
     thresholdDisplay.innerHTML = `<b>${e.target.value}%</b>`;
 });
 
-const thresholdLink = document.getElementById('threshold');
+
 const handleThresholdChange = (e) => {
-    if (e.code && e.code !== 'Enter') return
     const threshold = e.target.value;
-    if (100 >= threshold && threshold >= 0) {
-        config.minConfidence = parseInt(e.target.value);
-        thresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
-        confidenceSlider.value = e.target.value;
-        updatePrefs();
-        worker.postMessage({
-            action: 'set-variables',
-            confidence: config.minConfidence,
-        });
-        if (!PREDICTING && !resultTableElement[0].hidden) setFilter();
-    } else {
-        e.target.value = config.minConfidence;
-    }
+    config.minConfidence = parseInt(e.target.value);
+    thresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
+    confidenceDisplay.innerHTML = `<b>${threshold}%</b>`;
+    confidenceSlider.value = e.target.value;
+    confidenceRange.value = e.target.value
+    updatePrefs();
+    worker.postMessage({
+        action: 'set-variables',
+        confidence: config.minConfidence,
+    });
+    if (!PREDICTING && !resultTableElement[0].hidden) setFilter();
 }
-thresholdLink.addEventListener('blur', handleThresholdChange);
+confidenceRange.addEventListener('input', handleThresholdChange);
+// SNR
 const SNRThreshold = document.getElementById('SNR-threshold');
 const SNRSlider = document.getElementById('snrValue');
 SNRSlider.addEventListener('input', () => {
     SNRThreshold.innerText = SNRSlider.value;
 });
-SNRSlider.addEventListener('mouseup', () => {
+SNRSlider.addEventListener('change', () => {
     config.snr = parseFloat(SNRSlider.value);
     updatePrefs();
 });
 
 // number of threads
-const numberOfThreads = document.getElementById('threads');
-const ThreadSlider = document.getElementById('number-of-threads');
+const numberOfThreads = document.getElementById('threads-value');
+const ThreadSlider = document.getElementById('thread-slider');
 ThreadSlider.addEventListener('input', () => {
     numberOfThreads.innerText = ThreadSlider.value;
 });
-ThreadSlider.addEventListener('mouseup', () => {
+ThreadSlider.addEventListener('change', () => {
     config[config.backend].threads = parseInt(ThreadSlider.value);
     loadModel();
     updatePrefs();
