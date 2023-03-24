@@ -160,6 +160,8 @@ class Model {
             tf.tidy(() => {
                 const warmupResult = this.model.predict(tf.zeros(this.inputShape), {batchSize: this.batchSize});
                 warmupResult.arraySync();
+                // see if we can get padding compiled at this point
+                this.padBatch(tf.zeros( [1,this.inputShape[1], this.inputShape[2], this.inputShape[3]]), {batchSize: this.batchSize})
             })
         }
         console.log('WarmUp end', tf.memory().numTensors)
