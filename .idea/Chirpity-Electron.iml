@@ -7,6 +7,12 @@
       <excludeFolder url="file://$MODULE_DIR$/dist/win-unpacked/resources/app.asar.unpacked/node_modules" />
       <excludeFolder url="file://$MODULE_DIR$/dist" />
       <excludeFolder url="file://$MODULE_DIR$/venv" />
+      <excludeFolder url="file://$MODULE_DIR$/saved_model_448" />
+      <excludeFolder url="file://$MODULE_DIR$/BirdNet" />
+      <excludeFolder url="file://$MODULE_DIR$/2023321_EfficientNetV2B0_wd=1e-05_fixed_roll_SigmoidFocalCrossentropy_256x384_Adam_388" />
+      <excludeFolder url="file://$MODULE_DIR$/2023322_EfficientNetV2B0_wd=1e-05_fixed_roll_SigmoidFocalCrossentropy_224x336_Adam_390" />
+      <excludeFolder url="file://$MODULE_DIR$/.vscode" />
+      <excludeFolder url="file://$MODULE_DIR$/24000_v9" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
   </component>

@@ -568,22 +568,27 @@ reanalyseAllLink.addEventListener('click', async () => {
 const getSelectionResults = () => {
     STATE.mode = 'analyse';
     analyseList = [currentFile];
-    let start = region.start + bufferBegin;
-    // Remove small amount of region to avoid pulling in results from 'end'
-    let end = region.end + bufferBegin - 0.001;
-    if (end - start < 0.5) {
-        region.end = region.start + 0.5;
-        end = start + 0.5
+    try {
+        let start = region.start + bufferBegin;
+        // Remove small amount of region to avoid pulling in results from 'end'
+        let end = region.end + bufferBegin - 0.001;
+        if (end - start < 0.5) {
+            region.end = region.start + 0.5;
+            end = start + 0.5
+        }
+        STATE['selection']['start'] = start.toFixed(3);
+        STATE['selection']['end'] = end.toFixed(3);
+        postAnalyseMessage({
+            confidence: config.minConfidence,
+            resetResults: false,
+            currentFile: currentFile,
+            start: STATE['selection']['start'],
+            end: STATE['selection']['end'],
+        });
+    } catch (err) {
+        // Was too fast. Give worker chance to response and try again
+        setTimeout(getSelectionResults, 100)
     }
-    STATE['selection']['start'] = start.toFixed(3);
-    STATE['selection']['end'] = end.toFixed(3);
-    postAnalyseMessage({
-        confidence: config.minConfidence,
-        resetResults: false,
-        currentFile: currentFile,
-        start: STATE['selection']['start'],
-        end: STATE['selection']['end'],
-    });
 }
 
 const analyseSelectionLink = document.getElementById('analyseSelection');
@@ -1027,9 +1032,9 @@ window.onload = async () => {
             batchSizeSlider.max = (BATCH_SIZE_LIST.length - 1).toString();
             batchSizeValue.innerText = config[config.backend].batchSize;
             diagnostics['Batch size'] = config[config.backend].batchSize;
-            // const modelToUse = document.getElementById(config.model);
-            // modelToUse.checked = true;
-            // diagnostics['Model'] = config.model;
+            const modelToUse = document.getElementById('model-to-use');
+            modelToUse.value = config.model;
+            diagnostics['Model'] = config.model;
             const backend = document.getElementById(config.backend);
             backend.checked = true;
             // Show time of day in results?
@@ -1720,7 +1725,7 @@ function initSpectrogram(height, fftSamples) {
     updateElementCache();
 }
 
-colourmap.addEventListener('change', (e) =>{
+colourmap.addEventListener('change', (e) => {
     config.colormap = e.target.value;
     updatePrefs();
     if (wavesurfer) {
@@ -1791,15 +1796,13 @@ const loadModel = () => {
     });
 }
 
-const modelToUse = document.getElementsByName('model');
-for (let i = 0; i < modelToUse.length; i++) {
-    modelToUse[i].addEventListener('click', function (e) {
-        config.model = e.target.value;
-        updatePrefs();
-        diagnostics['Model'] = config.model;
-        loadModel();
-    })
-}
+const modelToUse = document.getElementById('model-to-use');
+modelToUse.addEventListener('change', function (e) {
+    config.model = e.target.value;
+    updatePrefs();
+    diagnostics['Model'] = config.model;
+    loadModel();
+})
 
 const backend = document.getElementsByName('backend');
 for (let i = 0; i < backend.length; i++) {

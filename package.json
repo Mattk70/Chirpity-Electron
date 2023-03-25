@@ -17,13 +17,19 @@
       "**/*",
       "!test*${/*}",
       "!dist${/*}",
+      "!BirdNet{/*}",
+      "!2023321_EfficientNetV2B0_wd=1e-05_fixed_roll_SigmoidFocalCrossentropy_256x384_Adam_388{/*}",
+      "!2023322_EfficientNetV2B0_wd=1e-05_fixed_roll_SigmoidFocalCrossentropy_224x336_Adam_390(/*)",
+      "!BirdNET_GLOBAL_3K_V2.2_Labels.txt",
+      "!venv${/*}",
       "!24000_v9${/*}",
       "!*git*${/*}",
       "!package-lock.json",
+      "!poetry-lock*",
       "!.idea",
+      "!saved_model$(/*)",
       ".model_config.json",
-      "node_modules/@tensorflow/tfjs-converter",
-      "node_modules/@tensorflow/tfjs-data",
+      "!node_modules{/*}",
       "node_modules/ffmpeg-static-electron/bin/${os}/${arch}/ffmpeg",
       "node_modules/ffmpeg-static-electron/index.js",
       "node_modules/ffmpeg-static-electron/package.json",
@@ -150,7 +156,8 @@
   "devDependencies": {
     "electron": "^23.1.2",
     "electron-builder": "^24.0.0",
-    "@tensorflow/tfjs-converter": "^4.2.0"
+    "@tensorflow/tfjs-converter": "^4.2.0",
+    "webpack-bundle-analyzer": "^4.8.0"
   },
   "dependencies": {
     "@popperjs/core": "^2.9.2",

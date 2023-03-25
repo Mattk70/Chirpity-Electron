@@ -97,12 +97,19 @@
                                             <fieldset class="border rounded m-2 p-1">
                                                 <legend style="font-size: 18px">Predictions</legend>
                                                 <div class="form-group rounded p-2 mb-2 bg-light">
+                                                    <label for="list-to-use">Model:</label>
+                                                    <select class="form-control" id="model-to-use">
+                                                        <option value="efficientnet">Chirpity</option>
+
+                                                    </select>
+                                                </div>
+                                                <div class="form-group rounded p-2 mb-2 bg-light">
                                                     <label for="confidence">Set threshold:</label>
                                                     <div class="input-group">
                                                         <input type="range" class="form-control-range" id="confidence"
                                                                min="5"
                                                                max="100"
-                                                        step="5">
+                                                               step="5">
                                                         <div class="input-group-append">
                                                             <span class="input-group-text"
                                                                   id="confidence-value">50%</span>
@@ -180,44 +187,44 @@
                                                         </div>
                                                     </div>
                                                 </div>
-                                                </div>
-                                                <div class="row">
-                                                    <div class="col me-auto">
-                                                        <div class="form-group rounded p-2 mb-2 bg-light">
-                                                            <label for="snrValue" class="form-label"
-                                                                   title="Ignore samples with just background noise. Value is the minimum signal strength to look at.">Signal
-                                                                to Noise Threshold:</label>
-                                                            <div class="input-group">
-                                                                <input type="range" class="form-control-range" min="0"
-                                                                       max="10"
-                                                                       step="0.5"
-                                                                       id="snrValue">
-                                                                <div class="input-group-append">
+                                            </div>
+                                            <div class="row">
+                                                <div class="col me-auto">
+                                                    <div class="form-group rounded p-2 mb-2 bg-light">
+                                                        <label for="snrValue" class="form-label"
+                                                               title="Ignore samples with just background noise. Value is the minimum signal strength to look at.">Signal
+                                                            to Noise Threshold:</label>
+                                                        <div class="input-group">
+                                                            <input type="range" class="form-control-range" min="0"
+                                                                   max="10"
+                                                                   step="0.5"
+                                                                   id="snrValue">
+                                                            <div class="input-group-append">
                                                                 <span class="input-group-text"
                                                                       id="SNR-threshold">0</span>
-                                                                </div>
                                                             </div>
                                                         </div>
-
                                                     </div>
-                                                    <div class="col ">
-                                                        <div class="form-group rounded p-2 mb-2 bg-light">
-                                                            <label for="batch-size"
-                                                                   title="Optimising the batch size can increase the prediction speed by 2-3x on longer files.&#10;If it is too large, the model will terminate.&#10;If that happens, set a lower batch size and restart Chirpity">Batch
-                                                                Size:</label>
-                                                            <div class="input-group">
-                                                                <input type="range" class="form-control-range"
-                                                                       id="batch-size"
-                                                                       min="0"
-                                                                       max="7">
-                                                                <div class="input-group-append">
+
+                                                </div>
+                                                <div class="col ">
+                                                    <div class="form-group rounded p-2 mb-2 bg-light">
+                                                        <label for="batch-size"
+                                                               title="Optimising the batch size can increase the prediction speed by 2-3x on longer files.&#10;If it is too large, the model will terminate.&#10;If that happens, set a lower batch size and restart Chirpity">Batch
+                                                            Size:</label>
+                                                        <div class="input-group">
+                                                            <input type="range" class="form-control-range"
+                                                                   id="batch-size"
+                                                                   min="0"
+                                                                   max="7">
+                                                            <div class="input-group-append">
                                                             <span class="input-group-text"
                                                                   id="batch-size-value">2</span>
-                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </div>
+                                            </div>
 
                                         </div>
                                     </fieldset>
@@ -395,7 +402,7 @@
                 <div class="btn-group float-end">
                     <span style="max-width: 70px" title="Nocmig mode on"
                           id="nocmigMode"
-                          class="material-icons-two-tone btn btn-outline-secondary p-1 pointer">bedtime</span>
+                          class="material-icons-two-tone btn btn-outline-secondary p-1 pt-2 pointer">bedtime</span>
                     <span style="max-width: 70px"
                           id="list-icon"
                           class="btn btn-outline-secondary p-1 pointer icon-container"><img class="icon"

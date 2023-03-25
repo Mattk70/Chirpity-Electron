@@ -1,3 +1,4 @@
+
 html, body {
     height: 100%;
     padding-top: 0;
@@ -24,7 +25,7 @@ html, body {
     font-family: 'Material Icons Two Tone';
     font-weight: normal;
     font-style: normal;
-    font-size: 28px; /* Preferred icon size */
+    font-size: x-large; /* Preferred icon size */
     font-display: block;
     display: inline-block;
     line-height: 1;
@@ -114,7 +115,7 @@ div#contentWrapper {
 }
 
 .zoom {
-    font-size: 36px;
+    font-size: xx-large;
 }
 
 .species-selector {
