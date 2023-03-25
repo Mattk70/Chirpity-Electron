@@ -296,9 +296,9 @@ class Model {
                 condition.dispose()
             }
             const c = newCondition || condition;
-            maskedTensorBatch = tf.booleanMaskAsync(fixedTensorBatch, c);
-            maskedKeysTensor = tf.booleanMaskAsync(keysTensor, c)
-            await Promise.all([maskedTensorBatch, maskedKeysTensor])
+            // maskedTensorBatch = tf.booleanMaskAsync(fixedTensorBatch, c);
+            // maskedKeysTensor = tf.booleanMaskAsync(keysTensor, c)
+            [maskedTensorBatch, maskedKeysTensor] = await Promise.all([ tf.booleanMaskAsync(fixedTensorBatch, c), tf.booleanMaskAsync(keysTensor, c)])
             c.dispose();
 
             fixedTensorBatch.dispose();
