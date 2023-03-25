@@ -16,7 +16,7 @@ let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on every change
 let select_records_stmt;
-const DEBUG = true;
+const DEBUG = false;
 
 const DATASET = false;
 const adding_chirpity_additions = true;
@@ -1105,6 +1105,7 @@ function spawnWorkers(model, list, batchSize, threads) {
         aborted = false;
         worker.postMessage({
             message: 'load',
+            model: model,
             list: list,
             batchSize: batchSize,
             backend: BACKEND
@@ -1236,7 +1237,7 @@ const parsePredictions = async (response) => {
         batchInProgress = FILE_QUEUE.length;
         predictionDone = true;
     } else {
-        await getSummary({interim: true, files: []});
+        getSummary({interim: true, files: []});
     }
     return [file, batchInProgress, response.worker]
 }
@@ -1268,11 +1269,6 @@ async function parseMessage(e) {
             // Now we have what we need to populate a database...
             // Load the archive db
             if (!diskDB) await loadDB(appPath);
-            //Create in-memory database
-            // if (!memoryDB) {
-            //     await loadDB();
-            //     //await dbSpeciesCheck();
-            // }
             break;
         case 'prediction':
             if (aborted) {
@@ -1888,7 +1884,7 @@ async function onUpdateRecord({
     if (what === 'ID' || what === 'speciesID') {
         // Map the field name to the one in the database
         what = 'speciesID';
-        whatSQL = `confidence = 2, speciesID = (SELECT id FROM species WHERE cname = '${value}')`;
+        whatSQL = `confidence = 200, speciesID = (SELECT id FROM species WHERE cname = '${value}')`;
     } else if (what === 'label') {
         whatSQL = `label = '${value}'`;
     } else {

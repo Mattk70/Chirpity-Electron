@@ -1,7 +1,5 @@
 const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs');
-const model_config = JSON.parse(fs.readFileSync('model_config.json', 'utf8'));
-const {height, width, labels, location} = model_config;
 let DEBUG = false;
 let BACKEND;
 
@@ -27,6 +25,7 @@ onmessage = async (e) => {
         switch (modelRequest) {
             case 'load':
                 if (DEBUG) console.log('load request to worker')
+                const {height, width, labels, location} = JSON.parse(fs.readFileSync('model_config.json', 'utf8'));
                 const appPath = '../' + location + '/';
                 const list = e.data.list;
                 const batch = e.data.batchSize;
@@ -47,6 +46,9 @@ onmessage = async (e) => {
                         console.log(tf.env().getFlags());
                     }
                     myModel = new Model(appPath, list);
+                    myModel.height = height;
+                    myModel.width = width;
+                    myModel.labels = labels;
                     await myModel.loadModel();
                     postMessage({message: 'update-list', blocked: BLOCKED_IDS, updateResults: false});
                     myModel.warmUp(batch);
@@ -79,18 +81,18 @@ onmessage = async (e) => {
             case 'get-spectrogram':
                 const buffer = e.data.buffer;
                 // Only consider full specs
-                if (buffer.length < 72000) return
+                if (buffer.length < this.chunkLength) return
                 const specFile = e.data.file;
                 const filepath = e.data.filepath;
-                const height = e.data.height;
-                const width = e.data.width
+                const spec_height = e.data.height;
+                const spec_width = e.data.width
                 let image;
                 const bufferTensor = tf.tensor1d(buffer);
                 const imageTensor = tf.tidy(() => {
                     return myModel.makeSpectrogram(bufferTensor);
                 })
                 image = tf.tidy(() => {
-                    let spec = myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), height, width);
+                    let spec = myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), spec_height, spec_width);
                     // rescale to 0-255
                     return tf.mul(spec, tf.scalar(255)).dataSync();
                 })
@@ -129,11 +131,12 @@ onmessage = async (e) => {
 class Model {
     constructor(appPath, list) {
         this.model = null;
-        this.labels = labels;
+        this.labels = null;
+        this.height = null;
+        this.width = null;
         this.config = CONFIG;
         this.chunkLength = this.config.sampleRate * this.config.specLength;
         this.model_loaded = false;
-        this.appPath = null;
         this.frame_length = 512;
         this.frame_step = 186;
         this.appPath = appPath;
@@ -173,14 +176,14 @@ class Model {
         // get the indices of any items in the blacklist, GRAYLIST
         if (this.list === 'birds') {
             // find the position of the blocked items in the label list
-            NOT_BIRDS.forEach(notBird => BLOCKED_IDS.push(labels.indexOf(notBird)))
+            NOT_BIRDS.forEach(notBird => BLOCKED_IDS.push(this.labels.indexOf(notBird)))
         } else if (this.list === 'migrants') {
-            for (let i = 0; i < labels.length; i++) {
-                if (!MIGRANTS.has(labels[i])) BLOCKED_IDS.push(i);
+            for (let i = 0; i < this.labels.length; i++) {
+                if (!MIGRANTS.has(this.labels[i])) BLOCKED_IDS.push(i);
             }
         }
-        GRAYLIST.forEach(species => SUPPRESSED_IDS.push(labels.indexOf(species)))
-        GOLDEN_LIST.forEach(species => ENHANCED_IDS.push(labels.indexOf(species)))
+        GRAYLIST.forEach(species => SUPPRESSED_IDS.push(this.labels.indexOf(species)))
+        GOLDEN_LIST.forEach(species => ENHANCED_IDS.push(this.labels.indexOf(species)))
     }
 
     normalize(spec) {
@@ -215,8 +218,8 @@ class Model {
 
 
     fixUpSpecBatch(specBatch, h, w) {
-        const img_height = h || height;
-        const img_width = w || width;
+        const img_height = h || this.height;
+        const img_width = w || this.width;
         return tf.tidy(() => {
             // Swap axes to fit output shape
             specBatch = tf.transpose(specBatch, [0, 2, 1]);
@@ -363,7 +366,7 @@ class Model {
         if (DEBUG) console.log('predictCunk begin', tf.memory().numTensors)
         audioBuffer = tf.tensor1d(audioBuffer);
         // check if we need to pad
-        const remainder = audioBuffer.shape % 72000;
+        const remainder = audioBuffer.shape % this.chunkLength;
         let paddedBuffer;
         if (remainder !== 0) {  // If the buffer isn't divisible by batch size, we must be at the end of the file
             paddedBuffer = audioBuffer.pad([[0, this.chunkLength - remainder]]);
@@ -371,14 +374,14 @@ class Model {
             if (DEBUG) console.log('Received final chunks')
         }
         const buffer = paddedBuffer || audioBuffer;
-        const numSamples = buffer.shape / 72000;
+        const numSamples = buffer.shape / this.chunkLength;
         let bufferList = tf.split(buffer, numSamples);
         buffer.dispose();
         bufferList = bufferList.map(x => {
             return this.makeSpectrogram(x)
         });
         const specBatch = tf.stack(bufferList);
-        const batchKeys = [...Array(numSamples).keys()].map(i => start + 72000 * i);
+        const batchKeys = [...Array(numSamples).keys()].map(i => start + this.chunkLength * i);
         // recreate the object...
         // let specBatch = {}
         //
