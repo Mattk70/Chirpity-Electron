@@ -59,8 +59,8 @@
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="navbarRecords">
                             <li class="dropdown-item disabled" href="#" id="save2db">Save Records</li>
-                            <li class="dropdown-item" href="#" id="charts">View charts</li>
-                            <li class="dropdown-item" href="#" id="explore">Explore records</li>
+                            <li class="dropdown-item disabled" href="#" id="charts">View charts</li>
+                            <li class="dropdown-item disabled" href="#" id="explore">Explore records</li>
                             <li class="dropdown-item" href="#" id="dataset">Create Dataset</li>
                         </ul>
                     </li>
@@ -95,12 +95,12 @@
                                     <div class="row">
                                         <div class="col-6">
                                             <fieldset class="border rounded m-2 p-1">
-                                                <legend style="font-size: 18px">Predictions</legend>
+                                                <legend style="font-size: large">Predictions</legend>
                                                 <div class="form-group rounded p-2 mb-2 bg-light">
                                                     <label for="list-to-use">Model:</label>
                                                     <select class="form-control" id="model-to-use">
                                                         <option value="efficientnet">Chirpity</option>
-
+                                                        <option value="BirdNet">BirdNet</option>
                                                     </select>
                                                 </div>
                                                 <div class="form-group rounded p-2 mb-2 bg-light">
@@ -129,7 +129,21 @@
                                         </div>
                                         <div class="col-6">
                                             <fieldset class="border rounded m-2 p-1">
-                                                <legend style="font-size: 18px">Spectrogram</legend>
+                                                <legend style="font-size: large" >Location <span class="circle"  title="Location is solely used to determine dawn and dusk times for recordings">?</span> </legend>
+                                                <div class="form-group rounded p-2 mb-2 bg-light">
+                                                    <div class="input-group mb-2">
+                                                        <span class="input-group-text pe-2">Lat:</span>
+                                                        <input id="latitude" type="text" class="form-control  ps-1" placeholder="0.0"
+                                                               aria-label="Latitude" aria-describedby="latitude">
+                                                        <span class="input-group-text pe-2">Lon:</span>
+                                                        <input id="longitude" type="text" class="form-control ps-1" placeholder="0.0"
+                                                               aria-label="Longitude" aria-describedby="longitude">
+                                                    </div>
+                                                    <span id="place"></span>
+                                                </div>
+                                            </fieldset>
+                                            <fieldset class="border rounded m-2 p-1">
+                                                <legend style="font-size: large">Spectrogram</legend>
                                                 <div class="form-group rounded p-2 mb-2 bg-light">
                                                     <label for="colourmap">Colourmap:</label>
                                                     <select class="form-control" id="colourmap">
@@ -148,7 +162,7 @@
                                         </div>
                                     </div>
                                     <fieldset class="border rounded m-2 p-1">
-                                        <legend style="font-size: 18px">System</legend>
+                                        <legend style="font-size: large">System</legend>
                                         <div class="container">
                                             <div class="row">
                                                 <div class="col">
