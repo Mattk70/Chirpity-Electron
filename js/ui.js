@@ -565,6 +565,50 @@ reanalyseAllLink.addEventListener('click', async () => {
     postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: fileList, reanalyse: true});
 });
 
+
+/// Lat / lon
+const lat = document.getElementById('latitude')
+const lon = document.getElementById('longitude')
+$('#latitude, #longitude').on('focus', function () {
+    document.removeEventListener('keydown', handleKeyDownDeBounce, true);
+})
+
+const displayLocation = () => {
+    if (lat.value && lon.value) {
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat.value}&lon=${lon.value}&zoom=14`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json()
+            })
+            .then(data => {
+                const address = data.display_name;
+                document.getElementById('place').innerText = address || "Location not recognised";
+                if (address) {
+                    config.latitude = lat.value;
+                    config.longitude = lon.value;
+                    config.location = address;
+                    updatePrefs();
+                }
+            })
+            .catch(error => {
+                console.log("got an error connecting to OpenStreetMap")
+                // If we have a number for lat & lon, go ahead and use it.
+                if (! isNaN(lat.value) && ! isNaN(lon.value)) {
+                    config.latitude = lat.value;
+                    config.longitude = lon.value;
+                    updatePrefs();
+                }
+
+            })
+    }
+}
+$('#latitude, #longitude').on('blur', function () {
+    document.addEventListener('keydown', handleKeyDownDeBounce, true);
+    displayLocation()
+})
+
 const getSelectionResults = () => {
     STATE.mode = 'analyse';
     analyseList = [currentFile];
@@ -994,8 +1038,9 @@ window.onload = async () => {
         timeOfDay: false,
         list: 'migrants',
         model: 'efficientnet',
-        latitude: 51.9,
-        longitude: -0.4,
+        latitude: '',
+        longitude: '',
+        location: 'Location not set',
         nocmig: false,
         snr: 0,
         warmup: true,
@@ -1066,6 +1111,9 @@ window.onload = async () => {
             ThreadSlider.max = diagnostics['Cores'];
             ThreadSlider.value = config[config.backend].threads;
             numberOfThreads.innerText = config[config.backend].threads;
+            lat.value = config.latitude;
+            lon.value = config.longitude;
+            place.innerText = config.location;
             //showElement([config.colormap], true)
             worker.postMessage({
                 action: 'set-variables',
@@ -1098,6 +1146,10 @@ const setUpWorkerMessaging = () => {
             switch (event) {
                 case 'model-ready':
                     onModelReady(args);
+                    break;
+                case 'diskDB-has-records':
+                    chartsLink.classList.remove('disabled');
+                    exploreLink.classList.remove('disabled');
                     break;
                 case 'update-summary':
                     updateSummary(args);

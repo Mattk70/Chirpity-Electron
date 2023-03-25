@@ -142,6 +142,10 @@ async function loadDB(path) {
             diskDB = new sqlite3.Database(file);
             STATE.db = diskDB;
             await diskDB.runAsync('VACUUM');
+            const {count} = await diskDB.getAsync('SELECT COUNT(*) as count FROM records')
+            if (count) {
+                UI.postMessage({event: 'diskDB-has-records'})
+            }
             console.log("Opened and cleaned disk db " + file)
         }
     } else {
@@ -1621,6 +1625,9 @@ const onSave2DiskDB = async () => {
     console.log(response.changes + ' date durations added to disk database')
     response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.records SELECT * FROM records');
     console.log(response.changes + ' records added to disk database')
+    if (response.changes){
+        UI.postMessage({event: 'diskDB-has-records'});
+    }
     await memoryDB.runAsync('END');
 
 
