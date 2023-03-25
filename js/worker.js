@@ -125,7 +125,7 @@ const createDB = async (file) => {
 const prepare_statements = (db) => {
     select_records_stmt = db.prepare(`SELECT species.cname, species.sname, records.confidence
                                       FROM species
-                                               INNER JOIN records ON species.id = records.speciesID
+                                               JOIN records ON species.id = records.speciesID
                                       WHERE records.dateTime = (?)
                                         AND confidence > (?)
                                         AND speciesID NOT IN ((?))
@@ -1432,15 +1432,27 @@ const getSummary = async ({
     let [where, when] = setWhereWhen({
         dateRange: range, species: explore ? species : undefined, files: files, context: 'summary'
     });
+    t0 = Date.now()
     const summary = await db.allAsync(`
-        SELECT MAX(confidence) as max, cname, sname, COUNT(cname) as count
-        FROM records
-            INNER JOIN species
-        ON species.id = speciesID
-            INNER JOIN files ON fileID = files.rowid
-            ${where} ${when}
-        GROUP BY cname
-        ORDER BY cname;`);
+SELECT species.cname, species.sname, COUNT(*) as count, max_confidence.max_confidence as max
+FROM (
+  SELECT DISTINCT records.dateTime, records.speciesID, 
+    MAX(records.confidence) OVER (PARTITION BY records.dateTime) AS max_confidence, 
+    ROW_NUMBER() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
+  FROM records 
+  JOIN files ON files.rowid = records.fileID 
+  ${where} ${when}
+) AS top_confidence_by_datetime_species
+JOIN species ON top_confidence_by_datetime_species.speciesID = species.id
+JOIN (
+  SELECT records.speciesID, MAX(records.confidence) AS max_confidence
+  FROM records
+  GROUP BY records.speciesID
+) AS max_confidence ON max_confidence.speciesID = species.id
+WHERE top_confidence_by_datetime_species.rank <= 1
+GROUP BY species.cname, max_confidence.max_confidence
+ORDER BY count DESC;
+`);
     // need another setWhereWhen call for total
     [where, when] = setWhereWhen({
         dateRange: range, species: species, files: files, context: 'summary'
@@ -1449,12 +1461,13 @@ const getSummary = async ({
     if (!interim) {
         const res = await db.getAsync(`SELECT COUNT(*) AS total
                                        FROM records
-                                                INNER JOIN species
+                                                JOIN species
                                                            ON species.id = speciesID
-                                                INNER JOIN files ON fileID = files.rowid
+                                                JOIN files ON fileID = files.rowid
                                            ${where} ${when}`);
         total = res.total;
     }
+    console.log("Get Summary   took", (Date.now() - t0) / 1000, " seconds")
     // need to send offset here?
     const event = interim ? 'update-summary' : 'prediction-done'
     UI.postMessage({
@@ -1480,6 +1493,7 @@ const getSummary = async ({
 //         })
 //     }
 // }
+
 
 /**
  *
@@ -1539,7 +1553,7 @@ const getResults = async ({
             sendResult(++index, result[i])
         }
     }
-    console.log("database took", (Date.now() - t0) / 1000, " seconds")
+    console.log("Get Results  took", (Date.now() - t0) / 1000, " seconds")
     if (!result.length) {
         if (context === 'selection') {
             // No more detections in the selection
@@ -1636,7 +1650,7 @@ const getSeasonRecords = async (species, season) => {
             SELECT MAX(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS maxDate,
                    MIN(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS minDate
             FROM records
-                     INNER JOIN species ON species.id = records.speciesID
+                     JOIN species ON species.id = records.speciesID
             WHERE species.cname = (?)
               AND STRFTIME('%m',
                            DATETIME(records.dateTime / 1000, 'unixepoch', 'localtime'))
@@ -1656,7 +1670,7 @@ const getMostCalls = (species) => {
         diskDB.get(`
             SELECT COUNT(*) as count, 
             DATE(dateTime/1000, 'unixepoch', 'localtime') as date
-            FROM records INNER JOIN species
+            FROM records JOIN species
             on species.id = records.speciesID
             WHERE species.cname = '${species}'
             GROUP BY STRFTIME('%Y', DATETIME(dateTime/1000, 'unixepoch', 'localtime')),
@@ -1710,8 +1724,7 @@ const getChartTotals = ({
             STRFTIME('%H', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Hour,    
             COUNT(*) as count
                     FROM records
-                        INNER JOIN species
-                    on species.id = speciesID
+                        JOIN species ON species.id = speciesID
                     WHERE species.cname = '${species}' ${dateFilter}
                     GROUP BY ${groupBy}
                     ORDER BY ${orderBy};`, (err, rows) => {
@@ -1735,7 +1748,7 @@ const getRate = (species) => {
 
         diskDB.all(`select STRFTIME('%W', DATE(dateTime / 1000, 'unixepoch', 'localtime')) as week, COUNT(*) as calls
                     from records
-                             INNER JOIN species ON species.id = records.speciesID
+                             JOIN species ON species.id = records.speciesID
                     WHERE species.cname = '${species}'
                     group by week;`, (err, rows) => {
             for (let i = 0; i < rows.length; i++) {
@@ -1764,7 +1777,7 @@ const getSpecies = (range) => {
     const [where, when] = setWhereWhen({range: STATE.explore?.range});
     diskDB.all(`SELECT DISTINCT cname, sname, COUNT(cname) as count
                 FROM records
-                    INNER JOIN species
+                    JOIN species
                 ON speciesID = id ${where} ${when}
                 GROUP BY cname
                 ORDER BY cname`, (err, rows) => {
@@ -2021,9 +2034,9 @@ const db2ResultSQL = `SELECT DISTINCT dateTime AS timestamp,
   label, 
   comment
                       FROM records
-                          INNER JOIN species
+                          JOIN species
                       ON species.id = records.speciesID
-                          INNER JOIN files ON records.fileID = files.rowid`;
+                          JOIN files ON records.fileID = files.rowid`;
 
 
 /*
