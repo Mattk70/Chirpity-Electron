@@ -1103,7 +1103,7 @@ window.onload = async () => {
             confidenceRange.value = config.minConfidence;
             thresholdDisplay.innerHTML = `<b>${config.minConfidence}%</b>`;
             confidenceSlider.value = config.minConfidence;
-            confidenceDisplay.innerText = config.minConfidence;
+            confidenceDisplay.innerHTML = `<b>${config.minConfidence}%</b>`;
             confidenceRange.value = config.minConfidence;
             SNRSlider.value = config.snr;
             SNRThreshold.innerText = config.snr;
