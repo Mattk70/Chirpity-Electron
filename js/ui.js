@@ -103,9 +103,8 @@ const progressBar = document.getElementById('progress-bar');
 const fileNumber = document.getElementById('fileNumber');
 const timelineSetting = document.getElementById('timelineSetting');
 const colourmap = document.getElementById('colourmap');
-const thresholdLink = document.getElementById('threshold');
 const batchSizeValue = document.getElementById('batch-size-value');
-
+const nocmig = document.getElementById('nocmig');
 
 let batchInProgress = false;
 let activeRow;
@@ -289,7 +288,7 @@ const initWavesurfer = ({
     initSpectrogram();
     createTimeline();
     if (audio) wavesurfer.loadDecodedBuffer(audio);
-    colourmap.value = config.colormap === 'greys' ? 'greys' : 'inferno';
+    colourmap.value = config.colormap;
     // Set click event that removes all regions
 
     waveElement.mousedown(function () {
@@ -393,6 +392,7 @@ const openFileInList = async (e) => {
 }
 const filename = document.getElementById('filename');
 filename.addEventListener('click', openFileInList);
+
 
 function updateFileName(files, openfile) {
     let filenameElement = document.getElementById('filename');
@@ -596,7 +596,7 @@ const displayLocation = () => {
             .catch(error => {
                 console.log("got an error connecting to OpenStreetMap")
                 // If we have a number for lat & lon, go ahead and use it.
-                if (! isNaN(lat.value) && ! isNaN(lon.value)) {
+                if (!isNaN(lat.value) && !isNaN(lon.value)) {
                     config.latitude = lat.value;
                     config.longitude = lon.value;
                     updatePrefs();
@@ -1096,11 +1096,12 @@ window.onload = async () => {
             updateListIcon();
             timelineSetting.value = config.timeOfDay ? 'timeOfDay' : 'timecode';
             // Spectrogram colour
-            colourmap.value = config.colormap === 'greys' ? 'greys' : 'inferno';
+            colourmap.value = config.colormap;
             // Nocmig mode state
             console.log('nocmig mode is ' + config.nocmig)
             nocmigButton.innerText = config.nocmig ? 'bedtime' : 'bedtime_off';
             nocmigButton.title = config.nocmig ? 'Nocmig mode on' : 'Nocmig mode off';
+            nocmig.checked = config.nocmig;
             confidenceRange.value = config.minConfidence;
             thresholdDisplay.innerHTML = `<b>${config.minConfidence}%</b>`;
             confidenceSlider.value = config.minConfidence;
@@ -2829,7 +2830,7 @@ const populateHelpModal = async (file, label) => {
     help.show();
 }
 
-nocmigButton.addEventListener('click', function () {
+const changeNocmigMode = (e) => {
     if (config.nocmig) {
         config.nocmig = false;
         nocmigButton.innerText = 'bedtime_off';
@@ -2839,12 +2840,16 @@ nocmigButton.addEventListener('click', function () {
         nocmigButton.innerText = 'bedtime';
         nocmigButton.title = 'Nocmig mode on';
     }
+    nocmig.checked = config.nocmig;
     worker.postMessage({
         action: 'set-variables',
         nocmig: config.nocmig,
     });
     updatePrefs();
-});
+}
+
+nocmigButton.addEventListener('click', changeNocmigMode);
+nocmig.addEventListener('change', changeNocmigMode)
 
 const fullscreen = document.getElementById('fullscreen');
 

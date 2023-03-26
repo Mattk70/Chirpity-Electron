@@ -93,8 +93,7 @@ const createDB = async (file) => {
     await db.runAsync('CREATE TABLE records(dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT, comment  TEXT, UNIQUE (dateTime, fileID, speciesID))');
     await db.runAsync('CREATE TABLE files(name TEXT,duration  REAL,filestart INTEGER, UNIQUE (name))');
     await db.runAsync('CREATE TABLE duration(day INTEGER, duration INTEGER, fileID INTEGER,UNIQUE (day, fileID))');
-    if (db === diskDB) await db.runAsync('CREATE INDEX idx_datetime ON records(dateTime)');
-
+    await db.runAsync('CREATE INDEX idx_datetime ON records(dateTime)');
     if (archiveMode) {
         for (let i = 0; i < LABELS.length; i++) {
             const [sname, cname] = LABELS[i].replaceAll("'", "''").split('_');
@@ -729,6 +728,10 @@ const getMetadata = async ({file, proxy = file, source_file = file}) => {
                 return resolve(metadata[file]);
             });
             readStream.on('error', err => {
+                UI.postMessage({
+                    event: 'generate-alert',
+                    message: `Error reading file: ` + file
+                })
                 console.log('readstream error:' + err)
             })
         }
@@ -1434,25 +1437,27 @@ const getSummary = async ({
     });
     t0 = Date.now()
     const summary = await db.allAsync(`
-SELECT species.cname, species.sname, COUNT(*) as count, max_confidence.max_confidence as max
-FROM (
-  SELECT DISTINCT records.dateTime, records.speciesID, 
-    MAX(records.confidence) OVER (PARTITION BY records.dateTime) AS max_confidence, 
-    ROW_NUMBER() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
-  FROM records 
-  JOIN files ON files.rowid = records.fileID 
-  ${where} ${when}
-) AS top_confidence_by_datetime_species
-JOIN species ON top_confidence_by_datetime_species.speciesID = species.id
-JOIN (
-  SELECT records.speciesID, MAX(records.confidence) AS max_confidence
-  FROM records
-  GROUP BY records.speciesID
-) AS max_confidence ON max_confidence.speciesID = species.id
-WHERE top_confidence_by_datetime_species.rank <= 1
-GROUP BY species.cname, max_confidence.max_confidence
-ORDER BY count DESC;
-`);
+        SELECT species.cname, species.sname, COUNT(*) as count, max_confidence.max_confidence as max
+        FROM (
+            SELECT DISTINCT dateTime, speciesID, MAX (confidence) 
+                OVER (PARTITION BY dateTime) AS max_confidence, ROW_NUMBER() 
+                OVER (PARTITION BY records.dateTime ORDER BY confidence DESC) AS rank
+            FROM records
+            JOIN files ON files.rowid = records.fileID
+            JOIN species ON speciesID = species.id
+            ${where} ${when}
+            ) AS top_confidence_by_datetime_species
+            JOIN species
+                ON top_confidence_by_datetime_species.speciesID = species.id
+            JOIN (
+            SELECT speciesID, MAX (confidence) AS max_confidence
+            FROM records
+            GROUP BY records.speciesID
+            ) AS max_confidence ON max_confidence.speciesID = species.id
+        WHERE top_confidence_by_datetime_species.rank <= 1
+        GROUP BY cname, max_confidence.max_confidence
+        ORDER BY count DESC;
+    `);
     // need another setWhereWhen call for total
     [where, when] = setWhereWhen({
         dateRange: range, species: species, files: files, context: 'summary'
@@ -1462,7 +1467,7 @@ ORDER BY count DESC;
         const res = await db.getAsync(`SELECT COUNT(*) AS total
                                        FROM records
                                                 JOIN species
-                                                           ON species.id = speciesID
+                                                     ON species.id = speciesID
                                                 JOIN files ON fileID = files.rowid
                                            ${where} ${when}`);
         total = res.total;
@@ -1625,7 +1630,7 @@ const onSave2DiskDB = async () => {
     console.log(response.changes + ' date durations added to disk database')
     response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.records SELECT * FROM records');
     console.log(response.changes + ' records added to disk database')
-    if (response.changes){
+    if (response.changes) {
         UI.postMessage({event: 'diskDB-has-records'});
     }
     await memoryDB.runAsync('END');
@@ -1727,7 +1732,8 @@ const getChartTotals = ({
             STRFTIME('%H', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Hour,    
             COUNT(*) as count
                     FROM records
-                        JOIN species ON species.id = speciesID
+                        JOIN species
+                    ON species.id = speciesID
                     WHERE species.cname = '${species}' ${dateFilter}
                     GROUP BY ${groupBy}
                     ORDER BY ${orderBy};`, (err, rows) => {
