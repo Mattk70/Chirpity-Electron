@@ -569,6 +569,7 @@ reanalyseAllLink.addEventListener('click', async () => {
 /// Lat / lon
 const lat = document.getElementById('latitude')
 const lon = document.getElementById('longitude')
+const place = document.getElementById('place')
 $('#latitude, #longitude').on('focus', function () {
     document.removeEventListener('keydown', handleKeyDownDeBounce, true);
 })
@@ -584,7 +585,7 @@ const displayLocation = () => {
             })
             .then(data => {
                 const address = data.display_name;
-                document.getElementById('place').innerText = address || "Location not recognised";
+                place.innerText = address || "Location not recognised";
                 if (address) {
                     config.latitude = lat.value;
                     config.longitude = lon.value;
@@ -1933,6 +1934,16 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         if (currentBuffer) {
             bufferBegin = currentFileDuration - windowLength;
             postBufferUpdate({begin: bufferBegin, position: 1})
+        }
+    },
+    KeyC: function (e) {
+        // Center window on playhead
+        if (e.ctrlKey && currentBuffer) {
+            const middle = bufferBegin + wavesurfer.getCurrentTime();
+            bufferBegin = middle - windowLength / 2;
+            bufferBegin = Math.max(0, bufferBegin);
+            bufferBegin = Math.min(bufferBegin, currentFileDuration - windowLength)
+            postBufferUpdate({begin: bufferBegin, position: 0.5})
         }
     },
     PageUp: function () {
