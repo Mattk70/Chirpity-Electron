@@ -895,7 +895,8 @@ function formatTimeCallback(secs) {
     // fill up seconds with zeroes
     let secondsStr;
     if (windowLength >= 5) {
-        secondsStr = seconds.toString();
+        secondsStr = (seconds + milliSeconds/1000).toFixed(2);
+        secondsStr = secondsStr.replace(/\.?0+$/, ''); // remove trailing zeroes
     } else {
         let fraction = Math.round(milliSeconds / 100);
         if (fraction === 10) {
