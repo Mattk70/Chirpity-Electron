@@ -105,6 +105,7 @@ const timelineSetting = document.getElementById('timelineSetting');
 const colourmap = document.getElementById('colourmap');
 const batchSizeValue = document.getElementById('batch-size-value');
 const nocmig = document.getElementById('nocmig');
+const context = document.getElementById('context');
 
 let batchInProgress = false;
 let activeRow;
@@ -518,13 +519,15 @@ function isEmptyObject(obj) {
 }
 
 function refreshResultsView() {
-    hideAll();
+
     if (fileLoaded) {
+        hideAll();
         showElement(['spectrogramWrapper', 'fullscreen'], false);
         if (!isEmptyObject(predictions)) {
             showElement(['resultTableContainer'], false);
         }
-    } else {
+    } else if (! fileList.length){
+        hideAll();
         showElement(['loadFileHint', 'loadFileHintText'], true);
     }
     //adjustSpecDims(true);
@@ -1044,6 +1047,7 @@ window.onload = async () => {
         longitude: '',
         location: 'Location not set',
         nocmig: false,
+        context: false,
         snr: 0,
         warmup: true,
         backend: 'tensorflow',
@@ -1103,6 +1107,7 @@ window.onload = async () => {
             nocmigButton.innerText = config.nocmig ? 'bedtime' : 'bedtime_off';
             nocmigButton.title = config.nocmig ? 'Nocmig mode on' : 'Nocmig mode off';
             nocmig.checked = config.nocmig;
+            context.checked = config.context;
             confidenceRange.value = config.minConfidence;
             thresholdDisplay.innerHTML = `<b>${config.minConfidence}%</b>`;
             confidenceSlider.value = config.minConfidence;
@@ -1125,7 +1130,8 @@ window.onload = async () => {
                 lat: config.latitude,
                 lon: config.longitude,
                 confidence: config.minConfidence,
-                nocmig: config.nocmig
+                nocmig: config.nocmig,
+                context: config.context
             });
             loadModel();
             worker.postMessage({action: 'clear-cache'})
@@ -2849,8 +2855,20 @@ const changeNocmigMode = (e) => {
     updatePrefs();
 }
 
+const toggleContextMode = () =>{
+    config.context = !config.context;
+    context.checked = config.context;
+    worker.postMessage({
+        action: 'set-variables',
+        context: config.context,
+    });
+    updatePrefs()
+}
+
 nocmigButton.addEventListener('click', changeNocmigMode);
 nocmig.addEventListener('change', changeNocmigMode)
+
+context.addEventListener('change', toggleContextMode)
 
 const fullscreen = document.getElementById('fullscreen');
 

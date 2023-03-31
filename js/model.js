@@ -1,6 +1,6 @@
 const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs');
-let DEBUG = false;
+let DEBUG = true;
 let BACKEND;
 
 //GLOBALS
@@ -65,7 +65,8 @@ onmessage = async (e) => {
                 break;
             case 'predict':
                 //const t0 = performance.now();
-                const {chunks, start, fileStart, file, snr, minConfidence, worker} = e.data;
+                const {chunks, start, fileStart, file, snr, minConfidence, worker, context} = e.data;
+                myModel.useContext = context;
                 const result = await myModel.predictChunk(chunks, start, fileStart, file, snr, minConfidence / 100);
                 response = {
                     message: 'prediction',
@@ -81,20 +82,21 @@ onmessage = async (e) => {
             case 'get-spectrogram':
                 const buffer = e.data.buffer;
                 // Only consider full specs
-                if (buffer.length < this.chunkLength) return
+                if (buffer.length < myModel.chunkLength) return
                 const specFile = e.data.file;
                 const filepath = e.data.filepath;
                 const spec_height = e.data.height;
                 const spec_width = e.data.width
                 let image;
-                const bufferTensor = tf.tensor1d(buffer);
+                const bufferTensor = myModel.normalise_audio(buffer);
                 const imageTensor = tf.tidy(() => {
                     return myModel.makeSpectrogram(bufferTensor);
                 })
                 image = tf.tidy(() => {
                     let spec = myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), spec_height, spec_width);
                     // rescale to 0-255
-                    return tf.mul(spec, tf.scalar(255)).dataSync();
+                    //const spec_max = tf.max(spec)
+                    return spec.dataSync() //tf.mul(spec, tf.scalar(255)).dataSync();
                 })
                 bufferTensor.dispose()
                 imageTensor.dispose()
@@ -141,6 +143,7 @@ class Model {
         this.frame_step = 186;
         this.appPath = appPath;
         this.list = list;
+        this.useContext = null;
     }
 
     async loadModel() {
@@ -164,7 +167,7 @@ class Model {
                 const warmupResult = this.model.predict(tf.zeros(this.inputShape), {batchSize: this.batchSize});
                 warmupResult.arraySync();
                 // see if we can get padding compiled at this point
-                this.padBatch(tf.zeros( [1,this.inputShape[1], this.inputShape[2], this.inputShape[3]]), {batchSize: this.batchSize})
+                this.padBatch(tf.zeros([1, this.inputShape[1], this.inputShape[2], this.inputShape[3]]), {batchSize: this.batchSize})
             })
         }
         console.log('WarmUp end', tf.memory().numTensors)
@@ -224,12 +227,20 @@ class Model {
             // Swap axes to fit output shape
             specBatch = tf.transpose(specBatch, [0, 2, 1]);
             specBatch = tf.reverse(specBatch, [1]);
-            //specBatch = tf.slice3d(specBatch, [0, 1, 1], [-1, height, width]);
-            specBatch = tf.abs(specBatch);
+
+            // specBatch = tf.abs(specBatch);
             // Add channel axis
             specBatch = tf.expandDims(specBatch, -1);
-            specBatch = tf.image.resizeBilinear(specBatch, [img_height, img_width], false);
-            return this.normalize(specBatch);
+            // let max_spec = Array.from(tf.max(specBatch).dataSync());
+            // let min_spec = Array.from(tf.min(specBatch).dataSync());
+            const log_spec_adjusted =tf.log(specBatch.add(1e-7)).mul(20)
+            // const preslice = specBatch.arraySync()
+            //specBatch = tf.slice4d(specBatch, [0, 0, 0, 0], [-1, img_height, img_width, -1]);
+            specBatch = tf.image.resizeBilinear(log_spec_adjusted, [img_height, img_width]);
+            // max_spec = Array.from(tf.max(specBatch).dataSync());
+            //  min_spec = Array.from(tf.min(specBatch).dataSync());
+            // const postslice = specBatch.arraySync()
+            return specBatch //  this.normalize(specBatch);
         })
     }
 
@@ -243,38 +254,33 @@ class Model {
         })
     }
 
-    checkAddContext(prediction, tensor, confidence, SNRthreshold) {
+    addContext(prediction, tensor, confidence) {
         // Create a set of images from the batch, offset by half the width of the original images
         const [batchSize, height, width, channel] = tensor.shape;
-        const makeContextAware = (BACKEND === 'webgl' || SNRthreshold === 0) && batchSize > 1;
-        if (makeContextAware) {
-            return tf.tidy(() => {
-                const firstHalf = tensor.slice([0, 0, 0, 0], [-1, -1, width / 2, -1]);
-                const secondHalf = tensor.slice([0, 0, width / 2, 0], [-1, -1, width / 2, -1]);
-                const paddedSecondHalf = tf.concat([tf.zeros([1, height, width / 2, channel]), secondHalf], 0);
-                secondHalf.dispose();
-                // prepend padding tensor
-                const [droppedSecondHalf, _] = paddedSecondHalf.split([paddedSecondHalf.shape[0] - 1, 1]);  // pop last tensor
-                paddedSecondHalf.dispose();
-                const combined = tf.concat([droppedSecondHalf, firstHalf], 2);  // concatenate adjacent pairs along the width dimension
-                firstHalf.dispose();
-                droppedSecondHalf.dispose();
-                const rshiftPrediction = this.model.predict(combined, {batchSize: this.batchSize});
-                combined.dispose();
-                // now we have predictions for both the original and rolled images
-                const [padding, remainder] = tf.split(rshiftPrediction, [1, -1]);
-                const lshiftPrediction = tf.concat([remainder, padding]);
-                // Get the highest predictions from the overlapping images
-                const surround = tf.maximum(rshiftPrediction, lshiftPrediction);
-                lshiftPrediction.dispose();
-                rshiftPrediction.dispose();
-                // Mask out where these are below the threshold
-                const indices = tf.greater(surround, confidence / 2);
-                return prediction.where(indices, 0);
-            })
-        } else {
-            return prediction;  // Do nothing
-        }
+        return tf.tidy(() => {
+            const firstHalf = tensor.slice([0, 0, 0, 0], [-1, -1, width / 2, -1]);
+            const secondHalf = tensor.slice([0, 0, width / 2, 0], [-1, -1, width / 2, -1]);
+            const paddedSecondHalf = tf.concat([tf.zeros([1, height, width / 2, channel]), secondHalf], 0);
+            secondHalf.dispose();
+            // prepend padding tensor
+            const [droppedSecondHalf, _] = paddedSecondHalf.split([paddedSecondHalf.shape[0] - 1, 1]);  // pop last tensor
+            paddedSecondHalf.dispose();
+            const combined = tf.concat([droppedSecondHalf, firstHalf], 2);  // concatenate adjacent pairs along the width dimension
+            firstHalf.dispose();
+            droppedSecondHalf.dispose();
+            const rshiftPrediction = this.model.predict(combined, {batchSize: this.batchSize});
+            combined.dispose();
+            // now we have predictions for both the original and rolled images
+            const [padding, remainder] = tf.split(rshiftPrediction, [1, -1]);
+            const lshiftPrediction = tf.concat([remainder, padding]);
+            // Get the highest predictions from the overlapping images
+            const surround = tf.maximum(rshiftPrediction, lshiftPrediction);
+            lshiftPrediction.dispose();
+            rshiftPrediction.dispose();
+            // Mask out where these are below the threshold
+            const indices = tf.greater(surround, confidence / 2);
+            return prediction.where(indices, 0);
+        })
     }
 
     async predictBatch(specs, keys, file, fileStart, threshold, confidence) {
@@ -301,7 +307,9 @@ class Model {
             const c = newCondition || condition;
             // maskedTensorBatch = tf.booleanMaskAsync(fixedTensorBatch, c);
             // maskedKeysTensor = tf.booleanMaskAsync(keysTensor, c)
-            [maskedTensorBatch, maskedKeysTensor] = await Promise.all([ tf.booleanMaskAsync(fixedTensorBatch, c), tf.booleanMaskAsync(keysTensor, c)])
+            [maskedTensorBatch, maskedKeysTensor] = await Promise.all([
+                tf.booleanMaskAsync(fixedTensorBatch, c),
+                tf.booleanMaskAsync(keysTensor, c)])
             c.dispose();
 
             fixedTensorBatch.dispose();
@@ -322,12 +330,17 @@ class Model {
         const tb = maskedTensorBatch || TensorBatch;
         let prediction;
         prediction = this.model.predict(tb, {batchSize: this.batchSize})
-
-        let newPrediction = this.checkAddContext(prediction, tb, confidence, threshold);
+        let newPrediction;
+        if (this.useContext && this.batchSize > 1 && threshold === 0) {
+            newPrediction = this.addContext(prediction, tb, confidence);
+        }
         tb.dispose();
         const finalPrediction = newPrediction || prediction;
+        //const sigmoid_prediction = tf.sigmoid(finalPrediction)
         const array_of_predictions = finalPrediction.arraySync()
-        finalPrediction.dispose();
+        // sigmoid_prediction.dispose()
+        prediction.dispose();
+        if (newPrediction) newPrediction.dispose()
 
         if (maskedKeysTensor) {
             keys = maskedKeysTensor.dataSync()
@@ -353,18 +366,34 @@ class Model {
     makeSpectrogram(audioBuffer) {
         return tf.tidy(() => {
             let spec = tf.abs(tf.signal.stft(audioBuffer, this.frame_length, this.frame_step))
-            const power = tf.square(spec);
-            const log_spec = tf.mul(tf.scalar(10.0), tf.div(tf.log(power), tf.log(tf.scalar(10.0))));
-            const maxLogSpec = tf.max(log_spec);
-            const log_spec_adjusted = tf.maximum(log_spec, tf.sub(maxLogSpec, tf.scalar(80)));
+
+            // const power = tf.square(spec);
+            // const log_spec = tf.mul(tf.scalar(10.0), tf.div(tf.log(power), tf.log(tf.scalar(10.0))));
+            // const maxLogSpec = tf.max(log_spec);
+            // const log_spec_adjusted = tf.maximum(log_spec, tf.sub(maxLogSpec, tf.scalar(80)));
             audioBuffer.dispose();
-            return log_spec_adjusted;
+            return spec;
+        })
+    }
+
+    const
+    normalise_audio = (signal) => {
+        return tf.tidy(() => {
+            signal = tf.tensor1d(signal)
+            const sig_max = tf.max(signal)
+            //const sig_min = tf.min(signal)
+            //const sig_max_ds = sig_max.dataSync()
+            //const sig_min_ds = sig_min.dataSync()
+            //Normalize the waveform to [-1,1]
+            return signal.div(sig_max).mul(tf.scalar(128));
+            //return signal.sub(sig_min).div(sig_max.sub(sig_min)).mul(tf.scalar(255)).sub(tf.scalar(128)) // .mul(tf.scalar(128));
         })
     }
 
     async predictChunk(audioBuffer, start, fileStart, file, threshold, confidence) {
         if (DEBUG) console.log('predictCunk begin', tf.memory().numTensors)
-        audioBuffer = tf.tensor1d(audioBuffer);
+        audioBuffer = this.normalise_audio(audioBuffer);
+
         // check if we need to pad
         const remainder = audioBuffer.shape % this.chunkLength;
         let paddedBuffer;
@@ -393,7 +422,7 @@ class Model {
         return result
     }
 
-    clearTensorArray(tensorObj) {
+    async clearTensorArray(tensorObj) {
         // Dispose of accumulated kept tensors in model tensor array
         tensorObj.forEach(tensor => tensor.dispose());
     }
