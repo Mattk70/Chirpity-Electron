@@ -56,7 +56,7 @@ ffmpeg.setFfmpegPath(staticFfmpeg.path);
 
 let predictionsRequested = {}, predictionsReceived = {}
 let COMPLETED = [], PENDING_FILES = [];
-let diskDB, memoryDB, NOCMIG, latitude, longitude;
+let diskDB, memoryDB, NOCMIG, CONTEXT_AWARE, latitude, longitude;
 
 let t0; // Application profiler
 
@@ -127,7 +127,7 @@ const prepare_statements = (db) => {
                                                JOIN records ON species.id = records.speciesID
                                       WHERE records.dateTime = (?)
                                         AND confidence > (?)
-                                        AND speciesID NOT IN ((?))
+                                        AND speciesID NOT IN (?)
                                       ORDER BY records.confidence DESC`);
 }
 
@@ -241,6 +241,7 @@ ipcRenderer.on('new-client', (event) => {
                 longitude = args.lon || longitude;
                 // Boolean value an issue with this pattern so...
                 if (Object.keys(args).includes('nocmig')) NOCMIG = args.nocmig;
+                if (Object.keys(args).includes('context')) CONTEXT_AWARE = args.context;
                 minConfidence = args.confidence || minConfidence;
                 TEMP = args.temp || TEMP;
                 appPath = args.path || appPath;
@@ -620,7 +621,18 @@ async function loadAudioFile({
     if (found) {
         await fetchAudioBuffer({file, start, end})
             .then((buffer) => {
-                const audioArray = buffer.getChannelData(0);
+                let audioArray = buffer.getChannelData(0);
+                let normalize = false;
+                let adjustedSignal = [];
+                if (normalize) {
+                    const audio_max = Math.max(...audioArray);
+                    const audio_min = Math.min(...audioArray);
+                    for (let i = 0; i < audioArray.length; i++) {
+                        audioArray[i] = (audioArray[i] - audio_min) / (audio_max - audio_min);
+                    }
+
+                }
+                if (adjustedSignal.length) audioArray = adjustedSignal;
                 UI.postMessage({
                     event: 'worker-loaded-audio',
                     start: metadata[file].fileStart,
@@ -901,6 +913,7 @@ function feedChunksToModel(channelData, chunkStart, file, end, resetResults, wor
         duration: end,
         resetResults: resetResults,
         snr: SNR,
+        context: CONTEXT_AWARE,
         minConfidence: minConfidence,
         chunks: channelData
     };
@@ -930,7 +943,7 @@ const speciesMatch = (path, sname) => {
 }
 
 const saveResults2DataSet = (rootDirectory) => {
-    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/Additions_dbscale';
+    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/bw_merged_chirpity';
     const height = 256, width = 384;
     let t0 = Date.now()
     let promise = Promise.resolve();
@@ -938,7 +951,7 @@ const saveResults2DataSet = (rootDirectory) => {
     let count = 0;
 
 
-    diskDB.each(`${db2ResultSQL} `, async (err, result) => {
+    diskDB.each(`${db2ResultSQL}`, async (err, result) => {
         // Check for level of ambient noise activation
         let ambient, threshold, value = 50;
         // adding_chirpity_additions is a flag for curated files, if true we assume every detection is correct
@@ -1180,7 +1193,7 @@ const parsePredictions = async (response) => {
     for (let [key, predictions] of Object.entries(latestResult)) {
         let updateUI = false, resultsToSend = [];
         for (let id = 0; id < predictions.length; id++) {
-            if (predictions[id] > 0) {
+            if (predictions[id] > 0.01) {
                 const speciesID = id;
                 const confidence = predictions[id] * 100;
                 if (confidence > minConfidence && STATE.blocked.indexOf(speciesID) === -1) {
@@ -1201,17 +1214,12 @@ const parsePredictions = async (response) => {
                     const result = {
                         timestamp: timestamp,
                         position: key,
+                        file: file,
                         cname: species.cname,
                         sname: species.sname,
                         score: species.confidence,
                     }
-                    UI.postMessage({
-                        event: 'prediction-ongoing',
-                        file: file,
-                        result: result,
-                        index: index++,
-                        selection: STATE.selection
-                    });
+                    sendResult(++index, result)
                 })
             })
         }
@@ -1439,16 +1447,16 @@ const getSummary = async ({
     const summary = await db.allAsync(`
         SELECT species.cname, species.sname, COUNT(*) as count, max_confidence.max_confidence as max
         FROM (
-            SELECT DISTINCT dateTime, speciesID, MAX (confidence) 
-                OVER (PARTITION BY dateTime) AS max_confidence, ROW_NUMBER() 
-                OVER (PARTITION BY records.dateTime ORDER BY confidence DESC) AS rank
+            SELECT DISTINCT dateTime, speciesID, MAX (confidence)
+            OVER (PARTITION BY dateTime) AS max_confidence, ROW_NUMBER()
+            OVER (PARTITION BY records.dateTime ORDER BY confidence DESC) AS rank
             FROM records
             JOIN files ON files.rowid = records.fileID
             JOIN species ON speciesID = species.id
             ${where} ${when}
             ) AS top_confidence_by_datetime_species
             JOIN species
-                ON top_confidence_by_datetime_species.speciesID = species.id
+        ON top_confidence_by_datetime_species.speciesID = species.id
             JOIN (
             SELECT speciesID, MAX (confidence) AS max_confidence
             FROM records
@@ -1472,7 +1480,7 @@ const getSummary = async ({
                                            ${where} ${when}`);
         total = res.total;
     }
-    console.log("Get Summary   took", (Date.now() - t0) / 1000, " seconds")
+    console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds")
     // need to send offset here?
     const event = interim ? 'update-summary' : 'prediction-done'
     UI.postMessage({
