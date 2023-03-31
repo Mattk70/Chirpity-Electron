@@ -1411,7 +1411,7 @@ function sendFeedback(file, cname, sname) {
     predictions[clickedIndex].cname = cname;
     predictions[clickedIndex].sname = sname;
     predictions[clickedIndex].filename =
-        `${cname.replace(/\s+/g, '_')}~${sname.replace(/\s+/g, '_')}~${Date.parse(predictions[clickedIndex].date)}.opus`;
+        `${cname.replace(/\s+/g, '_')}~${sname.replace(/\s+/g, '_')}~${predictions[clickedIndex].date}.opus`;
     sendFile('incorrect', predictions[clickedIndex]);
 }
 
