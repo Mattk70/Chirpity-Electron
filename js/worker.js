@@ -9,6 +9,9 @@ const {writeFile, mkdir, readdir} = require('node:fs/promises');
 const {utimes} = require('utimes');
 const stream = require("stream");
 const staticFfmpeg = require('ffmpeg-static-electron');
+
+
+
 const {stat} = require("fs/promises");
 let WINDOW_SIZE = 3;
 let NUM_WORKERS;
@@ -52,7 +55,7 @@ sqlite3.Database.prototype.getAsync = function (sql, ...params) {
 
 
 console.log(staticFfmpeg.path);
-ffmpeg.setFfmpegPath(staticFfmpeg.path);
+ffmpeg.setFfmpegPath(staticFfmpeg.path.replace('app.asar', 'app.asar.unpacked'));
 
 let predictionsRequested = {}, predictionsReceived = {}
 let COMPLETED = [], PENDING_FILES = [];

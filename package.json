@@ -27,7 +27,7 @@
       "!poetry-lock*",
       "!.idea",
       "!saved_model$(/*)",
-      ".model_config.json",
+      "model_config.json",
       "node_modules/ffmpeg-static-electron/bin/${os}/${arch}/ffmpeg",
       "node_modules/ffmpeg-static-electron/index.js",
       "node_modules/ffmpeg-static-electron/package.json",
@@ -154,8 +154,7 @@
   "devDependencies": {
     "electron": "^23.1.2",
     "electron-builder": "^24.0.0",
-    "@tensorflow/tfjs-converter": "^4.2.0",
-    "webpack-bundle-analyzer": "^4.8.0"
+    "@tensorflow/tfjs-converter": "^4.2.0"
   },
   "dependencies": {
     "@popperjs/core": "^2.9.2",
@@ -170,7 +169,7 @@
     "jquery": "^3.6.3",
     "sqlite3": "^5.0.8",
     "suncalc2": "^1.8.1",
-    "utimes": "5.1.0",
+    "utimes": "5.1.1",
     "uuid": "^8.3.2",
     "wavefile-reader": "^1.1.1",
     "wavesurfer.js": "^6.4.0"
