@@ -526,7 +526,7 @@ function refreshResultsView() {
         if (!isEmptyObject(predictions)) {
             showElement(['resultTableContainer'], false);
         }
-    } else if (! fileList.length){
+    } else if (!fileList.length) {
         hideAll();
         showElement(['loadFileHint', 'loadFileHintText'], true);
     }
@@ -898,7 +898,7 @@ function formatTimeCallback(secs) {
     // fill up seconds with zeroes
     let secondsStr;
     if (windowLength >= 5) {
-        secondsStr = (seconds + milliSeconds/1000).toFixed(2);
+        secondsStr = (seconds + milliSeconds / 1000).toFixed(2);
         secondsStr = secondsStr.replace(/\.?0+$/, ''); // remove trailing zeroes
     } else {
         let fraction = Math.round(milliSeconds / 100);
@@ -2855,7 +2855,7 @@ const changeNocmigMode = (e) => {
     updatePrefs();
 }
 
-const toggleContextMode = () =>{
+const toggleContextMode = () => {
     config.context = !config.context;
     context.checked = config.context;
     worker.postMessage({
@@ -3126,7 +3126,7 @@ const confidenceRange = document.getElementById('confidence');
 
 
 const setConfidence = (e) => {
-    hideConfidenceSlider()
+
     confidenceRange.value = e.target.value;
     handleThresholdChange(e);
 }
@@ -3148,9 +3148,9 @@ confidenceSliderDisplay.addEventListener('mouseenter', () => {
     if (confidenceTimerTimeout) clearTimeout(confidenceTimerTimeout)
 })
 
-confidenceSliderDisplay.addEventListener('mouseup', setConfidence);
-confidenceSliderDisplay.addEventListener('input', (e) => {
-    thresholdDisplay.innerHTML = `<b>${e.target.value}%</b>`;
+confidenceSliderDisplay.addEventListener('input', setConfidence);
+confidenceSliderDisplay.addEventListener('mouseup', (e) => {
+    hideConfidenceSlider()
 });
 
 

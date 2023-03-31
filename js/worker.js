@@ -1191,14 +1191,13 @@ const parsePredictions = async (response) => {
     let file = response.file, batchInProgress = false;
     const latestResult = response.result, db = STATE.db;
     for (let [key, predictions] of Object.entries(latestResult)) {
-        let updateUI = false, resultsToSend = [];
+        let updateUI = false;
         for (let id = 0; id < predictions.length; id++) {
-            if (predictions[id] > 0.01) {
+            if (predictions[id] >= 0.05) {
                 const speciesID = id;
                 const confidence = predictions[id] * 100;
                 if (confidence > minConfidence && STATE.blocked.indexOf(speciesID) === -1) {
                     updateUI = true;
-                    resultsToSend.push({id: speciesID, confidence: confidence})
                 }
                 key = parseInt(key);
                 //save all results to  db, regardless of minConfidence

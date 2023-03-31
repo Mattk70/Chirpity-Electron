@@ -381,12 +381,12 @@ class Model {
         return tf.tidy(() => {
             signal = tf.tensor1d(signal)
             const sig_max = tf.max(signal)
-            //const sig_min = tf.min(signal)
+            const sig_min = tf.min(signal)
             //const sig_max_ds = sig_max.dataSync()
             //const sig_min_ds = sig_min.dataSync()
             //Normalize the waveform to [-1,1]
-            return signal.div(sig_max).mul(tf.scalar(128));
-            //return signal.sub(sig_min).div(sig_max.sub(sig_min)).mul(tf.scalar(255)).sub(tf.scalar(128)) // .mul(tf.scalar(128));
+            //return signal.div(sig_max).mul(tf.scalar(128));
+            return signal.sub(sig_min).div(sig_max.sub(sig_min)).mul(tf.scalar(128))
         })
     }
 
