@@ -1,5 +1,6 @@
 const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs');
+const path = require('path');
 let DEBUG = true;
 let BACKEND;
 
@@ -25,7 +26,7 @@ onmessage = async (e) => {
         switch (modelRequest) {
             case 'load':
                 if (DEBUG) console.log('load request to worker')
-                const {height, width, labels, location} = JSON.parse(fs.readFileSync('model_config.json', 'utf8'));
+                const {height, width, labels, location} = JSON.parse(fs.readFileSync(path.join(__dirname, '../model_config.json'), 'utf8'));
                 const appPath = '../' + location + '/';
                 const list = e.data.list;
                 const batch = e.data.batchSize;
