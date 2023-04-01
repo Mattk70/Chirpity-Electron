@@ -387,7 +387,7 @@ function powerSave(on) {
 }
 
 const openFileInList = async (e) => {
-    if (!PREDICTING && e.target.type !== 'button') {
+    if (!PREDICTING && e.target.id !== 'setFileStart'  && e.target.tagName !== 'BUTTON') {
         await loadAudioFile({filePath: e.target.id, preserveResults: true})
     }
 }
