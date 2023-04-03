@@ -88,19 +88,19 @@
                         </ul>
                     </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"> Settings </a>
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Settings</a>
                         <ul class="nav-item dropdown-menu">
                             <li>
-                                <form style="width: 540px;">
+                                <form id="settingsForm">
                                     <div class="row">
-                                        <div class="col-6">
+                                        <div class="col-6 pe-0">
                                             <fieldset class="border rounded m-2 p-1">
                                                 <legend style="font-size: large">Predictions</legend>
                                                 <div class="form-group rounded p-2 mb-2 bg-light">
-                                                    <label for="list-to-use">Model:</label>
+                                                    <label for="model-to-use">Model:</label>
                                                     <select class="form-control" id="model-to-use">
                                                         <option value="efficientnet">Chirpity</option>
-                                                        <option value="BirdNet">BirdNet</option>
+<!--                                                        <option value="BirdNet">BirdNet</option>-->
                                                     </select>
                                                 </div>
                                                 <div class="form-group rounded p-2 mb-2 bg-light">
@@ -144,12 +144,11 @@
                                                     </div>
                                                 </div>
                                             </fieldset>
-
                                         </div>
-                                        <div class="col-6">
+                                        <div class="col-6 ps-0">
                                             <fieldset class="border rounded m-2 p-1">
                                                 <legend style="font-size: large">Location <span class="circle"
-                                                                                                title="Location is solely used to determine dawn and dusk times for recordings">?</span>
+                                                    title="Location is solely used to determine dawn and dusk times for recordings">?</span>
                                                 </legend>
                                                 <div class="form-group rounded p-2 mb-2 bg-light">
                                                     <div class="input-group mb-2">
@@ -157,12 +156,15 @@
                                                         <input id="latitude" type="text" class="form-control  ps-1"
                                                                placeholder="0.0"
                                                                aria-label="Latitude" aria-describedby="latitude">
-                                                        <span class="input-group-text pe-2">Lon:</span>
+                                                    </div>
+                                                    <div class="input-group mb-2">
+                                                        <span class="input-group-text pe-1">Lon:</span>
                                                         <input id="longitude" type="text" class="form-control ps-1"
                                                                placeholder="0.0"
                                                                aria-label="Longitude" aria-describedby="longitude">
                                                     </div>
                                                     <span id="place"></span>
+
                                                 </div>
                                             </fieldset>
                                             <fieldset class="border rounded m-2 p-1">
@@ -197,7 +199,7 @@
                                                     </select>
                                                 </div>
                                                 <div class="form-group rounded p-2 mb-2 bg-light">
-                                                    <label for="timeline">Timeline:</label>
+                                                    <label for="timelineSetting">Timeline:</label>
                                                     <select class="form-control" id="timelineSetting">
                                                         <option value="timecode">Timecode</option>
                                                         <option value="timeOfDay">Time of day</option>
@@ -212,7 +214,7 @@
                                             <div class="row">
                                                 <div class="col">
                                                     <div class="form-group rounded p-2 mb-2 bg-light">
-                                                        <label>Backend:</label>
+                                                        <label>Backend:</label><br>
                                                         <div class="form-check form-check-inline">
                                                             <input class="form-check-input" type="radio" name="backend"
                                                                    id="tensorflow"
@@ -284,7 +286,6 @@
                                                     </div>
                                                 </div>
                                             </div>
-
                                         </div>
                                     </fieldset>
                                 </form>
@@ -308,7 +309,7 @@
             </div>
             <!-- navbar-collapse.// -->
             <img src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"
-                 height="50px"/>
+                 height="40"/>
         </div>
         <!-- container-fluid.// -->
     </nav>
@@ -403,7 +404,9 @@
     <!-- Explore Div -->
     <div id="exploreWrapper" class="p-1 row g-1 d-none">
         <div class="species-selector col-sm-4" id="exploreSpeciesSearch">
-            <input type="text" class="input" placeholder="Search for a species...">
+            <label>
+                <input type="text" class="input" placeholder="Search for a species...">
+            </label>
             <div class="explore bird-list-wrapper"></div>
         </div>
         <div class="col-sm-8 align-middle">
@@ -465,14 +468,14 @@
                     <span style="max-width: 70px"
                           id="list-icon"
                           class="btn btn-outline-secondary p-1 pointer icon-container"><img class="icon"
-                                                                                            src="img/migrants.png"></span>
+                                                                                            src="img/migrants.png" alt="migrants"></span>
                     <span style="max-width: 70px" title="Prediction confidence threshold"
                           id="threshold-value"
                           class="btn  btn-outline-secondary p-1 fs-5 pointer icon-container"><b>50%</b>
                         </span>
                     <span id="confidenceSliderContainer" class="d-none">
-                            <input type="range" class="form-range vertical position-absolute" step="5"
-                                   id="confidenceValue">
+                            <label for="confidenceValue" class="visually-hidden">confidence</label><input type="range" class="form-range vertical position-absolute" step="5"
+                                                                        id="confidenceValue">
                     </span>
                 </div>
             </div>
@@ -521,7 +524,9 @@
             <div class="row">
                 <div class="col-sm-3">
                     <div id="speciesSearch" class="species-selector">
-                        <input type="text" class="input" placeholder="Search for a species...">
+                        <label>
+                            <input type="text" class="input" placeholder="Search for a species...">
+                        </label>
                         <div class="chart bird-list-wrapper"></div>
                     </div>
                     <div id='dataRecords' class="border border-dark rounded-border d-none">

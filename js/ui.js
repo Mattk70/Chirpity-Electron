@@ -821,7 +821,7 @@ function loadResultRegion(params) {
  */
 function adjustSpecDims(redraw, fftSamples) {
     //Contentwrapper starts below navbar (66px) and ends above footer (30px). Hence - 96
-    contentWrapperElement.height(bodyElement.height() - 96);
+    contentWrapperElement.height(bodyElement.height());
     const contentHeight = contentWrapperElement.outerHeight(true);
     // + 2 for padding
     const formOffset = $('#exploreWrapper').outerHeight(true);
@@ -2753,12 +2753,6 @@ function sendFile(mode, result) {
             cname: result.cname,
             sname: result.sname,
             score: result.score,
-            cname2: result.cname2,
-            sname2: result.sname2,
-            score2: result.score2,
-            cname3: result.cname3,
-            sname3: result.sname3,
-            score3: result.score3,
             date: result.date,
             lat: config.latitude,
             lon: config.longitude,
@@ -2782,15 +2776,6 @@ function sendFile(mode, result) {
         })
     }
 }
-
-// create a dict mapping score to icon
-// const iconDict = {
-//     guess: '<span class="confidence material-icons-two-tone text-secondary score border border-2 border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
-//     low: '<span class="confidence material-icons-two-tone score text-danger border border-2 border-secondary rounded" title="--%">signal_cellular_alt_1_bar</span>',
-//     medium: '<span class="confidence material-icons-two-tone score text-warning border border-2 border-secondary rounded" title="--%">signal_cellular_alt_2_bar</span>',
-//     high: '<span class="confidence material-icons-two-tone score text-success border border-2 border-secondary rounded" title="--%">signal_cellular_alt</span>',
-//     confirmed: '<span class="confidence material-icons-two-tone score text-success border border-2 border-secondary rounded" title="confirmed">done</span>',
-// }
 
 const iconDict = {
     guess: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: grey">--%</span></span>',

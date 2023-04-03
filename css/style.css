@@ -63,10 +63,6 @@ html, body {
     filter: invert(100%);
 }
 
-tr[id^="sub"] {
-    font-size: 12px;
-}
-
 span[id^="filename_"] {
     border-bottom: 1px;
     border-bottom: #818182;
@@ -74,6 +70,7 @@ span[id^="filename_"] {
     z-index: 2;
 }
 
+/*
 .rotate {
     transition: all 0.2s linear;
     cursor: pointer;
@@ -82,6 +79,7 @@ span[id^="filename_"] {
 .rotate.down {
     transform: rotate(180deg);
 }
+*/
 
 .filename {
     margin-left: auto;
@@ -110,7 +108,7 @@ div#contentWrapper {
     background: #dbe2ed url(../img/Redwing-flight.png);
     background-size: cover;
     position: absolute;
-    top: 66px;
+    top: 0px;
     width: 100%;
 }
 
@@ -552,11 +550,19 @@ input[type="range"].vertical {
 
 .circle {
     display: inline-block;
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
+    font-size: medium;
     background-color: gray;
     color: white;
     text-align: center;
-    line-height: 22px
+    line-height: 20px
+}
+
+#settingsForm {
+    height: 75vh;
+    min-width: 540px;
+    overflow-y: auto;
+    overflow-x: hidden;
 }

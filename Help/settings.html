@@ -12,23 +12,28 @@
     </tr>
     <tr>
         <th>Set Threshold</th>
-        <td>Sets the confidence above which the model will report a detection. Higher values will reduce false
-            positives, although that will increase the risk of missing genuine calls. A figure around 50% gives a good
-            balance (i.e. it will detect most genuine calls while minimising false positive detections).
+        <td>This setting determines the minimum confidence level required for the model to report a detection.
+            Increasing the value reduces false positives but increases the risk of missing genuine calls.
+            A value around 50% provides a good balance between detecting genuine calls and minimizing false positives.
         </td>
     </tr>
-    <tr>
-        <th>Model</th>
-        <td><ul>
-                <li><b>DenseNet:</b> Original model.</li>
-                <li><b>Efficient:</b> New model. Faster, less memory intensive and more sensitive. More prone to false IDs when there is a lot of background noise.</li>
-            </ul>
-        </td>
-    </tr>
+<!--    <tr>-->
+<!--        <th>Model</th>-->
+<!--        <td>-->
+<!--            <ul>-->
+<!--                <li><b>DenseNet:</b> Original model.</li>-->
+<!--                <li><b>Efficient:</b> New model. Faster, less memory intensive and more sensitive. More prone to false-->
+<!--                    IDs when there is a lot of background noise.-->
+<!--                </li>-->
+<!--            </ul>-->
+<!--        </td>-->
+<!--    </tr>-->
     <tr>
         <th>Search for</th>
-        <td><p><b>Migrants and Owls</b>. Just report detections relating to these species' calls (song detections are excluded).</p>
-            <p><b>All birds</b>. Include birdsong as well as calls, also includes species not known to call at night.</p>
+        <td><p><b>Migrants and Owls</b>. Just report detections relating to these species' calls (song detections are
+            excluded).</p>
+            <p><b>All birds</b>. Include birdsong as well as calls, also includes species not known to call at night.
+            </p>
             <p><b>Everything</b>. This full list comprises 305 bird species and the following non-bird classes:</p>
             <ul>
                 <li><b>Ambient noise:</b> wind, rain, pops and bangs. Things that go bump in the night...</li>
@@ -43,40 +48,90 @@
         </td>
     </tr>
     <tr>
-        <th>Batch Size</th>
-        <td>Sets the number of three second chunks of audio to pass to the model each time a prediction is requested.
-            A higher number will make processing up to three times faster on long files.
-            If set too high for your machine, the Chirpity model may crash as it runs out of memory. In that event, set
-            a lower value, close and restart Chirpity.
+        <th>Nocmig Mode</th>
+        <td>
+            Only search for detections at night. Chirpity calculates the end and start of civil twilight for the dates
+            of the files and the location that is set.
+        </td>
+    </tr>
+    <tr>
+        <th>Context Mode</th>
+        <td> In this mode, Chirpity will use the surrounding context when making predictions. This helps mitigate
+            against false positive detections.
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center bg-dark text-white"><h5>Location</h5></td>
+    </tr>
+    <tr>
+        <th>Location</th>
+        <td> Set the location to use for calculating the start and end of civil twilight.
         </td>
     </tr>
     <tr>
         <td colspan="2" class="text-center bg-dark text-white"><h5>Spectrogram</h5></td>
     </tr>
     <tr>
-        <td><b>Colour</b></td>
-        <td>Displays the spectrogram in colour</td>
-    </tr>
-    <tr>
-        <td><b>Grayscale</b></td>
-        <td>Displays a monochrome spectrogram in shades of grey.</td>
+        <td><b>Colourmap</b></td>
+        <td>Choose the colour map for the spectrogram display</td>
     </tr>
     <tr>
         <th>Timeline</th>
         <td>The spectrogram timeline has two modes:
             <ul>
                 <li>
-                    <b>Time Elapsed</b> displays the time from the beginning of the file.
+                    <b>Timecode</b> displays the time elapsed from the beginning of the file.
                 </li>
                 <li>
-                    <b>Time of Day</b> uses files timestamps to
-                    calculate the actual time of the calls detected. If a file does not have a timestamp reflecting the
-                    time of the recording, this will give a spurious reading. The start time of the current file can be
-                    edited by selecting the appropriate date and time on the <span
+                    <b>Time of Day</b> relies on file timestamps to determine the actual time of detected calls.
+                    If a file's timestamp does not reflect the recording time, an inaccurate reading will result.
+                    To edit the start time of the current file,
+                    select the desired date and time using the <span
                         class="material-icons-two-tone align-bottom">edit_calendar</span>
-                    icon next to the file name on the transport controls panel.
+                    icon located next to the file name on the transport controls panel.
+
                 </li>
             </ul>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center bg-dark text-white"><h5>System</h5></td>
+    </tr>
+    <tr>
+        <th>Backend</th>
+        <td>Choose how predictions are calculated on you computer.
+            <ul>
+                <li>
+                    <b>CPU</b> will use the CPU for predictions, this is generally faster if you have an integrated
+                    graphics card.
+                </li>
+                <li>
+                    <b>GPU</b> will use the graphics card. If you have a dedicated graphics card, this will typically be
+                    significantly faster.
+                </li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <th>Threads</th>
+        <td>This setting allows you to select the number of threads to use for predictions.
+            When using the CPU backend, the number of threads is automatically set to match the number of CPU cores available on the computer.
+            By default, the GPU backend uses one thread. Adjusting this setting, along with the batch size, can optimize the speed of predictions.
+        </td>
+    </tr>
+    <tr>
+        <th>Batch Size</th>
+        <td>This setting determines the number of three-second audio chunks to process each time a prediction is requested.
+            Larger values lead to faster processing, especially on long files.
+            However, setting it too high for your machine can cause the Chirpity model to crash due to memory limitations.
+            If this happens, set a lower value and restart Chirpity.
+        </td>
+    </tr>
+    <tr>
+        <th>Signal to Noise threshold</th>
+        <td>This setting is exclusive to the CPU backend. When enabled, Chirpity will disregard audio sections with unclear signals.
+            The strength of the signal required for a prediction to be attempted increases with a higher signal-to-noise value.
+            This results in significant speed gains, but may cause Chirpity to miss quieter, more distant calls.
         </td>
     </tr>
 </table>
