@@ -416,7 +416,7 @@ function updateFileName(files, openfile) {
                 appendStr += `<a id="${item}" class="dropdown-item openFiles" href="#">
                 <span class="material-icons-two-tone align-bottom">audio_file</span>${label}</a>`;
             }
-        })
+        });
         appendStr += `</div></div>`;
     } else {
         appendStr = `<div id="fileContainer">
@@ -821,7 +821,7 @@ function loadResultRegion(params) {
  */
 function adjustSpecDims(redraw, fftSamples) {
     //Contentwrapper starts below navbar (66px) and ends above footer (30px). Hence - 96
-    contentWrapperElement.height(bodyElement.height());
+    contentWrapperElement.height(bodyElement.height() - 86);
     const contentHeight = contentWrapperElement.outerHeight(true);
     // + 2 for padding
     const formOffset = $('#exploreWrapper').outerHeight(true);
