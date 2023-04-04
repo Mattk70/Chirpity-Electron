@@ -16,7 +16,7 @@ let SUPPRESSED_IDS = [];
 let ENHANCED_IDS = [];
 const CONFIG = {
     sampleRate: 24000, specLength: 3, sigmoid: 1.0,
-}
+};
 
 
 onmessage = async (e) => {
@@ -25,19 +25,24 @@ onmessage = async (e) => {
     try {
         switch (modelRequest) {
             case 'load':
-                if (DEBUG) console.log('load request to worker')
-                const {height, width, labels, location} = JSON.parse(fs.readFileSync(path.join(__dirname, '../model_config.json'), 'utf8'));
+                if (DEBUG) console.log('load request to worker');
+                const {
+                    height,
+                    width,
+                    labels,
+                    location
+                } = JSON.parse(fs.readFileSync(path.join(__dirname, '../model_config.json'), 'utf8'));
                 const appPath = '../' + location + '/';
                 const list = e.data.list;
                 const batch = e.data.batchSize;
                 const backend = e.data.backend;
-                postMessage({message: 'labels', labels: labels})
-                if (DEBUG) console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`)
+                postMessage({message: 'labels', labels: labels});
+                if (DEBUG) console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
                 tf.setBackend(backend).then(async () => {
                     if (backend === 'webgl') {
-                        tf.env().set('WEBGL_FORCE_F16_TEXTURES', true)
-                        tf.env().set('WEBGL_PACK', true)
-                        tf.env().set('WEBGL_EXP_CONV', true)
+                        tf.env().set('WEBGL_FORCE_F16_TEXTURES', true);
+                        tf.env().set('WEBGL_PACK', true);
+                        tf.env().set('WEBGL_EXP_CONV', true);
                         //tf.env().set('TOPK_K_CPU_HANDOFF_THRESHOLD', 0)
                         tf.env().set('TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD', 0);
                     }
@@ -62,7 +67,7 @@ onmessage = async (e) => {
                         labels: labels
                     })
 
-                })
+                });
                 break;
             case 'predict':
                 //const t0 = performance.now();
@@ -75,7 +80,7 @@ onmessage = async (e) => {
                     result: result,
                     fileStart: fileStart,
                     worker: worker
-                }
+                };
                 postMessage(response);
                 // reset the results
                 myModel.result = [];
@@ -83,24 +88,23 @@ onmessage = async (e) => {
             case 'get-spectrogram':
                 const buffer = e.data.buffer;
                 // Only consider full specs
-                if (buffer.length < myModel.chunkLength) return
+                if (buffer.length < myModel.chunkLength) return;
                 const specFile = e.data.file;
                 const filepath = e.data.filepath;
                 const spec_height = e.data.height;
-                const spec_width = e.data.width
+                const spec_width = e.data.width;
                 let image;
                 const bufferTensor = myModel.normalise_audio(buffer);
                 const imageTensor = tf.tidy(() => {
                     return myModel.makeSpectrogram(bufferTensor);
-                })
+                });
                 image = tf.tidy(() => {
                     let spec = myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), spec_height, spec_width);
-                    // rescale to 0-255
-                    //const spec_max = tf.max(spec)
-                    return spec.dataSync() //tf.mul(spec, tf.scalar(255)).dataSync();
-                })
-                bufferTensor.dispose()
-                imageTensor.dispose()
+                    const spec_max  = tf.max(spec);
+                    return spec.dataSync(); //.mul(255).div(spec_max).dataSync();
+                });
+                bufferTensor.dispose();
+                imageTensor.dispose();
                 response = {
                     message: 'spectrogram',
                     width: myModel.inputShape[2],
@@ -109,8 +113,8 @@ onmessage = async (e) => {
                     image: image,
                     file: specFile,
                     filepath: filepath
-                }
-                postMessage(response)
+                };
+                postMessage(response);
                 break;
             case'list':
                 myModel.list = e.data.list;
@@ -124,12 +128,7 @@ onmessage = async (e) => {
     catch (e) {
         console.log(e)
     }
-}
-
-
-// https://www.tensorflow.org/js/guide/platform_environment#flags
-//tf.enableDebugMode()
-
+};
 
 class Model {
     constructor(appPath, list) {
@@ -201,14 +200,6 @@ class Model {
         return spec
     }
 
-    //     normalize_test(spec) {
-    //     let spec_max = tf.max(spec, [0, 1]);
-    //     spec_max = tf.reshape(spec_max, [-1, 1, 1])
-    //     spec = spec.mul(255);
-    //     spec = spec.div(spec_max);
-    //     return spec;
-    // }
-
     getSNR(spectrograms) {
         return tf.tidy(() => {
             const max = tf.max(spectrograms, 2);
@@ -229,19 +220,19 @@ class Model {
             specBatch = tf.transpose(specBatch, [0, 2, 1]);
             specBatch = tf.reverse(specBatch, [1]);
 
-            // specBatch = tf.abs(specBatch);
+            //specBatch = tf.abs(specBatch);
             // Add channel axis
             specBatch = tf.expandDims(specBatch, -1);
             // let max_spec = Array.from(tf.max(specBatch).dataSync());
             // let min_spec = Array.from(tf.min(specBatch).dataSync());
-            const log_spec_adjusted =tf.log(specBatch.add(1e-7)).mul(20)
+            const log_spec_adjusted = tf.log1p(specBatch).mul(20);
             // const preslice = specBatch.arraySync()
             //specBatch = tf.slice4d(specBatch, [0, 0, 0, 0], [-1, img_height, img_width, -1]);
             specBatch = tf.image.resizeBilinear(log_spec_adjusted, [img_height, img_width]);
             // max_spec = Array.from(tf.max(specBatch).dataSync());
             //  min_spec = Array.from(tf.min(specBatch).dataSync());
             // const postslice = specBatch.arraySync()
-            return specBatch //  this.normalize(specBatch);
+            return specBatch // this.normalize(specBatch);
         })
     }
 
@@ -366,33 +357,34 @@ class Model {
 
     makeSpectrogram(audioBuffer) {
         return tf.tidy(() => {
-            let spec = tf.abs(tf.signal.stft(audioBuffer, this.frame_length, this.frame_step))
-
-            // const power = tf.square(spec);
-            // const log_spec = tf.mul(tf.scalar(10.0), tf.div(tf.log(power), tf.log(tf.scalar(10.0))));
-            // const maxLogSpec = tf.max(log_spec);
-            // const log_spec_adjusted = tf.maximum(log_spec, tf.sub(maxLogSpec, tf.scalar(80)));
+            let spec = tf.abs(tf.signal.stft(audioBuffer, this.frame_length, this.frame_step));
             audioBuffer.dispose();
             return spec;
+        })
+    }
+
+    normalizeTensor(audio) {
+        return tf.tidy(() => {
+            const tensor = tf.tensor1d(audio);
+            const {mean, variance} = tf.moments(tensor);
+            const stdDev = variance.sqrt();
+            const normalizedTensor = tensor.sub(mean).div(stdDev.mul(tf.scalar(2)));
+            return normalizedTensor;
         })
     }
 
     const
     normalise_audio = (signal) => {
         return tf.tidy(() => {
-            signal = tf.tensor1d(signal)
-            const sig_max = tf.max(signal)
-            const sig_min = tf.min(signal)
-            //const sig_max_ds = sig_max.dataSync()
-            //const sig_min_ds = sig_min.dataSync()
-            //Normalize the waveform to [-1,1]
-            //return signal.div(sig_max).mul(tf.scalar(128));
-            return signal.sub(sig_min).div(sig_max.sub(sig_min)).mul(tf.scalar(128))
+            signal = tf.tensor1d(signal);
+            const sigMax = tf.max(signal);
+            const sigMin = tf.min(signal);
+            return signal.sub(sigMin).div(sigMax.sub(sigMin)).mul(255).sub(127.5);
         })
-    }
+    };
 
     async predictChunk(audioBuffer, start, fileStart, file, threshold, confidence) {
-        if (DEBUG) console.log('predictCunk begin', tf.memory().numTensors)
+        if (DEBUG) console.log('predictCunk begin', tf.memory().numTensors);
         audioBuffer = this.normalise_audio(audioBuffer);
 
         // check if we need to pad
@@ -412,13 +404,7 @@ class Model {
         });
         const specBatch = tf.stack(bufferList);
         const batchKeys = [...Array(numSamples).keys()].map(i => start + this.chunkLength * i);
-        // recreate the object...
-        // let specBatch = {}
-        //
-        // for (let i = 0; i < batchKeys.length; i++) {
-        //     specBatch[batchKeys[i]] = bufferList[i];
-        // }
-        const result = await this.predictBatch(specBatch, batchKeys, file, fileStart, threshold, confidence)
+        const result = await this.predictBatch(specBatch, batchKeys, file, fileStart, threshold, confidence);
         this.clearTensorArray(bufferList);
         return result
     }
