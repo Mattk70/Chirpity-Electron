@@ -2680,7 +2680,7 @@ $(document).on('dblclick', '.delete', function (e) {
 });
 
 const deleteRecord = (target, isBatch) => {
-    //resetRegions();
+    if (target.childElementCount === 2) return; // No detections found in selection
     setClickedIndex(target);
     const [file, start, ,] = unpackNameAttr(target);
     const setting = target.closest('table');
