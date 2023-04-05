@@ -1202,28 +1202,30 @@ const parsePredictions = async (response) => {
                 if (confidence > minConfidence && STATE.blocked.indexOf(speciesID) === -1) {
                     updateUI = true;
                 }
-                key = parseInt(key);
+                key = parseFloat(key);
                 //save all results to  db, regardless of minConfidence
                 await insertRecord(key, speciesID, confidence, file)
             }
         }
-        if (updateUI && !STATE.selection?.start) {
-            const timestamp = metadata[file].fileStart + key * 1000;
-            //console.log(result);
-            //query the db for sname,  cname
-            select_records_stmt.all(timestamp, minConfidence, STATE.blocked, (err, speciesList) => {
-                speciesList.forEach(species => {
-                    const result = {
-                        timestamp: timestamp,
-                        position: key,
-                        file: file,
-                        cname: species.cname,
-                        sname: species.sname,
-                        score: species.confidence,
-                    }
-                    sendResult(++index, result)
+        if (updateUI) {
+            //if (!STATE.selection?.start) {
+                const timestamp = metadata[file].fileStart + key * 1000;
+                //console.log(result);
+                //query the db for sname,  cname
+                select_records_stmt.all(timestamp, minConfidence, STATE.blocked, (err, speciesList) => {
+                    speciesList.forEach(species => {
+                        const result = {
+                            timestamp: timestamp,
+                            position: key,
+                            file: file,
+                            cname: species.cname,
+                            sname: species.sname,
+                            score: species.confidence,
+                        }
+                        sendResult(++index, result)
+                    })
                 })
-            })
+            //}
         }
     }
 
@@ -1288,9 +1290,7 @@ async function parseMessage(e) {
             if (!diskDB) await loadDB(appPath);
             break;
         case 'prediction':
-            if (aborted) {
-
-            } else {
+            if ( ! aborted) {
                 predictWorkers[response.worker].isAvailable = true;
                 let [, batchInProgress, worker] = await parsePredictions(response);
                 //if (response['finished']) {
@@ -1301,7 +1301,7 @@ async function parseMessage(e) {
                     clearCache(CACHE_LOCATION, limit);
                     // This is the one time results *do not* come from the database
                     if (STATE.selection) {
-                        //i Get results here to fill in any previous detections in the range
+                        // Get results here to fill in any previous detections in the range
                         getResults({files: PENDING_FILES})
                     } else if (batchInProgress) {
                         UI.postMessage({
@@ -1312,8 +1312,6 @@ async function parseMessage(e) {
                         getSummary({files: PENDING_FILES});
                     }
                 }
-
-                //}
             }
             break;
         case 'spectrogram':
@@ -1426,7 +1424,7 @@ const setWhereWhen = ({dateRange, species, files, context}) => {
 
     //const cname = context === 'summary' ? 'cname' : 's1.cname';
     if (species) where += ` AND cname =  '${prepSQL(species)}'`;
-    const when = dateRange?.start ? ` AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
+    const when = dateRange?.start ? ` AND dateTime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
     return [where, when]
 };
 
@@ -1482,9 +1480,12 @@ const getSummary = async ({
                                            ${where} ${when}`);
         total = res.total;
     }
-    console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds")
+    console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds");
     // need to send offset here?
-    const event = interim ? 'update-summary' : 'prediction-done'
+    const event = interim ? 'update-summary' : 'prediction-done';
+    if (total === 0){
+        sendResult( ++index,'No detections found')
+    }
     UI.postMessage({
         event: event,
         summary: summary,
@@ -1496,18 +1497,7 @@ const getSummary = async ({
         batchInProgress: false,
         action: action
     })
-}
-
-
-// const dbSpeciesCheck = async () => {
-//     const {speciesCount} = await diskDB.getAsync('SELECT COUNT(*) as speciesCount FROM species');
-//     if (speciesCount !== LABELS.length) {
-//         UI.postMessage({
-//             event: 'generate-alert',
-//             message: `Warning:\nThe ${speciesCount} species in the archive database does not match the ${LABELS.length} species being used by the model.`
-//         })
-//     }
-// }
+};
 
 
 /**
@@ -1556,13 +1546,13 @@ const getResults = async ({
     });
     let index = offset;
     AUDACITY = {};
-    let t0 = Date.now()
+    let t0 = Date.now();
     const result = await db.allAsync(`${db2ResultSQL} ${where} ${when} ORDER BY ${order}, confidence DESC LIMIT ${limit} OFFSET ${offset}`);
     for (let i = 0; i < result.length; i++) {
         if (species && context !== 'explore') {
             const {count} = await db.getAsync(`SELECT COUNT(*) as count
                                                FROM records
-                                               WHERE datetime = ${result[i].timestamp}
+                                               WHERE dateTime = ${result[i].timestamp}
                                                  AND confidence >= ${confidence}`);
             result[i].count = count;
             sendResult(++index, result[i]);
@@ -1570,12 +1560,11 @@ const getResults = async ({
             sendResult(++index, result[i])
         }
     }
-    console.log("Get Results  took", (Date.now() - t0) / 1000, " seconds")
+    console.log("Get Results  took", (Date.now() - t0) / 1000, " seconds");
     if (!result.length) {
-        if (context === 'selection') {
+        if (STATE.selection) {
             // No more detections in the selection
-            UI.postMessage({event: 'no-detections-remain'});
-            STATE.selection = undefined
+            sendResult(++index, 'No detections found')
         } else if (species && context !== 'explore') { // Remove the species filter
             await getResults({
                 files: files,
@@ -1586,7 +1575,7 @@ const getResults = async ({
             })
         }
     }
-}
+};
 
 const sendResult = (index, result) => {
     const file = result.file;
@@ -1605,7 +1594,7 @@ const sendResult = (index, result) => {
         score: result.score
     };
     AUDACITY[file] ? AUDACITY[file].push(audacity) : AUDACITY[file] = [audacity];
-}
+};
 
 
 const getSavedFileInfo = async (file) => {
@@ -1621,7 +1610,7 @@ const getSavedFileInfo = async (file) => {
             }
         })
     })
-}
+};
 
 
 /**
@@ -1659,7 +1648,7 @@ const onSave2DiskDB = async () => {
             message: `Database update complete, ${response.changes} records added to the archive in ${((Date.now() - t0) / 1000)} seconds`
         })
     }
-}
+};
 
 const getSeasonRecords = async (species, season) => {
     // Because we're using stmt.prepare, we need to unescape quotes
@@ -1683,7 +1672,7 @@ const getSeasonRecords = async (species, season) => {
             }
         })
     })
-}
+};
 
 const getMostCalls = (species) => {
     return new Promise(function (resolve, reject) {
@@ -1807,7 +1796,7 @@ const getSpecies = (range) => {
         }
     })
     return true
-}
+};
 
 
 const onUpdateFileStart = async (args) => {
@@ -1827,12 +1816,12 @@ const onUpdateFileStart = async (args) => {
     const {changes} = await db.runAsync(`UPDATE files
                                          SET filestart = ${args.start}
                                          where rowid = '${rowid}'`);
-    changes ? console.log(`Changed ${file}`) : console.log(`No changes made`);
+    console.log(changes ? `Changed ${file}` : `No changes made`);
     let result = await db.runAsync(`UPDATE records
                                     set dateTime = position + ${args.start}
                                     where fileid = ${rowid}`);
     console.log(`Changed ${result.changes} records associated with  ${file}`);
-}
+};
 
 const prepSQL = (string) => string.replaceAll("''", "'").replaceAll("'", "''");
 
@@ -2064,8 +2053,6 @@ const db2ResultSQL = `SELECT DISTINCT dateTime AS timestamp,
 todo: bugs
     ***Crash on abort - no crash now, but predictions resume
     ***when analysing second batch of results, the first results linger.
-    Confidence filter not honoured on refresh results
-    ***Table does not  expand to fit when operation aborted
     ***when current model list differs from the one used when saving records, getResults gives wrong species
         -solved as in there are separate databases now, so results cached in the db for another model wont register.
     ***when nocmig mode on, getResults for daytime files prints no results, but summary printed. No warning given.
