@@ -270,7 +270,7 @@ class Model {
             lshiftPrediction.dispose();
             rshiftPrediction.dispose();
             // Mask out where these are below the threshold
-            const indices = tf.greater(surround, confidence / 2);
+            const indices = tf.greater(surround, confidence);
             return prediction.where(indices, 0);
         })
     }
