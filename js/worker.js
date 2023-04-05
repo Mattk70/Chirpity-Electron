@@ -11,7 +11,6 @@ const stream = require("stream");
 const staticFfmpeg = require('ffmpeg-static-electron');
 
 
-
 const {stat} = require("fs/promises");
 let WINDOW_SIZE = 3;
 let NUM_WORKERS;
@@ -821,6 +820,7 @@ const getPredictBuffers = async ({
         if (offlineCtx) {
             offlineCtx.startRendering().then((resampled) => {
                 const myArray = resampled.getChannelData(0);
+
                 if (++workerInstance === NUM_WORKERS) {
                     workerInstance = 0;
                 }
@@ -946,7 +946,7 @@ const speciesMatch = (path, sname) => {
 }
 
 const saveResults2DataSet = (rootDirectory) => {
-    if (!rootDirectory) rootDirectory = '/home/matt/PycharmProjects/Data/bw_merged_chirpity';
+    if (!rootDirectory) rootDirectory = '/Users/matthew/Downloads/test';
     const height = 256, width = 384;
     let t0 = Date.now()
     let promise = Promise.resolve();
@@ -1428,7 +1428,7 @@ const setWhereWhen = ({dateRange, species, files, context}) => {
     if (species) where += ` AND cname =  '${prepSQL(species)}'`;
     const when = dateRange?.start ? ` AND datetime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
     return [where, when]
-}
+};
 
 
 const getSummary = async ({
@@ -1445,7 +1445,7 @@ const getSummary = async ({
     let [where, when] = setWhereWhen({
         dateRange: range, species: explore ? species : undefined, files: files, context: 'summary'
     });
-    t0 = Date.now()
+    t0 = Date.now();
     const summary = await db.allAsync(`
         SELECT species.cname, species.sname, COUNT(*) as count, max_confidence.max_confidence as max
         FROM (
@@ -1534,9 +1534,11 @@ const getResults = async ({
                               limit = 500,
                               offset = undefined,
                           } = {}) => {
+    let confidence = minConfidence;
     if (STATE.selection) {
         offset = 0;
         range = STATE.selection;
+        confidence = 5;
     } else if (offset === undefined) { // Get offset state
         if (species) {
             if (!STATE.filteredOffset[species]) STATE.filteredOffset[species] = 0;
@@ -1561,7 +1563,7 @@ const getResults = async ({
             const {count} = await db.getAsync(`SELECT COUNT(*) as count
                                                FROM records
                                                WHERE datetime = ${result[i].timestamp}
-                                                 AND confidence >= ${minConfidence}`)
+                                                 AND confidence >= ${confidence}`);
             result[i].count = count;
             sendResult(++index, result[i]);
         } else {
