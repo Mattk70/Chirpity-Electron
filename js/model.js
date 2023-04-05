@@ -100,7 +100,7 @@ onmessage = async (e) => {
                 });
                 image = tf.tidy(() => {
                     let spec = myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), spec_height, spec_width);
-                    const spec_max  = tf.max(spec);
+                    const spec_max = tf.max(spec);
                     return spec.dataSync(); //.mul(255).div(spec_max).dataSync();
                 });
                 bufferTensor.dispose();
@@ -376,7 +376,7 @@ class Model {
     const
     normalise_audio = (signal) => {
         return tf.tidy(() => {
-            signal = tf.tensor1d(signal);
+            //signal = tf.tensor1d(signal);
             const sigMax = tf.max(signal);
             const sigMin = tf.min(signal);
             return signal.sub(sigMin).div(sigMax.sub(sigMin)).mul(255).sub(127.5);
@@ -385,7 +385,7 @@ class Model {
 
     async predictChunk(audioBuffer, start, fileStart, file, threshold, confidence) {
         if (DEBUG) console.log('predictCunk begin', tf.memory().numTensors);
-        audioBuffer = this.normalise_audio(audioBuffer);
+        audioBuffer = tf.tensor1d(audioBuffer);
 
         // check if we need to pad
         const remainder = audioBuffer.shape % this.chunkLength;
@@ -399,8 +399,12 @@ class Model {
         const numSamples = buffer.shape / this.chunkLength;
         let bufferList = tf.split(buffer, numSamples);
         buffer.dispose();
-        bufferList = bufferList.map(x => {
-            return this.makeSpectrogram(x)
+        bufferList = tf.tidy(() => {
+            return bufferList.map(x => {
+                let normal = this.normalise_audio(x);
+                x.dispose();
+                return this.makeSpectrogram(normal);
+            })
         });
         const specBatch = tf.stack(bufferList);
         const batchKeys = [...Array(numSamples).keys()].map(i => start + this.chunkLength * i);
