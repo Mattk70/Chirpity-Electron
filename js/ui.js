@@ -1380,11 +1380,11 @@ const editID = (cname, sname, cell) => {
     // Make sure we update the restore species
     //restoreSpecies = cell;
     let from;
-    restoreSpecies.querySelector('ul') ?
-        from = restoreSpecies.querySelector('ul').firstElementChild.firstChild.nodeValue.trim() :
-        from = restoreSpecies.firstElementChild.innerHTML.replace(/(.*)\s<.*/, "$1");
+    restoreSpecies.classList.contains('speciesFilter') ?
+        from = restoreSpecies.firstElementChild.innerHTML.replace(/(.*)\s<.*/, "$1") :
+        from = restoreSpecies.firstChild.nodeValue.replace('\n','').trim();
     // Are we batch editing here?
-    const context = getDetectionContext(cell)
+    const context = getDetectionContext(cell);
     const batch = context === 'resultSummary';
     let start, files = fileList, file;
     if (!batch) {
@@ -1883,7 +1883,6 @@ for (let i = 0; i < backend.length; i++) {
 }
 
 const timelineToggle = (e) => {
-    // set file creation time
     config.timeOfDay = e.target.value === 'timeOfDay'; //toggle setting
     const timeFields = document.querySelectorAll('.timestamp')
     timeFields.forEach(time => {
@@ -1891,6 +1890,7 @@ const timelineToggle = (e) => {
             time.classList.add('d-none');
     });
     if (fileLoaded) {
+        // Reload wavesurfer with the new timeline
         const position = wavesurfer.getCurrentTime() / windowLength;
         postBufferUpdate({begin: bufferBegin, position: position})
     }
@@ -2164,7 +2164,7 @@ async function onWorkerLoadedAudio({
     const resetSpec = !currentFile;
     currentFileDuration = sourceDuration;
     //if (preserveResults) completeDiv.hide();
-    console.log('UI received worker-loaded-audio: ' + file)
+    console.log('UI received worker-loaded-audio: ' + file);
     currentBuffer = new AudioBuffer({length: contents.length, numberOfChannels: 1, sampleRate: 24000});
     currentBuffer.copyToChannel(contents, 0);
     if (currentFile !== file) {
@@ -2185,10 +2185,10 @@ async function onWorkerLoadedAudio({
         if (fileList.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
     }
     fileLoaded = true;
-    updateSpec({buffer: currentBuffer, play: play, resetSpec: resetSpec})
+    updateSpec({buffer: currentBuffer, play: play, resetSpec: resetSpec});
     wavesurfer.seekTo(position);
     if (fileRegion) {
-        createRegion(fileRegion.start, fileRegion.end, fileRegion.label)
+        createRegion(fileRegion.start, fileRegion.end, fileRegion.label);
         if (fileRegion.play) {
             region.play()
         }
@@ -2207,7 +2207,7 @@ function onProgress(args) {
     }
     if (args.progress) {
         let progress = Math.round(args.progress * 1000) / 10;
-        updateProgress(progress)
+        updateProgress(progress);
         if (progress === 100.0) {
             progressDiv.hide();
         }

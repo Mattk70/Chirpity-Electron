@@ -624,17 +624,6 @@ async function loadAudioFile({
         await fetchAudioBuffer({file, start, end})
             .then((buffer) => {
                 let audioArray = buffer.getChannelData(0);
-                let normalize = false;
-                let adjustedSignal = [];
-                if (normalize) {
-                    const audio_max = Math.max(...audioArray);
-                    const audio_min = Math.min(...audioArray);
-                    for (let i = 0; i < audioArray.length; i++) {
-                        audioArray[i] = (audioArray[i] - audio_min) / (audio_max - audio_min);
-                    }
-
-                }
-                if (adjustedSignal.length) audioArray = adjustedSignal;
                 UI.postMessage({
                     event: 'worker-loaded-audio',
                     start: metadata[file].fileStart,
@@ -646,7 +635,7 @@ async function loadAudioFile({
                     fileRegion: region,
                     preserveResults: preserveResults,
                     play: play,
-                });
+                }, [audioArray.buffer]);
             })
             .catch(e => {
                 console.log(e);
@@ -921,7 +910,7 @@ function feedChunksToModel(channelData, chunkStart, file, end, resetResults, wor
         chunks: channelData
     };
     predictWorkers[worker].isAvailable = false;
-    predictWorkers[worker].postMessage(objData, [objData.chunks.buffer]);
+    predictWorkers[worker].postMessage(objData, [channelData.buffer]);
 }
 
 async function doPrediction({
@@ -1003,7 +992,7 @@ const saveResults2DataSet = (rootDirectory) => {
                             buffer: buffer,
                             height: height,
                             width: width
-                        })
+                        }, [buffer.buffer]);
                         count++;
                     }
                 }
@@ -1905,22 +1894,47 @@ async function onUpdateRecord({
         whatSQL = `comment = '${value}'`;
     }
     const filesSQL = openFiles.map(file => `'${prepSQL(file)}'`).toString();
+    // Get the old ID
+    let {id} = await db.getAsync(`SELECT id FROM species WHERE cname = '${fromSQL}'`);
     if (isBatch) {
-        //Batch update
-        whereSQL = `WHERE speciesID = (SELECT id FROM species WHERE cname = '${fromSQL}') `;
+        //Batch update only applies to ID. Get the ID of the species we're changing,
+        // and the dateTimes it appears in the top n predictions
+        whereSQL = `WHERE speciesID = ${id} AND dateTime IN (
+            SELECT dateTime FROM (
+                SELECT dateTime, confidence, speciesID, 
+                RANK() OVER (PARTITION BY dateTime ORDER BY confidence DESC) rank 
+                FROM records )
+                WHERE speciesID = ${id} AND rank <= 1 AND confidence >= ${minConfidence}
+            ) `;
         if (openFiles.length) {
+            // Limit changes to the files in scope
             whereSQL += `AND fileID IN (SELECT rowid from files WHERE name in (${filesSQL}))`;
         }
+        // We need to find all records for the 'from' species
+        // then delete all records for those dateTimes which aren't the 'from' species
+        let dateTimes = await db.allAsync(`SELECT dateTime from records ${whereSQL}`);
+        dateTimes = dateTimes.map(obj => obj.dateTime);
+        const {changes} = await db.runAsync(`DELETE FROM records WHERE dateTime IN (${dateTimes}) AND speciesID != ${id}`)
     } else {
-        // Sanitize input: start is passed to the function in float seconds,
-        // but we need a millisecond integer
         const startMilliseconds = (start * 1000).toFixed(0);
+        // Check to see if we have the to species already in the records at that dateTime
+        let speciesObj = await db.allAsync(`SELECT cname, id from records JOIN species on records.speciesID = species.id ${whereSQL}`);
+        const speciesCnames = speciesObj.map(obj => obj.cname);
+        const speciesIDs = speciesObj.map(obj => obj.id);
+        const found = speciesCnames.indexOf(value);
+        // If it is, update that record instead
+        if (found !== -1) {
+            whatSQL.replace(value,prepSQL(speciesCnames[found]));
+            id = speciesIDs[found]
+        }
         // Single record
-        whereSQL = `WHERE datetime = (SELECT filestart FROM files WHERE name = '${currentFile}') + ${startMilliseconds}`
+        whereSQL = `WHERE datetime = 
+                        (SELECT filestart FROM files WHERE name = '${currentFile}') + ${startMilliseconds} 
+                        AND speciesID = ${id}`;
     }
     const t0 = Date.now();
-    const {changes} = await db.runAsync(`UPDATE records
-                                         SET ${whatSQL} ${whereSQL}`);
+    const {changes} = await db.runAsync(`UPDATE records SET ${whatSQL} ${whereSQL}`);
+
     if (changes) {
         console.log(`Updated ${changes} records for ${what} in ${db.filename.replace(/.*\//, '')} database, setting it to ${value}`);
         console.log(`Update without transaction took ${Date.now() - t0} milliseconds`);
