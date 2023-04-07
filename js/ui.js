@@ -91,7 +91,6 @@ const bodyElement = $('body');
 let spectrogramWrapper = $('#spectrogramWrapper'), specElement, waveElement, specCanvasElement, specWaveElement;
 let waveCanvasElement, waveWaveElement,
     resultTableElement = $('#resultTableContainer');
-resultTableElement.animate({scrollTop: '300px'}, 400, 'swing');
 const contentWrapperElement = $('#contentWrapper');
 //const completeDiv = $('#complete');
 let resultTable = document.getElementById('resultTableBody');
@@ -1247,7 +1246,7 @@ function generateBirdList(store, rows) {
 
 $(document).on('focus', '.input', function () {
     document.removeEventListener('keydown', handleKeyDownDeBounce, true);
-    const container = this.parentNode.querySelector('.bird-list-wrapper');
+    const container = this.closest('div').querySelector('.bird-list-wrapper');
     // check we're not adjusting the confidence threshold - if we are, container will be null
     if (container) {
         let theList;
@@ -1263,7 +1262,7 @@ $(document).on('focus', '.input', function () {
         }
     }
     if (this.id === "speciesSearch") hideElement(['dataRecords']);
-})
+});
 
 $(document).on('blur', '.input', function (e) {
     document.addEventListener('keydown', handleKeyDownDeBounce, true);
@@ -1321,7 +1320,7 @@ $(document).on('keyup', '.input:not(.form-control)', filterList);
 function filterList(e) {
     const input = e.target;
     const filter = input.value.toUpperCase();
-    const ul = input.parentNode.querySelector("ul");
+    const ul = input.closest('div').querySelector("ul");
     const li = ul.getElementsByTagName('li');
     const theList = document.querySelector('.bird-list');
     theList.classList.remove('d-none');
@@ -2311,9 +2310,9 @@ async function onPredictionDone({
 
     if (active) {
         // Refresh node and scroll to active row:
-        activeRow = document.getElementById(active)
+        activeRow = document.getElementById(active);
         if (activeRow === null) { // because: after an edit the active row may not exist
-            resultTable = resultTableElement.getElementById('resultTableBody');
+            resultTable = document.getElementById('resultTableBody');
             const rows = resultTable.querySelectorAll('tr.daytime, tr.nighttime')
             if (rows.length) {
                 activeRow = rows[rows.length - 1];
