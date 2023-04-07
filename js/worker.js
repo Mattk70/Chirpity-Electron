@@ -1198,22 +1198,22 @@ const parsePredictions = async (response) => {
         }
         if (updateUI) {
             //if (!STATE.selection?.start) {
-                const timestamp = metadata[file].fileStart + key * 1000;
-                //console.log(result);
-                //query the db for sname,  cname
-                select_records_stmt.all(timestamp, minConfidence, STATE.blocked, (err, speciesList) => {
-                    speciesList.forEach(species => {
-                        const result = {
-                            timestamp: timestamp,
-                            position: key,
-                            file: file,
-                            cname: species.cname,
-                            sname: species.sname,
-                            score: species.confidence,
-                        }
-                        sendResult(++index, result)
-                    })
+            const timestamp = metadata[file].fileStart + key * 1000;
+            //console.log(result);
+            //query the db for sname,  cname
+            select_records_stmt.all(timestamp, minConfidence, STATE.blocked, (err, speciesList) => {
+                speciesList.forEach(species => {
+                    const result = {
+                        timestamp: timestamp,
+                        position: key,
+                        file: file,
+                        cname: species.cname,
+                        sname: species.sname,
+                        score: species.confidence,
+                    }
+                    sendResult(++index, result)
                 })
+            })
             //}
         }
     }
@@ -1279,7 +1279,7 @@ async function parseMessage(e) {
             if (!diskDB) await loadDB(appPath);
             break;
         case 'prediction':
-            if ( ! aborted) {
+            if (!aborted) {
                 predictWorkers[response.worker].isAvailable = true;
                 let [, batchInProgress, worker] = await parsePredictions(response);
                 //if (response['finished']) {
@@ -1437,19 +1437,18 @@ const getSummary = async ({
         SELECT species.cname, species.sname, COUNT(*) as count, max_confidence.max_confidence as max
         FROM (
             SELECT DISTINCT dateTime, speciesID, MAX (confidence)
-            OVER (PARTITION BY dateTime) AS max_confidence, ROW_NUMBER()
-            OVER (PARTITION BY records.dateTime ORDER BY confidence DESC) AS rank
-            FROM records
-            JOIN files ON files.rowid = records.fileID
-            JOIN species ON speciesID = species.id
-            ${where} ${when}
+                OVER (PARTITION BY dateTime) AS max_confidence, ROW_NUMBER()
+                OVER (PARTITION BY records.dateTime ORDER BY confidence DESC) AS rank
+                FROM records
+                JOIN files ON files.rowid = records.fileID
+                JOIN species ON speciesID = species.id
+                ${where} ${when}
             ) AS top_confidence_by_datetime_species
-            JOIN species
-        ON top_confidence_by_datetime_species.speciesID = species.id
-            JOIN (
-            SELECT speciesID, MAX (confidence) AS max_confidence
-            FROM records
-            GROUP BY records.speciesID
+                JOIN species ON top_confidence_by_datetime_species.speciesID = species.id
+                JOIN (
+                SELECT speciesID, MAX (confidence) AS max_confidence
+                FROM records
+                GROUP BY records.speciesID
             ) AS max_confidence ON max_confidence.speciesID = species.id
         WHERE top_confidence_by_datetime_species.rank <= 1
         GROUP BY cname, max_confidence.max_confidence
@@ -1472,8 +1471,8 @@ const getSummary = async ({
     console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds");
     // need to send offset here?
     const event = interim ? 'update-summary' : 'prediction-done';
-    if (total === 0){
-        sendResult( ++index,'No detections found')
+    if (total === 0) {
+        sendResult(++index, 'No detections found')
     }
     UI.postMessage({
         event: event,
@@ -1895,7 +1894,9 @@ async function onUpdateRecord({
     }
     const filesSQL = openFiles.map(file => `'${prepSQL(file)}'`).toString();
     // Get the old ID
-    let {id} = await db.getAsync(`SELECT id FROM species WHERE cname = '${fromSQL}'`);
+    let {id} = await db.getAsync(`SELECT id
+                                  FROM species
+                                  WHERE cname = '${fromSQL}'`);
     if (isBatch) {
         //Batch update only applies to ID. Get the ID of the species we're changing,
         // and the dateTimes it appears in the top n predictions
@@ -1912,28 +1913,43 @@ async function onUpdateRecord({
         }
         // We need to find all records for the 'from' species
         // then delete all records for those dateTimes which aren't the 'from' species
-        let dateTimes = await db.allAsync(`SELECT dateTime from records ${whereSQL}`);
+        let dateTimes = await db.allAsync(`SELECT dateTime
+                                           from records ${whereSQL}`);
         dateTimes = dateTimes.map(obj => obj.dateTime);
-        const {changes} = await db.runAsync(`DELETE FROM records WHERE dateTime IN (${dateTimes}) AND speciesID != ${id}`)
+        await db.runAsync(`DELETE
+                           FROM records
+                           WHERE dateTime IN (${dateTimes})
+                             AND speciesID != ${id}`)
     } else {
+        // This applies to label, comment and ID
         const startMilliseconds = (start * 1000).toFixed(0);
-        // Check to see if we have the to species already in the records at that dateTime
-        let speciesObj = await db.allAsync(`SELECT cname, id from records JOIN species on records.speciesID = species.id ${whereSQL}`);
-        const speciesCnames = speciesObj.map(obj => obj.cname);
-        const speciesIDs = speciesObj.map(obj => obj.id);
-        const found = speciesCnames.indexOf(value);
-        // If it is, update that record instead
-        if (found !== -1) {
-            whatSQL.replace(value,prepSQL(speciesCnames[found]));
-            id = speciesIDs[found]
-        }
         // Single record
         whereSQL = `WHERE datetime = 
-                        (SELECT filestart FROM files WHERE name = '${currentFile}') + ${startMilliseconds} 
-                        AND speciesID = ${id}`;
+                        (SELECT filestart FROM files WHERE name = '${currentFile}') + ${startMilliseconds}`;
+        if (what === 'speciesID') {
+            // Check to see if we have the to species already in the records at that dateTime
+            let speciesObj = await db.allAsync(`SELECT cname, id
+                                                from records
+                                                         JOIN species on records.speciesID = species.id ${whereSQL}`);
+            const speciesCnames = speciesObj.map(obj => obj.cname);
+            const speciesIDs = speciesObj.map(obj => obj.id);
+            const found = speciesCnames.indexOf(value);
+            // If we do, update that record instead, after deleting the record to change
+            if (found !== -1) {
+                await db.runAsync(`DELETE
+                                   FROM records ${whereSQL} AND speciesID = ${id}`);
+                whatSQL = whatSQL.replace(value, prepSQL(speciesCnames[found]));
+                whereSQL += ` AND speciesID = ${speciesIDs[found]}`
+            } else {
+                whereSQL += ` AND speciesID = ${id}`
+            }
+        } else {
+            whereSQL += ` AND speciesID = ${id}`
+        }
     }
     const t0 = Date.now();
-    const {changes} = await db.runAsync(`UPDATE records SET ${whatSQL} ${whereSQL}`);
+    const {changes} = await db.runAsync(`UPDATE records
+                                         SET ${whatSQL} ${whereSQL}`);
 
     if (changes) {
         console.log(`Updated ${changes} records for ${what} in ${db.filename.replace(/.*\//, '')} database, setting it to ${value}`);
