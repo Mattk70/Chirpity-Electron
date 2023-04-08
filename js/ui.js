@@ -1416,7 +1416,7 @@ function sendFeedback(file, cname, sname) {
 
 function getSpecies(target) {
     const row = target.closest('tr');
-    const speciesCell = row.querySelector('.cname');
+    const speciesCell = row.querySelector('.cname .cname');
     const species = speciesCell.innerText.split('\n')[0];
     return species;
 }
@@ -2499,14 +2499,14 @@ async function renderResult({
         const showTimeOfDay = config.timeOfDay ? '' : 'd-none';
         const activeTable = active ? 'table-active' : '';
         const labelHTML = label ? tags[label] : tags['Remove Label'];
-        const countIcon = count > 1 ? `<span class="circle pointer">${count}</span>` : '';
+        const countIcon = count > 1 ? `<span class="circle pointer" title="Click to view the ${count} detections at this timecode">${count}</span>` : '';
 
         tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${position + 3}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
             <th scope='row'>${index}</th>
             <td class='text-start text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-end">${UI_position} </td>
             <td name="${cname}" class='text-start cname'>
-            ${cname} ${countIcon} ${iconizeScore(score)}
+            <span class="cname">${cname}</span> ${countIcon} ${iconizeScore(score)}
              </td>
             <td><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
             <td><a href='https://xeno-canto.org/explore?query=${sname}%20type:"nocturnal flight call"' target="xc">
