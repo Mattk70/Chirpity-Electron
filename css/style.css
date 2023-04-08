@@ -557,7 +557,8 @@ input[type="range"].vertical {
     background-color: gray;
     color: white;
     text-align: center;
-    line-height: 20px
+    line-height: 20px;
+    float: right;
 }
 
 #settingsForm {
