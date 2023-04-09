@@ -1436,21 +1436,19 @@ const getSummary = async ({
     const summary = await db.allAsync(`
         SELECT species.cname, species.sname, COUNT(*) as count, max_confidence.max_confidence as max
         FROM (
-            SELECT DISTINCT dateTime, speciesID, MAX (confidence)
-                OVER (PARTITION BY dateTime) AS max_confidence, ROW_NUMBER()
-                OVER (PARTITION BY records.dateTime ORDER BY confidence DESC) AS rank
+            SELECT dateTime, speciesID, confidence, RANK()
+                OVER (PARTITION BY dateTime ORDER BY confidence DESC) AS rank
                 FROM records
                 JOIN files ON files.rowid = records.fileID
-                JOIN species ON speciesID = species.id
                 ${where} ${when}
-            ) AS top_confidence_by_datetime_species
-                JOIN species ON top_confidence_by_datetime_species.speciesID = species.id
+            ) AS confidence_by_datetime_species
+                JOIN species ON confidence_by_datetime_species.speciesID = species.id
                 JOIN (
-                SELECT speciesID, MAX (confidence) AS max_confidence
+                SELECT speciesID, MAX(confidence) AS max_confidence
                 FROM records
                 GROUP BY records.speciesID
             ) AS max_confidence ON max_confidence.speciesID = species.id
-        WHERE top_confidence_by_datetime_species.rank <= 1
+        WHERE confidence_by_datetime_species.rank <= 1
         GROUP BY cname, max_confidence.max_confidence
         ORDER BY count DESC;
     `);
@@ -1472,7 +1470,7 @@ const getSummary = async ({
     // need to send offset here?
     const event = interim ? 'update-summary' : 'prediction-done';
     if (total === 0) {
-        sendResult(++index, 'No detections found')
+        sendResult(1 , 'No detections found')
     }
     UI.postMessage({
         event: event,
