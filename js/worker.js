@@ -1,17 +1,17 @@
-const {ipcRenderer} = require('electron');
+const { ipcRenderer } = require('electron');
 const fs = require('fs');
 const wavefileReader = require('wavefile-reader');
 const p = require('path');
 const SunCalc = require('suncalc2');
 const ffmpeg = require('fluent-ffmpeg');
 const png = require('fast-png');
-const {writeFile, mkdir, readdir} = require('node:fs/promises');
-const {utimes} = require('utimes');
+const { writeFile, mkdir, readdir } = require('node:fs/promises');
+const { utimes } = require('utimes');
 const stream = require("stream");
 const staticFfmpeg = require('ffmpeg-static-electron');
 
 
-const {stat} = require("fs/promises");
+const { stat } = require("fs/promises");
 let WINDOW_SIZE = 3;
 let NUM_WORKERS;
 let workerInstance = 0;
@@ -64,20 +64,37 @@ let t0; // Application profiler
 
 //Object will hold files in the diskDB, and the active timestamp from the most recent selection analysis.
 let STATE;
-const resetState = (db) => {
-    STATE = {
-        db: db,
-        saved: new Set(), // list of files requested that are in the disk database
-        globalOffset: 0, // Current start number for unfiltered results
-        filteredOffset: {}, // Current species start number for filtered results
-        selection: false,
-        blocked: STATE ? STATE.blocked : [] // don't reset blocked IDs
+class State {
+    constructor(db) {
+        this.db = db,
+            this.filesToAnalyse = [],
+            this.limit = 500,
+            this.saved = new Set(), // list of files requested that are in the disk database
+            this.globalOffset = 0, // Current start number for unfiltered results
+            this.filteredOffset = {}, // Current species start number for filtered results
+            this.selection = false,
+            this.blocked = STATE ? STATE.blocked : [] // don't reset blocked IDs
+            this.predictionCount = 0;
     }
+
+    setFiles(files) {
+        console.log("Setting STATE, filesToAnalyse " + files);
+        this.filesToAnalyse = files;
+    }
+
+    increment(){
+        if (++this.predictionCount === 5){
+            this.predictionCount = 0
+        }
+        return this.predictionCount;
+    }
+
 }
-resetState();
+STATE = new State();
+
 
 const getSelectionRange = (file, start, end) => {
-    return {start: (start * 1000) + metadata[file].fileStart, end: (end * 1000) + metadata[file].fileStart}
+    return { start: (start * 1000) + metadata[file].fileStart, end: (end * 1000) + metadata[file].fileStart }
 }
 const createDB = async (file) => {
     const archiveMode = !!file;
@@ -104,7 +121,7 @@ const createDB = async (file) => {
         }
     } else {
         const filename = diskDB.filename;
-        let {code} = await db.runAsync(`ATTACH '${filename}' as disk`);
+        let { code } = await db.runAsync(`ATTACH '${filename}' as disk`);
         // If the db is not ready
         while (code === "SQLITE_BUSY") {
             console.log("Disk DB busy")
@@ -143,9 +160,9 @@ async function loadDB(path) {
             diskDB = new sqlite3.Database(file);
             STATE.db = diskDB;
             await diskDB.runAsync('VACUUM');
-            const {count} = await diskDB.getAsync('SELECT COUNT(*) as count FROM records')
+            const { count } = await diskDB.getAsync('SELECT COUNT(*) as count FROM records')
             if (count) {
-                UI.postMessage({event: 'diskDB-has-records'})
+                UI.postMessage({ event: 'diskDB-has-records' })
             }
             console.log("Opened and cleaned disk db " + file)
         }
@@ -162,26 +179,26 @@ let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need d
 let predictWorkers = [], predictionDone = true, aborted = false;
 
 // Set up the audio context:
-const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
+const audioCtx = new AudioContext({ latencyHint: 'interactive', sampleRate: sampleRate });
 
 let UI;
 let FILE_QUEUE = [];
 
 
-const dirInfo = async ({folder = undefined, recursive = false}) => {
-    const files = await readdir(folder, {withFileTypes: true});
+const dirInfo = async ({ folder = undefined, recursive = false }) => {
+    const files = await readdir(folder, { withFileTypes: true });
     const ctimes = [];
     const paths = files.map(async file => {
         const path = p.join(folder, file.name);
         if (file.isDirectory()) {
             if (recursive) {
-                return await dirInfo({folder: path, recursive: true})
+                return await dirInfo({ folder: path, recursive: true })
             } else {
                 return 0
             }
         }
         if (file.isFile() || file.isSymbolicLink()) {
-            const {size, ctimeMs} = await stat(path);
+            const { size, ctimeMs } = await stat(path);
             ctimes.push([path, ctimeMs, size]);
             return size
 
@@ -199,7 +216,7 @@ const dirInfo = async ({folder = undefined, recursive = false}) => {
 
 const clearCache = async (fileCache, sizeLimitInGB) => {
     // Cache size
-    let [size,] = await dirInfo({folder: fileCache});
+    let [size,] = await dirInfo({ folder: fileCache });
     const requiredSpace = sizeLimitInGB * 1024 ** 3;
     // If Full, clear at least 25% of cache, so we're not doing this too frequently
     if (size > requiredSpace) {
@@ -211,7 +228,7 @@ const clearCache = async (fileCache, sizeLimitInGB) => {
             if (proxy !== file) {
                 const stat = fs.lstatSync(proxy);
                 // Remove tmp file from metadata
-                fs.rmSync(proxy, {force: true});
+                fs.rmSync(proxy, { force: true });
                 // Delete the metadata
                 delete metadata[file];
                 console.log(`removed ${file} from cache`);
@@ -244,7 +261,7 @@ ipcRenderer.on('new-client', (event) => {
                 // Boolean value an issue with this pattern so...
                 if (Object.keys(args).includes('nocmig')) NOCMIG = args.nocmig;
                 if (Object.keys(args).includes('context')) CONTEXT_AWARE = args.context;
-                minConfidence = args.confidence || minConfidence;
+                minConfidence = (args.confidence || minConfidence) * 10;
                 TEMP = args.temp || TEMP;
                 appPath = args.path || appPath;
                 break;
@@ -272,7 +289,7 @@ ipcRenderer.on('new-client', (event) => {
                 saveResults2DataSet();
                 break;
             case 'load-model':
-                UI.postMessage({event: 'spawning'});
+                UI.postMessage({ event: 'spawning' });
                 BATCH_SIZE = parseInt(args.batchSize);
                 BACKEND = args.backend;
                 if (predictWorkers.length) terminateWorkers();
@@ -281,16 +298,14 @@ ipcRenderer.on('new-client', (event) => {
             case 'update-list':
                 SEEN_LIST_UPDATE = false;
                 predictWorkers.forEach(worker =>
-                    worker.postMessage({message: 'list', list: args.list}))
+                    worker.postMessage({ message: 'list', list: args.list }))
                 break;
             case 'file-load-request':
                 index = 0;
                 if (!predictionDone) onAbort(args);
 
-                STATE['db'] = memoryDB;
+                STATE.db = memoryDB;
                 console.log('Worker received audio ' + args.file);
-                // predictionsRequested = 0;
-                // predictionsReceived = 0;
                 await loadAudioFile(args);
                 break;
             case 'update-buffer':
@@ -303,7 +318,7 @@ ipcRenderer.on('new-client', (event) => {
                 }
                 break;
             case 'explore':
-                STATE['db'] = diskDB;
+                STATE.db = diskDB;
                 args.context = 'explore';
                 args.explore = true;
                 await getResults(args);
@@ -342,7 +357,11 @@ ipcRenderer.on('new-client', (event) => {
     }
 })
 
-
+/**
+ * Generates a list of supported audio files, recursively searching directories.
+ * Sends this list to the UI
+ * @param {*} files 
+ */
 const getFiles = async (files) => {
     let file_list = [];
     for (let i = 0; i < files.length; i++) {
@@ -357,15 +376,15 @@ const getFiles = async (files) => {
     // filter out unsupported files
     const supported_files = ['.wav', '.flac', '.opus', '.m4a', '.mp3', '.mpga', '.ogg', '.aac', '.mpeg', '.mp4'];
     file_list = file_list.filter((file) => {
-            return supported_files.some(ext => file.endsWith(ext))
-        }
+        return supported_files.some(ext => file.endsWith(ext))
+    }
     )
-    UI.postMessage({event: 'files', filePaths: file_list});
+    UI.postMessage({ event: 'files', filePaths: file_list });
 }
 
 // Get a list of files in a folder and subfolders
 const getFilesInDirectory = async dir => {
-    const files = await readdir(dir, {withFileTypes: true});
+    const files = await readdir(dir, { withFileTypes: true });
     let file_map = files.map(async file => {
         const path = p.join(dir, file.name);
         if (file.isDirectory()) return await getFilesInDirectory(path);
@@ -379,24 +398,24 @@ const getFilesInDirectory = async dir => {
 }
 
 
-// No need to pass through arguments object, so arrow function used.
 
 // Not an arrow function. Async function has access to arguments - so we can pass them to processnextfile
 async function onAnalyse({
-                             filesInScope = [],
-                             currentFile = undefined,
-                             start = 0,
-                             end = undefined,
-                             resetResults = false,
-                             reanalyse = false,
-                             confidence = minConfidence,
-                             snr = 0
-                         }) {
+    filesInScope = [],
+    currentFile = undefined,
+    start = 0,
+    end = undefined,
+    resetResults = false,
+    reanalyse = false,
+    confidence = minConfidence,
+    snr = 0
+}) {
     // if end was passed, this is a selection
     STATE.selection = end ? getSelectionRange(currentFile, start, end) : undefined;
-
+    //create a copy of files in scope for state, as filesInScope is spliced
+    STATE.setFiles([...filesInScope]);
     console.log(`Worker received message: ${filesInScope}, ${confidence}, start: ${start}, end: ${end}`);
-    minConfidence = confidence;
+    minConfidence = confidence * 10;
     SNR = snr;
     //Set global filesInScope for summary to use
     PENDING_FILES = filesInScope;
@@ -404,22 +423,18 @@ async function onAnalyse({
     AUDACITY = {};
     COMPLETED = [];
     FILE_QUEUE = currentFile ? [currentFile] : filesInScope;
-
-
     STATE.db = memoryDB;
-
-
     let count = 0;
     for (let i = FILE_QUEUE.length - 1; i >= 0; i--) {
         let file = FILE_QUEUE[i];
         if (DATASET) {
             //STATE.db = diskDB;
             const fileSQL = prepSQL(file);
-            const row = await diskDB.getAsync(`SELECT name
+            const file = await diskDB.getAsync(`SELECT name
                                                FROM files
                                                WHERE name = "${fileSQL}"`);
-            if (row) {
-                console.log(`Skipping ${row.name}, already analysed`)
+            if (file) {
+                console.log(`Skipping ${file.name}, already analysed`)
                 FILE_QUEUE.splice(i, 1)
                 count++
                 continue;
@@ -436,8 +451,8 @@ async function onAnalyse({
             if (allCached && !reanalyse) {
                 STATE.db = diskDB;
                 if (!STATE.selection) {
-                    await getResults({db: diskDB, files: FILE_QUEUE});
-                    await getSummary({files: FILE_QUEUE})
+                    await getResults({ db: diskDB, files: FILE_QUEUE });
+                    await getSummary({ files: FILE_QUEUE })
                     return
                 }
             }
@@ -448,31 +463,31 @@ async function onAnalyse({
     console.log("FILE_QUEUE has ", FILE_QUEUE.length, 'files', count, 'files ignored')
     if (predictionDone) {
         // Clear state unless analysing a selection
-        if (!STATE.selection) resetState(STATE.db);
+        //if (!STATE.selection) STATE = new State(STATE.db);
     }
     for (let i = 0; i < NUM_WORKERS; i++) {
-        processNextFile({start: start, end: end, resetResults: resetResults, worker: i});
+        processNextFile({ start: start, end: end, resetResults: resetResults, worker: i });
     }
 }
 
 function onAbort({
-                     model = 'efficientnet',
-                     list = 'migrants',
-                 }) {
+    model = 'efficientnet',
+    list = 'migrants',
+}) {
     aborted = true;
     FILE_QUEUE = [];
     index = 0;
     console.log("abort received")
     if (!predictionDone) {
         //restart the worker
-        UI.postMessage({event: 'spawning'});
+        UI.postMessage({ event: 'spawning' });
         terminateWorkers();
         spawnWorkers(model, list, BATCH_SIZE, NUM_WORKERS)
     }
     predictionDone = true;
     predictionsReceived = {};
     predictionsRequested = {};
-    UI.postMessage({event: 'prediction-done', batchInProgress: true});
+    UI.postMessage({ event: 'prediction-done', batchInProgress: true });
 }
 
 const getDuration = async (src) => {
@@ -526,7 +541,7 @@ const convertFileFormat = (file, destination, size, error) => {
                 })
             })
             .on('end', () => {
-                UI.postMessage({event: 'progress', text: 'File decompressed', progress: 1.0})
+                UI.postMessage({ event: 'progress', text: 'File decompressed', progress: 1.0 })
                 resolve(destination)
             })
             .save(destination)
@@ -572,7 +587,7 @@ async function getWorkingFile(file) {
         }
     }
     if (!metadata[file] || !metadata[file].isComplete) {
-        await getMetadata({file: file, proxy: proxy, source_file: source_file});
+        await getMetadata({ file: file, proxy: proxy, source_file: source_file });
     }
     return proxy;
 }
@@ -588,7 +603,7 @@ async function locateFile(file) {
     const dir = p.parse(file).dir, name = p.parse(file).name;
     // Check folder exists before trying to traverse it. If not, return empty list
     let [, folderInfo] = fs.existsSync(dir) ?
-        await dirInfo({folder: dir, recursive: false}) : ['', []];
+        await dirInfo({ folder: dir, recursive: false }) : ['', []];
     let filesInFolder = [];
     folderInfo.forEach(item => {
         filesInFolder.push(item[0])
@@ -611,17 +626,17 @@ async function locateFile(file) {
 }
 
 async function loadAudioFile({
-                                 file = '',
-                                 start = 0,
-                                 end = 20,
-                                 position = 0,
-                                 region = false,
-                                 preserveResults = false,
-                                 play = false,
-                             }) {
+    file = '',
+    start = 0,
+    end = 20,
+    position = 0,
+    region = false,
+    preserveResults = false,
+    play = false,
+}) {
     const found = await getWorkingFile(file);
     if (found) {
-        await fetchAudioBuffer({file, start, end})
+        await fetchAudioBuffer({ file, start, end })
             .then((buffer) => {
                 let audioArray = buffer.getChannelData(0);
                 UI.postMessage({
@@ -659,8 +674,8 @@ function addDays(date, days) {
  * @param source_file: the file that exists ( will be different after compression)
  * @returns {Promise<unknown>}
  */
-const getMetadata = async ({file, proxy = file, source_file = file}) => {
-    metadata[file] = {proxy: proxy};
+const getMetadata = async ({ file, proxy = file, source_file = file }) => {
+    metadata[file] = { proxy: proxy };
     // CHeck the database first, so we honour any manual update.
     const savedMeta = await getSavedFileInfo(file);
     metadata[file].duration = savedMeta?.duration || await getDuration(proxy);
@@ -777,9 +792,63 @@ async function setupCtx(chunk, header) {
  * @param resetResults
  * @returns {Promise<void>}
  */
-const getPredictBuffers = async ({
+
+/*const getPredictBuffers = async ({
                                      file = '', start = 0, end = undefined, resetResults = false, worker = undefined
                                  }) => {
+
+    // Fetch the WAV file
+    fetch(file)
+        .then(response => response.arrayBuffer())
+        .then(data => {
+            // Decode the audio data
+            return new Promise((resolve, reject) => {
+                audioCtx.decodeAudioData(data, resolve, reject);
+            });
+        })
+        .then(audioBuffer => {
+            const duration = 3; // duration in seconds
+            const sampleRate = audioBuffer.sampleRate;
+            const numChannels = audioBuffer.numberOfChannels;
+            const numSamples = Math.min(duration * sampleRate, audioBuffer.length);
+            const monoBuffer = audioCtx.createBuffer(1, numSamples, sampleRate);
+            const bufferSize = duration * sampleRate; // buffer size for each callback
+            const monoChannelData = monoBuffer.getChannelData(0);
+            const startIndex = start * sampleRate;
+            const endIndex = end ? Math.min(end * sampleRate, audioBuffer.length) : audioBuffer.length;
+            let currentIndex = 0;
+
+            // Mix to mono and extract the first 3 seconds of audio data
+            for (let i = startIndex; i < endIndex; i++) {
+                // Mix to mono by averaging left and right channels
+                for (let j = 0; j < numChannels; j++) {
+                    monoChannelData[i] += audioBuffer.getChannelData(j)[startIndex + i] / numChannels;
+                }
+                // Send to model when we have 3 seconds of audio data
+                if (currentIndex === bufferSize - 1) {
+                    // Convert the mono audio data to Float32Array
+                    const audioDataFloat32Array = new Float32Array(monoChannelData.buffer);
+                    feedChunksToModel(audioDataFloat32Array, startIndex, file, end, resetResults, worker);
+                    // Reset the monoChannelData and currentIndex
+                    monoChannelData.fill(0);
+                    currentIndex = 0;
+                } else {
+                    currentIndex++;
+                }
+            }
+            // Call the processing function with the remaining audio data if any
+            if (currentIndex > 0) {
+                // Convert the mono audio data to Float32Array
+                const audioDataFloat32Array = new Float32Array(monoChannelData.buffer);
+                feedChunksToModel(audioDataFloat32Array, startIndex, file, end, resetResults, worker);
+            }
+        })
+        .catch(error => console.error(error));
+}*/
+
+const getPredictBuffers = async ({
+    file = '', start = 0, end = undefined, resetResults = false, worker = undefined
+}) => {
     //let start = args.start, end = args.end, resetResults = args.resetResults, file = args.file;
     let chunkLength = 72000;
     // Ensure max and min are within range
@@ -810,7 +879,7 @@ const getPredictBuffers = async ({
             offlineCtx.startRendering().then((resampled) => {
                 const myArray = resampled.getChannelData(0);
 
-                if (++workerInstance === NUM_WORKERS) {
+                if (++workerInstance >= NUM_WORKERS) {
                     workerInstance = 0;
                 }
                 worker = workerInstance;
@@ -851,8 +920,8 @@ const getPredictBuffers = async ({
  * @returns {Promise<unknown>}
  */
 const fetchAudioBuffer = async ({
-                                    file = '', start = 0, end = metadata[file].duration
-                                }) => {
+    file = '', start = 0, end = metadata[file].duration
+}) => {
     if (end - start < 0.1) return  // prevents dataset creation barfing with  v. short buffers
     const proxy = await getWorkingFile(file);
     if (!proxy) return false
@@ -896,6 +965,10 @@ const fetchAudioBuffer = async ({
 
 function feedChunksToModel(channelData, chunkStart, file, end, resetResults, worker) {
     predictionsRequested[file]++;
+    if (worker === undefined) {
+        // pick a worker
+        worker = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+    }
     const objData = {
         message: 'predict',
         worker: worker,
@@ -914,16 +987,16 @@ function feedChunksToModel(channelData, chunkStart, file, end, resetResults, wor
 }
 
 async function doPrediction({
-                                file = '',
-                                start = 0,
-                                end = metadata[file].duration,
-                                resetResults = false,
-                                worker = undefined
-                            }) {
+    file = '',
+    start = 0,
+    end = metadata[file].duration,
+    resetResults = false,
+    worker = undefined
+}) {
     predictionDone = false;
     predictionStart = new Date();
-    await getPredictBuffers({file: file, start: start, end: end, resetResults: resetResults, worker: undefined});
-    UI.postMessage({event: 'update-audio-duration', value: metadata[file].duration});
+    await getPredictBuffers({ file: file, start: start, end: end, resetResults: resetResults, worker: undefined });
+    UI.postMessage({ event: 'update-audio-duration', value: metadata[file].duration });
 }
 
 const speciesMatch = (path, sname) => {
@@ -935,7 +1008,7 @@ const speciesMatch = (path, sname) => {
 }
 
 const saveResults2DataSet = (rootDirectory) => {
-    if (!rootDirectory) rootDirectory = '/Users/matthew/Downloads/test';
+    if (!rootDirectory) rootDirectory = '/mnt/608E21D98E21A88C/Users/simpo/PycharmProjects/Data/test';
     const height = 256, width = 384;
     let t0 = Date.now()
     let promise = Promise.resolve();
@@ -943,7 +1016,7 @@ const saveResults2DataSet = (rootDirectory) => {
     let count = 0;
 
 
-    diskDB.each(`${db2ResultSQL}`, async (err, result) => {
+    memoryDB.each(`${db2ResultSQL}`, async (err, result) => {
         // Check for level of ambient noise activation
         let ambient, threshold, value = 50;
         // adding_chirpity_additions is a flag for curated files, if true we assume every detection is correct
@@ -1009,15 +1082,15 @@ const saveResults2DataSet = (rootDirectory) => {
 }
 
 const onSpectrogram = async (filepath, file, width, height, data, channels) => {
-    await mkdir(filepath, {recursive: true});
-    let image = await png.encode({width: 384, height: 256, data: data, channels: channels})
+    await mkdir(filepath, { recursive: true });
+    let image = await png.encode({ width: 384, height: 256, data: data, channels: channels })
     const file_to_save = p.join(filepath, file);
     await writeFile(file_to_save, image);
     console.log('saved:', file_to_save);
 };
 
-async function uploadOpus({file, start, end, defaultName, metadata, mode}) {
-    const blob = await bufferToAudio({file: file, start: start, end: end, format: 'opus', meta: metadata});
+async function uploadOpus({ file, start, end, defaultName, metadata, mode }) {
+    const blob = await bufferToAudio({ file: file, start: start, end: end, format: 'opus', meta: metadata });
     // Populate a form with the file (blob) and filename
     const formData = new FormData();
     //const timestamp = Date.now()
@@ -1037,8 +1110,8 @@ async function uploadOpus({file, start, end, defaultName, metadata, mode}) {
 }
 
 const bufferToAudio = ({
-                           file = '', start = 0, end = 3, format = 'opus', meta = {}
-                       }) => {
+    file = '', start = 0, end = 3, format = 'opus', meta = {}
+}) => {
     let audioCodec, soundFormat, mimeType;
     if (format === 'opus') {
         audioCodec = 'libopus';
@@ -1084,7 +1157,7 @@ const bufferToAudio = ({
             const outputBuffer = Buffer.concat(buffers);
             let audio = [];
             audio.push(new Int8Array(outputBuffer))
-            const blob = new Blob(audio, {type: mimeType});
+            const blob = new Blob(audio, { type: mimeType });
             resolve(blob);
         });
     })
@@ -1109,7 +1182,7 @@ async function saveMP3(file, start, end, filename, metadata) {
 function spawnWorkers(model, list, batchSize, threads) {
     NUM_WORKERS = threads;
     for (let i = 0; i < threads; i++) {
-        const worker = new Worker('./js/model.js', {type: 'module'});
+        const worker = new Worker('./js/model.js', { type: 'module' });
         worker.isAvailable = true;
         predictWorkers.push(worker)
         console.log('loading a worker')
@@ -1130,7 +1203,7 @@ function spawnWorkers(model, list, batchSize, threads) {
 
 const terminateWorkers = () => {
     predictWorkers.forEach(worker => {
-        worker.postMessage({message: 'abort'})
+        worker.postMessage({ message: 'abort' })
         worker.terminate()
     })
     predictWorkers = [];
@@ -1184,22 +1257,28 @@ const parsePredictions = async (response) => {
     const latestResult = response.result, db = STATE.db;
     for (let [key, predictions] of Object.entries(latestResult)) {
         let updateUI = false;
-        for (let id = 0; id < predictions.length; id++) {
-            if (predictions[id] >= 0.05) {
-                const speciesID = id;
-                const confidence = predictions[id] * 100;
-                if (confidence > minConfidence && STATE.blocked.indexOf(speciesID) === -1) {
+        // Get the highest  5 values:
+        const limit = 5;
+        // create an array of objects with values (confidence) and their original indices (speciesID)
+        let valueAndIndexList = predictions.map((value, index) => ({ speciesID: index, confidence: value }));
+        // sort the array by value in descending order
+        valueAndIndexList.sort((a, b) => b.confidence - a.confidence);
+        // extract the top 5 predictions
+        let topValues = valueAndIndexList.slice(0, limit);
+        for (let i = 0; i < topValues.length; i++) {
+            let record = topValues[i];
+            if (record.confidence >= 0.05) {
+                record.confidence *= 1000;
+                if (record.confidence > minConfidence && STATE.blocked.indexOf(record.speciesID) === -1) {
                     updateUI = true;
                 }
                 key = parseFloat(key);
                 //save all results to  db, regardless of minConfidence
-                await insertRecord(key, speciesID, confidence, file)
+                await insertRecord(key, record.speciesID, record.confidence, file)
             }
         }
         if (updateUI) {
-            //if (!STATE.selection?.start) {
             const timestamp = metadata[file].fileStart + key * 1000;
-            //console.log(result);
             //query the db for sname,  cname
             select_records_stmt.all(timestamp, minConfidence, STATE.blocked, (err, speciesList) => {
                 speciesList.forEach(species => {
@@ -1211,16 +1290,14 @@ const parsePredictions = async (response) => {
                         sname: species.sname,
                         score: species.confidence,
                     }
-                    sendResult(++index, result)
+                    sendResult(++index, result, false)
                 })
-            })
-            //}
+            }
+            )
         }
     }
-
-    predictionsReceived[file]++;
-    const progress = predictionsReceived[file] / batchChunksToSend[file];
-    UI.postMessage({event: 'progress', progress: progress, file: file});
+    const progress = ++predictionsReceived[file] / batchChunksToSend[file];
+    UI.postMessage({ event: 'progress', progress: progress, file: file });
     if (progress === 1) {
         COMPLETED.push(file);
         let fileSQL = prepSQL(file)
@@ -1241,11 +1318,11 @@ const parsePredictions = async (response) => {
             })
         console.log(`Prediction done ${FILE_QUEUE.length} files to go`);
         console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
-        UI.postMessage({event: 'progress', progress: 1.0, text: '...'});
+        UI.postMessage({ event: 'progress', progress: 1.0, text: '...' });
         batchInProgress = FILE_QUEUE.length;
         predictionDone = true;
-    } else {
-        getSummary({interim: true, files: []});
+    } else if (STATE.increment() === 0) {
+        getSummary({ interim: true, files: [] });
     }
     return [file, batchInProgress, response.worker]
 }
@@ -1259,7 +1336,8 @@ async function parseMessage(e) {
                 STATE.blocked = response.blocked;
                 STATE.globalOffset = 0;
                 getSpecies(STATE.explore?.range);
-                if (response['updateResults'] && STATE.db) {  // update-results called after setting migrants list, so DB may not be initialized
+                if (response['updateResults'] && STATE.db) {
+                    // update-results called after setting migrants list, so DB may not be initialized
                     await getResults();
                     await getSummary();
                 }
@@ -1269,7 +1347,7 @@ async function parseMessage(e) {
             sampleRate = response['sampleRate'];
             const backend = response['backend'];
             console.log(backend);
-            UI.postMessage({event: 'model-ready', message: 'ready', backend: backend, labels: LABELS})
+            UI.postMessage({ event: 'model-ready', message: 'ready', backend: backend, labels: LABELS })
             break;
         case 'labels':
             t0 = Date.now();
@@ -1291,14 +1369,14 @@ async function parseMessage(e) {
                     // This is the one time results *do not* come from the database
                     if (STATE.selection) {
                         // Get results here to fill in any previous detections in the range
-                        getResults({files: PENDING_FILES})
+                        getResults({ files: PENDING_FILES })
                     } else if (batchInProgress) {
                         UI.postMessage({
                             event: 'prediction-done', batchInProgress: true,
                         })
                         processNextFile(worker);
                     } else {
-                        getSummary({files: PENDING_FILES});
+                        getSummary({ files: PENDING_FILES });
                     }
                 }
             }
@@ -1311,8 +1389,8 @@ async function parseMessage(e) {
 
 // Optional Arguments
 async function processNextFile({
-                                   start = undefined, end = undefined, resetResults = false, worker = undefined
-                               } = {}) {
+    start = undefined, end = undefined, resetResults = false, worker = undefined
+} = {}) {
     if (FILE_QUEUE.length) {
         predictionDone = false;
 
@@ -1393,7 +1471,7 @@ async function setStartEnd(file) {
 }
 
 
-const setWhereWhen = ({dateRange, species, files, context}) => {
+const setWhereWhen = ({ dateRange, species, files, context }) => {
     let where = `WHERE confidence >= ${minConfidence}`;
     if (!STATE.selection && STATE.blocked.length) {
         const blocked = STATE.blocked
@@ -1419,38 +1497,39 @@ const setWhereWhen = ({dateRange, species, files, context}) => {
 
 
 const getSummary = async ({
-                              db = STATE.db,
-                              range = undefined,
-                              files = [],
-                              species = undefined,
-                              explore = false,
-                              active = undefined,
-                              interim = false,
-                              action = undefined
-                          } = {}) => {
+    db = STATE.db,
+    range = undefined,
+    files = [],
+    species = undefined,
+    explore = false,
+    active = undefined,
+    interim = false,
+    action = undefined
+} = {}) => {
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
     let [where, when] = setWhereWhen({
         dateRange: range, species: explore ? species : undefined, files: files, context: 'summary'
     });
     t0 = Date.now();
     const summary = await db.allAsync(`
-        SELECT species.cname, species.sname, COUNT(*) as count, max_confidence.max_confidence as max
+        SELECT species.cname, species.sname, COUNT(*) as count, ROUND(max_confidence.max_confidence / 10.0, 0) as max
         FROM (
             SELECT dateTime, speciesID, confidence, RANK()
-                OVER (PARTITION BY dateTime ORDER BY confidence DESC) AS rank
-                FROM records
-                JOIN files ON files.rowid = records.fileID
-                ${where} ${when}
+            OVER (PARTITION BY dateTime ORDER BY confidence DESC) AS rank
+            FROM records
+            JOIN files ON files.rowid = records.fileID
+            ${where} ${when}
             ) AS confidence_by_datetime_species
-                JOIN species ON confidence_by_datetime_species.speciesID = species.id
-                JOIN (
-                SELECT speciesID, MAX(confidence) AS max_confidence
-                FROM records
-                GROUP BY records.speciesID
+            JOIN species
+        ON confidence_by_datetime_species.speciesID = species.id
+            JOIN (
+            SELECT speciesID, MAX (confidence) AS max_confidence
+            FROM records
+            GROUP BY records.speciesID
             ) AS max_confidence ON max_confidence.speciesID = species.id
         WHERE confidence_by_datetime_species.rank <= 1
         GROUP BY cname, max_confidence.max_confidence
-        ORDER BY count DESC;
+        ORDER BY count DESC, max_confidence.max_confidence DESC;
     `);
     // need another setWhereWhen call for total
     [where, when] = setWhereWhen({
@@ -1470,8 +1549,9 @@ const getSummary = async ({
     // need to send offset here?
     const event = interim ? 'update-summary' : 'prediction-done';
     if (total === 0) {
-        sendResult(1 , 'No detections found')
+        sendResult(1, 'No detections found', true)
     }
+
     UI.postMessage({
         event: event,
         summary: summary,
@@ -1501,20 +1581,20 @@ const getSummary = async ({
  * @returns {Promise<integer> } A count orf the records retrieved
  */
 const getResults = async ({
-                              db = STATE.db,
-                              range = undefined,
-                              order = 'dateTime',
-                              files = [],
-                              species = undefined,
-                              context = 'results',
-                              limit = 500,
-                              offset = undefined,
-                          } = {}) => {
+    db = STATE.db,
+    range = undefined,
+    order = 'dateTime',
+    files = [],
+    species = undefined,
+    context = 'results',
+    limit = 500,
+    offset = undefined,
+} = {}) => {
     let confidence = minConfidence;
     if (STATE.selection) {
         offset = 0;
         range = STATE.selection;
-        confidence = 5;
+        confidence = 50;
     } else if (offset === undefined) { // Get offset state
         if (species) {
             if (!STATE.filteredOffset[species]) STATE.filteredOffset[species] = 0;
@@ -1536,21 +1616,21 @@ const getResults = async ({
     const result = await db.allAsync(`${db2ResultSQL} ${where} ${when} ORDER BY ${order}, confidence DESC LIMIT ${limit} OFFSET ${offset}`);
     for (let i = 0; i < result.length; i++) {
         if (species && context !== 'explore') {
-            const {count} = await db.getAsync(`SELECT COUNT(*) as count
+            const { count } = await db.getAsync(`SELECT COUNT(*) as count
                                                FROM records
                                                WHERE dateTime = ${result[i].timestamp}
                                                  AND confidence >= ${confidence}`);
             result[i].count = count;
-            sendResult(++index, result[i]);
+            sendResult(++index, result[i], true);
         } else {
-            sendResult(++index, result[i])
+            sendResult(++index, result[i], true)
         }
     }
     console.log("Get Results  took", (Date.now() - t0) / 1000, " seconds");
     if (!result.length) {
         if (STATE.selection) {
             // No more detections in the selection
-            sendResult(++index, 'No detections found')
+            sendResult(++index, 'No detections found', true)
         } else if (species && context !== 'explore') { // Remove the species filter
             await getResults({
                 files: files,
@@ -1563,14 +1643,16 @@ const getResults = async ({
     }
 };
 
-const sendResult = (index, result) => {
+const sendResult = (index, result, fromDBQuery) => {
     const file = result.file;
+    // Convert confidence back to % value
+    result.score = (result.score / 10).toFixed(0)
     UI.postMessage({
         event: 'prediction-ongoing',
         file: file,
         result: result,
         index: index,
-        isFromDB: true,
+        isFromDB: fromDBQuery,
         selection: STATE.selection
     });
     // Recreate Audacity labels
@@ -1618,7 +1700,7 @@ const onSave2DiskDB = async () => {
     response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.records SELECT * FROM records');
     console.log(response.changes + ' records added to disk database')
     if (response.changes) {
-        UI.postMessage({event: 'diskDB-has-records'});
+        UI.postMessage({ event: 'diskDB-has-records' });
     }
     await memoryDB.runAsync('END');
 
@@ -1639,7 +1721,7 @@ const onSave2DiskDB = async () => {
 const getSeasonRecords = async (species, season) => {
     // Because we're using stmt.prepare, we need to unescape quotes
     species = species.replaceAll("''", "'");
-    const seasonMonth = {spring: "< '07'", autumn: " > '06'"}
+    const seasonMonth = { spring: "< '07'", autumn: " > '06'" }
     return new Promise(function (resolve, reject) {
         const stmt = diskDB.prepare(`
             SELECT MAX(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS maxDate,
@@ -1682,8 +1764,8 @@ const getMostCalls = (species) => {
 }
 
 const getChartTotals = ({
-                            species = undefined, range = {}
-                        }) => {
+    species = undefined, range = {}
+}) => {
     const dateRange = range;
     // Work out sensible aggregations from hours difference in daterange
     const hours_diff = dateRange.start ? Math.round((dateRange.end - dateRange.start) / (1000 * 60 * 60)) : 745;
@@ -1770,7 +1852,7 @@ const getRate = (species) => {
 }
 
 const getSpecies = (range) => {
-    const [where, when] = setWhereWhen({range: STATE.explore?.range});
+    const [where, when] = setWhereWhen({ range: STATE.explore?.range });
     diskDB.all(`SELECT DISTINCT cname, sname, COUNT(cname) as count
                 FROM records
                     JOIN species
@@ -1778,7 +1860,7 @@ const getSpecies = (range) => {
                 GROUP BY cname
                 ORDER BY cname`, (err, rows) => {
         if (err) console.log(err); else {
-            UI.postMessage({event: 'seen-species-list', list: rows})
+            UI.postMessage({ event: 'seen-species-list', list: rows })
         }
     })
     return true
@@ -1796,10 +1878,10 @@ const onUpdateFileStart = async (args) => {
     file = file.replace("'", "''");
     let db = diskDB;
 
-    let {rowid} = await db.getAsync(`SELECT rowid
+    let { rowid } = await db.getAsync(`SELECT rowid
                                      from files
                                      where name = '${file}'`);
-    const {changes} = await db.runAsync(`UPDATE files
+    const { changes } = await db.runAsync(`UPDATE files
                                          SET filestart = ${args.start}
                                          where rowid = '${rowid}'`);
     console.log(changes ? `Changed ${file}` : `No changes made`);
@@ -1812,20 +1894,20 @@ const onUpdateFileStart = async (args) => {
 const prepSQL = (string) => string.replaceAll("''", "'").replaceAll("'", "''");
 
 async function onDelete({
-                            file,
-                            start,
-                            active,
-                            species,
-                            files,
-                            context = 'results',
-                            order,
-                            explore,
-                            range,
-                            batch = false
-                        }) {
+    file,
+    start,
+    active,
+    species,
+    files,
+    context = 'results',
+    order,
+    explore,
+    range,
+    batch = false
+}) {
     const db = explore ? diskDB : STATE.db;
     file = prepSQL(file);
-    const {filestart} = await db.getAsync(`SELECT filestart
+    const { filestart } = await db.getAsync(`SELECT filestart
                                            from files
                                            WHERE name = '${file}'`);
     const datetime = filestart + (parseFloat(start) * 1000);
@@ -1861,20 +1943,20 @@ async function onDelete({
 }
 
 async function onUpdateRecord({
-                                  openFiles = [],
-                                  currentFile = '',
-                                  start = 0,
-                                  value = '',
-                                  isBatch = false,
-                                  from = '',
-                                  what = 'speciesID',
-                                  order = 'dateTime',
-                                  isFiltered = false,
-                                  isExplore = false,
-                                  context = 'results',
-                                  range = {},
-                                  active = undefined
-                              }) {
+    openFiles = [],
+    currentFile = '',
+    start = 0,
+    value = '',
+    isBatch = false,
+    from = '',
+    what = 'speciesID',
+    order = 'dateTime',
+    isFiltered = false,
+    isExplore = false,
+    context = 'results',
+    range = {},
+    active = undefined
+}) {
     const db = isExplore && context !== "selectionResults" ? diskDB : STATE.db;
     // Construct the SQL
     let whatSQL, whereSQL;
@@ -1884,7 +1966,7 @@ async function onUpdateRecord({
     if (what === 'ID' || what === 'speciesID') {
         // Map the field name to the one in the database
         what = 'speciesID';
-        whatSQL = `confidence = 200, speciesID = (SELECT id FROM species WHERE cname = '${value}')`;
+        whatSQL = `confidence = 2000, speciesID = (SELECT id FROM species WHERE cname = '${value}')`;
     } else if (what === 'label') {
         whatSQL = `label = '${value}'`;
     } else {
@@ -1892,7 +1974,7 @@ async function onUpdateRecord({
     }
     const filesSQL = openFiles.map(file => `'${prepSQL(file)}'`).toString();
     // Get the old ID
-    let {id} = await db.getAsync(`SELECT id
+    let { id } = await db.getAsync(`SELECT id
                                   FROM species
                                   WHERE cname = '${fromSQL}'`);
     if (isBatch) {
@@ -1946,7 +2028,7 @@ async function onUpdateRecord({
         }
     }
     const t0 = Date.now();
-    const {changes} = await db.runAsync(`UPDATE records
+    const { changes } = await db.runAsync(`UPDATE records
                                          SET ${whatSQL} ${whereSQL}`);
 
     if (changes) {
@@ -1965,7 +2047,7 @@ async function onUpdateRecord({
             resetResults: context !== 'selectionResults'
         });
         if (context !== 'selectionResults') {
-            await getSummary({db: db, files: openFiles, species: species, explore: isExplore, active: active});// Update the species list
+            await getSummary({ db: db, files: openFiles, species: species, explore: isExplore, active: active });// Update the species list
             getSpecies(range);
         }
         if (db === memoryDB) {
