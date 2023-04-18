@@ -505,10 +505,11 @@ input[type="range"] {
 
 input[type="range"].vertical {
     position: absolute;
+    z-index: 10;
     height: 150px;
     width: 18px;
     margin: 3px;
-    -webkit-appearance: slider-vertical;
+    appearance: slider-vertical;
     top: -160px;
     right: 15px;
 }
@@ -542,14 +543,8 @@ input[type="range"].vertical {
     }
 }
 
-@-webkit-keyframes ellipsis {
-    to {
-        width: 15px;
-    }
-}
 
 .circle {
-    display: inline-block;
     width: 20px;
     height: 20px;
     border-radius: 50%;

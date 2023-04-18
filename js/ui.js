@@ -386,7 +386,7 @@ function powerSave(on) {
 }
 
 const openFileInList = async (e) => {
-    if (!PREDICTING && e.target.id !== 'setFileStart'  && e.target.tagName !== 'BUTTON') {
+    if (!PREDICTING && e.target.id !== 'setFileStart' && e.target.tagName !== 'BUTTON') {
         await loadAudioFile({filePath: e.target.id, preserveResults: true})
     }
 }
@@ -607,7 +607,7 @@ const displayLocation = () => {
             })
     }
 }
-$('#latitude, #longitude').on('blur', function () {
+$('#latitude, #longitude, #timeInput').on('blur', function () {
     document.addEventListener('keydown', handleKeyDownDeBounce, true);
     displayLocation()
 })
@@ -1381,7 +1381,7 @@ const editID = (cname, sname, cell) => {
     let from;
     restoreSpecies.classList.contains('speciesFilter') ?
         from = restoreSpecies.firstElementChild.innerHTML.replace(/(.*)\s<.*/, "$1") :
-        from = restoreSpecies.firstChild.nodeValue.replace('\n','').trim();
+        from = restoreSpecies.firstChild.nodeValue.replace('\n', '').trim();
     // Are we batch editing here?
     const context = getDetectionContext(cell);
     const batch = context === 'resultSummary';
@@ -1826,8 +1826,7 @@ listIcon.addEventListener('click', () => {
             listToUse.value = keys[replace];
             config.list = keys[replace];
             updatePrefs();
-            worker.postMessage({action: 'update-list', list: config.list, explore: isExplore()})
-            // setTimeout(setFilter, 10);
+            worker.postMessage({action: 'update-list', list: config.list})
             break
         }
     }
@@ -1839,8 +1838,7 @@ listToUse.addEventListener('change', function (e) {
     config.list = e.target.value;
     updateListIcon();
     updatePrefs();
-    worker.postMessage({action: 'update-list', list: config.list, explore: isExplore()})
-    setFilter();
+    worker.postMessage({action: 'update-list', list: config.list})
 })
 
 const loadModel = () => {
@@ -1909,6 +1907,9 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     KeyE: function (e) {
         if (e.ctrlKey) sendFile('save');
     },
+    KeyG: function (e) {
+        if (e.ctrlKey) showGoToPosition();
+    },
     KeyO: async function (e) {
         if (e.ctrlKey) await showOpenDialog();
     },
@@ -1960,7 +1961,21 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             postBufferUpdate({begin: bufferBegin, position: position})
         }
     },
+    ArrowUp: function () {
+        if (currentBuffer) {
+            const position = wavesurfer.getCurrentTime() / windowLength;
+            bufferBegin = Math.max(0, bufferBegin - windowLength);
+            postBufferUpdate({begin: bufferBegin, position: position})
+        }
+    },
     PageDown: function () {
+        if (currentBuffer) {
+            const position = wavesurfer.getCurrentTime() / windowLength;
+            bufferBegin = Math.min(bufferBegin + windowLength, currentFileDuration - windowLength);
+            postBufferUpdate({begin: bufferBegin, position: position})
+        }
+    },
+    ArrowDown: function () {
         if (currentBuffer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
             bufferBegin = Math.min(bufferBegin + windowLength, currentFileDuration - windowLength);
@@ -2096,6 +2111,64 @@ const postBufferUpdate = ({
         region: region
     });
 }
+
+// Go to position
+const goto = new bootstrap.Modal(document.getElementById('gotoModal'));
+const showGoToPosition = () => {
+    if (currentFile) {
+        document.removeEventListener('keydown', handleKeyDownDeBounce, true);
+        goto.show();
+
+    }
+}
+
+const gotoModal = document.getElementById('gotoModal')
+gotoModal.addEventListener('hidden.bs.modal', () => {
+    document.addEventListener('keydown', handleKeyDownDeBounce, true);
+})
+
+gotoModal.addEventListener('shown.bs.modal', () => {
+    document.getElementById('timeInput').focus()
+})
+
+
+const gotoTime = (e) => {
+    e.preventDefault();
+    let hours = 0, minutes = 0, seconds = 0;
+    const time = document.getElementById('timeInput').value;
+    let timeArray = time.split(':');
+    if (timeArray.length === 1 && !isNaN(parseFloat(timeArray[0]))) {
+        seconds = parseFloat(timeArray[0]);
+    } else if (timeArray.length === 2 && !isNaN(parseInt(timeArray[0])) && !isNaN(parseInt(timeArray[1]))) {
+        // Case 2: Input is two numbers separated by a colon, take as minutes and seconds
+        minutes = Math.min(parseInt(timeArray[0]), 59);
+        seconds = Math.min(parseFloat(timeArray[1]), 59.999);
+    } else if (timeArray.length === 3 && !isNaN(parseInt(timeArray[0])) && !isNaN(parseInt(timeArray[1])) && !isNaN(parseInt(timeArray[2]))) {
+        // Case 3: Input is three numbers separated by colons, take as hours, minutes, and seconds
+        hours = Math.min(parseInt(timeArray[0]), 23);
+        minutes = Math.min(parseInt(timeArray[1]), 59);
+        seconds = Math.min(parseFloat(timeArray[2]), 59.999);
+    } else {
+        // Invalid input
+        alert('Invalid time format. Please enter time in one of the following formats: \n1. Float (for seconds) \n2. Two numbers separated by a colon (for minutes and seconds) \n3. Three numbers separated by colons (for hours, minutes, and seconds)');
+        document.addEventListener('keydown', handleKeyDownDeBounce, true);
+        return;
+    }
+    let start = hours * 3600 + minutes * 60 + seconds;
+    windowLength = 20;
+    const begin = Math.max(start - windowLength / 2, 0);
+    const position = begin === 0 ? start / windowLength : 0.5;
+    postBufferUpdate({begin: begin, position: position})
+
+    // Close the modal
+    goto.hide()
+}
+
+const go = document.getElementById('go')
+go.addEventListener('click', gotoTime)
+const gotoForm = document.getElementById('gotoForm')
+gotoForm.addEventListener('submit', gotoTime)
+
 // Electron Message handling
 const warmupText = document.getElementById('warmup');
 
@@ -2439,7 +2512,7 @@ async function renderResult({
                                 isFromDB = false,
                                 selection = false
                             }) {
-    const isFromCache = isFromDB;
+
     let tr = '';
     if (index <= 1) {
         if (selection) selectionTable.innerHTML = '';
@@ -2447,8 +2520,8 @@ async function renderResult({
             showElement(['resultTableContainer'], false);
             resultTable.innerHTML = '';
         }
-    } else if (!isFromCache && index > config.limit) {
-        if (index % (config.limit + 1) === 0) addPagination(index, 0);
+    } else if (index % (config.limit + 1) === 0) addPagination(index, 0);
+    if (!isFromDB && index > config.limit) {
         return
     }
     if (typeof (result) === 'string') {
@@ -2516,7 +2589,7 @@ async function renderResult({
             <td class="comment text-end">${commentHTML}</td>
         </tr>`;
     }
-    updateResultTable(tr, isFromCache, selection);
+    updateResultTable(tr, isFromDB, selection);
 }
 
 
@@ -2558,9 +2631,9 @@ detectionsAdd.addEventListener('click', event => {
     selectionTable.innerText = '';
 });
 
-const updateResultTable = (row, isFromCache, isSelection) => {
+const updateResultTable = (row, isFromDB, isSelection) => {
     const table = isSelection ? selectionTable : resultTable;
-    if (isFromCache && !isSelection) {
+    if (isFromDB && !isSelection) {
         if (!resultsBuffer) resultsBuffer = table.cloneNode();
         resultsBuffer.lastElementChild ?
             resultsBuffer.lastElementChild.insertAdjacentHTML('afterend', row) :
