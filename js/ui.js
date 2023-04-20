@@ -4,15 +4,15 @@ let labels = [];
 const STATE = {
     chart: {
         species: undefined,
-        range: {start: undefined, end: undefined}
+        range: { start: undefined, end: undefined }
     },
     explore: {
         species: undefined,
         order: 'dateTime',
-        range: {start: undefined, end: undefined}
+        range: { start: undefined, end: undefined }
     },
-    birdList: {lastSelectedSpecies: undefined},
-    selection: {start: undefined, end: undefined},
+    birdList: { lastSelectedSpecies: undefined },
+    selection: { start: undefined, end: undefined },
     mode: 'analyse'
 }
 
@@ -39,7 +39,7 @@ const establishMessageChannel =
             if (event.source === window) {
                 if (event.data === 'provide-worker-channel') {
                     [worker] = event.ports;
-                    worker.postMessage({action: 'create message port'});
+                    worker.postMessage({ action: 'create message port' });
                     // Once we have the port, we can communicate directly with the worker
                     // process.
                     worker.onmessage = e => {
@@ -120,7 +120,7 @@ contentWrapperElement.height(bodyElement.height() - 80);
 // Set default Options
 let config;
 const sampleRate = 24000;
-const audioCtx = new AudioContext({latencyHint: 'interactive', sampleRate: sampleRate});
+const audioCtx = new AudioContext({ latencyHint: 'interactive', sampleRate: sampleRate });
 
 
 /** Collect Diagnostics Information
@@ -213,7 +213,7 @@ async function loadAudioFile(args) {
 }
 
 
-function updateSpec({buffer, play = false, resetSpec = false}) {
+function updateSpec({ buffer, play = false, resetSpec = false }) {
     updateElementCache();
     wavesurfer.loadDecodedBuffer(buffer);
     waveCanvasElement.width('100%');
@@ -247,9 +247,9 @@ const resetRegions = () => {
 }
 
 const initWavesurfer = ({
-                            audio = undefined,
-                            height = 0
-                        }) => {
+    audio = undefined,
+    height = 0
+}) => {
     // if (reset) {
     //     // Show spec and timecode containers
     //     hideAll();
@@ -325,8 +325,9 @@ const initWavesurfer = ({
 
     wavesurfer.on('finish', function () {
         if (currentFileDuration > bufferBegin + windowLength) {
+            wavesurfer.stop()
             bufferBegin += windowLength;
-            postBufferUpdate({begin: bufferBegin, play: true})
+            postBufferUpdate({ begin: bufferBegin, play: true })
         }
     });
 
@@ -373,12 +374,12 @@ function zoomSpec(direction) {
     }
     // Keep playhead at same time in file
     position = (timeNow - bufferBegin) / windowLength;
-    postBufferUpdate({begin: bufferBegin, position: position})
+    postBufferUpdate({ begin: bufferBegin, position: position })
 }
 
 async function showOpenDialog() {
     const files = await window.electron.openDialog('showOpenDialog');
-    if (!files.canceled) await onOpenFiles({filePaths: files.filePaths});
+    if (!files.canceled) await onOpenFiles({ filePaths: files.filePaths });
 }
 
 function powerSave(on) {
@@ -387,7 +388,7 @@ function powerSave(on) {
 
 const openFileInList = async (e) => {
     if (!PREDICTING && e.target.id !== 'setFileStart' && e.target.tagName !== 'BUTTON') {
-        await loadAudioFile({filePath: e.target.id, preserveResults: true})
+        await loadAudioFile({ filePath: e.target.id, preserveResults: true })
     }
 }
 const filename = document.getElementById('filename');
@@ -447,7 +448,7 @@ function updateFileName(files, openfile) {
             }
         }, function (start, end, label) {
             fileStart = start.toDate().getTime();
-            worker.postMessage({action: 'update-file-start', file: currentFile, start: fileStart});
+            worker.postMessage({ action: 'update-file-start', file: currentFile, start: fileStart });
         });
     })
 }
@@ -458,8 +459,8 @@ function updateFileName(files, openfile) {
  * required filesystem routines
  * @param filePaths
  */
-const openFiles = ({filePaths}) => {
-    worker.postMessage({action: 'open-files', files: filePaths})
+const openFiles = ({ filePaths }) => {
+    worker.postMessage({ action: 'open-files', files: filePaths })
 }
 
 async function onOpenFiles(args) {
@@ -482,7 +483,7 @@ async function onOpenFiles(args) {
         disableMenuItem(['analyseAll', 'reanalyseAll'])
     }
 
-    await loadAudioFile({filePath: fileList[0]});
+    await loadAudioFile({ filePath: fileList[0] });
     updateFileName(fileList, fileList[0]);
 
     disableMenuItem(['analyseSelection', 'analyse', 'analyseAll', 'reanalyse', 'reanalyseAll'])
@@ -498,7 +499,7 @@ async function onOpenFiles(args) {
  * @returns {Promise<void>}
  */
 async function showSaveDialog() {
-    await window.electron.saveFile({currentFile: currentFile, labels: AUDACITY_LABELS[currentFile]});
+    await window.electron.saveFile({ currentFile: currentFile, labels: AUDACITY_LABELS[currentFile] });
 }
 
 // Worker listeners
@@ -541,7 +542,7 @@ navbarAnalysis.addEventListener('click', async () => {
 const analyseLink = document.getElementById('analyse');
 analyseLink.addEventListener('click', async () => {
     analyseList = [currentFile];
-    postAnalyseMessage({confidence: config.minConfidence, resetResults: true, currentFile: currentFile});
+    postAnalyseMessage({ confidence: config.minConfidence, resetResults: true, currentFile: currentFile });
 });
 
 const reanalyseLink = document.getElementById('reanalyse');
@@ -558,13 +559,13 @@ reanalyseLink.addEventListener('click', async () => {
 const analyseAllLink = document.getElementById('analyseAll');
 analyseAllLink.addEventListener('click', async () => {
     analyseList = undefined;
-    postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: fileList});
+    postAnalyseMessage({ confidence: config.minConfidence, resetResults: true, files: fileList });
 });
 
 const reanalyseAllLink = document.getElementById('reanalyseAll');
 reanalyseAllLink.addEventListener('click', async () => {
     analyseList = undefined;
-    postAnalyseMessage({confidence: config.minConfidence, resetResults: true, files: fileList, reanalyse: true});
+    postAnalyseMessage({ confidence: config.minConfidence, resetResults: true, files: fileList, reanalyse: true });
 });
 
 
@@ -724,17 +725,17 @@ function hideAll() {
 
 const save2dbLink = document.getElementById('save2db');
 save2dbLink.addEventListener('click', async () => {
-    worker.postMessage({action: 'save2db'})
+    worker.postMessage({ action: 'save2db' })
 });
 
 
 const chartsLink = document.getElementById('charts');
 chartsLink.addEventListener('click', async () => {
     STATE.mode = 'chart';
-    worker.postMessage({action: 'get-detected-species-list', range: STATE.chart.range});
+    worker.postMessage({ action: 'get-detected-species-list', range: STATE.chart.range });
     hideAll();
     showElement(['recordsContainer']);
-    worker.postMessage({action: 'chart', species: undefined, range: {start: undefined, end: undefined}});
+    worker.postMessage({ action: 'chart', species: undefined, range: { start: undefined, end: undefined } });
 });
 
 
@@ -742,14 +743,14 @@ const exploreLink = document.getElementById('explore');
 exploreLink.addEventListener('click', async () => {
     analyseList = undefined;
     STATE.mode = 'explore';
-    worker.postMessage({action: 'get-detected-species-list', range: STATE.explore.range});
+    worker.postMessage({ action: 'get-detected-species-list', range: STATE.explore.range });
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
 });
 
 const datasetLink = document.getElementById('dataset');
 datasetLink.addEventListener('click', async () => {
-    worker.postMessage({action: 'create-dataset'});
+    worker.postMessage({ action: 'create-dataset' });
 });
 
 
@@ -778,6 +779,7 @@ selectionTable.addEventListener('click', resultClick);
 
 function resultClick(e) {
     let row = e.target.closest('tr');
+    let classList = e.target.classList;
     if (!row || row.classList.length === 0) { // 1. clicked and dragged, 2 no detections in file row
         return
     }
@@ -790,27 +792,25 @@ function resultClick(e) {
     if (activeRow) activeRow.classList.remove('table-active');
     row.classList.add('table-active');
     activeRow = row;
-    const params = row.attributes[2].value.split('|');
-    if (e.target.classList.contains('play')) params.push('true')
-    loadResultRegion(params);
+    const [file, start, end, label] = row.attributes[2].value.split('|');
+    const play = classList.contains('play');
+    const del = classList.contains('delete');
+    if (!del) loadResultRegion({ file, start, end, label, play });
     if (e.target.classList.contains('circle')) {
         getSelectionResults()
     }
 }
 
-function loadResultRegion(params) {
-    // Accepts global start and end timecodes from model detections
-    // Need to find and centre a view of the detection in the spectrogram
-    // 3 second detections
-    let [file, start, end, label, play] = params;
+
+const loadResultRegion = ({ file = '', start = 0, end = 3, label = '', play = false } = {}) => {
     start = parseFloat(start);
     end = parseFloat(end);
     // ensure region doesn't spread across the whole window
     if (windowLength <= 3.5) windowLength = 6;
     bufferBegin = Math.max(0, start - (windowLength / 2) + 1.5)
+    const region = { start: Math.max(start - bufferBegin, 0), end: end - bufferBegin, label: label, play: play };
     const position = wavesurfer.getCurrentTime() / windowLength;
-    const region = {start: Math.max(start - bufferBegin, 0), end: end - bufferBegin, label: label, play: play};
-    postBufferUpdate({file: file, begin: bufferBegin, position: position, region: region})
+    postBufferUpdate({ file: file, begin: bufferBegin, position: position, region: region })
 }
 
 /**
@@ -1050,98 +1050,98 @@ window.onload = async () => {
         snr: 0,
         warmup: true,
         backend: 'tensorflow',
-        tensorflow: {threads: diagnostics['Cores'], batchSize: 4},
-        webgl: {threads: 1, batchSize: 4},
+        tensorflow: { threads: diagnostics['Cores'], batchSize: 4 },
+        webgl: { threads: 1, batchSize: 4 },
         limit: 500,
         fullscreen: false
     };
-// Load preferences and override defaults
+    // Load preferences and override defaults
     [appPath, tempPath] = await getPaths();
     await fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
-            if (err) {
-                console.log('JSON parse error ' + err);
-                // Use defaults
-                config = defaultConfig;
-            } else {
-                config = JSON.parse(data);
-            }
-
-            //fill in defaults
-            Object.keys(defaultConfig).forEach(key => {
-                if (!(key in config)) {
-                    config[key] = defaultConfig[key];
-                }
-            });
-
-            // Initialize Spectrogram
-            initWavesurfer({});
-            // Set UI option state
-            const batchSizeSlider = document.getElementById('batch-size');
-            // Map slider value to batch size
-            batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
-            batchSizeSlider.max = (BATCH_SIZE_LIST.length - 1).toString();
-            batchSizeValue.innerText = config[config.backend].batchSize;
-            diagnostics['Batch size'] = config[config.backend].batchSize;
-            const modelToUse = document.getElementById('model-to-use');
-            modelToUse.value = config.model;
-            diagnostics['Model'] = config.model;
-            const backend = document.getElementById(config.backend);
-            backend.checked = true;
-            // Show time of day in results?
-            const timestamp = document.querySelectorAll('.timestamp');
-            if (!config.timeOfDay) {
-                timestamp.forEach(el => {
-                    el.classList.add('d-none')
-                })
-            }
-            // Show the list in use
-            document.getElementById('list-to-use').value = config.list;
-            // And update the icon
-            updateListIcon();
-            timelineSetting.value = config.timeOfDay ? 'timeOfDay' : 'timecode';
-            // Spectrogram colour
-            colourmap.value = config.colormap;
-            // Nocmig mode state
-            console.log('nocmig mode is ' + config.nocmig)
-            nocmigButton.innerText = config.nocmig ? 'bedtime' : 'bedtime_off';
-            nocmigButton.title = config.nocmig ? 'Nocmig mode on' : 'Nocmig mode off';
-            nocmig.checked = config.nocmig;
-            context.checked = config.context;
-            confidenceRange.value = config.minConfidence;
-            thresholdDisplay.innerHTML = `<b>${config.minConfidence}%</b>`;
-            confidenceSlider.value = config.minConfidence;
-            confidenceDisplay.innerHTML = `<b>${config.minConfidence}%</b>`;
-            confidenceRange.value = config.minConfidence;
-            SNRSlider.value = config.snr;
-            SNRThreshold.innerText = config.snr;
-            SNRSlider.disabled = config.backend === 'webgl';
-            ThreadSlider.max = diagnostics['Cores'];
-            ThreadSlider.value = config[config.backend].threads;
-            numberOfThreads.innerText = config[config.backend].threads;
-            lat.value = config.latitude;
-            lon.value = config.longitude;
-            place.innerText = config.location;
-            //showElement([config.colormap], true)
-            worker.postMessage({
-                action: 'set-variables',
-                path: appPath,
-                temp: tempPath,
-                lat: config.latitude,
-                lon: config.longitude,
-                confidence: config.minConfidence,
-                nocmig: config.nocmig,
-                context: config.context
-            });
-            loadModel();
-            worker.postMessage({action: 'clear-cache'})
+        if (err) {
+            console.log('JSON parse error ' + err);
+            // Use defaults
+            config = defaultConfig;
+        } else {
+            config = JSON.parse(data);
         }
+
+        //fill in defaults
+        Object.keys(defaultConfig).forEach(key => {
+            if (!(key in config)) {
+                config[key] = defaultConfig[key];
+            }
+        });
+
+        // Initialize Spectrogram
+        initWavesurfer({});
+        // Set UI option state
+        const batchSizeSlider = document.getElementById('batch-size');
+        // Map slider value to batch size
+        batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
+        batchSizeSlider.max = (BATCH_SIZE_LIST.length - 1).toString();
+        batchSizeValue.innerText = config[config.backend].batchSize;
+        diagnostics['Batch size'] = config[config.backend].batchSize;
+        const modelToUse = document.getElementById('model-to-use');
+        modelToUse.value = config.model;
+        diagnostics['Model'] = config.model;
+        const backend = document.getElementById(config.backend);
+        backend.checked = true;
+        // Show time of day in results?
+        const timestamp = document.querySelectorAll('.timestamp');
+        if (!config.timeOfDay) {
+            timestamp.forEach(el => {
+                el.classList.add('d-none')
+            })
+        }
+        // Show the list in use
+        document.getElementById('list-to-use').value = config.list;
+        // And update the icon
+        updateListIcon();
+        timelineSetting.value = config.timeOfDay ? 'timeOfDay' : 'timecode';
+        // Spectrogram colour
+        colourmap.value = config.colormap;
+        // Nocmig mode state
+        console.log('nocmig mode is ' + config.nocmig)
+        nocmigButton.innerText = config.nocmig ? 'bedtime' : 'bedtime_off';
+        nocmigButton.title = config.nocmig ? 'Nocmig mode on' : 'Nocmig mode off';
+        nocmig.checked = config.nocmig;
+        context.checked = config.context;
+        confidenceRange.value = config.minConfidence;
+        thresholdDisplay.innerHTML = `<b>${config.minConfidence}%</b>`;
+        confidenceSlider.value = config.minConfidence;
+        confidenceDisplay.innerHTML = `<b>${config.minConfidence}%</b>`;
+        confidenceRange.value = config.minConfidence;
+        SNRSlider.value = config.snr;
+        SNRThreshold.innerText = config.snr;
+        SNRSlider.disabled = config.backend === 'webgl';
+        ThreadSlider.max = diagnostics['Cores'];
+        ThreadSlider.value = config[config.backend].threads;
+        numberOfThreads.innerText = config[config.backend].threads;
+        lat.value = config.latitude;
+        lon.value = config.longitude;
+        place.innerText = config.location;
+        //showElement([config.colormap], true)
+        worker.postMessage({
+            action: 'set-variables',
+            path: appPath,
+            temp: tempPath,
+            lat: config.latitude,
+            lon: config.longitude,
+            confidence: config.minConfidence,
+            nocmig: config.nocmig,
+            context: config.context
+        });
+        loadModel();
+        worker.postMessage({ action: 'clear-cache' })
+    }
     )
-// establish the message channel
+    // establish the message channel
     setUpWorkerMessaging()
 
-// Set footer year
+    // Set footer year
     $('#year').text(new Date().getFullYear());
-//Cache list elements
+    //Cache list elements
     speciesListItems = $('#bird-list li span');
 }
 
@@ -1187,7 +1187,7 @@ const setUpWorkerMessaging = () => {
                     break;
                 case 'promptToSave':
                     if (confirm("Save results to your archive?")) {
-                        worker.postMessage({action: 'save2db'})
+                        worker.postMessage({ action: 'save2db' })
                     }
                     break;
                 case 'worker-loaded-audio':
@@ -1476,14 +1476,14 @@ $(document).on('click', '.request-bird', function (e) {
     const picker = $('#' + pickerEl).data('daterangepicker');
     const start = picker.startDate._d.getTime();
     const end = picker.endDate._d.getTime();
-    STATE[context].range = end !== start ? {start: start, end: end} : {};
-    worker.postMessage({action: context, species: cname, range: STATE[context].range, order: STATE.explore.order})
+    STATE[context].range = end !== start ? { start: start, end: end } : {};
+    worker.postMessage({ action: context, species: cname, range: STATE[context].range, order: STATE.explore.order })
 })
 
 
 // Chart functions
 function getDateOfISOWeek(w) {
-    const options = {month: 'long', day: 'numeric'};
+    const options = { month: 'long', day: 'numeric' };
     const y = new Date().getFullYear();
     const simple = new Date(y, 0, 1 + (w - 1) * 7);
     const dow = simple.getDay();
@@ -1512,7 +1512,7 @@ function onChartData(args) {
             if (isNaN(value[0])) element.innerText = 'N/A';
             else {
                 element.innerText = value[0].toString() + ' on ' +
-                    new Date(value[1]).toLocaleDateString(undefined, {dateStyle: "short"})
+                    new Date(value[1]).toLocaleDateString(undefined, { dateStyle: "short" })
             }
         } else {
             element.innerText = value ? new Date(value).toLocaleDateString(undefined, {
@@ -1534,14 +1534,14 @@ function onChartData(args) {
 function setChartOptions(species, total, rate, results, dataPoints, aggregation, pointStart) {
     let chartOptions = {};
     chartOptions.yAxis = [];
-    const pointInterval = {Week: 7 * 24 * 36e5, Day: 24 * 36e5, Hour: 36e5};
+    const pointInterval = { Week: 7 * 24 * 36e5, Day: 24 * 36e5, Hour: 36e5 };
     chartOptions.colors = ["#003", "#2B9179", "#AB41E8", "#E88E2A", "#E86235"];
     chartOptions.chart = {
         zoomType: 'x',
-        backgroundColor: {linearGradient: [0, 0, 0, 500], stops: [[0, "#dbe2ed"], [1, "#dddddd"]]}
+        backgroundColor: { linearGradient: [0, 0, 0, 500], stops: [[0, "#dbe2ed"], [1, "#dddddd"]] }
     }
-    chartOptions.credits = {text: 'Chart generated by Chirpity Nocmig', href: ''}
-    chartOptions.title = species ? {text: `${species} Detections`} : {text: 'Hours Recorded'};
+    chartOptions.credits = { text: 'Chart generated by Chirpity Nocmig', href: '' }
+    chartOptions.title = species ? { text: `${species} Detections` } : { text: 'Hours Recorded' };
     chartOptions.lang = {
         noData: "No Detections to Display"
     }
@@ -1552,14 +1552,14 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
             color: '#303030'
         }
     }
-    chartOptions.time = {useUTC: false}; // Use localtime for axes
+    chartOptions.time = { useUTC: false }; // Use localtime for axes
     Highcharts.dateFormats.W = function (timestamp) {
         let date = new Date(timestamp), day = date.getUTCDay() === 0 ? 7 : date.getUTCDay(), dayNumber;
         date.setDate(date.getUTCDate() + 4 - day);
         dayNumber = Math.floor((date.getTime() - new Date(date.getUTCFullYear(), 0, 1, -6)) / 86400000);
         return 1 + Math.floor(dayNumber / 7);
     };
-    const format = {Week: '{value:Week %W}', Day: '{value:%a %e %b}', Hour: '{value:%l%P}'}
+    const format = { Week: '{value:Week %W}', Day: '{value:%a %e %b}', Hour: '{value:%l%P}' }
     chartOptions.xAxis = {
         type: 'datetime',
         tickInterval: pointInterval[aggregation], // one week
@@ -1572,7 +1572,7 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
     if (aggregation === 'Week') {
         chartOptions.series.push({
             name: 'Hours of recordings',
-            marker: {enabled: false},
+            marker: { enabled: false },
             yAxis: 0,
             type: 'areaspline',
             data: total,
@@ -1600,13 +1600,13 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
     if (rate && Math.max(...rate) > 0) {
         if (aggregation === 'Week') {
             chartOptions.yAxis.push({
-                title: {text: 'Hourly Detection Rate'},
-                accessibility: {description: 'Hourly rate of records'},
+                title: { text: 'Hourly Detection Rate' },
+                accessibility: { description: 'Hourly rate of records' },
                 opposite: true
             });
             chartOptions.series.push({
                 name: 'Average hourly call rate',
-                marker: {enabled: false},
+                marker: { enabled: false },
                 yAxis: 1,
                 type: 'areaspline',
                 data: rate,
@@ -1638,8 +1638,8 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
     if (hasResults) {
         chartOptions.yAxis.push(
             {
-                title: {text: 'Detections'},
-                accessibility: {description: 'Count of records'}
+                title: { text: 'Detections' },
+                accessibility: { description: 'Count of records' }
             }
         );
     }
@@ -1826,7 +1826,7 @@ listIcon.addEventListener('click', () => {
             listToUse.value = keys[replace];
             config.list = keys[replace];
             updatePrefs();
-            worker.postMessage({action: 'update-list', list: config.list})
+            worker.postMessage({ action: 'update-list', list: config.list })
             break
         }
     }
@@ -1838,7 +1838,7 @@ listToUse.addEventListener('change', function (e) {
     config.list = e.target.value;
     updateListIcon();
     updatePrefs();
-    worker.postMessage({action: 'update-list', list: config.list})
+    worker.postMessage({ action: 'update-list', list: config.list })
 })
 
 const loadModel = () => {
@@ -1889,7 +1889,7 @@ const timelineToggle = (e) => {
     if (fileLoaded) {
         // Reload wavesurfer with the new timeline
         const position = wavesurfer.getCurrentTime() / windowLength;
-        postBufferUpdate({begin: bufferBegin, position: position})
+        postBufferUpdate({ begin: bufferBegin, position: position })
     }
     updatePrefs();
 };
@@ -1917,7 +1917,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
     },
     KeyS: function (e) {
-        if (e.ctrlKey) worker.postMessage({action: 'save2db'});
+        if (e.ctrlKey) worker.postMessage({ action: 'save2db' });
     },
     Escape: function () {
         if (PREDICTING) {
@@ -1941,7 +1941,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     End: function () {
         if (currentBuffer) {
             bufferBegin = currentFileDuration - windowLength;
-            postBufferUpdate({begin: bufferBegin, position: 1})
+            postBufferUpdate({ begin: bufferBegin, position: 1 })
         }
     },
     KeyC: function (e) {
@@ -1951,35 +1951,35 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             bufferBegin = middle - windowLength / 2;
             bufferBegin = Math.max(0, bufferBegin);
             bufferBegin = Math.min(bufferBegin, currentFileDuration - windowLength)
-            postBufferUpdate({begin: bufferBegin, position: 0.5})
+            postBufferUpdate({ begin: bufferBegin, position: 0.5 })
         }
     },
     PageUp: function () {
         if (currentBuffer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
             bufferBegin = Math.max(0, bufferBegin - windowLength);
-            postBufferUpdate({begin: bufferBegin, position: position})
+            postBufferUpdate({ begin: bufferBegin, position: position })
         }
     },
     ArrowUp: function () {
         if (currentBuffer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
             bufferBegin = Math.max(0, bufferBegin - windowLength);
-            postBufferUpdate({begin: bufferBegin, position: position})
+            postBufferUpdate({ begin: bufferBegin, position: position })
         }
     },
     PageDown: function () {
         if (currentBuffer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
             bufferBegin = Math.min(bufferBegin + windowLength, currentFileDuration - windowLength);
-            postBufferUpdate({begin: bufferBegin, position: position})
+            postBufferUpdate({ begin: bufferBegin, position: position })
         }
     },
     ArrowDown: function () {
         if (currentBuffer) {
             const position = wavesurfer.getCurrentTime() / windowLength;
             bufferBegin = Math.min(bufferBegin + windowLength, currentFileDuration - windowLength);
-            postBufferUpdate({begin: bufferBegin, position: position})
+            postBufferUpdate({ begin: bufferBegin, position: position })
         }
     },
     ArrowLeft: function () {
@@ -1989,7 +1989,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             const position = wavesurfer.getCurrentTime() / windowLength;
             if (wavesurfer.getCurrentTime() < skip && bufferBegin > 0) {
                 bufferBegin -= skip;
-                postBufferUpdate({begin: bufferBegin, position: position})
+                postBufferUpdate({ begin: bufferBegin, position: position })
             }
         }
     },
@@ -2000,7 +2000,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             const position = Math.max(wavesurfer.getCurrentTime() / windowLength, 1);
             if (wavesurfer.getCurrentTime() > windowLength - skip) {
                 bufferBegin = Math.min(currentFileDuration - windowLength, bufferBegin += skip)
-                postBufferUpdate({begin: bufferBegin, position: position})
+                postBufferUpdate({ begin: bufferBegin, position: position })
             }
         }
     },
@@ -2014,7 +2014,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
                     end: region.end,
                     label: region.attributes?.label
                 } : undefined;
-                postBufferUpdate({begin: bufferBegin, position: position, region: currentRegion})
+                postBufferUpdate({ begin: bufferBegin, position: position, region: currentRegion })
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
@@ -2031,7 +2031,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
                     end: region.end,
                     label: region.attributes?.label
                 } : undefined;
-                postBufferUpdate({begin: bufferBegin, position: position, region: currentRegion})
+                postBufferUpdate({ begin: bufferBegin, position: position, region: currentRegion })
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
@@ -2048,7 +2048,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
                     end: region.end,
                     label: region.attributes?.label
                 } : undefined;
-                postBufferUpdate({begin: bufferBegin, position: position, region: currentRegion})
+                postBufferUpdate({ begin: bufferBegin, position: position, region: currentRegion })
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
@@ -2065,7 +2065,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
                     end: region.end,
                     label: region.attributes?.label
                 } : undefined;
-                postBufferUpdate({begin: bufferBegin, position: position, region: currentRegion})
+                postBufferUpdate({ begin: bufferBegin, position: position, region: currentRegion })
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
@@ -2093,13 +2093,13 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
 };
 
 const postBufferUpdate = ({
-                              file = currentFile,
-                              begin = 0,
-                              position = 0,
-                              play = false,
-                              resetSpec = false,
-                              region = undefined
-                          }) => {
+    file = currentFile,
+    begin = 0,
+    position = 0,
+    play = false,
+    resetSpec = false,
+    region = undefined
+}) => {
     worker.postMessage({
         action: 'update-buffer',
         file: file,
@@ -2158,7 +2158,7 @@ const gotoTime = (e) => {
     windowLength = 20;
     const begin = Math.max(start - windowLength / 2, 0);
     const position = begin === 0 ? start / windowLength : 0.5;
-    postBufferUpdate({begin: begin, position: position})
+    postBufferUpdate({ begin: begin, position: position })
 
     // Close the modal
     goto.hide()
@@ -2222,22 +2222,22 @@ function onModelReady(args) {
  * @returns {Promise<void>}
  */
 async function onWorkerLoadedAudio({
-                                       start = 0,
-                                       sourceDuration = 0,
-                                       bufferBegin = 0,
-                                       file = '',
-                                       position = 0,
-                                       contents = undefined,
-                                       fileRegion = {},
-                                       preserveResults = false,
-                                       play = false
-                                   }) {
+    start = 0,
+    sourceDuration = 0,
+    bufferBegin = 0,
+    file = '',
+    position = 0,
+    contents = undefined,
+    fileRegion = {},
+    preserveResults = false,
+    play = false
+}) {
     workerHasLoadedFile = true;
     const resetSpec = !currentFile;
     currentFileDuration = sourceDuration;
     //if (preserveResults) completeDiv.hide();
     console.log('UI received worker-loaded-audio: ' + file);
-    currentBuffer = new AudioBuffer({length: contents.length, numberOfChannels: 1, sampleRate: 24000});
+    currentBuffer = new AudioBuffer({ length: contents.length, numberOfChannels: 1, sampleRate: 24000 });
     currentBuffer.copyToChannel(contents, 0);
     if (currentFile !== file) {
         currentFile = file;
@@ -2257,7 +2257,7 @@ async function onWorkerLoadedAudio({
         if (fileList.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
     }
     fileLoaded = true;
-    updateSpec({buffer: currentBuffer, play: play, resetSpec: resetSpec});
+    updateSpec({ buffer: currentBuffer, play: play, resetSpec: resetSpec });
     wavesurfer.seekTo(position);
     if (fileRegion) {
         createRegion(fileRegion.start, fileRegion.end, fileRegion.label);
@@ -2290,9 +2290,9 @@ function onProgress(args) {
 
 
 const updateSummary = ({
-                           summary = [],
-                           filterSpecies = ''
-                       }) => {
+    summary = [],
+    filterSpecies = ''
+}) => {
     let summaryHTML = `<table id="resultSummary" class="table table-striped table-dark table-hover p-1"><thead>
             <tr>
                 <th class="col-3" scope="col">Max</th>
@@ -2328,16 +2328,16 @@ const updateSummary = ({
 }
 
 async function onPredictionDone({
-                                    filterSpecies = undefined,
-                                    batchInProgress = false,
-                                    audacityLabels = {},
-                                    file = undefined,
-                                    summary = [],
-                                    active = undefined,
-                                    total = 0,
-                                    offset = 0,
-                                    action = undefined
-                                }) {
+    filterSpecies = undefined,
+    batchInProgress = false,
+    audacityLabels = {},
+    file = undefined,
+    summary = [],
+    active = undefined,
+    total = 0,
+    offset = 0,
+    action = undefined
+}) {
 
     AUDACITY_LABELS = audacityLabels;
     enableMenuItem(['save2db']);
@@ -2354,7 +2354,7 @@ async function onPredictionDone({
         resultsBuffer = undefined;
     }
 
-    updateSummary({summary: summary, filterSpecies: filterSpecies});
+    updateSummary({ summary: summary, filterSpecies: filterSpecies });
 
     //Pagination
     total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
@@ -2371,9 +2371,6 @@ async function onPredictionDone({
             disableMenuItem(['saveLabels']);
         }
         if (currentFile) enableMenuItem(['analyse', 'reanalyse'])
-
-        // Add speciesfilter  filter handler
-        // setFilterHandler()
 
         // Diagnostics:
         t1_analysis = Date.now();
@@ -2461,42 +2458,31 @@ const addPagination = (total, offset) => {
 }
 
 
-function setFilter() {
-    // Prevent crazy double firing of handler
-    //e.stopImmediatePropagation();
-    // Species filtering in Explore is meaningless...
-    // There won't be a target if the input box is clicked rather than the list
-    // if (isExplore()) return
+function speciesFilter() {
     activeRow = undefined;
+    let species
     // Am I trying to unfilter?
     const target = this.location ? undefined : this.querySelector('span.pointer');
-    if (target?.classList.contains('text-warning')) {
-        // Clicked on filtered species icon
-        worker.postMessage({
-            action: 'filter',
-            files: isExplore() ? [] : analyseList || fileList,
-            order: STATE.explore.order
-        });
-        // Clear species from STATE
-        STATE.explore.species = undefined;
-    } else {
+    if (!target?.classList.contains('text-warning')) {
         // Clicked on unfiltered species name
-        const species = target ? target.innerHTML.replace(/\s<.*/, '') : undefined;
-        STATE.explore.species = species;
-        worker.postMessage({
-            action: 'filter',
-            species: species,
-            files: isExplore() ? [] : analyseList || fileList,
-            order: STATE.explore.order,
-        });
+        species = target ? target.innerHTML.replace(/\s<.*/, '') : undefined;
     }
+    STATE.explore.species = species
+    worker.postMessage({
+        action: 'filter',
+        species: species,
+        files: isExplore() ? [] : analyseList || fileList,
+        order: STATE.explore.order,
+    });
     seenTheDarkness = false;
     shownDaylightBanner = false;
     document.getElementById('results').scrollTop = 0;
 }
 
 
-$(document).on('click', '.speciesFilter', setFilter)
+
+
+$(document).on('click', '.speciesFilter', speciesFilter)
 
 const checkDayNight = (timestamp) => {
     let astro = SunCalc.getTimes(timestamp, config.latitude, config.longitude);
@@ -2506,12 +2492,12 @@ const checkDayNight = (timestamp) => {
 // TODO: show every detection in the spec window as a region on the spectrogram
 
 async function renderResult({
-                                index = 1,
-                                result = {},
-                                file = undefined,
-                                isFromDB = false,
-                                selection = false
-                            }) {
+    index = 1,
+    result = {},
+    file = undefined,
+    isFromDB = false,
+    selection = false
+}) {
 
     let tr = '';
     if (index <= 1) {
@@ -2598,8 +2584,8 @@ const detectionsModalDiv = document.getElementById('detectionsModal')
 
 detectionsModalDiv.addEventListener('hidden.bs.modal', () => {
     //resetRegions();
-    worker.postMessage({action: 'selection-off'});
-    worker.postMessage({action: 'set-variables', confidence: config.minConfidence})
+    worker.postMessage({ action: 'selection-off' });
+    worker.postMessage({ action: 'set-variables', confidence: config.minConfidence })
     worker.postMessage({
         action: 'filter',
         species: isSpeciesViewFiltered(true),
@@ -2614,20 +2600,21 @@ detectionsModalDiv.addEventListener('hidden.bs.modal', () => {
 const detectionsDismiss = document.getElementById('detections-dismiss');
 detectionsDismiss.addEventListener('click', event => {
     const rows = detectionsModalDiv.querySelectorAll('tr');
+
     let count = 0;
     rows.forEach(row => {
         count++;
         if (!row.classList.contains('text-bg-dark')) {
-            deleteRecord(row, rows.length - count);
+            deleteRecord(row, rows.length - count, 'selection');
         }
     });
-    STATE.selection = {start: undefined, end: undefined};
+    STATE.selection = { start: undefined, end: undefined };
     selectionTable.innerText = '';
 });
 
 const detectionsAdd = document.getElementById('detections-add');
 detectionsAdd.addEventListener('click', event => {
-    STATE.selection = {start: undefined, end: undefined};
+    STATE.selection = { start: undefined, end: undefined };
     selectionTable.innerText = '';
 });
 
@@ -2642,7 +2629,7 @@ const updateResultTable = (row, isFromDB, isSelection) => {
     } else {
         if (isSelection) {
             if (!detectionsModal || !detectionsModal._isShown) {
-                detectionsModal = new bootstrap.Modal('#detectionsModal', {backdrop: 'static'});
+                detectionsModal = new bootstrap.Modal('#detectionsModal', { backdrop: 'static' });
                 detectionsModal.show();
             }
         }
@@ -2745,40 +2732,43 @@ function setClickedIndex(target) {
     clickedIndex = clickedNode.querySelector('th') ? clickedNode.querySelector('th').innerText : null;
 }
 
-
+$(document).on('click', '.delete', function (e) {
+    e.preventDefault();
+});
 $(document).on('dblclick', '.delete', function (e) {
-    e.stopImmediatePropagation();
     deleteRecord(e.target);
 });
 
-const deleteRecord = (target, isBatch) => {
+const deleteRecord = (target, isBatch, context) => {
     if (target.childElementCount === 2) return; // No detections found in selection
     setClickedIndex(target);
     const [file, start, ,] = unpackNameAttr(target);
     const setting = target.closest('table');
-    let context = isExplore() ? 'explore' : 'results';
+    const row = target.closest('tr');
+    context = context || isExplore() ? 'explore' : 'results';
     let range, species;
-    if (setting.id === 'summary') {
-        range = STATE.explore.range
-        species = isSpeciesViewFiltered(true)
-    } else {
-        if (setting.id === 'selection') {
-            range = getSelectionRange();
-            context = 'selection';
-        }
-        species = getSpecies(target);
+    if (setting.id === 'selection') {
+        range = getSelectionRange();
+        context = 'selection';
     }
-
-    let active = getActiveRow();
+    species = getSpecies(target);
+    const index = row.rowIndex
+    setting.deleteRow(index);
+    // Move to the next row, if there is one
+    try {
+        setting.rows[index].click()
+    } catch (e) {
+        if (! e instanceof TypeError){
+            console.error(e)
+        }
+    }
+    resetRegions();
     worker.postMessage({
         action: 'delete',
         file: file,
         start: start,
-        active: active,
         species: species,
-        files: analyseList || fileList,
         context: context,
-        order: STATE.explore.order,
         explore: isExplore(),
         range: range,
         batch: isBatch
@@ -2787,7 +2777,7 @@ const deleteRecord = (target, isBatch) => {
 
 const getSelectionRange = () => {
     return STATE.selection ?
-        {start: (STATE.selection.start * 1000) + fileStart, end: (STATE.selection.end * 1000) + fileStart} :
+        { start: (STATE.selection.start * 1000) + fileStart, end: (STATE.selection.end * 1000) + fileStart } :
         undefined
 }
 
@@ -3030,7 +3020,7 @@ document.addEventListener('drop', async (event) => {
         // Using the path attribute to get absolute file path
         filelist.push(f.path);
     }
-    if (filelist.length) openFiles({filePaths: filelist})
+    if (filelist.length) openFiles({ filePaths: filelist })
 });
 
 
@@ -3089,10 +3079,10 @@ $(function () {
         $(this).on('apply.daterangepicker', function (ev, picker) {
             $(this).children('span').html(picker.startDate.format('MMMM D, YYYY') + ' - ' + picker.endDate.format('MMMM D, YYYY'));
             $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
-            const dateRange = {start: picker.startDate._d.getTime(), end: picker.endDate._d.getTime()};
+            const dateRange = { start: picker.startDate._d.getTime(), end: picker.endDate._d.getTime() };
             if (worker) {
                 // Update the seen species list
-                worker.postMessage({action: 'get-detected-species-list', range: dateRange});
+                worker.postMessage({ action: 'get-detected-species-list', range: dateRange });
                 if (this.id === 'chartRange') {
                     STATE.chart.range = dateRange;
                     if (STATE.chart.species) {
@@ -3119,14 +3109,14 @@ $(function () {
             $(this).children('span').html('Apply a date filter');
             if (worker) {
                 // Update the seen species list
-                worker.postMessage({action: 'get-detected-species-list'});
+                worker.postMessage({ action: 'get-detected-species-list' });
                 if (this.id === 'chartRange') {
                     if (STATE.chart.species) {
                         t0 = Date.now();
                         worker.postMessage({
                             action: 'chart',
                             species: STATE.chart.species,
-                            range: {start: undefined, end: undefined}
+                            range: { start: undefined, end: undefined }
                         });
                     }
                 }
@@ -3223,7 +3213,14 @@ const handleThresholdChange = (e) => {
         action: 'set-variables',
         confidence: config.minConfidence,
     });
-    if (!PREDICTING && !resultTableElement[0].hidden) setFilter();
+    if (!PREDICTING && !resultTableElement[0].hidden) {
+        worker.postMessage({
+            action: 'filter',
+            species: isSpeciesViewFiltered(true),
+            files: isExplore() ? [] : analyseList || fileList,
+            order: STATE.explore.order,
+        });   
+    }
 }
 confidenceRange.addEventListener('input', handleThresholdChange);
 // SNR
@@ -3248,3 +3245,4 @@ ThreadSlider.addEventListener('change', () => {
     loadModel();
     updatePrefs();
 });
+

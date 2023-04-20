@@ -23,7 +23,7 @@ ipcRenderer.once('load-results', async (event, args) => {
     // make sure our ui is ready to receive the message
     await windowLoaded;
     console.log('Posting file to UI');
-    window.postMessage({args: args}, '*')
+    window.postMessage({args: args}, '/')
 })
 ipcRenderer.once('provide-worker-channel', async (event) => {
     // make sure our ui is ready to receive the message
@@ -36,7 +36,7 @@ ipcRenderer.once('provide-worker-channel', async (event) => {
         console.log('received result:', event.data)
     }
     // now transfer the port
-    window.postMessage('provide-worker-channel', '*', event.ports)
+    window.postMessage('provide-worker-channel', '/', event.ports)
 })
 
 

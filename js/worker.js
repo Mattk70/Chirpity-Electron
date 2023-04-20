@@ -74,7 +74,7 @@ class State {
             this.filteredOffset = {}, // Current species start number for filtered results
             this.selection = false,
             this.blocked = STATE ? STATE.blocked : [] // don't reset blocked IDs
-            this.predictionCount = 0;
+        this.predictionCount = 0;
     }
 
     setFiles(files) {
@@ -82,8 +82,8 @@ class State {
         this.filesToAnalyse = files;
     }
 
-    increment(){
-        if (++this.predictionCount === 5){
+    increment() {
+        if (++this.predictionCount === 5) {
             this.predictionCount = 0
         }
         return this.predictionCount;
@@ -1546,10 +1546,11 @@ const getSummary = async ({
         total = res.total;
     }
     console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds");
-    // need to send offset here?
     const event = interim ? 'update-summary' : 'prediction-done';
-    if (total === 0) {
-        sendResult(1, 'No detections found', true)
+    // Why do we need this??
+    if (total === 0 && action !== 'delete') {
+        const qualifier = species || ''
+        sendResult(1, `No ${qualifier} detections found`, true)
     }
 
     UI.postMessage({
@@ -1576,7 +1577,6 @@ const getSummary = async ({
  * @param context: can be 'results', 'resultSummary' or 'selectionResults
  * @param limit: thee pagination limit
  * @param offset: is the SQL query offset to use
- * @param resetResults: is false when mid-way through a multi-file analysis, and during selection analysis
  *
  * @returns {Promise<integer> } A count orf the records retrieved
  */
@@ -1896,14 +1896,9 @@ const prepSQL = (string) => string.replaceAll("''", "'").replaceAll("'", "''");
 async function onDelete({
     file,
     start,
-    active,
     species,
-    files,
-    context = 'results',
-    order,
     explore,
     range,
-    batch = false
 }) {
     const db = explore ? diskDB : STATE.db;
     file = prepSQL(file);
@@ -1918,28 +1913,10 @@ async function onDelete({
                          AND speciesID =
                              (SELECT id FROM species WHERE cname = '${speciesSQL}')
     `)
-
-    if (context === 'selection') {
-        // Is this the last of  multiple deletions?
-        if (batch === false) {
-            // Add resetResults to arguments[0]
-            arguments[0].species = undefined;
-            await getResults(arguments[0]);
-        } else if (batch === 0) {
-            arguments[0].context = 'results';
-            STATE.selection = undefined;
-            await getResults(arguments[0]);
-            await getSummary(arguments[0]);
-        }
-    } else {
-        await getResults(arguments[0]);
-        await getSummary(arguments[0]);
-        if (db === diskDB) {
-            getSpecies(range);
-        }
+    await getSummary(arguments[0]);
+    if (db === diskDB) {
+        getSpecies(range);
     }
-
-
 }
 
 async function onUpdateRecord({
