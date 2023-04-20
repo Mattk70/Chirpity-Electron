@@ -1,5 +1,5 @@
 {
-  "name": "Chirpity",
+  "name": "chirpity",
   "version": "0.8.1",
   "description": "Chirpity Nocmig",
   "main": "main.js",
@@ -152,7 +152,7 @@
   },
   "homepage": "https://github.com/mattk70/Chirpity-Electron#readme",
   "devDependencies": {
-    "electron": "^23.1.2",
+    "electron": "^24.1.2",
     "electron-builder": "^24.0.0",
     "@tensorflow/tfjs-converter": "^4.2.0"
   },
@@ -167,11 +167,11 @@
     "ffmpeg-static-electron": "^2.0.3",
     "fluent-ffmpeg": "^2.1.2",
     "jquery": "^3.6.3",
-    "sqlite3": "^5.0.8",
+    "sqlite3": "^5.1.6",
     "suncalc2": "^1.8.1",
     "utimes": "5.1.1",
     "uuid": "^8.3.2",
     "wavefile-reader": "^1.1.1",
-    "wavesurfer.js": "^6.4.0"
+    "wavesurfer.js": "^6.6.3"
   }
 }

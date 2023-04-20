@@ -384,12 +384,8 @@
                     </table>
                 </div>
                 <div class="modal-footer justify-content-center">
-                    <button id="detections-add" type="button" class="btn btn-success" data-bs-dismiss="modal">Confirm
-                        Detections
-                    </button>
-                    <button id="detections-dismiss" type="button" class="btn btn-danger" data-bs-dismiss="modal">Discard
-                        Detections
-                    </button>
+                    <button id="detections-add" type="button" class="btn btn-success" data-bs-dismiss="modal">Confirm</button>
+                    <button id="detections-dismiss" type="button" class="btn btn-danger" data-bs-dismiss="modal">Discard All</button>
                 </div>
             </div>
         </div>
@@ -509,6 +505,7 @@
                             <label for="confidenceValue" class="visually-hidden">confidence</label><input type="range"
                                                                                                           class="form-range vertical position-absolute"
                                                                                                           step="5"
+                                                                                                          min="5"
                                                                                                           id="confidenceValue">
                     </span>
                 </div>

@@ -43,7 +43,7 @@ onmessage = async (e) => {
                         tf.env().set('WEBGL_FORCE_F16_TEXTURES', true);
                         tf.env().set('WEBGL_PACK', true);
                         tf.env().set('WEBGL_EXP_CONV', true);
-                        //tf.env().set('TOPK_K_CPU_HANDOFF_THRESHOLD', 0)
+                        tf.env().set('TOPK_K_CPU_HANDOFF_THRESHOLD', 128)
                         tf.env().set('TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD', 0);
                     }
                     tf.enableProdMode();
@@ -73,7 +73,7 @@ onmessage = async (e) => {
                 //const t0 = performance.now();
                 const {chunks, start, fileStart, file, snr, minConfidence, worker, context} = e.data;
                 myModel.useContext = context;
-                const result = await myModel.predictChunk(chunks, start, fileStart, file, snr, minConfidence / 100);
+                const result = await myModel.predictChunk(chunks, start, fileStart, file, snr, minConfidence / 1000);
                 response = {
                     message: 'prediction',
                     file: file,
