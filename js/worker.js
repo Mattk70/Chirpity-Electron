@@ -67,13 +67,14 @@ let STATE;
 class State {
     constructor(db) {
         this.db = db,
-            this.filesToAnalyse = [],
-            this.limit = 500,
-            this.saved = new Set(), // list of files requested that are in the disk database
-            this.globalOffset = 0, // Current start number for unfiltered results
-            this.filteredOffset = {}, // Current species start number for filtered results
-            this.selection = false,
-            this.blocked = STATE ? STATE.blocked : [] // don't reset blocked IDs
+        this.filesToAnalyse = [],
+        this.limit = 500,
+        this.saved = new Set(), // list of files requested that are in the disk database
+        this.globalOffset = 0, // Current start number for unfiltered results
+        this.filteredOffset = {}, // Current species start number for filtered results
+        this.selection = false,
+        this.blocked = STATE ? STATE.blocked : [] // don't reset blocked IDs
+        this.model = null;
         this.predictionCount = 0;
     }
 
@@ -156,7 +157,7 @@ async function loadDB(path) {
         const file = dataset_database ? p.join(path, `archive_dataset${LABELS.length}.sqlite`) : p.join(path, `archive${LABELS.length}.sqlite`)
         if (!fs.existsSync(file)) {
             await createDB(file);
-        } else {
+        } else if (diskDB?.filename !== file) {
             diskDB = new sqlite3.Database(file);
             STATE.db = diskDB;
             await diskDB.runAsync('VACUUM');
@@ -292,6 +293,7 @@ ipcRenderer.on('new-client', (event) => {
                 UI.postMessage({ event: 'spawning' });
                 BATCH_SIZE = parseInt(args.batchSize);
                 BACKEND = args.backend;
+                STATE.model = args.model;
                 if (predictWorkers.length) terminateWorkers();
                 spawnWorkers(args.model, args.list, BATCH_SIZE, args.threads);
                 break;
@@ -471,7 +473,7 @@ async function onAnalyse({
 }
 
 function onAbort({
-    model = 'efficientnet',
+    model = STATE.model,
     list = 'migrants',
 }) {
     aborted = true;
@@ -535,7 +537,7 @@ const convertFileFormat = (file, destination, size, error) => {
                 const time = parseInt(a[0]) * 3600 + parseInt(a[1]) * 60 + parseFloat(a[2]);
                 // AND HERE IS THE CALCULATION
                 const extractionProgress = time / totalTime;
-                console.log(`Processing: ${(time / totalTime) * 100}% converted`);
+                process.stdout.write(`Processing: ${((time / totalTime) * 100).toFixed(0)}% converted\r`);
                 UI.postMessage({
                     event: 'progress', text: 'Extracting file', progress: extractionProgress
                 })
@@ -1354,7 +1356,7 @@ async function parseMessage(e) {
             LABELS = response['labels'];
             // Now we have what we need to populate a database...
             // Load the archive db
-            if (!diskDB) await loadDB(appPath);
+            await loadDB(appPath);
             break;
         case 'prediction':
             if (!aborted) {
@@ -1545,7 +1547,7 @@ const getSummary = async ({
                                            ${where} ${when}`);
         total = res.total;
     }
-    console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds");
+    if (DEBUG) console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds");
     const event = interim ? 'update-summary' : 'prediction-done';
     // Why do we need this??
     if (total === 0 && action !== 'delete') {

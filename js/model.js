@@ -242,7 +242,7 @@ class Model {
             /*
             Try out taking log of spec when SNR is below threshold?
             */
-            specBatch = tf.log1p(specBatch).mul(20);
+            //specBatch = tf.log1p(specBatch).mul(20);
             // Swap axes to fit output shape
             specBatch = tf.transpose(specBatch, [0, 2, 1]);
             specBatch = tf.reverse(specBatch, [1]);
