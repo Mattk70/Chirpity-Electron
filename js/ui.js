@@ -104,7 +104,7 @@ const timelineSetting = document.getElementById('timelineSetting');
 const colourmap = document.getElementById('colourmap');
 const batchSizeValue = document.getElementById('batch-size-value');
 const nocmig = document.getElementById('nocmig');
-const context = document.getElementById('context');
+const contextAware = document.getElementById('context');
 
 let batchInProgress = false;
 let activeRow;
@@ -1041,7 +1041,7 @@ window.onload = async () => {
         minConfidence: 45,
         timeOfDay: false,
         list: 'migrants',
-        model: 'efficientnet',
+        model: 'v2',
         latitude: '',
         longitude: '',
         location: 'Location not set',
@@ -1106,7 +1106,7 @@ window.onload = async () => {
         nocmigButton.innerText = config.nocmig ? 'bedtime' : 'bedtime_off';
         nocmigButton.title = config.nocmig ? 'Nocmig mode on' : 'Nocmig mode off';
         nocmig.checked = config.nocmig;
-        context.checked = config.context;
+        contextAware.checked = config.contextAware;
         confidenceRange.value = config.minConfidence;
         thresholdDisplay.innerHTML = `<b>${config.minConfidence}%</b>`;
         confidenceSlider.value = config.minConfidence;
@@ -1114,7 +1114,9 @@ window.onload = async () => {
         confidenceRange.value = config.minConfidence;
         SNRSlider.value = config.snr;
         SNRThreshold.innerText = config.snr;
-        SNRSlider.disabled = config.backend === 'webgl';
+        if (config.backend === 'webgl'){
+            SNRSlider.disabled = true;
+        };
         ThreadSlider.max = diagnostics['Cores'];
         ThreadSlider.value = config[config.backend].threads;
         numberOfThreads.innerText = config[config.backend].threads;
@@ -1130,7 +1132,7 @@ window.onload = async () => {
             lon: config.longitude,
             confidence: config.minConfidence,
             nocmig: config.nocmig,
-            context: config.context
+            context: config.contextAware
         });
         loadModel();
         worker.postMessage({ action: 'clear-cache' })
@@ -1862,25 +1864,49 @@ modelToUse.addEventListener('change', function (e) {
     loadModel();
 })
 
-const backend = document.getElementsByName('backend');
-for (let i = 0; i < backend.length; i++) {
-    backend[i].addEventListener('click', function (e) {
-        config.backend = e.target.value;
-        SNRSlider.disabled = config.backend === 'webgl';
-        SNRThreshold.innerText = config.snr.toString();
-        // Update threads and batch Size in UI
-        ThreadSlider.value = config[config.backend].threads;
-        numberOfThreads.innerText = config[config.backend].threads;
-        batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
-        batchSizeValue.innerText = BATCH_SIZE_LIST[batchSizeSlider.value].toString();
-        config.backend === 'webgl' ? powerSave(true) : powerSave(false);
-        updatePrefs();
-        loadModel();
-    })
+const handleBackendChange = (e) => {
+    config.backend = e.target.value;
+    if (config.backend === 'webgl'){
+        powerSave(true)
+        SNRSlider.disabled = true;
+        config.snr = 0;
+    } else {
+        powerSave(false)
+        contextAware.disabled = false;
+        if (contextAware.checked){
+            config.contextAware = true;
+            SNRSlider.disabled = true;
+            config.snr = 0;
+        } else {
+            SNRSlider.disabled = false;
+            config.snr = parseFloat(SNRSlider.value);
+            if (config.snr) {
+                contextAware.disabed = true;
+                config.contextAware = false;
+            }
+        }
+
+    }
+    // Update threads and batch Size in UI
+    ThreadSlider.value = config[config.backend].threads;
+    numberOfThreads.innerText = config[config.backend].threads;
+    batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
+    batchSizeValue.innerText = BATCH_SIZE_LIST[batchSizeSlider.value].toString();
+    updatePrefs();
+    loadModel();
 }
 
-const timelineToggle = (e) => {
-    config.timeOfDay = e.target.value === 'timeOfDay'; //toggle setting
+const backend = document.getElementsByName('backend');
+for (let i = 0; i < backend.length; i++) {
+    backend[i].addEventListener('click', handleBackendChange)
+}
+
+
+const timelineToggle = (fromKeys) => {
+    if (fromKeys){
+        timelineSetting.value === 'timeOfDay' ? timelineSetting.value = 'timecode' : timelineSetting.value = 'timeOfDay'
+    }
+    config.timeOfDay = timelineSetting.value === 'timeOfDay'; //toggle setting
     const timeFields = document.querySelectorAll('.timestamp')
     timeFields.forEach(time => {
         config.timeOfDay ? time.classList.remove('d-none') :
@@ -1910,6 +1936,9 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     KeyG: function (e) {
         if (e.ctrlKey) showGoToPosition();
     },
+    KeyF: function (e) {
+        if (e.ctrlKey) toggleFullscreen();
+    },
     KeyO: async function (e) {
         if (e.ctrlKey) await showOpenDialog();
     },
@@ -1918,6 +1947,9 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     },
     KeyS: function (e) {
         if (e.ctrlKey) worker.postMessage({ action: 'save2db' });
+    },
+    KeyT: function (e) {
+        if (e.ctrlKey) timelineToggle(true);
     },
     Escape: function () {
         if (PREDICTING) {
@@ -2903,11 +2935,18 @@ const changeNocmigMode = (e) => {
 }
 
 const toggleContextMode = () => {
-    config.context = !config.context;
-    context.checked = config.context;
+    config.contextAware = !config.contextAware;
+    contextAware.checked = config.contextAware;
+    if (config.contextAware) {
+        SNRSlider.disabled = true;
+        config.snr = 0;
+    } else if (config.backend !== 'webgl'){
+        SNRSlider.disabled = false;
+        config.snr = parseFloat(SNRSlider.value);
+    }
     worker.postMessage({
         action: 'set-variables',
-        context: config.context,
+        context: config.contextAware,
     });
     updatePrefs()
 }
@@ -2915,11 +2954,11 @@ const toggleContextMode = () => {
 nocmigButton.addEventListener('click', changeNocmigMode);
 nocmig.addEventListener('change', changeNocmigMode)
 
-context.addEventListener('change', toggleContextMode)
+contextAware.addEventListener('change', toggleContextMode)
 
 const fullscreen = document.getElementById('fullscreen');
 
-fullscreen.addEventListener('click', function () {
+const toggleFullscreen = () =>{
     if (config.fullscreen) {
         config.fullscreen = false;
         fullscreen.innerText = 'fullscreen';
@@ -2928,7 +2967,9 @@ fullscreen.addEventListener('click', function () {
         fullscreen.innerText = 'fullscreen_exit';
     }
     adjustSpecDims(true);
-});
+}
+
+fullscreen.addEventListener('click', toggleFullscreen);
 
 
 const diagnosticMenu = document.getElementById('diagnostics');
@@ -3224,15 +3265,27 @@ const handleThresholdChange = (e) => {
 }
 confidenceRange.addEventListener('input', handleThresholdChange);
 // SNR
+const handleSNRchange = () => {
+    config.snr = parseFloat(SNRSlider.value);
+    if (config.snr > 0) {
+        config.contextAware = false;
+        contextAware.disabled = true;
+
+    } else {
+        config.contextAware = contextAware.checked;
+        contextAware.disabled = false;
+    }
+    updatePrefs();
+}
+
 const SNRThreshold = document.getElementById('SNR-threshold');
 const SNRSlider = document.getElementById('snrValue');
 SNRSlider.addEventListener('input', () => {
     SNRThreshold.innerText = SNRSlider.value;
 });
-SNRSlider.addEventListener('change', () => {
-    config.snr = parseFloat(SNRSlider.value);
-    updatePrefs();
-});
+SNRSlider.addEventListener('change', handleSNRchange);
+
+
 
 // number of threads
 const numberOfThreads = document.getElementById('threads-value');
