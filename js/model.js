@@ -1,7 +1,7 @@
 const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs');
 const path = require('path');
-let DEBUG = false;
+let DEBUG = true;
 let BACKEND;
 
 //GLOBALS
@@ -25,18 +25,19 @@ onmessage = async (e) => {
     try {
         switch (modelRequest) {
             case 'load':
+                const version = e.data.model;
                 if (DEBUG) console.log('load request to worker');
                 const {
                     height,
                     width,
                     labels,
                     location
-                } = JSON.parse(fs.readFileSync(path.join(__dirname, '../model_config.json'), 'utf8'));
+                } = JSON.parse(fs.readFileSync(path.join(__dirname, `../${version}_model_config.json`), 'utf8'));
                 const appPath = '../' + location + '/';
                 const list = e.data.list;
                 const batch = e.data.batchSize;
                 const backend = e.data.backend;
-                postMessage({message: 'labels', labels: labels});
+                postMessage({ message: 'labels', labels: labels });
                 if (DEBUG) console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
                 tf.setBackend(backend).then(async () => {
                     if (backend === 'webgl') {
@@ -51,12 +52,12 @@ onmessage = async (e) => {
                         console.log(tf.env());
                         console.log(tf.env().getFlags());
                     }
-                    myModel = new Model(appPath, list);
+                    myModel = new Model(appPath, list, version);
                     myModel.height = height;
                     myModel.width = width;
                     myModel.labels = labels;
                     await myModel.loadModel();
-                    postMessage({message: 'update-list', blocked: BLOCKED_IDS, updateResults: false});
+                    postMessage({ message: 'update-list', blocked: BLOCKED_IDS, updateResults: false });
                     myModel.warmUp(batch);
                     BACKEND = tf.getBackend();
                     postMessage({
@@ -71,7 +72,7 @@ onmessage = async (e) => {
                 break;
             case 'predict':
                 //const t0 = performance.now();
-                const {chunks, start, fileStart, file, snr, minConfidence, worker, context} = e.data;
+                const { chunks, start, fileStart, file, snr, minConfidence, worker, context } = e.data;
                 myModel.useContext = context;
                 const result = await myModel.predictChunk(chunks, start, fileStart, file, snr, minConfidence / 1000);
                 response = {
@@ -120,22 +121,22 @@ onmessage = async (e) => {
                 };
                 postMessage(response);
                 break;
-            case'list':
+            case 'list':
                 myModel.list = e.data.list;
                 console.log(`Setting list to ${myModel.list}`);
                 myModel.setList();
-                postMessage({message: 'update-list', blocked: BLOCKED_IDS, updateResults: true});
+                postMessage({ message: 'update-list', blocked: BLOCKED_IDS, updateResults: true });
                 break;
         }
     }
-        // If worker was respawned
+    // If worker was respawned
     catch (e) {
         console.log(e)
     }
 };
 
 class Model {
-    constructor(appPath, list) {
+    constructor(appPath, list, version) {
         this.model = null;
         this.labels = null;
         this.height = null;
@@ -148,6 +149,7 @@ class Model {
         this.appPath = appPath;
         this.list = list;
         this.useContext = null;
+        this.version = version;
     }
 
     async loadModel() {
@@ -156,7 +158,7 @@ class Model {
             // Model files must be in a different folder than the js, assets files
             console.log('loading model from ', this.appPath + 'model.json')
             this.model = await tf.loadGraphModel(this.appPath + 'model.json',
-                {weightPathPrefix: this.appPath});
+                { weightPathPrefix: this.appPath });
             this.model_loaded = true;
             this.setList();
             this.inputShape = [...this.model.inputs[0].shape];
@@ -168,10 +170,10 @@ class Model {
         this.inputShape[0] = this.batchSize;
         if (tf.getBackend() === 'webgl') {
             tf.tidy(() => {
-                const warmupResult = this.model.predict(tf.zeros(this.inputShape), {batchSize: this.batchSize});
+                const warmupResult = this.model.predict(tf.zeros(this.inputShape), { batchSize: this.batchSize });
                 warmupResult.arraySync();
                 // see if we can get padding compiled at this point
-                this.padBatch(tf.zeros([1, this.inputShape[1], this.inputShape[2], this.inputShape[3]]), {batchSize: this.batchSize})
+                this.padBatch(tf.zeros([1, this.inputShape[1], this.inputShape[2], this.inputShape[3]]), { batchSize: this.batchSize })
             })
         }
         if (DEBUG) console.log('WarmUp end', tf.memory().numTensors)
@@ -185,8 +187,22 @@ class Model {
             // find the position of the blocked items in the label list
             NOT_BIRDS.forEach(notBird => BLOCKED_IDS.push(this.labels.indexOf(notBird)))
         } else if (this.list === 'migrants') {
-            for (let i = 0; i < this.labels.length; i++) {
-                if (!MIGRANTS.has(this.labels[i])) BLOCKED_IDS.push(i);
+
+            if (this.version === 'v1') {
+                // strip (call) from migrants set
+                const migrants = new Set();
+                MIGRANTS.forEach((element) => {
+                    const newElement = element.replace(' (call)', '');
+                    migrants.add(newElement);
+                })
+                for (let i = 0; i < this.labels.length; i++) {
+                    if (!migrants.has(this.labels[i])) BLOCKED_IDS.push(i);
+                }
+            }
+            else {
+                for (let i = 0; i < this.labels.length; i++) {
+                    if (!MIGRANTS.has(this.labels[i])) BLOCKED_IDS.push(i);
+                }
             }
         }
         GRAYLIST.forEach(species => SUPPRESSED_IDS.push(this.labels.indexOf(species)))
@@ -206,12 +222,14 @@ class Model {
 
     getSNR(spectrograms) {
         return tf.tidy(() => {
-            const max = tf.max(spectrograms, 2);
-            const mean = tf.mean(spectrograms, 2);
-            const peak = tf.sub(max, mean);
+            const {mean, variance} = tf.moments(spectrograms, 2);
+            //const max = tf.max(spectrograms, 2);
+            //const mean = tf.mean(spectrograms, 2);
+            const peak = tf.div(variance, mean)
             let snr = tf.squeeze(tf.max(peak, 1));
             //snr = tf.sub(255, snr)  // bigger number, less signal
-            const test = snr.arraySync()
+            //const test = snr.arraySync()
+            //const SNR = peak.arraySync()
             return snr
         })
     }
@@ -224,7 +242,7 @@ class Model {
             /*
             Try out taking log of spec when SNR is below threshold?
             */
-            //specBatch = tf.log1p(specBatch).mul(20);
+            specBatch = tf.log1p(specBatch).mul(20);
             // Swap axes to fit output shape
             specBatch = tf.transpose(specBatch, [0, 2, 1]);
             specBatch = tf.reverse(specBatch, [1]);
@@ -260,7 +278,7 @@ class Model {
             const combined = tf.concat([droppedSecondHalf, firstHalf], 2);  // concatenate adjacent pairs along the width dimension
             firstHalf.dispose();
             droppedSecondHalf.dispose();
-            const rshiftPrediction = this.model.predict(combined, {batchSize: this.batchSize});
+            const rshiftPrediction = this.model.predict(combined, { batchSize: this.batchSize });
             combined.dispose();
             // now we have predictions for both the original and rolled images
             const [padding, remainder] = tf.split(rshiftPrediction, [1, -1]);
@@ -276,66 +294,58 @@ class Model {
     }
 
     async predictBatch(specs, keys, threshold, confidence) {
-        let fixedTensorBatch = this.fixUpSpecBatch(specs);
-        specs.dispose();
-        let keysTensor, TensorBatch, maskedKeysTensor, maskedTensorBatch;
-        if (BACKEND === 'webgl') {
-            if (fixedTensorBatch.shape[0] < this.batchSize) {
-                // WebGL works best when all batches are the same size
-                TensorBatch = this.padBatch(fixedTensorBatch)
-                fixedTensorBatch.dispose();
-            } else {
-                TensorBatch = fixedTensorBatch;
-            }
+        const TensorBatch = this.fixUpSpecBatch(specs); // + 1 tensor
+        specs.dispose(); // - 1 tensor
+        let paddedTensorBatch, maskedTensorBatch;
+        if (BACKEND === 'webgl' && TensorBatch.shape[0] < this.batchSize) {
+            // WebGL works best when all batches are the same size
+            paddedTensorBatch = this.padBatch(TensorBatch)  // + 1 tensor
         } else if (threshold) {
-            keysTensor = tf.stack(keys);
-            let condition = tf.less(this.getSNR(fixedTensorBatch), (10 - threshold) * 10);
+            const keysTensor = tf.stack(keys); // + 1 tensor
+            const snr = this.getSNR(TensorBatch)
+            const condition = tf.greaterEqual(snr, threshold); // + 1 tensor
+            snr.dispose();
             // Avoid mask cannot be scalar error at end of predictions
             let newCondition;
             if (condition.rankType === "0") {
-                newCondition = tf.expandDims(condition)
-                condition.dispose()
+                newCondition = tf.expandDims(condition) // + 1 tensor
+                condition.dispose() // - 1 tensor
             }
             const c = newCondition || condition;
+            let maskedKeysTensor;
             [maskedTensorBatch, maskedKeysTensor] = await Promise.all([
-                tf.booleanMaskAsync(fixedTensorBatch, c),
-                tf.booleanMaskAsync(keysTensor, c)])
-            c.dispose();
-
-            fixedTensorBatch.dispose();
-            keysTensor.dispose();
-
-
+                tf.booleanMaskAsync(TensorBatch, c),
+                tf.booleanMaskAsync(keysTensor, c)]) // + 2 tensor
+            c.dispose(); // - 1 tensor
+            keysTensor.dispose(); // - 1 tensor
+        
             if (!maskedTensorBatch.size) {
-                maskedTensorBatch.dispose();
-                maskedKeysTensor.dispose();
+                maskedTensorBatch.dispose(); // - 1 tensor
+                maskedKeysTensor.dispose(); // - 1 tensor
+                TensorBatch.dispose(); // - 1 tensor
+                if (DEBUG) console.log("No surviving tensors in batch", maskedTensorBatch.shape[0])
                 return []
             } else {
+                keys = maskedKeysTensor.dataSync();
+                maskedKeysTensor.dispose(); // - 1 tensor
                 if (DEBUG) console.log("surviving tensors in batch", maskedTensorBatch.shape[0])
             }
-        } else {
-            TensorBatch = fixedTensorBatch;
         }
 
-        const tb = maskedTensorBatch || TensorBatch;
-        let prediction;
-        prediction = this.model.predict(tb, {batchSize: this.batchSize})
+        const tb = paddedTensorBatch || maskedTensorBatch || TensorBatch;
+        const prediction = this.model.predict(tb, { batchSize: this.batchSize })
         let newPrediction;
         if (this.useContext && this.batchSize > 1 && threshold === 0) {
             newPrediction = this.addContext(prediction, tb, confidence);
+            prediction.dispose();
         }
-        tb.dispose();
-        const finalPrediction = newPrediction || prediction;
-        //const sigmoid_prediction = tf.sigmoid(finalPrediction)
-        const array_of_predictions = finalPrediction.arraySync()
-        // sigmoid_prediction.dispose()
+        TensorBatch.dispose();
+        if (paddedTensorBatch) paddedTensorBatch.dispose();
+        if (maskedTensorBatch) maskedTensorBatch.dispose();
+        
+        const array_of_predictions = (newPrediction || prediction).arraySync()
         prediction.dispose();
-        if (newPrediction) newPrediction.dispose()
-
-        if (maskedKeysTensor) {
-            keys = maskedKeysTensor.dataSync()
-            maskedKeysTensor.dispose();
-        }
+        if (newPrediction) newPrediction.dispose();
         return keys.reduce((acc, key, index) => {
             // convert key (samples) to milliseconds
             const position = key / CONFIG.sampleRate;
@@ -362,14 +372,14 @@ class Model {
             })
         }*/
 
-/*    normalise_audio = (signal) => {
-        return tf.tidy(() => {
-            //signal = tf.tensor1d(signal);
-            const sigMax = tf.max(signal);
-            const sigMin = tf.min(signal);
-            return signal.sub(sigMin).div(sigMax.sub(sigMin)).mul(255).sub(127.5);
-        })
-    };*/
+    /*    normalise_audio = (signal) => {
+            return tf.tidy(() => {
+                //signal = tf.tensor1d(signal);
+                const sigMax = tf.max(signal);
+                const sigMin = tf.min(signal);
+                return signal.sub(sigMin).div(sigMax.sub(sigMin)).mul(255).sub(127.5);
+            })
+        };*/
 
     normalise_audio = (signal) => {
         return tf.tidy(() => {
