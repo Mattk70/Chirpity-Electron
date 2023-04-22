@@ -1114,7 +1114,7 @@ window.onload = async () => {
         confidenceRange.value = config.minConfidence;
         SNRSlider.value = config.snr;
         SNRThreshold.innerText = config.snr;
-        if (config.backend === 'webgl'){
+        if (config.backend === 'webgl') {
             SNRSlider.disabled = true;
         };
         ThreadSlider.max = diagnostics['Cores'];
@@ -1866,14 +1866,14 @@ modelToUse.addEventListener('change', function (e) {
 
 const handleBackendChange = (e) => {
     config.backend = e.target.value;
-    if (config.backend === 'webgl'){
+    if (config.backend === 'webgl') {
         powerSave(true)
         SNRSlider.disabled = true;
         config.snr = 0;
     } else {
         powerSave(false)
         contextAware.disabled = false;
-        if (contextAware.checked){
+        if (contextAware.checked) {
             config.contextAware = true;
             SNRSlider.disabled = true;
             config.snr = 0;
@@ -1903,7 +1903,7 @@ for (let i = 0; i < backend.length; i++) {
 
 
 const timelineToggle = (fromKeys) => {
-    if (fromKeys){
+    if (fromKeys) {
         timelineSetting.value === 'timeOfDay' ? timelineSetting.value = 'timecode' : timelineSetting.value = 'timeOfDay'
     }
     config.timeOfDay = timelineSetting.value === 'timeOfDay'; //toggle setting
@@ -2165,35 +2165,36 @@ gotoModal.addEventListener('shown.bs.modal', () => {
 
 
 const gotoTime = (e) => {
-    e.preventDefault();
-    let hours = 0, minutes = 0, seconds = 0;
-    const time = document.getElementById('timeInput').value;
-    let timeArray = time.split(':');
-    if (timeArray.length === 1 && !isNaN(parseFloat(timeArray[0]))) {
-        seconds = parseFloat(timeArray[0]);
-    } else if (timeArray.length === 2 && !isNaN(parseInt(timeArray[0])) && !isNaN(parseInt(timeArray[1]))) {
-        // Case 2: Input is two numbers separated by a colon, take as minutes and seconds
-        minutes = Math.min(parseInt(timeArray[0]), 59);
-        seconds = Math.min(parseFloat(timeArray[1]), 59.999);
-    } else if (timeArray.length === 3 && !isNaN(parseInt(timeArray[0])) && !isNaN(parseInt(timeArray[1])) && !isNaN(parseInt(timeArray[2]))) {
-        // Case 3: Input is three numbers separated by colons, take as hours, minutes, and seconds
-        hours = Math.min(parseInt(timeArray[0]), 23);
-        minutes = Math.min(parseInt(timeArray[1]), 59);
-        seconds = Math.min(parseFloat(timeArray[2]), 59.999);
-    } else {
-        // Invalid input
-        alert('Invalid time format. Please enter time in one of the following formats: \n1. Float (for seconds) \n2. Two numbers separated by a colon (for minutes and seconds) \n3. Three numbers separated by colons (for hours, minutes, and seconds)');
-        document.addEventListener('keydown', handleKeyDownDeBounce, true);
-        return;
+    if (currentFile) {
+        e.preventDefault();
+        let hours = 0, minutes = 0, seconds = 0;
+        const time = document.getElementById('timeInput').value;
+        let timeArray = time.split(':');
+        if (timeArray.length === 1 && !isNaN(parseFloat(timeArray[0]))) {
+            seconds = parseFloat(timeArray[0]);
+        } else if (timeArray.length === 2 && !isNaN(parseInt(timeArray[0])) && !isNaN(parseInt(timeArray[1]))) {
+            // Case 2: Input is two numbers separated by a colon, take as minutes and seconds
+            minutes = Math.min(parseInt(timeArray[0]), 59);
+            seconds = Math.min(parseFloat(timeArray[1]), 59.999);
+        } else if (timeArray.length === 3 && !isNaN(parseInt(timeArray[0])) && !isNaN(parseInt(timeArray[1])) && !isNaN(parseInt(timeArray[2]))) {
+            // Case 3: Input is three numbers separated by colons, take as hours, minutes, and seconds
+            hours = Math.min(parseInt(timeArray[0]), 23);
+            minutes = Math.min(parseInt(timeArray[1]), 59);
+            seconds = Math.min(parseFloat(timeArray[2]), 59.999);
+        } else {
+            // Invalid input
+            alert('Invalid time format. Please enter time in one of the following formats: \n1. Float (for seconds) \n2. Two numbers separated by a colon (for minutes and seconds) \n3. Three numbers separated by colons (for hours, minutes, and seconds)');
+            document.addEventListener('keydown', handleKeyDownDeBounce, true);
+            return;
+        }
+        let start = hours * 3600 + minutes * 60 + seconds;
+        windowLength = 20;
+        bufferBegin = Math.max(start - windowLength / 2, 0);
+        const position = bufferBegin === 0 ? start / windowLength : 0.5;
+        postBufferUpdate({ begin: bufferBegin, position: position })
+        // Close the modal
+        goto.hide()
     }
-    let start = hours * 3600 + minutes * 60 + seconds;
-    windowLength = 20;
-    const begin = Math.max(start - windowLength / 2, 0);
-    const position = begin === 0 ? start / windowLength : 0.5;
-    postBufferUpdate({ begin: begin, position: position })
-
-    // Close the modal
-    goto.hide()
 }
 
 const go = document.getElementById('go')
@@ -2790,7 +2791,7 @@ const deleteRecord = (target, isBatch, context) => {
     try {
         setting.rows[index].click()
     } catch (e) {
-        if (! e instanceof TypeError){
+        if (!e instanceof TypeError) {
             console.error(e)
         }
     }
@@ -2940,7 +2941,7 @@ const toggleContextMode = () => {
     if (config.contextAware) {
         SNRSlider.disabled = true;
         config.snr = 0;
-    } else if (config.backend !== 'webgl'){
+    } else if (config.backend !== 'webgl') {
         SNRSlider.disabled = false;
         config.snr = parseFloat(SNRSlider.value);
     }
@@ -2958,7 +2959,7 @@ contextAware.addEventListener('change', toggleContextMode)
 
 const fullscreen = document.getElementById('fullscreen');
 
-const toggleFullscreen = () =>{
+const toggleFullscreen = () => {
     if (config.fullscreen) {
         config.fullscreen = false;
         fullscreen.innerText = 'fullscreen';
@@ -3260,7 +3261,7 @@ const handleThresholdChange = (e) => {
             species: isSpeciesViewFiltered(true),
             files: isExplore() ? [] : analyseList || fileList,
             order: STATE.explore.order,
-        });   
+        });
     }
 }
 confidenceRange.addEventListener('input', handleThresholdChange);
