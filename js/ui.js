@@ -797,7 +797,7 @@ function resultClick(e) {
     const del = classList.contains('delete');
     if (!del) loadResultRegion({ file, start, end, label, play });
     if (e.target.classList.contains('circle')) {
-        getSelectionResults()
+        setTimeout(getSelectionResults, 500)
     }
 }
 
@@ -1081,10 +1081,8 @@ window.onload = async () => {
         batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
         batchSizeSlider.max = (BATCH_SIZE_LIST.length - 1).toString();
         batchSizeValue.innerText = config[config.backend].batchSize;
-        diagnostics['Batch size'] = config[config.backend].batchSize;
         const modelToUse = document.getElementById('model-to-use');
         modelToUse.value = config.model;
-        diagnostics['Model'] = config.model;
         const backend = document.getElementById(config.backend);
         backend.checked = true;
         // Show time of day in results?
@@ -1860,7 +1858,6 @@ const modelToUse = document.getElementById('model-to-use');
 modelToUse.addEventListener('change', function (e) {
     config.model = e.target.value;
     updatePrefs();
-    diagnostics['Model'] = config.model;
     loadModel();
 })
 
@@ -1932,6 +1929,9 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     },
     KeyE: function (e) {
         if (e.ctrlKey) sendFile('save');
+    },
+    KeyD: function (e) {
+        if (e.ctrlKey && e.shiftKey)  worker.postMessage({ action: 'convert-dataset' });
     },
     KeyG: function (e) {
         if (e.ctrlKey) showGoToPosition();
@@ -2221,7 +2221,7 @@ function onModelReady(args) {
     if (region) enableMenuItem(['analyseSelection'])
     t1_warmup = Date.now();
     diagnostics['Warm Up'] = ((t1_warmup - t0_warmup) / 1000).toFixed(2) + ' seconds';
-    diagnostics['Backend'] = args.backend;
+    
 }
 
 
@@ -2967,7 +2967,7 @@ const toggleFullscreen = () => {
         config.fullscreen = true;
         fullscreen.innerText = 'fullscreen_exit';
     }
-    adjustSpecDims(true);
+    adjustSpecDims(true, 1024);
 }
 
 fullscreen.addEventListener('click', toggleFullscreen);
@@ -2975,6 +2975,13 @@ fullscreen.addEventListener('click', toggleFullscreen);
 
 const diagnosticMenu = document.getElementById('diagnostics');
 diagnosticMenu.addEventListener('click', async function () {
+    diagnostics['Model'] = config.model;
+    diagnostics['Backend'] = config.backend;
+    diagnostics['Batch size'] = config[config.backend].batchSize;
+    diagnostics['Threads'] = config[config.backend].threads;
+    diagnostics['Context'] = config.contextAware;
+    diagnostics['SNR'] = config.snr;
+    diagnostics['List'] = config.list;
     let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
     for (let [key, value] of Object.entries(diagnostics)) {
         if (key === 'Audio Duration') { // Format duration as days, hours,minutes, etc.
@@ -3016,7 +3023,6 @@ batchSizeSlider.addEventListener('input', (e) => {
 })
 batchSizeSlider.addEventListener('change', (e) => {
     config[config.backend].batchSize = BATCH_SIZE_LIST[e.target.value];
-    diagnostics['Batch size'] = config[config.backend].batchSize;
     loadModel();
     updatePrefs();
 })

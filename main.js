@@ -345,7 +345,7 @@ ipcMain.handle('openFiles', async (config) => {
         // Note: On Windows and Linux an open dialog can not be both a file selector and a directory selector,
         // so if you set properties to ['openFile', 'openDirectory'] on these platforms,
         // a directory selector will be shown.
-        properties: ['openFile', 'multiSelections']
+        properties: ['openFile', 'multiSelections'],
     });
 })
 ipcMain.handle('saveFile', (event, arg) => {
