@@ -96,7 +96,7 @@ onmessage = async (e) => {
                 const spec_width = e.data.width;
                 let image;
                 const signal = tf.tensor1d(buffer, 'float32');
-                const bufferTensor = myModel.normalise_audio(buffer);
+                const bufferTensor = myModel.normalise_audio(signal);
                 signal.dispose();
                 // const mymax = tf.max(bufferTensor).dataSync()
                 // const mymin = tf.min(bufferTensor).dataSync()
@@ -210,19 +210,21 @@ class Model {
     }
 
     normalize(spec) {
-        // console.log('Pre-norm### Min is: ', spec.min().dataSync(), 'Max is: ', spec.max().dataSync())
-        const spec_max = tf.max(spec, [1, 2]).reshape([-1, 1, 1, 1])
-        // const spec_min = tf.min(spec, [1, 2]).reshape([-1, 1, 1, 1])
-        spec = spec.mul(255);
-        spec = spec.div(spec_max);
-        // spec = tf.sub(spec, spec_min).div(tf.sub(spec_max, spec_min));
-        // console.log('{Post norm#### Min is: ', spec.min().dataSync(), 'Max is: ', spec.max().dataSync())
-        return spec
+        return tf.tidy(() => {
+            // console.log('Pre-norm### Min is: ', spec.min().dataSync(), 'Max is: ', spec.max().dataSync())
+            const spec_max = tf.max(spec, [1, 2]).reshape([-1, 1, 1, 1])
+            // const spec_min = tf.min(spec, [1, 2]).reshape([-1, 1, 1, 1])
+            spec = spec.mul(255);
+            spec = spec.div(spec_max);
+            // spec = tf.sub(spec, spec_min).div(tf.sub(spec_max, spec_min));
+            // console.log('{Post norm#### Min is: ', spec.min().dataSync(), 'Max is: ', spec.max().dataSync())
+            return spec
+        })
     }
 
     getSNR(spectrograms) {
         return tf.tidy(() => {
-            const {mean, variance} = tf.moments(spectrograms, 2);
+            const { mean, variance } = tf.moments(spectrograms, 2);
             //const max = tf.max(spectrograms, 2);
             //const mean = tf.mean(spectrograms, 2);
             const peak = tf.div(variance, mean)
@@ -248,9 +250,9 @@ class Model {
             specBatch = tf.reverse(specBatch, [1]);
             // Add channel axis
             specBatch = tf.expandDims(specBatch, -1);
-            specBatch = tf.slice4d(specBatch, [0, 1, 0, 0], [-1, img_height, img_width, -1]);
-            //specBatch = tf.image.resizeBilinear(specBatch, [img_height, img_width], true);
-            return specBatch
+            //specBatch = tf.slice4d(specBatch, [0, 1, 0, 0], [-1, img_height, img_width, -1]);
+            specBatch = tf.image.resizeBilinear(specBatch, [img_height, img_width], true);
+            return this.version === 'v1' ? specBatch : this.normalize(specBatch)
         })
     }
 
@@ -318,7 +320,7 @@ class Model {
                 tf.booleanMaskAsync(keysTensor, c)]) // + 2 tensor
             c.dispose(); // - 1 tensor
             keysTensor.dispose(); // - 1 tensor
-        
+
             if (!maskedTensorBatch.size) {
                 maskedTensorBatch.dispose(); // - 1 tensor
                 maskedKeysTensor.dispose(); // - 1 tensor
@@ -342,7 +344,7 @@ class Model {
         TensorBatch.dispose();
         if (paddedTensorBatch) paddedTensorBatch.dispose();
         if (maskedTensorBatch) maskedTensorBatch.dispose();
-        
+
         const array_of_predictions = (newPrediction || prediction).arraySync()
         prediction.dispose();
         if (newPrediction) newPrediction.dispose();

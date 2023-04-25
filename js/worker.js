@@ -67,13 +67,13 @@ let STATE;
 class State {
     constructor(db) {
         this.db = db,
-        this.filesToAnalyse = [],
-        this.limit = 500,
-        this.saved = new Set(), // list of files requested that are in the disk database
-        this.globalOffset = 0, // Current start number for unfiltered results
-        this.filteredOffset = {}, // Current species start number for filtered results
-        this.selection = false,
-        this.blocked = STATE ? STATE.blocked : [] // don't reset blocked IDs
+            this.filesToAnalyse = [],
+            this.limit = 500,
+            this.saved = new Set(), // list of files requested that are in the disk database
+            this.globalOffset = 0, // Current start number for unfiltered results
+            this.filteredOffset = {}, // Current species start number for filtered results
+            this.selection = false,
+            this.blocked = STATE ? STATE.blocked : [] // don't reset blocked IDs
         this.model = null;
         this.predictionCount = 0;
     }
@@ -147,7 +147,7 @@ const prepare_statements = (db) => {
                                                JOIN records ON species.id = records.speciesID
                                       WHERE records.dateTime = (?)
                                         AND confidence > (?)
-                                        AND speciesID NOT IN (?)
+                                        AND species.id NOT IN (?)
                                       ORDER BY records.confidence DESC`);
 }
 
@@ -289,6 +289,9 @@ ipcRenderer.on('new-client', (event) => {
             case 'create-dataset':
                 saveResults2DataSet();
                 break;
+            case 'convert-dataset':
+                convertSpecsFromExistingSpecs();
+                break;
             case 'load-model':
                 UI.postMessage({ event: 'spawning' });
                 BATCH_SIZE = parseInt(args.batchSize);
@@ -362,9 +365,9 @@ ipcRenderer.on('new-client', (event) => {
 /**
  * Generates a list of supported audio files, recursively searching directories.
  * Sends this list to the UI
- * @param {*} files 
+ * @param {*} files must be a list of file paths
  */
-const getFiles = async (files) => {
+const getFiles = async (files, image) => {
     let file_list = [];
     for (let i = 0; i < files.length; i++) {
         const stats = fs.lstatSync(files[i])
@@ -376,29 +379,52 @@ const getFiles = async (files) => {
         }
     }
     // filter out unsupported files
-    const supported_files = ['.wav', '.flac', '.opus', '.m4a', '.mp3', '.mpga', '.ogg', '.aac', '.mpeg', '.mp4'];
+    const supported_files = image ? ['.png'] :
+        ['.wav', '.flac', '.opus', '.m4a', '.mp3', '.mpga', '.ogg', '.aac', '.mpeg', '.mp4'];
+
     file_list = file_list.filter((file) => {
         return supported_files.some(ext => file.endsWith(ext))
     }
     )
     UI.postMessage({ event: 'files', filePaths: file_list });
+    return file_list;
 }
 
 // Get a list of files in a folder and subfolders
-const getFilesInDirectory = async dir => {
-    const files = await readdir(dir, { withFileTypes: true });
-    let file_map = files.map(async file => {
-        const path = p.join(dir, file.name);
-        if (file.isDirectory()) return await getFilesInDirectory(path);
-        if (file.isFile() || file.isSymbolicLink()) {
-            return path
-        }
-        return 0;
-    });
-    file_map = (await Promise.all(file_map)).flat(Infinity)
-    return file_map
-}
+// const getFilesInDirectory = async dir => {
+//     const files = await readdir(dir, { withFileTypes: true });
+//     let file_map = files.map(async file => {
+//         const path = p.join(dir, file.name);
+//         if (file.isDirectory()) return await getFilesInDirectory(path);
+//         if (file.isFile() || file.isSymbolicLink()) {
+//             return path
+//         }
+//         return 0;
+//     });
+//     file_map = (await Promise.all(file_map)).flat(Infinity)
+//     return file_map
+// }
 
+const getFilesInDirectory = async (dir) => {
+    const files = [];
+    const stack = [dir];
+  
+    while (stack.length) {
+      const currentDir = stack.pop();
+      const dirents = await readdir(currentDir, { withFileTypes: true });
+      for (const dirent of dirents) {
+        const path = p.join(currentDir, dirent.name);
+        if (dirent.isDirectory()) {
+          stack.push(path);
+        } else {
+          files.push(path);
+        }
+      }
+    }
+  
+    return files;
+  };
+  
 
 
 // Not an arrow function. Async function has access to arguments - so we can pass them to processnextfile
@@ -1009,6 +1035,42 @@ const speciesMatch = (path, sname) => {
     //return sname.includes('Anthus')
 }
 
+const convertSpecsFromExistingSpecs = async (path) => {
+    if (!path) path = '/mnt/608E21D98E21A88C/Users/simpo/PycharmProjects/Data/New_Dataset';
+    const file_list = await getFiles([path], true);
+    for (let i = 0; i < file_list.length; i++) {
+        const parts = p.parse(file_list[i]);
+        let species = parts.dir.split(p.sep);
+        species = species[species.length -1];
+        const [filename, time] = parts.name.split('_');
+        const [start, end] = time.split('-');
+        const path_to_save = path.replace('New_Dataset', 'New_Dataset_Converted') + p.sep + species;
+        const file_to_save = p.join(path_to_save, parts.base);
+        if (fs.existsSync(file_to_save)) {
+            console.log("skipping file as it is already saved")
+        } else {
+            const file_to_analyse = parts.dir.replace('New_Dataset', 'XC_ALL_mp3') + p.sep + filename + '.mp3';
+            const AudioBuffer = await fetchAudioBuffer({
+                start: parseFloat(start), end: parseFloat(end), file: file_to_analyse
+            })
+            if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
+                if (++workerInstance === NUM_WORKERS) {
+                    workerInstance = 0;
+                }
+                const buffer = AudioBuffer.getChannelData(0);
+                predictWorkers[workerInstance].postMessage({
+                    message: 'get-spectrogram',
+                    filepath: path_to_save,
+                    file: parts.base,
+                    buffer: buffer,
+                    height: 256,
+                    width: 384
+                }, [buffer.buffer]);
+            }
+        }
+    }
+}
+
 const saveResults2DataSet = (rootDirectory) => {
     if (!rootDirectory) rootDirectory = '/mnt/608E21D98E21A88C/Users/simpo/PycharmProjects/Data/test';
     const height = 256, width = 384;
@@ -1257,6 +1319,7 @@ const insertRecord = async (key, speciesID, confidence, file) => {
 const parsePredictions = async (response) => {
     let file = response.file, batchInProgress = false;
     const latestResult = response.result, db = STATE.db;
+    if (DEBUG) console.log('worker being used:', response.worker);
     for (let [key, predictions] of Object.entries(latestResult)) {
         let updateUI = false;
         // Get the highest  5 values:
@@ -1282,20 +1345,39 @@ const parsePredictions = async (response) => {
         if (updateUI) {
             const timestamp = metadata[file].fileStart + key * 1000;
             //query the db for sname,  cname
-            select_records_stmt.all(timestamp, minConfidence, STATE.blocked, (err, speciesList) => {
-                speciesList.forEach(species => {
-                    const result = {
-                        timestamp: timestamp,
-                        position: key,
-                        file: file,
-                        cname: species.cname,
-                        sname: species.sname,
-                        score: species.confidence,
-                    }
-                    sendResult(++index, result, false)
-                })
-            }
-            )
+            const speciesList = await memoryDB.allAsync(`
+                SELECT species.cname, species.sname, records.confidence
+                FROM species
+                        JOIN records ON species.id = records.speciesID
+                WHERE records.dateTime = ${timestamp}
+                AND confidence > ${minConfidence}
+                AND species.id NOT IN (${STATE.blocked})
+                ORDER BY records.confidence DESC`);
+            speciesList.forEach(species => {
+                const result = {
+                    timestamp: timestamp,
+                    position: key,
+                    file: file,
+                    cname: species.cname,
+                    sname: species.sname,
+                    score: species.confidence,
+                }
+                sendResult(++index, result, false)
+            })
+            // select_records_stmt.all(timestamp, minConfidence, STATE.blocked, (err, speciesList) => {
+            //     speciesList.forEach(species => {
+            //         const result = {
+            //             timestamp: timestamp,
+            //             position: key,
+            //             file: file,
+            //             cname: species.cname,
+            //             sname: species.sname,
+            //             score: species.confidence,
+            //         }
+            //         sendResult(++index, result, false)
+            //     })
+            // }
+            // )
         }
     }
     const progress = ++predictionsReceived[file] / batchChunksToSend[file];
@@ -1520,6 +1602,7 @@ const getSummary = async ({
             OVER (PARTITION BY dateTime ORDER BY confidence DESC) AS rank
             FROM records
             JOIN files ON files.rowid = records.fileID
+            JOIN species ON species.id = records.speciesID
             ${where} ${when}
             ) AS confidence_by_datetime_species
             JOIN species
@@ -1670,7 +1753,7 @@ const sendResult = (index, result, fromDBQuery) => {
 const getSavedFileInfo = async (file) => {
     // look for file in the disk DB, ignore extension
     return new Promise(function (resolve) {
-        const baseName = file.replace(/^(.*)\..*$/g, '$1');
+        const baseName = file.replace(/^(.*)\..*$/g, '$1%');
         const stmt = diskDB.prepare('SELECT * FROM files WHERE name LIKE  (?)');
         stmt.get(baseName, (err, row) => {
             if (err) {
