@@ -1556,13 +1556,14 @@ async function setStartEnd(file) {
 
 
 const setWhereWhen = ({ dateRange, species, files, context }) => {
-    let where = `WHERE confidence >= ${minConfidence}`;
+    let excluded_species_ids = 'speciesID NOT IN (-1)';
     if (!STATE.selection && STATE.blocked.length) {
-        const blocked = STATE.blocked
-        where += ` AND  speciesID NOT IN (${blocked})`
+        excluded_species_ids = `speciesID NOT IN (${STATE.blocked})`;
     }
+    let where = `AND confidence >= ${minConfidence}`;
     if (files?.length) {
-        where += ' AND files.name IN  (';
+        const name = context === 'summary' ? 'files.name' : 'name';
+        where += ` AND ${name} IN  (`;
         // Format the file list
         files.forEach(file => {
             file = prepSQL(file);
@@ -1576,7 +1577,7 @@ const setWhereWhen = ({ dateRange, species, files, context }) => {
     //const cname = context === 'summary' ? 'cname' : 's1.cname';
     if (species) where += ` AND cname =  '${prepSQL(species)}'`;
     const when = dateRange?.start ? ` AND dateTime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
-    return [where, when]
+    return [where, when, excluded_species_ids]
 };
 
 
@@ -1588,10 +1589,11 @@ const getSummary = async ({
     explore = false,
     active = undefined,
     interim = false,
-    action = undefined
+    action = undefined,
+    topRankin = 1
 } = {}) => {
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
-    let [where, when] = setWhereWhen({
+    let [where, when, excluded_species_ids] = setWhereWhen({
         dateRange: range, species: explore ? species : undefined, files: files, context: 'summary'
     });
     t0 = Date.now();
@@ -1603,7 +1605,7 @@ const getSummary = async ({
             FROM records
             JOIN files ON files.rowid = records.fileID
             JOIN species ON species.id = records.speciesID
-            ${where} ${when}
+            WHERE ${excluded_species_ids} ${where}  ${when}
             ) AS confidence_by_datetime_species
             JOIN species
         ON confidence_by_datetime_species.speciesID = species.id
@@ -1612,12 +1614,12 @@ const getSummary = async ({
             FROM records
             GROUP BY records.speciesID
             ) AS max_confidence ON max_confidence.speciesID = species.id
-        WHERE confidence_by_datetime_species.rank <= 1
+        WHERE confidence_by_datetime_species.rank <= ${topRankin}
         GROUP BY cname, max_confidence.max_confidence
         ORDER BY count DESC, max_confidence.max_confidence DESC;
     `);
     // need another setWhereWhen call for total
-    [where, when] = setWhereWhen({
+    [where, when, excluded_species_ids] = setWhereWhen({
         dateRange: range, species: species, files: files, context: 'summary'
     });
     let total;
@@ -1627,7 +1629,7 @@ const getSummary = async ({
                                                 JOIN species
                                                      ON species.id = speciesID
                                                 JOIN files ON fileID = files.rowid
-                                           ${where} ${when}`);
+                                           WHERE ${excluded_species_ids} ${where} ${when}`);
         total = res.total;
     }
     if (DEBUG) console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds");
@@ -1674,12 +1676,14 @@ const getResults = async ({
     context = 'results',
     limit = 500,
     offset = undefined,
+    topRankin = 1
 } = {}) => {
     let confidence = minConfidence;
     if (STATE.selection) {
         offset = 0;
         range = STATE.selection;
         confidence = 50;
+        topRankin = 5;
     } else if (offset === undefined) { // Get offset state
         if (species) {
             if (!STATE.filteredOffset[species]) STATE.filteredOffset[species] = 0;
@@ -1692,13 +1696,49 @@ const getResults = async ({
         else STATE.globalOffset = offset;
     }
     if (context === 'explore') db = diskDB;
-    const [where, when] = setWhereWhen({
+    const [where, when, excluded_species_ids] = setWhereWhen({
         dateRange: range, species: species, files: files, context: context
     });
     let index = offset;
     AUDACITY = {};
     let t0 = Date.now();
-    const result = await db.allAsync(`${db2ResultSQL} ${where} ${when} ORDER BY ${order}, confidence DESC LIMIT ${limit} OFFSET ${offset}`);
+    const result = await db.allAsync(`
+    WITH ranked_records AS (
+        SELECT 
+          records.dateTime, 
+          files.duration, 
+          files.filestart, 
+          files.name,
+          records.position, 
+          records.speciesID,
+          species.sname, 
+          species.cname, 
+          records.confidence, 
+          records.label, 
+          records.comment, 
+          RANK() OVER (PARTITION BY records.dateTime, records.fileID ORDER BY records.confidence DESC) AS confidence_rank
+        FROM records 
+          JOIN species ON records.speciesID = species.id 
+          JOIN files ON records.fileID = files.rowid 
+          WHERE ${excluded_species_ids}
+      )
+      SELECT 
+        dateTime as timestamp, 
+        duration, 
+        filestart, 
+        name as file, 
+        position, 
+        speciesID,
+        sname, 
+        cname, 
+        confidence as score, 
+        label, 
+        comment,
+        confidence_rank
+      FROM 
+        ranked_records 
+        WHERE confidence_rank <= ${topRankin} ${where} ${when} ORDER BY ${order}, confidence DESC LIMIT ${limit} OFFSET ${offset}`);
+
     for (let i = 0; i < result.length; i++) {
         if (species && context !== 'explore') {
             const { count } = await db.getAsync(`SELECT COUNT(*) as count
@@ -2205,20 +2245,21 @@ async function onChartRequest(args) {
     })
 }
 
-const db2ResultSQL = `SELECT DISTINCT dateTime AS timestamp, 
-  files.duration, 
-  files.filestart,
-  files.name AS file, 
-  position,
-  species.sname, 
-  species.cname, 
-  confidence AS score, 
-  label, 
-  comment
-                      FROM records
-                          JOIN species
-                      ON species.id = records.speciesID
-                          JOIN files ON records.fileID = files.rowid`;
+// const db2ResultSQL = `SELECT DISTINCT dateTime AS timestamp, 
+//   files.duration, 
+//   files.filestart,
+//   files.name AS file, 
+//   position,
+//   species.sname, 
+//   species.cname, 
+//   confidence AS score, 
+//   label, 
+//   comment
+//                       FROM records
+//                           JOIN species
+//                       ON species.id = records.speciesID
+//                           JOIN files ON records.fileID = files.rowid`;
+
 
 
 /*

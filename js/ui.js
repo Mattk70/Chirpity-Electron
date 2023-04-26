@@ -1381,7 +1381,7 @@ const editID = (cname, sname, cell) => {
     let from;
     restoreSpecies.classList.contains('speciesFilter') ?
         from = restoreSpecies.firstElementChild.innerHTML.replace(/(.*)\s<.*/, "$1") :
-        from = restoreSpecies.firstChild.nodeValue.replace('\n', '').trim();
+        from = restoreSpecies.querySelector('.cname').innerText;
     // Are we batch editing here?
     const context = getDetectionContext(cell);
     const batch = context === 'resultSummary';
