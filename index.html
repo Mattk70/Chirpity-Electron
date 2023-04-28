@@ -369,7 +369,7 @@
                     <h5 class="modal-title" id="detectionsModalLabel">Audio Selection Analysis</h5>
                 </div>
                 <div id="detectionsModalBody" class="modal-body p-0 ">
-                    <table id='selectionResults' class="text-center table table-hover w-100">
+                    <table id='selectionResults' class="text-center table table-hover w-100 align-middle">
                         <thead id="selectionResultsHead">
                         <tr class="text-bg-dark">
                             <th class="col">#</th>
@@ -378,9 +378,9 @@
                             <th class="text-start">Species</th>
                             <th class="col">Play</th>
                             <th class="col">XC</th>
-                            <th class="col">Delete</th>
                             <th class="">Label</th>
-                            <th class="col text-end">Notes</th>
+                            <th class="col">Notes</th>
+                            <th class="col text-end">Delete</th>
                         </tr>
                         </thead>
                         <tbody class="text-dark" id="selectionResultTableBody">
@@ -530,8 +530,8 @@
                 <nav aria-label="Identification results">
                     <ul class="m-2 pagination justify-content-center"></ul>
                 </nav>
-                <table id='results' class="text-center table table-hover w-100">
-                    <thead id="resultsHead">
+                <table id='results' class="text-center table table-hover w-100 align-middle">
+                    <thead id="resultsHead" class="d-none">
                     <tr class="bg-dark">
                         <th class="col">#</th>
                         <th class="col text-start timestamp">Time</th>
@@ -539,9 +539,9 @@
                         <th id="species-sort" class="pointer">Species</th>
                         <th class="col">Play</th>
                         <th class="col">XC</th>
-                        <th class="col">Delete</th>
                         <th class="">Label</th>
-                        <th class="col text-end">Notes</th>
+                        <th class="col">Notes</th>
+                        <th class="col text-end">Delete</th>
                     </tr>
                     </thead>
                     <tbody class="text-dark" id="resultTableBody">

@@ -213,15 +213,16 @@ async function loadAudioFile(args) {
 }
 
 
-function updateSpec({ buffer, play = false, resetSpec = false }) {
-    updateElementCache();
+function updateSpec({ buffer, play = false, position = 0, resetSpec = false }) {
+    //updateElementCache();
     wavesurfer.loadDecodedBuffer(buffer);
-    waveCanvasElement.width('100%');
-    specCanvasElement.width('100%');
-    $('.spec-labels').width('55px');
+    //waveCanvasElement.width('100%');
+    //specCanvasElement.width('100%');
+    //$('.spec-labels').width('55px');
+    wavesurfer.seekTo(position);
+    play ? wavesurfer.play() : wavesurfer.pause();
     if (resetSpec) adjustSpecDims(true);
     showElement(['fullscreen']);
-    if (play) wavesurfer.play()
 }
 
 function createTimeline() {
@@ -285,6 +286,7 @@ const initWavesurfer = ({
             })
         ]
     });
+    wavesurfer.bufferRequested = false;
     initSpectrogram();
     createTimeline();
     if (audio) wavesurfer.loadDecodedBuffer(audio);
@@ -297,37 +299,36 @@ const initWavesurfer = ({
     // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
         region = e;
-        // region.on('contextmenu', function () {
-        //     const menu = new bootstrap.Menu('#demo1Box', {
-        //         actions: [{
-        //             name: 'Action',
-        //             onClick: function () {
-        //                 console.log("Action' clicked!");
-        //             }
-        //         }, {
-        //             name: 'Another action',
-        //             onClick: function () {
-        //                 console.log("Another action' clicked!");
-        //             }
-        //         }, {
-        //             name: 'A third action',
-        //             onClick: function () {
-        //                 console.log("A third action' clicked!");
-        //             }
-        //         }]
-        //     });
-        // })
         enableMenuItem(['exportMP3']);
         if (modelReady) {
             enableMenuItem(['analyseSelection']);
         }
     });
+    // Queue up next audio window while playing
+    wavesurfer.on('audioprocess', function () {
 
+        const currentTime = wavesurfer.getCurrentTime();
+        const duration = wavesurfer.getDuration();
+        const playedPart = currentTime / duration;
+
+        if (playedPart > 0.5) {
+
+            if (!wavesurfer.bufferRequested && currentFileDuration > bufferBegin + windowLength) {
+                const begin = bufferBegin + windowLength;
+                postBufferUpdate({ begin: begin, play: false, queued: true })
+                wavesurfer.bufferRequested = true;
+            }
+        }
+    });
     wavesurfer.on('finish', function () {
         if (currentFileDuration > bufferBegin + windowLength) {
             wavesurfer.stop()
+            if (NEXT_BUFFER) {
+                onWorkerLoadedAudio(NEXT_BUFFER)
+            } else {
+                postBufferUpdate({ begin: bufferBegin, play: true })
+            }
             bufferBegin += windowLength;
-            postBufferUpdate({ begin: bufferBegin, play: true })
         }
     });
 
@@ -350,31 +351,33 @@ function updateElementCache() {
 }
 
 function zoomSpec(direction) {
-    if (typeof direction !== 'string') { // then it's an event
-        direction = direction.target.closest('button').id
-    }
-    let offsetSeconds = wavesurfer.getCurrentTime();
-    let position = offsetSeconds / windowLength;
-    let timeNow = bufferBegin + offsetSeconds;
-    if (direction === 'zoomIn') {
-        if (windowLength < 1.5) return;
-        windowLength /= 2;
-        bufferBegin += windowLength * position;
-    } else {
-        if (windowLength > 100 || windowLength === currentFileDuration) return;
-        bufferBegin -= windowLength * position;
-        windowLength = Math.min(currentFileDuration, windowLength * 2);
-
-        if (bufferBegin < 0) {
-            bufferBegin = 0;
-        } else if (bufferBegin + windowLength > currentFileDuration) {
-            bufferBegin = currentFileDuration - windowLength
-
+    if (fileLoaded) {
+        if (typeof direction !== 'string') { // then it's an event
+            direction = direction.target.closest('button').id
         }
+        let offsetSeconds = wavesurfer.getCurrentTime();
+        let position = offsetSeconds / windowLength;
+        let timeNow = bufferBegin + offsetSeconds;
+        if (direction === 'zoomIn') {
+            if (windowLength < 1.5) return;
+            windowLength /= 2;
+            bufferBegin += windowLength * position;
+        } else {
+            if (windowLength > 100 || windowLength === currentFileDuration) return;
+            bufferBegin -= windowLength * position;
+            windowLength = Math.min(currentFileDuration, windowLength * 2);
+
+            if (bufferBegin < 0) {
+                bufferBegin = 0;
+            } else if (bufferBegin + windowLength > currentFileDuration) {
+                bufferBegin = currentFileDuration - windowLength
+
+            }
+        }
+        // Keep playhead at same time in file
+        position = (timeNow - bufferBegin) / windowLength;
+        postBufferUpdate({ begin: bufferBegin, position: position })
     }
-    // Keep playhead at same time in file
-    position = (timeNow - bufferBegin) / windowLength;
-    postBufferUpdate({ begin: bufferBegin, position: position })
 }
 
 async function showOpenDialog() {
@@ -530,7 +533,7 @@ function refreshResultsView() {
         hideAll();
         showElement(['loadFileHint', 'loadFileHintText'], true);
     }
-    //adjustSpecDims(true);
+    adjustSpecDims(true);
 }
 
 const navbarAnalysis = document.getElementById('navbarAnalysis');
@@ -720,7 +723,7 @@ function hideElement(id_list) {
 function hideAll() {
     // File hint div,  Waveform, timeline and spec, controls and result table
     hideElement(['loadFileHint', 'loadFileHintText', 'loadFileHintSpinner', 'exploreWrapper',
-        'spectrogramWrapper', 'resultTableContainer', 'recordsContainer', 'fullscreen']);
+        'spectrogramWrapper', 'resultTableContainer', 'recordsContainer', 'fullscreen', 'resultsHead']);
 }
 
 const save2dbLink = document.getElementById('save2db');
@@ -746,6 +749,7 @@ exploreLink.addEventListener('click', async () => {
     worker.postMessage({ action: 'get-detected-species-list', range: STATE.explore.range });
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
+    adjustSpecDims(true)
 });
 
 const datasetLink = document.getElementById('dataset');
@@ -849,7 +853,9 @@ function adjustSpecDims(redraw, fftSamples) {
             specElement.css('z-index', 0);
             $('.spec-labels').width('55px')
         }
-        if (wavesurfer && redraw) wavesurfer.drawBuffer();
+        if (wavesurfer && redraw) {
+            wavesurfer.drawBuffer();
+        }
         specOffset = specWrapperElement.offsetHeight;
     } else {
         specOffset = 0
@@ -1234,7 +1240,7 @@ function generateBirdList(store, rows) {
     } else {
         listHTML = '<div class="bird-list seen"><div class="rounded-border"><ul class="request-bird">';
         for (const item in rows) {
-            listHTML += `<li><a href="#">${rows[item].cname} - ${rows[item].sname} (${rows[item].count})</a></li>`;
+            listHTML += `<li><a href="#"><span class="cname">${rows[item].cname}</span> - ${rows[item].sname} <span class="badge bg-secondary rounded-pill float-end">${rows[item].count}</span></a></li>`;
         }
     }
     const parking = document.getElementById(store);
@@ -1292,8 +1298,8 @@ let restoreSpecies;
 $(document).on('contextmenu', '.edit, .cname', setEditID);
 
 function setEditID(e) {
-    setClickedIndex(e.target);
     const currentRow = e.target.closest('tr');
+    setClickedIndex(currentRow);
     let restore = currentRow.querySelector('.cname').cloneNode(true);
     restore.classList.add('restore', 'd-none');
     currentRow.appendChild(restore);
@@ -1369,8 +1375,8 @@ const getActiveRow = () => {
 };
 
 const isSpeciesViewFiltered = (sendSpecies) => {
-    const filtered = document.querySelector('.speciesFilter span.text-warning');
-    const species = filtered ? filtered.innerHTML.replace(/\s<.*/, '') : undefined;
+    const filtered = document.querySelector('#speciesFilter tr.text-warning');
+    const species = filtered ? filtered.querySelector('.cname').innerText : undefined;
     return sendSpecies ? species : filtered !== null;
 }
 
@@ -1379,21 +1385,19 @@ const editID = (cname, sname, cell) => {
     // Make sure we update the restore species
     //restoreSpecies = cell;
     let from;
-    restoreSpecies.classList.contains('speciesFilter') ?
-        from = restoreSpecies.firstElementChild.innerHTML.replace(/(.*)\s<.*/, "$1") :
-        from = restoreSpecies.querySelector('.cname').innerText;
+    from = restoreSpecies.querySelector('.cname').innerText;
     // Are we batch editing here?
     const context = getDetectionContext(cell);
     const batch = context === 'resultSummary';
     let start, files = fileList, file;
     if (!batch) {
         [file, start, end, currentRow] = unpackNameAttr(cell, cname);
-        sendFeedback(file, cname, sname);
+        sendFeedback(file, cname, sname, start);
     }
     //let active = getActiveRow();
     //cell.innerHTML = `${cname} <br><i>${sname}</i>`;
     const range = context === 'selectionResults' ? getSelectionRange() : undefined;
-    updateRecord('ID', range, start, from, cname, context, batch)
+    updateRecord('ID', range, start, from, cname, context, batch, file)
 };
 
 function unpackNameAttr(el, cname) {
@@ -1406,9 +1410,10 @@ function unpackNameAttr(el, cname) {
 }
 
 
-function sendFeedback(file, cname, sname) {
+function sendFeedback(file, cname, sname, start) {
     predictions[clickedIndex].cname = cname;
     predictions[clickedIndex].sname = sname;
+    predictions[clickedIndex].start = start;
     predictions[clickedIndex].filename =
         `${cname.replace(/\s+/g, '_')}~${sname.replace(/\s+/g, '_')}~${predictions[clickedIndex].date}.opus`;
     sendFile('incorrect', predictions[clickedIndex]);
@@ -1440,7 +1445,7 @@ function updateLabel(e) {
         // this is the summary table and a batch update is wanted
         //are we in Explore mode?
         const files = isExplore() ? [] : fileList;
-        updateRecord('label', undefined, species, label, detectionContext, true)
+        updateRecord('label', undefined, undefined, species, label, detectionContext, true)
     }
     addEvents('label');
 }
@@ -1468,16 +1473,22 @@ const getDetectionContext = (target) => target.closest('table').id;
 $(document).on('click', '.request-bird', function (e) {
     // Clear the results table
     resultTable.innerText = '';
-    const [, cname] = formatInputText(e.target.innerText)
+    const row = e.target.closest('li')
+    const cname = row.querySelector('.cname').innerText
     const context = this.closest('.bird-list-wrapper').classList[0];
     let pickerEl = context + 'Range';
     t0 = Date.now();
-    context === 'chart' ? STATE.chart.species = cname : STATE.explore.species = cname;
-    const picker = $('#' + pickerEl).data('daterangepicker');
-    const start = picker.startDate._d.getTime();
-    const end = picker.endDate._d.getTime();
-    STATE[context].range = end !== start ? { start: start, end: end } : {};
-    worker.postMessage({ action: context, species: cname, range: STATE[context].range, order: STATE.explore.order })
+    let action, order;
+    if (context === 'chart') {
+        STATE.chart.species = cname;
+        action = 'chart';
+        order = undefined
+    } else {
+        STATE.explore.species = cname;
+        action = 'filter';
+        order = STATE.explore.order;
+    }
+    worker.postMessage({ action: action, species: cname, range: STATE[context].range, order: order })
 })
 
 
@@ -1931,7 +1942,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         if (e.ctrlKey) sendFile('save');
     },
     KeyD: function (e) {
-        if (e.ctrlKey && e.shiftKey)  worker.postMessage({ action: 'convert-dataset' });
+        if (e.ctrlKey && e.shiftKey) worker.postMessage({ action: 'convert-dataset' });
     },
     KeyG: function (e) {
         if (e.ctrlKey) showGoToPosition();
@@ -2130,7 +2141,8 @@ const postBufferUpdate = ({
     position = 0,
     play = false,
     resetSpec = false,
-    region = undefined
+    region = undefined,
+    queued = false
 }) => {
     worker.postMessage({
         action: 'update-buffer',
@@ -2140,7 +2152,8 @@ const postBufferUpdate = ({
         end: begin + windowLength,
         play: play,
         resetSpec: resetSpec,
-        region: region
+        region: region,
+        queued: queued
     });
 }
 
@@ -2221,7 +2234,7 @@ function onModelReady(args) {
     if (region) enableMenuItem(['analyseSelection'])
     t1_warmup = Date.now();
     diagnostics['Warm Up'] = ((t1_warmup - t0_warmup) / 1000).toFixed(2) + ' seconds';
-    
+
 }
 
 
@@ -2254,51 +2267,70 @@ function onModelReady(args) {
  * @param play whether to auto-play the audio
  * @returns {Promise<void>}
  */
+let NEXT_BUFFER;
 async function onWorkerLoadedAudio({
     start = 0,
     sourceDuration = 0,
     bufferBegin = 0,
     file = '',
     position = 0,
+    buffer = undefined,
     contents = undefined,
-    fileRegion = {},
-    preserveResults = false,
-    play = false
+    fileRegion = undefined,
+    play = false,
+    queued = false
 }) {
     workerHasLoadedFile = true;
     const resetSpec = !currentFile;
     currentFileDuration = sourceDuration;
     //if (preserveResults) completeDiv.hide();
-    console.log('UI received worker-loaded-audio: ' + file);
-    currentBuffer = new AudioBuffer({ length: contents.length, numberOfChannels: 1, sampleRate: 24000 });
-    currentBuffer.copyToChannel(contents, 0);
-    if (currentFile !== file) {
-        currentFile = file;
-        fileStart = start;
-        fileEnd = new Date(fileStart + (currentFileDuration * 1000));
-        // Update the current file name in the UI
-        updateFileName(fileList, file);
-    }
-    if (config.timeOfDay) {
-        bufferStartTime = new Date(fileStart + (bufferBegin * 1000))
+    console.log(`UI received worker-loaded-audio: ${file}, buffered: ${contents === undefined}`);
+    if (contents) {
+        currentBuffer = new AudioBuffer({ length: contents.length, numberOfChannels: 1, sampleRate: 24000 });
+        currentBuffer.copyToChannel(contents, 0);
     } else {
-        bufferStartTime = new Date(zero.getTime() + (bufferBegin * 1000))
+        currentBuffer = buffer;
     }
-    if (windowLength > currentFileDuration) windowLength = currentFileDuration;
-    if (modelReady) {
-        enableMenuItem(['analyse', 'reanalyse']);
-        if (fileList.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
-    }
-    fileLoaded = true;
-    updateSpec({ buffer: currentBuffer, play: play, resetSpec: resetSpec });
-    wavesurfer.seekTo(position);
-    if (fileRegion) {
-        createRegion(fileRegion.start, fileRegion.end, fileRegion.label);
-        if (fileRegion.play) {
-            region.play()
+    if (queued) {
+        // Prepare arguments to call this function with
+        NEXT_BUFFER = {
+            start: start, sourceDuration: sourceDuration, bufferBegin: bufferBegin, file: file,
+            buffer: currentBuffer, play: true, resetSpec: false, queued: false
         }
+        return;
     } else {
-        resetRegions();
+        NEXT_BUFFER = undefined;
+        if (currentFile !== file) {
+            currentFile = file;
+            fileStart = start;
+            fileEnd = new Date(fileStart + (currentFileDuration * 1000));
+            // Update the current file name in the UI
+            updateFileName(fileList, file);
+        }
+        if (config.timeOfDay) {
+            bufferStartTime = new Date(fileStart + (bufferBegin * 1000))
+        } else {
+            bufferStartTime = new Date(zero.getTime() + (bufferBegin * 1000))
+        }
+        if (windowLength > currentFileDuration) windowLength = currentFileDuration;
+
+        fileLoaded = true;
+
+
+        updateSpec({ buffer: currentBuffer, position: position, play: play, resetSpec: resetSpec });
+        wavesurfer.bufferRequested = false;
+        if (modelReady) {
+            enableMenuItem(['analyse', 'reanalyse']);
+            if (fileList.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
+        }
+        if (fileRegion) {
+            createRegion(fileRegion.start, fileRegion.end, fileRegion.label);
+            if (fileRegion.play) {
+                region.play()
+            }
+        } else {
+            resetRegions();
+        }
     }
 }
 
@@ -2333,16 +2365,16 @@ const updateSummary = ({
                 <th class="col-1 text-end" scope="col" >Count</th>
                 <th class="col-3 text-end" scope="col">Label</th>
             </tr>
-            </thead><tbody>`;
+            </thead><tbody id="speciesFilter">`;
 
     for (let i = 0; i < summary.length; i++) {
-        const selected = summary[i].cname === filterSpecies ? 'text-warning' : '';
-        summaryHTML += `<tr tabindex="-1">
+        const selected = summary[i].cname === filterSpecies ? ' text-warning' : '';
+        summaryHTML += `<tr tabindex="-1" class="${selected}">
                         <td class="max">${iconizeScore(summary[i].max)}</td>
-                        <td class="cname speciesFilter">
-                            <span class="pointer ${selected}">${summary[i].cname} <i>${summary[i].sname}</i></span>
+                        <td class="cname${selected}">
+                            <span class="pointer"><span class="cname">${summary[i].cname}</span> <i>${summary[i].sname}</i></span>
                         </td>                       
-                        <td class="text-end">${summary[i].count}</td>
+                        <td class="text-end${selected}">${summary[i].count}</td>
                         <td class="label">${tags['Remove Label']}</td>`;
 
     }
@@ -2352,11 +2384,11 @@ const updateSummary = ({
     const buffer = old_summary.cloneNode();
     buffer.innerHTML = summaryHTML;
     old_summary.replaceWith(buffer);
-
-    const currentFilter = document.querySelector('.speciesFilter span.text-warning');
+    document.getElementById('speciesFilter').addEventListener('click', speciesFilter)
+    const currentFilter = document.querySelector('#speciesFilter tr.text-warning');
     if (currentFilter) {
-        const filterRow = currentFilter.closest('tr');
-        filterRow.focus();
+        //const filterRow = currentFilter.rowIndex;
+        currentFilter.focus();
     }
 }
 
@@ -2491,16 +2523,15 @@ const addPagination = (total, offset) => {
 }
 
 
-function speciesFilter() {
+function speciesFilter(e) {
     activeRow = undefined;
-    let species
+    let species;
     // Am I trying to unfilter?
-    const target = this.location ? undefined : this.querySelector('span.pointer');
-    if (!target?.classList.contains('text-warning')) {
-        // Clicked on unfiltered species name
-        species = target ? target.innerHTML.replace(/\s<.*/, '') : undefined;
+    if (!e.target.closest('tr').classList.contains('text-warning')) {
+        // Clicked on unfiltered species
+        species = getSpecies(e.target)
     }
-    STATE.explore.species = species
+    STATE.explore.species = species;
     worker.postMessage({
         action: 'filter',
         species: species,
@@ -2515,7 +2546,8 @@ function speciesFilter() {
 
 
 
-$(document).on('click', '.speciesFilter', speciesFilter)
+
+
 
 const checkDayNight = (timestamp) => {
     let astro = SunCalc.getTimes(timestamp, config.latitude, config.longitude);
@@ -2536,7 +2568,7 @@ async function renderResult({
     if (index <= 1) {
         if (selection) selectionTable.innerHTML = '';
         else {
-            showElement(['resultTableContainer'], false);
+            showElement(['resultTableContainer', 'resultsHead'], false);
             resultTable.innerHTML = '';
         }
     } else if (index % (config.limit + 1) === 0) addPagination(index, 0);
@@ -2603,9 +2635,9 @@ async function renderResult({
             <td><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
             <td><a href='https://xeno-canto.org/explore?query=${sname}%20type:"nocturnal flight call"' target="xc">
                 <img src='img/logo/XC.png' alt='Search ${cname} on Xeno Canto' title='${cname} NFCs on Xeno Canto'></a></td>
-            <td><span class='delete material-icons-two-tone pointer'>delete_forever</span></td>
             <td class="label">${labelHTML}</td>
             <td class="comment text-end">${commentHTML}</td>
+            <td class="text-end"><span class='delete material-icons-two-tone pointer'>delete_forever</span></td>
         </tr>`;
     }
     updateResultTable(tr, isFromDB, selection);
@@ -2711,7 +2743,7 @@ function commentHandler(e) {
         }
         let [file, start, ,] = unpackNameAttr(activeRow);
         // let active = getActiveRow();
-        updateRecord('comment', undefined, start, species, note, context)
+        updateRecord('comment', undefined, start, species, note, context, false, file)
         addEvents('comment');
         document.addEventListener('keydown', handleKeyDownDeBounce, true);
     } else if (e.type === 'blur') {
@@ -2720,12 +2752,12 @@ function commentHandler(e) {
     }
 }
 
-const updateRecord = (what, range, start, from, to, context, batchUpdate) => {
+const updateRecord = (what, range, start, from, to, context, batchUpdate, file) => {
     //if (context === 'selectionResults') selectionTable.innerHTML = '';
     worker.postMessage({
         action: 'update-record',
         openFiles: fileList,
-        currentFile: currentFile,
+        currentFile: file || currentFile,
         start: start,
         from: from,
         value: to,
@@ -2740,9 +2772,10 @@ const updateRecord = (what, range, start, from, to, context, batchUpdate) => {
     })
 };
 
-$(document).on('click', '.add-label, .edit-label', labelHandler);
+$(document).on('mousedown', '.add-label, .edit-label', labelHandler);
 
 function labelHandler(e) {
+    e.preventDefault();
     const cell = e.target.closest('td');
     activeRow = cell.closest('tr');
     cell.innerHTML = `<span class="badge bg-dark rounded-pill pointer">Nocmig</span> 
@@ -2762,7 +2795,8 @@ const tags = {
 
 function setClickedIndex(target) {
     const clickedNode = target.closest('tr');
-    clickedIndex = clickedNode.querySelector('th') ? clickedNode.querySelector('th').innerText : null;
+    //clickedIndex = clickedNode.querySelector('th') ? clickedNode.querySelector('th').innerText : null;
+    clickedIndex = clickedNode.rowIndex;
 }
 
 $(document).on('click', '.delete', function (e) {
@@ -3045,14 +3079,14 @@ timeSort.addEventListener('click', () => {
 
 const postExploreMessage = (order) => {
     STATE.explore.order = order;
-    if (STATE.explore.species) {
-        worker.postMessage({
-            action: 'explore',
-            species: STATE.explore.species,
-            file: currentFile,
-            order: STATE.explore.order
-        })
-    }
+
+    worker.postMessage({
+        action: 'filter',
+        species: STATE.explore.species,
+        order: STATE.explore.order,
+        explore: true
+    })
+
 }
 // Drag file to app window to open
 document.addEventListener('dragover', (event) => {
@@ -3143,11 +3177,12 @@ $(function () {
                     }
                 } else if (this.id === 'exploreRange') {
                     STATE.explore.range = dateRange;
-                    if (STATE.explore.species) worker.postMessage({
-                        action: 'explore',
+                    worker.postMessage({
+                        action: 'filter',
                         species: STATE.explore.species,
                         range: STATE.explore.range,
-                        order: STATE.explore.order
+                        order: STATE.explore.order,
+                        explore: true
                     });
                 }
             }
@@ -3159,14 +3194,22 @@ $(function () {
                 // Update the seen species list
                 worker.postMessage({ action: 'get-detected-species-list' });
                 if (this.id === 'chartRange') {
+                    STATE.chart.range = undefined;
                     if (STATE.chart.species) {
                         t0 = Date.now();
                         worker.postMessage({
                             action: 'chart',
                             species: STATE.chart.species,
-                            range: { start: undefined, end: undefined }
                         });
                     }
+                } else if (this.id === 'exploreRange') {
+                    STATE.explore.range = undefined;
+                    worker.postMessage({
+                        action: 'filter',
+                        species: STATE.explore.species,
+                        order: STATE.explore.order,
+                        explore: true
+                    });
                 }
             }
         });
