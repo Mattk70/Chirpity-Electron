@@ -322,13 +322,6 @@ ipcRenderer.on('new-client', (event) => {
                     await getSummary(args);
                 }
                 break;
-            case 'explore':
-                STATE.db = diskDB;
-                args.context = 'explore';
-                args.explore = true;
-                await getResults(args);
-                await getSummary(args);
-                break;
             case 'analyse':
                 // Create a new memory db if one doesn't exist, or wipe it if one does,
                 // unless we're looking at a selection
@@ -661,6 +654,7 @@ async function loadAudioFile({
     region = false,
     preserveResults = false,
     play = false,
+    queued = false
 }) {
     const found = await getWorkingFile(file);
     if (found) {
@@ -678,6 +672,7 @@ async function loadAudioFile({
                     fileRegion: region,
                     preserveResults: preserveResults,
                     play: play,
+                    queued: queued
                 }, [audioArray.buffer]);
             })
             .catch(e => {
@@ -1594,7 +1589,7 @@ const getSummary = async ({
 } = {}) => {
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
     let [where, when, excluded_species_ids] = setWhereWhen({
-        dateRange: range, species: explore ? species : undefined, files: files, context: 'summary'
+        dateRange: range, files: files, context: 'summary'
     });
     t0 = Date.now();
     const summary = await db.allAsync(`
@@ -1661,7 +1656,8 @@ const getSummary = async ({
  * @param order: sort order for explore
  * @param files: files to query for detections
  * @param species: filter for SQL query
- * @param context: can be 'results', 'resultSummary' or 'selectionResults
+ * @param context: can be 'results', 'resultSummary' or 'selectionResults'
+ * @param explore: boolean. Are we in explore mode
  * @param limit: thee pagination limit
  * @param offset: is the SQL query offset to use
  *
@@ -1674,6 +1670,7 @@ const getResults = async ({
     files = [],
     species = undefined,
     context = 'results',
+    explore = false,
     limit = 500,
     offset = undefined,
     topRankin = 1
@@ -1695,7 +1692,7 @@ const getResults = async ({
         if (species) STATE.filteredOffset[species] = offset;
         else STATE.globalOffset = offset;
     }
-    if (context === 'explore') db = diskDB;
+    if (explore) db = diskDB;
     const [where, when, excluded_species_ids] = setWhereWhen({
         dateRange: range, species: species, files: files, context: context
     });
@@ -1822,7 +1819,10 @@ const onSave2DiskDB = async () => {
     // Update the duration table
     response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.duration SELECT * FROM duration');
     console.log(response.changes + ' date durations added to disk database')
-    response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.records SELECT * FROM records');
+    response = await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.records 
+        SELECT * FROM records
+        WHERE confidence >= ${minConfidence}
+        AND speciesID NOT IN (${STATE.blocked})`);
     console.log(response.changes + ' records added to disk database')
     if (response.changes) {
         UI.postMessage({ event: 'diskDB-has-records' });
@@ -2117,7 +2117,8 @@ async function onUpdateRecord({
             const speciesIDs = speciesObj.map(obj => obj.id);
             const found = speciesCnames.indexOf(value);
             // If we do, update that record instead, after deleting the record to change
-            if (found !== -1) {
+            // From !== value : don't delete the record if the ID hasn't changed
+            if (found !== -1 && from !== value) {
                 await db.runAsync(`DELETE
                                    FROM records ${whereSQL} AND speciesID = ${id}`);
                 whatSQL = whatSQL.replace(value, prepSQL(speciesCnames[found]));
