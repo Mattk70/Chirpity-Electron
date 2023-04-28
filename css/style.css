@@ -461,14 +461,6 @@ footer {
     background: lightgrey;
 }
 
-.confidence-confirmed {
-    display: flex;
-    align-items: flex-end;
-    border: 1px solid black;
-    border-radius: 5px;
-    background: lightgrey;
-}
-
 .row .bar {
     display: flex;
     justify-content: center;
