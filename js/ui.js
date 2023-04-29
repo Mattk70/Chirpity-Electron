@@ -544,12 +544,14 @@ navbarAnalysis.addEventListener('click', async () => {
 
 const analyseLink = document.getElementById('analyse');
 analyseLink.addEventListener('click', async () => {
+    STATE.mode = 'analyse';
     analyseList = [currentFile];
     postAnalyseMessage({ confidence: config.minConfidence, resetResults: true, currentFile: currentFile });
 });
 
 const reanalyseLink = document.getElementById('reanalyse');
 reanalyseLink.addEventListener('click', async () => {
+    STATE.mode = 'analyse';
     analyseList = [currentFile];
     postAnalyseMessage({
         confidence: config.minConfidence,
@@ -561,12 +563,14 @@ reanalyseLink.addEventListener('click', async () => {
 
 const analyseAllLink = document.getElementById('analyseAll');
 analyseAllLink.addEventListener('click', async () => {
+    STATE.mode = 'analyse';
     analyseList = undefined;
     postAnalyseMessage({ confidence: config.minConfidence, resetResults: true, files: fileList });
 });
 
 const reanalyseAllLink = document.getElementById('reanalyseAll');
 reanalyseAllLink.addEventListener('click', async () => {
+    STATE.mode = 'analyse';
     analyseList = undefined;
     postAnalyseMessage({ confidence: config.minConfidence, resetResults: true, files: fileList, reanalyse: true });
 });
@@ -617,7 +621,6 @@ $('#latitude, #longitude, #timeInput').on('blur', function () {
 })
 
 const getSelectionResults = () => {
-    STATE.mode = 'analyse';
     analyseList = [currentFile];
     try {
         let start = region.start + bufferBegin;
@@ -750,6 +753,7 @@ exploreLink.addEventListener('click', async () => {
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
     adjustSpecDims(true)
+    worker.postMessage({ action: 'filter', species: undefined, range: STATE.explore.range , explore: true}); 
 });
 
 const datasetLink = document.getElementById('dataset');
@@ -1376,7 +1380,7 @@ const getActiveRow = () => {
 
 const isSpeciesViewFiltered = (sendSpecies) => {
     const filtered = document.querySelector('#speciesFilter tr.text-warning');
-    const species = filtered ? filtered.querySelector('.cname').innerText : undefined;
+    const species = filtered ? getSpecies(filtered) : undefined;
     return sendSpecies ? species : filtered !== null;
 }
 
@@ -1478,7 +1482,7 @@ $(document).on('click', '.request-bird', function (e) {
     const context = this.closest('.bird-list-wrapper').classList[0];
     let pickerEl = context + 'Range';
     t0 = Date.now();
-    let action, order;
+    let action, order, explore;
     if (context === 'chart') {
         STATE.chart.species = cname;
         action = 'chart';
@@ -1486,9 +1490,10 @@ $(document).on('click', '.request-bird', function (e) {
     } else {
         STATE.explore.species = cname;
         action = 'filter';
+        explore = true;
         order = STATE.explore.order;
     }
-    worker.postMessage({ action: action, species: cname, range: STATE[context].range, order: order })
+    worker.postMessage({ action: action, explore: explore, species: cname, range: STATE[context].range, order: order })
 })
 
 
@@ -2478,18 +2483,23 @@ pagination.forEach(item => {
                 clicked = parseInt(clicked)
             }
             const limit = config.limit;
-            let offset = (clicked - 1) * limit;
+            const  offset = (clicked - 1) * limit;
+            let explore, order;
+            if (isExplore()) {
+                explore = isExplore();
+                order = STATE.explore.order;
+            }
             const species = isSpeciesViewFiltered(true);
             // Reset daylight banner
             shownDaylightBanner = false;
             worker.postMessage({
                 action: 'filter',
                 species: species,
-                files: analyseList || fileList,
+                files: explore ? [] : analyseList || fileList,
                 offset: offset,
                 limit: limit,
-                explore: isExplore(),
-                order: STATE.explore.order
+                explore: explore,
+                order: order
             });
         }
     })
@@ -2525,18 +2535,23 @@ const addPagination = (total, offset) => {
 
 function speciesFilter(e) {
     activeRow = undefined;
-    let species;
+    let species, explore, order;
     // Am I trying to unfilter?
     if (!e.target.closest('tr').classList.contains('text-warning')) {
         // Clicked on unfiltered species
         species = getSpecies(e.target)
     }
-    STATE.explore.species = species;
+    if (isExplore()) {
+        explore = true;
+        STATE.explore.species = species;
+        order = STATE.explore.order;
+    }    
     worker.postMessage({
         action: 'filter',
         species: species,
-        files: isExplore() ? [] : analyseList || fileList,
-        order: STATE.explore.order,
+        files: explore ? [] : analyseList || fileList,
+        order: order,
+        explore: explore
     });
     seenTheDarkness = false;
     shownDaylightBanner = false;
@@ -2624,7 +2639,7 @@ async function renderResult({
         const activeTable = active ? 'table-active' : '';
         const labelHTML = label ? tags[label] : tags['Remove Label'];
         const countIcon = count > 1 ? `<span class="circle pointer" title="Click to view the ${count} detections at this timecode">${count}</span>` : '';
-
+        const XC_type = cname.indexOf('(song)') !== -1 ? "song" : "nocturnal flight call";
         tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${position + 3}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
             <th scope='row'>${index}</th>
             <td class='text-start text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
@@ -2633,7 +2648,7 @@ async function renderResult({
             <span class="cname">${cname}</span> ${countIcon} ${iconizeScore(score)}
              </td>
             <td><span class='material-icons-two-tone play pointer'>play_circle_filled</span></td>
-            <td><a href='https://xeno-canto.org/explore?query=${sname}%20type:"nocturnal flight call"' target="xc">
+            <td><a href='https://xeno-canto.org/explore?query=${sname}%20type:"${XC_type}"' target="xc">
                 <img src='img/logo/XC.png' alt='Search ${cname} on Xeno Canto' title='${cname} NFCs on Xeno Canto'></a></td>
             <td class="label">${labelHTML}</td>
             <td class="comment text-end">${commentHTML}</td>
@@ -2647,7 +2662,7 @@ async function renderResult({
 let resultsBuffer, detectionsModal;
 const detectionsModalDiv = document.getElementById('detectionsModal')
 
-detectionsModalDiv.addEventListener('hidden.bs.modal', () => {
+detectionsModalDiv.addEventListener('hidden.bs.modal', (e) => {
     //resetRegions();
     worker.postMessage({ action: 'selection-off' });
     worker.postMessage({ action: 'set-variables', confidence: config.minConfidence })

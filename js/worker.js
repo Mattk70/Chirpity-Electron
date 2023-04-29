@@ -1591,6 +1591,7 @@ const getSummary = async ({
     let [where, when, excluded_species_ids] = setWhereWhen({
         dateRange: range, files: files, context: 'summary'
     });
+    if (explore) db = diskDB;
     t0 = Date.now();
     const summary = await db.allAsync(`
         SELECT species.cname, species.sname, COUNT(*) as count, ROUND(max_confidence.max_confidence / 10.0, 0) as max
