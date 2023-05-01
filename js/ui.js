@@ -300,7 +300,7 @@ const initWavesurfer = ({
     wavesurfer.on('region-created', function (e) {
         region = e;
         enableMenuItem(['exportMP3']);
-        if (modelReady) {
+        if (modelReady && ! PREDICTING) {
             enableMenuItem(['analyseSelection']);
         }
     });
@@ -649,7 +649,8 @@ const analyseSelectionLink = document.getElementById('analyseSelection');
 analyseSelectionLink.addEventListener('click', getSelectionResults);
 
 function postAnalyseMessage(args) {
-
+    disableMenuItem(['analyseSelection']);
+    // Reset the buffer playhead and zoom:
     if (args.resetResults) {
         analyseReset();
         resetResults();
@@ -1058,6 +1059,7 @@ window.onload = async () => {
         nocmig: false,
         context: false,
         snr: 0,
+        HPfrequency: 0,
         warmup: true,
         backend: 'tensorflow',
         tensorflow: { threads: diagnostics['Cores'], batchSize: 4 },
@@ -1125,6 +1127,8 @@ window.onload = async () => {
         if (config.backend === 'webgl') {
             SNRSlider.disabled = true;
         };
+        HPThreshold.innerText = config.HPfrequency + 'Hz';
+        HPSlider.value = config.HPfrequency;
         ThreadSlider.max = diagnostics['Cores'];
         ThreadSlider.value = config[config.backend].threads;
         numberOfThreads.innerText = config[config.backend].threads;
@@ -1140,7 +1144,8 @@ window.onload = async () => {
             lon: config.longitude,
             confidence: config.minConfidence,
             nocmig: config.nocmig,
-            context: config.contextAware
+            context: config.contextAware,
+            HPfrequency: config.HPfrequency
         });
         loadModel();
         worker.postMessage({ action: 'clear-cache' })
@@ -2665,7 +2670,7 @@ const detectionsModalDiv = document.getElementById('detectionsModal')
 detectionsModalDiv.addEventListener('hidden.bs.modal', (e) => {
     //resetRegions();
     worker.postMessage({ action: 'selection-off' });
-    worker.postMessage({ action: 'set-variables', confidence: config.minConfidence })
+    worker.postMessage({ action: 'set-variables', confidence: config.minConfidence})
     worker.postMessage({
         action: 'filter',
         species: isSpeciesViewFiltered(true),
@@ -3080,16 +3085,12 @@ batchSizeSlider.addEventListener('change', (e) => {
 // Listeners to sort results table
 const speciesSort = document.getElementById('species-sort');
 speciesSort.addEventListener('click', () => {
-    if (isExplore()) {
         postExploreMessage('score DESC ')
-    }
 });
 
 const timeSort = document.getElementById('time-sort');
 timeSort.addEventListener('click', () => {
-    if (isExplore()) {
         postExploreMessage('dateTime')
-    }
 });
 
 const postExploreMessage = (order) => {
@@ -3097,9 +3098,9 @@ const postExploreMessage = (order) => {
 
     worker.postMessage({
         action: 'filter',
-        species: STATE.explore.species,
+        species: isSpeciesViewFiltered(true),
         order: STATE.explore.order,
-        explore: true
+        explore: isExplore()
     })
 
 }
@@ -3343,12 +3344,31 @@ const handleSNRchange = () => {
     updatePrefs();
 }
 
+
 const SNRThreshold = document.getElementById('SNR-threshold');
 const SNRSlider = document.getElementById('snrValue');
 SNRSlider.addEventListener('input', () => {
     SNRThreshold.innerText = SNRSlider.value;
 });
 SNRSlider.addEventListener('change', handleSNRchange);
+
+// High pass filter
+const handleHPchange = () => {
+    config.HPfrequency = parseFloat(HPSlider.value);
+    updatePrefs();
+    worker.postMessage({ action: 'set-variables', HPfrequency: config.HPfrequency })
+    if (fileLoaded){
+        const position = wavesurfer.getCurrentTime() / windowLength;
+        postBufferUpdate({ begin: bufferBegin, position: position })
+    }
+}
+
+const HPThreshold = document.getElementById('HP-threshold');
+const HPSlider = document.getElementById('HPValue');
+HPSlider.addEventListener('input', () => {
+    HPThreshold.innerText = HPSlider.value + 'Hz';
+});
+HPSlider.addEventListener('change', handleHPchange);
 
 
 
