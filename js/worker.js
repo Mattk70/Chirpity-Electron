@@ -74,6 +74,7 @@ class State {
             this.filteredOffset = {}, // Current species start number for filtered results
             this.selection = false,
             this.blocked = STATE ? STATE.blocked : [] // don't reset blocked IDs
+        this.highPassFrequency = 0;
         this.model = null;
         this.predictionCount = 0;
     }
@@ -181,7 +182,7 @@ let predictWorkers = [], predictionDone = true, aborted = false;
 
 // Set up the audio context:
 const audioCtx = new AudioContext({ latencyHint: 'interactive', sampleRate: sampleRate });
-
+const audioCtxSource = audioCtx.createBufferSource();
 let UI;
 let FILE_QUEUE = [];
 
@@ -259,12 +260,14 @@ ipcRenderer.on('new-client', (event) => {
                 // This pattern to only update variables that have values
                 latitude = args.lat || latitude;
                 longitude = args.lon || longitude;
+                TEMP = args.temp || TEMP;
+                appPath = args.path || appPath;
+                minConfidence = args.confidence * 10 || minConfidence;
                 // Boolean value an issue with this pattern so...
                 if (Object.keys(args).includes('nocmig')) NOCMIG = args.nocmig;
                 if (Object.keys(args).includes('context')) CONTEXT_AWARE = args.context;
-                minConfidence = (args.confidence || minConfidence) * 10;
-                TEMP = args.temp || TEMP;
-                appPath = args.path || appPath;
+                if (Object.keys(args).includes('HPfrequency')) STATE.highPassFrequency = args.HPfrequency;
+                console.log("Set variables", args)
                 break;
             case 'clear-cache':
                 CACHE_LOCATION = p.join(TEMP, 'chirpity');
@@ -401,23 +404,23 @@ const getFiles = async (files, image) => {
 const getFilesInDirectory = async (dir) => {
     const files = [];
     const stack = [dir];
-  
+
     while (stack.length) {
-      const currentDir = stack.pop();
-      const dirents = await readdir(currentDir, { withFileTypes: true });
-      for (const dirent of dirents) {
-        const path = p.join(currentDir, dirent.name);
-        if (dirent.isDirectory()) {
-          stack.push(path);
-        } else {
-          files.push(path);
+        const currentDir = stack.pop();
+        const dirents = await readdir(currentDir, { withFileTypes: true });
+        for (const dirent of dirents) {
+            const path = p.join(currentDir, dirent.name);
+            if (dirent.isDirectory()) {
+                stack.push(path);
+            } else {
+                files.push(path);
+            }
         }
-      }
     }
-  
+
     return files;
-  };
-  
+};
+
 
 
 // Not an arrow function. Async function has access to arguments - so we can pass them to processnextfile
@@ -785,6 +788,7 @@ const convertTimeToBytes = (time, metadata) => {
     return (Math.round((time * metadata.bytesPerSec) / bytesPerSample) * bytesPerSample) + metadata.head;
 }
 
+
 async function setupCtx(chunk, header) {
     // Deal with detached arraybuffer issue
     let audioBufferChunk;
@@ -795,17 +799,66 @@ async function setupCtx(chunk, header) {
         return false
     }
 
-    const source = audioCtx.createBufferSource();
-    source.buffer = audioBufferChunk;
-    const duration = source.buffer.duration;
-    const buffer = source.buffer;
+    
+    audioCtxSource.buffer = audioBufferChunk;
+    const duration = audioCtxSource.buffer.duration;
+    const buffer = audioCtxSource.buffer;
     const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
     const offlineSource = offlineCtx.createBufferSource();
+
+    // Create a highpass filter to attenuate the noise
+    const filter = offlineCtx.createBiquadFilter();
+    filter.type = "highpass"; // Standard second-order resonant highpass filter with 12dB/octave rolloff. Frequencies below the cutoff are attenuated; frequencies above it pass through.
+    filter.frequency.value = STATE.highPassFrequency //frequency || 0; // This sets the cutoff frequency. 0 is off. 
+    filter.Q.value = 1; // Indicates how peaked the frequency is around the cutoff. The greater the value, the greater the peak.
+
+    // Create a highshelf filter to boost or attenuate high-frequency content
+    const highshelfFilter = offlineCtx.createBiquadFilter();
+    highshelfFilter.type = 'highshelf';
+    highshelfFilter.frequency.value = STATE.highPassFrequency || 0; // This sets the cutoff frequency of the highshelf filter to 3000 Hz
+    highshelfFilter.gain.value = 6; // This sets the boost or attenuation in decibels (dB)
+
+
+    // await offlineCtx.audioWorklet.addModule('js/audio_normalizer.js');
+    // const normalizerNode = new AudioWorkletNode(offlineCtx, 'audio-normalizer', {
+    //     processorOptions: {
+    //         cutoff: STATE.highPassFrequency,
+    //         frequency: 100,
+    //     }
+    // });
+
     offlineSource.buffer = buffer;
-    offlineSource.connect(offlineCtx.destination);
+    // offlineSource.connect(normalizerNode);
+    offlineSource.connect(filter);
+    filter.connect(highshelfFilter);
+    highshelfFilter.connect(offlineCtx.destination);
+    // normalizerNode.connect(offlineCtx.destination);
+
+    // // Create a gain node to adjust the audio level
+    // const gainNode = offlineCtx.createGain();
+    // const maxLevel = 0.5; // This sets the maximum audio level to 0.5 (50% of maximum)
+    // const minLevel = 0.05; // This sets the minimum audio level to 0.05 (5% of maximum)
+    // const scriptNode = offlineCtx.createScriptProcessor(4096, 1, 1); // This sets the buffer size to 4096 samples
+    // highshelfFilter.connect(scriptNode);
+
+    // scriptNode.connect(gainNode);
+    // gainNode.connect(offlineCtx.destination);
+    // // Analyze the audio levels in real-time
+    // scriptNode.onaudioprocess = function (event) {
+    //     const inputBuffer = event.inputBuffer.getChannelData(0);
+    //     let max = 0;
+    //     for (let i = 0; i < inputBuffer.length; i++) {
+    //         const absValue = Math.abs(inputBuffer[i]);
+    //         if (absValue > max) {
+    //             max = absValue;
+    //         }
+    //     }
+    //     const level = max.toFixed(2); // Round the level to two decimal places
+    //     gainNode.gain.value = level >= maxLevel ? 1 : (level <= minLevel ? 0 : (level - minLevel) / (maxLevel - minLevel));
+    // };
     offlineSource.start();
     return offlineCtx;
-}
+};
 
 /**
  *
@@ -893,10 +946,15 @@ const getPredictBuffers = async ({
     });
     let chunkStart = start * sampleRate;
     //const fileDuration = end - start;
-
+    STATE.predictStream = readStream;
     readStream.on('data', async chunk => {
         // Ensure data is processed in order
         readStream.pause();
+        if (aborted) {
+            readStream.close()
+            aborted = false;
+            return
+        }
         const offlineCtx = await setupCtx(chunk, metadata[file].header);
         if (offlineCtx) {
             offlineCtx.startRendering().then((resampled) => {
@@ -1036,7 +1094,7 @@ const convertSpecsFromExistingSpecs = async (path) => {
     for (let i = 0; i < file_list.length; i++) {
         const parts = p.parse(file_list[i]);
         let species = parts.dir.split(p.sep);
-        species = species[species.length -1];
+        species = species[species.length - 1];
         const [filename, time] = parts.name.split('_');
         const [start, end] = time.split('-');
         const path_to_save = path.replace('New_Dataset', 'New_Dataset_Converted') + p.sep + species;
@@ -1240,6 +1298,8 @@ async function saveMP3(file, start, end, filename, metadata) {
 /// Workers  From the MDN example
 function spawnWorkers(model, list, batchSize, threads) {
     NUM_WORKERS = threads;
+    // And be ready to receive the list:
+    SEEN_LIST_UPDATE = false;
     for (let i = 0; i < threads; i++) {
         const worker = new Worker('./js/model.js', { type: 'module' });
         worker.isAvailable = true;
@@ -1487,7 +1547,7 @@ async function processNextFile({
             if (start === end) {
                 // Nothing to do for this file
                 COMPLETED.push(file);
-                const result = `No predictions.for ${file}. It has no period within it where predictions would be given`;
+                const result = `No detections in ${file}. It has no period within it where predictions would be given`;
                 index++;
                 UI.postMessage({
                     event: 'prediction-ongoing', file: file, result: result, index: index
@@ -1631,10 +1691,10 @@ const getSummary = async ({
     if (DEBUG) console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds");
     const event = interim ? 'update-summary' : 'prediction-done';
     // Why do we need this??
-    if (total === 0 && action !== 'delete') {
-        const qualifier = species || ''
-        sendResult(1, `No ${qualifier} detections found`, true)
-    }
+    // if (total === 0 && action !== 'delete') {
+    //     const qualifier = species || ''
+    //     sendResult(1, `No ${qualifier} detections found in`, true)
+    // }
 
     UI.postMessage({
         event: event,
@@ -1753,7 +1813,7 @@ const getResults = async ({
     if (!result.length) {
         if (STATE.selection) {
             // No more detections in the selection
-            sendResult(++index, 'No detections found', true)
+            sendResult(++index, 'No detections found in the selection', true)
         } else if (species && context !== 'explore') { // Remove the species filter
             await getResults({
                 files: files,

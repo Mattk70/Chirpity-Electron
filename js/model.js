@@ -72,19 +72,21 @@ onmessage = async (e) => {
                 break;
             case 'predict':
                 //const t0 = performance.now();
-                const { chunks, start, fileStart, file, snr, minConfidence, worker, context } = e.data;
-                myModel.useContext = context;
-                const result = await myModel.predictChunk(chunks, start, fileStart, file, snr, minConfidence / 1000);
-                response = {
-                    message: 'prediction',
-                    file: file,
-                    result: result,
-                    fileStart: fileStart,
-                    worker: worker
-                };
-                postMessage(response);
-                // reset the results
-                myModel.result = [];
+                if (myModel.model_loaded) { //test here, as after abort, model is null
+                    const { chunks, start, fileStart, file, snr, minConfidence, worker, context } = e.data;
+                    myModel.useContext = context;
+                    const result = await myModel.predictChunk(chunks, start, fileStart, file, snr, minConfidence / 1000);
+                    response = {
+                        message: 'prediction',
+                        file: file,
+                        result: result,
+                        fileStart: fileStart,
+                        worker: worker
+                    };
+                    postMessage(response);
+                    // reset the results
+                    myModel.result = [];
+                }
                 break;
             case 'get-spectrogram':
                 const buffer = e.data.buffer;
@@ -390,7 +392,7 @@ class Model {
             const sigMin = tf.min(signal);
             const range = sigMax.sub(sigMin);
             //return signal.sub(sigMin).div(range).mul(tf.scalar(8192.0, 'float32')).sub(tf.scalar(4095, 'float32'))
-            return signal.sub(sigMin).div(range).mul(tf.scalar(2.0, 'float32')).sub(tf.scalar(1.0, 'float32'))
+            return signal.sub(sigMin).div(range).mul(tf.scalar(2)).sub(tf.scalar(1))
         })
     };
 
