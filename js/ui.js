@@ -527,7 +527,7 @@ function refreshResultsView() {
         hideAll();
         showElement(['spectrogramWrapper', 'fullscreen'], false);
         if (!isEmptyObject(predictions)) {
-            showElement(['resultTableContainer'], false);
+            showElement(['resultTableContainer', 'resultsHead'], false);
         }
     } else if (!fileList.length) {
         hideAll();

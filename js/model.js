@@ -227,13 +227,12 @@ class Model {
     getSNR(spectrograms) {
         return tf.tidy(() => {
             const { mean, variance } = tf.moments(spectrograms, 2);
-            //const max = tf.max(spectrograms, 2);
-            //const mean = tf.mean(spectrograms, 2);
             const peak = tf.div(variance, mean)
             let snr = tf.squeeze(tf.max(peak, 1));
             //snr = tf.sub(255, snr)  // bigger number, less signal
-            //const test = snr.arraySync()
-            //const SNR = peak.arraySync()
+            // const MEAN = mean.arraySync()
+            // const VARIANCE = variance.arraySync()
+            // const PEAK = peak.arraySync()
             return snr
         })
     }
@@ -305,9 +304,11 @@ class Model {
             // WebGL works best when all batches are the same size
             paddedTensorBatch = this.padBatch(TensorBatch)  // + 1 tensor
         } else if (threshold) {
+            if (this.version !== 'v1') threshold*= 4;
             const keysTensor = tf.stack(keys); // + 1 tensor
             const snr = this.getSNR(TensorBatch)
             const condition = tf.greaterEqual(snr, threshold); // + 1 tensor
+            if (DEBUG) console.log('SNR is: ', snr.dataSync())
             snr.dispose();
             // Avoid mask cannot be scalar error at end of predictions
             let newCondition;
@@ -403,7 +404,8 @@ class Model {
         // check if we need to pad
         const remainder = audioBuffer.shape % this.chunkLength;
         let paddedBuffer;
-        if (remainder !== 0) {  // If the buffer isn't divisible by batch size, we must be at the end of the file
+        if (remainder !== 0) {  
+            // Pad to the nearest full sample
             paddedBuffer = audioBuffer.pad([[0, this.chunkLength - remainder]]);
             audioBuffer.dispose();
             if (DEBUG) console.log('Received final chunks')
@@ -412,6 +414,7 @@ class Model {
         const numSamples = buffer.shape / this.chunkLength;
         let bufferList = tf.split(buffer, numSamples);
         buffer.dispose();
+        // Turn the audio into a spec tensor
         bufferList = tf.tidy(() => {
             return bufferList.map(x => {
                 let normal = this.normalise_audio(x);

@@ -182,7 +182,7 @@ let predictWorkers = [], predictionDone = true, aborted = false;
 
 // Set up the audio context:
 const audioCtx = new AudioContext({ latencyHint: 'interactive', sampleRate: sampleRate });
-const audioCtxSource = audioCtx.createBufferSource();
+
 let UI;
 let FILE_QUEUE = [];
 
@@ -434,6 +434,8 @@ async function onAnalyse({
     confidence = minConfidence,
     snr = 0
 }) {
+    // Now we've asked for a new analysis, clear the aborted flag
+    aborted = false;
     // if end was passed, this is a selection
     STATE.selection = end ? getSelectionRange(currentFile, start, end) : undefined;
     //create a copy of files in scope for state, as filesInScope is spliced
@@ -799,24 +801,32 @@ async function setupCtx(chunk, header) {
         return false
     }
 
-    
+    const audioCtxSource = audioCtx.createBufferSource();
     audioCtxSource.buffer = audioBufferChunk;
     const duration = audioCtxSource.buffer.duration;
     const buffer = audioCtxSource.buffer;
     const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
     const offlineSource = offlineCtx.createBufferSource();
+    offlineSource.buffer = buffer;
 
-    // Create a highpass filter to attenuate the noise
-    const filter = offlineCtx.createBiquadFilter();
-    filter.type = "highpass"; // Standard second-order resonant highpass filter with 12dB/octave rolloff. Frequencies below the cutoff are attenuated; frequencies above it pass through.
-    filter.frequency.value = STATE.highPassFrequency //frequency || 0; // This sets the cutoff frequency. 0 is off. 
-    filter.Q.value = 1; // Indicates how peaked the frequency is around the cutoff. The greater the value, the greater the peak.
+    if (STATE.highPassFrequency) {
+        // Create a highpass filter to attenuate the noise
+        const filter = offlineCtx.createBiquadFilter();
+        filter.type = "highpass"; // Standard second-order resonant highpass filter with 12dB/octave rolloff. Frequencies below the cutoff are attenuated; frequencies above it pass through.
+        filter.frequency.value = STATE.highPassFrequency //frequency || 0; // This sets the cutoff frequency. 0 is off. 
+        filter.Q.value = 0; // Indicates how peaked the frequency is around the cutoff. The greater the value, the greater the peak.
+        
+        offlineSource.connect(filter);
+        filter.connect(offlineCtx.destination);
+    } else {
+        offlineSource.connect(offlineCtx.destination);
+    }
 
-    // Create a highshelf filter to boost or attenuate high-frequency content
-    const highshelfFilter = offlineCtx.createBiquadFilter();
-    highshelfFilter.type = 'highshelf';
-    highshelfFilter.frequency.value = STATE.highPassFrequency || 0; // This sets the cutoff frequency of the highshelf filter to 3000 Hz
-    highshelfFilter.gain.value = 6; // This sets the boost or attenuation in decibels (dB)
+    // // Create a highshelf filter to boost or attenuate high-frequency content
+    // const highshelfFilter = offlineCtx.createBiquadFilter();
+    // highshelfFilter.type = 'highshelf';
+    // highshelfFilter.frequency.value = STATE.highPassFrequency || 0; // This sets the cutoff frequency of the highshelf filter to 3000 Hz
+    // highshelfFilter.gain.value = 0; // This sets the boost or attenuation in decibels (dB)
 
 
     // await offlineCtx.audioWorklet.addModule('js/audio_normalizer.js');
@@ -827,11 +837,8 @@ async function setupCtx(chunk, header) {
     //     }
     // });
 
-    offlineSource.buffer = buffer;
     // offlineSource.connect(normalizerNode);
-    offlineSource.connect(filter);
-    filter.connect(highshelfFilter);
-    highshelfFilter.connect(offlineCtx.destination);
+    // highshelfFilter.connect(offlineCtx.destination);
     // normalizerNode.connect(offlineCtx.destination);
 
     // // Create a gain node to adjust the audio level
@@ -952,7 +959,6 @@ const getPredictBuffers = async ({
         readStream.pause();
         if (aborted) {
             readStream.close()
-            aborted = false;
             return
         }
         const offlineCtx = await setupCtx(chunk, metadata[file].header);
@@ -1305,8 +1311,6 @@ function spawnWorkers(model, list, batchSize, threads) {
         worker.isAvailable = true;
         predictWorkers.push(worker)
         console.log('loading a worker')
-        // Now we've loaded a new model, clear the aborted flag
-        aborted = false;
         worker.postMessage({
             message: 'load',
             model: model,
