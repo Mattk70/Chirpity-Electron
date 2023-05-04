@@ -105,6 +105,14 @@ const colourmap = document.getElementById('colourmap');
 const batchSizeValue = document.getElementById('batch-size-value');
 const nocmig = document.getElementById('nocmig');
 const contextAware = document.getElementById('context');
+const audioFade = document.getElementById('fade');
+const audioBitrate = document.getElementById('bitrate');
+const audioQuality = document.getElementById('quality');
+const audioBitrateContainer = document.getElementById('bitrate-container');
+const audioQualityContainer = document.getElementById('quality-container');
+const audioPadding = document.getElementById('padding');
+const audioFormat = document.getElementById('format');
+const audioDownmix = document.getElementById('downmix');
 
 let batchInProgress = false;
 let activeRow;
@@ -300,7 +308,7 @@ const initWavesurfer = ({
     wavesurfer.on('region-created', function (e) {
         region = e;
         enableMenuItem(['exportMP3']);
-        if (modelReady && ! PREDICTING) {
+        if (modelReady && !PREDICTING) {
             enableMenuItem(['analyseSelection']);
         }
     });
@@ -754,7 +762,7 @@ exploreLink.addEventListener('click', async () => {
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
     adjustSpecDims(true)
-    worker.postMessage({ action: 'filter', species: undefined, range: STATE.explore.range , explore: true}); 
+    worker.postMessage({ action: 'filter', species: undefined, range: STATE.explore.range, explore: true });
 });
 
 const datasetLink = document.getElementById('dataset');
@@ -1053,17 +1061,20 @@ window.onload = async () => {
         timeOfDay: false,
         list: 'migrants',
         model: 'v2',
-        latitude: '',
-        longitude: '',
+        latitude: 52.87,
+        longitude: 0.89, // Great Snoring :)
         location: 'Location not set',
         nocmig: false,
         context: false,
         snr: 0,
         HPfrequency: 0,
+        LowShelfGain: 0,
+        LowShelfFrequency: 0,
         warmup: true,
         backend: 'tensorflow',
         tensorflow: { threads: diagnostics['Cores'], batchSize: 4 },
         webgl: { threads: 1, batchSize: 4 },
+        audio: { format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false },
         limit: 500,
         fullscreen: false
     };
@@ -1112,7 +1123,19 @@ window.onload = async () => {
         // Spectrogram colour
         colourmap.value = config.colormap;
         // Nocmig mode state
-        console.log('nocmig mode is ' + config.nocmig)
+        console.log('nocmig mode is ' + config.nocmig);
+
+        // Audio preferences:
+        audioFormat.value = config.audio.format;
+        audioBitrate.value = config.audio.bitrate;
+        audioQuality.value = config.audio.quality;
+        showRelevantAudioQuality();
+        audioFade.checked = config.audio.fade;
+        audioPadding.checked = config.audio.padding;
+        audioFade.disabled = ! audioPadding.checked;
+        audioDownmix.checked = config.audio.downmix;
+
+
         nocmigButton.innerText = config.nocmig ? 'bedtime' : 'bedtime_off';
         nocmigButton.title = config.nocmig ? 'Nocmig mode on' : 'Nocmig mode off';
         nocmig.checked = config.nocmig;
@@ -1127,8 +1150,14 @@ window.onload = async () => {
         if (config.backend === 'webgl') {
             SNRSlider.disabled = true;
         };
+        // Filters
         HPThreshold.innerText = config.HPfrequency + 'Hz';
         HPSlider.value = config.HPfrequency;
+
+        LowShelfSlider.value = config.LowShelfFrequency;
+        LowShelfThreshold.innerText = config.LowShelfFrequency + 'Hz';
+        LowShelfGain.value = config.LowShelfGain;
+
         ThreadSlider.max = diagnostics['Cores'];
         ThreadSlider.value = config[config.backend].threads;
         numberOfThreads.innerText = config[config.backend].threads;
@@ -1145,7 +1174,8 @@ window.onload = async () => {
             confidence: config.minConfidence,
             nocmig: config.nocmig,
             context: config.contextAware,
-            HPfrequency: config.HPfrequency
+            HPfrequency: config.HPfrequency,
+            audio: config.audio
         });
         loadModel();
         worker.postMessage({ action: 'clear-cache' })
@@ -1949,7 +1979,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         }
     },
     KeyE: function (e) {
-        if (e.ctrlKey) sendFile('save');
+        if (e.ctrlKey && region) sendFile('save');
     },
     KeyD: function (e) {
         if (e.ctrlKey && e.shiftKey) worker.postMessage({ action: 'convert-dataset' });
@@ -2488,7 +2518,7 @@ pagination.forEach(item => {
                 clicked = parseInt(clicked)
             }
             const limit = config.limit;
-            const  offset = (clicked - 1) * limit;
+            const offset = (clicked - 1) * limit;
             let explore, order;
             if (isExplore()) {
                 explore = isExplore();
@@ -2550,7 +2580,7 @@ function speciesFilter(e) {
         explore = true;
         STATE.explore.species = species;
         order = STATE.explore.order;
-    }    
+    }
     worker.postMessage({
         action: 'filter',
         species: species,
@@ -2670,7 +2700,7 @@ const detectionsModalDiv = document.getElementById('detectionsModal')
 detectionsModalDiv.addEventListener('hidden.bs.modal', (e) => {
     //resetRegions();
     worker.postMessage({ action: 'selection-off' });
-    worker.postMessage({ action: 'set-variables', confidence: config.minConfidence})
+    worker.postMessage({ action: 'set-variables', confidence: config.minConfidence })
     worker.postMessage({
         action: 'filter',
         species: isSpeciesViewFiltered(true),
@@ -2889,12 +2919,19 @@ function sendFile(mode, result) {
             start = 0;
             end = currentBuffer.duration;
         }
-        filename = 'export.mp3'
+        filename = 'export.' + config.audio.format;
     }
 
-    let metadata;
+    let metadata = {
+        lat: config.latitude,
+        lon: config.longitude,
+        Artist: 'Chirpity',
+        date: new Date().getFullYear(),
+        version: version
+    };       
     if (result) {
         metadata = {
+            ...metadata,
             UUID: config.UUID,
             start: start,
             end: end,
@@ -2902,12 +2939,10 @@ function sendFile(mode, result) {
             cname: result.cname,
             sname: result.sname,
             score: result.score,
-            date: result.date,
-            lat: config.latitude,
-            lon: config.longitude,
-            version: version
+            date: result.date
         };
     }
+
     if (mode === 'save') {
         worker.postMessage({
             action: 'save',
@@ -2970,6 +3005,11 @@ const populateHelpModal = async (file, label) => {
     const help = new bootstrap.Modal(document.getElementById('helpModal'));
     help.show();
 }
+
+// Prevent the settings menu disappearing on click
+document.getElementById('settingsMenu').addEventListener('click', (e) => {
+    e.stopImmediatePropagation();
+})
 
 const changeNocmigMode = (e) => {
     if (config.nocmig) {
@@ -3085,12 +3125,12 @@ batchSizeSlider.addEventListener('change', (e) => {
 // Listeners to sort results table
 const speciesSort = document.getElementById('species-sort');
 speciesSort.addEventListener('click', () => {
-        postExploreMessage('score DESC ')
+    postExploreMessage('score DESC ')
 });
 
 const timeSort = document.getElementById('time-sort');
 timeSort.addEventListener('click', () => {
-        postExploreMessage('dateTime')
+    postExploreMessage('dateTime')
 });
 
 const postExploreMessage = (order) => {
@@ -3352,23 +3392,55 @@ SNRSlider.addEventListener('input', () => {
 });
 SNRSlider.addEventListener('change', handleSNRchange);
 
-// High pass filter
-const handleHPchange = () => {
-    config.HPfrequency = parseFloat(HPSlider.value);
-    updatePrefs();
-    worker.postMessage({ action: 'set-variables', HPfrequency: config.HPfrequency })
-    if (fileLoaded){
+// Filter handling
+
+// High pass threshold
+const showFilterEffect = () => {
+    if (fileLoaded) {
         const position = wavesurfer.getCurrentTime() / windowLength;
         postBufferUpdate({ begin: bufferBegin, position: position })
     }
 }
 
+const handleHPchange = () => {
+    config.HPfrequency = parseInt(HPSlider.value);
+    updatePrefs();
+    worker.postMessage({ action: 'set-variables', HPfrequency: config.HPfrequency })
+    showFilterEffect();
+}
+
 const HPThreshold = document.getElementById('HP-threshold');
-const HPSlider = document.getElementById('HPValue');
+const HPSlider = document.getElementById('HighPassFrequency');
 HPSlider.addEventListener('input', () => {
     HPThreshold.innerText = HPSlider.value + 'Hz';
 });
 HPSlider.addEventListener('change', handleHPchange);
+
+// Low shelf threshold
+const handleLowShelfchange = () => {
+    config.LowShelfFrequency = parseInt(LowShelfSlider.value);
+    updatePrefs();
+    worker.postMessage({ action: 'set-variables', LowShelfFrequency: config.LowShelfFrequency })
+    showFilterEffect();
+}
+
+const LowShelfThreshold = document.getElementById('LowShelf-threshold');
+const LowShelfSlider = document.getElementById('LowShelfFrequency');
+LowShelfSlider.addEventListener('input', () => {
+    LowShelfThreshold.innerText = LowShelfSlider.value + 'Hz';
+});
+LowShelfSlider.addEventListener('change', handleLowShelfchange);
+
+// Low shelf gain
+const handleGainchange = () => {
+    config.LowShelfGain = parseInt(LowShelfGain.value);
+    updatePrefs();
+    worker.postMessage({ action: 'set-variables', LowShelfGain: config.LowShelfGain })
+    showFilterEffect();
+}
+
+const LowShelfGain = document.getElementById('gain');
+LowShelfGain.addEventListener('change', handleGainchange);
 
 
 
@@ -3382,5 +3454,59 @@ ThreadSlider.addEventListener('change', () => {
     config[config.backend].threads = parseInt(ThreadSlider.value);
     loadModel();
     updatePrefs();
+});
+
+
+// Audio preferences:
+
+const showRelevantAudioQuality = () => {
+    if (['mp3', 'opus'].includes(config.audio.format)) {
+        audioBitrateContainer.classList.remove('d-none');
+        audioQualityContainer.classList.add('d-none');
+    } else if (config.audio.format === 'flac') {
+        audioQualityContainer.classList.remove('d-none');
+        audioBitrateContainer.classList.add('d-none');
+    } else {
+        audioQualityContainer.classList.add('d-none');
+        audioBitrateContainer.classList.add('d-none');
+    }
+}
+
+audioFormat.addEventListener('change', (e) => {
+    config.audio.format = e.target.value;
+    showRelevantAudioQuality();
+    updatePrefs();
+    worker.postMessage({action: 'set-variables', audio: config.audio})
+});
+
+audioBitrate.addEventListener('change', (e) => {
+    config.audio.bitrate = e.target.value;;
+    updatePrefs();
+    worker.postMessage({action: 'set-variables', audio: config.audio})
+});
+
+audioQuality.addEventListener('change', (e) => {
+    config.audio.quality = e.target.value;;
+    updatePrefs();
+    worker.postMessage({action: 'set-variables', audio: config.audio})
+});
+
+audioFade.addEventListener('change', (e) => {
+    config.audio.fade = e.target.checked;
+    updatePrefs();
+    worker.postMessage({action: 'set-variables', audio: config.audio})
+});
+
+audioPadding.addEventListener('change', (e) => {
+    config.audio.padding = e.target.checked;
+    audioFade.disabled = !audioPadding.checked;
+    updatePrefs();
+    worker.postMessage({action: 'set-variables', audio: config.audio})
+});
+
+audioDownmix.addEventListener('change', (e) => {
+    config.audio.downmix = e.target.checked;
+    updatePrefs();
+    worker.postMessage({action: 'set-variables', audio: config.audio})
 });
 

@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+
 <head>
     <!-- Required meta tags -->
     <meta charset="utf-8">
@@ -9,12 +10,12 @@
 
     <!-- Bootstrap & CSS-->
     <script defer src="./node_modules/jquery/dist/jquery.min.js"></script>
-    <link rel="stylesheet" href="./node_modules/bootstrap/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="./node_modules/bootstrap/dist/css/bootstrap.min.css" />
     <script defer src="./node_modules/@popperjs/core/dist/umd/popper.min.js"></script>
     <script defer src="./node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
     <!-- Additional JavaScript & CSS -->
-    <link rel="stylesheet" href="css/style.css"/>
-    <link rel="stylesheet" href="css/daterangepicker.css"/>
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/daterangepicker.css" />
     <script defer src="js/moment.min.js"></script>
     <script defer src="js/daterangepicker.js"></script>
 
@@ -22,633 +23,770 @@
     <title>Chirpity Bird Call Detection</title>
 
 </head>
+
 <body>
 
 
-<!-- Navigation bar -->
-<div id="navPadding" class="position-absolute top-0 w-100">
-    <nav class="navbar navbar-expand-md navbar-dark bg-dark" id="primary_nav_wrap">
-        <div class="container-fluid">
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main_nav"
+    <!-- Navigation bar -->
+    <div id="navPadding" class="position-absolute top-0 w-100">
+        <nav class="navbar navbar-expand-md navbar-dark bg-dark" id="primary_nav_wrap">
+            <div class="container-fluid">
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main_nav"
                     aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="main_nav">
-                <ul class="navbar-nav">
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown"
-                           data-bs-toggle="dropdown">
-                            File
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a id="open" class="dropdown-item" href="#"><u>O</u>pen Audio File </a></li>
-                            <li><a class="dropdown-item disabled" id="saveLabels" href="#">
-                                Save <u>A</u>udacity Labels</a></li>
-                            <li><a class="dropdown-item disabled" id="exportMP3" href="#">
-                                Export Selected Audio</a></li>
-                            <li>
-                                <hr class="dropdown-divider">
-                            <li><a class="dropdown-item" href="#" id="exit">Exit</a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarRecords" role="button"
-                           data-bs-toggle="dropdown"
-                           aria-haspopup="true" aria-expanded="false">
-                            Records
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="navbarRecords">
-                            <li class="dropdown-item disabled" href="#" id="save2db">Save Records</li>
-                            <li class="dropdown-item disabled" href="#" id="charts">View charts</li>
-                            <li class="dropdown-item disabled" href="#" id="explore">Explore records</li>
-                            <li class="dropdown-item" href="#" id="dataset">Create Dataset</li>
-                        </ul>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarAnalysis" role="button"
-                           data-bs-toggle="dropdown"
-                           aria-haspopup="true" aria-expanded="false">
-                            Analysis
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
-                            <li><a class="dropdown-item text-danger" href="#" id="warmup">Model Warming up
-                                <div class="spinner-grow spinner-grow-sm" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
-                            </a></li>
-                            <li><a class="dropdown-item disabled" href="#" id="analyse">Analyse File</a></li>
-                            <li><a class="dropdown-item disabled" href="#" id="analyseSelection">Analyse Selected
-                                Interval</a></li>
-                            <li><a class="dropdown-item disabled" href="#" id="analyseAll">Analyse All Open Files</a>
-                            </li>
-                            <li class="dropdown-divider"></li>
-                            <li><a class="dropdown-item disabled" href="#" id="reanalyse">Re-analyse File</a></li>
-                            <li><a class="dropdown-item disabled" href="#" id="reanalyseAll">Re-analyse All Open
-                                Files</a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button"
-                           data-bs-toggle="dropdown">Settings</a>
-                        <ul class="nav-item dropdown-menu">
-                            <li>
-                                <form id="settingsForm">
-                                    <div class="row">
-                                        <div class="col-6 pe-0">
-                                            <fieldset class="border rounded m-2 p-1">
-                                                <legend style="font-size: large">Predictions</legend>
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="main_nav">
+                    <ul class="navbar-nav">
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" data-bs-toggle="dropdown">
+                                File
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a id="open" class="dropdown-item" href="#"><u>O</u>pen Audio File </a></li>
+                                <li><a class="dropdown-item disabled" id="saveLabels" href="#">
+                                        Save <u>A</u>udacity Labels</a></li>
+                                <li><a class="dropdown-item disabled" id="exportMP3" href="#">
+                                        Export Selected Audio</a></li>
+                                <li>
+                                    <hr class="dropdown-divider">
+                                <li><a class="dropdown-item" href="#" id="exit">Exit</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarRecords" role="button"
+                                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                Records
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="navbarRecords">
+                                <li class="dropdown-item disabled" href="#" id="save2db">Save Records</li>
+                                <li class="dropdown-item disabled" href="#" id="charts">View charts</li>
+                                <li class="dropdown-item disabled" href="#" id="explore">Explore records</li>
+                                <li class="dropdown-item" href="#" id="dataset">Create Dataset</li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarAnalysis" role="button"
+                                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                Analysis
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                                <li><a class="dropdown-item text-danger" href="#" id="warmup">Model Warming up
+                                        <div class="spinner-grow spinner-grow-sm" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </a></li>
+                                <li><a class="dropdown-item disabled" href="#" id="analyse">Analyse File</a></li>
+                                <li><a class="dropdown-item disabled" href="#" id="analyseSelection">Analyse Selected
+                                        Interval</a></li>
+                                <li><a class="dropdown-item disabled" href="#" id="analyseAll">Analyse All Open
+                                        Files</a>
+                                </li>
+                                <li class="dropdown-divider"></li>
+                                <li><a class="dropdown-item disabled" href="#" id="reanalyse">Re-analyse File</a></li>
+                                <li><a class="dropdown-item disabled" href="#" id="reanalyseAll">Re-analyse All Open
+                                        Files</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button"
+                                data-bs-toggle="dropdown">Settings</a>
+                            <ul id="settingsMenu" class="nav-item dropdown-menu">
+                                <li>
+                                    <form id="settingsForm">
+                                        <div class="row">
+                                            <div class="col-6 pe-0">
+                                                <fieldset class="border rounded m-2 p-1">
+                                                    <legend style="font-size: large">Predictions</legend>
 
-                                                <div class="form-group rounded p-2 mb-2 bg-light">
-                                                    <label for="confidence">Set threshold:</label>
-                                                    <div class="input-group">
-                                                        <input type="range" class="form-control-range" id="confidence"
-                                                               min="5"
-                                                               max="100"
-                                                               step="5">
-                                                        <div class="input-group-append">
-                                                            <span class="input-group-text"
-                                                                  id="confidence-value">50%</span>
+                                                    <div class="form-group rounded p-2 mb-2 bg-light"><span
+                                                            class="circle"
+                                                            title="Determines the minimum confidence required for results to be returned">?</span>
+                                                        <label for="confidence">Set threshold:</label>
+                                                        <div class="input-group">
+                                                            <input type="range" class="form-control-range"
+                                                                id="confidence" min="5" max="100" step="5">
+                                                            <div class="input-group-append">
+                                                                <span class="input-group-text"
+                                                                    id="confidence-value">50%</span>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
 
-                                                <div class="form-group rounded p-2 mb-2 bg-light">
-                                                    <label for="list-to-use">Search For:</label>
-                                                    <select class="form-control" id="list-to-use">
-                                                        <option value="migrants">Migrants and Owls</option>
-                                                        <option value="birds">Birds</option>
-                                                        <option value="everything">Everything</option>
-                                                    </select>
-                                                </div>
-                                                <div class="form-group rounded p-2 mb-2 bg-light">
-                                                    <div class="form-check form-switch">
-                                                        <input class="form-check-input" type="checkbox" role="switch"
-                                                               id="nocmig">
-                                                        <label class="form-check-label" for="nocmig">Nocmig mode</label>
+                                                    <div class="form-group rounded p-2 mb-2 bg-light">
                                                         <span class="circle"
-                                                            title="When enabled, Nocmig mode only searches for detections at night">?</span>
+                                                            title="Filters the detections returned in results.">?</span>
+                                                        <div class="row pe-3">
+                                                            <label class="col-auto ps-0" for="list-to-use">Show:</label>
+                                                            <select class="form-control col" id="list-to-use">
+                                                                <option value="migrants">Nocturnal Birds</option>
+                                                                <option value="birds">Birds</option>
+                                                                <option value="everything">Everything</option>
+                                                            </select>
+                                                        </div>
                                                     </div>
+                                                    <div class="form-group rounded p-2 mb-2 bg-light">
+                                                        <div class="form-check form-switch">
+                                                            <input class="form-check-input" type="checkbox"
+                                                                role="switch" id="nocmig">
+                                                            <label class="form-check-label" for="nocmig">Nocmig
+                                                                mode</label>
+                                                            <span class="circle"
+                                                                title="When enabled, Nocmig mode only searches for detections at night">?</span>
+                                                        </div>
+                                                    </div>
+                                                </fieldset>
+                                                <fieldset class="border rounded m-2 p-1">
+                                                    <legend style="font-size: large">Location <span class="circle me-2"
+                                                            title="Location is used to determine dawn and dusk times for recordings">?</span>
+                                                    </legend>
+                                                    <div class="form-group rounded p-2 mb-2 bg-light">
+                                                        <div class="row">
+                                                            <div class="input-group col">
+                                                                <span class="input-group-text pe-2">Lat:</span>
+                                                                <input id="latitude" type="text"
+                                                                    class="form-control ps-2" placeholder="0.0"
+                                                                    aria-label="Latitude" aria-describedby="latitude">
 
-                                                </div>
-                                                <div class="form-group rounded p-2 mb-2 bg-light">
-                                                    <div class="form-check form-switch">
-                                                        <span class="material-icons-two-tone" title="Experimental">science</span>
-                                                        <input class="form-check-input" type="checkbox" role="switch"
-                                                               id="context">
-                                                        <label class="form-check-label" for="context">
-                                                            Context mode</label>
+                                                                <span class="input-group-text pe-2">Lon:</span>
+                                                                <input id="longitude" type="text"
+                                                                    class="form-control ps-2" placeholder="0.0"
+                                                                    aria-label="Longitude" aria-describedby="longitude">
+                                                            </div>
+                                                        </div>
+                                                        <div class="mt-2" id="place"></div>
+
+                                                    </div>
+                                                </fieldset>
+                                            </div>
+                                            <div class="col-6 ps-0">
+                                                <fieldset class="border rounded m-2 p-1 bg-warning">
+                                                    <legend style="font-size: large"><span
+                                                            class="material-icons-two-tone align-middle"
+                                                            title="Experimental">science</span> Experimental features
+                                                    </legend>
+                                                    <div class="form-group rounded p-2 mb-2 bg-light">
+                                                        <div class="form-check form-switch">
+
+                                                            <input class="form-check-input" type="checkbox"
+                                                                role="switch" id="context">
+                                                            <label class="form-check-label" for="context">
+                                                                Context mode</label>
                                                             <span class="circle"
                                                                 title="When enabled, context mode adapts predictions by analyzing the surrounding context.">?</span>
-                                                    </div>
-                                                </div>
-                                                <div class="col me-auto">
-                                                    <div class="form-group rounded p-2 mb-2 bg-light">
-                                                        <span class="material-icons-two-tone" title="Experimental">science</span> <label for="snrValue" class="form-label"
-                                                               title="Ignore samples with just background noise. Value is the minimum signal strength to look at.">Signal
-                                                            to Noise Threshold: </label>
-                                                        <div class="input-group">
-                                                            <input type="range" class="form-control-range" min="0"
-                                                                   max="10"
-                                                                   step="0.5"
-                                                                   id="snrValue">
-                                                            <div class="input-group-append">
-                                                                <span class="input-group-text"
-                                                                      id="SNR-threshold">0</span>
-                                                            </div>
                                                         </div>
                                                     </div>
-
-                                                </div>
-                                                <div class="col me-auto">
-                                                    <div class="form-group rounded p-2 pe-0 mb-2 bg-light">
-                                                        <span class="material-icons-two-tone" title="Experimental">science</span> <label for="HPValue" class="form-label"
-                                                               title="Apply a High pass filter to the audio">High Pass filter:</label>
-                                                        <div class="input-group">
-                                                            <input type="range" class="form-control-range" min="0"
-                                                                   max="500"
-                                                                   step="10"
-                                                                   id="HPValue">
-                                                            <div class="input-group-append">
-                                                                <span class="input-group-text"
-                                                                      id="HP-threshold">0</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                </div>
-                                            </fieldset>
-                                        </div>
-                                        <div class="col-6 ps-0">
-                                            <fieldset class="border rounded m-2 p-1">
-                                                <legend style="font-size: large">Location <span class="circle"
-                                                                                                title="Location is used to determine dawn and dusk times for recordings">?</span>
-                                                </legend>
-                                                <div class="form-group rounded p-2 mb-2 bg-light">
-                                                    <div class="input-group mb-2">
-                                                        <span class="input-group-text pe-2">Lat:</span>
-                                                        <input id="latitude" type="text" class="form-control  ps-1"
-                                                               placeholder="0.0"
-                                                               aria-label="Latitude" aria-describedby="latitude">
-                                                    </div>
-                                                    <div class="input-group mb-2">
-                                                        <span class="input-group-text pe-1">Lon:</span>
-                                                        <input id="longitude" type="text" class="form-control ps-1"
-                                                               placeholder="0.0"
-                                                               aria-label="Longitude" aria-describedby="longitude">
-                                                    </div>
-                                                    <span id="place"></span>
-
-                                                </div>
-                                            </fieldset>
-                                            <fieldset class="border rounded m-2 p-1">
-                                                <legend style="font-size: large">Spectrogram</legend>
-                                                <div class="form-group rounded p-2 mb-2 bg-light">
-                                                    <label for="colourmap">Colourmap:</label>
-                                                    <select class="form-control" id="colourmap">
-                                                        <option value="greys">Greyscale</option>
-                                                        <option value="bone">Bone</option>
-                                                        <option value="turbidity">Turbidity</option>
-                                                        <option value="chlorophyll">Chlorophyll</option>
-                                                        <option value="viridis">Viridis</option>
-                                                        <option value="cdom">CDom</option>
-                                                        <option value="temperature">Temperature</option>
-                                                        <!--                                                        <option value="density">Density</option>-->
-                                                        <!--                                                        <option value="oxygen">Oxygen</option>-->
-                                                        <!--                                                        <option value="copper">Copper</option>-->
-                                                        <!--                                                        <option value="earth">Earth</option>-->
-                                                        <option value="inferno">Inferno</option>
-                                                        <option value="magma">Magma</option>
-                                                        <option value="plasma">Plasma</option>
-                                                        <option value="hot">Hot</option>
-                                                        <!--                                                        <option value="cubehelix">CubeHelix</option>-->
-                                                        <!--                                                        <option value="phase">Phase</option>-->
-                                                        <!--                                                        <option value="YlOrRd">Yellow/red</option>-->
-                                                        <!--                                                        <option value="picnic">Picnic</option>-->
-                                                        <!--                                                        <option value="electric">Electric</option>-->
-                                                        <!--                                                        <option value="bluered">BlueRed</option>-->
-                                                        <!--                                                        <option value="blackbody">Blackbody</option>-->
-                                                        <!--                                                        <option value="rainbow">Rainbow</option>-->
-                                                        <!--                                                        <option value="rainbow-soft">Rainbow</option>-->
-                                                    </select>
-                                                </div>
-                                                <div class="form-group rounded p-2 mb-2 bg-light">
-                                                    <label for="timelineSetting">Timeline:</label>
-                                                    <select class="form-control" id="timelineSetting">
-                                                        <option value="timecode">Timecode</option>
-                                                        <option value="timeOfDay">Time of day</option>
-                                                    </select>
-                                                </div>
-                                            </fieldset>
-                                        </div>
-                                    </div>
-                                    <fieldset class="border rounded m-2 p-1">
-                                        <legend style="font-size: large">System</legend>
-                                        <div class="container">
-                                            <div class="row">
-                                                <div class="col ps-0">
-                                                    <div class="form-group rounded p-2 mb-2 bg-light">
-                                                        <label>Backend:</label><br>
-                                                        <div class="form-check form-check-inline">
-                                                            <input class="form-check-input" type="radio" name="backend"
-                                                                   id="tensorflow"
-                                                                   value="tensorflow" checked>
-                                                            <label class="form-check-label" for="tensorflow">
-                                                                CPU
+                                                    <div class="col me-auto">
+                                                        <div class="form-group rounded p-2 mb-2 bg-light">
+                                                            <span class="circle"
+                                                                title="Ignore samples with just background noise. Value is the minimum signal strength to look at.">?</span>
+                                                            <label for="snrValue" class="form-label">
+                                                                Signal to Noise Threshold:
                                                             </label>
-                                                        </div>
-                                                        <div class="form-check form-check-inline">
-                                                            <input class="form-check-input" type="radio" name="backend"
-                                                                   id="webgl"
-                                                                   value="webgl">
-                                                            <label class="form-check-label" for="webgl">
-                                                                GPU
-                                                            </label>
-                                                        </div>
-                                                    </div>
-
-                                                </div>
-                                                <div class="col pe-0">
-                                                    <div class="form-group rounded p-2 mb-2 bg-light">
-                                                        <label for="thread-slider"
-                                                               title="Number of parallel predictions to run.">Threads:</label>
-                                                        <div class="input-group">
-                                                            <input type="range" class="form-control-range"
-                                                                   id="thread-slider" min="1"
-                                                                   max="24">
-                                                            <div class="input-group-append">
+                                                            <div class="input-group">
+                                                                <input type="range" class="form-control-range" min="0"
+                                                                    max="10" step="0.5" id="snrValue">
+                                                                <div class="input-group-append">
                                                                     <span class="input-group-text"
-                                                                          id="threads-value">12</span>
+                                                                        id="SNR-threshold">0</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                    </div>
+                                                    <div class="col me-auto">
+                                                        <div class="form-group rounded p-2 mb-2 bg-light">
+                                                            <span class="circle"
+                                                                title="When enabled, removes low frequency noise below the threshold.">?</span>
+                                                            <label for="HPValue" class="form-label">
+                                                                High Pass filter:
+                                                            </label>
+                                                            <div class="input-group me-0 p-0">
+                                                                <input type="range" class="form-control-range" min="0"
+                                                                    max="2500" step="25" id="HighPassFrequency">
+                                                                <div class="input-group-append">
+                                                                    <span class="input-group-text"
+                                                                        id="HP-threshold">0</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="form-group rounded p-2 mb-2 bg-light">
+                                                            <span class="circle"
+                                                                title="When used, attenuates low frequency noise below the frequency thresshold.">?</span>
+                                                            <label for="LowShelfFrequency" class="form-label">
+                                                                Low Shelf filter:
+                                                            </label>
+                                                            <div class="input-group me-0 p-0">
+                                                                <input type="range" class="form-control-range" min="0"
+                                                                    max="2500" step="100" id="LowShelfFrequency">
+                                                                <div class="input-group-append">
+                                                                    <span class="input-group-text"
+                                                                        id="LowShelf-threshold">0</span>
+                                                                </div>
+                                                            </div>
+                                                            <div class="row pe-3 mt-2">
+                                                                <label for="gain" class="form-label col">
+                                                                    Attenuation:
+                                                                </label>
+                                                                <div class="input-group me-0  col">
+                                                                    <select class="form-control" id="gain">
+                                                                        <option value="0">0 dB</option>
+                                                                        <option value="-3">3 dB</option>
+                                                                        <option value="-6">6 dB</option>
+                                                                        <option value="-9">9 dB</option>
+                                                                        <option value="-12">12 dB</option>
+                                                                        <option value="-24">24 dB</option>
+                                                                        <option value="-48">48 dB</option>
+                                                                    </select>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </div>
-                                            <div class="row">
-                                                <div class="col ps-0">
+                                                </fieldset>
+                                                <fieldset class="border rounded m-2 p-1">
+                                                    <legend style="font-size: large">Spectrogram</legend>
                                                     <div class="form-group rounded p-2 mb-2 bg-light">
-                                                        <label for="model-to-use">Model:</label>
-                                                        <select class="form-control" id="model-to-use">
-                                                            <option value="v1">V 1.0</option>
-                                                            <option value="v2">V 2.0</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                                <div class="col pe-0">
-                                                    <div class="form-group rounded p-2 mb-2 bg-light">
-                                                        <label for="batch-size"
-                                                               title="Optimising the batch size can increase the prediction speed by 2-3x on longer files.&#10;If it is too large, the model will terminate.&#10;If that happens, set a lower batch size and restart Chirpity">Batch
-                                                            Size:</label>
-                                                        <div class="input-group">
-                                                            <input type="range" class="form-control-range"
-                                                                   id="batch-size"
-                                                                   min="0"
-                                                                   max="7">
-                                                            <div class="input-group-append">
-                                                            <span class="input-group-text"
-                                                                 id="batch-size-value">2</span>
-                                                            </div>
+                                                        <div class="row pe-3">
+                                                            <label class="col" for="colourmap">Colourmap:</label>
+                                                            <select class="form-control col" id="colourmap">
+                                                                <option value="greys">Greyscale</option>
+                                                                <option value="bone">Bone</option>
+                                                                <option value="turbidity">Turbidity</option>
+                                                                <option value="chlorophyll">Chlorophyll</option>
+                                                                <option value="viridis">Viridis</option>
+                                                                <option value="cdom">CDom</option>
+                                                                <option value="temperature">Temperature</option>
+                                                                <!--                                                        <option value="density">Density</option>-->
+                                                                <!--                                                        <option value="oxygen">Oxygen</option>-->
+                                                                <!--                                                        <option value="copper">Copper</option>-->
+                                                                <!--                                                        <option value="earth">Earth</option>-->
+                                                                <option value="inferno">Inferno</option>
+                                                                <option value="magma">Magma</option>
+                                                                <option value="plasma">Plasma</option>
+                                                                <option value="hot">Hot</option>
+                                                                <!--                                                        <option value="cubehelix">CubeHelix</option>-->
+                                                                <!--                                                        <option value="phase">Phase</option>-->
+                                                                <!--                                                        <option value="YlOrRd">Yellow/red</option>-->
+                                                                <!--                                                        <option value="picnic">Picnic</option>-->
+                                                                <!--                                                        <option value="electric">Electric</option>-->
+                                                                <!--                                                        <option value="bluered">BlueRed</option>-->
+                                                                <!--                                                        <option value="blackbody">Blackbody</option>-->
+                                                                <!--                                                        <option value="rainbow">Rainbow</option>-->
+                                                                <!--                                                        <option value="rainbow-soft">Rainbow</option>-->
+                                                            </select>
                                                         </div>
                                                     </div>
-                                                </div>
+                                                    <div class="form-group rounded p-2 mb-2 bg-light">
+                                                        <div class="row pe-3">
+                                                            <label class="col" for="timelineSetting">Timeline:</label>
+                                                            <select class="form-control col" id="timelineSetting">
+                                                                <option value="timecode">Timecode</option>
+                                                                <option value="timeOfDay">Time of day</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                </fieldset>
                                             </div>
                                         </div>
-                                    </fieldset>
-                                </form>
-                            </li>
-                        </ul>
-                    </li>
-                    <li class="nav-item dropdown active">
-                        <a class="nav-link dropdown-toggle" href="#" id="help" role="button" data-bs-toggle="dropdown"
-                           aria-haspopup="true" aria-expanded="false">
-                            Help
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
-                            <li><a class="dropdown-item" id="usage" href="#">Usage</a></li>
-                            <li><a class="dropdown-item" id="settings" href="#">Settings</a></li>
-                            <li><a class="dropdown-item" id="keyboard" href="#">Keyboard Shortcuts</a></li>
-                            <li><a class="dropdown-item" id="diagnostics" href="#">Diagnostics</a></li>
-                        </ul>
-                    </li>
-                </ul>
+                                        <fieldset class="border rounded m-2 p-1">
+                                            <legend style="font-size: large">System</legend>
+                                            <div class="container">
+                                                <div class="row">
+                                                    <div class="col ps-0">
+                                                        <div class="form-group rounded p-2 mb-2 bg-light">
+                                                            <div class="row pe-3">
+                                                                <label class="col">Backend:</label><br>
+                                                                <div class="col">
+                                                                    <div class="form-check">
+                                                                        <input class="form-check-input" type="radio"
+                                                                            name="backend" id="tensorflow"
+                                                                            value="tensorflow" checked>
+                                                                        <label class="form-check-label"
+                                                                            for="tensorflow">
+                                                                            CPU
+                                                                        </label>
+                                                                    </div>
+                                                                    <div class="form-check">
+                                                                        <input class="form-check-input" type="radio"
+                                                                            name="backend" id="webgl" value="webgl">
+                                                                        <label class="form-check-label" for="webgl">
+                                                                            GPU
+                                                                        </label>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col"><span class="circle"
+                                                                        title="The GPU backend may speed up processing if you have a dedicated graphics card.">?</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col pe-0">
+                                                        <div class="form-group rounded p-2 mb-2 bg-light">
+                                                            <span class="circle"
+                                                                title="The number of parallel predictions to run">?</span>
+                                                            <label for="thread-slider">Threads:</label>
+                                                            <div class="input-group">
+                                                                <input type="range" class="form-control-range"
+                                                                    id="thread-slider" min="1" max="24">
+                                                                <div class="input-group-append">
+                                                                    <span class="input-group-text"
+                                                                        id="threads-value">12</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col ps-0">
+                                                        <div class="form-group rounded p-2 mb-2 bg-light">
+                                                            <div class="row pe-3">
+                                                                <label class="col" for="model-to-use">Model:</label>
+                                                                <select class="form-control col" id="model-to-use">
+                                                                    <option value="v1">V 1.0</option>
+                                                                    <option value="v2">V 2.0</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col pe-0">
+                                                        <div class="form-group rounded p-2 mb-2 bg-light">
+                                                            <span class="circle"
+                                                                title="Optimising the batch size can increase processing speed on longer files.&#10;If it is too large, Chirpity may run out of memory and crash when predicting.&#10;If that happens, reduce batch size.">?</span>
+                                                            <label for="batch-size">Batch Size:</label>
+                                                            <div class="input-group">
+                                                                <input type="range" class="form-control-range"
+                                                                    id="batch-size" min="0" max="7">
+                                                                <div class="input-group-append">
+                                                                    <span class="input-group-text"
+                                                                        id="batch-size-value">2</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </fieldset>
+                                        <fieldset class="border rounded m-2 p-1">
+                                            <legend style="font-size: large">Audio Export</legend>
+                                            <div class="container">
+                                                <div class="row">
+                                                    <div class="col ps-0">
+                                                        <div class="form-group rounded p-2 mb-2 bg-light">
+                                                            <div class="row pe-3">
+                                                                <label class="col" for="format">Format:</label>
+                                                                <select class="form-control col" id="format">
+                                                                    <option value="wav">WAV</option>
+                                                                    <option value="flac">FLAC</option>
+                                                                    <option value="mp3">MP3</option>
+                                                                    <!-- <option value="m4a">M4A</option> -->
+                                                                    <option value="opus">Opus</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col pe-0">
+                                                        <div class="form-group rounded p-2 pe-0 mb-2 bg-light">
+                                                            <div class="row pe-3">
+                                                                <label class="col">Decorators:</label>
+                                                                <div class="col">
+                                                                    <div class="form-check">
+                                                                        <input class="form-check-input" type="checkbox"
+                                                                            id="padding" value="2" checked>
+                                                                        <label class="form-check-label" for="padding">
+                                                                            Pad
+                                                                        </label>
+                                                                    </div>
+                                                                    <div class="form-check">
+                                                                        <input class="form-check-input" type="checkbox"
+                                                                            id="fade" disabled value="1">
+                                                                        <label class="form-check-label" for="fade">
+                                                                            Fade
+                                                                        </label>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col"><span class="circle" title="'Pad' adds 2 seconds before and after a selection to the exported audio. 
+'Fade' adds a 1 second fade effect to the start and end of the audio">?</span></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col ps-0">
+                                                        <div class="form-group rounded p-2 mb-2 bg-light">
+                                                            <div id="bitrate-container" class="row pe-3 ease">
+                                                                <label class="col" for="bitrate">Bitrate:</label>
+                                                                <select class="form-control col" id="bitrate">
+                                                                    <option value="320">320 kbps</option>
+                                                                    <option value="192">192 kbps</option>
+                                                                    <option value="160">160 kbps</option>
+                                                                    <option value="128">128 kbps</option>
+                                                                    <option value="96">96 kbps</option>
+                                                                </select>
+                                                            </div>
+                                                            <div id="quality-container" class="row pe-3 ease">
+                                                                <label class="col" for="quality">Compression
+                                                                    Level:</label>
+                                                                <select class="form-control col" id="quality">
+                                                                    <option value="0">0</option>
+                                                                    <option value="1">1</option>
+                                                                    <option value="2">2</option>
+                                                                    <option value="3">3</option>
+                                                                    <option value="4">4</option>
+                                                                    <option value="5">5</option>
+                                                                    <option value="6">6</option>
+                                                                    <option value="7">7</option>
+                                                                    <option value="8">8</option>
+                                                                    <option value="9">9</option>
+                                                                    <option value="10">10</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col pe-0">
+                                                        <div class="form-group rounded p-2 mb-2 bg-light">
+                                                            <span class="circle me-2"
+                                                                title="When enabled, stereo audio will be downmixed to mono">?</span>
+                                                            <div class="form-check form-switch">
+                                                                <input class="form-check-input" type="checkbox"
+                                                                    role="switch" id="downmix">
+                                                                <label class="form-check-label" for="downmix">Convert to
+                                                                    mono</label>
 
-            </div>
-            <!-- navbar-collapse.// -->
-            <img src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"
-                 height="40"/>
-        </div>
-        <!-- container-fluid.// -->
-    </nav>
-</div>
-<!-- Content wrapper -->
-<div id="contentWrapper">
-    <!-- DIV to Hold the bird list  -->
-    <div id="allSpecies" class="d-none"></div>
-    <div id="seenSpecies" class="d-none"></div>
+                                                            </div>
 
-    <!-- Diagnostic Modal -->
-    <div class="modal fade" id="diagnosticsModal" tabindex="-1" aria-labelledby="diagnosticsModalLabel"
-         aria-hidden="true">
-        <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header justify-content-center">
-                    <h5 class="modal-title" id="diagnosticsModalLabel">Diagnostic Information</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
-                    </button>
-                </div>
-                <div id="diagnosticsModalBody" class="modal-body"></div>
-                <div class="modal-footer justify-content-center">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <!-- Help Modal -->
-    <div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
-        <div class="modal-dialog  modal-xl modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header justify-content-center">
-                    <h5 class="modal-title" id="helpModalLabel">Help</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div id="helpModalBody" class="modal-body"></div>
-                <div class="modal-footer justify-content-center">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <!-- Analyse selection modal -->
-    <div class="modal fade" id="detectionsModal" tabindex="-1" aria-labelledby="detectionsModalLabel"
-         aria-hidden="true">
-        <div class="modal-dialog  modal-lg modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header justify-content-center text-bg-dark">
-                    <h5 class="modal-title" id="detectionsModalLabel">Audio Selection Analysis</h5>
-                </div>
-                <div id="detectionsModalBody" class="modal-body p-0 ">
-                    <table id='selectionResults' class="text-center table table-hover w-100 align-middle">
-                        <thead id="selectionResultsHead">
-                        <tr class="text-bg-dark">
-                            <th class="col">#</th>
-                            <th class="col timestamp">Time</th>
-                            <th class="text-start">Position</th>
-                            <th class="text-start">Species</th>
-                            <th class="col">Play</th>
-                            <th class="col">XC</th>
-                            <th class="">Label</th>
-                            <th class="col">Notes</th>
-                            <th class="col text-end">Delete</th>
-                        </tr>
-                        </thead>
-                        <tbody class="text-dark" id="selectionResultTableBody">
-                        </tbody>
-                    </table>
-                </div>
-                <div class="modal-footer justify-content-center">
-                    <button id="detections-add" type="button" class="btn btn-success" data-bs-dismiss="modal">Confirm</button>
-                    <button id="detections-dismiss" type="button" class="btn btn-danger" data-bs-dismiss="modal">Discard All</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <!-- Goto Modal -->
-    <div class="modal fade" id="gotoModal" tabindex="-1" aria-labelledby="gotoModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-sm">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="gotoModalLabel">Go to Position</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="gotoForm">
-                        <div class="mb-3">
-                            <label for="timeInput" class="form-label">
-                                <input type="text" class="form-control" id="timeInput" name="timeInput"
-                                       placeholder="Enter timecode">
-                                <small id="gotoHelp" class="form-text text-muted">Accepts seconds, mm:ss and
-                                    hh:mm:ss.</small>
-                            </label>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="go">Go</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <!-- Load audio file hint -->
-    <div class="d-flex h-100 flex-column text-dark align-items-center justify-content-center" id="loadFileHint">
-        <div class="">
-            <p class="lead align-content-center" id="loadFileHintText">Load an audio file for analysis by
-                selecting <span class="fst-italic"> "File > Open Audio File" </span> in the top menu.</p>
-        </div>
-        <div class="">
-            <div class="d-none spinner-border" role="status" id="loadFileHintSpinner"></div>
-        </div>
-    </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </fieldset>
+                                    </form>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown active">
+                            <a class="nav-link dropdown-toggle" href="#" id="help" role="button"
+                                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                Help
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                                <li><a class="dropdown-item" id="usage" href="#">Usage</a></li>
+                                <li><a class="dropdown-item" id="settings" href="#">Settings</a></li>
+                                <li><a class="dropdown-item" id="keyboard" href="#">Keyboard Shortcuts</a></li>
+                                <li><a class="dropdown-item" id="diagnostics" href="#">Diagnostics</a></li>
+                            </ul>
+                        </li>
+                    </ul>
 
-    <!-- Explore Div -->
-    <div id="exploreWrapper" class="p-1 row g-1 d-none">
-        <div class="species-selector col-sm-4" id="exploreSpeciesSearch">
-            <label>
-                <input type="text" class="input" placeholder="Search for a species...">
-            </label>
-            <div class="explore bird-list-wrapper"></div>
-        </div>
-        <div class="col-sm-8 align-middle">
-            <div class="text-center pointer" id="exploreRange"
-                 style="font-size: 16px;padding: 12px 20px 12px 40px; width: 100%">
-                <i class="material-icons-two-tone  align-bottom">date_range</i>&nbsp;
-                <span>Apply a date filter</span> <i
-                    class="material-icons-two-tone  align-bottom">expand_more</i>
-            </div>
-        </div>
-    </div>
-
-    <!-- Spectrogram view -->
-    <div class="w-100 d-none" id="spectrogramWrapper">
-        <div>
-            <div class="bg-dark border border-secondary w-100" id="timeline"></div>
-            <div class="w-100" id="spectrogram">
-                <span title="Toggle Fullscreen mode" id="fullscreen"
-                      class="material-icons-two-tone btn btn-outline-secondary p-1 pointer d-none">fullscreen</span>
-            </div>
-            <div class="w-100" id="waveform"></div>
-        </div>
-        <!-- Controls view -->
-        <div class="container-fluid p-1 text-bg-dark d-inline-flex" id="controlsWrapper"
-             style="max-height: 50px">
-
-            <div id="filename" class="col-5 ps-1 overflow-visible flex-nowrap"></div>
-            <div class="col btn-group bg-dark ps-1 pe-1 text-nowrap" role="group">
-                <button id="playToggle" class="p-1 btn btn-outline-secondary">
-                    <i class="material-icons-two-tone ">play_arrow</i><span
-                        class="align-middle d-none d-lg-inline">Play  </span>
-                    /
-                    <i class="material-icons-two-tone ">pause</i><span
-                        class="align-middle d-none d-lg-inline-block">Pause</span>
-                </button>
-            </div>
-
-            <div class="col btn-group bg-dark  pe-2" role="group">
-                <button id="zoomIn" title="Zoom into the spectrogram" class="btn btn-outline-secondary"
-                        style="max-width: 70px">
-                    <span class="material-icons-two-tone zoom">zoom_in</span>
-                </button>
-                <button id="zoomOut" title="Zoom out of the spectrogram" class="btn btn-outline-secondary"
-                        style="max-width: 70px"><span class="material-icons-two-tone zoom align-middle">zoom_out</span>
-                </button>
-            </div>
-            <div id="progressDiv" class="col-2" style="display:none"><span
-                    id="fileNumber"></span><br>
-                <progress id="progress-bar" max="100"></progress>
-            </div>
-
-            <div id="complete" class="col-2 pe-2" style="display:none">
-            </div>
-            <div class="col pe-1">
-                <div class="btn-group float-end">
-                    <span style="max-width: 70px" title="Nocmig mode on"
-                          id="nocmigMode"
-                          class="material-icons-two-tone btn btn-outline-secondary p-1 pt-2 pointer">bedtime</span>
-                    <span style="max-width: 70px"
-                          id="list-icon"
-                          class="btn btn-outline-secondary p-1 pointer icon-container"><img class="icon"
-                                                                                            src="img/migrants.png"
-                                                                                            alt="migrants"></span>
-                    <span style="max-width: 70px" title="Prediction confidence threshold"
-                          id="threshold-value"
-                          class="btn  btn-outline-secondary p-1 fs-5 pointer icon-container"><b>50%</b>
-                        </span>
-                    <span id="confidenceSliderContainer" class="d-none">
-                            <label for="confidenceValue" class="visually-hidden">confidence</label><input type="range"
-                                                                                                          class="form-range vertical position-absolute"
-                                                                                                          step="5"
-                                                                                                          min="5"
-                                                                                                          id="confidenceValue">
-                    </span>
                 </div>
+                <!-- navbar-collapse.// -->
+                <img src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"
+                    height="40" />
             </div>
-        </div>
+            <!-- container-fluid.// -->
+        </nav>
     </div>
-    <!-- Result container -->
-    <div class="d-none" id="resultTableContainer">
-        <div class="row g-0 h-100">
-            <div class="col-sm-4 h-100 overflow-auto" id="summary">
-                <!-- Summary table -->
-                <!--                <div class="rounded-border">-->
-                <div id='summaryTable'></div>
-                <!--                </div>-->
-            </div>
-            <!-- Results table -->
-            <div class="col-sm-8 ps-1 pe-0 h-100 position-relative overflow-auto" id="resultsDiv">
-                <nav aria-label="Identification results">
-                    <ul class="m-2 pagination justify-content-center"></ul>
-                </nav>
-                <table id='results' class="text-center table table-hover w-100 align-middle">
-                    <thead id="resultsHead" class="d-none">
-                    <tr class="bg-dark">
-                        <th class="col">#</th>
-                        <th class="col text-start timestamp">Time</th>
-                        <th id="time-sort" class="text-end pointer">Position</th>
-                        <th id="species-sort" class="pointer">Species</th>
-                        <th class="col">Play</th>
-                        <th class="col">XC</th>
-                        <th class="">Label</th>
-                        <th class="col">Notes</th>
-                        <th class="col text-end">Delete</th>
-                    </tr>
-                    </thead>
-                    <tbody class="text-dark" id="resultTableBody">
-                    </tbody>
-                </table>
-                <nav aria-label="Identification results">
-                    <ul class="m-2 pagination justify-content-center"></ul>
-                </nav>
-            </div>
-        </div>
-    </div>
-    <!-- Records container -->
-    <div class="d-none h-100 overflow-auto p-2" id="recordsContainer">
-        <div class="container-fluid">
-            <div class="row">
-                <div class="col-sm-3">
-                    <div id="speciesSearch" class="species-selector">
-                        <label>
-                            <input type="text" class="input" placeholder="Search for a species...">
-                        </label>
-                        <div class="chart bird-list-wrapper"></div>
+    <!-- Content wrapper -->
+    <div id="contentWrapper">
+        <!-- DIV to Hold the bird list  -->
+        <div id="allSpecies" class="d-none"></div>
+        <div id="seenSpecies" class="d-none"></div>
+
+        <!-- Diagnostic Modal -->
+        <div class="modal fade" id="diagnosticsModal" tabindex="-1" aria-labelledby="diagnosticsModalLabel"
+            aria-hidden="true">
+            <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header justify-content-center">
+                        <h5 class="modal-title" id="diagnosticsModalLabel">Diagnostic Information</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+                        </button>
                     </div>
-                    <div id='dataRecords' class="border border-dark rounded-border d-none">
-                        <table class="table table-striped table-hover">
-                            <tbody id="recordsTableBody">
-                            <tr>
-                                <th>Earliest Spring Record</th>
-                                <td id="earliestSpring"></td>
-                            </tr>
-                            <tr>
-                                <th>Latest Spring Record</th>
-                                <td id="latestSpring"></td>
-                            </tr>
-                            <tr>
-                                <th>Earliest Autumn Record</th>
-                                <td id="earliestAutumn"></td>
-                            </tr>
-                            <tr>
-                                <th>Latest Autumn Record</th>
-                                <td id="latestAutumn"></td>
-                            </tr>
-                            <tr>
-                                <th>Most Calls in 24 hours</th>
-                                <td id="mostDetections"></td>
-                            </tr>
-                            <tr class="fst-italic text-sm-start">
-                                <th>Chart generated in:</th>
-                                <td id="genTime"></td>
-                            </tr>
+                    <div id="diagnosticsModalBody" class="modal-body"></div>
+                    <div class="modal-footer justify-content-center">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Help Modal -->
+        <div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+            <div class="modal-dialog  modal-xl modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header justify-content-center">
+                        <h5 class="modal-title" id="helpModalLabel">Help</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div id="helpModalBody" class="modal-body"></div>
+                    <div class="modal-footer justify-content-center">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Analyse selection modal -->
+        <div class="modal fade" id="detectionsModal" tabindex="-1" aria-labelledby="detectionsModalLabel"
+            aria-hidden="true">
+            <div class="modal-dialog  modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header justify-content-center text-bg-dark">
+                        <h5 class="modal-title" id="detectionsModalLabel">Audio Selection Analysis</h5>
+                    </div>
+                    <div id="detectionsModalBody" class="modal-body p-0 ">
+                        <table id='selectionResults' class="text-center table table-hover w-100 align-middle">
+                            <thead id="selectionResultsHead">
+                                <tr class="text-bg-dark">
+                                    <th class="col">#</th>
+                                    <th class="col timestamp">Time</th>
+                                    <th class="text-start">Position</th>
+                                    <th class="text-start">Species</th>
+                                    <th class="col">Play</th>
+                                    <th class="col">XC</th>
+                                    <th class="">Label</th>
+                                    <th class="col">Notes</th>
+                                    <th class="col text-end">Delete</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-dark" id="selectionResultTableBody">
                             </tbody>
                         </table>
                     </div>
+                    <div class="modal-footer justify-content-center">
+                        <button id="detections-add" type="button" class="btn btn-success"
+                            data-bs-dismiss="modal">Confirm</button>
+                        <button id="detections-dismiss" type="button" class="btn btn-danger"
+                            data-bs-dismiss="modal">Discard All</button>
+                    </div>
                 </div>
-                <div class="col-sm-9">
-                    <div class="row">
-                        <div class="col text-center pointer" id="chartRange"
-                             style="font-size: 16px;padding: 12px 20px 12px 40px; width: 100%">
-                            <i class="material-icons-two-tone  align-bottom">date_range</i>&nbsp;
-                            <span>Apply a date filter</span> <i
-                                class="material-icons-two-tone  align-bottom">expand_more</i>
+            </div>
+        </div>
+        <!-- Goto Modal -->
+        <div class="modal fade" id="gotoModal" tabindex="-1" aria-labelledby="gotoModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="gotoModalLabel">Go to Position</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="gotoForm">
+                            <div class="mb-3">
+                                <label for="timeInput" class="form-label">
+                                    <input type="text" class="form-control" id="timeInput" name="timeInput"
+                                        placeholder="Enter timecode">
+                                    <small id="gotoHelp" class="form-text text-muted">Accepts seconds, mm:ss and
+                                        hh:mm:ss.</small>
+                                </label>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="go">Go</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Load audio file hint -->
+        <div class="d-flex h-100 flex-column text-dark align-items-center justify-content-center" id="loadFileHint">
+            <div class="">
+                <p class="lead align-content-center" id="loadFileHintText">Load an audio file for analysis by
+                    selecting <span class="fst-italic"> "File > Open Audio File" </span> in the top menu.</p>
+            </div>
+            <div class="">
+                <div class="d-none spinner-border" role="status" id="loadFileHintSpinner"></div>
+            </div>
+        </div>
+
+        <!-- Explore Div -->
+        <div id="exploreWrapper" class="p-1 row g-1 d-none">
+            <div class="species-selector col-sm-4" id="exploreSpeciesSearch">
+                <label>
+                    <input type="text" class="input" placeholder="Search for a species...">
+                </label>
+                <div class="explore bird-list-wrapper"></div>
+            </div>
+            <div class="col-sm-8 align-middle">
+                <div class="text-center pointer" id="exploreRange"
+                    style="font-size: 16px;padding: 12px 20px 12px 40px; width: 100%">
+                    <i class="material-icons-two-tone  align-bottom">date_range</i>&nbsp;
+                    <span>Apply a date filter</span> <i class="material-icons-two-tone  align-bottom">expand_more</i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Spectrogram view -->
+        <div class="w-100 d-none" id="spectrogramWrapper">
+            <div>
+                <div class="bg-dark border border-secondary w-100" id="timeline"></div>
+                <div class="w-100" id="spectrogram">
+                    <span title="Toggle Fullscreen mode" id="fullscreen"
+                        class="material-icons-two-tone btn btn-outline-secondary p-1 pointer d-none">fullscreen</span>
+                </div>
+                <div class="w-100" id="waveform"></div>
+            </div>
+            <!-- Controls view -->
+            <div class="container-fluid p-1 text-bg-dark d-inline-flex" id="controlsWrapper" style="max-height: 50px">
+
+                <div id="filename" class="col-5 ps-1 overflow-visible flex-nowrap"></div>
+                <div class="col btn-group bg-dark ps-1 pe-1 text-nowrap" role="group">
+                    <button id="playToggle" class="p-1 btn btn-outline-secondary">
+                        <i class="material-icons-two-tone ">play_arrow</i><span
+                            class="align-middle d-none d-lg-inline">Play </span>
+                        /
+                        <i class="material-icons-two-tone ">pause</i><span
+                            class="align-middle d-none d-lg-inline-block">Pause</span>
+                    </button>
+                </div>
+
+                <div class="col btn-group bg-dark  pe-2" role="group">
+                    <button id="zoomIn" title="Zoom into the spectrogram" class="btn btn-outline-secondary"
+                        style="max-width: 70px">
+                        <span class="material-icons-two-tone zoom">zoom_in</span>
+                    </button>
+                    <button id="zoomOut" title="Zoom out of the spectrogram" class="btn btn-outline-secondary"
+                        style="max-width: 70px"><span class="material-icons-two-tone zoom align-middle">zoom_out</span>
+                    </button>
+                </div>
+                <div id="progressDiv" class="col-2" style="display:none"><span id="fileNumber"></span><br>
+                    <progress id="progress-bar" max="100"></progress>
+                </div>
+
+                <div id="complete" class="col-2 pe-2" style="display:none">
+                </div>
+                <div class="col pe-1">
+                    <div class="btn-group float-end">
+                        <span style="max-width: 70px" title="Nocmig mode on" id="nocmigMode"
+                            class="material-icons-two-tone btn btn-outline-secondary p-1 pt-2 pointer">bedtime</span>
+                        <span style="max-width: 70px" id="list-icon"
+                            class="btn btn-outline-secondary p-1 pointer icon-container"><img class="icon"
+                                src="img/migrants.png" alt="migrants"></span>
+                        <span style="max-width: 70px" title="Prediction confidence threshold" id="threshold-value"
+                            class="btn  btn-outline-secondary p-1 fs-5 pointer icon-container"><b>50%</b>
+                        </span>
+                        <span id="confidenceSliderContainer" class="d-none">
+                            <label for="confidenceValue" class="visually-hidden">confidence</label><input type="range"
+                                class="form-range vertical position-absolute" step="5" min="5" id="confidenceValue">
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Result container -->
+        <div class="d-none" id="resultTableContainer">
+            <div class="row g-0 h-100">
+                <div class="col-sm-4 h-100 overflow-auto" id="summary">
+                    <!-- Summary table -->
+                    <!--                <div class="rounded-border">-->
+                    <div id='summaryTable'></div>
+                    <!--                </div>-->
+                </div>
+                <!-- Results table -->
+                <div class="col-sm-8 ps-1 pe-0 h-100 position-relative overflow-auto" id="resultsDiv">
+                    <nav aria-label="Identification results">
+                        <ul class="m-2 pagination justify-content-center"></ul>
+                    </nav>
+                    <table id='results' class="text-center table table-hover w-100 align-middle">
+                        <thead id="resultsHead" class="d-none">
+                            <tr class="bg-dark">
+                                <th class="col">#</th>
+                                <th class="col text-start timestamp">Time</th>
+                                <th id="time-sort" class="text-end pointer">Position</th>
+                                <th id="species-sort" class="pointer">Species</th>
+                                <th class="col">Play</th>
+                                <th class="col">XC</th>
+                                <th class="">Label</th>
+                                <th class="col">Notes</th>
+                                <th class="col text-end">Delete</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-dark" id="resultTableBody">
+                        </tbody>
+                    </table>
+                    <nav aria-label="Identification results">
+                        <ul class="m-2 pagination justify-content-center"></ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+        <!-- Records container -->
+        <div class="d-none h-100 overflow-auto p-2" id="recordsContainer">
+            <div class="container-fluid">
+                <div class="row">
+                    <div class="col-sm-3">
+                        <div id="speciesSearch" class="species-selector">
+                            <label>
+                                <input type="text" class="input" placeholder="Search for a species...">
+                            </label>
+                            <div class="chart bird-list-wrapper"></div>
+                        </div>
+                        <div id='dataRecords' class="border border-dark rounded-border d-none">
+                            <table class="table table-striped table-hover">
+                                <tbody id="recordsTableBody">
+                                    <tr>
+                                        <th>Earliest Spring Record</th>
+                                        <td id="earliestSpring"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Latest Spring Record</th>
+                                        <td id="latestSpring"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Earliest Autumn Record</th>
+                                        <td id="earliestAutumn"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Latest Autumn Record</th>
+                                        <td id="latestAutumn"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Most Calls in 24 hours</th>
+                                        <td id="mostDetections"></td>
+                                    </tr>
+                                    <tr class="fst-italic text-sm-start">
+                                        <th>Chart generated in:</th>
+                                        <td id="genTime"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="col chart-outer">
-                            <div class="border border-dark rounded-3" id="chart-week"></div>
+                    <div class="col-sm-9">
+                        <div class="row">
+                            <div class="col text-center pointer" id="chartRange"
+                                style="font-size: 16px;padding: 12px 20px 12px 40px; width: 100%">
+                                <i class="material-icons-two-tone  align-bottom">date_range</i>&nbsp;
+                                <span>Apply a date filter</span> <i
+                                    class="material-icons-two-tone  align-bottom">expand_more</i>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col chart-outer">
+                                <div class="border border-dark rounded-3" id="chart-week"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
 
-<!-- Footer -->
-<footer class="p-1 text-bg-primary" id="footer">
-    <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span><br><a
-            href="https://www.flaticon.com/free-icons/">Some icons created by Freepik - Flaticon</a></small>
-</footer>
-<script defer src="node_modules/wavesurfer.js/dist/wavesurfer.min.js"></script>
-<script defer src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js"></script>
-<script defer src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js"></script>
-<script defer src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.regions.min.js"></script>
-<script defer src="js/highcharts.js"></script>
-<script defer src="js/series-label.js"></script>
-<script defer src="js/exporting.js"></script>
-<script defer src="js/export-data.js"></script>
-<script defer src="js/accessibility.js"></script>
-<script defer src="js/no-data-to-display.js"></script>
+    <!-- Footer -->
+    <footer class="p-1 text-bg-primary" id="footer">
+        <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span><br><a
+                href="https://www.flaticon.com/free-icons/">Some icons created by Freepik - Flaticon</a></small>
+    </footer>
+    <script defer src="node_modules/wavesurfer.js/dist/wavesurfer.min.js"></script>
+    <script defer src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js"></script>
+    <script defer src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js"></script>
+    <script defer src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.regions.min.js"></script>
+    <script defer src="js/highcharts.js"></script>
+    <script defer src="js/series-label.js"></script>
+    <script defer src="js/exporting.js"></script>
+    <script defer src="js/export-data.js"></script>
+    <script defer src="js/accessibility.js"></script>
+    <script defer src="js/no-data-to-display.js"></script>
 
-<script defer src="./js/ui.js"></script>
+    <script defer src="./js/ui.js"></script>
 </body>
+
 </html>
