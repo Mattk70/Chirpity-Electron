@@ -1175,6 +1175,8 @@ window.onload = async () => {
             nocmig: config.nocmig,
             context: config.contextAware,
             HPfrequency: config.HPfrequency,
+            LowShelfGain:  config.LowShelfGain,
+            LowShelfFrequency: config.LowShelfFrequency,
             audio: config.audio
         });
         loadModel();
