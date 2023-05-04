@@ -498,7 +498,7 @@ Modal customisations
 }
 
 input[type="range"] {
-    width: 150px;
+    width: 140px;
     margin: 3px;
 }
 
@@ -562,7 +562,18 @@ input[type="range"].vertical {
 
 #settingsForm {
     height: 75vh;
-    min-width: 540px;
+    min-width: 550px;
+    max-height: 925px;
     overflow-y: auto;
     overflow-x: hidden;
+}
+
+.fade-in {
+    opacity: 1;
+    transition: opacity 0.5s ease-in;
+  }
+
+.fade-out {
+    opacity: 0;
+    transition: opacity 0.5s ease-out;
 }

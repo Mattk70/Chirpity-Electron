@@ -270,7 +270,7 @@ app.whenReady().then(async () => {
         const dialogOpts = {
             type: 'warning',
             title: 'Crash report',
-            detail: 'Oh no! The model has crashed'
+            detail: 'Oh no! The model has crashed. Try lowering the batch size and / or number of threads in settings'
         };
 
         dialog.showMessageBox(dialogOpts).then((returnValue) => {

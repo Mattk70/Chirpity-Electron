@@ -74,7 +74,8 @@ class State {
             this.filteredOffset = {}, // Current species start number for filtered results
             this.selection = false,
             this.blocked = STATE ? STATE.blocked : [] // don't reset blocked IDs
-        this.highPassFrequency = 0;
+            this.filters = {highPassFrequency: 0, lowShelfFrequency: 0, lowShelfGain: -6}
+
         this.model = null;
         this.predictionCount = 0;
     }
@@ -258,6 +259,7 @@ ipcRenderer.on('new-client', (event) => {
         switch (action) {
             case 'set-variables':
                 // This pattern to only update variables that have values
+                STATE.audioPreferences = args.audio || STATE.audioPreferences;
                 latitude = args.lat || latitude;
                 longitude = args.lon || longitude;
                 TEMP = args.temp || TEMP;
@@ -266,8 +268,10 @@ ipcRenderer.on('new-client', (event) => {
                 // Boolean value an issue with this pattern so...
                 if (Object.keys(args).includes('nocmig')) NOCMIG = args.nocmig;
                 if (Object.keys(args).includes('context')) CONTEXT_AWARE = args.context;
-                if (Object.keys(args).includes('HPfrequency')) STATE.highPassFrequency = args.HPfrequency;
-                console.log("Set variables", args)
+                if (Object.keys(args).includes('HPfrequency')) STATE.filters.highPassFrequency = args.HPfrequency;
+                if (Object.keys(args).includes('LowShelfFrequency')) STATE.filters.lowShelfFrequency = args.LowShelfFrequency;
+                if (Object.keys(args).includes('LowShelfGain')) STATE.filters.lowShelfGain = args.LowShelfGain;
+                if (DEBUG) console.log("Set variables", args)
                 break;
             case 'clear-cache':
                 CACHE_LOCATION = p.join(TEMP, 'chirpity');
@@ -541,6 +545,12 @@ const convertFileFormat = (file, destination, size, error) => {
         ffmpeg(file)
             .audioChannels(channels)
             .audioFrequency(sampleRate)
+            // .audioFilters(
+            //     {
+            //       filter: 'dynaudnorm',
+            //       options: 'f=500:p=0.95:g=3'
+            //     }
+            // )
             .on('error', (err) => {
                 console.log('An error occurred: ' + err.message);
                 if (err) {
@@ -808,19 +818,27 @@ async function setupCtx(chunk, header) {
     const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
     const offlineSource = offlineCtx.createBufferSource();
     offlineSource.buffer = buffer;
-
-    if (STATE.highPassFrequency) {
+    let previousFilter = undefined;
+    if (STATE.filters.highPassFrequency) {
         // Create a highpass filter to attenuate the noise
-        const filter = offlineCtx.createBiquadFilter();
-        filter.type = "highpass"; // Standard second-order resonant highpass filter with 12dB/octave rolloff. Frequencies below the cutoff are attenuated; frequencies above it pass through.
-        filter.frequency.value = STATE.highPassFrequency //frequency || 0; // This sets the cutoff frequency. 0 is off. 
-        filter.Q.value = 0; // Indicates how peaked the frequency is around the cutoff. The greater the value, the greater the peak.
-        
-        offlineSource.connect(filter);
-        filter.connect(offlineCtx.destination);
-    } else {
-        offlineSource.connect(offlineCtx.destination);
+        const highpassFilter = offlineCtx.createBiquadFilter();
+        highpassFilter.type = "highpass"; // Standard second-order resonant highpass filter with 12dB/octave rolloff. Frequencies below the cutoff are attenuated; frequencies above it pass through.
+        highpassFilter.frequency.value = STATE.filters.highPassFrequency //frequency || 0; // This sets the cutoff frequency. 0 is off. 
+        highpassFilter.Q.value = 0; // Indicates how peaked the frequency is around the cutoff. The greater the value, the greater the peak.
+        offlineSource.connect(highpassFilter);
+        previousFilter = highpassFilter;
     }
+    if (STATE.filters.lowShelfFrequency && STATE.filters.lowShelfGain){
+        // Create a lowshelf filter to boost or attenuate low-frequency content
+        const lowshelfFilter = offlineCtx.createBiquadFilter();
+        lowshelfFilter.type = 'lowshelf';
+        lowshelfFilter.frequency.value = STATE.filters.lowShelfFrequency; // This sets the cutoff frequency of the lowshelf filter to 1000 Hz
+        lowshelfFilter.gain.value = STATE.filters.lowShelfGain; // This sets the boost or attenuation in decibels (dB)
+        previousFilter ? previousFilter.connect(lowshelfFilter) : offlineSource.connect(lowshelfFilter);
+        previousFilter = lowshelfFilter;
+    }
+    previousFilter ? previousFilter.connect(offlineCtx.destination) : offlineSource.connect(offlineCtx.destination);
+    
 
     // // Create a highshelf filter to boost or attenuate high-frequency content
     // const highshelfFilter = offlineCtx.createBiquadFilter();
@@ -1233,18 +1251,39 @@ async function uploadOpus({ file, start, end, defaultName, metadata, mode }) {
 }
 
 const bufferToAudio = ({
-    file = '', start = 0, end = 3, format = 'opus', meta = {}
+    file = '', start = 0, end = 3, meta = {}
 }) => {
-    let audioCodec, soundFormat, mimeType;
-    if (format === 'opus') {
-        audioCodec = 'libopus';
-        soundFormat = 'opus'
-        mimeType = 'audio/ogg'
-    } else if (format === 'mp3') {
+    let audioCodec, mimeType;
+    let padding = STATE.audioPreferences.padding;
+    let fade = STATE.audioPreferences.fade;
+    let bitrate = STATE.audioPreferences.bitrate;
+    let quality = parseInt(STATE.audioPreferences.quality);
+    let downmix = STATE.audioPreferences.downmix;
+    let format = STATE.audioPreferences.format;
+    const bitrateMap = {24000: '24k', 16000: '16k', 12000: '12k', 8000: '8k', 44100: '44k', 22050: '22k', 11025: '11k'};
+    if (format === 'mp3') {
         audioCodec = 'libmp3lame';
         soundFormat = 'mp3';
         mimeType = 'audio/mpeg'
+    } else if  (format === 'wav') {
+        audioCodec = 'pcm_s16le';
+        soundFormat = 'wav';
+        mimeType = 'audio/wav'
+    } else if (format === 'flac') {
+        audioCodec = 'flac';
+        soundFormat = 'flac';
+        mimeType = 'audio/flac'
+        // Static binary is missing the aac encoder
+    // } else if (format === 'm4a') {
+    //     audioCodec = 'aac';
+    //     soundFormat = 'aac';
+    //     mimeType = 'audio/mp4'
+    } else if (format === 'opus') {
+        audioCodec = 'libopus';
+        soundFormat = 'opus'
+        mimeType = 'audio/ogg'
     }
+
     let optionList = [];
     for (let [k, v] of Object.entries(meta)) {
         if (typeof v === 'string') {
@@ -1253,24 +1292,58 @@ const bufferToAudio = ({
         optionList.push('-metadata');
         optionList.push(`${k}=${v}`);
     }
+
+    if (padding) {
+        start -= padding;
+        end += padding;
+        start = Math.max(0, start);
+        end = Math.min(end, metadata[file].duration);
+    }
+
     return new Promise(function (resolve) {
         const bufferStream = new stream.PassThrough();
-        ffmpeg(metadata[file].proxy)
+        let ffmpgCommand = ffmpeg(file)
+            .toFormat(soundFormat)
             .seekInput(start)
             .duration(end - start)
-            .audioBitrate(160)
-            .audioChannels(1)
-            .audioFrequency(24000)
+            .audioChannels(downmix ? 1 : -1)
+            // I can't get this to work with Opus
+            // .audioFrequency(metadata[file].sampleRate)
             .audioCodec(audioCodec)
-            .format(soundFormat)
-            .outputOptions(optionList)
-            .on('error', (err) => {
-                console.log('An error occurred: ' + err.message);
-            })
-            .on('end', function () {
+            .addOutputOptions(...optionList)
+            
+        if (['mp3','m4a', 'opus'].includes(format)) {
+            //if (format === 'opus') bitrate *= 1000;
+            ffmpgCommand = ffmpgCommand.audioBitrate(bitrate)
+        } else if (['flac'].includes(format)) {
+            ffmpgCommand = ffmpgCommand.audioQuality(quality)
+        }
+        
+        if (fade && padding) {
+            const duration = end - start;
+            if (start >= 1 && end <= metadata[file].duration - 1) {
+                ffmpgCommand = ffmpgCommand.audioFilters(
+                    {
+                        filter: 'afade',
+                        options: `t=in:ss=${start}:d=1`
+                    },
+                    {
+                        filter: 'afade',
+                        options: `t=out:st=${duration - 1}:d=1`
+                    }
+                )
+            }
+        }
+        ffmpgCommand.on('start', function(commandLine) {
+            console.log('FFmpeg command: ' + commandLine);
+          })
+        ffmpgCommand.on('error', (err) => {
+            console.log('An error occurred: ' + err.message);
+        })
+        ffmpgCommand.on('end', function () {
                 console.log(format + " file rendered")
             })
-            .writeToStream(bufferStream);
+        ffmpgCommand.writeToStream(bufferStream);
 
         const buffers = [];
         bufferStream.on('data', (buf) => {
