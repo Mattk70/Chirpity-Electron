@@ -319,9 +319,9 @@ app.on('activate', async () => {
     }
 });
 
-ipcMain.handle('dialog', (event, method, params) => {
-    dialog[method](mainWindow, params);
-});
+// ipcMain.handle('dialog', (event, method, params) => {
+//     dialog[method](mainWindow, params);
+// });
 
 ipcMain.handle('powerSaveBlocker', (event, on) => {
     //Stop system sleep
@@ -348,6 +348,18 @@ ipcMain.handle('openFiles', async (config) => {
         properties: ['openFile', 'multiSelections'],
     });
 })
+
+ipcMain.handle('selectDirectory', async (config) => {
+    // Show file dialog to select a directory
+    return await dialog.showOpenDialog(mainWindow, {
+        // From docs:
+        // Note: On Windows and Linux an open dialog can not be both a file selector and a directory selector,
+        // so if you set properties to ['openFile', 'openDirectory'] on these platforms,
+        // a directory selector will be shown.
+        properties: ['openDirectory']
+    });
+})
+
 ipcMain.handle('saveFile', (event, arg) => {
     // Show file dialog to select audio file
     let currentFile = arg.currentFile.substr(0, arg.currentFile.lastIndexOf(".")) + ".txt";

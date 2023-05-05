@@ -74,7 +74,7 @@ class State {
             this.filteredOffset = {}, // Current species start number for filtered results
             this.selection = false,
             this.blocked = STATE ? STATE.blocked : [] // don't reset blocked IDs
-            this.filters = {highPassFrequency: 0, lowShelfFrequency: 0, lowShelfGain: -6}
+            this.filters = {highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: -6}
 
         this.model = null;
         this.predictionCount = 0;
@@ -270,7 +270,7 @@ ipcRenderer.on('new-client', (event) => {
                 if (Object.keys(args).includes('context')) CONTEXT_AWARE = args.context;
                 if (Object.keys(args).includes('HPfrequency')) STATE.filters.highPassFrequency = args.HPfrequency;
                 if (Object.keys(args).includes('LowShelfFrequency')) STATE.filters.lowShelfFrequency = args.LowShelfFrequency;
-                if (Object.keys(args).includes('LowShelfGain')) STATE.filters.lowShelfGain = args.LowShelfGain;
+                if (Object.keys(args).includes('LowShelfAttenuation')) STATE.filters.lowShelfAttenuation = args.LowShelfAttenuation;
                 if (DEBUG) console.log("Set variables", args)
                 break;
             case 'clear-cache':
@@ -329,6 +329,9 @@ ipcRenderer.on('new-client', (event) => {
                     await getSummary(args);
                 }
                 break;
+            case 'export-results':
+                await getResults(args);
+                break;
             case 'analyse':
                 // Create a new memory db if one doesn't exist, or wipe it if one does,
                 // unless we're looking at a selection
@@ -339,7 +342,7 @@ ipcRenderer.on('new-client', (event) => {
                 break;
             case 'save':
                 console.log("file save requested")
-                await saveMP3(args.file, args.start, args.end, args.filename, args.metadata);
+                await saveAudio(args.file, args.start, args.end, args.filename, args.metadata);
                 break;
             case 'post':
                 await uploadOpus(args);
@@ -828,12 +831,12 @@ async function setupCtx(chunk, header) {
         offlineSource.connect(highpassFilter);
         previousFilter = highpassFilter;
     }
-    if (STATE.filters.lowShelfFrequency && STATE.filters.lowShelfGain){
+    if (STATE.filters.lowShelfFrequency && STATE.filters.lowShelfAttenuation){
         // Create a lowshelf filter to boost or attenuate low-frequency content
         const lowshelfFilter = offlineCtx.createBiquadFilter();
         lowshelfFilter.type = 'lowshelf';
         lowshelfFilter.frequency.value = STATE.filters.lowShelfFrequency; // This sets the cutoff frequency of the lowshelf filter to 1000 Hz
-        lowshelfFilter.gain.value = STATE.filters.lowShelfGain; // This sets the boost or attenuation in decibels (dB)
+        lowshelfFilter.gain.value = STATE.filters.lowShelfAttenuation; // This sets the boost or attenuation in decibels (dB)
         previousFilter ? previousFilter.connect(lowshelfFilter) : offlineSource.connect(lowshelfFilter);
         previousFilter = lowshelfFilter;
     }
@@ -1251,7 +1254,7 @@ async function uploadOpus({ file, start, end, defaultName, metadata, mode }) {
 }
 
 const bufferToAudio = ({
-    file = '', start = 0, end = 3, meta = {}
+    file = '', start = 0, end = 3, meta = {}, format = undefined
 }) => {
     let audioCodec, mimeType;
     let padding = STATE.audioPreferences.padding;
@@ -1259,7 +1262,7 @@ const bufferToAudio = ({
     let bitrate = STATE.audioPreferences.bitrate;
     let quality = parseInt(STATE.audioPreferences.quality);
     let downmix = STATE.audioPreferences.downmix;
-    let format = STATE.audioPreferences.format;
+    if (! format) format = STATE.audioPreferences.format;
     const bitrateMap = {24000: '24k', 16000: '16k', 12000: '12k', 8000: '8k', 44100: '44k', 22050: '22k', 11025: '11k'};
     if (format === 'mp3') {
         audioCodec = 'libmp3lame';
@@ -1359,18 +1362,24 @@ const bufferToAudio = ({
     })
 };
 
-async function saveMP3(file, start, end, filename, metadata) {
-    const MP3Blob = await bufferToAudio({
-        file: file, start: start, end: end, format: 'mp3', meta: metadata
+async function saveAudio(file, start, end, filename, metadata, folder) {
+    const thisBlob = await bufferToAudio({
+        file: file, start: start, end: end, meta: metadata
     });
-    const anchor = document.createElement('a');
-    document.body.appendChild(anchor);
-    anchor.style = 'display: none';
-    const url = window.URL.createObjectURL(MP3Blob);
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    window.URL.revokeObjectURL(url);
+    if (folder){
+        const buffer = Buffer.from( await thisBlob.arrayBuffer() );
+        fs.writeFile(p.join(folder, filename), buffer, () => {if (DEBUG) console.log('Audio file saved')} );
+    }
+    else {
+        const anchor = document.createElement('a');
+        document.body.appendChild(anchor);
+        anchor.style = 'display: none';
+        const url = window.URL.createObjectURL(thisBlob);
+        anchor.href = url;
+        anchor.download = filename;
+        anchor.click();
+        window.URL.revokeObjectURL(url);
+    }
 }
 
 
@@ -1811,7 +1820,8 @@ const getResults = async ({
     explore = false,
     limit = 500,
     offset = undefined,
-    topRankin = 1
+    topRankin = 1,
+    exportTo = undefined
 } = {}) => {
     let confidence = minConfidence;
     if (STATE.selection) {
@@ -1875,7 +1885,17 @@ const getResults = async ({
         WHERE confidence_rank <= ${topRankin} ${where} ${when} ORDER BY ${order}, confidence DESC LIMIT ${limit} OFFSET ${offset}`);
 
     for (let i = 0; i < result.length; i++) {
-        if (species && context !== 'explore') {
+        const r = result[i];
+        if (exportTo){
+            // Format date to YYYY-MM-DD-HH-MM-ss
+            const dateString = new Date(r.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
+            const filename = `${r.cname}-${dateString}.${STATE.audioPreferences.format}`
+            console.log(`Exporting from ${r.file}, position ${r.position}, into folder ${exportTo}`)
+            saveAudio(r.file, r.position, r.position + 3, filename, metadata, exportTo)
+            if (i === result.length - 1) UI.postMessage({event:'generate-alert', message: `${result.length} files saved`})
+        }
+        else if (species && context !== 'explore') {
+            
             const { count } = await db.getAsync(`SELECT COUNT(*) as count
                                                FROM records
                                                WHERE dateTime = ${result[i].timestamp}
