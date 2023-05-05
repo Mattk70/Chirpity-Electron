@@ -2945,7 +2945,8 @@ function sendFile(mode, result) {
             start = 0;
             end = currentBuffer.duration;
         }
-        filename = 'export.' + config.audio.format;
+        const dateString = new Date(fileStart + (start * 1000)).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
+        filename = dateString + '_export.' + config.audio.format;
     }
 
     let metadata = {
