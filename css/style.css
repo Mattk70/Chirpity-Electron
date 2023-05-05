@@ -57,6 +57,7 @@ html, body {
     max-height: 30px;
     max-width: 30px;
     filter: invert(45%);
+
 }
 
 #list-icon:hover > img {
@@ -75,11 +76,11 @@ span[id^="filename_"] {
     transition: all 0.2s linear;
     cursor: pointer;
 }
-
-.rotate.down {
-    transform: rotate(180deg);
-}
 */
+.rotate-270 {
+    transform: rotate(270deg);
+}
+
 
 .filename {
     margin-left: auto;

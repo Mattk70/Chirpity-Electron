@@ -113,7 +113,8 @@ const audioQualityContainer = document.getElementById('quality-container');
 const audioPadding = document.getElementById('padding');
 const audioFormat = document.getElementById('format');
 const audioDownmix = document.getElementById('downmix');
-
+const audioFiltersIcon = document.getElementById('audioFiltersIcon')
+const contextAwareIcon = document.getElementById('context-mode');
 let batchInProgress = false;
 let activeRow;
 let predictions = {}, speciesListItems,
@@ -251,7 +252,7 @@ function createTimeline() {
 const resetRegions = () => {
     if (wavesurfer) wavesurfer.clearRegions();
     region = undefined;
-    disableMenuItem(['analyseSelection', 'exportMP3']);
+    disableMenuItem(['analyseSelection', 'export-audio']);
     if (workerHasLoadedFile) enableMenuItem(['analyse']);
 }
 
@@ -307,7 +308,7 @@ const initWavesurfer = ({
     // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
         region = e;
-        enableMenuItem(['exportMP3']);
+        enableMenuItem(['export-audio']);
         if (modelReady && !PREDICTING) {
             enableMenuItem(['analyseSelection']);
         }
@@ -398,7 +399,7 @@ function powerSave(on) {
 }
 
 const openFileInList = async (e) => {
-    if (!PREDICTING && e.target.id !== 'setFileStart' && e.target.tagName !== 'BUTTON') {
+    if (!PREDICTING && e.target.tagName === 'A') {
         await loadAudioFile({ filePath: e.target.id, preserveResults: true })
     }
 }
@@ -743,6 +744,25 @@ save2dbLink.addEventListener('click', async () => {
     worker.postMessage({ action: 'save2db' })
 });
 
+const export2audio = document.getElementById('export2audio');
+export2audio.addEventListener('click', async () => {
+    const species = isSpeciesViewFiltered(true);
+    if (! species) {
+        alert("Filter results by species to export audio files");
+        return
+    }
+    const response = await window.electron.selectDirectory('selectDirectory');
+    if (! response.canceled){
+        const directory = response.filePaths[0];
+        worker.postMessage({
+            action: 'export-results', 
+            exportTo: directory,
+            species: species,
+            files: isExplore() ? [] : fileList,
+            limit: 100
+        })
+    }
+});
 
 const chartsLink = document.getElementById('charts');
 chartsLink.addEventListener('click', async () => {
@@ -1068,7 +1088,7 @@ window.onload = async () => {
         context: false,
         snr: 0,
         HPfrequency: 0,
-        LowShelfGain: 0,
+        LowShelfAttenuation: 0,
         LowShelfFrequency: 0,
         warmup: true,
         backend: 'tensorflow',
@@ -1140,6 +1160,7 @@ window.onload = async () => {
         nocmigButton.title = config.nocmig ? 'Nocmig mode on' : 'Nocmig mode off';
         nocmig.checked = config.nocmig;
         contextAware.checked = config.contextAware;
+        contextAwareIconDisplay();
         confidenceRange.value = config.minConfidence;
         thresholdDisplay.innerHTML = `<b>${config.minConfidence}%</b>`;
         confidenceSlider.value = config.minConfidence;
@@ -1153,10 +1174,11 @@ window.onload = async () => {
         // Filters
         HPThreshold.innerText = config.HPfrequency + 'Hz';
         HPSlider.value = config.HPfrequency;
-
         LowShelfSlider.value = config.LowShelfFrequency;
         LowShelfThreshold.innerText = config.LowShelfFrequency + 'Hz';
-        LowShelfGain.value = config.LowShelfGain;
+        LowShelfAttenuation.value = -config.LowShelfAttenuation;
+        LowShelfAttenuationThreshold.innerText = LowShelfAttenuation.value + ' dB';
+        filterIconDisplay();
 
         ThreadSlider.max = diagnostics['Cores'];
         ThreadSlider.value = config[config.backend].threads;
@@ -1175,7 +1197,7 @@ window.onload = async () => {
             nocmig: config.nocmig,
             context: config.contextAware,
             HPfrequency: config.HPfrequency,
-            LowShelfGain:  config.LowShelfGain,
+            LowShelfAttenuation:  config.LowShelfAttenuation,
             LowShelfFrequency: config.LowShelfFrequency,
             audio: config.audio
         });
@@ -1933,6 +1955,7 @@ const handleBackendChange = (e) => {
             if (config.snr) {
                 contextAware.disabed = true;
                 config.contextAware = false;
+                contextAwareIconDisplay();
             }
         }
 
@@ -1981,7 +2004,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         }
     },
     KeyE: function (e) {
-        if (e.ctrlKey && region) sendFile('save');
+        if (e.ctrlKey && region) exportAudio();
     },
     KeyD: function (e) {
         if (e.ctrlKey && e.shiftKey) worker.postMessage({ action: 'convert-dataset' });
@@ -2571,6 +2594,7 @@ const addPagination = (total, offset) => {
 
 
 function speciesFilter(e) {
+    if (e.target.tagName === 'TBODY') return; // on Drag
     activeRow = undefined;
     let species, explore, order;
     // Am I trying to unfilter?
@@ -2982,11 +3006,20 @@ const iconizeScore = (score) => {
 }
 
 // File menu handling
+
+const exportAudio = () => {
+    let index = -1;
+    if (activeRow){
+        index = setClickedIndex(activeRow)
+    }
+    sendFile('save', predictions[index])
+}
+
 document.getElementById('open').addEventListener('click', showOpenDialog);
 document.getElementById('saveLabels').addEventListener('click', showSaveDialog);
-document.getElementById('exportMP3').addEventListener('click', () => {
-    sendFile('save')
-});
+document.getElementById('export-audio').addEventListener('click', exportAudio);
+
+
 document.getElementById('exit').addEventListener('click', exitApplication);
 
 // Help menu handling
@@ -3031,9 +3064,15 @@ const changeNocmigMode = (e) => {
     updatePrefs();
 }
 
+const contextAwareIconDisplay = () => {
+    config.contextAware ? contextAwareIcon.classList.remove('d-none') : contextAwareIcon.classList.add('d-none');
+};
+
+
 const toggleContextMode = () => {
     config.contextAware = !config.contextAware;
     contextAware.checked = config.contextAware;
+    contextAwareIconDisplay();
     if (config.contextAware) {
         SNRSlider.disabled = true;
         config.snr = 0;
@@ -3395,7 +3434,13 @@ SNRSlider.addEventListener('input', () => {
 SNRSlider.addEventListener('change', handleSNRchange);
 
 // Filter handling
-
+const filterIconDisplay = () =>{
+    if (config.HPfrequency || (config.LowShelfAttenuation && config.LowShelfFrequency)){
+        audioFiltersIcon.classList.remove('d-none')
+    } else {
+        audioFiltersIcon.classList.add('d-none')
+    }
+}
 // High pass threshold
 const showFilterEffect = () => {
     if (fileLoaded) {
@@ -3409,6 +3454,7 @@ const handleHPchange = () => {
     updatePrefs();
     worker.postMessage({ action: 'set-variables', HPfrequency: config.HPfrequency })
     showFilterEffect();
+    filterIconDisplay();
 }
 
 const HPThreshold = document.getElementById('HP-threshold');
@@ -3424,6 +3470,7 @@ const handleLowShelfchange = () => {
     updatePrefs();
     worker.postMessage({ action: 'set-variables', LowShelfFrequency: config.LowShelfFrequency })
     showFilterEffect();
+    filterIconDisplay();
 }
 
 const LowShelfThreshold = document.getElementById('LowShelf-threshold');
@@ -3434,15 +3481,18 @@ LowShelfSlider.addEventListener('input', () => {
 LowShelfSlider.addEventListener('change', handleLowShelfchange);
 
 // Low shelf gain
-const handleGainchange = () => {
-    config.LowShelfGain = parseInt(LowShelfGain.value);
+const handleAttenuationchange = () => {
+    config.LowShelfAttenuation = - parseInt(LowShelfAttenuation.value);
+    LowShelfAttenuationThreshold.innerText = LowShelfAttenuation.value + ' dB';
     updatePrefs();
-    worker.postMessage({ action: 'set-variables', LowShelfGain: config.LowShelfGain })
+    worker.postMessage({ action: 'set-variables', LowShelfAttenuation: config.LowShelfAttenuation })
     showFilterEffect();
+    filterIconDisplay();
 }
 
-const LowShelfGain = document.getElementById('gain');
-LowShelfGain.addEventListener('change', handleGainchange);
+const LowShelfAttenuation = document.getElementById('attenuation');
+const LowShelfAttenuationThreshold = document.getElementById('attenuation-threshold');
+LowShelfAttenuation.addEventListener('change', handleAttenuationchange);
 
 
 

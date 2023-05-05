@@ -45,7 +45,7 @@
                                 <li><a id="open" class="dropdown-item" href="#"><u>O</u>pen Audio File </a></li>
                                 <li><a class="dropdown-item disabled" id="saveLabels" href="#">
                                         Save <u>A</u>udacity Labels</a></li>
-                                <li><a class="dropdown-item disabled" id="exportMP3" href="#">
+                                <li><a class="dropdown-item disabled" id="export-audio" href="#">
                                         Export Selected Audio</a></li>
                                 <li>
                                     <hr class="dropdown-divider">
@@ -59,6 +59,7 @@
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="navbarRecords">
                                 <li class="dropdown-item disabled" href="#" id="save2db">Save Records</li>
+                                <li class="dropdown-item " href="#" id="export2audio">Export Records</li>
                                 <li class="dropdown-item disabled" href="#" id="charts">View charts</li>
                                 <li class="dropdown-item disabled" href="#" id="explore">Explore records</li>
                                 <li class="dropdown-item" href="#" id="dataset">Create Dataset</li>
@@ -224,19 +225,15 @@
                                                                 </div>
                                                             </div>
                                                             <div class="row pe-3 mt-2">
-                                                                <label for="gain" class="form-label col">
+                                                                <label for="attenuation" class="form-label col">
                                                                     Attenuation:
                                                                 </label>
                                                                 <div class="input-group me-0  col">
-                                                                    <select class="form-control" id="gain">
-                                                                        <option value="0">0 dB</option>
-                                                                        <option value="-3">3 dB</option>
-                                                                        <option value="-6">6 dB</option>
-                                                                        <option value="-9">9 dB</option>
-                                                                        <option value="-12">12 dB</option>
-                                                                        <option value="-24">24 dB</option>
-                                                                        <option value="-48">48 dB</option>
-                                                                    </select>
+                                                                    <input type="range" class="form-control-range" min="0"
+                                                                    max="50" id="attenuation">
+                                                                <div class="input-group-append">
+                                                                    <span class="input-group-text"
+                                                                        id="attenuation-threshold">0 dB</span>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -627,8 +624,8 @@
             <div class="container-fluid p-1 text-bg-dark d-inline-flex" id="controlsWrapper" style="max-height: 50px">
 
                 <div id="filename" class="col-5 ps-1 overflow-visible flex-nowrap"></div>
-                <div class="col btn-group bg-dark ps-1 pe-1 text-nowrap" role="group">
-                    <button id="playToggle" class="p-1 btn btn-outline-secondary">
+                <div class="col-auto btn-group bg-dark ps-1 text-nowrap" role="group">
+                    <button id="playToggle" class="p-1 pe-2 btn btn-outline-secondary">
                         <i class="material-icons-two-tone ">play_arrow</i><span
                             class="align-middle d-none d-lg-inline">Play </span>
                         /
@@ -655,7 +652,11 @@
                 <div class="col pe-1">
                     <div class="btn-group float-end">
                         <span style="max-width: 70px" title="Nocmig mode on" id="nocmigMode"
-                            class="material-icons-two-tone btn btn-outline-secondary p-1 pt-2 pointer">bedtime</span>
+                            class="material-icons-two-tone btn btn-outline-secondary p-1 pt-2">bedtime</span>
+                        <span style="max-width: 70px" id="audioFiltersIcon" title="Audio filters applied" 
+                        class="material-icons-two-tone btn  btn-outline-secondary p-1 pt-2 icon-container text-warning d-none">blur_on</span>
+                        <span style="max-width: 70px" id="context-mode" title="Context Aware mode enabled" 
+                        class="material-icons-two-tone btn  btn-outline-secondary p-1 pt-2 icon-container text-warning">swap_horiz</span>
                         <span style="max-width: 70px" id="list-icon"
                             class="btn btn-outline-secondary p-1 pointer icon-container"><img class="icon"
                                 src="img/migrants.png" alt="migrants"></span>
