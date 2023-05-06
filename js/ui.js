@@ -313,6 +313,11 @@ const initWavesurfer = ({
             enableMenuItem(['analyseSelection']);
         }
     });
+    // Clear label on modifying region
+    wavesurfer.on('region-updated', function (e) {
+        region = e;
+        region.attributes.label = '';
+    });
     // Queue up next audio window while playing
     wavesurfer.on('audioprocess', function () {
 
@@ -793,6 +798,22 @@ datasetLink.addEventListener('click', async () => {
 
 // thresholdLink.addEventListener('keypress', handleThresholdChange );
 
+const checkWidth = (text) =>{
+    // Create a temporary element to measure the width of the text
+const tempElement = document.createElement('span');
+tempElement.style.position = 'absolute';
+tempElement.style.visibility = 'hidden';
+tempElement.textContent = text;
+document.body.appendChild(tempElement);
+
+// Get the width of the text
+const textWidth = tempElement.clientWidth;
+
+// Remove the temporary element from the document
+document.body.removeChild(tempElement);
+return textWidth + 5
+}
+
 
 function createRegion(start, end, label) {
     wavesurfer.pause();
@@ -802,9 +823,15 @@ function createRegion(start, end, label) {
         end: end,
         color: "rgba(255, 255, 255, 0.2)",
         attributes: {
-            label: label || ''
-        }
+            label: label || '',
+
+        },
     });
+    const region = document.getElementsByTagName('region')[0];
+    const text = region.attributes['data-region-label'].value;
+    if (region.clientWidth <= checkWidth(text)) {
+        region.style.writingMode = 'vertical-rl';
+    }
     const progress = start / wavesurfer.getDuration();
     wavesurfer.seekAndCenter(progress);
 }
@@ -1772,7 +1799,7 @@ const waitForFinalEvent = (function () {
     };
 })();
 
-$(window).resize(function () {
+$(window).on('resize',function () {
     waitForFinalEvent(function () {
 
         WindowResize();
