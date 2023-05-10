@@ -181,7 +181,7 @@
                                                             <span class="circle"
                                                                 title="Ignore samples with just background noise. Value is the minimum signal strength to look at.">?</span>
                                                             <label for="snrValue" class="form-label">
-                                                                Signal to Noise Threshold:
+                                                                SNR filter:
                                                             </label>
                                                             <div class="input-group">
                                                                 <input type="range" class="form-control-range" min="0"
@@ -583,7 +583,7 @@
             </div>
         </div>
         <!-- Load audio file hint -->
-        <div class="d-flex h-100 flex-column text-dark align-items-center justify-content-center" id="loadFileHint">
+        <!-- <div class="d-flex h-100 flex-column text-dark align-items-center justify-content-center" id="loadFileHint">
             <div class="">
                 <p class="lead align-content-center" id="loadFileHintText">Load an audio file for analysis by
                     selecting <span class="fst-italic"> "File > Open Audio File" </span> in the top menu.</p>
@@ -591,7 +591,7 @@
             <div class="">
                 <div class="d-none spinner-border" role="status" id="loadFileHintSpinner"></div>
             </div>
-        </div>
+        </div> -->
 
         <!-- Explore Div -->
         <div id="exploreWrapper" class="p-1 row g-1 d-none">
@@ -653,15 +653,15 @@
                     <div class="btn-group float-end">
                         <span style="max-width: 70px" title="Nocmig mode on" id="nocmigMode"
                             class="material-icons-two-tone btn btn-outline-secondary p-1 pt-2">bedtime</span>
-                        <span style="max-width: 70px" id="audioFiltersIcon" title="Audio filters applied" 
-                        class="material-icons-two-tone btn  btn-outline-secondary p-1 pt-2 icon-container text-warning d-none">blur_on</span>
+                        <span style="max-width: 70px" id="audioFiltersIcon" title="Experimental audio filters applied" 
+                        class="material-icons-two-tone btn btn-outline-secondary p-1 pt-2">blur_on</span>
                         <span style="max-width: 70px" id="context-mode" title="Context Aware mode enabled" 
-                        class="material-icons-two-tone btn  btn-outline-secondary p-1 pt-2 icon-container text-warning">swap_horiz</span>
+                        class="material-icons-two-tone btn btn-outline-secondary p-1 pt-2 text-warning">swap_horiz</span>
                         <span style="max-width: 70px" id="list-icon"
-                            class="btn btn-outline-secondary p-1 pointer icon-container"><img class="icon"
+                            class="btn btn-outline-secondary p-1"><img class="icon"
                                 src="img/migrants.png" alt="migrants"></span>
                         <span style="max-width: 70px" title="Prediction confidence threshold" id="threshold-value"
-                            class="btn  btn-outline-secondary p-1 fs-5 pointer icon-container"><b>50%</b>
+                            class="btn btn-outline-secondary p-1 fs-5"><b>50%</b>
                         </span>
                         <span id="confidenceSliderContainer" class="d-none">
                             <label for="confidenceValue" class="visually-hidden">confidence</label><input type="range"

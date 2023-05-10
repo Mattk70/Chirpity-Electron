@@ -18,7 +18,7 @@ let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on every change
 let select_records_stmt;
-const DEBUG = false;
+const DEBUG = true;
 
 const DATASET = false;
 const adding_chirpity_additions = true;
@@ -74,9 +74,10 @@ class State {
             this.filteredOffset = {}, // Current species start number for filtered results
             this.selection = false,
             this.blocked = STATE ? STATE.blocked : [] // don't reset blocked IDs
-            this.filters = {highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: -6}
-
-        this.model = null;
+        this.filters = { highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: -6 }
+        this.chart = {},
+            this.explore = {},
+            this.model = null;
         this.predictionCount = 0;
     }
 
@@ -140,7 +141,7 @@ const createDB = async (file) => {
         prepare_statements(db);
     }
     await db.runAsync('END');
-    return true
+    return db
 }
 
 const prepare_statements = (db) => {
@@ -291,6 +292,7 @@ ipcRenderer.on('new-client', (event) => {
                 await onUpdateFileStart(args)
                 break;
             case 'get-detected-species-list':
+
                 getSpecies(args.range);
                 break;
             case 'create-dataset':
@@ -316,7 +318,7 @@ ipcRenderer.on('new-client', (event) => {
                 index = 0;
                 if (!predictionDone) onAbort(args);
 
-                STATE.db = memoryDB;
+                STATE.db = memoryDB || await createDB();
                 console.log('Worker received audio ' + args.file);
                 await loadAudioFile(args);
                 break;
@@ -331,6 +333,10 @@ ipcRenderer.on('new-client', (event) => {
                 break;
             case 'export-results':
                 await getResults(args);
+                break;
+            case 'change-mode':
+                STATE.mode = args.mode;
+                if (STATE.mode !== 'analyse') STATE.db = diskDB;
                 break;
             case 'analyse':
                 // Create a new memory db if one doesn't exist, or wipe it if one does,
@@ -433,10 +439,8 @@ const getFilesInDirectory = async (dir) => {
 // Not an arrow function. Async function has access to arguments - so we can pass them to processnextfile
 async function onAnalyse({
     filesInScope = [],
-    currentFile = undefined,
     start = 0,
     end = undefined,
-    resetResults = false,
     reanalyse = false,
     confidence = minConfidence,
     snr = 0
@@ -444,19 +448,21 @@ async function onAnalyse({
     // Now we've asked for a new analysis, clear the aborted flag
     aborted = false;
     // if end was passed, this is a selection
-    STATE.selection = end ? getSelectionRange(currentFile, start, end) : undefined;
+    STATE.selection = end ? getSelectionRange(filesInScope[0], start, end) : undefined;
     //create a copy of files in scope for state, as filesInScope is spliced
-    STATE.setFiles([...filesInScope]);
+    STATE.setFiles(filesInScope);
     console.log(`Worker received message: ${filesInScope}, ${confidence}, start: ${start}, end: ${end}`);
-    minConfidence = confidence * 10;
+    //minConfidence = confidence * 10;
     SNR = snr;
     //Set global filesInScope for summary to use
     PENDING_FILES = filesInScope;
     index = 0;
     AUDACITY = {};
     COMPLETED = [];
-    FILE_QUEUE = currentFile ? [currentFile] : filesInScope;
-    STATE.db = memoryDB;
+    FILE_QUEUE = filesInScope;
+    // If we are analsing a selection, don't change the db
+    // Otherwise, all new analyses go to the memory db
+    if (!STATE.selection) STATE.db = memoryDB;
     let count = 0;
     for (let i = FILE_QUEUE.length - 1; i >= 0; i--) {
         let file = FILE_QUEUE[i];
@@ -473,7 +479,9 @@ async function onAnalyse({
                 continue;
             }
         } else {
-            // check if results for the files are cached (we only consider it cached if all files have been saved to the disk DB)
+            // check if results for the files are cached 
+            // we only consider it cached if all files have been saved to the disk DB)
+            // BECAUSE we want to change state.db to disk if they are
             let allCached = true;
             for (let i = 0; i < FILE_QUEUE.length; i++) {
                 if (!await getSavedFileInfo(FILE_QUEUE[i])) {
@@ -481,13 +489,11 @@ async function onAnalyse({
                     break;
                 }
             }
-            if (allCached && !reanalyse) {
+            if (allCached && !reanalyse && !STATE.selection) {
                 STATE.db = diskDB;
-                if (!STATE.selection) {
-                    await getResults({ db: diskDB, files: FILE_QUEUE });
-                    await getSummary({ files: FILE_QUEUE })
-                    return
-                }
+                await getResults({ db: diskDB, files: FILE_QUEUE });
+                await getSummary({ files: FILE_QUEUE })
+                return
             }
         }
 
@@ -499,7 +505,7 @@ async function onAnalyse({
         //if (!STATE.selection) STATE = new State(STATE.db);
     }
     for (let i = 0; i < NUM_WORKERS; i++) {
-        processNextFile({ start: start, end: end, resetResults: resetResults, worker: i });
+        processNextFile({ start: start, end: end, resetResults: STATE.selection === undefined, worker: i });
     }
 }
 
@@ -831,7 +837,7 @@ async function setupCtx(chunk, header) {
         offlineSource.connect(highpassFilter);
         previousFilter = highpassFilter;
     }
-    if (STATE.filters.lowShelfFrequency && STATE.filters.lowShelfAttenuation){
+    if (STATE.filters.lowShelfFrequency && STATE.filters.lowShelfAttenuation) {
         // Create a lowshelf filter to boost or attenuate low-frequency content
         const lowshelfFilter = offlineCtx.createBiquadFilter();
         lowshelfFilter.type = 'lowshelf';
@@ -841,7 +847,7 @@ async function setupCtx(chunk, header) {
         previousFilter = lowshelfFilter;
     }
     previousFilter ? previousFilter.connect(offlineCtx.destination) : offlineSource.connect(offlineCtx.destination);
-    
+
 
     // // Create a highshelf filter to boost or attenuate high-frequency content
     // const highshelfFilter = offlineCtx.createBiquadFilter();
@@ -1262,13 +1268,13 @@ const bufferToAudio = ({
     let bitrate = STATE.audioPreferences.bitrate;
     let quality = parseInt(STATE.audioPreferences.quality);
     let downmix = STATE.audioPreferences.downmix;
-    if (! format) format = STATE.audioPreferences.format;
-    const bitrateMap = {24000: '24k', 16000: '16k', 12000: '12k', 8000: '8k', 44100: '44k', 22050: '22k', 11025: '11k'};
+    if (!format) format = STATE.audioPreferences.format;
+    const bitrateMap = { 24000: '24k', 16000: '16k', 12000: '12k', 8000: '8k', 44100: '44k', 22050: '22k', 11025: '11k' };
     if (format === 'mp3') {
         audioCodec = 'libmp3lame';
         soundFormat = 'mp3';
         mimeType = 'audio/mpeg'
-    } else if  (format === 'wav') {
+    } else if (format === 'wav') {
         audioCodec = 'pcm_s16le';
         soundFormat = 'wav';
         mimeType = 'audio/wav'
@@ -1277,10 +1283,10 @@ const bufferToAudio = ({
         soundFormat = 'flac';
         mimeType = 'audio/flac'
         // Static binary is missing the aac encoder
-    // } else if (format === 'm4a') {
-    //     audioCodec = 'aac';
-    //     soundFormat = 'aac';
-    //     mimeType = 'audio/mp4'
+        // } else if (format === 'm4a') {
+        //     audioCodec = 'aac';
+        //     soundFormat = 'aac';
+        //     mimeType = 'audio/mp4'
     } else if (format === 'opus') {
         audioCodec = 'libopus';
         soundFormat = 'opus'
@@ -1314,14 +1320,14 @@ const bufferToAudio = ({
             // .audioFrequency(metadata[file].sampleRate)
             .audioCodec(audioCodec)
             .addOutputOptions(...optionList)
-            
-        if (['mp3','m4a', 'opus'].includes(format)) {
+
+        if (['mp3', 'm4a', 'opus'].includes(format)) {
             //if (format === 'opus') bitrate *= 1000;
             ffmpgCommand = ffmpgCommand.audioBitrate(bitrate)
         } else if (['flac'].includes(format)) {
             ffmpgCommand = ffmpgCommand.audioQuality(quality)
         }
-        
+
         if (fade && padding) {
             const duration = end - start;
             if (start >= 1 && end <= metadata[file].duration - 1) {
@@ -1337,15 +1343,15 @@ const bufferToAudio = ({
                 )
             }
         }
-        ffmpgCommand.on('start', function(commandLine) {
-            console.log('FFmpeg command: ' + commandLine);
-          })
+        ffmpgCommand.on('start', function (commandLine) {
+            if (DEBUG) console.log('FFmpeg command: ' + commandLine);
+        })
         ffmpgCommand.on('error', (err) => {
             console.log('An error occurred: ' + err.message);
         })
         ffmpgCommand.on('end', function () {
-                console.log(format + " file rendered")
-            })
+            console.log(format + " file rendered")
+        })
         ffmpgCommand.writeToStream(bufferStream);
 
         const buffers = [];
@@ -1366,9 +1372,9 @@ async function saveAudio(file, start, end, filename, metadata, folder) {
     const thisBlob = await bufferToAudio({
         file: file, start: start, end: end, meta: metadata
     });
-    if (folder){
-        const buffer = Buffer.from( await thisBlob.arrayBuffer() );
-        fs.writeFile(p.join(folder, filename), buffer, () => {if (DEBUG) console.log('Audio file saved')} );
+    if (folder) {
+        const buffer = Buffer.from(await thisBlob.arrayBuffer());
+        fs.writeFile(p.join(folder, filename), buffer, () => { if (DEBUG) console.log('Audio file saved') });
     }
     else {
         const anchor = document.createElement('a');
@@ -1560,7 +1566,6 @@ async function parseMessage(e) {
                 SEEN_LIST_UPDATE = true;
                 STATE.blocked = response.blocked;
                 STATE.globalOffset = 0;
-                getSpecies(STATE.explore?.range);
                 if (response['updateResults'] && STATE.db) {
                     // update-results called after setting migrants list, so DB may not be initialized
                     await getResults();
@@ -1701,7 +1706,9 @@ const setWhereWhen = ({ dateRange, species, files, context }) => {
     if (!STATE.selection && STATE.blocked.length) {
         excluded_species_ids = `speciesID NOT IN (${STATE.blocked})`;
     }
-    let where = `AND confidence >= ${minConfidence}`;
+    // NOT the same as a dateRange - this is for analyzing a selection
+    const confidence = STATE.selection ? 50 : minConfidence;
+    let where = `AND confidence >= ${confidence}`;
     if (files?.length) {
         const name = context === 'summary' ? 'files.name' : 'name';
         where += ` AND ${name} IN  (`;
@@ -1725,7 +1732,7 @@ const setWhereWhen = ({ dateRange, species, files, context }) => {
 const getSummary = async ({
     db = STATE.db,
     range = undefined,
-    files = [],
+    files = STATE.filesToAnalyse,
     species = undefined,
     explore = false,
     active = undefined,
@@ -1766,12 +1773,21 @@ const getSummary = async ({
     });
     let total;
     if (!interim) {
-        const res = await db.getAsync(`SELECT COUNT(*) AS total
-                                       FROM records
-                                                JOIN species
-                                                     ON species.id = speciesID
-                                                JOIN files ON fileID = files.rowid
-                                           WHERE ${excluded_species_ids} ${where} ${when}`);
+        // FIx the files.name error
+        where = where.replace('files.name', 'name');
+        const res = await db.getAsync(
+            `SELECT COUNT(*) AS total
+                FROM (
+                    SELECT MAX(confidence) AS confidence, speciesID, cname, dateTime, name
+                    FROM records
+                    JOIN species
+                        ON species.id = speciesID
+                    JOIN files ON fileID = files.rowid
+                    
+                    GROUP BY dateTime
+                ) AS max_confidences
+                WHERE ${excluded_species_ids} ${where} ${when}
+        `);
         total = res.total;
     }
     if (DEBUG) console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds");
@@ -1814,7 +1830,7 @@ const getResults = async ({
     db = STATE.db,
     range = undefined,
     order = 'dateTime',
-    files = [],
+    files = STATE.filesToAnalyse,
     species = undefined,
     context = 'results',
     explore = false,
@@ -1886,16 +1902,16 @@ const getResults = async ({
 
     for (let i = 0; i < result.length; i++) {
         const r = result[i];
-        if (exportTo){
+        if (exportTo) {
             // Format date to YYYY-MM-DD-HH-MM-ss
             const dateString = new Date(r.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
             const filename = `${r.cname}-${dateString}.${STATE.audioPreferences.format}`
             console.log(`Exporting from ${r.file}, position ${r.position}, into folder ${exportTo}`)
             saveAudio(r.file, r.position, r.position + 3, filename, metadata, exportTo)
-            if (i === result.length - 1) UI.postMessage({event:'generate-alert', message: `${result.length} files saved`})
+            if (i === result.length - 1) UI.postMessage({ event: 'generate-alert', message: `${result.length} files saved` })
         }
         else if (species && context !== 'explore') {
-            
+
             const { count } = await db.getAsync(`SELECT COUNT(*) as count
                                                FROM records
                                                WHERE dateTime = ${result[i].timestamp}
@@ -1911,15 +1927,19 @@ const getResults = async ({
         if (STATE.selection) {
             // No more detections in the selection
             sendResult(++index, 'No detections found in the selection', true)
-        } else if (species && context !== 'explore') { // Remove the species filter
-            await getResults({
-                files: files,
-                range: range,
-                context: context,
-                limit: limit,
-                offset: offset
-            })
+        } else {
+            species = species || '';
+            sendResult(++index, `No ${species} detections found.`, true)
         }
+        // else if (species && context !== 'explore') { // Remove the species filter
+        //     await getResults({
+        //         files: files,
+        //         range: range,
+        //         context: context,
+        //         limit: limit,
+        //         offset: offset
+        //     })
+        // }
     }
 };
 
@@ -2135,7 +2155,7 @@ const getRate = (species) => {
 }
 
 const getSpecies = (range) => {
-    const [where, when] = setWhereWhen({ range: STATE.explore?.range });
+    const [where, when] = setWhereWhen({ dateRange: range });
     diskDB.all(`SELECT DISTINCT cname, sname, COUNT(cname) as count
                 FROM records
                     JOIN species
