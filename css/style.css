@@ -131,6 +131,7 @@ div#contentWrapper {
     border: 1px solid #ddd; /* Add a grey border */
     border-radius: 5px;
     margin-bottom: 3px; /* Add some space below the input */
+    max-width: 320px
 }
 
 
@@ -152,14 +153,14 @@ ul {
     box-shadow: -2px 6px 6px rgba(0, 0, 0, 0.4);
     border-bottom-left-radius: 5px;
     border-bottom-right-radius: 5px;
-    min-width: 100%;
+    min-width: 320px;
 }
 
 .bird-list {
     overflow: auto;
-    margin-right: -9px;
+    margin-right: 0;
     max-height: 250px;
-
+    max-width: 320px;
 }
 
 
@@ -202,8 +203,7 @@ region.wavesurfer-region:before {
     content: attr(data-region-label);
     position: absolute;
     color: beige;
-    background-color: rgba(266, 255, 236, 0.0);
-    top: 0;
+    top: 10px;
     padding-left: 5px;
 }
 
@@ -293,7 +293,7 @@ region.wavesurfer-region[data-region-highlight] {
 
 /* width */
 ::-webkit-scrollbar {
-    width: 0.5em;
+    width: 0.75em;
     height: 0.5em;
 }
 

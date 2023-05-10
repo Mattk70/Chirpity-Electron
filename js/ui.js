@@ -2,18 +2,19 @@ let seenTheDarkness = false, shownDaylightBanner = false;
 let labels = [];
 
 const STATE = {
+    mode: 'analyse',
+    openFiles: [],
     chart: {
         species: undefined,
         range: { start: undefined, end: undefined }
     },
     explore: {
         species: undefined,
-        order: 'dateTime',
         range: { start: undefined, end: undefined }
     },
-    birdList: { lastSelectedSpecies: undefined },
+    sortOrder: 'dateTime',
+    birdList: { lastSelectedSpecies: undefined }, // Used to put the last selected species at the top of the all-species list
     selection: { start: undefined, end: undefined },
-    mode: 'analyse'
 }
 
 // Batch size map for slider
@@ -487,6 +488,7 @@ async function onOpenFiles(args) {
     //completeDiv.hide();
     // Store the file list and Load First audio file
     fileList = args.filePaths;
+    STATE.openFiles = args.filePaths;
     // Sort file by time created (the oldest first):
     if (fileList.length > 1) {
         if (modelReady) enableMenuItem(['analyseAll', 'reanalyseAll'])
@@ -545,49 +547,100 @@ function refreshResultsView() {
         }
     } else if (!fileList.length) {
         hideAll();
-        showElement(['loadFileHint', 'loadFileHintText'], true);
+        //showElement(['loadFileHint', 'loadFileHintText'], true);
     }
     adjustSpecDims(true);
 }
 
-const navbarAnalysis = document.getElementById('navbarAnalysis');
-navbarAnalysis.addEventListener('click', async () => {
-    refreshResultsView();
-    STATE.mode = 'analyse';
-});
+// const navbarAnalysis = document.getElementById('navbarAnalysis');
+// navbarAnalysis.addEventListener('click', async () => {
+//     refreshResultsView();
+//     STATE.mode = 'analyse';
+// });
+
+const getSelectionResults = () => {
+    try {
+        let start = region.start + bufferBegin;
+        // Remove small amount of region to avoid pulling in results from 'end'
+        let end = region.end + bufferBegin - 0.001;
+        if (end - start < 0.5) {
+            region.end = region.start + 0.5;
+            end = start + 0.5
+        }
+        STATE['selection']['start'] = start.toFixed(3);
+        STATE['selection']['end'] = end.toFixed(3);
+        postAnalyseMessage({
+            filesInScope: [currentFile],
+            start: STATE['selection']['start'],
+            end: STATE['selection']['end'],
+        });
+    } catch (err) {
+        // Was too fast. Give worker chance to respond and try again
+        setTimeout(getSelectionResults, 100)
+    }
+}
+
 
 const analyseLink = document.getElementById('analyse');
 analyseLink.addEventListener('click', async () => {
-    STATE.mode = 'analyse';
-    analyseList = [currentFile];
-    postAnalyseMessage({ confidence: config.minConfidence, resetResults: true, currentFile: currentFile });
+    postAnalyseMessage({filesInScope: [currentFile] });
 });
 
 const reanalyseLink = document.getElementById('reanalyse');
 reanalyseLink.addEventListener('click', async () => {
-    STATE.mode = 'analyse';
-    analyseList = [currentFile];
     postAnalyseMessage({
-        confidence: config.minConfidence,
-        resetResults: true,
-        currentFile: currentFile,
+        filesInScope: [currentFile],
         reanalyse: true
     });
 });
 
 const analyseAllLink = document.getElementById('analyseAll');
 analyseAllLink.addEventListener('click', async () => {
-    STATE.mode = 'analyse';
-    analyseList = undefined;
-    postAnalyseMessage({ confidence: config.minConfidence, resetResults: true, files: fileList });
+    postAnalyseMessage({filesInScope: fileList });
 });
 
 const reanalyseAllLink = document.getElementById('reanalyseAll');
 reanalyseAllLink.addEventListener('click', async () => {
-    STATE.mode = 'analyse';
-    analyseList = undefined;
-    postAnalyseMessage({ confidence: config.minConfidence, resetResults: true, files: fileList, reanalyse: true });
+    postAnalyseMessage({filesInScope: fileList, reanalyse: true });
 });
+
+
+const analyseSelectionLink = document.getElementById('analyseSelection');
+analyseSelectionLink.addEventListener('click', getSelectionResults);
+
+
+function postAnalyseMessage(args) {
+    if (!PREDICTING) {
+        disableMenuItem(['analyseSelection']);
+        const selection = !!args.end;
+        const filesInScope = args.filesInScope;
+        if (!selection) {
+            STATE.mode = 'analyse';
+            // Tell the worker we are in Analyse mode
+            worker.postMessage({ action: 'change-mode', mode: STATE.mode });
+            // Reset the buffer playhead and zoom:
+            analyseReset();
+            resetResults();
+            refreshResultsView();
+            STATE.mode = 'analyse';
+        } else {
+            progressDiv.show();
+            updateProgress(0);
+            delete diagnostics['Audio Duration'];
+        }
+        if (filesInScope.length > 1) {
+            batchInProgress = true;
+        }
+        worker.postMessage({
+            action: 'analyse',
+            start: args.start,
+            end: args.end,
+            filesInScope: filesInScope,
+            reanalyse: args.reanalyse,
+            snr: config.snr
+        });
+    }
+}
 
 
 /// Lat / lon
@@ -633,62 +686,6 @@ $('#latitude, #longitude, #timeInput').on('blur', function () {
     document.addEventListener('keydown', handleKeyDownDeBounce, true);
     displayLocation()
 })
-
-const getSelectionResults = () => {
-    analyseList = [currentFile];
-    try {
-        let start = region.start + bufferBegin;
-        // Remove small amount of region to avoid pulling in results from 'end'
-        let end = region.end + bufferBegin - 0.001;
-        if (end - start < 0.5) {
-            region.end = region.start + 0.5;
-            end = start + 0.5
-        }
-        STATE['selection']['start'] = start.toFixed(3);
-        STATE['selection']['end'] = end.toFixed(3);
-        postAnalyseMessage({
-            confidence: config.minConfidence,
-            resetResults: false,
-            currentFile: currentFile,
-            start: STATE['selection']['start'],
-            end: STATE['selection']['end'],
-        });
-    } catch (err) {
-        // Was too fast. Give worker chance to response and try again
-        setTimeout(getSelectionResults, 100)
-    }
-}
-
-const analyseSelectionLink = document.getElementById('analyseSelection');
-analyseSelectionLink.addEventListener('click', getSelectionResults);
-
-function postAnalyseMessage(args) {
-    disableMenuItem(['analyseSelection']);
-    // Reset the buffer playhead and zoom:
-    if (args.resetResults) {
-        analyseReset();
-        resetResults();
-    } else {
-        progressDiv.show();
-        updateProgress(0);
-        delete diagnostics['Audio Duration'];
-    }
-    worker.postMessage({
-        action: 'analyse',
-        confidence: args.confidence,
-        resetResults: args.resetResults,
-        start: args.start,
-        end: args.end,
-        currentFile: args.currentFile,
-        filesInScope: analyseList || fileList,
-        reanalyse: args.reanalyse,
-        snr: config.snr
-    });
-    if (!args.currentFile) {
-        batchInProgress = true;
-    }
-}
-
 
 // Menu bar functions
 
@@ -740,7 +737,7 @@ function hideElement(id_list) {
 
 function hideAll() {
     // File hint div,  Waveform, timeline and spec, controls and result table
-    hideElement(['loadFileHint', 'loadFileHintText', 'loadFileHintSpinner', 'exploreWrapper',
+    hideElement(['exploreWrapper',
         'spectrogramWrapper', 'resultTableContainer', 'recordsContainer', 'fullscreen', 'resultsHead']);
 }
 
@@ -752,19 +749,21 @@ save2dbLink.addEventListener('click', async () => {
 const export2audio = document.getElementById('export2audio');
 export2audio.addEventListener('click', async () => {
     const species = isSpeciesViewFiltered(true);
-    if (! species) {
+    if (!species) {
         alert("Filter results by species to export audio files");
         return
     }
     const response = await window.electron.selectDirectory('selectDirectory');
-    if (! response.canceled){
+    if (!response.canceled) {
         const directory = response.filePaths[0];
         worker.postMessage({
-            action: 'export-results', 
+            action: 'export-results',
             exportTo: directory,
             species: species,
             files: isExplore() ? [] : fileList,
-            limit: 100
+            explore: isExplore(),
+            limit: 100,
+            range: isExplore() ? STATE.explore.range : undefined
         })
     }
 });
@@ -772,6 +771,8 @@ export2audio.addEventListener('click', async () => {
 const chartsLink = document.getElementById('charts');
 chartsLink.addEventListener('click', async () => {
     STATE.mode = 'chart';
+    // Tell the worker we are in Chart mode
+    worker.postMessage({ action: 'change-mode', mode: STATE.mode });
     worker.postMessage({ action: 'get-detected-species-list', range: STATE.chart.range });
     hideAll();
     showElement(['recordsContainer']);
@@ -781,8 +782,9 @@ chartsLink.addEventListener('click', async () => {
 
 const exploreLink = document.getElementById('explore');
 exploreLink.addEventListener('click', async () => {
-    analyseList = undefined;
     STATE.mode = 'explore';
+    // Tell the worker we are in Explore mode
+    worker.postMessage({ action: 'change-mode', mode: STATE.mode });
     worker.postMessage({ action: 'get-detected-species-list', range: STATE.explore.range });
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
@@ -795,23 +797,27 @@ datasetLink.addEventListener('click', async () => {
     worker.postMessage({ action: 'create-dataset' });
 });
 
+$('.spec-labels').on('mousedown', (e) => {
+    e.stopImmediatePropagation();
+    console.log('label draggggggggggggg')
+})
 
 // thresholdLink.addEventListener('keypress', handleThresholdChange );
 
-const checkWidth = (text) =>{
+const checkWidth = (text) => {
     // Create a temporary element to measure the width of the text
-const tempElement = document.createElement('span');
-tempElement.style.position = 'absolute';
-tempElement.style.visibility = 'hidden';
-tempElement.textContent = text;
-document.body.appendChild(tempElement);
+    const tempElement = document.createElement('span');
+    tempElement.style.position = 'absolute';
+    tempElement.style.visibility = 'hidden';
+    tempElement.textContent = text;
+    document.body.appendChild(tempElement);
 
-// Get the width of the text
-const textWidth = tempElement.clientWidth;
+    // Get the width of the text
+    const textWidth = tempElement.clientWidth;
 
-// Remove the temporary element from the document
-document.body.removeChild(tempElement);
-return textWidth + 5
+    // Remove the temporary element from the document
+    document.body.removeChild(tempElement);
+    return textWidth + 5
 }
 
 
@@ -821,7 +827,7 @@ function createRegion(start, end, label) {
     wavesurfer.addRegion({
         start: start,
         end: end,
-        color: "rgba(255, 255, 255, 0.2)",
+        color: "rgba(255, 255, 255, 0.1)",
         attributes: {
             label: label || '',
 
@@ -1179,20 +1185,12 @@ window.onload = async () => {
         showRelevantAudioQuality();
         audioFade.checked = config.audio.fade;
         audioPadding.checked = config.audio.padding;
-        audioFade.disabled = ! audioPadding.checked;
+        audioFade.disabled = !audioPadding.checked;
         audioDownmix.checked = config.audio.downmix;
-
-
-        nocmigButton.innerText = config.nocmig ? 'bedtime' : 'bedtime_off';
-        nocmigButton.title = config.nocmig ? 'Nocmig mode on' : 'Nocmig mode off';
-        nocmig.checked = config.nocmig;
+        setNocmig(config.nocmig);
         contextAware.checked = config.contextAware;
         contextAwareIconDisplay();
-        confidenceRange.value = config.minConfidence;
-        thresholdDisplay.innerHTML = `<b>${config.minConfidence}%</b>`;
-        confidenceSlider.value = config.minConfidence;
-        confidenceDisplay.innerHTML = `<b>${config.minConfidence}%</b>`;
-        confidenceRange.value = config.minConfidence;
+        showThreshold(config.minConfidence);
         SNRSlider.value = config.snr;
         SNRThreshold.innerText = config.snr;
         if (config.backend === 'webgl') {
@@ -1224,7 +1222,7 @@ window.onload = async () => {
             nocmig: config.nocmig,
             context: config.contextAware,
             HPfrequency: config.HPfrequency,
-            LowShelfAttenuation:  config.LowShelfAttenuation,
+            LowShelfAttenuation: config.LowShelfAttenuation,
             LowShelfFrequency: config.LowShelfFrequency,
             audio: config.audio
         });
@@ -1368,6 +1366,10 @@ $(document).on('blur', '.input', function (e) {
     }
 })
 
+$(document).on('mousedown', '.bird-list-wrapper', function(e){
+    e.preventDefault();
+})
+
 function hideBirdList(el) {
     const list = el.closest('.species-selector').querySelector('.bird-list');
     if (el.id === 'edit') {
@@ -1388,7 +1390,7 @@ let restoreSpecies;
 $(document).on('contextmenu', '.edit, .cname', setEditID);
 
 function setEditID(e) {
-    const currentRow = e.target.closest('tr');
+    const currentRow = this.closest('tr');
     setClickedIndex(currentRow);
     let restore = currentRow.querySelector('.cname').cloneNode(true);
     restore.classList.add('restore', 'd-none');
@@ -1406,7 +1408,7 @@ function setEditID(e) {
 
 
 // Clear contents of species input when clicked
-$('.species-selector > input').on('focus', function () {
+$('.species-selector input').on('focus', function () {
     this.value = '';
 })
 
@@ -1577,7 +1579,7 @@ $(document).on('click', '.request-bird', function (e) {
         STATE.explore.species = cname;
         action = 'filter';
         explore = true;
-        order = STATE.explore.order;
+        order = STATE.sortOrder;
     }
     worker.postMessage({ action: action, explore: explore, species: cname, range: STATE[context].range, order: order })
 })
@@ -1799,7 +1801,7 @@ const waitForFinalEvent = (function () {
     };
 })();
 
-$(window).on('resize',function () {
+$(window).on('resize', function () {
     waitForFinalEvent(function () {
 
         WindowResize();
@@ -2543,7 +2545,7 @@ async function onPredictionDone({
             const rows = resultTable.querySelectorAll('tr.daytime, tr.nighttime')
             if (rows.length) {
                 activeRow = rows[rows.length - 1];
-            }
+            } else { return }
         } else {
             activeRow.classList.add('table-active');
         }
@@ -2571,21 +2573,17 @@ pagination.forEach(item => {
             }
             const limit = config.limit;
             const offset = (clicked - 1) * limit;
-            let explore, order;
-            if (isExplore()) {
-                explore = isExplore();
-                order = STATE.explore.order;
-            }
+            const order = STATE.sortOrder;
             const species = isSpeciesViewFiltered(true);
             // Reset daylight banner
             shownDaylightBanner = false;
             worker.postMessage({
                 action: 'filter',
                 species: species,
-                files: explore ? [] : analyseList || fileList,
+                files: isExplore() ? [] : fileList,
                 offset: offset,
                 limit: limit,
-                explore: explore,
+                explore: isExplore(),
                 order: order
             });
         }
@@ -2623,7 +2621,7 @@ const addPagination = (total, offset) => {
 function speciesFilter(e) {
     if (e.target.tagName === 'TBODY') return; // on Drag
     activeRow = undefined;
-    let species, explore, order;
+    let species, explore, order, range;
     // Am I trying to unfilter?
     if (!e.target.closest('tr').classList.contains('text-warning')) {
         // Clicked on unfiltered species
@@ -2632,14 +2630,16 @@ function speciesFilter(e) {
     if (isExplore()) {
         explore = true;
         STATE.explore.species = species;
-        order = STATE.explore.order;
+        range = STATE.explore.range
     }
+    order = STATE.sortOrder;
     worker.postMessage({
         action: 'filter',
         species: species,
-        files: explore ? [] : analyseList || fileList,
+        files: explore ? [] : fileList,
         order: order,
-        explore: explore
+        explore: explore,
+        range: range
     });
     seenTheDarkness = false;
     shownDaylightBanner = false;
@@ -2680,7 +2680,7 @@ async function renderResult({
     }
     if (typeof (result) === 'string') {
         const nocturnal = config.nocmig ? '<b>during the night</b>' : '';
-        tr += `<tr><th scope='row'>${index}</th><td colspan="8">${result} (Predicting ${config.list} ${nocturnal} with at least ${config.minConfidence}% confidence in the prediction)</td></tr>`;
+        tr += `<tr><th scope='row'>${index}</th><td colspan="8">${result} (Showing ${config.list} detected ${nocturnal} with at least ${config.minConfidence}% confidence in the prediction)</td></tr>`;
     } else {
         const {
             timestamp,
@@ -2760,9 +2760,8 @@ detectionsModalDiv.addEventListener('hidden.bs.modal', (e) => {
         files: fileList,
         active: getActiveRow(),
         explore: isExplore(),
-        order: STATE.explore.order
+        order: STATE.sortOrder
     });
-    analyseList = undefined;
 });
 
 const detectionsDismiss = document.getElementById('detections-dismiss');
@@ -2870,7 +2869,7 @@ const updateRecord = (what, range, start, from, to, context, batchUpdate, file) 
         isBatch: batchUpdate,
         context: context,
         active: getActiveRow(),
-        oder: STATE.explore.order,
+        oder: STATE.sortOrder,
         range: range
     })
 };
@@ -2982,7 +2981,7 @@ function sendFile(mode, result) {
         Artist: 'Chirpity',
         date: new Date().getFullYear(),
         version: version
-    };       
+    };
     if (result) {
         metadata = {
             ...metadata,
@@ -3037,7 +3036,7 @@ const iconizeScore = (score) => {
 
 const exportAudio = () => {
     let index = -1;
-    if (activeRow){
+    if (activeRow) {
         index = setClickedIndex(activeRow)
     }
     sendFile('save', predictions[index])
@@ -3074,17 +3073,22 @@ document.getElementById('settingsMenu').addEventListener('click', (e) => {
     e.stopImmediatePropagation();
 })
 
-const changeNocmigMode = (e) => {
-    if (config.nocmig) {
-        config.nocmig = false;
-        nocmigButton.innerText = 'bedtime_off';
-        nocmigButton.title = 'Nocmig mode off';
-    } else {
-        config.nocmig = true;
+function setNocmig(on) {
+    if (on){
         nocmigButton.innerText = 'bedtime';
         nocmigButton.title = 'Nocmig mode on';
+        nocmigButton.classList.add('text-info');
+    } else {
+        nocmigButton.innerText = 'bedtime_off';
+        nocmigButton.title = 'Nocmig mode off';
+        nocmigButton.classList.remove('text-info');
     }
     nocmig.checked = config.nocmig;
+}
+
+const changeNocmigMode = () => {
+    config.nocmig = !config.nocmig;
+    setNocmig(config.nocmig);
     worker.postMessage({
         action: 'set-variables',
         nocmig: config.nocmig,
@@ -3093,7 +3097,13 @@ const changeNocmigMode = (e) => {
 }
 
 const contextAwareIconDisplay = () => {
-    config.contextAware ? contextAwareIcon.classList.remove('d-none') : contextAwareIcon.classList.add('d-none');
+    if (config.contextAware){
+        contextAwareIcon.classList.add('text-warning');
+        contextAwareIcon.title = "Context aware mode enabled";
+    } else{
+        contextAwareIcon.classList.remove('text-warning');
+        contextAwareIcon.title = "Context aware mode disabled";
+    }
 };
 
 
@@ -3178,7 +3188,7 @@ document.getElementById('playToggle').addEventListener('mousedown', async () => 
 document.getElementById('zoomIn').addEventListener('click', zoomSpec);
 document.getElementById('zoomOut').addEventListener('click', zoomSpec);
 
-// Listeners to set and display  batch size
+// Listeners to set and display batch size
 const batchSizeSlider = document.getElementById('batch-size');
 
 batchSizeSlider.addEventListener('input', (e) => {
@@ -3194,21 +3204,21 @@ batchSizeSlider.addEventListener('change', (e) => {
 // Listeners to sort results table
 const speciesSort = document.getElementById('species-sort');
 speciesSort.addEventListener('click', () => {
-    postExploreMessage('score DESC ')
+    setSortOrder('score DESC ')
 });
 
 const timeSort = document.getElementById('time-sort');
 timeSort.addEventListener('click', () => {
-    postExploreMessage('dateTime')
+    setSortOrder('dateTime')
 });
 
-const postExploreMessage = (order) => {
-    STATE.explore.order = order;
+const setSortOrder = (order) => {
+    STATE.sortOrder = order;
 
     worker.postMessage({
         action: 'filter',
         species: isSpeciesViewFiltered(true),
-        order: STATE.explore.order,
+        order: STATE.sortOrder,
         explore: isExplore()
     })
 
@@ -3289,7 +3299,7 @@ $(function () {
             const dateRange = { start: picker.startDate._d.getTime(), end: picker.endDate._d.getTime() };
             if (worker) {
                 // Update the seen species list
-                worker.postMessage({ action: 'get-detected-species-list', range: dateRange });
+                worker.postMessage({ action: 'get-detected-species-list', range: dateRange, explore: isExplore() });
                 if (this.id === 'chartRange') {
                     STATE.chart.range = dateRange;
                     if (STATE.chart.species) {
@@ -3306,7 +3316,7 @@ $(function () {
                         action: 'filter',
                         species: STATE.explore.species,
                         range: STATE.explore.range,
-                        order: STATE.explore.order,
+                        order: STATE.sortOrder,
                         explore: true
                     });
                 }
@@ -3317,7 +3327,7 @@ $(function () {
             $(this).children('span').html('Apply a date filter');
             if (worker) {
                 // Update the seen species list
-                worker.postMessage({ action: 'get-detected-species-list' });
+                worker.postMessage({ action: 'get-detected-species-list', explore: isExplore() });
                 if (this.id === 'chartRange') {
                     STATE.chart.range = undefined;
                     if (STATE.chart.species) {
@@ -3332,7 +3342,7 @@ $(function () {
                     worker.postMessage({
                         action: 'filter',
                         species: STATE.explore.species,
-                        order: STATE.explore.order,
+                        order: STATE.sortOrder,
                         explore: true
                     });
                 }
@@ -3416,14 +3426,17 @@ confidenceSliderDisplay.addEventListener('mouseup', (e) => {
     hideConfidenceSlider()
 });
 
-
-const handleThresholdChange = (e) => {
-    const threshold = e.target.value;
-    config.minConfidence = parseInt(e.target.value);
+function showThreshold(threshold) {
     thresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
     confidenceDisplay.innerHTML = `<b>${threshold}%</b>`;
-    confidenceSlider.value = e.target.value;
-    confidenceRange.value = e.target.value
+    confidenceSlider.value = threshold;
+    confidenceRange.value = threshold;
+}
+
+const handleThresholdChange = (e) => {
+    const threshold = parseInt(e.target.value);
+    showThreshold(threshold);
+    config.minConfidence = threshold;
     updatePrefs();
     worker.postMessage({
         action: 'set-variables',
@@ -3433,12 +3446,30 @@ const handleThresholdChange = (e) => {
         worker.postMessage({
             action: 'filter',
             species: isSpeciesViewFiltered(true),
-            files: isExplore() ? [] : analyseList || fileList,
-            order: STATE.explore.order,
+            files: isExplore() ? [] : fileList,
+            order: STATE.sortOrder,
         });
     }
 }
 confidenceRange.addEventListener('input', handleThresholdChange);
+// Filter handling
+const filterIconDisplay = () => {
+    if (config.HPfrequency || (config.LowShelfAttenuation && config.LowShelfFrequency) || config.snr) {
+        audioFiltersIcon.classList.add('text-warning');
+        audioFiltersIcon.title = 'Experimental audio filters applied';
+    } else {
+        audioFiltersIcon.classList.remove('text-warning')
+        audioFiltersIcon.title = 'No audio filters applied';
+    }
+}
+// High pass threshold
+const showFilterEffect = () => {
+    if (fileLoaded) {
+        const position = wavesurfer.getCurrentTime() / windowLength;
+        postBufferUpdate({ begin: bufferBegin, position: position })
+    }
+}
+
 // SNR
 const handleSNRchange = () => {
     config.snr = parseFloat(SNRSlider.value);
@@ -3451,6 +3482,7 @@ const handleSNRchange = () => {
         contextAware.disabled = false;
     }
     updatePrefs();
+    filterIconDisplay();
 }
 
 
@@ -3460,22 +3492,6 @@ SNRSlider.addEventListener('input', () => {
     SNRThreshold.innerText = SNRSlider.value;
 });
 SNRSlider.addEventListener('change', handleSNRchange);
-
-// Filter handling
-const filterIconDisplay = () =>{
-    if (config.HPfrequency || (config.LowShelfAttenuation && config.LowShelfFrequency)){
-        audioFiltersIcon.classList.remove('d-none')
-    } else {
-        audioFiltersIcon.classList.add('d-none')
-    }
-}
-// High pass threshold
-const showFilterEffect = () => {
-    if (fileLoaded) {
-        const position = wavesurfer.getCurrentTime() / windowLength;
-        postBufferUpdate({ begin: bufferBegin, position: position })
-    }
-}
 
 const handleHPchange = () => {
     config.HPfrequency = parseInt(HPSlider.value);
@@ -3556,37 +3572,37 @@ audioFormat.addEventListener('change', (e) => {
     config.audio.format = e.target.value;
     showRelevantAudioQuality();
     updatePrefs();
-    worker.postMessage({action: 'set-variables', audio: config.audio})
+    worker.postMessage({ action: 'set-variables', audio: config.audio })
 });
 
 audioBitrate.addEventListener('change', (e) => {
     config.audio.bitrate = e.target.value;;
     updatePrefs();
-    worker.postMessage({action: 'set-variables', audio: config.audio})
+    worker.postMessage({ action: 'set-variables', audio: config.audio })
 });
 
 audioQuality.addEventListener('change', (e) => {
     config.audio.quality = e.target.value;;
     updatePrefs();
-    worker.postMessage({action: 'set-variables', audio: config.audio})
+    worker.postMessage({ action: 'set-variables', audio: config.audio })
 });
 
 audioFade.addEventListener('change', (e) => {
     config.audio.fade = e.target.checked;
     updatePrefs();
-    worker.postMessage({action: 'set-variables', audio: config.audio})
+    worker.postMessage({ action: 'set-variables', audio: config.audio })
 });
 
 audioPadding.addEventListener('change', (e) => {
     config.audio.padding = e.target.checked;
     audioFade.disabled = !audioPadding.checked;
     updatePrefs();
-    worker.postMessage({action: 'set-variables', audio: config.audio})
+    worker.postMessage({ action: 'set-variables', audio: config.audio })
 });
 
 audioDownmix.addEventListener('change', (e) => {
     config.audio.downmix = e.target.checked;
     updatePrefs();
-    worker.postMessage({action: 'set-variables', audio: config.audio})
+    worker.postMessage({ action: 'set-variables', audio: config.audio })
 });
 
