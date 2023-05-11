@@ -1202,7 +1202,7 @@ window.onload = async () => {
         LowShelfSlider.value = config.LowShelfFrequency;
         LowShelfThreshold.innerText = config.LowShelfFrequency + 'Hz';
         LowShelfAttenuation.value = -config.LowShelfAttenuation;
-        LowShelfAttenuationThreshold.innerText = LowShelfAttenuation.value + ' dB';
+        LowShelfAttenuationThreshold.innerText = LowShelfAttenuation.value + 'dB';
         filterIconDisplay();
 
         ThreadSlider.max = diagnostics['Cores'];
@@ -3527,7 +3527,6 @@ LowShelfSlider.addEventListener('change', handleLowShelfchange);
 // Low shelf gain
 const handleAttenuationchange = () => {
     config.LowShelfAttenuation = - parseInt(LowShelfAttenuation.value);
-    LowShelfAttenuationThreshold.innerText = LowShelfAttenuation.value + ' dB';
     updatePrefs();
     worker.postMessage({ action: 'set-variables', LowShelfAttenuation: config.LowShelfAttenuation })
     showFilterEffect();
@@ -3538,7 +3537,9 @@ const LowShelfAttenuation = document.getElementById('attenuation');
 const LowShelfAttenuationThreshold = document.getElementById('attenuation-threshold');
 LowShelfAttenuation.addEventListener('change', handleAttenuationchange);
 
-
+LowShelfAttenuation.addEventListener('input', () =>{
+    LowShelfAttenuationThreshold.innerText = LowShelfAttenuation.value + 'dB';
+});
 
 // number of threads
 const numberOfThreads = document.getElementById('threads-value');
