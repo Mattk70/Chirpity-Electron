@@ -362,7 +362,7 @@ function updateElementCache() {
     specCanvasElement = $('#spectrogram canvas');
     waveCanvasElement = $('#waveform canvas');
     waveWaveElement = $('#waveform wave');
-    specWaveElement = $('#spectrogram wave')
+    specWaveElement = $('#spectrogram wave');
 }
 
 function zoomSpec(direction) {
@@ -583,7 +583,7 @@ const getSelectionResults = () => {
 
 const analyseLink = document.getElementById('analyse');
 analyseLink.addEventListener('click', async () => {
-    postAnalyseMessage({filesInScope: [currentFile] });
+    postAnalyseMessage({ filesInScope: [currentFile] });
 });
 
 const reanalyseLink = document.getElementById('reanalyse');
@@ -596,18 +596,19 @@ reanalyseLink.addEventListener('click', async () => {
 
 const analyseAllLink = document.getElementById('analyseAll');
 analyseAllLink.addEventListener('click', async () => {
-    postAnalyseMessage({filesInScope: fileList });
+    postAnalyseMessage({ filesInScope: fileList });
 });
 
 const reanalyseAllLink = document.getElementById('reanalyseAll');
 reanalyseAllLink.addEventListener('click', async () => {
-    postAnalyseMessage({filesInScope: fileList, reanalyse: true });
+    postAnalyseMessage({ filesInScope: fileList, reanalyse: true });
 });
 
 
 const analyseSelectionLink = document.getElementById('analyseSelection');
 analyseSelectionLink.addEventListener('click', getSelectionResults);
-
+const ContextAnalyseSelectionLink = document.getElementById('context-analyse-selection');
+ContextAnalyseSelectionLink.addEventListener('click', getSelectionResults);
 
 function postAnalyseMessage(args) {
     if (!PREDICTING) {
@@ -1366,7 +1367,7 @@ $(document).on('blur', '.input', function (e) {
     }
 })
 
-$(document).on('mousedown', '.bird-list-wrapper', function(e){
+$(document).on('mousedown', '.bird-list-wrapper', function (e) {
     e.preventDefault();
 })
 
@@ -1457,7 +1458,11 @@ function editHandler(e) {
         if (!sname) sname = cname;
         STATE.birdList.lastSelectedSpecies = cname;
         const cnameCell = this.closest('.cname');
-        editID(cname, sname, cnameCell);
+        if (cnameCell){ 
+            editID(cname, sname, cnameCell);
+        } else {
+            hideBirdList(input)
+        }
     }
 }
 
@@ -1477,7 +1482,7 @@ const editID = (cname, sname, cell) => {
     // Make sure we update the restore species
     //restoreSpecies = cell;
     let from;
-    from = restoreSpecies.querySelector('.cname').innerText;
+    from = restoreSpecies?.querySelector('.cname').innerText;
     // Are we batch editing here?
     const context = getDetectionContext(cell);
     const batch = context === 'resultSummary';
@@ -2452,7 +2457,7 @@ const updateSummary = ({
     summary = [],
     filterSpecies = ''
 }) => {
-    let summaryHTML = `<table id="resultSummary" class="table table-striped table-dark table-hover p-1"><thead>
+    let summaryHTML = `<table id="resultSummary" class="table table-striped table-dark p-1"><thead>
             <tr>
                 <th class="col-3" scope="col">Max</th>
                 <th class="col-5" scope="col">Species</th>
@@ -2680,7 +2685,7 @@ async function renderResult({
     }
     if (typeof (result) === 'string') {
         const nocturnal = config.nocmig ? '<b>during the night</b>' : '';
-        tr += `<tr><th scope='row'>${index}</th><td colspan="8">${result} (Showing ${config.list} detected ${nocturnal} with at least ${config.minConfidence}% confidence in the prediction)</td></tr>`;
+        tr += `<tr><td colspan="8">${result} (Showing ${config.list} detected ${nocturnal} with at least ${config.minConfidence}% confidence in the prediction)</td></tr>`;
     } else {
         const {
             timestamp,
@@ -2703,7 +2708,7 @@ async function renderResult({
             // Only do this if change starts midway through a file
             if ((index - 1) % config.limit !== 0) {
                 // Show the twilight start bar
-                tr += `<tr class="text-bg-dark"><td colspan="20" class="text-center">
+                tr += `<tr class="text-bg-dark"><td colspan="20" class="text-center text-white">
                 Start of civil twilight <span class="material-icons-two-tone text-warning align-bottom">wb_twilight</span>
                 </td></tr>`;
             }
@@ -2729,7 +2734,7 @@ async function renderResult({
         const countIcon = count > 1 ? `<span class="circle pointer" title="Click to view the ${count} detections at this timecode">${count}</span>` : '';
         const XC_type = cname.indexOf('(song)') !== -1 ? "song" : "nocturnal flight call";
         tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${position + 3}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
-            <th scope='row'>${index}</th>
+           
             <td class='text-start text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-end">${UI_position} </td>
             <td name="${cname}" class='text-start cname'>
@@ -2924,14 +2929,16 @@ const deleteRecord = (target, isBatch, context) => {
     const index = row.rowIndex
     setting.deleteRow(index);
     // Move to the next row, if there is one
-    try {
-        setting.rows[index].click()
-    } catch (e) {
-        if (!e instanceof TypeError) {
-            console.error(e)
+    if (!isBatch){
+        try {
+            setting.rows[index].click()
+        } catch (e) {
+            if (!e instanceof TypeError) {
+                console.error(e)
+            }
         }
     }
-    resetRegions();
+    //resetRegions();
     worker.postMessage({
         action: 'delete',
         file: file,
@@ -3074,7 +3081,7 @@ document.getElementById('settingsMenu').addEventListener('click', (e) => {
 })
 
 function setNocmig(on) {
-    if (on){
+    if (on) {
         nocmigButton.innerText = 'bedtime';
         nocmigButton.title = 'Nocmig mode on';
         nocmigButton.classList.add('text-info');
@@ -3097,17 +3104,17 @@ const changeNocmigMode = () => {
 }
 
 const contextAwareIconDisplay = () => {
-    if (config.contextAware){
+    if (config.contextAware) {
         contextAwareIcon.classList.add('text-warning');
         contextAwareIcon.title = "Context aware mode enabled";
-    } else{
+    } else {
         contextAwareIcon.classList.remove('text-warning');
         contextAwareIcon.title = "Context aware mode disabled";
     }
 };
 
 
-const toggleContextMode = () => {
+const toggleContextAwareMode = () => {
     config.contextAware = !config.contextAware;
     contextAware.checked = config.contextAware;
     contextAwareIconDisplay();
@@ -3124,11 +3131,13 @@ const toggleContextMode = () => {
     });
     updatePrefs()
 }
+contextAwareIcon.addEventListener('click', toggleContextAwareMode)
+
 
 nocmigButton.addEventListener('click', changeNocmigMode);
 nocmig.addEventListener('change', changeNocmigMode)
 
-contextAware.addEventListener('change', toggleContextMode)
+contextAware.addEventListener('change', toggleContextAwareMode)
 
 const fullscreen = document.getElementById('fullscreen');
 
@@ -3537,7 +3546,7 @@ const LowShelfAttenuation = document.getElementById('attenuation');
 const LowShelfAttenuationThreshold = document.getElementById('attenuation-threshold');
 LowShelfAttenuation.addEventListener('change', handleAttenuationchange);
 
-LowShelfAttenuation.addEventListener('input', () =>{
+LowShelfAttenuation.addEventListener('input', () => {
     LowShelfAttenuationThreshold.innerText = LowShelfAttenuation.value + 'dB';
 });
 
@@ -3607,3 +3616,44 @@ audioDownmix.addEventListener('change', (e) => {
     worker.postMessage({ action: 'set-variables', audio: config.audio })
 });
 
+
+$('#spectrogramWrapper').on('contextmenu', function (e) {
+    if (region) {
+        var top = e.pageY - 50;
+        var left = e.pageX;
+        $("#context-menu").css({
+            display: "block",
+            top: top,
+            left: left
+        }).addClass("show");
+    }
+    return false; //blocks default Webbrowser right click menu
+}).on("click", function () {
+    $("#context-menu").removeClass("show").hide();
+});
+
+$("#context-menu a").on("click", function () {
+    $(this).parent().removeClass("show").hide();
+});
+
+const createManualRecord = document.getElementById('create-manual-record')
+
+createManualRecord.addEventListener('click', showRecordEntryForm);
+
+function showRecordEntryForm() {
+    const recordEntryModal = new bootstrap.Modal(document.getElementById('record-entry-modal'));
+    generateBirdList('allSpecies');
+    const speciesList = `<div id='edit' class="species-selector">
+                            <input type="text" class="input" spellcheck="false" id="editInput" 
+                                placeholder="Select a species...">
+                            <div class="editing bird-list-wrapper"></div>                        
+                        </div>`;
+
+    const comment = `<div class="form-floating">
+    <textarea class="form-control" placeholder="Leave a comment here" id="floatingTextarea2" style="height: 200px"></textarea>
+    <label for="floatingTextarea2">Comments</label>
+  </div>`;
+    $('#record-entry-modal-body').html(speciesList + comment);
+    document.getElementById('editInput').focus();
+    recordEntryModal.show();
+}
