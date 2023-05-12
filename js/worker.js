@@ -450,7 +450,7 @@ async function onAnalyse({
     // if end was passed, this is a selection
     STATE.selection = end ? getSelectionRange(filesInScope[0], start, end) : undefined;
     //create a copy of files in scope for state, as filesInScope is spliced
-    STATE.setFiles(filesInScope);
+    STATE.setFiles([...filesInScope]);
     console.log(`Worker received message: ${filesInScope}, ${confidence}, start: ${start}, end: ${end}`);
     //minConfidence = confidence * 10;
     SNR = snr;
@@ -1747,25 +1747,21 @@ const getSummary = async ({
     if (explore) db = diskDB;
     t0 = Date.now();
     const summary = await db.allAsync(`
-        SELECT species.cname, species.sname, COUNT(*) as count, ROUND(max_confidence.max_confidence / 10.0, 0) as max
-        FROM (
-            SELECT dateTime, speciesID, confidence, RANK()
-            OVER (PARTITION BY dateTime ORDER BY confidence DESC) AS rank
-            FROM records
-            JOIN files ON files.rowid = records.fileID
-            JOIN species ON species.id = records.speciesID
-            WHERE ${excluded_species_ids} ${where}  ${when}
-            ) AS confidence_by_datetime_species
-            JOIN species
-        ON confidence_by_datetime_species.speciesID = species.id
-            JOIN (
-            SELECT speciesID, MAX (confidence) AS max_confidence
-            FROM records
-            GROUP BY records.speciesID
-            ) AS max_confidence ON max_confidence.speciesID = species.id
-        WHERE confidence_by_datetime_species.rank <= ${topRankin}
-        GROUP BY cname, max_confidence.max_confidence
-        ORDER BY count DESC, max_confidence.max_confidence DESC;
+
+    WITH ranked_records AS (
+        SELECT records.dateTime, records.speciesID, records.confidence,
+          RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
+        FROM records
+        JOIN files ON files.rowid = records.fileID
+        WHERE ${excluded_species_ids} ${where} ${when}
+      )
+      SELECT species.cname, species.sname, COUNT(*) as count, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
+      FROM ranked_records
+      JOIN species ON species.id = ranked_records.speciesID
+      WHERE ranked_records.rank <= ${topRankin}
+      GROUP BY species.id
+      ORDER BY count DESC, max DESC;
+    
     `);
     // need another setWhereWhen call for total
     [where, when, excluded_species_ids] = setWhereWhen({
@@ -1856,7 +1852,10 @@ const getResults = async ({
         if (species) STATE.filteredOffset[species] = offset;
         else STATE.globalOffset = offset;
     }
-    if (explore) db = diskDB;
+    if (explore) {
+        db = diskDB;
+        files = [];
+    }
     const [where, when, excluded_species_ids] = setWhereWhen({
         dateRange: range, species: species, files: files, context: context
     });
@@ -2202,6 +2201,7 @@ async function onDelete({
     species,
     explore,
     range,
+    isBatch
 }) {
     const db = explore ? diskDB : STATE.db;
     file = prepSQL(file);
@@ -2216,7 +2216,7 @@ async function onDelete({
                          AND speciesID =
                              (SELECT id FROM species WHERE cname = '${speciesSQL}')
     `)
-    await getSummary(arguments[0]);
+    if (! isBatch) await getSummary(arguments[0]);
     if (db === diskDB) {
         getSpecies(range);
     }

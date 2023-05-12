@@ -182,9 +182,15 @@ ul {
 /* make dropdown stick to row */
 .table-active {
     overflow: visible;
-    position: relative
+    position: relative;
+    font-weight: bolder;
 }
 
+/*
+tbody tr:not(.table-active):hover {
+    background-color: whitesmoke; 
+}
+*/
 
 #results > thead, #results > th, #resultSummary > thead, #resultSummary > th {
     position: sticky;

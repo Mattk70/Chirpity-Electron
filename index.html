@@ -229,15 +229,15 @@
                                                                     Attenuation:
                                                                 </label>
                                                                 <div class="input-group me-0  col">
-                                                                    <input type="range" class="form-control-range" min="0"
-                                                                    max="50" id="attenuation">
-                                                                <div class="input-group-append">
-                                                                    <span class="input-group-text"
-                                                                        id="attenuation-threshold">0 dB</span>
+                                                                    <input type="range" class="form-control-range"
+                                                                        min="0" max="50" id="attenuation">
+                                                                    <div class="input-group-append">
+                                                                        <span class="input-group-text"
+                                                                            id="attenuation-threshold">0 dB</span>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    </div>
                                                 </fieldset>
                                                 <fieldset class="border rounded m-2 p-1">
                                                     <legend style="font-size: large">Spectrogram</legend>
@@ -504,6 +504,26 @@
                 </div>
             </div>
         </div>
+        <!-- Record Entry Modal -->
+        <div class="modal fade" id="record-entry-modal" tabindex="-1" aria-labelledby="record-entry-modal-label"
+            aria-hidden="true">
+            <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header justify-content-center">
+                        <h5 class="modal-title" id="record-entry-modal-label">Create a Record</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+                        </button>
+                    </div>
+                    <div id="record-entry-modal-body" class="modal-body"></div>
+                    <div class="modal-footer justify-content-center">
+                        <button id="record-add" type="button" class="btn btn-success"
+                            data-bs-dismiss="modal">Add</button>
+                        <button id="record-dismiss" type="button" class="btn btn-danger"
+                            data-bs-dismiss="modal">Dismiss</button>
+                    </div>
+                </div>
+            </div>
+        </div>
         <!-- Help Modal -->
         <div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
             <div class="modal-dialog  modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -531,7 +551,7 @@
                         <table id='selectionResults' class="text-center table table-hover w-100 align-middle">
                             <thead id="selectionResultsHead">
                                 <tr class="text-bg-dark">
-                                    <th class="col">#</th>
+                                    <!-- <th class="col">#</th> -->
                                     <th class="col timestamp">Time</th>
                                     <th class="text-start">Position</th>
                                     <th class="text-start">Species</th>
@@ -612,6 +632,11 @@
 
         <!-- Spectrogram view -->
         <div class="w-100 d-none" id="spectrogramWrapper">
+            <!-- context menu-->
+            <div class="dropdown-menu dropdown-menu-sm" id="context-menu">
+                <a class="dropdown-item" href="#" id="context-analyse-selection">Analyse selection</a>
+                <a class="dropdown-item" id="create-manual-record" href="#">Create Record</a>
+            </div>
             <div>
                 <div class="bg-dark border border-secondary w-100" id="timeline"></div>
                 <div class="w-100" id="spectrogram">
@@ -653,13 +678,12 @@
                     <div class="btn-group float-end">
                         <span style="max-width: 70px" title="Nocmig mode on" id="nocmigMode"
                             class="material-icons-two-tone btn btn-outline-secondary p-1 pt-2">bedtime</span>
-                        <span style="max-width: 70px" id="audioFiltersIcon" title="Experimental audio filters applied" 
-                        class="material-icons-two-tone btn btn-outline-secondary p-1 pt-2">blur_on</span>
-                        <span style="max-width: 70px" id="context-mode" title="Context Aware mode enabled" 
-                        class="material-icons-two-tone btn btn-outline-secondary p-1 pt-2 text-warning">swap_horiz</span>
-                        <span style="max-width: 70px" id="list-icon"
-                            class="btn btn-outline-secondary p-1"><img class="icon"
-                                src="img/migrants.png" alt="migrants"></span>
+                        <span style="max-width: 70px" id="audioFiltersIcon" title="Experimental audio filters applied"
+                            class="material-icons-two-tone btn btn-outline-secondary p-1 pt-2">blur_on</span>
+                        <span style="max-width: 70px" id="context-mode" title="Context Aware mode enabled"
+                            class="material-icons-two-tone btn btn-outline-secondary p-1 pt-2 text-warning">swap_horiz</span>
+                        <span style="max-width: 70px" id="list-icon" class="btn btn-outline-secondary p-1"><img
+                                class="icon" src="img/migrants.png" alt="migrants"></span>
                         <span style="max-width: 70px" title="Prediction confidence threshold" id="threshold-value"
                             class="btn btn-outline-secondary p-1 fs-5"><b>50%</b>
                         </span>
@@ -688,7 +712,7 @@
                     <table id='results' class="text-center table table-hover w-100 align-middle">
                         <thead id="resultsHead" class="d-none">
                             <tr class="bg-dark">
-                                <th class="col">#</th>
+                                <!-- <th class="col">#</th> -->
                                 <th class="col text-start timestamp">Time</th>
                                 <th id="time-sort" class="text-end pointer">Position</th>
                                 <th id="species-sort" class="pointer">Species</th>
