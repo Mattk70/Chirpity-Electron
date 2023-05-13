@@ -1,5 +1,5 @@
-
-html, body {
+html,
+body {
     height: 100%;
     padding-top: 0;
     padding-bottom: 0;
@@ -17,15 +17,16 @@ html, body {
     font-style: normal;
     font-weight: 400;
     src: local('Material Icons Two Tone'),
-    local('MaterialIconsTwoTone-Regular'),
-    url(../fonts/MaterialIconsTwoTone-Regular.woff2) format('woff2')
+        local('MaterialIconsTwoTone-Regular'),
+        url(../fonts/MaterialIconsTwoTone-Regular.woff2) format('woff2')
 }
 
 .material-icons-two-tone {
     font-family: 'Material Icons Two Tone';
     font-weight: normal;
     font-style: normal;
-    font-size: x-large; /* Preferred icon size */
+    font-size: x-large;
+    /* Preferred icon size */
     font-display: block;
     display: inline-block;
     line-height: 1;
@@ -60,7 +61,7 @@ html, body {
 
 }
 
-#list-icon:hover > img {
+#list-icon:hover>img {
     filter: invert(100%);
 }
 
@@ -97,7 +98,8 @@ span[id^="filename_"] {
     transition: all 0.3s ease-in-out;
 }
 
-#controlsWrapper .row, #transport-controls {
+#controlsWrapper .row,
+#transport-controls {
     min-width: 850px;
     white-space: nowrap;
     height: 40px;
@@ -122,15 +124,23 @@ div#contentWrapper {
 }
 
 .input:not(.form-control) {
-    background-image: url('searchicon.png'); /* Add a search icon to input */
-    background-position: 10px 12px; /* Position the search icon */
-    background-repeat: no-repeat; /* Do not repeat the icon image */
-    width: 100%; /* Fixed-width */
-    font-size: 16px; /* Increase font-size */
-    padding: 12px 20px 12px 40px; /* Add some padding */
-    border: 1px solid #ddd; /* Add a grey border */
+    background-image: url('searchicon.png');
+    /* Add a search icon to input */
+    background-position: 10px 12px;
+    /* Position the search icon */
+    background-repeat: no-repeat;
+    /* Do not repeat the icon image */
+    width: 100%;
+    /* Fixed-width */
+    font-size: 16px;
+    /* Increase font-size */
+    padding: 12px 20px 12px 40px;
+    /* Add some padding */
+    border: 1px solid #ddd;
+    /* Add a grey border */
     border-radius: 5px;
-    margin-bottom: 3px; /* Add some space below the input */
+    margin-bottom: 3px;
+    /* Add some space below the input */
     max-width: 320px
 }
 
@@ -165,18 +175,27 @@ ul {
 
 
 .bird-list li a {
-    border: 1px solid #ddd; /* Add a border to all links */
-    margin-top: -1px; /* Prevent double borders */
-    background-color: #f6f6f6; /* Grey background color */
-    padding: 10px; /* Add some padding */
-    text-decoration: none; /* Remove default text underline */
-    font-size: 14px; /* Increase the font-size */
-    color: black; /* Add a black text color */
-    display: block; /* Make it into a block element to fill the whole list */
+    border: 1px solid #ddd;
+    /* Add a border to all links */
+    margin-top: -1px;
+    /* Prevent double borders */
+    background-color: #f6f6f6;
+    /* Grey background color */
+    padding: 10px;
+    /* Add some padding */
+    text-decoration: none;
+    /* Remove default text underline */
+    font-size: 14px;
+    /* Increase the font-size */
+    color: black;
+    /* Add a black text color */
+    display: block;
+    /* Make it into a block element to fill the whole list */
 }
 
 .bird-list li a:hover:not(.header) {
-    background-color: #eee; /* Add a hover effect to all links, except for headers */
+    background-color: #eee;
+    /* Add a hover effect to all links, except for headers */
 }
 
 /* make dropdown stick to row */
@@ -192,7 +211,10 @@ tbody tr:not(.table-active):hover {
 }
 */
 
-#results > thead, #results > th, #resultSummary > thead, #resultSummary > th {
+#results>thead,
+#results>th,
+#resultSummary>thead,
+#resultSummary>th {
     position: sticky;
     top: 0;
     color: white;
@@ -338,7 +360,8 @@ footer {
 
 /* Flip comment icons */
 
-.add-comment, .edit-comment {
+.add-comment,
+.edit-comment {
     transform: scaleX(-1);
 }
 
@@ -361,11 +384,11 @@ footer {
         position: relative;
     }
 
-    ul ul > li:hover {
+    ul ul>li:hover {
         background-color: #f1f1f1
     }
 
-    .dropdown-menu > li:hover > .submenu {
+    .dropdown-menu>li:hover>.submenu {
         display: block;
     }
 
@@ -390,7 +413,7 @@ footer {
         left: 100%
     }
 
-    #primary_nav_wrap ul li:hover > ul {
+    #primary_nav_wrap ul li:hover>ul {
         visibility: visible;
         transition-delay: 0s;
     }
@@ -407,7 +430,7 @@ footer {
         overflow: auto;
     }
 
-    .dropdown-menu > li > .submenu {
+    .dropdown-menu>li>.submenu {
         display: block;
     }
 
@@ -578,7 +601,7 @@ input[type="range"].vertical {
 .fade-in {
     opacity: 1;
     transition: opacity 0.5s ease-in;
-  }
+}
 
 .fade-out {
     opacity: 0;
