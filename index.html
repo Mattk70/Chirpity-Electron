@@ -58,11 +58,13 @@
                                 Records
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="navbarRecords">
-                                <li class="dropdown-item disabled" href="#" id="save2db">Save Records</li>
-                                <li class="dropdown-item " href="#" id="export2audio">Export Records</li>
+                                <li class="dropdown-item disabled" href="#" id="save2db">Save to Archive</li>
+                                <li class="dropdown-item " href="#" id="export2audio">Export Audio Clips</li>
                                 <li class="dropdown-item disabled" href="#" id="charts">View charts</li>
-                                <li class="dropdown-item disabled" href="#" id="explore">Explore records</li>
-                                <li class="dropdown-item" href="#" id="dataset">Create Dataset</li>
+                                <li class="dropdown-item disabled" href="#" id="explore">Explore Archive</li>
+                                <li class="dropdown-divider"></li>
+                                <li class="dropdown-item  text-danger" href="#" id="purge-file">Remove Current File From Archive</li>
+                                <li class="dropdown-item d-none" href="#" id="dataset">Create Dataset</li>
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
@@ -510,17 +512,18 @@
             <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header justify-content-center">
-                        <h5 class="modal-title" id="record-entry-modal-label">Create a Record</h5>
+                        <h5 class="modal-title" id="record-entry-modal-label">Create Record</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
                         </button>
                     </div>
+                    <form id="record-entry-form">
                     <div id="record-entry-modal-body" class="modal-body"></div>
                     <div class="modal-footer justify-content-center">
-                        <button id="record-add" type="button" class="btn btn-success"
-                            data-bs-dismiss="modal">Add</button>
+                        <button id="record-add" type="submit" class="btn btn-success">Add</button>
                         <button id="record-dismiss" type="button" class="btn btn-danger"
                             data-bs-dismiss="modal">Dismiss</button>
                     </div>
+                </form>
                 </div>
             </div>
         </div>
@@ -634,8 +637,12 @@
         <div class="w-100 d-none" id="spectrogramWrapper">
             <!-- context menu-->
             <div class="dropdown-menu dropdown-menu-sm" id="context-menu">
-                <a class="dropdown-item" href="#" id="context-analyse-selection">Analyse selection</a>
-                <a class="dropdown-item" id="create-manual-record" href="#">Create Record</a>
+                <a class="dropdown-item" href="#" id="context-analyse-selection"><span class="material-icons-two-tone">
+                    search
+                    </span> Analyse selection</a>
+                <a class="dropdown-item" id="create-manual-record" href="#"><span class="material-icons-two-tone">
+                    post_add
+                    </span> Create Record</a>
             </div>
             <div>
                 <div class="bg-dark border border-secondary w-100" id="timeline"></div>
@@ -654,7 +661,7 @@
                         <i class="material-icons-two-tone ">play_arrow</i><span
                             class="align-middle d-none d-lg-inline">Play </span>
                         /
-                        <i class="material-icons-two-tone ">pause</i><span
+                        <i class="material-icons-two-tone">pause</i><span
                             class="align-middle d-none d-lg-inline-block">Pause</span>
                     </button>
                 </div>
@@ -715,11 +722,11 @@
                                 <!-- <th class="col">#</th> -->
                                 <th class="col text-start timestamp">Time</th>
                                 <th id="time-sort" class="text-end pointer">Position</th>
-                                <th id="species-sort" class="pointer">Species</th>
+                                <th id="species-sort" class="text-start pointer">Species</th>
                                 <th class="col">Play</th>
                                 <th class="col">XC</th>
-                                <th class="">Label</th>
-                                <th class="col">Notes</th>
+                                <th class="col">Label</th>
+                                <th class="col text-end">Notes</th>
                                 <th class="col text-end">Delete</th>
                             </tr>
                         </thead>

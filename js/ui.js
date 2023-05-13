@@ -505,7 +505,7 @@ async function onOpenFiles(args) {
     await loadAudioFile({ filePath: fileList[0] });
     updateFileName(fileList, fileList[0]);
 
-    disableMenuItem(['analyseSelection', 'analyse', 'analyseAll', 'reanalyse', 'reanalyseAll'])
+    disableMenuItem(['analyseSelection', 'analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'export2audio', 'save2db'])
     // Reset the buffer playhead and zoom:
     bufferBegin = 0;
     windowLength = 20;
@@ -563,9 +563,10 @@ const getSelectionResults = () => {
         let start = region.start + bufferBegin;
         // Remove small amount of region to avoid pulling in results from 'end'
         let end = region.end + bufferBegin - 0.001;
-        if (end - start < 0.5) {
-            region.end = region.start + 0.5;
-            end = start + 0.5
+        const mod = end - start % 3;
+        if (end - start < 1.5 || mod < 1.5) {
+            region.end += 1.5;
+            end += 1.5;
         }
         STATE['selection']['start'] = start.toFixed(3);
         STATE['selection']['end'] = end.toFixed(3);
@@ -657,7 +658,7 @@ const displayLocation = () => {
         fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat.value}&lon=${lon.value}&zoom=14`)
             .then(response => {
                 if (!response.ok) {
-                    throw new Error('Network response was not ok');
+                    throw new Error('Network error: ' + response);
                 }
                 return response.json()
             })
@@ -1337,6 +1338,30 @@ function generateBirdList(store, rows) {
     parking.innerHTML = listHTML;
 }
 
+function generateBirdOptionList({ store, rows, selected }) {
+    let listHTML = `
+    <div class="form-floating">
+        <select id="bird-list" class="form-select form-select mb-3" aria-label=".form-select" required>`;
+
+    if (store === 'allSpecies') {
+        const lastSelectedSpecies = selected || STATE.birdList.lastSelectedSpecies;
+        listHTML += lastSelectedSpecies ?
+            `<option selected value="${lastSelectedSpecies}">${lastSelectedSpecies}</option>` : '<option selected disabled value=""></option>';
+        for (const item in labels) {
+            const [sname, cname] = labels[item].split('_');
+            if (cname.indexOf(lastSelectedSpecies) === -1) {
+                listHTML += `<option value="${cname}">${cname} - ${sname}</option>`;
+            }
+        }
+    } else {
+        for (const item in rows) {
+            listHTML += `<option value="${rows[item].cname}">${rows[item].cname} - ${rows[item].sname} <span class="badge bg-secondary rounded-pill float-end">${rows[item].count}</span></option>`;
+        }
+    }
+    listHTML += '</select><label for="bird-list">Species</label></div>';
+    return listHTML;
+}
+
 // Search list handlers
 
 $(document).on('focus', '.input', function () {
@@ -1386,19 +1411,15 @@ function hideBirdList(el) {
     }
 }
 
-let restoreSpecies;
-
 $(document).on('contextmenu', '.edit, .cname', setEditID);
 
 function setEditID(e) {
     const currentRow = this.closest('tr');
     setClickedIndex(currentRow);
-    let restore = currentRow.querySelector('.cname').cloneNode(true);
-    restore.classList.add('restore', 'd-none');
-    currentRow.appendChild(restore);
     let cname = currentRow.querySelector('.cname');
-    // save the original cell contents in case edit is aborted or doesn't change species
-    restoreSpecies = restore;
+    let restoreSpecies = cname.cloneNode(true);
+    restoreSpecies.classList.add('restore', 'd-none');
+    currentRow.appendChild(restoreSpecies);
     // save the original species to use in batch edit search
     generateBirdList('allSpecies');
     cname.innerHTML = `<div id='edit' class="species-selector"><input type="text" class="input" id="editInput" 
@@ -1458,7 +1479,7 @@ function editHandler(e) {
         if (!sname) sname = cname;
         STATE.birdList.lastSelectedSpecies = cname;
         const cnameCell = this.closest('.cname');
-        if (cnameCell){ 
+        if (cnameCell) {
             editID(cname, sname, cnameCell);
         } else {
             hideBirdList(input)
@@ -1480,9 +1501,9 @@ const isSpeciesViewFiltered = (sendSpecies) => {
 //Works for single and batch items in Explore, but not in Analyse
 const editID = (cname, sname, cell) => {
     // Make sure we update the restore species
-    //restoreSpecies = cell;
     let from;
-    from = restoreSpecies?.querySelector('.cname').innerText;
+    const row = cell.closest('tr');
+    from = row.querySelector('.restore >.cname').innerText;
     // Are we batch editing here?
     const context = getDetectionContext(cell);
     const batch = context === 'resultSummary';
@@ -2318,7 +2339,7 @@ gotoForm.addEventListener('submit', gotoTime)
 const warmupText = document.getElementById('warmup');
 
 function displayWarmUpMessage() {
-    disableMenuItem(['analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'analyseSelection']);
+    disableMenuItem(['analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'analyseSelection', 'export2audio', 'save2db']);
     warmupText.classList.remove('d-none');
 }
 
@@ -2504,7 +2525,7 @@ async function onPredictionDone({
 }) {
 
     AUDACITY_LABELS = audacityLabels;
-    enableMenuItem(['save2db']);
+    enableMenuItem(['save2db', 'export2audio']);
     // Defer further processing until batch complete
     if (batchInProgress) {
         progressDiv.show();
@@ -2696,6 +2717,7 @@ async function renderResult({
             score,
             label,
             comment,
+            end,
             count
         } = result;
         const dayNight = checkDayNight(timestamp);
@@ -2733,8 +2755,7 @@ async function renderResult({
         const labelHTML = label ? tags[label] : tags['Remove Label'];
         const countIcon = count > 1 ? `<span class="circle pointer" title="Click to view the ${count} detections at this timecode">${count}</span>` : '';
         const XC_type = cname.indexOf('(song)') !== -1 ? "song" : "nocturnal flight call";
-        tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${position + 3}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
-           
+        tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${end || position + 3}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
             <td class='text-start text-nowrap timestamp ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-end">${UI_position} </td>
             <td name="${cname}" class='text-start cname'>
@@ -2929,7 +2950,7 @@ const deleteRecord = (target, isBatch, context) => {
     const index = row.rowIndex
     setting.deleteRow(index);
     // Move to the next row, if there is one
-    if (!isBatch){
+    if (!isBatch) {
         try {
             setting.rows[index].click()
         } catch (e) {
@@ -3026,7 +3047,7 @@ const iconDict = {
     low: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: rgba(255,0,0,0.5)">--%</span></span>',
     medium: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #fd7e14">--%</span></span>',
     high: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #198754">--%</span></span>',
-    confirmed: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: 100%; background: #198754"><span class="material-icons-two-tone">done</span></span></span>',
+    confirmed: '<span class="material-icons-two-tone text-muted">star</span>',
 }
 
 
@@ -3639,21 +3660,89 @@ $("#context-menu a").on("click", function () {
 const createManualRecord = document.getElementById('create-manual-record')
 
 createManualRecord.addEventListener('click', showRecordEntryForm);
+const recordEntryModal = new bootstrap.Modal(document.getElementById('record-entry-modal'), { backdrop: 'static' });
+
 
 function showRecordEntryForm() {
-    const recordEntryModal = new bootstrap.Modal(document.getElementById('record-entry-modal'));
-    generateBirdList('allSpecies');
-    const speciesList = `<div id='edit' class="species-selector">
-                            <input type="text" class="input" spellcheck="false" id="editInput" 
-                                placeholder="Select a species...">
-                            <div class="editing bird-list-wrapper"></div>                        
+    const cname = region.attributes.label.replace('?', '');
+    const speciesList = `<div class="row">
+                            <div class="col-8">
+                                    ${generateBirdOptionList({ store: 'allSpecies', rows: undefined, selected: cname })}
+                            </div>
+                            <div class="col"><div class="form-floating mb-3">
+                                <input type="number" id="call-count" value="1" class="form-control" min="1">
+                                <label for="call-count">Call Count</label>
+                            </div></div>
                         </div>`;
-
-    const comment = `<div class="form-floating">
-    <textarea class="form-control" placeholder="Leave a comment here" id="floatingTextarea2" style="height: 200px"></textarea>
+    const label = `
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="record-label" id="label-local" value="Local">
+                <label class="form-check-label" for="label-local">Local</label>
+            </div>
+            <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="record-label" id="label-nocmig" value="Nocmig">
+                    <label class="form-check-label" for="label-nocmig">Nocmig</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="record-label" id="label-unknown" value="">
+                <label class="form-check-label" for="label-unknown">Unknown</label>
+            </div>`;
+    const comment = `<div class="form-floating mt-3">
+    <textarea class="form-control" id="record-comment" style="height: 200px"></textarea>
     <label for="floatingTextarea2">Comments</label>
   </div>`;
-    $('#record-entry-modal-body').html(speciesList + comment);
-    document.getElementById('editInput').focus();
+    $('#record-entry-modal-body').html(speciesList + label + comment);
+    document.removeEventListener('keydown', handleKeyDownDeBounce, true);
     recordEntryModal.show();
 }
+
+const insertManualRecord = (cname, start, end, comment, count, label) => {
+    worker.postMessage({
+        action: 'insert-manual-record',
+        cname: cname,
+        start: start.toFixed(3),
+        end: end.toFixed(3),
+        comment: comment,
+        count: count,
+        file: currentFile,
+        label: label
+    })
+}
+
+const recordEntryForm = document.getElementById('record-entry-form');
+recordEntryForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    const start = bufferBegin + region.start;
+    const end = bufferBegin + region.end;
+    const cname = document.getElementById('bird-list').value;
+    const count = document.getElementById('call-count').value;
+    const comment = document.getElementById('record-comment').value;
+    const label = document.querySelector('input[name="record-label"]:checked')?.value || '';
+    insertManualRecord(cname, start, end, comment, count, label)
+    recordEntryModal.hide();
+})
+
+const recordEntryModalDiv = document.getElementById('record-entry-modal')
+recordEntryModalDiv.addEventListener('hidden.bs.modal', (e) => {
+    document.addEventListener('keydown', handleKeyDownDeBounce, true);
+    worker.postMessage({
+        action: 'filter',
+        species: isSpeciesViewFiltered(true),
+        files: fileList,
+        active: getActiveRow(),
+        explore: isExplore(),
+        order: STATE.sortOrder
+    });
+});
+
+const purgeFile = document.getElementById('purge-file');
+purgeFile.addEventListener('click', () => {
+    if (currentFile) {
+        if (confirm(`This will remove ${currentFile} and all its associated data from the database archive. Proceed?`)) {
+            worker.postMessage({
+                action: 'purge-file',
+                fileName: currentFile
+            })
+        }
+    }
+})

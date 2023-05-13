@@ -113,9 +113,23 @@ const createDB = async (file) => {
     const db = archiveMode ? diskDB : memoryDB;
     await db.runAsync('BEGIN');
     await db.runAsync('CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT, cname TEXT)');
-    await db.runAsync('CREATE TABLE records(dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT, comment  TEXT, UNIQUE (dateTime, fileID, speciesID))');
-    await db.runAsync('CREATE TABLE files(name TEXT,duration  REAL,filestart INTEGER, UNIQUE (name))');
-    await db.runAsync('CREATE TABLE duration(day INTEGER, duration INTEGER, fileID INTEGER,UNIQUE (day, fileID))');
+    await db.runAsync(`CREATE TABLE files(
+        id INTEGER PRIMARY KEY,
+        name TEXT,duration  REAL,filestart INTEGER, 
+        UNIQUE (name))`);
+    await db.runAsync(`CREATE TABLE records(
+        dateTime INTEGER, position INTEGER, fileID INTEGER, 
+        speciesID INTEGER, confidence INTEGER, label  TEXT, 
+        comment  TEXT, end INTEGER, 
+        UNIQUE (dateTime, fileID, speciesID),
+        CONSTRAINT fk_files
+            FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE, 
+        FOREIGN KEY (speciesID) REFERENCES species(id))`);
+    await db.runAsync(`CREATE TABLE duration(
+        day INTEGER, duration INTEGER, fileID INTEGER,
+        UNIQUE (day, fileID),
+        CONSTRAINT fk_files
+            FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`);
     await db.runAsync('CREATE INDEX idx_datetime ON records(dateTime)');
     if (archiveMode) {
         for (let i = 0; i < LABELS.length; i++) {
@@ -164,6 +178,7 @@ async function loadDB(path) {
             diskDB = new sqlite3.Database(file);
             STATE.db = diskDB;
             await diskDB.runAsync('VACUUM');
+            await diskDB.runAsync('PRAGMA foreign_keys = ON');
             const { count } = await diskDB.getAsync('SELECT COUNT(*) as count FROM records')
             if (count) {
                 UI.postMessage({ event: 'diskDB-has-records' })
@@ -334,6 +349,9 @@ ipcRenderer.on('new-client', (event) => {
             case 'export-results':
                 await getResults(args);
                 break;
+            case 'insert-manual-record':
+                await onInsertManualRecord(args);
+                break;
             case 'change-mode':
                 STATE.mode = args.mode;
                 if (STATE.mode !== 'analyse') STATE.db = diskDB;
@@ -364,6 +382,9 @@ ipcRenderer.on('new-client', (event) => {
                 break;
             case 'chart':
                 await onChartRequest(args);
+                break;
+            case 'purge-file':
+                onFileDelete(args.fileName);
                 break;
             default:
                 UI.postMessage('Worker communication lines open')
@@ -1426,19 +1447,19 @@ const insertRecord = async (key, speciesID, confidence, file) => {
     confidence = Math.round(confidence);
     const fileSQL = prepSQL(file);
     const db = STATE.db;
-    let res = await db.getAsync(`SELECT rowid
+    let res = await db.getAsync(`SELECT id
                                  FROM files
                                  WHERE name = '${fileSQL}'`);
     if (!res) {
         res = await db.runAsync(`INSERT
-        OR IGNORE INTO files VALUES ( '${fileSQL}',
+        OR IGNORE INTO files VALUES ( null, '${fileSQL}',
         ${metadata[file].duration},
         ${metadata[file].fileStart}
         )`);
         fileID = res.lastID;
         changes = 1;
     } else {
-        fileID = res.rowid;
+        fileID = res.id;
     }
     if (changes) {
         const durationSQL = Object.entries(metadata[file].dateDuration)
@@ -1458,10 +1479,58 @@ const insertRecord = async (key, speciesID, confidence, file) => {
     ${speciesID},
     ${confidence},
     null,
+    null,
     null
     )`);
 }
 
+const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label }) => {
+    const offsetStart = Math.round(start * 1000);
+    let changes, fileID;
+    const fileSQL = prepSQL(file);
+    const speciesSQL = prepSQL(cname);
+    const commentSQL = prepSQL(comment);
+    const db = diskDB;
+    const { speciesID } = await db.getAsync(`SELECT id as speciesID FROM species
+                                        WHERE cname = '${speciesSQL}'`);
+    let res = await db.getAsync(`SELECT id FROM files
+                                        WHERE name = '${fileSQL}'`);
+    if (!res) {
+        res = await db.runAsync(`INSERT
+        OR IGNORE INTO files VALUES ( null, '${fileSQL}',
+        ${metadata[file].duration},
+        ${metadata[file].fileStart}
+        )`);
+        fileID = res.lastID;
+        changes = 1;
+    } else {
+        fileID = res.id;
+    }
+    if (changes) {
+        const durationSQL = Object.entries(metadata[file].dateDuration)
+            .map(entry => `(${entry.toString()},${fileID})`).join(',');
+        // No "OR IGNORE" in this statement because it should only run when the file is new
+        await db.runAsync(`INSERT
+        OR IGNORE INTO duration
+                               VALUES
+        ${durationSQL}`);
+    }
+    let response = await db.runAsync(`INSERT OR REPLACE INTO records 
+                        VALUES (
+                            ${metadata[file].fileStart + offsetStart},
+                            ${start},
+                            ${fileID},
+                            ${speciesID},
+                            2000,
+                            '${label}',
+                            '${commentSQL}',
+                            ${end}
+                        )`);
+    if (response.changes) {
+        UI.postMessage({ event: 'diskDB-has-records' });
+    }
+    UI.postMessage({ event: 'generate-alert', message: `A ${cname} record has been saved to the archive.` })
+}
 
 const parsePredictions = async (response) => {
     let file = response.file, batchInProgress = false;
@@ -1532,7 +1601,7 @@ const parsePredictions = async (response) => {
     if (progress === 1) {
         COMPLETED.push(file);
         let fileSQL = prepSQL(file)
-        db.getAsync(`SELECT rowid
+        db.getAsync(`SELECT id
                      FROM files
                      WHERE name = '${fileSQL}'`)
             .then(row => {
@@ -1752,7 +1821,7 @@ const getSummary = async ({
         SELECT records.dateTime, records.speciesID, records.confidence,
           RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
         FROM records
-        JOIN files ON files.rowid = records.fileID
+        JOIN files ON files.id = records.fileID
         WHERE ${excluded_species_ids} ${where} ${when}
       )
       SELECT species.cname, species.sname, COUNT(*) as count, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
@@ -1778,7 +1847,7 @@ const getSummary = async ({
                     FROM records
                     JOIN species
                         ON species.id = speciesID
-                    JOIN files ON fileID = files.rowid
+                    JOIN files ON fileID = files.id
                     
                     GROUP BY dateTime
                 ) AS max_confidences
@@ -1876,10 +1945,11 @@ const getResults = async ({
           records.confidence, 
           records.label, 
           records.comment, 
+          records.end,
           RANK() OVER (PARTITION BY records.dateTime, records.fileID ORDER BY records.confidence DESC) AS confidence_rank
         FROM records 
           JOIN species ON records.speciesID = species.id 
-          JOIN files ON records.fileID = files.rowid 
+          JOIN files ON records.fileID = files.id 
           WHERE ${excluded_species_ids}
       )
       SELECT 
@@ -1894,6 +1964,7 @@ const getResults = async ({
         confidence as score, 
         label, 
         comment,
+        end,
         confidence_rank
       FROM 
         ranked_records 
@@ -1988,9 +2059,9 @@ const onSave2DiskDB = async () => {
     t0 = Date.now();
     memoryDB.runAsync('BEGIN');
     const files = await memoryDB.allAsync('SELECT * FROM files');
-    const filesSQL = files.map(file => `('${prepSQL(file.name)}', ${file.duration}, ${file.filestart})`).toString();
+    const filesSQL = files.map(file => `( NULL, '${prepSQL(file.name)}', ${file.duration}, ${file.filestart})`).toString();
     let response = await memoryDB.runAsync(`INSERT
-    OR IGNORE INTO disk.files VALUES
+    OR IGNORE INTO disk.files VALUES 
     ${filesSQL}`);
     console.log(response.changes + ' files added to disk database')
     // Update the duration table
@@ -2180,16 +2251,16 @@ const onUpdateFileStart = async (args) => {
     file = file.replace("'", "''");
     let db = diskDB;
 
-    let { rowid } = await db.getAsync(`SELECT rowid
+    let { id } = await db.getAsync(`SELECT id
                                      from files
                                      where name = '${file}'`);
     const { changes } = await db.runAsync(`UPDATE files
                                          SET filestart = ${args.start}
-                                         where rowid = '${rowid}'`);
+                                         where id = '${id}'`);
     console.log(changes ? `Changed ${file}` : `No changes made`);
     let result = await db.runAsync(`UPDATE records
                                     set dateTime = position + ${args.start}
-                                    where fileid = ${rowid}`);
+                                    where fileid = ${id}`);
     console.log(`Changed ${result.changes} records associated with  ${file}`);
 };
 
@@ -2216,7 +2287,7 @@ async function onDelete({
                          AND speciesID =
                              (SELECT id FROM species WHERE cname = '${speciesSQL}')
     `)
-    if (! isBatch) await getSummary(arguments[0]);
+    if (!isBatch) await getSummary(arguments[0]);
     if (db === diskDB) {
         getSpecies(range);
     }
@@ -2269,7 +2340,7 @@ async function onUpdateRecord({
             ) `;
         if (openFiles.length) {
             // Limit changes to the files in scope
-            whereSQL += `AND fileID IN (SELECT rowid from files WHERE name in (${filesSQL}))`;
+            whereSQL += `AND fileID IN (SELECT id from files WHERE name in (${filesSQL}))`;
         }
         // We need to find all records for the 'from' species
         // then delete all records for those dateTimes which aren't the 'from' species
@@ -2424,6 +2495,25 @@ async function onChartRequest(args) {
     })
 }
 
+const onFileDelete = async (fileName) => {
+    const fileSQL = prepSQL(fileName);
+    const result = await diskDB.runAsync(`DELETE FROM files WHERE name = '${fileSQL}'`);
+    if (result.changes) {
+        if (STATE.mode === "explore"){
+            getSpecies(STATE.explore.range);
+        } else {
+            getSpecies(STATE.chart.range);
+        }
+        UI.postMessage({
+            event: 'generate-alert', message: `${fileName} 
+and its associated records were deleted successfully`});
+    } else {
+        UI.postMessage({
+            event: 'generate-alert', message: `${fileName} 
+was not found in the Archve databasse.`});
+    }
+}
+
 // const db2ResultSQL = `SELECT DISTINCT dateTime AS timestamp, 
 //   files.duration, 
 //   files.filestart,
@@ -2437,7 +2527,7 @@ async function onChartRequest(args) {
 //                       FROM records
 //                           JOIN species
 //                       ON species.id = records.speciesID
-//                           JOIN files ON records.fileID = files.rowid`;
+//                           JOIN files ON records.fileID = files.id`;
 
 
 
