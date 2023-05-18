@@ -2431,7 +2431,7 @@ async function onPredictionDone({
         if (filterSpecies) {
             const filteredOffset = {};
             filteredOffset[filterSpecies] = offset;
-            worker.postMessage({ action: 'update-state', filteredOffset: filteredOffset})
+            worker.postMessage({ action: 'update-state', filteredOffset: filteredOffset })
         } else {
             worker.postMessage({ action: 'update-state', globalOffset: offset })
         }
@@ -2718,26 +2718,6 @@ const isExplore = () => {
 };
 
 
-const updateRecord = (what, range, start, from, to, context, batchUpdate, file) => {
-    //if (context === 'selectionResults') selectionTable.innerHTML = '';
-    worker.postMessage({
-        action: 'update-record',
-        openFiles: fileList,
-        currentFile: file || currentFile,
-        start: start,
-        from: from,
-        value: to,
-        what: what,
-        isFiltered: isSpeciesViewFiltered(),
-        isExplore: isExplore(),
-        isBatch: batchUpdate,
-        context: context,
-        active: getActiveRowID(),
-        range: range
-    })
-};
-
-
 
 const tags = {
     Local: '<span class="badge bg-success rounded-pill">Local</span>',
@@ -2751,7 +2731,7 @@ function setClickedIndex(target) {
     clickedIndex = clickedNode.rowIndex;
 }
 
-const deleteRecord = (target, isBatch, context) => {
+const deleteRecord = (target, isBatch) => {
     if (target instanceof PointerEvent) target = activeRow;
     if (isBatch) {
         target.forEach(position => {
@@ -2770,13 +2750,12 @@ const deleteRecord = (target, isBatch, context) => {
     const [file, start, ,] = unpackNameAttr(target);
     const setting = target.closest('table');
     const row = target.closest('tr');
-    const species = getSpecies(target);
 
     worker.postMessage({
         action: 'delete',
         file: file,
         start: start,
-        species: species,
+        species: getSpecies(target),
         speciesFiltered: isSpeciesViewFiltered()
     })
     // Clear the record in the UI
@@ -2784,6 +2763,18 @@ const deleteRecord = (target, isBatch, context) => {
     setting.deleteRow(index);
     setting.rows[index]?.click()
 
+}
+
+const deleteSpecies = (target) => {
+    worker.postMessage({
+        action: 'delete-species',
+        species: getSpecies(target),
+        speciesFiltered: isSpeciesViewFiltered()
+    })
+    // Clear the record in the UI
+    const row = target.closest('tr');
+    const table = document.getElementById('resultSummary')
+    table.deleteRow(row.rowIndex);
 }
 
 const getSelectionRange = () => {
@@ -3290,8 +3281,6 @@ const handleThresholdChange = (e) => {
         worker.postMessage({
             action: 'filter',
             species: isSpeciesViewFiltered(true),
-            // files: isExplore() ? [] : fileList,
-            // order: STATE.sortOrder,
         });
     }
 }
@@ -3460,35 +3449,45 @@ function getSnameFromCname(cname) {
     }
     return null; // Substring not found in any item
 }
+
 $(document).on('click', function () {
     $("#context-menu").removeClass("show").hide();
 })
 
+
+function buildSummaryMenu(menu, target) {
+    menu.html(`
+    <a class="dropdown-item" id="create-manual-record" href="#">
+        <span class="material-icons-two-tone">post_add</span> Edit Archive Records
+    </a>
+    <a class="dropdown-item" id="context-create-clip" href="#">
+        <span class="material-icons-two-tone">music_note</span> Export Audio Clips
+    </a>
+    <a class="dropdown-item" id="context-xc" href='#' target="xc">
+        <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> View species on Xeno-Canto
+    </a>
+    <div class="dropdown-divider"></div>
+    <a class="dropdown-item" id="context-delete" href="#">
+        <span class='delete material-icons-two-tone'>delete_forever</span> Delete Records
+    </a>
+`);
+    const contextDelete = document.getElementById('context-delete');
+    contextDelete.addEventListener('click', function () {
+        deleteSpecies(target);
+    })
+}
+
+
+
 $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('contextmenu', function (e) {
-    e.target.click();
     const menu = $("#context-menu");
-    const batchContext = e.target.closest('#summaryTable');
-    if (!batchContext && activeRow === undefined && region === undefined) return;
-    const createOrEdit = isExplore() && (region?.attributes.label || batchContext) ? 'Edit' :
-        'Create';
-    if (batchContext) {
-        // Batch context
-        menu.html(`
-            <a class="dropdown-item" id="create-manual-record" href="#">
-                <span class="material-icons-two-tone">post_add</span> ${createOrEdit} Archive Records
-            </a>
-            <a class="dropdown-item" id="context-create-clip" href="#">
-                <span class="material-icons-two-tone">music_note</span> Export Audio Clips
-            </a>
-            <a class="dropdown-item" id="context-xc" href='#' target="xc">
-                <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> View species on Xeno-Canto
-            </a>
-            <div class="dropdown-divider"></div>
-            <a class="dropdown-item" id="context-delete" href="#">
-                <span class='delete material-icons-two-tone'>delete_forever</span> Delete Records
-            </a>
-        `);
+    const target = e.target;
+    const summaryContext = target.closest('#summaryTable');
+    if (summaryContext) {
+        buildSummaryMenu(menu, target)
     } else {
+        if (activeRow === undefined && region === undefined) return;
+        const createOrEdit = isExplore() && region?.attributes.label ? 'Edit' : 'Create';
         menu.html(`
             <a class="dropdown-item play"><span class='material-icons-two-tone'>play_circle_filled</span> Play</a>
             <a class="dropdown-item" href="#" id="context-analyse-selection">
@@ -3511,23 +3510,24 @@ $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('c
         `);
         const contextAnalyseSelectionLink = document.getElementById('context-analyse-selection');
         contextAnalyseSelectionLink.addEventListener('click', getSelectionResults);
+        const contextDelete = document.getElementById('context-delete');
+        contextDelete.addEventListener('click', deleteRecord);
     }
     // Add event Handlers
     document.getElementById('context-create-clip').addEventListener('click', exportAudio);
     document.getElementById('create-manual-record').addEventListener('click', function (e) {
         if (e.target.innerText.indexOf('Edit') !== -1) {
-            showRecordEntryForm('Update', batchContext);
+            showRecordEntryForm('Update', summaryContext);
         } else {
-            showRecordEntryForm('Add', batchContext);
+            showRecordEntryForm('Add', summaryContext);
         }
     })
-    const contextDelete = document.getElementById('context-delete');
-    contextDelete.addEventListener('click', deleteRecord);
+
     const xc = document.getElementById('context-xc');
-    if (region?.attributes.label || batchContext) {
+    if (region?.attributes.label || summaryContext) {
         let cname;
-        if (batchContext) {
-            const row = e.target.closest('tr');
+        if (summaryContext) {
+            const row = target.closest('tr');
             cname = row.querySelector('.cname .cname').innerText;
         } else {
             cname = region.attributes.label.replace('?', '');
@@ -3537,14 +3537,12 @@ $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('c
             cname.indexOf('call)') !== -1 ? "nocturnal flight call" : '';
         xc.href = `https://xeno-canto.org/explore?query=${sname}%20type:"${XC_type}`;
         xc.classList.remove('d-none');
-        contextDelete.classList.remove('d-none');
     }
     else {
         xc.classList.add('d-none');
         contextDelete.classList.add('d-none');
     }
     // Calculate menu positioning:
-
     const menuWidth = menu.outerWidth();
     const menuHeight = menu.outerHeight();
     let top = e.pageY - 50;
@@ -3671,10 +3669,7 @@ recordEntryModalDiv.addEventListener('hidden.bs.modal', (e) => {
     worker.postMessage({
         action: 'filter',
         species: isSpeciesViewFiltered(true),
-        files: fileList,
         active: getActiveRowID(),
-        explore: isExplore(),
-        order: STATE.sortOrder
     });
 });
 
