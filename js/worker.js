@@ -10,6 +10,7 @@ const { utimes } = require('utimes');
 const stream = require("stream");
 const staticFfmpeg = require('ffmpeg-static-electron');
 
+import { State } from './state.js';
 
 const { stat } = require("fs/promises");
 let WINDOW_SIZE = 3;
@@ -17,7 +18,7 @@ let NUM_WORKERS;
 let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on every change
-let select_records_stmt;
+
 const DEBUG = true;
 
 const DATASET = false;
@@ -58,43 +59,12 @@ ffmpeg.setFfmpegPath(staticFfmpeg.path.replace('app.asar', 'app.asar.unpacked'))
 
 let predictionsRequested = {}, predictionsReceived = {}
 let COMPLETED = [], PENDING_FILES = [];
-let diskDB, memoryDB, NOCMIG, CONTEXT_AWARE, latitude, longitude;
+let diskDB, memoryDB, latitude, longitude;
 
 let t0; // Application profiler
 
 //Object will hold files in the diskDB, and the active timestamp from the most recent selection analysis.
-let STATE;
-class State {
-    constructor(db) {
-        this.db = db,
-            this.filesToAnalyse = [],
-            this.limit = 500,
-            this.saved = new Set(), // list of files requested that are in the disk database
-            this.globalOffset = 0, // Current start number for unfiltered results
-            this.filteredOffset = {}, // Current species start number for filtered results
-            this.selection = false,
-            this.blocked = STATE ? STATE.blocked : [] // don't reset blocked IDs
-        this.filters = { highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: -6 }
-        this.chart = {},
-            this.explore = {},
-            this.model = null;
-        this.predictionCount = 0;
-    }
-
-    setFiles(files) {
-        console.log("Setting STATE, filesToAnalyse " + files);
-        this.filesToAnalyse = files;
-    }
-
-    increment() {
-        if (++this.predictionCount === 5) {
-            this.predictionCount = 0
-        }
-        return this.predictionCount;
-    }
-
-}
-STATE = new State();
+const STATE = new State();
 
 
 const getSelectionRange = (file, start, end) => {
@@ -120,7 +90,7 @@ const createDB = async (file) => {
     await db.runAsync(`CREATE TABLE records(
         dateTime INTEGER, position INTEGER, fileID INTEGER, 
         speciesID INTEGER, confidence INTEGER, label  TEXT, 
-        comment  TEXT, end INTEGER, 
+        comment  TEXT, end INTEGER, callCount INTEGER,
         UNIQUE (dateTime, fileID, speciesID),
         CONSTRAINT fk_files
             FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE, 
@@ -152,22 +122,10 @@ const createDB = async (file) => {
         console.log(response.changes + ' files added to memory database')
         response = await db.runAsync('INSERT INTO species SELECT * FROM disk.species');
         console.log(response.changes + ' species added to memory database')
-        prepare_statements(db);
     }
     await db.runAsync('END');
     return db
 }
-
-const prepare_statements = (db) => {
-    select_records_stmt = db.prepare(`SELECT species.cname, species.sname, records.confidence
-                                      FROM species
-                                               JOIN records ON species.id = records.speciesID
-                                      WHERE records.dateTime = (?)
-                                        AND confidence > (?)
-                                        AND species.id NOT IN (?)
-                                      ORDER BY records.confidence DESC`);
-}
-
 
 async function loadDB(path) {
     if (path) {
@@ -176,7 +134,7 @@ async function loadDB(path) {
             await createDB(file);
         } else if (diskDB?.filename !== file) {
             diskDB = new sqlite3.Database(file);
-            STATE.db = diskDB;
+            STATE.update({ db: diskDB });
             await diskDB.runAsync('VACUUM');
             await diskDB.runAsync('PRAGMA foreign_keys = ON');
             const { count } = await diskDB.getAsync('SELECT COUNT(*) as count FROM records')
@@ -193,7 +151,7 @@ async function loadDB(path) {
 
 
 let metadata = {};
-let minConfidence, index = 0, AUDACITY = {}, predictionStart, SNR = 0;
+let index = 0, AUDACITY = {}, predictionStart;
 let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
 let predictWorkers = [], predictionDone = true, aborted = false;
 
@@ -266,6 +224,9 @@ const clearCache = async (fileCache, sizeLimitInGB) => {
     return false
 }
 
+
+
+
 ipcRenderer.on('new-client', (event) => {
     [UI] = event.ports;
     UI.onmessage = async (e) => {
@@ -273,21 +234,13 @@ ipcRenderer.on('new-client', (event) => {
         const action = args.action;
         console.log('message received ', action)
         switch (action) {
-            case 'set-variables':
+            case 'update-state':
                 // This pattern to only update variables that have values
-                STATE.audioPreferences = args.audio || STATE.audioPreferences;
                 latitude = args.lat || latitude;
                 longitude = args.lon || longitude;
                 TEMP = args.temp || TEMP;
                 appPath = args.path || appPath;
-                minConfidence = args.confidence * 10 || minConfidence;
-                // Boolean value an issue with this pattern so...
-                if (Object.keys(args).includes('nocmig')) NOCMIG = args.nocmig;
-                if (Object.keys(args).includes('context')) CONTEXT_AWARE = args.context;
-                if (Object.keys(args).includes('HPfrequency')) STATE.filters.highPassFrequency = args.HPfrequency;
-                if (Object.keys(args).includes('LowShelfFrequency')) STATE.filters.lowShelfFrequency = args.LowShelfFrequency;
-                if (Object.keys(args).includes('LowShelfAttenuation')) STATE.filters.lowShelfAttenuation = args.LowShelfAttenuation;
-                if (DEBUG) console.log("Set variables", args)
+                STATE.update(args);
                 break;
             case 'clear-cache':
                 CACHE_LOCATION = p.join(TEMP, 'chirpity');
@@ -320,7 +273,7 @@ ipcRenderer.on('new-client', (event) => {
                 UI.postMessage({ event: 'spawning' });
                 BATCH_SIZE = parseInt(args.batchSize);
                 BACKEND = args.backend;
-                STATE.model = args.model;
+                STATE.update({ model: args.model });
                 if (predictWorkers.length) terminateWorkers();
                 spawnWorkers(args.model, args.list, BATCH_SIZE, args.threads);
                 break;
@@ -332,8 +285,8 @@ ipcRenderer.on('new-client', (event) => {
             case 'file-load-request':
                 index = 0;
                 if (!predictionDone) onAbort(args);
-
-                STATE.db = memoryDB || await createDB();
+                if (!memoryDB) await createDB();
+                STATE.update({ db: memoryDB });
                 console.log('Worker received audio ' + args.file);
                 await loadAudioFile(args);
                 break;
@@ -353,8 +306,11 @@ ipcRenderer.on('new-client', (event) => {
                 await onInsertManualRecord(args);
                 break;
             case 'change-mode':
-                STATE.mode = args.mode;
-                if (STATE.mode !== 'analyse') STATE.db = diskDB;
+                STATE.changeMode({ 
+                    mode: args.mode, 
+                    disk: diskDB, 
+                    memory: memoryDB
+                 });
                 break;
             case 'analyse':
                 // Create a new memory db if one doesn't exist, or wipe it if one does,
@@ -376,9 +332,6 @@ ipcRenderer.on('new-client', (event) => {
                 break;
             case 'abort':
                 onAbort(args);
-                break;
-            case 'selection-off':
-                STATE.selection = undefined;
                 break;
             case 'chart':
                 await onChartRequest(args);
@@ -463,18 +416,15 @@ async function onAnalyse({
     start = 0,
     end = undefined,
     reanalyse = false,
-    confidence = minConfidence,
-    snr = 0
 }) {
     // Now we've asked for a new analysis, clear the aborted flag
     aborted = false;
-    // if end was passed, this is a selection
-    STATE.selection = end ? getSelectionRange(filesInScope[0], start, end) : undefined;
+    // set to memory database. If end was passed, this is a selection
+    STATE.update({ db: memoryDB, selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined });
     //create a copy of files in scope for state, as filesInScope is spliced
     STATE.setFiles([...filesInScope]);
-    console.log(`Worker received message: ${filesInScope}, ${confidence}, start: ${start}, end: ${end}`);
-    //minConfidence = confidence * 10;
-    SNR = snr;
+    console.log(`Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`);
+    //confidence = confidence * 10;
     //Set global filesInScope for summary to use
     PENDING_FILES = filesInScope;
     index = 0;
@@ -483,7 +433,7 @@ async function onAnalyse({
     FILE_QUEUE = filesInScope;
     // If we are analsing a selection, don't change the db
     // Otherwise, all new analyses go to the memory db
-    if (!STATE.selection) STATE.db = memoryDB;
+    if (!STATE.selection) STATE.update({ db: memoryDB });
     let count = 0;
     for (let i = FILE_QUEUE.length - 1; i >= 0; i--) {
         let file = FILE_QUEUE[i];
@@ -511,7 +461,7 @@ async function onAnalyse({
                 }
             }
             if (allCached && !reanalyse && !STATE.selection) {
-                STATE.db = diskDB;
+                STATE.update({ db: diskDB });
                 await getResults({ db: diskDB, files: FILE_QUEUE });
                 await getSummary({ files: FILE_QUEUE })
                 return
@@ -867,6 +817,15 @@ async function setupCtx(chunk, header) {
         previousFilter ? previousFilter.connect(lowshelfFilter) : offlineSource.connect(lowshelfFilter);
         previousFilter = lowshelfFilter;
     }
+    // // Create a compressor node
+    // const compressor = new DynamicsCompressorNode(offlineCtx, {
+    //     threshold: -30,
+    //     knee: 6,
+    //     ratio: 6,
+    //     attack: 0,
+    //     release: 0,
+    //   });
+    // previousFilter = offlineSource.connect(compressor) ;
     previousFilter ? previousFilter.connect(offlineCtx.destination) : offlineSource.connect(offlineCtx.destination);
 
 
@@ -1000,8 +959,6 @@ const getPredictBuffers = async ({
         start: byteStart, end: byteEnd, highWaterMark: highWaterMark
     });
     let chunkStart = start * sampleRate;
-    //const fileDuration = end - start;
-    STATE.predictStream = readStream;
     readStream.on('data', async chunk => {
         // Ensure data is processed in order
         readStream.pause();
@@ -1112,9 +1069,9 @@ function feedChunksToModel(channelData, chunkStart, file, end, resetResults, wor
         start: chunkStart,
         duration: end,
         resetResults: resetResults,
-        snr: SNR,
-        context: CONTEXT_AWARE,
-        minConfidence: minConfidence,
+        snr: STATE.filters.SNR,
+        context: STATE.detect.contextAware,
+        confidence: STATE.detect.confidence,
         chunks: channelData
     };
     predictWorkers[worker].isAvailable = false;
@@ -1284,12 +1241,12 @@ const bufferToAudio = ({
     file = '', start = 0, end = 3, meta = {}, format = undefined
 }) => {
     let audioCodec, mimeType;
-    let padding = STATE.audioPreferences.padding;
-    let fade = STATE.audioPreferences.fade;
-    let bitrate = STATE.audioPreferences.bitrate;
-    let quality = parseInt(STATE.audioPreferences.quality);
-    let downmix = STATE.audioPreferences.downmix;
-    if (!format) format = STATE.audioPreferences.format;
+    let padding = STATE.audio.padding;
+    let fade = STATE.audio.fade;
+    let bitrate = STATE.audio.bitrate;
+    let quality = parseInt(STATE.audio.quality);
+    let downmix = STATE.audio.downmix;
+    if (!format) format = STATE.audio.format;
     const bitrateMap = { 24000: '24k', 16000: '16k', 12000: '12k', 8000: '8k', 44100: '44k', 22050: '22k', 11025: '11k' };
     if (format === 'mp3') {
         audioCodec = 'libmp3lame';
@@ -1480,17 +1437,19 @@ const insertRecord = async (key, speciesID, confidence, file) => {
     ${confidence},
     null,
     null,
-    null
+    ${key + 3},
+    0
     )`);
 }
 
-const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label }) => {
-    const offsetStart = Math.round(start * 1000);
+const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label, toDisk }) => {
+    start = parseFloat(start), end = parseFloat(end);
+    const startMilliseconds = Math.round(start * 1000);
     let changes, fileID;
     const fileSQL = prepSQL(file);
     const speciesSQL = prepSQL(cname);
     const commentSQL = prepSQL(comment);
-    const db = diskDB;
+    const db = toDisk ? diskDB : memoryDB;
     const { speciesID } = await db.getAsync(`SELECT id as speciesID FROM species
                                         WHERE cname = '${speciesSQL}'`);
     let res = await db.getAsync(`SELECT id FROM files
@@ -1509,27 +1468,26 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     if (changes) {
         const durationSQL = Object.entries(metadata[file].dateDuration)
             .map(entry => `(${entry.toString()},${fileID})`).join(',');
-        // No "OR IGNORE" in this statement because it should only run when the file is new
-        await db.runAsync(`INSERT
-        OR IGNORE INTO duration
-                               VALUES
-        ${durationSQL}`);
+        await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
     }
-    let response = await db.runAsync(`INSERT OR REPLACE INTO records 
-                        VALUES (
-                            ${metadata[file].fileStart + offsetStart},
-                            ${start},
-                            ${fileID},
-                            ${speciesID},
-                            2000,
-                            '${label}',
-                            '${commentSQL}',
-                            ${end}
-                        )`);
-    if (response.changes) {
+    let response;
+    const dateTime = metadata[file].fileStart + startMilliseconds;
+    response = await db.runAsync(`
+        INSERT OR REPLACE INTO records VALUES (
+            ${dateTime},
+            ${start},
+            ${fileID},
+            ${speciesID},
+            2000,
+            '${label}',
+            '${commentSQL}',
+            ${end},
+            ${count}
+        )`);
+    if (response.changes && toDisk) {
         UI.postMessage({ event: 'diskDB-has-records' });
     }
-    UI.postMessage({ event: 'generate-alert', message: `A ${cname} record has been saved to the archive.` })
+    if (STATE.mode !== 'explore' && toDisk) UI.postMessage({ event: 'generate-alert', message: `A ${cname} record has been saved to the archive.` })
 }
 
 const parsePredictions = async (response) => {
@@ -1550,11 +1508,11 @@ const parsePredictions = async (response) => {
             let record = topValues[i];
             if (record.confidence >= 0.05) {
                 record.confidence *= 1000;
-                if (record.confidence > minConfidence && STATE.blocked.indexOf(record.speciesID) === -1) {
+                if (record.confidence > STATE.detect.confidence && STATE.blocked.indexOf(record.speciesID) === -1) {
                     updateUI = true;
                 }
                 key = parseFloat(key);
-                //save all results to  db, regardless of minConfidence
+                //save all results to  db, regardless of confidence
                 await insertRecord(key, record.speciesID, record.confidence, file)
             }
         }
@@ -1562,11 +1520,11 @@ const parsePredictions = async (response) => {
             const timestamp = metadata[file].fileStart + key * 1000;
             //query the db for sname,  cname
             const speciesList = await memoryDB.allAsync(`
-                SELECT species.cname, species.sname, records.confidence
+                SELECT species.cname, species.sname, records.confidence, callCount
                 FROM species
                         JOIN records ON species.id = records.speciesID
                 WHERE records.dateTime = ${timestamp}
-                AND confidence > ${minConfidence}
+                AND confidence > ${STATE.detect.confidence}
                 AND species.id NOT IN (${STATE.blocked})
                 ORDER BY records.confidence DESC`);
             speciesList.forEach(species => {
@@ -1577,23 +1535,11 @@ const parsePredictions = async (response) => {
                     cname: species.cname,
                     sname: species.sname,
                     score: species.confidence,
+                    callCount: species.callCount
                 }
                 sendResult(++index, result, false)
             })
-            // select_records_stmt.all(timestamp, minConfidence, STATE.blocked, (err, speciesList) => {
-            //     speciesList.forEach(species => {
-            //         const result = {
-            //             timestamp: timestamp,
-            //             position: key,
-            //             file: file,
-            //             cname: species.cname,
-            //             sname: species.sname,
-            //             score: species.confidence,
-            //         }
-            //         sendResult(++index, result, false)
-            //     })
-            // }
-            // )
+
         }
     }
     const progress = ++predictionsReceived[file] / batchChunksToSend[file];
@@ -1633,8 +1579,7 @@ async function parseMessage(e) {
         case 'update-list':
             if (!SEEN_LIST_UPDATE) {
                 SEEN_LIST_UPDATE = true;
-                STATE.blocked = response.blocked;
-                STATE.globalOffset = 0;
+                STATE.update({ blocked: response.blocked, globalOffset: 0 });
                 if (response['updateResults'] && STATE.db) {
                     // update-results called after setting migrants list, so DB may not be initialized
                     await getResults();
@@ -1745,7 +1690,7 @@ async function processNextFile({
 async function setStartEnd(file) {
     const meta = metadata[file];
     let start, end;
-    if (NOCMIG) {
+    if (STATE.detect.nocmig) {
         const fileEnd = meta.fileStart + (meta.duration * 1000);
         // If it's dark at the file start, start at 0 ...otherwise start at dusk
         if (meta.fileStart < meta.dawn || meta.fileStart > meta.dusk) {
@@ -1776,7 +1721,7 @@ const setWhereWhen = ({ dateRange, species, files, context }) => {
         excluded_species_ids = `speciesID NOT IN (${STATE.blocked})`;
     }
     // NOT the same as a dateRange - this is for analyzing a selection
-    const confidence = STATE.selection ? 50 : minConfidence;
+    const confidence = STATE.selection ? 50 : STATE.detect.confidence;
     let where = `AND confidence >= ${confidence}`;
     if (files?.length) {
         const name = context === 'summary' ? 'files.name' : 'name';
@@ -1799,74 +1744,59 @@ const setWhereWhen = ({ dateRange, species, files, context }) => {
 
 
 const getSummary = async ({
-    db = STATE.db,
-    range = undefined,
-    files = STATE.filesToAnalyse,
     species = undefined,
-    explore = false,
     active = undefined,
     interim = false,
     action = undefined,
     topRankin = 1
 } = {}) => {
+    const db = STATE.db;
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
+    let range, files = [];
+    if (STATE.mode !== 'analyse') {
+        range = STATE[STATE.mode].range;
+    } else {
+        files = STATE.filesToAnalyse;
+    }
+
     let [where, when, excluded_species_ids] = setWhereWhen({
         dateRange: range, files: files, context: 'summary'
     });
-    if (explore) db = diskDB;
     t0 = Date.now();
+    const speciesClause = species ? ` AND cname = '${prepSQL(species)}'` : '';
     const summary = await db.allAsync(`
-
     WITH ranked_records AS (
-        SELECT records.dateTime, records.speciesID, records.confidence,
+        SELECT records.dateTime, records.speciesID, records.confidence, records.fileID, cname, sname,
           RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
         FROM records
         JOIN files ON files.id = records.fileID
+        JOIN species ON species.id = records.speciesID
         WHERE ${excluded_species_ids} ${where} ${when}
       )
-      SELECT species.cname, species.sname, COUNT(*) as count, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
+    SELECT cname, sname, COUNT(*) as count, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
       FROM ranked_records
-      JOIN species ON species.id = ranked_records.speciesID
       WHERE ranked_records.rank <= ${topRankin}
-      GROUP BY species.id
-      ORDER BY count DESC, max DESC;
-    
+      GROUP BY speciesID
+    UNION ALL
+    SELECT
+        'Total' AS sname,
+        cname as cname,
+        COUNT(*) AS count,
+        ROUND(MAX(ranked_records.confidence) / 10.0, 0) AS max
+      FROM
+        ranked_records
+        JOIN files ON files.id = ranked_records.fileID
+      WHERE
+        ${excluded_species_ids} ${where} ${when} ${speciesClause} AND
+        ranked_records.rank <= ${topRankin}
+    ORDER BY count DESC, max DESC;    
     `);
-    // need another setWhereWhen call for total
-    [where, when, excluded_species_ids] = setWhereWhen({
-        dateRange: range, species: species, files: files, context: 'summary'
-    });
-    let total;
-    if (!interim) {
-        // FIx the files.name error
-        where = where.replace('files.name', 'name');
-        const res = await db.getAsync(
-            `SELECT COUNT(*) AS total
-                FROM (
-                    SELECT MAX(confidence) AS confidence, speciesID, cname, dateTime, name
-                    FROM records
-                    JOIN species
-                        ON species.id = speciesID
-                    JOIN files ON fileID = files.id
-                    
-                    GROUP BY dateTime
-                ) AS max_confidences
-                WHERE ${excluded_species_ids} ${where} ${when}
-        `);
-        total = res.total;
-    }
+
     if (DEBUG) console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds");
     const event = interim ? 'update-summary' : 'prediction-done';
-    // Why do we need this??
-    // if (total === 0 && action !== 'delete') {
-    //     const qualifier = species || ''
-    //     sendResult(1, `No ${qualifier} detections found in`, true)
-    // }
-
     UI.postMessage({
         event: event,
         summary: summary,
-        total: total,
         offset: offset,
         audacityLabels: AUDACITY,
         filterSpecies: species,
@@ -1879,35 +1809,30 @@ const getSummary = async ({
 
 /**
  *
- * @param db: whether to use memory or disk db for searches
- * @param range: a datetime start and end to use in a where clause
- * @param order: sort order for explore
  * @param files: files to query for detections
  * @param species: filter for SQL query
  * @param context: can be 'results', 'resultSummary' or 'selectionResults'
- * @param explore: boolean. Are we in explore mode
- * @param limit: thee pagination limit
+ * @param limit: the pagination limit per page
  * @param offset: is the SQL query offset to use
+ * @param topRankin: return results >= to this rank for each datetime
+ * @param exportTo: if set, will export audio of the returned results to this folder
  *
- * @returns {Promise<integer> } A count orf the records retrieved
+ * @returns {Promise<integer> } A count of the records retrieved
  */
 const getResults = async ({
-    db = STATE.db,
-    range = undefined,
-    order = 'dateTime',
-    files = STATE.filesToAnalyse,
     species = undefined,
     context = 'results',
-    explore = false,
     limit = 500,
     offset = undefined,
     topRankin = 1,
     exportTo = undefined
 } = {}) => {
-    let confidence = minConfidence;
+    const { db, sortOrder, mode, filesToAnalyse } = STATE;
+    const range = STATE.selection || STATE[mode]?.range;
+    const files = mode === 'explore' ? [] : filesToAnalyse;
+    let confidence = STATE.detect.confidence;
     if (STATE.selection) {
         offset = 0;
-        range = STATE.selection;
         confidence = 50;
         topRankin = 5;
     } else if (offset === undefined) { // Get offset state
@@ -1919,12 +1844,10 @@ const getResults = async ({
         }
     } else { // Set offset state
         if (species) STATE.filteredOffset[species] = offset;
-        else STATE.globalOffset = offset;
+        else STATE.update({ globalOffset: offset });
     }
-    if (explore) {
-        db = diskDB;
-        files = [];
-    }
+    // if (explore) { db = diskDB; files = [] }
+
     const [where, when, excluded_species_ids] = setWhereWhen({
         dateRange: range, species: species, files: files, context: context
     });
@@ -1946,6 +1869,7 @@ const getResults = async ({
           records.label, 
           records.comment, 
           records.end,
+          records.callCount,
           RANK() OVER (PARTITION BY records.dateTime, records.fileID ORDER BY records.confidence DESC) AS confidence_rank
         FROM records 
           JOIN species ON records.speciesID = species.id 
@@ -1965,17 +1889,18 @@ const getResults = async ({
         label, 
         comment,
         end,
+        callCount,
         confidence_rank
       FROM 
         ranked_records 
-        WHERE confidence_rank <= ${topRankin} ${where} ${when} ORDER BY ${order}, confidence DESC LIMIT ${limit} OFFSET ${offset}`);
+        WHERE confidence_rank <= ${topRankin} ${where} ${when} ORDER BY ${sortOrder}, confidence DESC, callCount DESC LIMIT ${limit} OFFSET ${offset}`);
 
     for (let i = 0; i < result.length; i++) {
         const r = result[i];
         if (exportTo) {
             // Format date to YYYY-MM-DD-HH-MM-ss
             const dateString = new Date(r.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
-            const filename = `${r.cname}-${dateString}.${STATE.audioPreferences.format}`
+            const filename = `${r.cname}-${dateString}.${STATE.audio.format}`
             console.log(`Exporting from ${r.file}, position ${r.position}, into folder ${exportTo}`)
             saveAudio(r.file, r.position, r.position + 3, filename, metadata, exportTo)
             if (i === result.length - 1) UI.postMessage({ event: 'generate-alert', message: `${result.length} files saved` })
@@ -1992,7 +1917,7 @@ const getResults = async ({
             sendResult(++index, result[i], true)
         }
     }
-    console.log("Get Results  took", (Date.now() - t0) / 1000, " seconds");
+    console.log("Get Results took", (Date.now() - t0) / 1000, " seconds");
     if (!result.length) {
         if (STATE.selection) {
             // No more detections in the selection
@@ -2001,22 +1926,23 @@ const getResults = async ({
             species = species || '';
             sendResult(++index, `No ${species} detections found.`, true)
         }
-        // else if (species && context !== 'explore') { // Remove the species filter
-        //     await getResults({
-        //         files: files,
-        //         range: range,
-        //         context: context,
-        //         limit: limit,
-        //         offset: offset
-        //     })
-        // }
     }
 };
 
 const sendResult = (index, result, fromDBQuery) => {
     const file = result.file;
-    // Convert confidence back to % value
-    result.score = (result.score / 10).toFixed(0)
+    if (typeof result === 'object') {
+        // Convert confidence back to % value
+        result.score = (result.score / 10).toFixed(0)
+
+        // Recreate Audacity labels
+        const audacity = {
+            timestamp: `${result.position}\t${result.position + WINDOW_SIZE}`,
+            cname: result.cname,
+            score: Number(result.score) / 100
+        };
+        AUDACITY[file] ? AUDACITY[file].push(audacity) : AUDACITY[file] = [audacity];
+    }
     UI.postMessage({
         event: 'prediction-ongoing',
         file: file,
@@ -2025,13 +1951,6 @@ const sendResult = (index, result, fromDBQuery) => {
         isFromDB: fromDBQuery,
         selection: STATE.selection
     });
-    // Recreate Audacity labels
-    const audacity = {
-        timestamp: `${result.start}\t${result.start + WINDOW_SIZE}`,
-        cname: result.cname,
-        score: result.score
-    };
-    AUDACITY[file] ? AUDACITY[file].push(audacity) : AUDACITY[file] = [audacity];
 };
 
 
@@ -2069,7 +1988,7 @@ const onSave2DiskDB = async () => {
     console.log(response.changes + ' date durations added to disk database')
     response = await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.records 
         SELECT * FROM records
-        WHERE confidence >= ${minConfidence}
+        WHERE confidence >= ${STATE.detect.confidence}
         AND speciesID NOT IN (${STATE.blocked})`);
     console.log(response.changes + ' records added to disk database')
     if (response.changes) {
@@ -2083,7 +2002,7 @@ const onSave2DiskDB = async () => {
     if (!DATASET) {
         files.forEach(file => STATE.saved.add(file));
         // Now we have saved the records, set state to DiskDB
-        STATE.db = diskDB;
+        STATE.update({ db: diskDB });
         UI.postMessage({
             event: 'generate-alert',
             message: `Database update complete, ${response.changes} records added to the archive in ${((Date.now() - t0) / 1000)} seconds`
@@ -2224,7 +2143,8 @@ const getRate = (species) => {
     })
 }
 
-const getSpecies = (range) => {
+const getSpecies = () => {
+    const range = STATE.explore.range;
     const [where, when] = setWhereWhen({ dateRange: range });
     diskDB.all(`SELECT DISTINCT cname, sname, COUNT(cname) as count
                 FROM records
@@ -2259,7 +2179,7 @@ const onUpdateFileStart = async (args) => {
                                          where id = '${id}'`);
     console.log(changes ? `Changed ${file}` : `No changes made`);
     let result = await db.runAsync(`UPDATE records
-                                    set dateTime = position + ${args.start}
+                                    set dateTime = (position * 1000) + ${args.start}
                                     where fileid = ${id}`);
     console.log(`Changed ${result.changes} records associated with  ${file}`);
 };
@@ -2270,150 +2190,39 @@ async function onDelete({
     file,
     start,
     species,
-    explore,
-    range,
-    isBatch
+    // need speciesfiltered because species triggers getSummary to highlight it
+    speciesFiltered
 }) {
-    const db = explore ? diskDB : STATE.db;
+    const db = STATE.db;
     file = prepSQL(file);
     const { filestart } = await db.getAsync(`SELECT filestart
                                            from files
                                            WHERE name = '${file}'`);
     const datetime = filestart + (parseFloat(start) * 1000);
-    const speciesSQL = prepSQL(species);
-    await db.runAsync(`DELETE
-                       FROM records
-                       WHERE datetime = ${datetime}
-                         AND speciesID =
-                             (SELECT id FROM species WHERE cname = '${speciesSQL}')
-    `)
-    if (!isBatch) await getSummary(arguments[0]);
-    if (db === diskDB) {
-        getSpecies(range);
-    }
-}
 
-async function onUpdateRecord({
-    openFiles = [],
-    currentFile = '',
-    start = 0,
-    value = '',
-    isBatch = false,
-    from = '',
-    what = 'speciesID',
-    order = 'dateTime',
-    isFiltered = false,
-    isExplore = false,
-    context = 'results',
-    range = {},
-    active = undefined
-}) {
-    const db = isExplore && context !== "selectionResults" ? diskDB : STATE.db;
-    // Construct the SQL
-    let whatSQL, whereSQL;
-    value = prepSQL(value);
-    let fromSQL = prepSQL(from);
-    currentFile = prepSQL(currentFile);
-    if (what === 'ID' || what === 'speciesID') {
-        // Map the field name to the one in the database
-        what = 'speciesID';
-        whatSQL = `confidence = 2000, speciesID = (SELECT id FROM species WHERE cname = '${value}')`;
-    } else if (what === 'label') {
-        whatSQL = `label = '${value}'`;
-    } else {
-        whatSQL = `comment = '${value}'`;
+    let SQL = `DELETE FROM records WHERE datetime = ${datetime}`;
+    if (species) {
+        const speciesSQL = prepSQL(species);
+        SQL += ` AND speciesID = (SELECT id FROM species WHERE cname = '${speciesSQL}')`;
     }
-    const filesSQL = openFiles.map(file => `'${prepSQL(file)}'`).toString();
-    // Get the old ID
-    let { id } = await db.getAsync(`SELECT id
-                                  FROM species
-                                  WHERE cname = '${fromSQL}'`);
-    if (isBatch) {
-        //Batch update only applies to ID. Get the ID of the species we're changing,
-        // and the dateTimes it appears in the top n predictions
-        whereSQL = `WHERE speciesID = ${id} AND dateTime IN (
-            SELECT dateTime FROM (
-                SELECT dateTime, confidence, speciesID, 
-                RANK() OVER (PARTITION BY dateTime ORDER BY confidence DESC) rank 
-                FROM records )
-                WHERE speciesID = ${id} AND rank <= 1 AND confidence >= ${minConfidence}
-            ) `;
-        if (openFiles.length) {
-            // Limit changes to the files in scope
-            whereSQL += `AND fileID IN (SELECT id from files WHERE name in (${filesSQL}))`;
-        }
-        // We need to find all records for the 'from' species
-        // then delete all records for those dateTimes which aren't the 'from' species
-        let dateTimes = await db.allAsync(`SELECT dateTime
-                                           from records ${whereSQL}`);
-        dateTimes = dateTimes.map(obj => obj.dateTime);
-        await db.runAsync(`DELETE
-                           FROM records
-                           WHERE dateTime IN (${dateTimes})
-                             AND speciesID != ${id}`)
-    } else {
-        // This applies to label, comment and ID
-        const startMilliseconds = (start * 1000).toFixed(0);
-        // Single record
-        whereSQL = `WHERE datetime = 
-                        (SELECT filestart FROM files WHERE name = '${currentFile}') + ${startMilliseconds}`;
-        if (what === 'speciesID') {
-            // Check to see if we have the to species already in the records at that dateTime
-            let speciesObj = await db.allAsync(`SELECT cname, id
-                                                from records
-                                                         JOIN species on records.speciesID = species.id ${whereSQL}`);
-            const speciesCnames = speciesObj.map(obj => obj.cname);
-            const speciesIDs = speciesObj.map(obj => obj.id);
-            const found = speciesCnames.indexOf(value);
-            // If we do, update that record instead, after deleting the record to change
-            // From !== value : don't delete the record if the ID hasn't changed
-            if (found !== -1 && from !== value) {
-                await db.runAsync(`DELETE
-                                   FROM records ${whereSQL} AND speciesID = ${id}`);
-                whatSQL = whatSQL.replace(value, prepSQL(speciesCnames[found]));
-                whereSQL += ` AND speciesID = ${speciesIDs[found]}`
-            } else {
-                whereSQL += ` AND speciesID = ${id}`
-            }
-        } else {
-            whereSQL += ` AND speciesID = ${id}`
-        }
-    }
-    const t0 = Date.now();
-    const { changes } = await db.runAsync(`UPDATE records
-                                         SET ${whatSQL} ${whereSQL}`);
-
+    let { changes } = await db.runAsync(SQL);
     if (changes) {
-        console.log(`Updated ${changes} records for ${what} in ${db.filename.replace(/.*\//, '')} database, setting it to ${value}`);
-        console.log(`Update without transaction took ${Date.now() - t0} milliseconds`);
-        const species = isFiltered || isExplore ? from : '';
-        if (isExplore) openFiles = [];
-
-        await getResults({
-            db: db,
-            range: range,
-            files: openFiles,
-            species: species,
-            explore: isExplore,
-            order: order,
-            resetResults: context !== 'selectionResults'
-        });
-        if (context !== 'selectionResults') {
-            await getSummary({ db: db, files: openFiles, species: species, explore: isExplore, active: active });// Update the species list
-            getSpecies(range);
+        if (STATE.mode !== 'selection') {
+            // Update the summary table
+            if (speciesFiltered === false) {
+                delete arguments[0].species
+            }
+            await getSummary(arguments[0]);
         }
-        if (db === memoryDB) {
-            UI.postMessage({
-                event: 'generate-alert', message: 'Remember to save your records to store this change'
-            })
+        // Update the seen species list
+        if (db === diskDB) {
+            getSpecies();
         }
-    } else {
-        console.log(`No records updated in ${db.filename.replace(/.*\//, '')}`)
     }
 }
 
 async function onChartRequest(args) {
-    console.log(`Getting chart for ${args.species} starting ${args.range[0]}`);
+    console.log(`Getting chart for ${args.species} starting ${args.range.start}`);
     const dateRange = args.range, results = {}, dataRecords = {};
     // Escape apostrophes
     if (args.species) {
@@ -2499,11 +2308,7 @@ const onFileDelete = async (fileName) => {
     const fileSQL = prepSQL(fileName);
     const result = await diskDB.runAsync(`DELETE FROM files WHERE name = '${fileSQL}'`);
     if (result.changes) {
-        if (STATE.mode === "explore"){
-            getSpecies(STATE.explore.range);
-        } else {
-            getSpecies(STATE.chart.range);
-        }
+        getSpecies();
         UI.postMessage({
             event: 'generate-alert', message: `${fileName} 
 and its associated records were deleted successfully`});
@@ -2533,11 +2338,7 @@ was not found in the Archve databasse.`});
 
 /*
 todo: bugs
-    ***Crash on abort - no crash now, but predictions resume
     ***when analysing second batch of results, the first results linger.
-    ***when current model list differs from the one used when saving records, getResults gives wrong species
-        -solved as in there are separate databases now, so results cached in the db for another model wont register.
-    ***when nocmig mode on, getResults for daytime files prints no results, but summary printed. No warning given.
     ***manual records entry doesn't preserve species in explore mode
     ***save records to db doesn't work with updaterecord!
     ***AUDACITY results for multiple files doesn't work well, as it puts labels in by position only. Need to make audacity an object,
