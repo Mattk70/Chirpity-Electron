@@ -256,6 +256,9 @@ ipcRenderer.on('new-client', (event) => {
             case 'delete':
                 await onDelete(args)
                 break;
+            case 'delete-species':
+                await onDeleteSpecies(args)
+                break;
             case 'update-file-start':
                 await onUpdateFileStart(args)
                 break;
@@ -306,11 +309,11 @@ ipcRenderer.on('new-client', (event) => {
                 await onInsertManualRecord(args);
                 break;
             case 'change-mode':
-                STATE.changeMode({ 
-                    mode: args.mode, 
-                    disk: diskDB, 
+                STATE.changeMode({
+                    mode: args.mode,
+                    disk: diskDB,
                     memory: memoryDB
-                 });
+                });
                 break;
             case 'analyse':
                 // Create a new memory db if one doesn't exist, or wipe it if one does,
@@ -2220,6 +2223,42 @@ async function onDelete({
         }
     }
 }
+
+async function onDeleteSpecies({
+    species,
+    // need speciesfiltered because species triggers getSummary to highlight it
+    speciesFiltered
+}) {
+    const db = STATE.db;
+    const speciesSQL = prepSQL(species);
+    let SQL = `DELETE FROM records 
+            WHERE speciesID = (SELECT id FROM species WHERE cname = '${speciesSQL}')`;
+    if (STATE.mode === 'analyse'){
+        const filesSQL = STATE.filesToAnalyse.map(file => `'${prepSQL(file)}'`).join(',');
+        const rows = await db.allAsync(`SELECT id FROM files WHERE NAME IN (${filesSQL})`);
+        const ids = rows.map(row => row.id).join(',');
+        SQL += ` AND fileID in (${ids})`;
+    }
+    if (STATE.mode === 'explore'){
+        const {start, end} = STATE.explore.range;
+        if (start) SQL += ` AND dateTime BETWEEN ${start} AND ${end}`
+    }
+    let { changes } = await db.runAsync(SQL);
+    if (changes) {
+        if (STATE.mode !== 'selection') {
+        // Update the summary table
+            if (speciesFiltered === false) {
+                delete arguments[0].species
+            }
+            await getSummary(arguments[0]);
+        }
+        if (db === diskDB) {
+        // Update the seen species list
+            getSpecies();
+        }
+    }
+}
+
 
 async function onChartRequest(args) {
     console.log(`Getting chart for ${args.species} starting ${args.range.start}`);
