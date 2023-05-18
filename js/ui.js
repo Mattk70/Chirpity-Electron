@@ -3475,6 +3475,7 @@ function buildSummaryMenu(menu, target) {
     contextDelete.addEventListener('click', function () {
         deleteSpecies(target);
     })
+    return contextDelete;
 }
 
 
@@ -3483,9 +3484,11 @@ $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('c
     const menu = $("#context-menu");
     const target = e.target;
     const summaryContext = target.closest('#summaryTable');
+    let contextDelete;
     if (summaryContext) {
-        buildSummaryMenu(menu, target)
+        contextDelete = buildSummaryMenu(menu, target)
     } else {
+        target.click()
         if (activeRow === undefined && region === undefined) return;
         const createOrEdit = isExplore() && region?.attributes.label ? 'Edit' : 'Create';
         menu.html(`
@@ -3510,7 +3513,7 @@ $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('c
         `);
         const contextAnalyseSelectionLink = document.getElementById('context-analyse-selection');
         contextAnalyseSelectionLink.addEventListener('click', getSelectionResults);
-        const contextDelete = document.getElementById('context-delete');
+        contextDelete = document.getElementById('context-delete');
         contextDelete.addEventListener('click', deleteRecord);
     }
     // Add event Handlers
