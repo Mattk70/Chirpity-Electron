@@ -1678,13 +1678,13 @@ async function setStartEnd(file) {
 
 
 const setWhereWhen = ({ dateRange, species, files, context }) => {
-    let excluded_species_ids = 'speciesID NOT IN (-1)';
+    let excluded_species_ids = -1;
     if (!STATE.selection && STATE.blocked.length) {
-        excluded_species_ids = `speciesID NOT IN (${STATE.blocked})`;
+        excluded_species_ids = `${STATE.blocked}`;
     }
     // NOT the same as a dateRange - this is for analyzing a selection
     const confidence = STATE.selection ? 50 : STATE.detect.confidence;
-    let where = `AND confidence >= ${confidence}`;
+    let where = `${confidence}`;
     if (files?.length) {
         const name = context === 'summary' ? 'files.name' : 'name';
         where += ` AND ${name} IN  (`;
@@ -1733,7 +1733,7 @@ const getSummary = async ({
         FROM records
         JOIN files ON files.id = records.fileID
         JOIN species ON species.id = records.speciesID
-        WHERE ${excluded_species_ids} ${where} ${when}
+        WHERE speciesID NOT IN (${excluded_species_ids}) AND confidence >= ${where} ${when}
       )
     SELECT cname, sname, COUNT(*) as count, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
       FROM ranked_records
@@ -1748,8 +1748,8 @@ const getSummary = async ({
       FROM
         ranked_records
         JOIN files ON files.id = ranked_records.fileID
-      WHERE
-        ${excluded_species_ids} ${where} ${when} ${speciesClause} AND
+      WHERE speciesID NOT IN
+        (${excluded_species_ids}) AND confidence >= ${where} ${when} ${speciesClause} AND
         ranked_records.rank <= ${topRankin}
     ORDER BY count DESC, max DESC;    
     `);
@@ -1836,7 +1836,7 @@ const getResults = async ({
         FROM records 
           JOIN species ON records.speciesID = species.id 
           JOIN files ON records.fileID = files.id 
-          WHERE ${excluded_species_ids}
+          WHERE speciesID NOT IN (${excluded_species_ids})
       )
       SELECT 
         dateTime as timestamp, 
@@ -1855,7 +1855,7 @@ const getResults = async ({
         confidence_rank
       FROM 
         ranked_records 
-        WHERE confidence_rank <= ${topRankin} ${where} ${when} ORDER BY ${sortOrder}, confidence DESC, callCount DESC LIMIT ${limit} OFFSET ${offset}`);
+        WHERE confidence_rank <= ${topRankin} AND confidence >= ${where} ${when} ORDER BY ${sortOrder}, confidence DESC, callCount DESC LIMIT ${limit} OFFSET ${offset}`);
 
     for (let i = 0; i < result.length; i++) {
         const r = result[i];
@@ -1869,14 +1869,12 @@ const getResults = async ({
         }
         else if (species && context !== 'explore') {
 
-            const { count } = await db.getAsync(`SELECT COUNT(*) as count
-                                               FROM records
-                                               WHERE dateTime = ${result[i].timestamp}
-                                                 AND confidence >= ${confidence}`);
-            result[i].count = count;
-            sendResult(++index, result[i], true);
+            const { count } = await db.getAsync(`SELECT COUNT(*) as count FROM records WHERE dateTime = ?
+                                                 AND confidence >= ?`, r.timestamp, confidence);
+            r.count = count;
+            sendResult(++index, r, true);
         } else {
-            sendResult(++index, result[i], true)
+            sendResult(++index, r, true)
         }
     }
     console.log("Get Results took", (Date.now() - t0) / 1000, " seconds");
@@ -1967,7 +1965,6 @@ const onSave2DiskDB = async () => {
 
 const getSeasonRecords = async (species, season) => {
     // Because we're using stmt.prepare, we need to unescape quotes
-    species = species.replaceAll("''", "'");
     const seasonMonth = { spring: "< '07'", autumn: " > '06'" }
     return new Promise(function (resolve, reject) {
         const stmt = diskDB.prepare(`
@@ -1996,7 +1993,7 @@ const getMostCalls = (species) => {
             DATE(dateTime/1000, 'unixepoch', 'localtime') as date
             FROM records JOIN species
             on species.id = records.speciesID
-            WHERE species.cname = '${species}'
+            WHERE species.cname = '${prepSQL(species)}'
             GROUP BY STRFTIME('%Y', DATETIME(dateTime/1000, 'unixepoch', 'localtime')),
                 STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')),
                 STRFTIME('%d', DATETIME(dateTime/1000, 'unixepoch', 'localtime'))
@@ -2104,7 +2101,7 @@ const getSpecies = () => {
     diskDB.all(`SELECT DISTINCT cname, sname, COUNT(cname) as count
                 FROM records
                     JOIN species
-                ON speciesID = id ${where} ${when}
+                ON speciesID = id AND confidence >= ${where} ${when}
                 GROUP BY cname
                 ORDER BY cname`, (err, rows) => {
         if (err) console.log(err); else {
@@ -2149,18 +2146,12 @@ async function onDelete({
     speciesFiltered
 }) {
     const db = STATE.db;
-    file = prepSQL(file);
-    const { filestart } = await db.getAsync(`SELECT filestart
-                                           from files
-                                           WHERE name = '${file}'`);
+    const { filestart } = await db.getAsync('SELECT filestart from files WHERE name = ?', file);
     const datetime = filestart + (parseFloat(start) * 1000);
-
-    let SQL = `DELETE FROM records WHERE datetime = ${datetime}`;
-    if (species) {
-        const speciesSQL = prepSQL(species);
-        SQL += ` AND speciesID = (SELECT id FROM species WHERE cname = '${speciesSQL}')`;
-    }
-    let { changes } = await db.runAsync(SQL);
+    species = species || '%';
+    let { changes } = await db.runAsync(`DELETE FROM records 
+        WHERE datetime = ? AND speciesID = (SELECT id FROM species WHERE cname LIKE ?)`,
+        datetime, species);
     if (changes) {
         if (STATE.mode !== 'selection') {
             // Update the summary table
