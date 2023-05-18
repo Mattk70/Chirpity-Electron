@@ -442,10 +442,7 @@ async function onAnalyse({
         let file = FILE_QUEUE[i];
         if (DATASET) {
             //STATE.db = diskDB;
-            const fileSQL = prepSQL(file);
-            const file = await diskDB.getAsync(`SELECT name
-                                               FROM files
-                                               WHERE name = "${fileSQL}"`);
+            const file = await diskDB.getAsync('SELECT name FROM files WHERE name = ?', file);
             if (file) {
                 console.log(`Skipping ${file.name}, already analysed`)
                 FILE_QUEUE.splice(i, 1)
@@ -1405,17 +1402,11 @@ const insertRecord = async (key, speciesID, confidence, file) => {
     const offset = key * 1000;
     let changes, fileID;
     confidence = Math.round(confidence);
-    const fileSQL = prepSQL(file);
     const db = STATE.db;
-    let res = await db.getAsync(`SELECT id
-                                 FROM files
-                                 WHERE name = '${fileSQL}'`);
+    let res = await db.getAsync('SELECT id FROM files WHERE name = ', file);
     if (!res) {
-        res = await db.runAsync(`INSERT
-        OR IGNORE INTO files VALUES ( null, '${fileSQL}',
-        ${metadata[file].duration},
-        ${metadata[file].fileStart}
-        )`);
+        res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,? )', 
+            null, file, metadata[file].duration, metadata[file].fileStart);
         fileID = res.lastID;
         changes = 1;
     } else {
@@ -1425,44 +1416,24 @@ const insertRecord = async (key, speciesID, confidence, file) => {
         const durationSQL = Object.entries(metadata[file].dateDuration)
             .map(entry => `(${entry.toString()},${fileID})`).join(',');
         // No "OR IGNORE" in this statement because it should only run when the file is new
-        await db.runAsync(`INSERT
-        OR IGNORE INTO duration
-                               VALUES
-        ${durationSQL}`);
+        await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
     }
-    await db.runAsync(`INSERT
-    OR REPLACE INTO records 
-                VALUES (
-    ${metadata[file].fileStart + offset},
-    ${key},
-    ${fileID},
-    ${speciesID},
-    ${confidence},
-    null,
-    null,
-    ${key + 3},
-    0
-    )`);
+    await db.runAsync('INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?)',
+        metadata[file].fileStart + offset, key, fileID, speciesID, confidence,
+        null, null, key + 3, 0);
 }
 
 const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label, toDisk }) => {
     start = parseFloat(start), end = parseFloat(end);
     const startMilliseconds = Math.round(start * 1000);
     let changes, fileID;
-    const fileSQL = prepSQL(file);
-    const speciesSQL = prepSQL(cname);
-    const commentSQL = prepSQL(comment);
     const db = toDisk ? diskDB : memoryDB;
     const { speciesID } = await db.getAsync(`SELECT id as speciesID FROM species
-                                        WHERE cname = '${speciesSQL}'`);
-    let res = await db.getAsync(`SELECT id FROM files
-                                        WHERE name = '${fileSQL}'`);
+                                        WHERE cname = ?`, cname);
+    let res = await db.getAsync(`SELECT id FROM files WHERE name = ?`, file);
     if (!res) {
-        res = await db.runAsync(`INSERT
-        OR IGNORE INTO files VALUES ( null, '${fileSQL}',
-        ${metadata[file].duration},
-        ${metadata[file].fileStart}
-        )`);
+        res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,? )',
+            null, file, metadata[file].duration, metadata[file].fileStart);
         fileID = res.lastID;
         changes = 1;
     } else {
@@ -1475,18 +1446,9 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     }
     let response;
     const dateTime = metadata[file].fileStart + startMilliseconds;
-    response = await db.runAsync(`
-        INSERT OR REPLACE INTO records VALUES (
-            ${dateTime},
-            ${start},
-            ${fileID},
-            ${speciesID},
-            2000,
-            '${label}',
-            '${commentSQL}',
-            ${end},
-            ${count}
-        )`);
+    response = await db.runAsync('INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,? )',
+        dateTime, start, fileID, speciesID, 2000, label, comment, end, parseInt(count));
+
     if (response.changes && toDisk) {
         UI.postMessage({ event: 'diskDB-has-records' });
     }
@@ -1549,10 +1511,7 @@ const parsePredictions = async (response) => {
     UI.postMessage({ event: 'progress', progress: progress, file: file });
     if (progress === 1) {
         COMPLETED.push(file);
-        let fileSQL = prepSQL(file)
-        db.getAsync(`SELECT id
-                     FROM files
-                     WHERE name = '${fileSQL}'`)
+        db.getAsync('SELECT id FROM files WHERE name = ?', file)
             .then(row => {
                 if (!row) {
                     const result = `No predictions found in ${file}`;
