@@ -5,7 +5,6 @@ body {
     padding-bottom: 0;
     min-width: 700px;
     overflow: hidden;
-    transition: background 1.5s linear;
 }
 
 .border-10 {
@@ -113,6 +112,12 @@ div#contentWrapper {
     position: absolute;
     top: 56px;
     width: 100%;
+    opacity:0;
+    transition: opacity 2.5s ease;
+}
+
+div#contentWrapper.loaded {
+        opacity: 1; /* Change background opacity to 1 when the body has the "loaded" class */
 }
 
 .zoom {
@@ -539,6 +544,7 @@ input[type="range"].vertical {
     width: 18px;
     margin: 3px;
     -webkit-appearance: slider-vertical;
+    appearance: slider-vertical;
     top: -160px;
     right: 15px;
 }
@@ -606,4 +612,9 @@ input[type="range"].vertical {
 .fade-out {
     opacity: 0;
     transition: opacity 0.5s ease-out;
+}
+
+#context-menu {
+    /* One more than modal */
+    z-index: 1056;
 }
