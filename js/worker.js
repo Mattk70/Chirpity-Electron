@@ -1939,30 +1939,23 @@ const getSavedFileInfo = async (file) => {
 const onSave2DiskDB = async () => {
     t0 = Date.now();
     memoryDB.runAsync('BEGIN');
-    const files = await memoryDB.allAsync('SELECT * FROM files');
-    const filesSQL = files.map(file => `( NULL, '${prepSQL(file.name)}', ${file.duration}, ${file.filestart})`).toString();
-    let response = await memoryDB.runAsync(`INSERT
-    OR IGNORE INTO disk.files VALUES 
-    ${filesSQL}`);
+    let response = await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.files (id, name, duration, filestart) 
+                                            SELECT id, name, duration, filestart FROM files`);
     console.log(response.changes + ' files added to disk database')
     // Update the duration table
     response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.duration SELECT * FROM duration');
     console.log(response.changes + ' date durations added to disk database')
     response = await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.records 
         SELECT * FROM records
-        WHERE confidence >= ${STATE.detect.confidence}
-        AND speciesID NOT IN (${STATE.blocked})`);
+        WHERE confidence >= ? AND speciesID NOT IN (?)`, STATE.detect.confidence, STATE.blocked);
     console.log(response.changes + ' records added to disk database')
     if (response.changes) {
         UI.postMessage({ event: 'diskDB-has-records' });
     }
     await memoryDB.runAsync('END');
 
-
-    // Clear and relaunch the memory DB
-    //memoryDB.close(); // is this necessary??
     if (!DATASET) {
-        files.forEach(file => STATE.saved.add(file));
+
         // Now we have saved the records, set state to DiskDB
         STATE.update({ db: diskDB });
         UI.postMessage({
