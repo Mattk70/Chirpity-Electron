@@ -1403,7 +1403,7 @@ const insertRecord = async (key, speciesID, confidence, file) => {
     let changes, fileID;
     confidence = Math.round(confidence);
     const db = STATE.db;
-    let res = await db.getAsync('SELECT id FROM files WHERE name = ', file);
+    let res = await db.getAsync('SELECT id FROM files WHERE name = ?', file);
     if (!res) {
         res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,? )', 
             null, file, metadata[file].duration, metadata[file].fileStart);
