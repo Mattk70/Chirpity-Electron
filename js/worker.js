@@ -1240,7 +1240,7 @@ async function uploadOpus({ file, start, end, defaultName, metadata, mode }) {
 const bufferToAudio = ({
     file = '', start = 0, end = 3, meta = {}, format = undefined
 }) => {
-    let audioCodec, mimeType;
+    let audioCodec, mimeType, soundFormat;
     let padding = STATE.audio.padding;
     let fade = STATE.audio.fade;
     let bitrate = STATE.audio.bitrate;
@@ -1945,7 +1945,7 @@ const onSave2DiskDB = async () => {
     console.log(response.changes + ' date durations added to disk database')
     response = await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.records 
         SELECT * FROM records
-        WHERE confidence >= ? AND speciesID NOT IN (?)`, STATE.detect.confidence, STATE.blocked);
+        WHERE confidence >= ${STATE.detect.confidence} AND speciesID NOT IN (${STATE.blocked})`);
     console.log(response.changes + ' records added to disk database')
     if (response.changes) {
         UI.postMessage({ event: 'diskDB-has-records' });
@@ -2120,23 +2120,19 @@ const onUpdateFileStart = async (args) => {
     metadata[file].isComplete = false;
     //allow for this file to be compressed...
     await getWorkingFile(file);
-    file = file.replace("'", "''");
-    let db = diskDB;
-
-    let { id } = await db.getAsync(`SELECT id
-                                     from files
-                                     where name = '${file}'`);
-    const { changes } = await db.runAsync(`UPDATE files
-                                         SET filestart = ${args.start}
-                                         where id = '${id}'`);
+    let db = STATE.db;
+    db.runAsync('BEGIN');
+    let { id } = await db.getAsync('SELECT id from files where name = ?', file);
+    const { changes } = await db.runAsync('UPDATE files SET filestart = ? where id = ?', args.start, id);
     console.log(changes ? `Changed ${file}` : `No changes made`);
-    let result = await db.runAsync(`UPDATE records
-                                    set dateTime = (position * 1000) + ${args.start}
-                                    where fileid = ${id}`);
+    let result = await db.runAsync('UPDATE records set dateTime = (position * 1000) + ? where fileid = ?', args.start, id);
+    db.runAsync('END');
     console.log(`Changed ${result.changes} records associated with  ${file}`);
 };
 
+
 const prepSQL = (string) => string.replaceAll("''", "'").replaceAll("'", "''");
+
 
 async function onDelete({
     file,
@@ -2150,7 +2146,7 @@ async function onDelete({
     const datetime = filestart + (parseFloat(start) * 1000);
     species = species || '%';
     let { changes } = await db.runAsync(`DELETE FROM records 
-        WHERE datetime = ? AND speciesID = (SELECT id FROM species WHERE cname LIKE ?)`,
+        WHERE datetime = ? AND speciesID = (SELECT id FROM species WHERE cname = ?)`,
         datetime, species);
     if (changes) {
         if (STATE.mode !== 'selection') {
@@ -2287,8 +2283,7 @@ async function onChartRequest(args) {
 }
 
 const onFileDelete = async (fileName) => {
-    const fileSQL = prepSQL(fileName);
-    const result = await diskDB.runAsync(`DELETE FROM files WHERE name = '${fileSQL}'`);
+    const result = await diskDB.runAsync('DELETE FROM files WHERE name = ?', fileName);
     if (result.changes) {
         getSpecies();
         UI.postMessage({
