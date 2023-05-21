@@ -1788,7 +1788,7 @@ async function processNextFile({
             } else {
                 UI.postMessage({
                     event: 'progress',
-                    text: "<span class='loading'>Awaiting detections</span>",
+                    text: "<span class='loading'>Scanning</span>",
                     file: file
                 });
                 await doPrediction({
