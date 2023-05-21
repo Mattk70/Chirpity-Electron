@@ -169,8 +169,8 @@ function resetResults() {
  * @param val: float between 0 and 1
  */
 function updateProgress(val) {
+    if (val) progressBar.value = val;
     val = val.toString();
-    progressBar.value = val;
     progressBar.innerText = val + '%';
 }
 
