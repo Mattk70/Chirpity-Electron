@@ -19,7 +19,9 @@ export class State {
             this.chart = { range: { start: undefined, end: undefined }, species: undefined },
             this.explore = { range: { start: undefined, end: undefined } },
             this.model = null,
-            this.predictionCount = 0
+            this.predictionCount = 0,
+            this.topRankin = 1,
+            this.GET_RESULT_SQL = undefined
     }
 
 
