@@ -9,10 +9,11 @@ const { writeFile, mkdir, readdir } = require('node:fs/promises');
 const { utimes } = require('utimes');
 const stream = require("stream");
 const staticFfmpeg = require('ffmpeg-static-electron');
+const { stat } = require("fs/promises");
 
 import { State } from './state.js';
+import { sqlite3 } from './database.js';
 
-const { stat } = require("fs/promises");
 let WINDOW_SIZE = 3;
 let NUM_WORKERS;
 let workerInstance = 0;
@@ -24,34 +25,6 @@ const DEBUG = true;
 const DATASET = false;
 const adding_chirpity_additions = true;
 const dataset_database = DATASET;
-
-const sqlite3 = DEBUG ? require('sqlite3').verbose() : require('sqlite3');
-sqlite3.Database.prototype.runAsync = function (sql, ...params) {
-    return new Promise((resolve, reject) => {
-        this.run(sql, params, function (err) {
-            if (err) return reject(err);
-            resolve(this);
-        });
-    });
-};
-
-sqlite3.Database.prototype.allAsync = function (sql, ...params) {
-    return new Promise((resolve, reject) => {
-        this.all(sql, params, (err, rows) => {
-            if (err) return reject(err);
-            resolve(rows);
-        });
-    });
-};
-
-sqlite3.Database.prototype.getAsync = function (sql, ...params) {
-    return new Promise((resolve, reject) => {
-        this.get(sql, params, (err, row) => {
-            if (err) return reject(err);
-            resolve(row);
-        });
-    });
-};
 
 
 console.log(staticFfmpeg.path);
@@ -241,6 +214,8 @@ ipcRenderer.on('new-client', (event) => {
                 TEMP = args.temp || TEMP;
                 appPath = args.path || appPath;
                 STATE.update(args);
+                // Need to recompile prepared sql if changeing sortOrder
+                if (args.sortOrder) prepStatements();
                 break;
             case 'clear-cache':
                 CACHE_LOCATION = p.join(TEMP, 'chirpity');
@@ -309,16 +284,21 @@ ipcRenderer.on('new-client', (event) => {
                 await onInsertManualRecord(args);
                 break;
             case 'change-mode':
+                if (!memoryDB)  await createDB();
                 STATE.changeMode({
                     mode: args.mode,
                     disk: diskDB,
                     memory: memoryDB
                 });
+                // PREPARE SQL STATEMENTS
+                prepStatements();
                 break;
             case 'analyse':
                 // Create a new memory db if one doesn't exist, or wipe it if one does,
                 // unless we're looking at a selection
-                if (!memoryDB || !args.end) await createDB();
+                if (!memoryDB || !args.end) {
+                    await createDB();
+                }
                 predictionsReceived = {};
                 predictionsRequested = {};
                 await onAnalyse(args);
@@ -411,7 +391,172 @@ const getFilesInDirectory = async (dir) => {
     return files;
 };
 
+const prepParams = (list) =>  list.map(item => '?').join(',');
 
+
+const prepWhereClause = ({ dateRange, species }) => {
+    let where = 'WHERE confidence >= ?';
+    if (!STATE.selection && STATE.blocked.length) {
+        where += ` AND speciesID NOT IN (${prepParams(STATE.blocked)})`
+    }
+    if (STATE.mode !== 'explore') {
+        where += ` AND name IN  (${prepParams(STATE.filesToAnalyse)})`;
+    }
+    if (species) where += ' AND cname = ?';
+    if (dateRange?.start) where += ' AND dateTime BETWEEN ? AND ?';
+    return where
+};
+
+const getResultsParams = (species, confidence, offset, limit, topRankin) => {
+    const addBlockedIDs = !STATE.selection && STATE.blocked.length;
+    const params = [];
+    if (addBlockedIDs) {
+        params.push(...STATE.blocked);
+    }
+    params.push(topRankin, confidence, species);
+    if (STATE.mode !== 'explore') {
+        params.push(...STATE.filesToAnalyse);
+    }
+    if (STATE.selection) params.push(STATE.selection.start, STATE.selection.end);
+    else if (STATE.explore.range.start !== undefined){
+        params.push(STATE.explore.range.start, STATE.explore.range.end);
+    }
+    params.push(limit, offset)
+    return params
+}
+
+const getSummaryParams = (species, confidence) => {
+    const addBlockedIDs = !STATE.selection && STATE.blocked.length;
+    const useRange = (STATE.mode === 'explore' && STATE.explore.range.start !== undefined ) 
+                    || STATE.selection;
+    const params = [confidence];
+    const extraParams = [];
+    if (STATE.mode !== 'explore') {
+        extraParams.push(...STATE.filesToAnalyse);
+    }
+    if (STATE.selection) params.push(STATE.selection.start, STATE.selection.end);
+    else if (STATE.explore.range.start !== undefined){
+        extraParams.push(STATE.explore.range.start, STATE.explore.range.end);
+    }
+    if (addBlockedIDs) {
+        extraParams.push(...STATE.blocked);
+    }
+    params.push(...extraParams);
+    params.push(confidence, species);
+    params.push(...extraParams);
+    return params
+}
+
+const prepSummaryStatement = () => {
+    let excluded;
+    const addBlockedIDs = !STATE.selection && STATE.blocked.length;
+    const useRange = (STATE.mode === 'explore' && STATE.explore.range.start !== undefined ) 
+                    || STATE.selection;
+    let summaryStatement = `
+    WITH ranked_records AS (
+        SELECT records.dateTime, records.speciesID, records.confidence, records.fileID, cname, sname,
+          RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
+        FROM records
+        JOIN files ON files.id = records.fileID
+        JOIN species ON species.id = records.speciesID
+        WHERE confidence >=  ? `;
+    let extraClause = '';
+    if (STATE.mode !== 'explore') {
+        extraClause += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+    }
+    if (useRange) {
+        extraClause += ' AND dateTime BETWEEN ? AND ? ';
+    }
+    if (addBlockedIDs) {
+        excluded = prepParams(STATE.blocked);
+        extraClause += ` AND speciesID NOT IN (${excluded}) `;
+    }
+    summaryStatement += extraClause;
+    summaryStatement +=  `
+    )
+    SELECT cname, sname, COUNT(*) as count, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
+      FROM ranked_records
+      WHERE ranked_records.rank <= ${STATE.topRankin}
+      GROUP BY speciesID
+    UNION ALL
+    SELECT
+        'Total' AS sname,
+        cname as cname,
+        COUNT(*) AS count,
+        ROUND(MAX(ranked_records.confidence) / 10.0, 0) AS max
+      FROM
+        ranked_records
+        JOIN files ON files.id = ranked_records.fileID
+    WHERE confidence >= ? AND cname LIKE ? AND ranked_records.rank <= ${STATE.topRankin} `;
+    summaryStatement += extraClause;
+    summaryStatement += 'ORDER BY count DESC, max DESC';
+    STATE.GET_SUMMARY_SQL = STATE.db.prepare(summaryStatement);
+    //console.log('Summary SQL statement:\n' + summaryStatement)
+}
+
+const prepResultsStatement = () => {
+    let resultStatement = `
+    WITH ranked_records AS (
+        SELECT 
+          records.dateTime, 
+          files.duration, 
+          files.filestart, 
+          files.name,
+          records.position, 
+          records.speciesID,
+          species.sname, 
+          species.cname, 
+          records.confidence, 
+          records.label, 
+          records.comment, 
+          records.end,
+          records.callCount,
+          RANK() OVER (PARTITION BY records.dateTime, records.fileID ORDER BY records.confidence DESC) AS confidence_rank
+        FROM records 
+          JOIN species ON records.speciesID = species.id 
+          JOIN files ON records.fileID = files.id `;
+
+    if (!STATE.selection && STATE.blocked.length) {
+        resultStatement += ` AND speciesID NOT IN (${prepParams(STATE.blocked)}) `
+    }
+
+    resultStatement += `
+    )
+      SELECT 
+        dateTime as timestamp, 
+        duration, 
+        filestart, 
+        name as file, 
+        position, 
+        speciesID,
+        sname, 
+        cname, 
+        confidence as score, 
+        label, 
+        comment,
+        end,
+        callCount,
+        confidence_rank
+      FROM 
+        ranked_records 
+        WHERE confidence_rank <= ? AND confidence >= ? AND cname LIKE ? `;
+
+    if (STATE.mode !== 'explore') {
+        resultStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+    }
+    if (( STATE.mode === 'explore' && STATE.explore.range.start !== undefined ) 
+        || STATE.selection) {
+            resultStatement += ' AND dateTime BETWEEN ? AND ? ';
+    }
+    resultStatement +=  `ORDER BY ${STATE.sortOrder}, confidence DESC, callCount DESC LIMIT ? OFFSET ?`;
+    STATE.GET_RESULT_SQL = STATE.db.prepare(resultStatement);
+    //console.log('Results SQL statement:\n' + resultStatement)
+}
+
+const prepStatements = (species) => {
+    prepResultsStatement(species);
+    prepSummaryStatement(species);
+};
 
 // Not an arrow function. Async function has access to arguments - so we can pass them to processnextfile
 async function onAnalyse({
@@ -427,16 +572,17 @@ async function onAnalyse({
     //create a copy of files in scope for state, as filesInScope is spliced
     STATE.setFiles([...filesInScope]);
     console.log(`Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`);
-    //confidence = confidence * 10;
     //Set global filesInScope for summary to use
     PENDING_FILES = filesInScope;
     index = 0;
     AUDACITY = {};
     COMPLETED = [];
     FILE_QUEUE = filesInScope;
+
     // If we are analsing a selection, don't change the db
     // Otherwise, all new analyses go to the memory db
     if (!STATE.selection) STATE.update({ db: memoryDB });
+
     let count = 0;
     for (let i = FILE_QUEUE.length - 1; i >= 0; i--) {
         let file = FILE_QUEUE[i];
@@ -462,6 +608,9 @@ async function onAnalyse({
             }
             if (allCached && !reanalyse && !STATE.selection) {
                 STATE.update({ db: diskDB });
+                // PREPARE SQL STATEMENTS for diskdb
+                prepStatements();
+
                 await getResults({ db: diskDB, files: FILE_QUEUE });
                 await getSummary({ files: FILE_QUEUE })
                 return
@@ -470,6 +619,9 @@ async function onAnalyse({
 
         console.log(`Adding ${file} to the queue.`)
     }
+    // PREPARE SQL STATEMENTS
+    prepStatements();
+
     console.log("FILE_QUEUE has ", FILE_QUEUE.length, 'files', count, 'files ignored')
     if (predictionDone) {
         // Clear state unless analysing a selection
@@ -1542,6 +1694,8 @@ async function parseMessage(e) {
             if (!SEEN_LIST_UPDATE) {
                 SEEN_LIST_UPDATE = true;
                 STATE.update({ blocked: response.blocked, globalOffset: 0 });
+                // PREPARE SQL STATEMENTS
+                prepStatements();
                 if (response['updateResults'] && STATE.db) {
                     // update-results called after setting migrants list, so DB may not be initialized
                     await getResults();
@@ -1687,15 +1841,8 @@ const setWhereWhen = ({ dateRange, species, files, context }) => {
     let where = `${confidence}`;
     if (files?.length) {
         const name = context === 'summary' ? 'files.name' : 'name';
-        where += ` AND ${name} IN  (`;
-        // Format the file list
-        files.forEach(file => {
-            file = prepSQL(file);
-            where += `'${file}',`
-        })
-        // remove last comma
-        where = where.slice(0, -1);
-        where += ')';
+        const filesSQL = files.map(file => `'${prepSQL(file)}'`).join(',');
+        where += ` AND ${name} IN  (${filesSQL})`;
     }
 
     //const cname = context === 'summary' ? 'cname' : 's1.cname';
@@ -1705,12 +1852,14 @@ const setWhereWhen = ({ dateRange, species, files, context }) => {
 };
 
 
+
+
 const getSummary = async ({
     species = undefined,
     active = undefined,
     interim = false,
     action = undefined,
-    topRankin = 1
+    topRankin = STATE.topRankin
 } = {}) => {
     const db = STATE.db;
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
@@ -1721,38 +1870,41 @@ const getSummary = async ({
         files = STATE.filesToAnalyse;
     }
 
-    let [where, when, excluded_species_ids] = setWhereWhen({
-        dateRange: range, files: files, context: 'summary'
-    });
+    // let [where, when, excluded_species_ids] = setWhereWhen({
+    //     dateRange: range, files: files, context: 'summary'
+    // });
     t0 = Date.now();
-    const speciesClause = species ? ` AND cname = '${prepSQL(species)}'` : '';
-    const summary = await db.allAsync(`
-    WITH ranked_records AS (
-        SELECT records.dateTime, records.speciesID, records.confidence, records.fileID, cname, sname,
-          RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
-        FROM records
-        JOIN files ON files.id = records.fileID
-        JOIN species ON species.id = records.speciesID
-        WHERE speciesID NOT IN (${excluded_species_ids}) AND confidence >= ${where} ${when}
-      )
-    SELECT cname, sname, COUNT(*) as count, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
-      FROM ranked_records
-      WHERE ranked_records.rank <= ${topRankin}
-      GROUP BY speciesID
-    UNION ALL
-    SELECT
-        'Total' AS sname,
-        cname as cname,
-        COUNT(*) AS count,
-        ROUND(MAX(ranked_records.confidence) / 10.0, 0) AS max
-      FROM
-        ranked_records
-        JOIN files ON files.id = ranked_records.fileID
-      WHERE speciesID NOT IN
-        (${excluded_species_ids}) AND confidence >= ${where} ${when} ${speciesClause} AND
-        ranked_records.rank <= ${topRankin}
-    ORDER BY count DESC, max DESC;    
-    `);
+    const speciesForSTMT = species || '%';
+    const params = getSummaryParams(speciesForSTMT, STATE.detect.confidence);
+    const summary = await STATE.GET_SUMMARY_SQL.allAsync(...params);
+
+    // const summary = await db.allAsync(`
+    // WITH ranked_records AS (
+    //     SELECT records.dateTime, records.speciesID, records.confidence, records.fileID, cname, sname,
+    //       RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
+    //     FROM records
+    //     JOIN files ON files.id = records.fileID
+    //     JOIN species ON species.id = records.speciesID
+    //     WHERE speciesID NOT IN (${excluded_species_ids}) AND confidence >= ${where} ${when}
+    //   )
+    // SELECT cname, sname, COUNT(*) as count, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
+    //   FROM ranked_records
+    //   WHERE ranked_records.rank <= ${STATE.topRankin}
+    //   GROUP BY speciesID
+    // UNION ALL
+    // SELECT
+    //     'Total' AS sname,
+    //     cname as cname,
+    //     COUNT(*) AS count,
+    //     ROUND(MAX(ranked_records.confidence) / 10.0, 0) AS max
+    //   FROM
+    //     ranked_records
+    //     JOIN files ON files.id = ranked_records.fileID
+    //   WHERE speciesID NOT IN
+    //     (${excluded_species_ids}) AND confidence >= ${where} ${when} ${speciesClause} AND
+    //     ranked_records.rank <= ${STATE.topRankin}
+    // ORDER BY count DESC, max DESC;    
+    // `);
 
     if (DEBUG) console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds");
     const event = interim ? 'update-summary' : 'prediction-done';
@@ -1786,7 +1938,7 @@ const getResults = async ({
     context = 'results',
     limit = 500,
     offset = undefined,
-    topRankin = 1,
+    topRankin = STATE.topRankin,
     exportTo = undefined
 } = {}) => {
     const { db, sortOrder, mode, filesToAnalyse } = STATE;
@@ -1808,54 +1960,13 @@ const getResults = async ({
         if (species) STATE.filteredOffset[species] = offset;
         else STATE.update({ globalOffset: offset });
     }
-    // if (explore) { db = diskDB; files = [] }
 
-    const [where, when, excluded_species_ids] = setWhereWhen({
-        dateRange: range, species: species, files: files, context: context
-    });
     let index = offset;
     AUDACITY = {};
     let t0 = Date.now();
-    const result = await db.allAsync(`
-    WITH ranked_records AS (
-        SELECT 
-          records.dateTime, 
-          files.duration, 
-          files.filestart, 
-          files.name,
-          records.position, 
-          records.speciesID,
-          species.sname, 
-          species.cname, 
-          records.confidence, 
-          records.label, 
-          records.comment, 
-          records.end,
-          records.callCount,
-          RANK() OVER (PARTITION BY records.dateTime, records.fileID ORDER BY records.confidence DESC) AS confidence_rank
-        FROM records 
-          JOIN species ON records.speciesID = species.id 
-          JOIN files ON records.fileID = files.id 
-          WHERE speciesID NOT IN (${excluded_species_ids})
-      )
-      SELECT 
-        dateTime as timestamp, 
-        duration, 
-        filestart, 
-        name as file, 
-        position, 
-        speciesID,
-        sname, 
-        cname, 
-        confidence as score, 
-        label, 
-        comment,
-        end,
-        callCount,
-        confidence_rank
-      FROM 
-        ranked_records 
-        WHERE confidence_rank <= ${topRankin} AND confidence >= ${where} ${when} ORDER BY ${sortOrder}, confidence DESC, callCount DESC LIMIT ${limit} OFFSET ${offset}`);
+    const speciesForSTMT = species || '%';
+    const params = getResultsParams(speciesForSTMT, confidence, offset, limit, topRankin);
+    const result = await STATE.GET_RESULT_SQL.allAsync(...params);
 
     for (let i = 0; i < result.length; i++) {
         const r = result[i];
@@ -2146,7 +2257,7 @@ async function onDelete({
     const datetime = filestart + (parseFloat(start) * 1000);
     species = species || '%';
     let { changes } = await db.runAsync(`DELETE FROM records 
-        WHERE datetime = ? AND speciesID = (SELECT id FROM species WHERE cname = ?)`,
+        WHERE datetime = ? AND speciesID = (SELECT id FROM species WHERE cname LIKE ?)`,
         datetime, species);
     if (changes) {
         if (STATE.mode !== 'selection') {
