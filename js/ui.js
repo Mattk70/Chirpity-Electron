@@ -2148,6 +2148,7 @@ const postBufferUpdate = ({
     region = undefined,
     queued = false
 }) => {
+    fileLoaded = false
     worker.postMessage({
         action: 'update-buffer',
         file: file,
@@ -2317,7 +2318,7 @@ async function onWorkerLoadedAudio({
         }
         if (windowLength > currentFileDuration) windowLength = currentFileDuration;
 
-        fileLoaded = true;
+        
 
 
         updateSpec({ buffer: currentBuffer, position: position, play: play, resetSpec: resetSpec });
@@ -2334,6 +2335,7 @@ async function onWorkerLoadedAudio({
         } else {
             clearActive();
         }
+        fileLoaded = true;
         if (activeRow) activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 }
@@ -3480,7 +3482,7 @@ function buildSummaryMenu(menu, target) {
 
 
 
-$('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('contextmenu', function (e) {
+$('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('contextmenu', async function (e) {
     const menu = $("#context-menu");
     const target = e.target;
     const summaryContext = target.closest('#summaryTable');
@@ -3488,7 +3490,14 @@ $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('c
     if (summaryContext) {
         contextDelete = buildSummaryMenu(menu, target)
     } else {
-        target.click()
+        const [file, start, end,] = unpackNameAttr(target);
+        // If we haven't clicked the active row or we cleared the region, load the row we clicked
+        if ((region?.start + bufferBegin) !== start){
+            target.click();
+            // Wait for file to load
+            await waitForFileLoad();
+            
+        }
         if (activeRow === undefined && region === undefined) return;
         const createOrEdit = isExplore() && region?.attributes.label ? 'Edit' : 'Create';
         menu.html(`
@@ -3687,3 +3696,15 @@ purgeFile.addEventListener('click', () => {
         }
     }
 })
+
+
+// Utility functions to wait for var to be true
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+  
+async function waitForFileLoad() {
+while (!fileLoaded) {
+        await delay(100); // Wait for 100 milliseconds before checking again
+    }
+}
