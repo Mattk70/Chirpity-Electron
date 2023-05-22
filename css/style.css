@@ -5,6 +5,7 @@ body {
     padding-bottom: 0;
     min-width: 700px;
     overflow: hidden;
+    background: #f8f9fa;
 }
 
 .border-10 {

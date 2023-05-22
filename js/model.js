@@ -73,15 +73,17 @@ onmessage = async (e) => {
             case 'predict':
                 //const t0 = performance.now();
                 if (myModel.model_loaded) { //test here, as after abort, model is null
-                    const { chunks, start, fileStart, file, snr, confidence, worker, context } = e.data;
+                    const { chunks, start, fileStart, file, snr, confidence, worker, context, resetResults } = e.data;
                     myModel.useContext = context;
+                    myModel.selection = !resetResults;
                     const result = await myModel.predictChunk(chunks, start, fileStart, file, snr, confidence / 1000);
                     response = {
                         message: 'prediction',
                         file: file,
                         result: result,
                         fileStart: fileStart,
-                        worker: worker
+                        worker: worker,
+                        selection: myModel.selection
                     };
                     postMessage(response);
                     // reset the results
@@ -152,6 +154,7 @@ class Model {
         this.list = list;
         this.useContext = null;
         this.version = version;
+        this.selection = false;
     }
 
     async loadModel() {
@@ -340,7 +343,12 @@ class Model {
         const tb = paddedTensorBatch || maskedTensorBatch || TensorBatch;
         const prediction = this.model.predict(tb, { batchSize: this.batchSize })
         let newPrediction;
-        if (this.useContext && this.batchSize > 1 && threshold === 0) {
+        if (this.selection){
+            newPrediction = tf.max(prediction, 0, true);
+            prediction.dispose();
+            keys = keys.splice(0,1);
+        }
+        else if (this.useContext && this.batchSize > 1 && threshold === 0) {
             newPrediction = this.addContext(prediction, tb, confidence);
             prediction.dispose();
         }
@@ -348,12 +356,13 @@ class Model {
         if (paddedTensorBatch) paddedTensorBatch.dispose();
         if (maskedTensorBatch) maskedTensorBatch.dispose();
 
-        const array_of_predictions = (newPrediction || prediction).arraySync()
-        prediction.dispose();
+        const finalPrediction = newPrediction || prediction;
+        const array_of_predictions = finalPrediction.arraySync()
+        finalPrediction.dispose();
         if (newPrediction) newPrediction.dispose();
         return keys.reduce((acc, key, index) => {
             // convert key (samples) to milliseconds
-            const position = key / CONFIG.sampleRate;
+            const position = (key / CONFIG.sampleRate).toFixed(3);
             acc[position] = array_of_predictions[index];
             return acc;
         }, {});
