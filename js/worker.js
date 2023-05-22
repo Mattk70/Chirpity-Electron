@@ -541,7 +541,7 @@ const prepResultsStatement = () => {
         ranked_records 
         WHERE confidence_rank <= ? AND confidence >= ? AND cname LIKE ? `;
 
-    if (STATE.mode !== 'explore') {
+    if (STATE.mode !== 'explore'  && !STATE.selection) {
         resultStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
     }
     if (( STATE.mode === 'explore' && STATE.explore.range.start !== undefined ) 
@@ -569,8 +569,7 @@ async function onAnalyse({
     aborted = false;
     // set to memory database. If end was passed, this is a selection
     STATE.update({ db: memoryDB, selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined });
-    //create a copy of files in scope for state, as filesInScope is spliced
-    STATE.setFiles([...filesInScope]);
+
     console.log(`Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`);
     //Set global filesInScope for summary to use
     PENDING_FILES = filesInScope;
@@ -581,7 +580,11 @@ async function onAnalyse({
 
     // If we are analsing a selection, don't change the db
     // Otherwise, all new analyses go to the memory db
-    if (!STATE.selection) STATE.update({ db: memoryDB });
+    if (!STATE.selection) {
+        STATE.update({ db: memoryDB });
+        //create a copy of files in scope for state, as filesInScope is spliced
+        STATE.setFiles([...filesInScope]);
+    }
 
     let count = 0;
     for (let i = FILE_QUEUE.length - 1; i >= 0; i--) {
@@ -1035,58 +1038,6 @@ async function setupCtx(chunk, header) {
  * @returns {Promise<void>}
  */
 
-/*const getPredictBuffers = async ({
-                                     file = '', start = 0, end = undefined, resetResults = false, worker = undefined
-                                 }) => {
-
-    // Fetch the WAV file
-    fetch(file)
-        .then(response => response.arrayBuffer())
-        .then(data => {
-            // Decode the audio data
-            return new Promise((resolve, reject) => {
-                audioCtx.decodeAudioData(data, resolve, reject);
-            });
-        })
-        .then(audioBuffer => {
-            const duration = 3; // duration in seconds
-            const sampleRate = audioBuffer.sampleRate;
-            const numChannels = audioBuffer.numberOfChannels;
-            const numSamples = Math.min(duration * sampleRate, audioBuffer.length);
-            const monoBuffer = audioCtx.createBuffer(1, numSamples, sampleRate);
-            const bufferSize = duration * sampleRate; // buffer size for each callback
-            const monoChannelData = monoBuffer.getChannelData(0);
-            const startIndex = start * sampleRate;
-            const endIndex = end ? Math.min(end * sampleRate, audioBuffer.length) : audioBuffer.length;
-            let currentIndex = 0;
-
-            // Mix to mono and extract the first 3 seconds of audio data
-            for (let i = startIndex; i < endIndex; i++) {
-                // Mix to mono by averaging left and right channels
-                for (let j = 0; j < numChannels; j++) {
-                    monoChannelData[i] += audioBuffer.getChannelData(j)[startIndex + i] / numChannels;
-                }
-                // Send to model when we have 3 seconds of audio data
-                if (currentIndex === bufferSize - 1) {
-                    // Convert the mono audio data to Float32Array
-                    const audioDataFloat32Array = new Float32Array(monoChannelData.buffer);
-                    feedChunksToModel(audioDataFloat32Array, startIndex, file, end, resetResults, worker);
-                    // Reset the monoChannelData and currentIndex
-                    monoChannelData.fill(0);
-                    currentIndex = 0;
-                } else {
-                    currentIndex++;
-                }
-            }
-            // Call the processing function with the remaining audio data if any
-            if (currentIndex > 0) {
-                // Convert the mono audio data to Float32Array
-                const audioDataFloat32Array = new Float32Array(monoChannelData.buffer);
-                feedChunksToModel(audioDataFloat32Array, startIndex, file, end, resetResults, worker);
-            }
-        })
-        .catch(error => console.error(error));
-}*/
 
 const getPredictBuffers = async ({
     file = '', start = 0, end = undefined, resetResults = false, worker = undefined
@@ -2254,11 +2205,13 @@ async function onDelete({
 }) {
     const db = STATE.db;
     const { filestart } = await db.getAsync('SELECT filestart from files WHERE name = ?', file);
-    const datetime = filestart + (parseFloat(start) * 1000);
-    species = species || '%';
-    let { changes } = await db.runAsync(`DELETE FROM records 
-        WHERE datetime = ? AND speciesID = (SELECT id FROM species WHERE cname LIKE ?)`,
-        datetime, species);
+    const params = [filestart + (parseFloat(start) * 1000)];
+    let sql = 'DELETE FROM records WHERE datetime = ?';
+    if (species) {
+        sql += ' AND speciesID = (SELECT id FROM species WHERE cname = ?)'
+        params.push(species);
+    }
+    let { changes } = await db.runAsync( sql, ...params);
     if (changes) {
         if (STATE.mode !== 'selection') {
             // Update the summary table
@@ -2433,7 +2386,7 @@ todo: bugs
         and return the result for the current file only #######
     ***In explore, editID doesn't change the label of the region to the new species
     ***Analyse selection returns just the file in which the selection is requested
-
+    Reported region duration tooltip incorrect 
 
 Todo: Database
      Database delete: records, files (and all associated records). Use when reanalysing
