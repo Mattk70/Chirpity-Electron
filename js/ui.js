@@ -98,7 +98,7 @@ let resultTable = document.getElementById('resultTableBody');
 const selectionTable = document.getElementById('selectionResultTableBody');
 const nocmigButton = document.getElementById('nocmigMode');
 const summaryTable = $('#summaryTable');
-const progressDiv = $('#progressDiv');
+const progressDiv = document.getElementById('progressDiv');
 const progressBar = document.getElementById('progress-bar');
 const fileNumber = document.getElementById('fileNumber');
 const timelineSetting = document.getElementById('timelineSetting');
@@ -160,7 +160,7 @@ function resetResults() {
     predictions = {};
     seenTheDarkness = false;
     shownDaylightBanner = false;
-    progressDiv.hide();
+    progressDiv.classList.add('d-none');
     updateProgress(0)
 }
 
@@ -295,16 +295,9 @@ const initWavesurfer = ({
         fillParent: true,
         responsive: true,
         height: height,
-        plugins: [
-            WaveSurfer.regions.create({
-                formatTimeCallback: formatRegionTooltip,
-                dragSelection: true,
-                slop: 5,
-                color: "rgba(255, 255, 255, 0.2)"
-            })
-        ]
     });
     wavesurfer.bufferRequested = false;
+    initRegion();
     initSpectrogram();
     createTimeline();
     if (audio) wavesurfer.loadDecodedBuffer(audio);
@@ -536,7 +529,7 @@ function analyseReset() {
     PREDICTING = true;
     delete diagnostics['Audio Duration'];
     AUDACITY_LABELS = {};
-    progressDiv.show();
+    progressDiv.classList.remove('d-none');
     // Diagnostics
     t0_analysis = Date.now();
 }
@@ -632,7 +625,7 @@ function postAnalyseMessage(args) {
             refreshResultsView();
         } else {
             worker.postMessage({ action: 'change-mode', mode: 'selection' });
-            progressDiv.show();
+            progressDiv.classList.remove('d-none');
             updateProgress(0);
             delete diagnostics['Audio Duration'];
         }
@@ -1752,6 +1745,19 @@ function enableKeyDownEvent() {
 
 ///////////// Nav bar Option handlers //////////////
 
+function initRegion() {
+    if (wavesurfer.regions) wavesurfer.destroyPlugin('regions');
+    wavesurfer.addPlugin(WaveSurfer.regions.create({
+            formatTimeCallback: formatRegionTooltip,
+            dragSelection: true,
+            // Region length bug (likely mine) means I don't trust leangths > 60 seconds
+            maxLength: config[config.backend].batchSize * 3,
+            slop: 5,
+            color: "rgba(255, 255, 255, 0.2)"
+        })
+    ).initPlugin('regions')
+}
+
 function initSpectrogram(height, fftSamples) {
     console.log("initializing spectrogram")
     if (!fftSamples) {
@@ -1895,7 +1901,8 @@ const handleBackendChange = (e) => {
     batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
     batchSizeValue.innerText = BATCH_SIZE_LIST[batchSizeSlider.value].toString();
     updatePrefs();
-
+    // restart wavesurfer regions to set new maxLength
+    initRegion();
     loadModel();
 }
 
@@ -1977,6 +1984,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
                 list: config.list
             });
             alert('Operation cancelled');
+            progressDiv.classList.add('d-none');
         }
     },
     Home: function () {
@@ -2341,7 +2349,7 @@ async function onWorkerLoadedAudio({
 }
 
 function onProgress(args) {
-    progressDiv.show();
+    progressDiv.classList.remove('d-none');
     if (args.text) {
         fileNumber.innerHTML = args.text;
     } else {
@@ -2352,7 +2360,7 @@ function onProgress(args) {
         let progress = Math.round(args.progress * 1000) / 10;
         updateProgress(progress);
         if (progress === 100.0) {
-            progressDiv.hide();
+            progressDiv.classList.add('d-none');
         }
     } else {
         updateProgress(0)
@@ -2415,7 +2423,7 @@ async function onPredictionDone({
     enableMenuItem(['save2db', 'export2audio']);
     // Defer further processing until batch complete
     if (batchInProgress) {
-        progressDiv.show();
+        progressDiv.classList.remove('d-none');
         return;
     } else {
         PREDICTING = false;
@@ -2441,7 +2449,7 @@ async function onPredictionDone({
     //Pagination
     total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
     if (action !== 'filter') {
-        progressDiv.hide();
+        
         updateProgress(0)
 
         //completeDiv.show();
@@ -2576,7 +2584,9 @@ async function renderResult({
 
     let tr = '';
     if (index <= 1) {
-        if (selection) selectionTable.innerHTML = '';
+        if (selection) {
+            selectionTable.innerHTML = '';
+        }
         else {
             showElement(['resultTableContainer', 'resultsHead'], false);
             resultTable.innerHTML = '';
@@ -2635,6 +2645,8 @@ async function renderResult({
         const showTimestamp = config.timeOfDay ? 'd-none' : '';
         const activeTable = active ? 'table-active' : '';
         const labelHTML = label ? tags[label] : '';
+        const hide = selection ? 'd-none' : '';
+
         const countIcon = count > 1 ? `<span class="circle pointer" title="Click to view the ${count} detections at this timecode">${count}</span>` : '';
         const XC_type = cname.indexOf('(song)') !== -1 ? "song" : "nocturnal flight call";
         tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${end || position + 3}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
@@ -2643,10 +2655,10 @@ async function renderResult({
             <td name="${cname}" class='text-start cname'>
             <span class="cname">${cname}</span> ${countIcon} ${iconizeScore(score)}
              </td>
-             <td class="text-end call-count">${callCount || 'Present'} </td>
+             <td class="text-end call-count ${hide}">${callCount || 'Present'} </td>
             
-            <td class="label">${labelHTML}</td>
-            <td class="comment text-end">${commentHTML}</td>
+            <td class="label ${hide}">${labelHTML}</td>
+            <td class="comment text-end ${hide}">${commentHTML}</td>
             
         </tr>`;
     }
@@ -2684,11 +2696,11 @@ detectionsDismiss.addEventListener('click', event => {
         //     resultTable.rows(rowIndex).click();
         // }
     }
-    clearActive()
+    //clearActive()
 });
 
 const detectionsAdd = document.getElementById('detections-add');
-detectionsAdd.addEventListener('click', clearActive);
+//detectionsAdd.addEventListener('click', clearActive);
 
 const updateResultTable = (row, isFromDB, isSelection) => {
     const table = isSelection ? selectionTable : resultTable;
@@ -2703,7 +2715,7 @@ const updateResultTable = (row, isFromDB, isSelection) => {
             if (!detectionsModal || !detectionsModal._isShown) {
                 detectionsModal = new bootstrap.Modal('#detectionsModal', { backdrop: 'static' });
                 detectionsModal.show();
-                clearActive()
+                //clearActive()
             }
         }
         table.lastElementChild ? table.lastElementChild.insertAdjacentHTML('afterend', row) :
@@ -3039,6 +3051,8 @@ batchSizeSlider.addEventListener('change', (e) => {
     config[config.backend].batchSize = BATCH_SIZE_LIST[e.target.value];
     loadModel();
     updatePrefs();
+    // Reset region maxLength
+    initRegion();
 })
 
 
@@ -3485,18 +3499,22 @@ function buildSummaryMenu(menu, target) {
 $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('contextmenu', async function (e) {
     const menu = $("#context-menu");
     const target = e.target;
-    const summaryContext = target.closest('#summaryTable');
+    const summaryContext = target.closest('#speciesFilter');
+    const resultContext = target.closest('#resultTableBody');
     let contextDelete;
     if (summaryContext) {
         contextDelete = buildSummaryMenu(menu, target)
     } else {
-        const [file, start, end,] = unpackNameAttr(target);
         // If we haven't clicked the active row or we cleared the region, load the row we clicked
-        if ((region?.start + bufferBegin) !== start){
-            target.click();
-            // Wait for file to load
-            await waitForFileLoad();
-            
+        if (resultContext){
+            const [file, start, end,] = unpackNameAttr(target);
+            if ((region?.start + bufferBegin) !== start){
+                
+                target.click();
+                // Wait for file to load
+                await waitForFileLoad();
+                
+            }
         }
         if (activeRow === undefined && region === undefined) return;
         const createOrEdit = isExplore() && region?.attributes.label ? 'Edit' : 'Create';
