@@ -414,7 +414,7 @@ const getResultsParams = (species, confidence, offset, limit, topRankin) => {
         params.push(...STATE.blocked);
     }
     params.push(topRankin, confidence, species);
-    if (STATE.mode !== 'explore') {
+    if (STATE.mode !== 'explore' && !STATE.selection) {
         params.push(...STATE.filesToAnalyse);
     }
     if (STATE.selection) params.push(STATE.selection.start, STATE.selection.end);
@@ -541,7 +541,7 @@ const prepResultsStatement = () => {
         ranked_records 
         WHERE confidence_rank <= ? AND confidence >= ? AND cname LIKE ? `;
 
-    if (STATE.mode !== 'explore'  && !STATE.selection) {
+    if (!(STATE.mode === 'explore'  || STATE.selection)) {
         resultStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
     }
     if (( STATE.mode === 'explore' && STATE.explore.range.start !== undefined ) 
@@ -1563,6 +1563,8 @@ const parsePredictions = async (response) => {
     const latestResult = response.result, db = STATE.db;
     if (DEBUG) console.log('worker being used:', response.worker);
     for (let [key, predictions] of Object.entries(latestResult)) {
+        key = parseFloat(key);
+        const timestamp = metadata[file].fileStart + key * 1000;
         let updateUI = false;
         // Get the highest  5 values:
         const limit = 5;
@@ -1579,13 +1581,26 @@ const parsePredictions = async (response) => {
                 if (record.confidence > STATE.detect.confidence && STATE.blocked.indexOf(record.speciesID) === -1) {
                     updateUI = true;
                 }
-                key = parseFloat(key);
+                
+
+                if (STATE.selection && updateUI) {
+                    const {cname} = await memoryDB.getAsync(`SELECT cname FROM species WHERE id = ${record.speciesID}`);
+                    const duration = (STATE.selection.end - STATE.selection.start) / 1000;
+                    const result = {
+                        timestamp: timestamp, 
+                        position: key,
+                        end: key + duration,
+                        file: file,
+                        cname: cname, 
+                        score: record.confidence}
+                    sendResult(++index, result, false)
+                }
                 //save all results to  db, regardless of confidence
-                await insertRecord(key, record.speciesID, record.confidence, file)
+                else {await insertRecord(key, record.speciesID, record.confidence, file)}
             }
         }
         if (updateUI) {
-            const timestamp = metadata[file].fileStart + key * 1000;
+            
             //query the db for sname,  cname
             const speciesList = await memoryDB.allAsync(`
                 SELECT species.cname, species.sname, records.confidence, callCount
@@ -1612,7 +1627,7 @@ const parsePredictions = async (response) => {
     }
     const progress = ++predictionsReceived[file] / batchChunksToSend[file];
     UI.postMessage({ event: 'progress', progress: progress, file: file });
-    if (progress === 1) {
+    if (progress === 1 && !STATE.selection) {
         COMPLETED.push(file);
         db.getAsync('SELECT id FROM files WHERE name = ?', file)
             .then(row => {
@@ -1677,16 +1692,12 @@ async function parseMessage(e) {
                 if (predictionsReceived[response.file] === predictionsRequested[response.file]) {
                     const limit = 10;
                     clearCache(CACHE_LOCATION, limit);
-                    // This is the one time results *do not* come from the database
-                    if (STATE.selection) {
-                        // Get results here to fill in any previous detections in the range
-                        getResults({ files: PENDING_FILES })
-                    } else if (batchInProgress) {
+                    if (batchInProgress) {
                         UI.postMessage({
                             event: 'prediction-done', batchInProgress: true,
                         })
                         processNextFile(worker);
-                    } else {
+                    } else if (! STATE.selection) {
                         getSummary({ files: PENDING_FILES });
                     }
                 }
@@ -2199,14 +2210,17 @@ const prepSQL = (string) => string.replaceAll("''", "'").replaceAll("'", "''");
 async function onDelete({
     file,
     start,
+    end,
     species,
     // need speciesfiltered because species triggers getSummary to highlight it
     speciesFiltered
 }) {
     const db = STATE.db;
     const { filestart } = await db.getAsync('SELECT filestart from files WHERE name = ?', file);
-    const params = [filestart + (parseFloat(start) * 1000)];
-    let sql = 'DELETE FROM records WHERE datetime = ?';
+    start = filestart + (parseFloat(start) * 1000);
+    end = filestart + (parseFloat(end) * 1000);
+    const params = [start, end];
+    let sql = 'DELETE FROM records WHERE datetime = ? AND end = ?';
     if (species) {
         sql += ' AND speciesID = (SELECT id FROM species WHERE cname = ?)'
         params.push(species);
