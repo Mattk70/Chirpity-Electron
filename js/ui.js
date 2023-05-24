@@ -122,7 +122,6 @@ let predictions = {}, speciesListItems,
     clickedIndex, currentFileDuration;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
-let workerHasLoadedFile = false;
 // Set content container height
 contentWrapperElement.height(bodyElement.height() - 80);
 
@@ -170,13 +169,16 @@ function resetResults() {
  */
 function updateProgress(val) {
     if (val) progressBar.value = val;
+    else {
+        delete progressBar.value;
+    }
     val = val.toString();
     progressBar.innerText = val + '%';
 }
 
 async function loadAudioFile(args) {
     let filePath = args.filePath, originalFileEnd = args.originalFileEnd;
-    workerHasLoadedFile = false;
+    fileLoaded = false;
     try {
         fileEnd = fs.statSync(filePath).mtime;
         worker.postMessage({
@@ -254,7 +256,7 @@ const resetRegions = () => {
     if (wavesurfer) wavesurfer.clearRegions();
     region = undefined;
     disableMenuItem(['analyseSelection', 'export-audio']);
-    if (workerHasLoadedFile) enableMenuItem(['analyse']);
+    if (fileLoaded) enableMenuItem(['analyse']);
 }
 
 function clearActive() {
@@ -624,7 +626,6 @@ function postAnalyseMessage(args) {
             resetResults();
             refreshResultsView();
         } else {
-            worker.postMessage({ action: 'change-mode', mode: 'selection' });
             progressDiv.classList.remove('d-none');
             updateProgress(0);
             delete diagnostics['Audio Duration'];
@@ -2240,7 +2241,7 @@ function onModelReady(args) {
     modelReady = true;
     labels = args.labels;
     warmupText.classList.add('d-none');
-    if (workerHasLoadedFile) {
+    if (fileLoaded) {
         enableMenuItem(['analyse', 'reanalyse'])
         if (fileList.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
     }
@@ -2293,7 +2294,7 @@ async function onWorkerLoadedAudio({
     play = false,
     queued = false
 }) {
-    workerHasLoadedFile = true;
+    fileLoaded = true;
     const resetSpec = !currentFile;
     currentFileDuration = sourceDuration;
     //if (preserveResults) completeDiv.hide();
@@ -2669,38 +2670,43 @@ async function renderResult({
 let resultsBuffer, detectionsModal;
 const detectionsModalDiv = document.getElementById('detectionsModal')
 
-detectionsModalDiv.addEventListener('hidden.bs.modal', (e) => {
+detectionsModalDiv.addEventListener('hide.bs.modal', (e) => {
     worker.postMessage({ action: 'update-state', selection: undefined });
-    worker.postMessage({ action: 'change-mode', mode: STATE.mode })
+    //worker.postMessage({ action: 'change-mode', mode: STATE.mode })
 });
 
 
-const detectionsDismiss = document.getElementById('detections-dismiss');
-detectionsDismiss.addEventListener('click', event => {
-    const rows = detectionsModalDiv.querySelectorAll('tr');
-    const positions = new Set();
-    let count = 0;
-    rows.forEach(row => {
-        if (!row.classList.contains('text-bg-dark')) {
-            const [, position] = unpackNameAttr(row);
-            if (position) positions.add(position)
-        }
-    });
-    deleteRecord(positions, true);
-    if (activeRow && activeRow.closest('#results')) {
-        // Remove the initiating detection from the main results table
-        resultTable = document.getElementById('resultTableBody');
-        const rowIndex = activeRow.rowIndex;
-        resultTable.deleteRow(rowIndex - 1);
-        // if (resultTable.rows.length){
-        //     resultTable.rows(rowIndex).click();
-        // }
-    }
-    //clearActive()
-});
+// const detectionsDismiss = document.getElementById('detections-dismiss');
+// detectionsDismiss.addEventListener('click', event => {
+//     const rows = detectionsModalDiv.querySelectorAll('tr');
+//     const positions = new Set();
+//     let count = 0;
+//     rows.forEach(row => {
+//         if (!row.classList.contains('text-bg-dark')) {
+//             const [, start, end] = unpackNameAttr(row);
+//             if (start) positions.add([start, end])
+//         }
+//     });
+//     deleteRecord(positions);
+//     if (activeRow && activeRow.closest('#results')) {
+//         // Remove the initiating detection from the main results table
+//         resultTable = document.getElementById('resultTableBody');
+//         const rowIndex = activeRow.rowIndex;
+//         resultTable.deleteRow(rowIndex - 1);
+//         // if (resultTable.rows.length){
+//         //     resultTable.rows(rowIndex).click();
+//         // }
+//     }
+//     //clearActive()
+// });
 
-const detectionsAdd = document.getElementById('detections-add');
-//detectionsAdd.addEventListener('click', clearActive);
+// const detectionsAdd = document.getElementById('detections-add');
+// detectionsAdd.addEventListener('click', () => {
+//     worker.postMessage({
+//         action: 'filter',
+//         species: isSpeciesViewFiltered(true)
+//     })
+// })
 
 const updateResultTable = (row, isFromDB, isSelection) => {
     const table = isSelection ? selectionTable : resultTable;
@@ -2745,14 +2751,17 @@ function setClickedIndex(target) {
     clickedIndex = clickedNode.rowIndex;
 }
 
-const deleteRecord = (target, isBatch) => {
+const deleteRecord = (target) => {
+    let isBatch = false;
     if (target instanceof PointerEvent) target = activeRow;
-    if (isBatch) {
+    else {
         target.forEach(position => {
+            const [start, end] = position;
             worker.postMessage({
                 action: 'delete',
                 file: currentFile,
-                start: position,
+                start: start,
+                end: end
             })
         })
         activeRow = undefined;
@@ -2761,7 +2770,7 @@ const deleteRecord = (target, isBatch) => {
     if (target.childElementCount === 2) return; // No detections found in selection
 
     setClickedIndex(target);
-    const [file, start, ,] = unpackNameAttr(target);
+    const [file, start, end,] = unpackNameAttr(target);
     const setting = target.closest('table');
     const row = target.closest('tr');
 
@@ -2769,6 +2778,7 @@ const deleteRecord = (target, isBatch) => {
         action: 'delete',
         file: file,
         start: start,
+        end: end,
         species: getSpecies(target),
         speciesFiltered: isSpeciesViewFiltered()
     })
@@ -3501,30 +3511,28 @@ $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('c
     const target = e.target;
     const summaryContext = target.closest('#speciesFilter');
     const resultContext = target.closest('#resultTableBody');
+    const selectionContext = target.closest('#selectionResults');
     let contextDelete;
     if (summaryContext) {
         contextDelete = buildSummaryMenu(menu, target)
     } else {
         // If we haven't clicked the active row or we cleared the region, load the row we clicked
-        if (resultContext){
+        if (resultContext || selectionContext){
             const [file, start, end,] = unpackNameAttr(target);
-            if ((region?.start + bufferBegin) !== start){
-                
-                target.click();
-                // Wait for file to load
-                await waitForFileLoad();
-                
-            }
+            target.click();
+            // Wait for file to load
+            await waitForFileLoad();
         }
         if (activeRow === undefined && region === undefined) return;
         const createOrEdit = isExplore() && region?.attributes.label ? 'Edit' : 'Create';
+        const hide = selectionContext ? 'd-none' : '';
         menu.html(`
             <a class="dropdown-item play"><span class='material-icons-two-tone'>play_circle_filled</span> Play</a>
-            <a class="dropdown-item" href="#" id="context-analyse-selection">
+            <a class="dropdown-item ${hide}" href="#" id="context-analyse-selection">
                 <span class="material-icons-two-tone">search</span> Analyse
             </a>
             <div class="dropdown-divider"></div>
-            <a class="dropdown-item" id="create-manual-record" href="#">
+            <a class="dropdown-item ${hide}" id="create-manual-record" href="#">
                 <span class="material-icons-two-tone">post_add</span> ${createOrEdit} Archive Record
             </a>
             <a class="dropdown-item" id="context-create-clip" href="#">
@@ -3533,8 +3541,8 @@ $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('c
             <a class="dropdown-item" id="context-xc" href='#' target="xc">
                 <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> View Species on Xeno-Canto
             </a>
-            <div class="dropdown-divider"></div>
-            <a class="dropdown-item" id="context-delete" href="#">
+            <div class="dropdown-divider ${hide}"></div>
+            <a class="dropdown-item ${hide}" id="context-delete" href="#">
                 <span class='delete material-icons-two-tone'>delete_forever</span> Delete Record
             </a>
         `);
@@ -3564,7 +3572,7 @@ $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('c
         }
         const sname = getSnameFromCname(cname);
         const XC_type = cname.indexOf('(song)') !== -1 ? "song" :
-            cname.indexOf('call)') !== -1 ? "nocturnal flight call" : '';
+            cname.indexOf('call)') !== -1 ? "nocturnal flight call" : "";
         xc.href = `https://xeno-canto.org/explore?query=${sname}%20type:"${XC_type}`;
         xc.classList.remove('d-none');
     }
@@ -3716,7 +3724,7 @@ purgeFile.addEventListener('click', () => {
 })
 
 
-// Utility functions to wait for var to be true
+// Utility functions to wait for file to load
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
