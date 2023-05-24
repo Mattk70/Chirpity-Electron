@@ -51,11 +51,12 @@ export class State {
         }
         updateState(this, updates);
     }
-
+    // Separate from update-state as we're passing a database handle
     changeMode({ mode, disk, memory }) {
         this.mode = mode;
         // Modes: analyse, chart, explore, selection, saved-analysis
-        if (['analyse', 'selection'].includes(mode)) {
+        //if (['analyse', 'selection'].includes(mode)) {
+        if (mode === 'analyse'){
             this.db = memory;
         } else {
             this.db = disk;
