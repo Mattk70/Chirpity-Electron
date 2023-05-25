@@ -273,6 +273,7 @@ ipcRenderer.on('new-client', (event) => {
                 break;
             case 'filter':
                 if (STATE.db) {
+                    prepStatements();
                     await getResults(args);
                     await getSummary(args);
                 }
@@ -394,25 +395,12 @@ const getFilesInDirectory = async (dir) => {
 const prepParams = (list) =>  list.map(item => '?').join(',');
 
 
-const prepWhereClause = ({ dateRange, species }) => {
-    let where = 'WHERE confidence >= ?';
-    if (!STATE.selection && STATE.blocked.length) {
-        where += ` AND speciesID NOT IN (${prepParams(STATE.blocked)})`
-    }
-    if (STATE.mode !== 'explore') {
-        where += ` AND name IN  (${prepParams(STATE.filesToAnalyse)})`;
-    }
-    if (species) where += ' AND cname = ?';
-    if (dateRange?.start) where += ' AND dateTime BETWEEN ? AND ?';
-    return where
-};
-
 const getResultsParams = (species, confidence, offset, limit, topRankin) => {
-    const addBlockedIDs = !STATE.selection && STATE.blocked.length;
+    const blocked = (STATE.blocked.length && (STATE.userSettingsInSelection || ! STATE.selection)) ?
+        STATE.blocked : [];
     const params = [];
-    if (addBlockedIDs) {
-        params.push(...STATE.blocked);
-    }
+    params.push(...blocked);
+
     params.push(topRankin, confidence, species);
     if (STATE.mode !== 'explore' && !STATE.selection) {
         params.push(...STATE.filesToAnalyse);
@@ -421,15 +409,15 @@ const getResultsParams = (species, confidence, offset, limit, topRankin) => {
     else if (STATE.explore.range.start !== undefined){
         params.push(STATE.explore.range.start, STATE.explore.range.end);
     }
-    params.push(limit, offset)
+    params.push(limit, offset);
     return params
 }
 
-const getSummaryParams = (species, confidence) => {
-    const addBlockedIDs = !STATE.selection && STATE.blocked.length;
+const getSummaryParams = (species) => {
+    const blocked = STATE.blocked.length && ! STATE.selection ? STATE.blocked : [];
     const useRange = (STATE.mode === 'explore' && STATE.explore.range.start !== undefined ) 
                     || STATE.selection;
-    const params = [confidence];
+    const params = [STATE.detect.confidence];
     const extraParams = [];
     if (STATE.mode !== 'explore') {
         extraParams.push(...STATE.filesToAnalyse);
@@ -438,18 +426,15 @@ const getSummaryParams = (species, confidence) => {
     else if (STATE.explore.range.start !== undefined){
         extraParams.push(STATE.explore.range.start, STATE.explore.range.end);
     }
-    if (addBlockedIDs) {
-        extraParams.push(...STATE.blocked);
-    }
+    extraParams.push(...blocked);
     params.push(...extraParams);
-    params.push(confidence, species);
+    params.push(STATE.detect.confidence, species);
     params.push(...extraParams);
     return params
 }
 
 const prepSummaryStatement = () => {
-    let excluded;
-    const addBlockedIDs = !STATE.selection && STATE.blocked.length;
+    const blocked = STATE.blocked.length && ! STATE.selection ? STATE.blocked : [];
     const useRange = (STATE.mode === 'explore' && STATE.explore.range.start !== undefined ) 
                     || STATE.selection;
     let summaryStatement = `
@@ -467,10 +452,9 @@ const prepSummaryStatement = () => {
     if (useRange) {
         extraClause += ' AND dateTime BETWEEN ? AND ? ';
     }
-    if (addBlockedIDs) {
-        excluded = prepParams(STATE.blocked);
-        extraClause += ` AND speciesID NOT IN (${excluded}) `;
-    }
+    const excluded = prepParams(STATE.blocked);
+    extraClause += ` AND speciesID NOT IN (${excluded}) `;
+
     summaryStatement += extraClause;
     summaryStatement +=  `
     )
@@ -516,9 +500,10 @@ const prepResultsStatement = () => {
           JOIN species ON records.speciesID = species.id 
           JOIN files ON records.fileID = files.id `;
 
-    if (!STATE.selection && STATE.blocked.length) {
-        resultStatement += ` AND speciesID NOT IN (${prepParams(STATE.blocked)}) `
-    }
+    const blocked = (STATE.blocked.length && (STATE.userSettingsInSelection || ! STATE.selection)) ?
+        STATE.blocked : [];
+    resultStatement += ` AND speciesID NOT IN (${prepParams(blocked)}) `
+
 
     resultStatement += `
     )
@@ -568,7 +553,8 @@ async function onAnalyse({
     // Now we've asked for a new analysis, clear the aborted flag
     aborted = false;
     // set to memory database. If end was passed, this is a selection
-    STATE.update({ db: memoryDB, selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined });
+    if (!end) STATE.update({ db: memoryDB })
+    STATE.update({ selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined});
 
     console.log(`Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`);
     //Set global filesInScope for summary to use
@@ -581,55 +567,51 @@ async function onAnalyse({
     // If we are analsing a selection, don't change the db
     // Otherwise, all new analyses go to the memory db
     if (!STATE.selection) {
-        STATE.update({ db: memoryDB });
         //create a copy of files in scope for state, as filesInScope is spliced
         STATE.setFiles([...filesInScope]);
     }
 
     let count = 0;
-    for (let i = FILE_QUEUE.length - 1; i >= 0; i--) {
-        let file = FILE_QUEUE[i];
-        if (DATASET) {
+    if (DATASET) {
+        for (let i = FILE_QUEUE.length - 1; i >= 0; i--) {
+            let file = FILE_QUEUE[i];
             //STATE.db = diskDB;
-            const file = await diskDB.getAsync('SELECT name FROM files WHERE name = ?', file);
-            if (file) {
+            const result = await diskDB.getAsync('SELECT name FROM files WHERE name = ?', file);
+            if (result) {
                 console.log(`Skipping ${file.name}, already analysed`)
                 FILE_QUEUE.splice(i, 1)
                 count++
                 continue;
             }
-        } else {
-            // check if results for the files are cached 
-            // we only consider it cached if all files have been saved to the disk DB)
-            // BECAUSE we want to change state.db to disk if they are
-            let allCached = true;
-            for (let i = 0; i < FILE_QUEUE.length; i++) {
-                if (!await getSavedFileInfo(FILE_QUEUE[i])) {
-                    allCached = false;
-                    break;
-                }
-            }
-            if (allCached && !reanalyse && !STATE.selection) {
-                STATE.update({ db: diskDB });
-                // PREPARE SQL STATEMENTS for diskdb
-                prepStatements();
-
-                await getResults({ db: diskDB, files: FILE_QUEUE });
-                await getSummary({ files: FILE_QUEUE })
-                return
+            console.log(`Adding ${file} to the queue.`)
+        } 
+    }
+    else {
+        // check if results for the files are cached 
+        // we only consider it cached if all files have been saved to the disk DB)
+        // BECAUSE we want to change state.db to disk if they are
+        let allCached = true;
+        for (let i = 0; i < FILE_QUEUE.length; i++) {
+            if (!await getSavedFileInfo(FILE_QUEUE[i])) {
+                allCached = false;
+                break;
             }
         }
-
-        console.log(`Adding ${file} to the queue.`)
+        if (allCached && !reanalyse && !STATE.selection) {
+            STATE.update({ db: diskDB });
+            prepStatements();
+            await getResults();
+            await getSummary();
+            return
+        }
     }
+
+
+    
     // PREPARE SQL STATEMENTS
     prepStatements();
 
     console.log("FILE_QUEUE has ", FILE_QUEUE.length, 'files', count, 'files ignored')
-    if (predictionDone) {
-        // Clear state unless analysing a selection
-        //if (!STATE.selection) STATE = new State(STATE.db);
-    }
     for (let i = 0; i < NUM_WORKERS; i++) {
         processNextFile({ start: start, end: end, resetResults: STATE.selection === undefined, worker: i });
     }
@@ -1505,7 +1487,7 @@ const insertRecord = async (key, speciesID, confidence, file) => {
     const offset = key * 1000;
     let changes, fileID;
     confidence = Math.round(confidence);
-    const db = STATE.db;
+    const db =  memoryDB; //STATE.db;
     let res = await db.getAsync('SELECT id FROM files WHERE name = ?', file);
     if (!res) {
         res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,? )', 
@@ -1584,31 +1566,37 @@ const parsePredictions = async (response) => {
                 
 
                 if (STATE.selection && updateUI) {
-                    const {cname} = await memoryDB.getAsync(`SELECT cname FROM species WHERE id = ${record.speciesID}`);
-                    const duration = (STATE.selection.end - STATE.selection.start) / 1000;
-                    const result = {
-                        timestamp: timestamp, 
-                        position: key,
-                        end: key + duration,
-                        file: file,
-                        cname: cname, 
-                        score: record.confidence}
-                    sendResult(++index, result, false)
+                    const confidenceRequired = STATE.userSettingsInSelection ?
+                        STATE.detect.confidence : 0.05;
+                    if (record.confidence >= confidenceRequired){
+                        const {cname} = await memoryDB.getAsync(`SELECT cname FROM species WHERE id = ${record.speciesID}`);
+                        const duration = (STATE.selection.end - STATE.selection.start) / 1000;
+                        const result = {
+                            timestamp: timestamp, 
+                            position: key,
+                            end: key + duration,
+                            file: file,
+                            cname: cname, 
+                            score: record.confidence}
+                        sendResult(++index, result, false)
+                    }
                 }
                 //save all results to  db, regardless of confidence
                 else {await insertRecord(key, record.speciesID, record.confidence, file)}
             }
         }
-        if (updateUI) {
-            
+        if (updateUI && ! STATE.selection) {
+            const blocked_condiiion = STATE.blocked.length ?
+                `AND species.id NOT IN (${STATE.blocked})` : '';
             //query the db for sname,  cname
+            const test = await memoryDB.allAsync('select * from records')
             const speciesList = await memoryDB.allAsync(`
                 SELECT species.cname, species.sname, records.confidence, callCount
                 FROM species
                         JOIN records ON species.id = records.speciesID
                 WHERE records.dateTime = ${timestamp}
                 AND confidence > ${STATE.detect.confidence}
-                AND species.id NOT IN (${STATE.blocked})
+                ${blocked_condiiion}
                 ORDER BY records.confidence DESC`);
             speciesList.forEach(species => {
                 const result = {
@@ -1622,33 +1610,35 @@ const parsePredictions = async (response) => {
                 }
                 sendResult(++index, result, false)
             })
-
         }
+        STATE.userSettingsInSelection = false;
     }
     const progress = ++predictionsReceived[file] / batchChunksToSend[file];
     UI.postMessage({ event: 'progress', progress: progress, file: file });
-    if (progress === 1 && !STATE.selection) {
-        COMPLETED.push(file);
-        db.getAsync('SELECT id FROM files WHERE name = ?', file)
-            .then(row => {
-                if (!row) {
-                    const result = `No predictions found in ${file}`;
-                    UI.postMessage({
-                        event: 'prediction-ongoing',
-                        file: file,
-                        result: result,
-                        index: index,
-                        selection: STATE.selection
-                    });
-                }
-            })
-        console.log(`Prediction done ${FILE_QUEUE.length} files to go`);
-        console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
-        UI.postMessage({ event: 'progress', progress: 1.0, text: '...' });
-        batchInProgress = FILE_QUEUE.length;
-        predictionDone = true;
-    } else if (STATE.increment() === 0) {
-        getSummary({ interim: true, files: [] });
+    if ( ! STATE.selection){
+        if (progress === 1) {
+            COMPLETED.push(file);
+            db.getAsync('SELECT id FROM files WHERE name = ?', file)
+                .then(row => {
+                    if (!row) {
+                        const result = `No predictions found in ${file}`;
+                        UI.postMessage({
+                            event: 'prediction-ongoing',
+                            file: file,
+                            result: result,
+                            index: index,
+                            selection: STATE.selection
+                        });
+                    }
+                })
+            console.log(`Prediction done ${FILE_QUEUE.length} files to go`);
+            console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
+            UI.postMessage({ event: 'progress', progress: 1.0, text: '...' });
+            batchInProgress = FILE_QUEUE.length;
+            predictionDone = true;
+        } else if (STATE.increment() === 0) {
+            getSummary({ interim: true});
+        }
     }
     return [file, batchInProgress, response.worker]
 }
@@ -1698,7 +1688,7 @@ async function parseMessage(e) {
                         })
                         processNextFile(worker);
                     } else if (! STATE.selection) {
-                        getSummary({ files: PENDING_FILES });
+                        getSummary();
                     }
                 }
             }
@@ -1799,7 +1789,7 @@ const setWhereWhen = ({ dateRange, species, files, context }) => {
         excluded_species_ids = `${STATE.blocked}`;
     }
     // NOT the same as a dateRange - this is for analyzing a selection
-    const confidence = STATE.selection ? 50 : STATE.detect.confidence;
+    const confidence = STATE.selection && ! STATE.userSettingsInSelection ? 50 : STATE.detect.confidence;
     let where = `${confidence}`;
     if (files?.length) {
         const name = context === 'summary' ? 'files.name' : 'name';
@@ -1826,47 +1816,16 @@ const getSummary = async ({
     const db = STATE.db;
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
     let range, files = [];
-    if (STATE.mode !== 'analyse') {
+    if ( ['explore', 'chart'].includes(STATE.mode)) {
         range = STATE[STATE.mode].range;
     } else {
         files = STATE.filesToAnalyse;
     }
 
-    // let [where, when, excluded_species_ids] = setWhereWhen({
-    //     dateRange: range, files: files, context: 'summary'
-    // });
     t0 = Date.now();
     const speciesForSTMT = species || '%';
-    const params = getSummaryParams(speciesForSTMT, STATE.detect.confidence);
+    const params = getSummaryParams(speciesForSTMT);
     const summary = await STATE.GET_SUMMARY_SQL.allAsync(...params);
-
-    // const summary = await db.allAsync(`
-    // WITH ranked_records AS (
-    //     SELECT records.dateTime, records.speciesID, records.confidence, records.fileID, cname, sname,
-    //       RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
-    //     FROM records
-    //     JOIN files ON files.id = records.fileID
-    //     JOIN species ON species.id = records.speciesID
-    //     WHERE speciesID NOT IN (${excluded_species_ids}) AND confidence >= ${where} ${when}
-    //   )
-    // SELECT cname, sname, COUNT(*) as count, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
-    //   FROM ranked_records
-    //   WHERE ranked_records.rank <= ${STATE.topRankin}
-    //   GROUP BY speciesID
-    // UNION ALL
-    // SELECT
-    //     'Total' AS sname,
-    //     cname as cname,
-    //     COUNT(*) AS count,
-    //     ROUND(MAX(ranked_records.confidence) / 10.0, 0) AS max
-    //   FROM
-    //     ranked_records
-    //     JOIN files ON files.id = ranked_records.fileID
-    //   WHERE speciesID NOT IN
-    //     (${excluded_species_ids}) AND confidence >= ${where} ${when} ${speciesClause} AND
-    //     ranked_records.rank <= ${STATE.topRankin}
-    // ORDER BY count DESC, max DESC;    
-    // `);
 
     if (DEBUG) console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds");
     const event = interim ? 'update-summary' : 'prediction-done';
@@ -1907,7 +1866,7 @@ const getResults = async ({
     const range = STATE.selection || STATE[mode]?.range;
     const files = mode === 'explore' ? [] : filesToAnalyse;
     let confidence = STATE.detect.confidence;
-    if (STATE.selection) {
+    if (STATE.selection && ! STATE.userSettingsInSelection) {
         offset = 0;
         confidence = 50;
         topRankin = 5;
