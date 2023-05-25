@@ -272,11 +272,7 @@ const initWavesurfer = ({
     audio = undefined,
     height = 0
 }) => {
-    // if (reset) {
-    //     // Show spec and timecode containers
-    //     hideAll();
-    //     showElement(['spectrogramWrapper', 'fullscreen'], false);
-    // }
+
     if (wavesurfer) {
         wavesurfer.pause();
     }
@@ -570,8 +566,6 @@ const getSelectionResults = (userSettings) => {
     STATE.selection = {};
     STATE['selection']['start'] = start.toFixed(3);
     STATE['selection']['end'] = end.toFixed(3);
-
-    //worker.postMessage({ action: 'change-mode', mode: 'selection' })
 
     // We use usersettings to pull in results from the circle. 
     // WON'T work for saved analyses.
@@ -2800,6 +2794,8 @@ const deleteSpecies = (target) => {
     const row = target.closest('tr');
     const table = document.getElementById('resultSummary')
     table.deleteRow(row.rowIndex);
+    resultTable = document.getElementById('resultTableBody');
+    resultTable.innerHTML = '';
 }
 
 const getSelectionRange = () => {
@@ -3510,11 +3506,12 @@ $(document).on('click', function () {
 $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('contextmenu', async function (e) {
     const target = e.target;
     if (target.classList.contains('circle')) return;
-    
+
     const menu = $("#context-menu");
     let resultContext, summaryContext = '', selectionContext = '', plural = '';
+    const inSummary = target.closest('#speciesFilter')
     if (target.closest('#resultTableBody')) resultContext = true;
-    else if  ( target.closest('#speciesFilter')){
+    else if  ( inSummary ){
         summaryContext = 'd-none';
         plural = 's';
     }
@@ -3524,11 +3521,17 @@ $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('c
 
     // If we haven't clicked the active row or we cleared the region, load the row we clicked
     if (resultContext || selectionContext || summaryContext){
-        // let file, start, end;
-        // if (! summaryContext) [file, start, end,] = unpackNameAttr(target);
-        target.click();
-        // Wait for file to load
-        await waitForFileLoad();
+        // Lets check if the summary needs to be filtered
+        if (inSummary) {
+            if ( ! target.closest('tr').classList.contains('text-warning')){
+                target.click() // Wait for file to load
+                await waitForFileLoad();
+            }
+        } else {
+            target.click(); // Wait for file to load
+            await waitForFileLoad();
+        }
+       
     }
     if (!summaryContext && activeRow === undefined && region === undefined) return;
     const createOrEdit = isExplore() && region?.attributes.label ? 'Edit' : 'Create';
