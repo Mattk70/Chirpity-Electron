@@ -21,7 +21,8 @@ export class State {
             this.model = null,
             this.predictionCount = 0,
             this.topRankin = 1,
-            this.GET_RESULT_SQL = undefined
+            this.GET_RESULT_SQL = undefined,
+            this.userSettingsInSelection - false
     }
 
 
@@ -55,12 +56,7 @@ export class State {
     changeMode({ mode, disk, memory }) {
         this.mode = mode;
         // Modes: analyse, chart, explore, selection, saved-analysis
-        //if (['analyse', 'selection'].includes(mode)) {
-        if (mode === 'analyse'){
-            this.db = memory;
-        } else {
-            this.db = disk;
-        }
+        this.db = ['chart', 'explore'].includes(mode) ? disk : memory;
         // Reset pagination offsets
         this.globalOffset = 0;
         this.filteredOffset = {};
