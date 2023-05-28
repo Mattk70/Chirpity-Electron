@@ -357,15 +357,24 @@ class Model {
         if (maskedTensorBatch) maskedTensorBatch.dispose();
 
         const finalPrediction = newPrediction || prediction;
-        const array_of_predictions = finalPrediction.arraySync()
+        //new
+        const {indices, values} = tf.topk(finalPrediction, 5, true)
+        const topIndices = indices.arraySync();
+        const topValues = values.arraySync();
+        indices.dispose();
+        values.dispose();
+        // end new
+        // const array_of_predictions = finalPrediction.arraySync()
         finalPrediction.dispose();
         if (newPrediction) newPrediction.dispose();
-        return keys.reduce((acc, key, index) => {
-            // convert key (samples) to milliseconds
-            const position = (key / CONFIG.sampleRate).toFixed(3);
-            acc[position] = array_of_predictions[index];
-            return acc;
-        }, {});
+        keys = keys.map(key => (key / CONFIG.sampleRate).toFixed(3));
+        return [keys, topIndices, topValues];
+        // return keys.reduce((acc, key, index) => {
+        //     // convert key (samples) to milliseconds
+        //     const position = (key / CONFIG.sampleRate).toFixed(3);
+        //     acc[position] = array_of_predictions[index];
+        //     return acc;
+        // }, {});
     }
 
     makeSpectrogram(signal) {
