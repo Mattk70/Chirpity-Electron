@@ -1020,6 +1020,19 @@ async function setupCtx(chunk, header) {
  * @returns {Promise<void>}
  */
 
+function getWorker(){
+    return new Promise((resolve) => {
+        for (var i = 0; i < predictWorkers.length; i++) {
+            if (predictWorkers[i].isAvailable) {
+            resolve(i); // Found an available worker, return its position
+            }
+        }
+    
+        // No available workers found, wait for a delay and check again
+        setTimeout(() => { resolve(getWorker())}, 100);
+    })
+
+}
 
 const getPredictBuffers = async ({
     file = '', start = 0, end = undefined, resetResults = false, worker = undefined
@@ -1056,14 +1069,16 @@ const getPredictBuffers = async ({
             offlineCtx.startRendering().then((resampled) => {
                 const myArray = resampled.getChannelData(0);
 
-                if (++workerInstance >= NUM_WORKERS) {
-                    workerInstance = 0;
-                }
-                worker = workerInstance;
-                feedChunksToModel(myArray, chunkStart, file, end, resetResults, worker);
-                chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
-                // Now the async stuff is done ==>
-                readStream.resume();
+                // if (++workerInstance >= NUM_WORKERS) {
+                //     workerInstance = 0;
+                // }
+
+                getWorker().then(worker => { //workerInstance;
+                    feedChunksToModel(myArray, chunkStart, file, end, resetResults, worker);
+                    chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
+                    // Now the async stuff is done ==>
+                    readStream.resume();
+                })
             }).catch((err) => {
                 console.error(`PredictBuffer rendering failed: ${err}`);
                 // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
@@ -1071,10 +1086,10 @@ const getPredictBuffers = async ({
         } else {
             console.log('Short chunk', chunk.length, 'skipping')
             if (worker === undefined) {
-                if (++workerInstance >= NUM_WORKERS) {
-                    workerInstance = 0;
-                }
-                worker = workerInstance;
+                // if (++workerInstance >= NUM_WORKERS) {
+                //     workerInstance = 0;
+                // }
+                worker = await getWorker() //workerInstance;
             }
             // Create array with 0's (short segment of silence that will trigger the finalChunk flag
             const myArray = new Float32Array(new Array(chunkLength).fill(0));
@@ -1140,11 +1155,12 @@ const fetchAudioBuffer = async ({
     });
 }
 
-function feedChunksToModel(channelData, chunkStart, file, end, resetResults, worker) {
+async function feedChunksToModel(channelData, chunkStart, file, end, resetResults, worker) {
     predictionsRequested[file]++;
     if (worker === undefined) {
         // pick a worker
-        worker = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+        worker = await getWorker()
+        //worker = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
     }
     const objData = {
         message: 'predict',
@@ -1203,9 +1219,10 @@ const convertSpecsFromExistingSpecs = async (path) => {
                 start: parseFloat(start), end: parseFloat(end), file: file_to_analyse
             })
             if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
-                if (++workerInstance === NUM_WORKERS) {
-                    workerInstance = 0;
-                }
+                // if (++workerInstance === NUM_WORKERS) {
+                //     workerInstance = 0;
+                // }
+                workerInstance = await getWorker();
                 const buffer = AudioBuffer.getChannelData(0);
                 predictWorkers[workerInstance].postMessage({
                     message: 'get-spectrogram',
@@ -1267,9 +1284,10 @@ const saveResults2DataSet = (rootDirectory) => {
                         start: start, end: end, file: result.file
                     })
                     if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
-                        if (++workerInstance === NUM_WORKERS) {
-                            workerInstance = 0;
-                        }
+                        // if (++workerInstance === NUM_WORKERS) {
+                        //     workerInstance = 0;
+                        // }
+                        workerInstance = await await getWorker();
                         const buffer = AudioBuffer.getChannelData(0);
                         predictWorkers[workerInstance].postMessage({
                             message: 'get-spectrogram',
@@ -1544,54 +1562,47 @@ const parsePredictions = async (response) => {
     let file = response.file, batchInProgress = false;
     const latestResult = response.result, db = STATE.db;
     if (DEBUG) console.log('worker being used:', response.worker);
-    for (let [key, predictions] of Object.entries(latestResult)) {
-        key = parseFloat(key);
-        const timestamp = metadata[file].fileStart + key * 1000;
-        let updateUI = false;
-        // Get the highest  5 values:
-        const limit = 5;
-        // create an array of objects with values (confidence) and their original indices (speciesID)
-        let valueAndIndexList = predictions.map((value, index) => ({ speciesID: index, confidence: value }));
-        // sort the array by value in descending order
-        valueAndIndexList.sort((a, b) => b.confidence - a.confidence);
-        // extract the top 5 predictions
-        let topValues = valueAndIndexList.slice(0, limit);
-        for (let i = 0; i < topValues.length; i++) {
-            let record = topValues[i];
-            if (record.confidence >= 0.05) {
-                record.confidence *= 1000;
-                if (record.confidence > STATE.detect.confidence && STATE.blocked.indexOf(record.speciesID) === -1) {
-                    updateUI = true;
-                }
-                
 
-                if (STATE.selection && updateUI) {
-                    const confidenceRequired = STATE.userSettingsInSelection ?
-                        STATE.detect.confidence : 0.05;
-                    if (record.confidence >= confidenceRequired){
-                        const {cname} = await memoryDB.getAsync(`SELECT cname FROM species WHERE id = ${record.speciesID}`);
-                        const duration = (STATE.selection.end - STATE.selection.start) / 1000;
-                        const result = {
-                            timestamp: timestamp, 
-                            position: key,
-                            end: key + duration,
-                            file: file,
-                            cname: cname, 
-                            score: record.confidence}
-                        sendResult(++index, result, false)
-                    }
+
+    let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
+    for (let i = 0; i < keysArray.length; i++){
+        let updateUI = false;
+        let key = parseFloat(keysArray[i]);
+        const timestamp = metadata[file].fileStart + key * 1000;
+        const confidenceArray = confidenceBatch[i]; 
+        const speciesIDArray = speciesIDBatch[i];
+        for (let j = 0; j < confidenceArray.length; j++){
+            let confidence = confidenceArray[j];
+            if (confidence < 0.05) break;
+            let speciesID = speciesIDArray[j];
+            confidence *= 1000;
+            updateUI = (confidence > STATE.detect.confidence && 
+                STATE.blocked.indexOf(speciesID) === -1);
+            if (STATE.selection && updateUI) {
+                const confidenceRequired = STATE.userSettingsInSelection ?
+                    STATE.detect.confidence : 50;
+                if (confidence >= confidenceRequired){
+                    const {cname} = await memoryDB.getAsync(`SELECT cname FROM species WHERE id = ${speciesID}`);
+                    const duration = (STATE.selection.end - STATE.selection.start) / 1000;
+                    const result = {
+                        timestamp: timestamp, 
+                        position: key,
+                        end: key + duration,
+                        file: file,
+                        cname: cname, 
+                        score: confidence}
+                    sendResult(++index, result, false)
                 }
-                //save all results to  db, regardless of confidence
-                else {await insertRecord(key, record.speciesID, record.confidence, file)}
             }
+            //save all results to  db, regardless of confidence
+            else {await insertRecord(key, speciesID, confidence, file)}
         }
         if (updateUI && ! STATE.selection) {
             const blocked_condiiion = STATE.blocked.length ?
                 `AND species.id NOT IN (${STATE.blocked})` : '';
-            //query the db for sname,  cname
-            const test = await memoryDB.allAsync('select * from records')
+            //query the db for sname, cname, start and end
             const speciesList = await memoryDB.allAsync(`
-                SELECT species.cname, species.sname, records.confidence, callCount
+                SELECT species.cname, species.sname, records.confidence, callCount, records.end
                 FROM species
                         JOIN records ON species.id = records.speciesID
                 WHERE records.dateTime = ${timestamp}
@@ -1602,6 +1613,7 @@ const parsePredictions = async (response) => {
                 const result = {
                     timestamp: timestamp,
                     position: key,
+                    end: species.end,
                     file: file,
                     cname: species.cname,
                     sname: species.sname,
@@ -1611,8 +1623,9 @@ const parsePredictions = async (response) => {
                 sendResult(++index, result, false)
             })
         }
-        STATE.userSettingsInSelection = false;
     }
+    STATE.userSettingsInSelection = false;
+
     const progress = ++predictionsReceived[file] / batchChunksToSend[file];
     UI.postMessage({ event: 'progress', progress: progress, file: file });
     if ( ! STATE.selection){
@@ -1642,6 +1655,7 @@ const parsePredictions = async (response) => {
     }
     return [file, batchInProgress, response.worker]
 }
+
 
 async function parseMessage(e) {
     const response = e.data;

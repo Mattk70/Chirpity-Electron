@@ -170,7 +170,7 @@ function resetResults() {
 function updateProgress(val) {
     if (val) progressBar.value = val;
     else {
-        delete progressBar.value;
+     progressBar.removeAttribute('value');
     }
     val = val.toString();
     progressBar.innerText = val + '%';
@@ -612,6 +612,7 @@ function postAnalyseMessage(args) {
         disableMenuItem(['analyseSelection']);
         const selection = !!args.end;
         const filesInScope = args.filesInScope;
+        updateProgress(0);
         if (!selection) {
             //STATE.mode = 'analyse';
             // Tell the worker we are in Analyse mode
@@ -622,7 +623,6 @@ function postAnalyseMessage(args) {
             refreshResultsView();
         } else {
             progressDiv.classList.remove('d-none');
-            updateProgress(0);
             delete diagnostics['Audio Duration'];
         }
         if (filesInScope.length > 1) {
