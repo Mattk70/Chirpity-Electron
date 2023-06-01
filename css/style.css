@@ -92,12 +92,6 @@ span[id^="filename_"] {
     cursor: pointer;
 }
 
-.delete:hover {
-    color: red;
-    font-size: 36px;
-    transition: all 0.3s ease-in-out;
-}
-
 #controlsWrapper .row,
 #transport-controls {
     min-width: 850px;
@@ -129,26 +123,12 @@ div#contentWrapper.loaded {
     position: relative;
 }
 
-.input:not(.form-control) {
-    background-image: url('searchicon.png');
-    /* Add a search icon to input */
-    background-position: 10px 12px;
-    /* Position the search icon */
-    background-repeat: no-repeat;
-    /* Do not repeat the icon image */
-    width: 100%;
-    /* Fixed-width */
-    font-size: 16px;
-    /* Increase font-size */
-    padding: 12px 20px 12px 40px;
-    /* Add some padding */
-    border: 1px solid #ddd;
-    /* Add a grey border */
-    border-radius: 5px;
-    margin-bottom: 3px;
+select {
+    margin-bottom: 0.2em;
     /* Add some space below the input */
-    max-width: 320px
+    max-width: 25em
 }
+
 
 
 ul {
@@ -160,7 +140,7 @@ ul {
 }
 
 
-.bird-list-wrapper {
+/* .bird-list-wrapper {
     margin-top: -3px;
     overflow: hidden;
     max-height: 250px;
@@ -170,7 +150,7 @@ ul {
     border-bottom-left-radius: 5px;
     border-bottom-right-radius: 5px;
     min-width: 320px;
-}
+} */
 
 .bird-list {
     overflow: auto;
@@ -544,8 +524,8 @@ input[type="range"].vertical {
     height: 150px;
     width: 18px;
     margin: 3px;
+    appearance: auto;
     -webkit-appearance: slider-vertical;
-    appearance: slider-vertical;
     top: -160px;
     right: 15px;
 }

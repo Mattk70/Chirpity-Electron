@@ -220,9 +220,6 @@ async function handleMessage(e) {
         case 'open-files':
             await getFiles(args.files)
             break;
-        case 'update-record':
-            await onUpdateRecord(args)
-            break;
         case 'delete':
             await onDelete(args)
             break;
@@ -233,8 +230,7 @@ async function handleMessage(e) {
             await onUpdateFileStart(args)
             break;
         case 'get-detected-species-list':
-
-            getSpecies(args.range);
+            getSpecies();
             break;
         case 'create-dataset':
             saveResults2DataSet();
@@ -722,8 +718,8 @@ async function getWorkingFile(file) {
         const filename = pc.base + '.wav';
         const prefix = pc.dir.replace(pc.root, '');
         const path = p.join(CACHE_LOCATION, prefix);
-        if (!fs.existsSync(path)) { 
-            await mkdir(path, {recursive:true});
+        if (!fs.existsSync(path)) {
+            await mkdir(path, { recursive: true });
         }
         const destination = p.join(path, filename);
 
@@ -1080,11 +1076,11 @@ const getPredictBuffers = async ({
                 }
 
                 //getWorker().then(worker => { //workerInstance;
-                    worker = workerInstance;
-                    feedChunksToModel(myArray, chunkStart, file, end, resetResults, worker);
-                    chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
-                    // Now the async stuff is done ==>
-                    readStream.resume();
+                worker = workerInstance;
+                feedChunksToModel(myArray, chunkStart, file, end, resetResults, worker);
+                chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
+                // Now the async stuff is done ==>
+                readStream.resume();
                 //})
             }).catch((err) => {
                 console.error(`PredictBuffer rendering failed: ${err}`);
@@ -1586,7 +1582,7 @@ const parsePredictions = async (response) => {
             updateUI = (confidence > STATE.detect.confidence &&
                 STATE.blocked.indexOf(speciesID) === -1);
             //save all results to  db, regardless of confidence
-            if (!STATE.selection) insertRecord(key, speciesID, confidence, file);
+            if (!STATE.selection) await insertRecord(key, speciesID, confidence, file);
             if (STATE.selection || updateUI) {
                 let end, confidenceRequired;
                 if (STATE.selection) {
@@ -1600,23 +1596,21 @@ const parsePredictions = async (response) => {
                 }
 
                 if (confidence >= confidenceRequired) {
-                    memoryDB.get(`SELECT cname FROM species WHERE id = ${speciesID}`, (err, res) => {
-                        if (err) console.log(err);
-                        const cname = res.cname;
-                        const result = {
-                            timestamp: timestamp,
-                            position: key,
-                            end: end,
-                            file: file,
-                            cname: cname,
-                            score: confidence
-                        }
-                        sendResult(++index, result, false)
-                    } );
-                }
+                    const { cname } = await memoryDB.getAsync(`SELECT cname FROM species WHERE id = ${speciesID}`);
+                    const result = {
+                        timestamp: timestamp,
+                        position: key,
+                        end: end,
+                        file: file,
+                        cname: cname,
+                        score: confidence
+                    }
+                    sendResult(++index, result, false)
+                };
             }
         }
     }
+
     STATE.userSettingsInSelection = false;
 
     const progress = ++predictionsReceived[file] / batchChunksToSend[file];
@@ -2183,9 +2177,9 @@ async function onDelete({
 }) {
     const db = STATE.db;
     const { filestart } = await db.getAsync('SELECT filestart from files WHERE name = ?', file);
-    start = filestart + (parseFloat(start) * 1000);
-    end = filestart + (parseFloat(end) * 1000);
-    const params = [start, end];
+    const datetime = filestart + (parseFloat(start) * 1000);
+    end = parseFloat(end);
+    const params = [datetime, end];
     let sql = 'DELETE FROM records WHERE datetime = ? AND end = ?';
     if (species) {
         sql += ' AND speciesID = (SELECT id FROM species WHERE cname = ?)'
@@ -2333,6 +2327,8 @@ const onFileDelete = async (fileName) => {
         UI.postMessage({
             event: 'generate-alert', message: `${fileName} 
 and its associated records were deleted successfully`});
+        getResults();
+        getSummary();
     } else {
         UI.postMessage({
             event: 'generate-alert', message: `${fileName} 
