@@ -164,7 +164,7 @@
                                                     </div>
                                                 </fieldset>
                                                 <fieldset class="border rounded m-2 p-1">
-                                                    <legend style="font-size: large">Location <span class="circle me-2"
+                                                    <legend style="font-size: large">Default Location <span class="circle me-2"
                                                             title="Location is used to determine dawn and dusk times for recordings">?</span>
                                                     </legend>
                                                     <div class="form-group rounded p-2 mb-2 bg-light">
@@ -639,14 +639,10 @@
         <!-- Explore Div -->
         <div id="exploreWrapper" class="p-1 row g-1 d-none">
             <div class="species-selector col-sm-4" id="exploreSpeciesSearch">
-                <label>
-                    <input type="text" class="input" placeholder="Search for a species...">
-                </label>
-                <div class="explore bird-list-wrapper"></div>
+                <div id="explore-list" class="explore bird-list-wrapper form-floating"></div>
             </div>
             <div class="col-sm-8 align-middle">
-                <div class="text-center pointer" id="exploreRange"
-                    style="font-size: 16px;padding: 12px 20px 12px 40px; width: 100%">
+                <div class="btn btn-outline-secondary float-end" id="exploreRange">
                     <i class="material-icons-two-tone  align-bottom">date_range</i>&nbsp;
                     <span>Apply a date filter</span> <i class="material-icons-two-tone  align-bottom">expand_more</i>
                 </div>
@@ -654,11 +650,11 @@
         </div>
         <!-- context menu-->
         <div class="dropdown-menu dropdown-menu-sm" id="context-menu">
-                <a class="dropdown-item play"><span class='material-icons-two-tone'>play_circle_filled</span> Play</a>
-                <a class="dropdown-item" href="#" id="context-analyse-selection"><span class="material-icons-two-tone">
-                        search
-                    </span> Analyse</a>
-                <div class="dropdown-divider"></div>
+            <a class="dropdown-item play"><span class='material-icons-two-tone'>play_circle_filled</span> Play</a>
+            <a class="dropdown-item" href="#" id="context-analyse-selection"><span class="material-icons-two-tone">
+                    search
+                </span> Analyse</a>
+            <div class="dropdown-divider"></div>
             <a class="dropdown-item" id="create-manual-record" href="#"><span class="material-icons-two-tone">
                     post_add
                 </span> Create Archive Record</a>
@@ -689,7 +685,7 @@
             <div class="container-fluid p-1 text-bg-dark d-inline-flex" id="controlsWrapper" style="max-height: 50px">
 
                 <div id="filename" class="col-auto ps-1 overflow-visible flex-nowrap"></div>
-                <div class="col-auto btn-group bg-dark ps-1 text-nowrap" role="group">
+                <div class="col-auto btn-group bg-dark me-2 ps-1 text-nowrap" role="group">
                     <button id="playToggle" class="p-1 pe-2 btn btn-outline-secondary">
                         <i class="material-icons-two-tone ">play_arrow</i><span
                             class="align-middle d-none d-lg-inline">Play </span>
@@ -777,57 +773,54 @@
         <div class="d-none h-100 overflow-auto p-2" id="recordsContainer">
             <div class="container-fluid">
                 <div class="row">
-                    <div class="col-sm-3">
+                    <div class="col-3">
                         <div id="speciesSearch" class="species-selector">
-                            <label>
-                                <input type="text" class="input" placeholder="Search for a species...">
-                            </label>
-                            <div class="chart bird-list-wrapper"></div>
-                        </div>
-                        <div id='dataRecords' class="border border-dark rounded-border d-none">
-                            <table class="table table-striped table-hover">
-                                <tbody id="recordsTableBody">
-                                    <tr>
-                                        <th>Earliest Spring Record</th>
-                                        <td id="earliestSpring"></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Latest Spring Record</th>
-                                        <td id="latestSpring"></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Earliest Autumn Record</th>
-                                        <td id="earliestAutumn"></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Latest Autumn Record</th>
-                                        <td id="latestAutumn"></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Most Calls in 24 hours</th>
-                                        <td id="mostDetections"></td>
-                                    </tr>
-                                    <tr class="fst-italic text-sm-start">
-                                        <th>Chart generated in:</th>
-                                        <td id="genTime"></td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                            <div id="chart-list" class="chart bird-list-wrapper form-floating"></div>
                         </div>
                     </div>
-                    <div class="col-sm-9">
-                        <div class="row">
-                            <div class="col text-center pointer" id="chartRange"
-                                style="font-size: 16px;padding: 12px 20px 12px 40px; width: 100%">
-                                <i class="material-icons-two-tone  align-bottom">date_range</i>&nbsp;
-                                <span>Apply a date filter</span> <i
-                                    class="material-icons-two-tone  align-bottom">expand_more</i>
-                            </div>
+                    <div class="col-9">
+                        <div class="btn btn-outline-secondary float-end" id="chartRange">
+                            <i class="material-icons-two-tone align-bottom">date_range</i>&nbsp;
+                            <span>Apply a date filter</span> <i
+                                class="material-icons-two-tone  align-bottom">expand_more</i>
                         </div>
-                        <div class="row">
-                            <div class="col chart-outer">
-                                <div class="border border-dark rounded-3" id="chart-week"></div>
-                            </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div id='dataRecords' class="col-3">
+                        <table class="table table-striped border border-dark rounded-border mt-5">
+                            <tbody id="recordsTableBody">
+                                <tr><th id="speciesName" class="text-center" colspan="2"></th></tr>
+                                <tr>
+                                    <th>Earliest Spring Record</th>
+                                    <td id="earliestSpring"></td>
+                                </tr>
+                                <tr>
+                                    <th>Latest Spring Record</th>
+                                    <td id="latestSpring"></td>
+                                </tr>
+                                <tr>
+                                    <th>Earliest Autumn Record</th>
+                                    <td id="earliestAutumn"></td>
+                                </tr>
+                                <tr>
+                                    <th>Latest Autumn Record</th>
+                                    <td id="latestAutumn"></td>
+                                </tr>
+                                <tr>
+                                    <th>Most Calls in 24 hours</th>
+                                    <td id="mostDetections"></td>
+                                </tr>
+                                <tr class="fst-italic text-sm-start">
+                                    <th>Chart generated in:</th>
+                                    <td id="genTime"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-9">
+                        <div class="chart-outer">
+                            <div class="border border-dark rounded-3" id="chart-week"></div>
                         </div>
                     </div>
                 </div>

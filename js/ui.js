@@ -170,7 +170,7 @@ function resetResults() {
 function updateProgress(val) {
     if (val) progressBar.value = val;
     else {
-     progressBar.removeAttribute('value');
+        progressBar.removeAttribute('value');
     }
     val = val.toString();
     progressBar.innerText = val + '%';
@@ -262,7 +262,7 @@ const resetRegions = () => {
 function clearActive() {
     resetRegions();
     STATE.selection = false;
-    worker.postMessage({action: 'update-state', selection: false})
+    worker.postMessage({ action: 'update-state', selection: false })
     activeRow?.classList.remove('table-active');
     activeRow = undefined;
     //selectionTable.innerText = '';
@@ -421,7 +421,8 @@ function updateFileName(files, openfile) {
     let appendStr;
     if (files.length > 1) {
         appendStr = `<div id="fileContainer" class="btn-group dropup">
-        <button type="button" class="btn btn-dark" id="dropdownMenuButton"><span id="setFileStart" title="Amend recording start time"
+        <button type="button" class="btn btn-dark" id="dropdownMenuButton"><span id="setLocation" title="Amend recording location"
+        class="material-icons-two-tone align-bottom pointer">edit_location_alt</span><span id="setFileStart" title="Amend recording start time"
                   class="material-icons-two-tone align-bottom pointer">edit_calendar</span> ${label}
         </button>
         <button class="btn btn-dark dropdown-toggle dropdown-toggle-split" type="button" 
@@ -440,6 +441,8 @@ function updateFileName(files, openfile) {
     } else {
         appendStr = `<div id="fileContainer">
         <button class="btn btn-dark" type="button" id="dropdownMenuButton">
+        <span id="setLocation" title="Amend recording location"
+        class="material-icons-two-tone align-bottom pointer">edit_location_alt</span>
         <span id="setFileStart" title="Amend recording start time"
                   class="material-icons-two-tone align-bottom pointer">edit_calendar</span> ${label}
         </button></div>`;
@@ -797,10 +800,10 @@ datasetLink.addEventListener('click', async () => {
     worker.postMessage({ action: 'create-dataset' });
 });
 
-$('.spec-labels').on('mousedown', (e) => {
-    e.stopImmediatePropagation();
-    console.log('label draggggggggggggg')
-})
+// $('.spec-labels').on('mousedown', (e) => {
+//     e.stopImmediatePropagation();
+//     console.log('label draggggggggggggg')
+// })
 
 // thresholdLink.addEventListener('keypress', handleThresholdChange );
 
@@ -1224,7 +1227,6 @@ window.onload = async () => {
     speciesListItems = $('#bird-list li span');
 }
 
-
 const setUpWorkerMessaging = () => {
     establishMessageChannel.then(() => {
         worker.addEventListener('message', function (e) {
@@ -1289,134 +1291,46 @@ const setUpWorkerMessaging = () => {
 }
 
 function generateBirdList(store, rows) {
-    let listHTML;
-
-    if (store === 'allSpecies') {
-        const excluded = ['Human', 'Vehicle', 'Animal', 'Ambient Noise'];
-        const lastSelectedSpecies = STATE.birdList.lastSelectedSpecies;
-        const remember = lastSelectedSpecies && excluded.indexOf(lastSelectedSpecies) === -1 ?
-            `<li><a href="#">${lastSelectedSpecies}</a></li>` : '';
-        listHTML = `
-            <div class="bird-list all"><div class="rounded-border"><ul>
-            ${remember}
-            <li><a href="#">Animal</a></li>
-            <li><a href="#">Ambient Noise</a></li>
-            <li><a href="#">Human</a></li>
-            <li><a href="#">Vehicle</a></li>`;
-
-        for (const item in labels) {
-            const [sname, cname] = labels[item].split('_');
-            if (excluded.indexOf(cname) === -1 && cname.indexOf(lastSelectedSpecies) === -1) {
-                listHTML += `<li><a href="#">${cname} - ${sname}</a></li>`;
-            }
-        }
-    } else {
-        listHTML = '<div class="bird-list seen"><div class="rounded-border"><ul class="request-bird">';
-        for (const item in rows) {
-            listHTML += `<li><a href="#"><span class="cname">${rows[item].cname}</span> - ${rows[item].sname} <span class="badge bg-secondary rounded-pill float-end">${rows[item].count}</span></a></li>`;
-        }
-    }
-    const parking = document.getElementById(store);
-    listHTML += '</ul></div></div>';
-    parking.innerHTML = listHTML;
+    const chart = document.getElementById('chart-list');
+    const explore = document.getElementById('explore-list');
+    const listHTML = generateBirdOptionList({ store, rows });
+    chart.innerHTML = listHTML;
+    explore.innerHTML = listHTML;
 }
 
-function generateBirdOptionList({ store, rows, selected }) {
-    let listHTML = `
-    <div class="form-floating">
-        <select id="bird-list" class="form-select form-select mb-3" aria-label=".form-select" required>`;
 
+
+function generateBirdOptionList({ store, rows, selected }) {
+    let listHTML = '';
     if (store === 'allSpecies') {
+        let sortedList = labels.map(label => label.split('_')[1]);
+        sortedList.sort((a, b) => a.localeCompare(b));
+        // Check if we have prepared this before
+        const all = document.getElementById('allSpecies');
         const lastSelectedSpecies = selected || STATE.birdList.lastSelectedSpecies;
-        listHTML += lastSelectedSpecies ?
-            `<option selected value="${lastSelectedSpecies}">${lastSelectedSpecies}</option>` : '<option selected disabled value=""></option>';
-        for (const item in labels) {
-            const [sname, cname] = labels[item].split('_');
-            if (cname.indexOf(lastSelectedSpecies) === -1) {
-                listHTML += `<option value="${cname}">${cname} - ${sname}</option>`;
+        listHTML += '<div class="form-floating"><select spellcheck="false" id="bird-list-all" class="input form-select mb-3" aria-label=".form-select" required>';
+        listHTML += '<option value=""></option>';
+        for (const item in sortedList) {
+            //const [sname, cname] = labels[item].split('_');
+            if (sortedList[item] !== lastSelectedSpecies) {
+                listHTML += `<option value="${sortedList[item]}">${sortedList[item]}</option>`;
+            } else {
+                listHTML += `<option value="${sortedList[item]}" selected>${sortedList[item]}</option>`;
             }
         }
+        listHTML += '</select><label for="bird-list-all">Species</label></div>';
     } else {
+        listHTML += '<select id="bird-list-seen" class="form-select"><option value=""></option>';
         for (const item in rows) {
-            listHTML += `<option value="${rows[item].cname}">${rows[item].cname} - ${rows[item].sname} <span class="badge bg-secondary rounded-pill float-end">${rows[item].count}</span></option>`;
+            listHTML += `<option value="${rows[item].cname}">${rows[item].cname}</option>`;
         }
+        listHTML += '</select><label for="bird-list-seen">Species</label>';
     }
-    listHTML += '</select><label for="bird-list">Species</label></div>';
+
     return listHTML;
 }
 
-// Search list handlers
 
-$(document).on('focus', '.input', function () {
-    document.removeEventListener('keydown', handleKeyDownDeBounce, true);
-    const container = this.closest('div').querySelector('.bird-list-wrapper');
-    // check we're not adjusting the confidence threshold - if we are, container will be null
-    if (container) {
-        let theList;
-        if (container.classList.contains('editing')) {
-            theList = document.querySelector('#allSpecies .bird-list')
-        } else {
-            theList = document.querySelector('#seenSpecies .bird-list')
-        }
-        if (theList) {  //there won't be a seenSpecies list until some records are saved
-            container.appendChild(theList.cloneNode(true));
-            theList = container.querySelector('.bird-list');
-            //theList.addEventListener('click', editHandler);
-        }
-    }
-    if (this.id === "speciesSearch") hideElement(['dataRecords']);
-});
-
-$(document).on('blur', '.input', function (e) {
-    document.addEventListener('keydown', handleKeyDownDeBounce, true);
-    if (this.id !== 'threshold') {
-        // We're looking at the birdlist search, so use a timeout to allow a click event on the list to fire
-        setTimeout(hideBirdList, 250, this.parentNode);
-    }
-})
-
-$(document).on('mousedown', '.bird-list-wrapper', function (e) {
-    e.preventDefault();
-})
-
-function hideBirdList(el) {
-    const list = el.closest('.species-selector').querySelector('.bird-list');
-    if (el.id === 'edit') {
-        const cname = el.closest('.cname');
-        if (cname) {
-            const row = cname.closest('tr');
-            const restore = row.querySelector('.restore');
-            cname.replaceWith(restore);
-            restore.classList.remove('restore', 'd-none');
-        }
-    } else {
-        list.remove();
-    }
-}
-
-
-
-// Bird list filtering
-$(document).on('keyup', '.input:not(.form-control)', filterList);
-
-function filterList(e) {
-    const input = e.target;
-    const filter = input.value.toUpperCase();
-    const ul = input.closest('div').querySelector("ul");
-    const li = ul.getElementsByTagName('li');
-    const theList = document.querySelector('.bird-list');
-    theList.classList.remove('d-none');
-    // Loop through all list items, and hide those who don't match the search query
-    for (let i = 0; i < li.length; i++) {
-        const a = li[i].getElementsByTagName("a")[0];
-        const txtValue = a.textContent || a.innerText;
-        if (txtValue.toUpperCase().indexOf(filter) > -1) {
-            li[i].style.display = "";
-        } else {
-            li[i].style.display = "none";
-        }
-    }
-}
 
 const getActiveRowID = () => activeRow?.id;
 
@@ -1457,13 +1371,13 @@ function getSpecies(target) {
 
 const getDetectionContext = (target) => target.closest('table').id;
 
-// Bird list form  click handler
-$(document).on('click', '.request-bird', function (e) {
+
+$(document).on('change', '#bird-list-seen', function (e) {
+
     // Clear the results table
     resultTable.innerText = '';
-    const row = e.target.closest('li')
-    const cname = row.querySelector('.cname').innerText
-    const context = this.closest('.bird-list-wrapper').classList[0];
+    const cname = e.target.value;
+    const context = e.target.parentNode.classList.contains('chart') ? 'chart' : 'explore';
     let pickerEl = context + 'Range';
     t0 = Date.now();
     let action, explore;
@@ -1474,8 +1388,17 @@ $(document).on('click', '.request-bird', function (e) {
         action = 'filter';
     }
     worker.postMessage({ action: action, species: cname, range: STATE[context].range })
+
 })
 
+// $(document).on('focus', '.bird-list', function (e) {
+//     document.removeEventListener('keydown', handleKeyDownDeBounce, true);
+//     e.target.value = '';
+// })
+
+// $(document).on('blur', '.bird-list', function (e) {
+//     document.addEventListener('keydown', handleKeyDownDeBounce, true);
+// })
 
 // Chart functions
 function getDateOfISOWeek(w) {
@@ -1496,7 +1419,13 @@ function onChartData(args) {
     const genTime = Date.now() - t0;
     const genTimeElement = document.getElementById('genTime')
     genTimeElement.innerText = (genTime / 1000).toFixed(1) + ' seconds';
-    if (args.species) showElement(['dataRecords'], false);
+    if (args.species) {
+        showElement(['recordsTableBody'], false);
+        const title = document.getElementById('speciesName');
+        title.innerText = args.species;
+    } else {
+        hideElement(['recordsTableBody']);
+    }
     const elements = document.getElementsByClassName('highcharts-data-table');
     while (elements.length > 0) {
         elements[0].parentNode.removeChild(elements[0]);
@@ -1747,13 +1676,13 @@ function enableKeyDownEvent() {
 function initRegion() {
     if (wavesurfer.regions) wavesurfer.destroyPlugin('regions');
     wavesurfer.addPlugin(WaveSurfer.regions.create({
-            formatTimeCallback: formatRegionTooltip,
-            dragSelection: true,
-            // Region length bug (likely mine) means I don't trust leangths > 60 seconds
-            maxLength: config[config.backend].batchSize * 3,
-            slop: 5,
-            color: "rgba(255, 255, 255, 0.2)"
-        })
+        formatTimeCallback: formatRegionTooltip,
+        dragSelection: true,
+        // Region length bug (likely mine) means I don't trust leangths > 60 seconds
+        maxLength: config[config.backend].batchSize * 3,
+        slop: 5,
+        color: "rgba(255, 255, 255, 0.2)"
+    })
     ).initPlugin('regions')
 }
 
@@ -2325,7 +2254,7 @@ async function onWorkerLoadedAudio({
         }
         if (windowLength > currentFileDuration) windowLength = currentFileDuration;
 
-        
+
 
 
         updateSpec({ buffer: currentBuffer, position: position, play: play, resetSpec: resetSpec });
@@ -2448,7 +2377,7 @@ async function onPredictionDone({
     //Pagination
     total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
     if (action !== 'filter') {
-        
+
         updateProgress(0)
 
         //completeDiv.show();
@@ -2700,10 +2629,10 @@ detectionsModalDiv.addEventListener('hide.bs.modal', (e) => {
 
 // const detectionsAdd = document.getElementById('detections-add');
 // detectionsAdd.addEventListener('click', () => {
-//     worker.postMessage({
-//         action: 'filter',
-//         species: isSpeciesViewFiltered(true)
-//     })
+    // worker.postMessage({
+    //     action: 'filter',
+    //     species: isSpeciesViewFiltered(true)
+    // })
 // })
 
 const updateResultTable = (row, isFromDB, isSelection) => {
@@ -3144,7 +3073,7 @@ $(function () {
             timePickerIncrement: 60,
             startDate: start,
             endDate: end,
-            opens: "center",
+            opens: "left",
             ranges: {
                 'Last Night': [moment().startOf('day').add(12, 'hours').subtract(1, 'days'), moment().startOf('day').add(12, 'hours')],
                 'Previous Night': [moment().startOf('day').add(12, 'hours').subtract(2, 'days'), moment().subtract(1, 'days').startOf('day').add(12, 'hours')],
@@ -3161,8 +3090,6 @@ $(function () {
             $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
             const dateRange = { start: picker.startDate._d.getTime(), end: picker.endDate._d.getTime() };
             if (worker) {
-                // Update the seen species list
-                worker.postMessage({ action: 'get-detected-species-list', range: dateRange, explore: isExplore() });
                 if (this.id === 'chartRange') {
                     STATE.chart.range = dateRange;
                     worker.postMessage({ action: 'update-state', chart: STATE.chart })
@@ -3181,14 +3108,14 @@ $(function () {
                         range: STATE.explore.range,
                     });
                 }
+                // Update the seen species list
+                worker.postMessage({action: 'get-detected-species-list'})
             }
         });
 
         $(this).on('cancel.daterangepicker', function () {
             $(this).children('span').html('Apply a date filter');
             if (worker) {
-                // Update the seen species list
-                worker.postMessage({ action: 'get-detected-species-list', explore: isExplore() });
                 if (this.id === 'chartRange') {
                     STATE.chart.range = { start: undefined, end: undefined };
                     worker.postMessage({ action: 'update-state', chart: STATE.chart })
@@ -3205,7 +3132,9 @@ $(function () {
                         action: 'filter',
                         species: isSpeciesViewFiltered(true),
                     });
-                }
+                }                
+                // Update the seen species list
+                worker.postMessage({action: 'get-detected-species-list'})
             }
         });
     })
@@ -3477,32 +3406,6 @@ $(document).on('click', function () {
     $("#context-menu").removeClass("show").hide();
 })
 
-
-// function buildSummaryMenu(menu, target) {
-//     menu.html(`
-//     <a class="dropdown-item" id="create-manual-record" href="#">
-//         <span class="material-icons-two-tone">post_add</span> Edit Archive Records
-//     </a>
-//     <a class="dropdown-item" id="context-create-clip" href="#">
-//         <span class="material-icons-two-tone">music_note</span> Export Audio Clips
-//     </a>
-//     <a class="dropdown-item" id="context-xc" href='#' target="xc">
-//         <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> View species on Xeno-Canto
-//     </a>
-//     <div class="dropdown-divider"></div>
-//     <a class="dropdown-item" id="context-delete" href="#">
-//         <span class='delete material-icons-two-tone'>delete_forever</span> Delete Records
-//     </a>
-// `);
-//     const contextDelete = document.getElementById('context-delete');
-//     contextDelete.addEventListener('click', function () {
-//         deleteSpecies(target);
-//     })
-//     return contextDelete;
-// }
-
-
-
 $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('contextmenu', async function (e) {
     const target = e.target;
     if (target.classList.contains('circle')) return;
@@ -3511,19 +3414,19 @@ $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('c
     let resultContext, summaryContext = '', selectionContext = '', plural = '';
     const inSummary = target.closest('#speciesFilter')
     if (target.closest('#resultTableBody')) resultContext = true;
-    else if  ( inSummary ){
+    else if (inSummary) {
         summaryContext = 'd-none';
         plural = 's';
     }
-    else if (target.closest('#selectionResultTableBody' )) { selectionContext = 'd-none' }
-    
+    else if (target.closest('#selectionResultTableBody')) { selectionContext = 'd-none' }
+
     let contextDelete;
 
     // If we haven't clicked the active row or we cleared the region, load the row we clicked
-    if (resultContext || selectionContext || summaryContext){
+    if (resultContext || selectionContext || summaryContext) {
         // Lets check if the summary needs to be filtered
         if (inSummary) {
-            if ( ! target.closest('tr').classList.contains('text-warning')){
+            if (!target.closest('tr').classList.contains('text-warning')) {
                 target.click() // Wait for file to load
                 await waitForFileLoad();
             }
@@ -3531,7 +3434,7 @@ $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('c
             target.click(); // Wait for file to load
             await waitForFileLoad();
         }
-       
+
     }
     if (!summaryContext && activeRow === undefined && region === undefined) return;
     const createOrEdit = isExplore() && region?.attributes.label ? 'Edit' : 'Create';
@@ -3556,19 +3459,19 @@ $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('c
             <span class='delete material-icons-two-tone'>delete_forever</span> Delete Record${plural}
         </a>
     `);
-    if (! selectionContext){
+    if (!selectionContext) {
         const contextAnalyseSelectionLink = document.getElementById('context-analyse-selection');
         contextAnalyseSelectionLink.addEventListener('click', getSelectionResults);
         contextDelete = document.getElementById('context-delete');
         resultContext ? contextDelete.addEventListener('click', deleteRecord) :
-                        contextDelete.addEventListener('click', function () {
-                            deleteSpecies(target);
-                        });
-        }
+            contextDelete.addEventListener('click', function () {
+                deleteSpecies(target);
+            });
+    }
     // Add event Handlers
     const exporLink = document.getElementById('context-create-clip');
     summaryContext ? exporLink.addEventListener('click', batchExportAudio) :
-    exporLink.addEventListener('click', exportAudio) ;
+        exporLink.addEventListener('click', exportAudio);
     if (!(selectionContext || summaryContext)) {
         document.getElementById('create-manual-record').addEventListener('click', function (e) {
             if (e.target.innerText.indexOf('Edit') !== -1) {
@@ -3634,6 +3537,7 @@ async function showRecordEntryForm(mode, batch) {
         commentText = activeRow.querySelector('.comment > span')?.title || '';
 
         callCount = activeRow.querySelector('.call-count').innerText;
+        callCount = callCount.replace('Present', '');
         typeIndex = ['Local', 'Nocmig', ''].indexOf(activeRow.querySelector('.label').innerText);
     }
     const speciesList = `
@@ -3672,8 +3576,17 @@ async function showRecordEntryForm(mode, batch) {
     $('#record-entry-modal-body').html(speciesList + label + comment);
     const action = document.getElementById('record-add')
     action.innerText = mode;
+    action.addEventListener('click', () => {
+        worker.postMessage({
+            action: 'filter',
+            species: isSpeciesViewFiltered(true),
+            active: getActiveRowID(),
+        });
+    })
     if (typeIndex) document.querySelectorAll('input[name="record-label"]')[typeIndex].checked = true;
-
+    // Clear entry on input focus, so list appears
+    const birdListInput = document.getElementById('bird-list-all');
+    // birdListInput.addEventListener('click', () => { birdListInput.value = '' });
     document.removeEventListener('keydown', handleKeyDownDeBounce, true);
     recordEntryModal.show();
 }
@@ -3709,7 +3622,7 @@ recordEntryForm.addEventListener('submit', function (e) {
     const batch = document.getElementById('batch-mode').value;
     const start = bufferBegin + region.start;
     const end = bufferBegin + region.end;
-    const cname = document.getElementById('bird-list').value;
+    const cname = document.getElementById('bird-list-all').value;
     // Update the region label
     region.attributes.label = cname;
     const count = document.getElementById('call-count').value;
@@ -3722,11 +3635,6 @@ recordEntryForm.addEventListener('submit', function (e) {
 const recordEntryModalDiv = document.getElementById('record-entry-modal')
 recordEntryModalDiv.addEventListener('hidden.bs.modal', (e) => {
     document.addEventListener('keydown', handleKeyDownDeBounce, true);
-    worker.postMessage({
-        action: 'filter',
-        species: isSpeciesViewFiltered(true),
-        active: getActiveRowID(),
-    });
 });
 
 const purgeFile = document.getElementById('purge-file');
@@ -3745,10 +3653,10 @@ purgeFile.addEventListener('click', () => {
 // Utility functions to wait for file to load
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
-  }
-  
+}
+
 async function waitForFileLoad() {
-while (!fileLoaded) {
+    while (!fileLoaded) {
         await delay(100); // Wait for 100 milliseconds before checking again
     }
 }
