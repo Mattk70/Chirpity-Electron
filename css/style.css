@@ -128,9 +128,15 @@ select {
     /* Add some space below the input */
     max-width: 25em
 }
+.dropdown-menu {
+    min-width: 300px;
+}
 
-
-
+.shortcut {
+    color: #666;
+    font-size: 14px;
+    vertical-align: -webkit-baseline-middle;
+}
 ul {
     /* Remove default list styling */
     list-style-type: none;
