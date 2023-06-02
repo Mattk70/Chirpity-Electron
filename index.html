@@ -43,14 +43,14 @@
                             </a>
                             <ul class="dropdown-menu">
                                 <li><a id="open" class="dropdown-item" href="#">
-                                        <span class="material-icons-two-tone">file_open</span> <u>O</u>pen Audio
-                                        File(s)</a></li>
+                                        <span class="material-icons-two-tone">file_open</span> Open Audio
+                                        File(s) <span class="shortcut float-end">Ctrl+O</span></a></li>
                                 <li><a class="dropdown-item disabled" id="saveLabels" href="#">
-                                        <span class="material-icons-two-tone">label</span> Save <u>A</u>udacity
+                                        <span class="material-icons-two-tone">label</span> Save Audacity
                                         Labels</a></li>
                                 <li><a class="dropdown-item disabled" id="export-audio" href="#">
                                         <span class="material-icons-two-tone">music_note</span> Export Selected
-                                        Audio</a></li>
+                                        Audio <span class="shortcut float-end">Ctrl+E</span></a></li>
                                 <li>
                                     <hr class="dropdown-divider">
                                 <li><a class="dropdown-item" href="#" id="exit">
@@ -65,9 +65,10 @@
                             <ul class="dropdown-menu" aria-labelledby="navbarRecords">
                                 <li class="dropdown-item disabled" href="#" id="save2db">
                                     <span class="material-icons-two-tone">archive</span> Save to Archive
+                                    <span class="shortcut float-end">Ctrl+S</span>
                                 </li>
                                 <li class="dropdown-item " href="#" id="export2audio">
-                                    <span class="material-icons-two-tone">music_note</span> Export Audio Clips
+                                    <span class="material-icons-two-tone">music_note</span> Export Audio Clips 
                                 </li>
                                 <li class="dropdown-divider"></li>
                                 <li class="dropdown-item disabled" href="#" id="charts">
@@ -98,7 +99,8 @@
                                         </div>
                                     </a></li>
                                 <li><a class="dropdown-item disabled" href="#" id="analyse">
-                                        <span class="material-icons-two-tone">search</span> Analyse File</a></li>
+                                        <span class="material-icons-two-tone">search</span> Analyse File
+                                        <span class="shortcut float-end">Ctrl+A</span> </a></li>
                                 <li><a class="dropdown-item disabled" href="#" id="analyseSelection">
                                         <span class="material-icons-two-tone">manage_search</span> Analyse Selected
                                         Interval</a></li>
@@ -676,7 +678,7 @@
             <div>
                 <div class="bg-dark border border-secondary w-100" id="timeline"></div>
                 <div class="w-100" id="spectrogram">
-                    <span title="Toggle Fullscreen mode" id="fullscreen"
+                    <span title="Toggle Fullscreen mode (Ctrl+F)" id="fullscreen"
                         class="material-icons-two-tone btn btn-outline-secondary p-1 pointer d-none">fullscreen</span>
                 </div>
                 <div class="w-100" id="waveform"></div>
@@ -696,11 +698,11 @@
                 </div>
 
                 <div class="col btn-group bg-dark  pe-2" role="group">
-                    <button id="zoomIn" title="Zoom into the spectrogram" class="btn btn-outline-secondary"
+                    <button id="zoomIn" title="Zoom into the spectrogram (Ctrl +)" class="btn btn-outline-secondary"
                         style="max-width: 70px">
                         <span class="material-icons-two-tone zoom">zoom_in</span>
                     </button>
-                    <button id="zoomOut" title="Zoom out of the spectrogram" class="btn btn-outline-secondary"
+                    <button id="zoomOut" title="Zoom out of the spectrogram (Ctrl -)" class="btn btn-outline-secondary"
                         style="max-width: 70px"><span class="material-icons-two-tone zoom align-middle">zoom_out</span>
                     </button>
                 </div>
