@@ -414,7 +414,9 @@ const filename = document.getElementById('filename');
 filename.addEventListener('click', openFileInList);
 
 
-function renderFilnamePanel(files, openfile) {
+function renderFilnamePanel() {
+    const openfile = currentFile;
+    const files = fileList;
     let filenameElement = document.getElementById('filename');
     filenameElement.innerHTML = '';
     let label = openfile.replace(/^.*[\\\/]/, "");
@@ -623,7 +625,7 @@ async function onOpenFiles(args) {
 
     await loadAudioFile({ filePath: fileList[0] });
     disableMenuItem(['analyseSelection', 'analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'export2audio', 'save2db'])
-    //renderFilnamePanel(fileList, fileList[0]);
+
     // Reset the buffer playhead and zoom:
     bufferBegin = 0;
     windowLength = 20;
@@ -874,6 +876,7 @@ function hideAll() {
 const save2dbLink = document.getElementById('save2db');
 save2dbLink.addEventListener('click', async () => {
     worker.postMessage({ action: 'save2db' })
+    renderFilnamePanel();
 });
 
 const export2audio = document.getElementById('export2audio');
@@ -1403,7 +1406,11 @@ const setUpWorkerMessaging = () => {
                     onChartData(args);
                     break;
                 case 'generate-alert':
+                    if (args.render){
+                        renderFilnamePanel();
+                    }
                     alert(args.message)
+
                     break
                 case 'no-detections-remain':
                     detectionsModal.hide();
@@ -2028,7 +2035,9 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
     },
     KeyS: function (e) {
-        if (e.ctrlKey) worker.postMessage({ action: 'save2db' });
+        if (e.ctrlKey) {
+            worker.postMessage({ action: 'save2db' });
+        }
     },
     KeyT: function (e) {
         if (e.ctrlKey) timelineToggle(true);
@@ -2375,7 +2384,7 @@ async function onWorkerLoadedAudio({
             fileStart = start;
             fileEnd = new Date(fileStart + (currentFileDuration * 1000));
             // Update the current file name in the UI
-            renderFilnamePanel(fileList, file);
+            renderFilnamePanel();
         }
         if (config.timeOfDay) {
             bufferStartTime = new Date(fileStart + (bufferBegin * 1000))
@@ -3739,6 +3748,7 @@ purgeFile.addEventListener('click', () => {
                 fileName: currentFile
             })
         }
+        renderFilnamePanel()
     }
 })
 
