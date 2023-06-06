@@ -12,7 +12,7 @@ export class State {
             // filteredOffset is the only propoerty that is updated directly
             this.filteredOffset = {}, // Current species start number for filtered results
             this.selection = false,
-            this.blocked = [-1],
+            this.blocked = [],
             this.audio = { format: 'mp3', bitrate: 128, padding: false, fade: false, downmix: false, quality: 5, },
             this.filters = { highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: -6, SNR: 0 },
             this.detect = { nocmig: false, contextAware: false, confidence: 450 },
@@ -22,7 +22,9 @@ export class State {
             this.predictionCount = 0,
             this.topRankin = 1,
             this.GET_RESULT_SQL = undefined,
-            this.userSettingsInSelection - false
+            this.userSettingsInSelection = false,
+            this.lat = undefined,
+            this.lon = undefined
     }
 
 
@@ -55,8 +57,8 @@ export class State {
     // Separate from update-state as we're passing a database handle
     changeMode({ mode, disk, memory }) {
         this.mode = mode;
-        // Modes: analyse, chart, explore, selection, saved-analysis
-        this.db = ['chart', 'explore'].includes(mode) ? disk : memory;
+        // Modes: analyse, chart, explore, selection, archive
+        this.db = ['chart', 'explore', 'archive'].includes(mode) ? disk : memory;
         // Reset pagination offsets
         this.globalOffset = 0;
         this.filteredOffset = {};

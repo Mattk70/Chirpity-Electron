@@ -68,7 +68,7 @@
                                     <span class="shortcut float-end">Ctrl+S</span>
                                 </li>
                                 <li class="dropdown-item " href="#" id="export2audio">
-                                    <span class="material-icons-two-tone">music_note</span> Export Audio Clips 
+                                    <span class="material-icons-two-tone">music_note</span> Export Audio Clips
                                 </li>
                                 <li class="dropdown-divider"></li>
                                 <li class="dropdown-item disabled" href="#" id="charts">
@@ -166,7 +166,8 @@
                                                     </div>
                                                 </fieldset>
                                                 <fieldset class="border rounded m-2 p-1">
-                                                    <legend style="font-size: large">Default Location <span class="circle me-2"
+                                                    <legend style="font-size: large">Default Location <span
+                                                            class="circle me-2"
                                                             title="Location is used to determine dawn and dusk times for recordings">?</span>
                                                     </legend>
                                                     <div class="form-group rounded p-2 mb-2 bg-light">
@@ -638,14 +639,76 @@
                 </div>
             </div>
         </div>
+        <!-- Location Modal -->
+        <div class="modal fade" id="locationModal" tabindex="-1" aria-labelledby="locationModalLabel"
+            aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="gotoModalLabel">Set Location</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form id="locationForm">
+                        <div class="modal-body">
+                            <fieldset class="border rounded m-2 p-1">
+                                <legend class="h6">Pick A Saved Location</legend>
+                                <div class="form-group rounded p-2 mb-2 bg-light">
+                                    <div class="row">
+                                        <div class="input-group col">
+                                            <div class="form-group w-100">
+                                                <label for="savedLocations"></label>
+                                                <select class="form-control" id="savedLocations">
+                                                </select>
+                                              </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </fieldset>
+                            <fieldset class="border rounded m-2 p-1">
+                                <legend class="h6">Add, Edit or Delete Location</legend>
+                                <div class="form-group rounded p-2 mb-2 bg-light">
+                                    <div class="row">
+                                        <div class="input-group col">
+                                            <span class="input-group-text pe-2">Lat:</span>
+                                            <input id="customLat" type="text" class="form-control ps-2"
+                                                placeholder="0.0" aria-label="Latitude" aria-describedby="customLat"
+                                                required>
+
+                                            <span class="input-group-text pe-2">Lon:</span>
+                                            <input id="customLon" type="text" class="form-control ps-2"
+                                                placeholder="0.0" aria-label="Longitude" aria-describedby="customLon"
+                                                required>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="input-group col">
+                                            <textarea class="mt-2 w-100" id="customPlace" spellcheck="false"
+                                                maxlength="100" required></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </fieldset>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" id="set-location">Set Location</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
         <!-- Explore Div -->
         <div id="exploreWrapper" class="p-1 row g-1 d-none">
             <div class="species-selector col-sm-4" id="exploreSpeciesSearch">
                 <div id="explore-list" class="explore bird-list-wrapper form-floating"></div>
             </div>
             <div class="col-sm-8 align-middle">
-                <div class="btn btn-outline-secondary float-end" id="exploreRange">
-                    <i class="material-icons-two-tone  align-bottom">date_range</i>&nbsp;
+                <div class="btn btn-outline-secondary float-end disabled" id="exploreLocation">
+                    <i class="material-icons-two-tone align-bottom">location_on</i>&nbsp;
+                    <span>Apply a location filter</span> <i class="material-icons-two-tone  align-bottom">expand_more</i>
+                </div>
+                <div class="btn btn-outline-secondary float-end me-2" id="exploreRange">
+                    <i class="material-icons-two-tone align-bottom">date_range</i>&nbsp;
                     <span>Apply a date filter</span> <i class="material-icons-two-tone  align-bottom">expand_more</i>
                 </div>
             </div>
@@ -781,6 +844,11 @@
                         </div>
                     </div>
                     <div class="col-9">
+                        <div class="btn btn-outline-secondary float-end ms-2 disabled" id="chartLocation">
+                            <i class="material-icons-two-tone align-bottom">location_on</i>&nbsp;
+                            <span>Apply a location filter</span> <i
+                                class="material-icons-two-tone  align-bottom">expand_more</i>
+                        </div>
                         <div class="btn btn-outline-secondary float-end" id="chartRange">
                             <i class="material-icons-two-tone align-bottom">date_range</i>&nbsp;
                             <span>Apply a date filter</span> <i
@@ -792,7 +860,9 @@
                     <div id='dataRecords' class="col-3">
                         <table class="table table-striped border border-dark rounded-border mt-5">
                             <tbody id="recordsTableBody">
-                                <tr><th id="speciesName" class="text-center" colspan="2"></th></tr>
+                                <tr>
+                                    <th id="speciesName" class="text-center" colspan="2"></th>
+                                </tr>
                                 <tr>
                                     <th>Earliest Spring Record</th>
                                     <td id="earliestSpring"></td>
