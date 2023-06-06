@@ -2001,22 +2001,19 @@ const onSave2DiskDB = async () => {
         })
         return // nothing to do. Also will crash if trying to update disk from disk.
     }
-
-    memoryDB.run('BEGIN');
-    memoryDB.run(`INSERT OR IGNORE INTO disk.files SELECT * FROM files`);
+    await memoryDB.runAsync('BEGIN');
+    await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.files SELECT * FROM files`);
 
     // Update the duration table
-    memoryDB.run('INSERT OR IGNORE INTO disk.duration SELECT * FROM duration', (err, response) => {
-        if (err) return console.log(err)
-        console.log(response?.changes + ' date durations added to disk database')
-    });
-    memoryDB.run(`
+    let response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.duration SELECT * FROM duration');
+    console.log(response.changes + ' date durations added to disk database');
+    // now update records
+    response = await memoryDB.runAsync(`
             INSERT OR IGNORE INTO disk.records 
                 SELECT * FROM records
-            WHERE confidence >= ${STATE.detect.confidence} AND speciesID NOT IN (${STATE.blocked})`, (err, response) => {
-        if (err) return console.log(err)
-        console.log(response?.changes + ' records added to disk database')
-        if (response?.changes) {
+            WHERE confidence >= ${STATE.detect.confidence} AND speciesID NOT IN (${STATE.blocked})`);
+    console.log(response?.changes + ' records added to disk database')
+    if (response?.changes) {
             UI.postMessage({ event: 'diskDB-has-records' });
             if (!DATASET) {
 
@@ -2024,13 +2021,12 @@ const onSave2DiskDB = async () => {
                 onChangeMode('archive');
                 UI.postMessage({
                     event: 'generate-alert',
-                    message: `Database update complete, ${response.changes} records added to the archive in ${((Date.now() - t0) / 1000)} seconds`
+                    message: `Database update complete, ${response.changes} records added to the archive in ${((Date.now() - t0) / 1000)} seconds`,
+                    render: true
                 })
             }
         }
-    });
-    memoryDB.run('END');
-
+    await memoryDB.runAsync('END');
 };
 
 const getSeasonRecords = async (species, season) => {
@@ -2360,10 +2356,15 @@ async function onChartRequest(args) {
 const onFileDelete = async (fileName) => {
     const result = await diskDB.runAsync('DELETE FROM files WHERE name = ?', fileName);
     if (result.changes) {
+        onChangeMode('analyse');
         getSpecies();
         UI.postMessage({
-            event: 'generate-alert', message: `${fileName} 
-and its associated records were deleted successfully`});
+            event: 'generate-alert', 
+            message: `${fileName} 
+and its associated records were deleted successfully`,
+            render: true
+        });
+        
         getResults();
         getSummary();
     } else {
