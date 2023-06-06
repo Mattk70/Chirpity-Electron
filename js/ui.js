@@ -1,4 +1,4 @@
-let seenTheDarkness = false, shownDaylightBanner = false;
+let seenTheDarkness = false, shownDaylightBanner = false, LOCATIONS = ['dummy'], locationID = undefined;
 let labels = [];
 
 const STATE = {
@@ -97,7 +97,7 @@ const contentWrapperElement = $('#contentWrapper');
 let resultTable = document.getElementById('resultTableBody');
 const selectionTable = document.getElementById('selectionResultTableBody');
 const nocmigButton = document.getElementById('nocmigMode');
-const summaryTable = $('#summaryTable');
+const summaryTable = document.getElementById('summaryTable');
 const progressDiv = document.getElementById('progressDiv');
 const progressBar = document.getElementById('progress-bar');
 const fileNumber = document.getElementById('fileNumber');
@@ -118,7 +118,7 @@ const audioFiltersIcon = document.getElementById('audioFiltersIcon')
 const contextAwareIcon = document.getElementById('context-mode');
 let batchInProgress = false;
 let activeRow;
-let predictions = {}, speciesListItems,
+let predictions = {},
     clickedIndex, currentFileDuration;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
@@ -152,7 +152,7 @@ diagnostics['Cores'] = os.cpus().length;
 diagnostics['System Memory'] = (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) + ' GB';
 
 function resetResults() {
-    summaryTable.empty();
+    summaryTable.innerText = '';
     pagination.forEach(item => item.classList.add('d-none'));
     resultTable = document.getElementById('resultTableBody');
     resultTable.innerHTML = '';
@@ -414,16 +414,17 @@ const filename = document.getElementById('filename');
 filename.addEventListener('click', openFileInList);
 
 
-function updateFileName(files, openfile) {
+function renderFilnamePanel(files, openfile) {
     let filenameElement = document.getElementById('filename');
     filenameElement.innerHTML = '';
     let label = openfile.replace(/^.*[\\\/]/, "");
     let appendStr;
+    const isSaved = ['archive', 'explore'].includes(STATE.mode) ? 'text-info' : 'text-warning';
     if (files.length > 1) {
         appendStr = `<div id="fileContainer" class="btn-group dropup">
         <button type="button" class="btn btn-dark" id="dropdownMenuButton"><span id="setLocation" title="Amend recording location"
         class="material-icons-two-tone align-bottom pointer">edit_location_alt</span><span id="setFileStart" title="Amend recording start time"
-                  class="material-icons-two-tone align-bottom pointer">edit_calendar</span> ${label}
+                  class="material-icons-two-tone align-bottom pointer">edit_calendar</span> <span class="${isSaved}">${label}</span>
         </button>
         <button class="btn btn-dark dropdown-toggle dropdown-toggle-split" type="button" 
                 data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -444,7 +445,7 @@ function updateFileName(files, openfile) {
         <span id="setLocation" title="Amend recording location"
         class="material-icons-two-tone align-bottom pointer">edit_location_alt</span>
         <span id="setFileStart" title="Amend recording start time"
-                  class="material-icons-two-tone align-bottom pointer">edit_calendar</span> ${label}
+                  class="material-icons-two-tone align-bottom pointer">edit_calendar</span> <span class="${isSaved}">${label}</span>
         </button></div>`;
     }
 
@@ -473,8 +474,122 @@ function updateFileName(files, openfile) {
             worker.postMessage({ action: 'update-file-start', file: currentFile, start: fileStart });
         });
     })
+    // Add the setLocation handler
+    const setLocationIcon = document.getElementById('setLocation');
+    setLocationIcon.addEventListener('click', () => {
+        setLocation()
+    })
+    // Adapt menu
+    customiseAnalysisMenu(isSaved === 'text-info');
 }
 
+function customiseAnalysisMenu(saved){
+    const analyseMenu = document.getElementById('analyse');
+    if (saved){
+        analyseMenu.innerHTML = `<span class="material-icons-two-tone">upload_file</span> Retrieve Results
+        <span class="shortcut float-end">Ctrl+A</span>`;
+        enableMenuItem(['reanalyse']);
+    } else {
+        analyseMenu.innerHTML = `<span class="material-icons-two-tone">search</span> Analyse File
+        <span class="shortcut float-end">Ctrl+A</span>`;
+        disableMenuItem(['reanalyse']);
+    }
+}
+
+async function setLocation() {
+    let showLocation;
+    if (LOCATIONS[0] === 'dummy') {
+        worker.postMessage({ action: 'get-locations' });
+        await waitForLocations();
+    }
+    const lat = document.getElementById('customLat');
+    const lon = document.getElementById('customLon');
+    const customPlace = document.getElementById('customPlace');
+    const savedLocationSelect = document.getElementById('savedLocations');
+    const locationAdd = document.getElementById('set-location');
+    if (!LOCATIONS.length) {
+        savedLocationSelect.classList.add('d-none')
+    }
+    else {
+        savedLocationSelect.innerHTML = '<option value="">(Default)</option>'; // clear options
+        savedLocationSelect.classList.remove('d-none');
+
+        LOCATIONS.forEach(loc => {
+            const option = document.createElement('option')
+            option.value = loc.id;
+            option.textContent = loc.place;
+            if (locationID === loc.id) {
+                lat.value = loc.lat;
+                lon.value = loc.lon;
+                customPlace.value = loc.place;
+
+                option.selected = true;
+            }
+            savedLocationSelect.appendChild(option);
+        })
+        showLocation = () => {
+            const newLocation = LOCATIONS.find(obj => obj.id === parseInt(savedLocationSelect.value));
+            if (newLocation) {
+                lat.value = newLocation.lat, lon.value = newLocation.lon, customPlace.value = newLocation.place;
+            } else {  //Default location
+                lat.value = config.latitude, lon.value = config.longitude, customPlace.value = config.location;
+            }
+        }
+        savedLocationSelect.addEventListener('change', showLocation)
+    }
+    if (!lat.value) {
+        // Use default location
+        lat.value = config.latitude;
+        lon.value = config.longitude;
+        customPlace.value = config.location;
+    }
+    const addOrDelete = () => {
+        if (customPlace.value) {
+            locationAdd.innerText = 'Set Location'
+            locationAdd.classList.remove('btn-danger');
+            locationAdd.classList.add('button-primary');
+        } else {
+            locationAdd.innerText = 'Delete Location'
+            locationAdd.classList.add('btn-danger');
+            locationAdd.classList.remove('button-primary');
+        }
+    }
+    // Highlight delete
+    customPlace.addEventListener('keyup', addOrDelete);
+    addOrDelete();
+    const locationModalDiv = document.getElementById('locationModal');
+    const locationModal = new bootstrap.Modal(locationModalDiv);
+    locationModal.show();
+    document.removeEventListener('keydown', handleKeyDownDeBounce, true);
+
+    // Submit action
+    const locationForm = document.getElementById('locationForm');
+
+    const displayLocation = async () => {
+        const place = await getLocation(lat, lon);
+        if (place) customPlace.value = place;
+        else customPlace.ariaPlaceholder = 'Location not recognised';
+    }
+
+    [lat, lon].forEach(el => {
+        el.addEventListener('blur', displayLocation)
+    })
+
+    const addLocation = () => {
+        locationID = parseInt(savedLocationSelect.value);
+        worker.postMessage({ action: 'set-custom-file-location', lat: lat.value, lon: lon.value, place: customPlace.value, file: currentFile })
+        locationModal.hide();
+    }
+    locationAdd.addEventListener('click', addLocation)
+    const onModalDismiss = () => {
+        enableKeyDownEvent();
+        locationForm.reset();
+        locationAdd.removeEventListener('click', addLocation);
+        locationModalDiv.removeEventListener('hide.bs.modal', onModalDismiss);
+        if (showLocation) savedLocationSelect.removeEventListener('change', setLocation)
+    }
+    locationModalDiv.addEventListener('hide.bs.modal', onModalDismiss);
+}
 
 /**
  * We post the list to the worker as it has node and that allows it easier access to the
@@ -507,9 +622,8 @@ async function onOpenFiles(args) {
     }
 
     await loadAudioFile({ filePath: fileList[0] });
-    updateFileName(fileList, fileList[0]);
-
     disableMenuItem(['analyseSelection', 'analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'export2audio', 'save2db'])
+    //renderFilnamePanel(fileList, fileList[0]);
     // Reset the buffer playhead and zoom:
     bufferBegin = 0;
     windowLength = 20;
@@ -617,10 +731,6 @@ function postAnalyseMessage(args) {
         const filesInScope = args.filesInScope;
         updateProgress(0);
         if (!selection) {
-            //STATE.mode = 'analyse';
-            // Tell the worker we are in Analyse mode
-            //worker.postMessage({ action: 'change-mode', mode: STATE.mode });
-            // Reset the buffer playhead and zoom:
             analyseReset();
             resetResults();
             refreshResultsView();
@@ -644,49 +754,68 @@ function postAnalyseMessage(args) {
 
 
 /// Lat / lon
-const lat = document.getElementById('latitude')
-const lon = document.getElementById('longitude')
+const defaultLat = document.getElementById('latitude')
+const defaultLon = document.getElementById('longitude')
 const place = document.getElementById('place')
 $('#latitude, #longitude').on('focus', function () {
     document.removeEventListener('keydown', handleKeyDownDeBounce, true);
 })
 
-const displayLocation = () => {
-    if (lat.value && lon.value) {
-        fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat.value}&lon=${lon.value}&zoom=14`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network error: ' + response);
-                }
-                return response.json()
-            })
-            .then(data => {
-                const address = data.display_name;
-                place.innerHTML = address ? '<span class="material-icons-two-tone">fmd_good</span> ' + address :
-                    '<span class="material-icons-two-tone text-danger">fmd_bad</span> Location not recognised';
-                if (address) {
-                    config.latitude = lat.value;
-                    config.longitude = lon.value;
-                    config.location = address;
-                    updatePrefs();
-                }
-            })
-            .catch(error => {
-                console.log("got an error connecting to OpenStreetMap")
-                // If we have a number for lat & lon, go ahead and use it.
-                if (!isNaN(lat.value) && !isNaN(lon.value)) {
-                    config.latitude = lat.value;
-                    config.longitude = lon.value;
-                    updatePrefs();
-                }
+function getLocation(lat, lon) {
+    return new Promise((resolve, reject) => {
+        let usingDefault = false;
+        if (!lat) {
+            lat = defaultLat; lon = defaultLon;
+            usingDefault = true;
+        }
+        if (lat.value && lon.value) {
+            const storedLocation = LOCATIONS.find(obj => obj.lat === lat && obj.lon === lon);
+            if (storedLocation) return resolve(storedLocation.place);
 
-            })
-    }
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat.value}&lon=${lon.value}&zoom=14`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network error: ' + response);
+                    }
+                    return response.json()
+                })
+                .then(data => {
+                    const address = data.display_name;
+                    if (address) {
+                        if (usingDefault) {
+                            config.latitude = lat.value;
+                            config.longitude = lon.value;
+                            config.location = address;
+                            updatePrefs();
+                        }
+                    }
+                    resolve(address);
+                })
+                .catch(error => {
+                    console.log("got an error connecting to OpenStreetMap")
+                    // If we have a number for default lat & lon, go ahead and use it.
+                    if (!isNaN(lat.value) && !isNaN(lon.value)) {
+                        config.latitude = lat.value;
+                        config.longitude = lon.value;
+                        updatePrefs();
+                    }
+                    reject(error);
+                })
+        } else {
+            resolve(undefined)
+        }
+    })
 }
-$('#latitude, #longitude, #timeInput').on('blur', function () {
-    document.addEventListener('keydown', handleKeyDownDeBounce, true);
-    displayLocation()
+$('#latitude, #longitude').on('blur', async function () {
+    enableKeyDownEvent();
+    const address = await getLocation();
+    const content = address ? '<span class="material-icons-two-tone">fmd_good</span> ' + address :
+        '<span class="material-icons-two-tone text-danger">fmd_bad</span> Location not recognised';
+    place.innerHTML = content;
 })
+
+
+
 
 // Menu bar functions
 
@@ -773,26 +902,24 @@ async function batchExportAudio(e) {
 
 const chartsLink = document.getElementById('charts');
 chartsLink.addEventListener('click', async () => {
-    STATE.mode = 'chart';
     // Tell the worker we are in Chart mode
-    worker.postMessage({ action: 'change-mode', mode: STATE.mode });
+    worker.postMessage({ action: 'change-mode', mode: 'chart' });
     worker.postMessage({ action: 'get-detected-species-list', range: STATE.chart.range });
     hideAll();
     showElement(['recordsContainer']);
-    worker.postMessage({ action: 'chart', species: undefined, range: { start: undefined, end: undefined } });
+    worker.postMessage({ action: 'chart', species: undefined, range: STATE.chart.range });
 });
 
 
 const exploreLink = document.getElementById('explore');
 exploreLink.addEventListener('click', async () => {
-    STATE.mode = 'explore';
     // Tell the worker we are in Explore mode
-    worker.postMessage({ action: 'change-mode', mode: STATE.mode });
+    worker.postMessage({ action: 'change-mode', mode: 'explore' });
     worker.postMessage({ action: 'get-detected-species-list', range: STATE.explore.range });
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
     adjustSpecDims(true)
-    worker.postMessage({ action: 'filter', species: undefined, range: STATE.explore.range, explore: true });
+    worker.postMessage({ action: 'filter', species: undefined, range: STATE.explore.range, explore: true }); // re-prepare
 });
 
 const datasetLink = document.getElementById('dataset');
@@ -1139,7 +1266,7 @@ window.onload = async () => {
             config = JSON.parse(data);
         }
 
-        //fill in defaults
+        //fill in defaults - after updates add new items
         Object.keys(defaultConfig).forEach(key => {
             if (!(key in config)) {
                 config[key] = defaultConfig[key];
@@ -1200,8 +1327,8 @@ window.onload = async () => {
         ThreadSlider.max = diagnostics['Cores'];
         ThreadSlider.value = config[config.backend].threads;
         numberOfThreads.innerText = config[config.backend].threads;
-        lat.value = config.latitude;
-        lon.value = config.longitude;
+        defaultLat.value = config.latitude;
+        defaultLon.value = config.longitude;
         place.innerHTML = '<span class="material-icons-two-tone">fmd_good</span>' + config.location;
 
         worker.postMessage({
@@ -1223,8 +1350,6 @@ window.onload = async () => {
 
     // Set footer year
     $('#year').text(new Date().getFullYear());
-    //Cache list elements
-    speciesListItems = $('#bird-list li span');
 }
 
 const setUpWorkerMessaging = () => {
@@ -1282,6 +1407,13 @@ const setUpWorkerMessaging = () => {
                     break
                 case 'no-detections-remain':
                     detectionsModal.hide();
+                    break;
+                case 'location-list':
+                    LOCATIONS = args.locations;
+                    break;
+                case 'mode-changed':
+                    STATE.mode = args.mode;
+                    console.log ('Mode changed to: ' + args.mode);
                     break;
                 default:
                     alert(`Unrecognised message from worker:${args.event}`)
@@ -1387,7 +1519,7 @@ $(document).on('change', '#bird-list-seen', function (e) {
     } else {
         action = 'filter';
     }
-    worker.postMessage({ action: action, species: cname, range: STATE[context].range })
+    worker.postMessage({ action: action, species: cname, range: STATE[context].range }) // no re-prepare
 
 })
 
@@ -2109,9 +2241,7 @@ const showGoToPosition = () => {
 }
 
 const gotoModal = document.getElementById('gotoModal')
-gotoModal.addEventListener('hidden.bs.modal', () => {
-    document.addEventListener('keydown', handleKeyDownDeBounce, true);
-})
+gotoModal.addEventListener('hidden.bs.modal', enableKeyDownEvent)
 
 gotoModal.addEventListener('shown.bs.modal', () => {
     document.getElementById('timeInput').focus()
@@ -2138,7 +2268,6 @@ const gotoTime = (e) => {
         } else {
             // Invalid input
             alert('Invalid time format. Please enter time in one of the following formats: \n1. Float (for seconds) \n2. Two numbers separated by a colon (for minutes and seconds) \n3. Three numbers separated by colons (for hours, minutes, and seconds)');
-            document.addEventListener('keydown', handleKeyDownDeBounce, true);
             return;
         }
         let start = hours * 3600 + minutes * 60 + seconds;
@@ -2169,7 +2298,7 @@ function onModelReady(args) {
     labels = args.labels;
     warmupText.classList.add('d-none');
     if (fileLoaded) {
-        enableMenuItem(['analyse', 'reanalyse'])
+        enableMenuItem(['analyse'])
         if (fileList.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
     }
     if (region) enableMenuItem(['analyseSelection'])
@@ -2210,6 +2339,7 @@ function onModelReady(args) {
  */
 let NEXT_BUFFER;
 async function onWorkerLoadedAudio({
+    location,
     start = 0,
     sourceDuration = 0,
     bufferBegin = 0,
@@ -2221,7 +2351,7 @@ async function onWorkerLoadedAudio({
     play = false,
     queued = false
 }) {
-    fileLoaded = true;
+    fileLoaded = true, locationID = location;
     const resetSpec = !currentFile;
     currentFileDuration = sourceDuration;
     //if (preserveResults) completeDiv.hide();
@@ -2245,7 +2375,7 @@ async function onWorkerLoadedAudio({
             fileStart = start;
             fileEnd = new Date(fileStart + (currentFileDuration * 1000));
             // Update the current file name in the UI
-            updateFileName(fileList, file);
+            renderFilnamePanel(fileList, file);
         }
         if (config.timeOfDay) {
             bufferStartTime = new Date(fileStart + (bufferBegin * 1000))
@@ -2255,13 +2385,11 @@ async function onWorkerLoadedAudio({
         if (windowLength > currentFileDuration) windowLength = currentFileDuration;
 
 
-
-
         updateSpec({ buffer: currentBuffer, position: position, play: play, resetSpec: resetSpec });
         wavesurfer.bufferRequested = false;
         if (modelReady) {
-            enableMenuItem(['analyse', 'reanalyse']);
-            if (fileList.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
+            enableMenuItem(['analyse']);
+            if (fileList.length > 1) enableMenuItem(['analyseAll'])
         }
         if (fileRegion) {
             createRegion(fileRegion.start, fileRegion.end, fileRegion.label);
@@ -2327,7 +2455,6 @@ const updateSummary = ({ summary = [], filterSpecies = '' }) => {
     const buffer = old_summary.cloneNode();
     buffer.innerHTML = summaryHTML;
     old_summary.replaceWith(buffer);
-    document.getElementById('speciesFilter').addEventListener('click', speciesFilter)
     const currentFilter = document.querySelector('#speciesFilter tr.text-warning');
     if (currentFilter) {
         //const filterRow = currentFilter.rowIndex;
@@ -2388,7 +2515,7 @@ async function onPredictionDone({
         } else {
             disableMenuItem(['saveLabels']);
         }
-        if (currentFile) enableMenuItem(['analyse', 'reanalyse'])
+        if (currentFile) enableMenuItem(['analyse'])
 
         // Diagnostics:
         t1_analysis = Date.now();
@@ -2440,7 +2567,7 @@ pagination.forEach(item => {
                 species: species,
                 offset: offset,
                 limit: limit,
-            });
+            }); // no re-prepare
         }
     })
 })
@@ -2472,9 +2599,11 @@ const addPagination = (total, offset) => {
     })
 }
 
+const summary = document.getElementById('summary');
+summary.addEventListener('click', speciesFilter);
 
 function speciesFilter(e) {
-    if (e.target.tagName === 'TBODY') return; // on Drag
+    if (e.target.tagName === 'TBODY' || e.target.tagName === 'TH') return; // on Drag or clicked header
     clearActive();
     let species, range;
     // Am I trying to unfilter?
@@ -2488,7 +2617,7 @@ function speciesFilter(e) {
     worker.postMessage({
         action: 'filter',
         species: species
-    });
+    }); // no re-prepare
     seenTheDarkness = false;
     shownDaylightBanner = false;
     document.getElementById('results').scrollTop = 0;
@@ -2599,41 +2728,8 @@ const detectionsModalDiv = document.getElementById('detectionsModal')
 
 detectionsModalDiv.addEventListener('hide.bs.modal', (e) => {
     worker.postMessage({ action: 'update-state', selection: undefined });
-    //worker.postMessage({ action: 'change-mode', mode: STATE.mode })
 });
 
-
-// const detectionsDismiss = document.getElementById('detections-dismiss');
-// detectionsDismiss.addEventListener('click', event => {
-//     const rows = detectionsModalDiv.querySelectorAll('tr');
-//     const positions = new Set();
-//     let count = 0;
-//     rows.forEach(row => {
-//         if (!row.classList.contains('text-bg-dark')) {
-//             const [, start, end] = unpackNameAttr(row);
-//             if (start) positions.add([start, end])
-//         }
-//     });
-//     deleteRecord(positions);
-//     if (activeRow && activeRow.closest('#results')) {
-//         // Remove the initiating detection from the main results table
-//         resultTable = document.getElementById('resultTableBody');
-//         const rowIndex = activeRow.rowIndex;
-//         resultTable.deleteRow(rowIndex - 1);
-//         // if (resultTable.rows.length){
-//         //     resultTable.rows(rowIndex).click();
-//         // }
-//     }
-//     //clearActive()
-// });
-
-// const detectionsAdd = document.getElementById('detections-add');
-// detectionsAdd.addEventListener('click', () => {
-    // worker.postMessage({
-    //     action: 'filter',
-    //     species: isSpeciesViewFiltered(true)
-    // })
-// })
 
 const updateResultTable = (row, isFromDB, isSelection) => {
     const table = isSelection ? selectionTable : resultTable;
@@ -3012,7 +3108,7 @@ const setSortOrder = (order) => {
     worker.postMessage({
         action: 'filter',
         species: isSpeciesViewFiltered(true)
-    })
+    }) // re-prepare
 
 }
 // Drag file to app window to open
@@ -3106,10 +3202,10 @@ $(function () {
                         action: 'filter',
                         species: STATE.explore.species,
                         range: STATE.explore.range,
-                    });
+                    }); // re-prepare
                 }
                 // Update the seen species list
-                worker.postMessage({action: 'get-detected-species-list'})
+                worker.postMessage({ action: 'get-detected-species-list' })
             }
         });
 
@@ -3131,10 +3227,10 @@ $(function () {
                     worker.postMessage({
                         action: 'filter',
                         species: isSpeciesViewFiltered(true),
-                    });
-                }                
+                    }); // re-prepare
+                }
                 // Update the seen species list
-                worker.postMessage({action: 'get-detected-species-list'})
+                worker.postMessage({ action: 'get-detected-species-list' })
             }
         });
     })
@@ -3233,7 +3329,7 @@ const handleThresholdChange = (e) => {
         worker.postMessage({
             action: 'filter',
             species: isSpeciesViewFiltered(true),
-        });
+        }); // no re-prepare
     }
 }
 confidenceRange.addEventListener('input', handleThresholdChange);
@@ -3434,10 +3530,9 @@ $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('c
             target.click(); // Wait for file to load
             await waitForFileLoad();
         }
-
     }
     if (!summaryContext && activeRow === undefined && region === undefined) return;
-    const createOrEdit = isExplore() && region?.attributes.label ? 'Edit' : 'Create';
+    const createOrEdit = (['archive', 'explore'].includes(STATE.mode)) && region?.attributes.label ? 'Edit' : 'Create';
 
     menu.html(`
         <a class="dropdown-item play ${summaryContext} ${selectionContext}"><span class='material-icons-two-tone'>play_circle_filled</span> Play</a>
@@ -3581,7 +3676,7 @@ async function showRecordEntryForm(mode, batch) {
             action: 'filter',
             species: isSpeciesViewFiltered(true),
             active: getActiveRowID(),
-        });
+        }); // no re-prepare
     })
     if (typeIndex) document.querySelectorAll('input[name="record-label"]')[typeIndex].checked = true;
     // Clear entry on input focus, so list appears
@@ -3633,9 +3728,7 @@ recordEntryForm.addEventListener('submit', function (e) {
 })
 
 const recordEntryModalDiv = document.getElementById('record-entry-modal')
-recordEntryModalDiv.addEventListener('hidden.bs.modal', (e) => {
-    document.addEventListener('keydown', handleKeyDownDeBounce, true);
-});
+recordEntryModalDiv.addEventListener('hidden.bs.modal', enableKeyDownEvent);
 
 const purgeFile = document.getElementById('purge-file');
 purgeFile.addEventListener('click', () => {
@@ -3657,6 +3750,12 @@ function delay(ms) {
 
 async function waitForFileLoad() {
     while (!fileLoaded) {
+        await delay(100); // Wait for 100 milliseconds before checking again
+    }
+}
+
+async function waitForLocations() {
+    while (LOCATIONS[0] === 'dummy') {
         await delay(100); // Wait for 100 milliseconds before checking again
     }
 }

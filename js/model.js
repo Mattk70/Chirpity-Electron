@@ -1,7 +1,7 @@
 const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs');
 const path = require('path');
-let DEBUG = true;
+let DEBUG = false;
 let BACKEND;
 
 //GLOBALS
@@ -161,7 +161,7 @@ class Model {
         console.log('loading model')
         if (this.model_loaded === false) {
             // Model files must be in a different folder than the js, assets files
-            console.log('loading model from ', this.appPath + 'model.json')
+            if (DEBUG) console.log('loading model from ', this.appPath + 'model.json')
             this.model = await tf.loadGraphModel(this.appPath + 'model.json',
                 { weightPathPrefix: this.appPath });
             this.model_loaded = true;
