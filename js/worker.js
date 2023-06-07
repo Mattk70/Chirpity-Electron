@@ -30,7 +30,7 @@ console.log(staticFfmpeg.path);
 ffmpeg.setFfmpegPath(staticFfmpeg.path.replace('app.asar', 'app.asar.unpacked'));
 
 let predictionsRequested = {}, predictionsReceived = {}
-let COMPLETED = [], PENDING_FILES = [];
+let COMPLETED = [];
 let diskDB, memoryDB;
 
 let t0; // Application profiler
@@ -560,20 +560,20 @@ async function onAnalyse({
 }) {
     // Now we've asked for a new analysis, clear the aborted flag
     aborted = false;
-    if (! end) await createDB();
+
     // Set the appropraite selection range if this is a selection analysis
     STATE.update({ selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined });
 
     console.log(`Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`);
     //Set global filesInScope for summary to use
-    PENDING_FILES = filesInScope;
     index = 0;
     AUDACITY = {};
     COMPLETED = [];
     FILE_QUEUE = filesInScope;
 
-
-    if (!STATE.selection) {
+    if (! STATE.selection) {
+        // Start with a clean memory db
+        await createDB();
         //create a copy of files in scope for state, as filesInScope is spliced
         STATE.setFiles([...filesInScope]);
     }
@@ -604,7 +604,7 @@ async function onAnalyse({
                 break;
             }
         }
-        if (allCached && !reanalyse && !STATE.selection) {
+        if (allCached && !reanalyse && !STATE.selection) {  // handle circle here
             onChangeMode('archive');
             await getResults();
             await getSummary();
