@@ -210,22 +210,30 @@ async function handleMessage(e) {
     const action = args.action;
     console.log('message received ', action)
     switch (action) {
-        case 'update-state':
-            // This pattern to only update variables that have values
-            // latitude = args.lat || latitude;
-            // longitude = args.lon || longitude;
-            TEMP = args.temp || TEMP;
-            appPath = args.path || appPath;
-            STATE.update(args);
-            // Need to recompile prepared sql if changeing sortOrder
+        case 'abort':
+            onAbort(args);
+            break;
+        case 'analyse':
+            predictionsReceived = {};
+            predictionsRequested = {};
+            await onAnalyse(args);
+            break;
+        case 'change-mode':
+            onChangeMode(args.mode);
+            break;
+        case 'chart':
+            await onChartRequest(args);
             break;
         case 'clear-cache':
             CACHE_LOCATION = p.join(TEMP, 'chirpity');
             if (!fs.existsSync(CACHE_LOCATION)) fs.mkdirSync(CACHE_LOCATION);
             await clearCache(CACHE_LOCATION, 0);  // belt and braces - in dev mode, ctrl-c in console will prevent cache clear on exit
             break;
-        case 'open-files':
-            await getFiles(args.files)
+        case 'convert-dataset':
+            convertSpecsFromExistingSpecs();
+            break;
+        case 'create-dataset':
+            saveResults2DataSet();
             break;
         case 'delete':
             await onDelete(args)
@@ -233,33 +241,8 @@ async function handleMessage(e) {
         case 'delete-species':
             await onDeleteSpecies(args)
             break;
-        case 'update-file-start':
-            await onUpdateFileStart(args)
-            break;
-        case 'get-detected-species-list':
-            getSpecies();
-            break;
-        case 'create-dataset':
-            saveResults2DataSet();
-            break;
-        case 'set-custom-file-location':
-            onSetCustomLocation(args);
-            break;
-        case 'convert-dataset':
-            convertSpecsFromExistingSpecs();
-            break;
-        case 'load-model':
-            UI.postMessage({ event: 'spawning' });
-            BATCH_SIZE = parseInt(args.batchSize);
-            BACKEND = args.backend;
-            STATE.update({ model: args.model });
-            if (predictWorkers.length) terminateWorkers();
-            spawnWorkers(args.model, args.list, BATCH_SIZE, args.threads);
-            break;
-        case 'update-list':
-            SEEN_LIST_UPDATE = false;
-            predictWorkers.forEach(worker =>
-                worker.postMessage({ message: 'list', list: args.list }))
+        case 'export-results':
+            await getResults(args);
             break;
         case 'file-load-request':
             index = 0;
@@ -269,50 +252,67 @@ async function handleMessage(e) {
             console.log('Worker received audio ' + args.file);
             await loadAudioFile(args);
             break;
-        case 'update-buffer':
-            await loadAudioFile(args);
-            break;
         case 'filter':
             if (STATE.db) {
                 await getResults(args);
                 await getSummary(args);
             }
             break;
-        case 'export-results':
-            await getResults(args);
+        case 'get-detected-species-list':
+            getSpecies();
+            break;
+        case 'get-locations':
+            getLocations();
             break;
         case 'insert-manual-record':
             await onInsertManualRecord(args);
             break;
-        case 'change-mode':
-            onChangeMode(args.mode);
+        case 'load-model':
+            UI.postMessage({ event: 'spawning' });
+            BATCH_SIZE = parseInt(args.batchSize);
+            BACKEND = args.backend;
+            STATE.update({ model: args.model });
+            if (predictWorkers.length) terminateWorkers();
+            spawnWorkers(args.model, args.list, BATCH_SIZE, args.threads);
             break;
-        case 'analyse':
-            predictionsReceived = {};
-            predictionsRequested = {};
-            await onAnalyse(args);
+        case 'open-files':
+            await getFiles(args.files)
+            break;
+        case 'post':
+            await uploadOpus(args);
+            break;
+        case 'purge-file':
+            onFileDelete(args.fileName);
             break;
         case 'save':
             console.log("file save requested")
             await saveAudio(args.file, args.start, args.end, args.filename, args.metadata);
             break;
-        case 'post':
-            await uploadOpus(args);
-            break;
         case 'save2db':
             await onSave2DiskDB();
             break;
-        case 'abort':
-            onAbort(args);
+        case 'set-custom-file-location':
+            onSetCustomLocation(args);
             break;
-        case 'chart':
-            await onChartRequest(args);
+        case 'update-buffer':
+            await loadAudioFile(args);
             break;
-        case 'purge-file':
-            onFileDelete(args.fileName);
+        case 'update-file-start':
+            await onUpdateFileStart(args)
             break;
-        case 'get-locations':
-            getLocations();
+        case 'update-list':
+            SEEN_LIST_UPDATE = false;
+            predictWorkers.forEach(worker =>
+                worker.postMessage({ message: 'list', list: args.list }))
+            break;
+        case 'update-state':
+            // This pattern to only update variables that have values
+            // latitude = args.lat || latitude;
+            // longitude = args.lon || longitude;
+            TEMP = args.temp || TEMP;
+            appPath = args.path || appPath;
+            STATE.update(args);
+            // Need to recompile prepared sql if changeing sortOrder
             break;
         default:
             UI.postMessage('Worker communication lines open')
@@ -402,10 +402,10 @@ const prepParams = (list) => list.map(item => '?').join(',');
 
 
 const getResultsParams = (species, confidence, offset, limit, topRankin) => {
-    const blocked = (STATE.blocked.length && (STATE.userSettingsInSelection || !STATE.selection)) ?
+    const blocked = (STATE.blocked.length && ! STATE.selection) ?
         STATE.blocked : [];
     const params = [];
-    params.push(...blocked);
+    if (blocked.length) params.push(...blocked);
 
     params.push(topRankin, confidence, species);
     if (['analyse', 'archive'].includes(STATE.mode) && !STATE.selection) {
@@ -438,7 +438,7 @@ const getSummaryParams = (species) => {
 
 const prepSummaryStatement = () => {
     const blocked = STATE.blocked.length && !STATE.selection ? STATE.blocked : [];
-    const range = STATE.mode === 'explore' ? STATE.explore.range : STATE.selection?.range;
+    const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
     const useRange = range?.start;
     let summaryStatement = `
     WITH ranked_records AS (
@@ -449,7 +449,7 @@ const prepSummaryStatement = () => {
         JOIN species ON species.id = records.speciesID
         WHERE confidence >=  ? `;
     let extraClause = '';
-    if (['analyse', 'archive'].includes(STATE.mode) && STATE.filesToAnalyse.length) {
+    if (['analyse', 'archive'].includes(STATE.mode)) {
         extraClause += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
     }
     else if (useRange) {
@@ -504,10 +504,8 @@ const prepResultsStatement = () => {
           JOIN species ON records.speciesID = species.id 
           JOIN files ON records.fileID = files.id `;
 
-    const blocked = (STATE.blocked.length && (STATE.userSettingsInSelection || !STATE.selection)) ?
-        STATE.blocked : [];
-    resultStatement += ` AND speciesID NOT IN (${prepParams(blocked)}) `
-
+    const blocked = STATE.selection ? [] :  STATE.blocked;
+    if (blocked.length) resultStatement += ` AND speciesID NOT IN (${prepParams(blocked)}) `;
 
     resultStatement += `
     )
@@ -530,14 +528,17 @@ const prepResultsStatement = () => {
         ranked_records 
         WHERE confidence_rank <= ? AND confidence >= ? AND cname LIKE ? `;
 
-    if (['analyse', 'archive'].includes(STATE.mode)) {
+
+    // might have two locations with same dates - so need to add files
+    if (['analyse', 'archive'].includes(STATE.mode) && ! STATE.selection) {
         resultStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
     }
-    const range = STATE.mode === 'explore' ? STATE.explore.range : STATE.selection?.range;
+    const range = STATE.mode === 'explore' ? STATE.explore.range : STATE.selection;
     const useRange = range?.start;
     if (useRange) {
         resultStatement += ' AND dateTime BETWEEN ? AND ? ';
     }
+
     resultStatement += `ORDER BY ${STATE.sortOrder}, confidence DESC, callCount DESC LIMIT ? OFFSET ?`;
     STATE.GET_RESULT_SQL = STATE.db.prepare(resultStatement);
     //console.log('Results SQL statement:\n' + resultStatement)
@@ -557,6 +558,7 @@ async function onAnalyse({
     start = 0,
     end = undefined,
     reanalyse = false,
+    fromDB = false
 }) {
     // Now we've asked for a new analysis, clear the aborted flag
     aborted = false;
@@ -604,10 +606,16 @@ async function onAnalyse({
                 break;
             }
         }
-        if (allCached && !reanalyse && !STATE.selection) {  // handle circle here
-            onChangeMode('archive');
-            await getResults();
-            await getSummary();
+        if (fromDB || allCached && !reanalyse && !STATE.selection) {  // handle circle here
+            if (!fromDB) {
+                onChangeMode('archive');
+                await getSummary();
+            }
+            if (fromDB){
+                await getResults({ topRankin: 5});
+            } else {
+                await getResults();
+            }
             return
         }
     }
@@ -1636,7 +1644,7 @@ const parsePredictions = async (response) => {
         }
     }
 
-    STATE.userSettingsInSelection = false;
+    //STATE.userSettingsInSelection = false;
 
     const progress = ++predictionsReceived[file] / batchChunksToSend[file];
     UI.postMessage({ event: 'progress', progress: progress, file: file });
@@ -1672,29 +1680,18 @@ const parsePredictions = async (response) => {
 async function parseMessage(e) {
     const response = e.data;
     switch (response['message']) {
-        case 'update-list':
-            if (!SEEN_LIST_UPDATE) {
-                SEEN_LIST_UPDATE = true;
-                STATE.update({ blocked: response.blocked, globalOffset: 0 });
-                if (response['updateResults'] && STATE.db) {
-                    // update-results called after setting migrants list, so DB may not be initialized
-                    await getResults();
-                    await getSummary();
-                }
-            }
-            break;
-        case 'model-ready':
-            sampleRate = response['sampleRate'];
-            const backend = response['backend'];
-            console.log(backend);
-            UI.postMessage({ event: 'model-ready', message: 'ready', backend: backend, labels: LABELS })
-            break;
         case 'labels':
             t0 = Date.now();
             LABELS = response['labels'];
             // Now we have what we need to populate a database...
             // Load the archive db
             await loadDB(appPath);
+            break;
+        case 'model-ready':
+            sampleRate = response['sampleRate'];
+            const backend = response['backend'];
+            console.log(backend);
+            UI.postMessage({ event: 'model-ready', message: 'ready', backend: backend, labels: LABELS })
             break;
         case 'prediction':
             if (!aborted) {
@@ -1719,6 +1716,17 @@ async function parseMessage(e) {
             break;
         case 'spectrogram':
             onSpectrogram(response['filepath'], response['file'], response['width'], response['height'], response['image'], response['channels'])
+            break;
+        case 'update-list':
+            if (!SEEN_LIST_UPDATE) {
+                SEEN_LIST_UPDATE = true;
+                STATE.update({ blocked: response.blocked, globalOffset: 0 });
+                if (response['updateResults'] && STATE.db) {
+                    // update-results called after setting migrants list, so DB may not be initialized
+                    await getResults();
+                    await getSummary();
+                }
+            }
             break;
     }
 }
@@ -1888,15 +1896,8 @@ const getResults = async ({
     exportTo = undefined
 } = {}) => {
     prepResultsStatement();
-    const { db, sortOrder, mode, filesToAnalyse } = STATE;
-    const range = STATE.selection || STATE[mode]?.range;
-    const files = mode === 'explore' ? [] : filesToAnalyse;
     let confidence = STATE.detect.confidence;
-    if (STATE.selection && !STATE.userSettingsInSelection) {
-        offset = 0;
-        confidence = 50;
-        topRankin = 5;
-    } else if (offset === undefined) { // Get offset state
+    if (offset === undefined) { // Get offset state
         if (species) {
             if (!STATE.filteredOffset[species]) STATE.filteredOffset[species] = 0;
             offset = STATE.filteredOffset[species];
@@ -1926,8 +1927,8 @@ const getResults = async ({
             if (i === result.length - 1) UI.postMessage({ event: 'generate-alert', message: `${result.length} files saved` })
         }
         else if (species && context !== 'explore') {
-
-            const { count } = await db.getAsync(`SELECT COUNT(*) as count FROM records WHERE dateTime = ?
+            // get a number for the circle
+            const { count } = await STATE.db.getAsync(`SELECT COUNT(*) as count FROM records WHERE dateTime = ?
                                                  AND confidence >= ?`, r.timestamp, confidence);
             r.count = count;
             sendResult(++index, r, true);
