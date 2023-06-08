@@ -22,7 +22,6 @@ export class State {
             this.predictionCount = 0,
             this.topRankin = 1,
             this.GET_RESULT_SQL = undefined,
-            this.userSettingsInSelection = false,
             this.lat = undefined,
             this.lon = undefined
     }
