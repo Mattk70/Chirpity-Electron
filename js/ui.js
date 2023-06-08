@@ -672,8 +672,9 @@ function refreshResultsView() {
     adjustSpecDims(true);
 }
 
-
-const getSelectionResults = (userSettings) => {
+// fromDB is requested when circle clicked
+const getSelectionResults = (fromDB) => {
+    if (fromDB instanceof PointerEvent) fromDB = false;
     let start = region.start + bufferBegin;
     // Remove small amount of region to avoid pulling in results from 'end'
     let end = region.end + bufferBegin - 0.001;
@@ -686,14 +687,12 @@ const getSelectionResults = (userSettings) => {
     STATE['selection']['start'] = start.toFixed(3);
     STATE['selection']['end'] = end.toFixed(3);
 
-    // We use usersettings to pull in results from the circle. 
-    // WON'T work for saved analyses.
-    if (userSettings === true) worker.postMessage({ action: 'update-state', userSettingsInSelection: true })
-    postAnalyseMessage({
+postAnalyseMessage({
         filesInScope: [currentFile],
         start: STATE['selection']['start'],
         end: STATE['selection']['end'],
-        offset: 0
+        offset: 0,
+        fromDB: fromDB
     });
 }
 
@@ -737,7 +736,7 @@ function postAnalyseMessage(args) {
             resetResults();
             refreshResultsView();
         } else {
-            progressDiv.classList.remove('d-none');
+            //progressDiv.classList.remove('d-none');
             delete diagnostics['Audio Duration'];
         }
         if (filesInScope.length > 1) {
@@ -749,7 +748,8 @@ function postAnalyseMessage(args) {
             end: args.end,
             filesInScope: filesInScope,
             reanalyse: args.reanalyse,
-            SNR: config.filters.SNR
+            SNR: config.filters.SNR,
+            fromDB: args.fromDB
         });
     }
 }
