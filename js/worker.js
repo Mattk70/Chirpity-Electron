@@ -852,20 +852,16 @@ function addDays(date, days) {
  * @param source_file: the file that exists ( will be different after compression)
  * @returns {Promise<unknown>}
  */
-const getMetadata = async ({ file, proxy = file, source_file = file, latitude, longitude }) => {
+const getMetadata = async ({ file, proxy = file, source_file = file}) => {
     metadata[file] = { proxy: proxy };
     // CHeck the database first, so we honour any manual updates.
     const savedMeta = await getSavedFileInfo(file);
     // Latitude only provided when updating location
-    if (savedMeta?.locationID && !latitude) {
-        metadata[file].locationID = savedMeta.locationID;
+    const latitude =  savedMeta?.lat || STATE.lat;
+    const longitude = savedMeta?.lon || STATE.lon;
+    const row = await diskDB.getAsync('SELECT id FROM locations WHERE lat = ? and lon = ?', latitude, longitude);
+    metadata[file].locationID = row?.id;
 
-    } else {
-        latitude = latitude || STATE.lat;
-        longitude = longitude || STATE.lon;
-        const row = await diskDB.getAsync('SELECT id FROM locations WHERE lat = ? and lon = ?', latitude, longitude);
-        metadata[file].locationID = row?.id;
-    }
     metadata[file].duration = savedMeta?.duration || await getDuration(proxy);
 
     return new Promise((resolve) => {
@@ -1977,7 +1973,7 @@ const getSavedFileInfo = async (file) => {
     // look for file in the disk DB, ignore extension
     return new Promise(function (resolve) {
         const baseName = file.replace(/^(.*)\..*$/g, '$1%');
-        const stmt = diskDB.prepare('SELECT * FROM files WHERE name LIKE  (?)');
+        const stmt = diskDB.prepare('SELECT * FROM files JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)');
         stmt.get(baseName, (err, row) => {
             if (err) {
                 console.log('There was an error ', err)
@@ -2405,8 +2401,6 @@ async function onSetCustomLocation({ lat, lon, place, file }) {
     await getMetadata({
         file: file,
         proxy: metadata[file].proxy,
-        latitude: lat,
-        longitude: lon
     });
     await getLocations();
 }
