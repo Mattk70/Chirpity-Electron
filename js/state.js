@@ -23,7 +23,8 @@ export class State {
             this.topRankin = 1,
             this.GET_RESULT_SQL = undefined,
             this.lat = undefined,
-            this.lon = undefined
+            this.lon = undefined,
+            this.locationID = undefined
     }
 
 

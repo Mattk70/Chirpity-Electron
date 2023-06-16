@@ -402,7 +402,7 @@ const prepParams = (list) => list.map(item => '?').join(',');
 
 
 const getResultsParams = (species, confidence, offset, limit, topRankin) => {
-    const blocked = (STATE.blocked.length && ! STATE.selection) ?
+    const blocked = (STATE.blocked.length && !STATE.selection) ?
         STATE.blocked : [];
     const params = [];
     if (blocked.length) params.push(...blocked);
@@ -414,6 +414,9 @@ const getResultsParams = (species, confidence, offset, limit, topRankin) => {
     if (STATE.selection) params.push(STATE.selection.start, STATE.selection.end);
     else if (STATE.explore.range.start !== undefined) {
         params.push(STATE.explore.range.start, STATE.explore.range.end);
+    }
+    if (STATE.locationID) {
+        params.push(STATE.locationID);
     }
     params.push(limit, offset);
     return params
@@ -430,6 +433,7 @@ const getSummaryParams = (species) => {
     }
     else if (useRange) params.push(range.start, range.end);
     extraParams.push(...blocked);
+    if (STATE.locationID) extraParams.push(STATE.locationID);
     params.push(...extraParams);
     params.push(STATE.detect.confidence, species);
     params.push(...extraParams);
@@ -458,6 +462,9 @@ const prepSummaryStatement = () => {
     if (STATE.blocked.length) {
         const excluded = prepParams(STATE.blocked);
         extraClause += ` AND speciesID NOT IN (${excluded}) `;
+    }
+    if (STATE.locationID) {
+        extraClause += ' AND locationID = ? ';
     }
     summaryStatement += extraClause;
     summaryStatement += `
@@ -490,6 +497,7 @@ const prepResultsStatement = () => {
           files.duration, 
           files.filestart, 
           files.name,
+          files.locationID,
           records.position, 
           records.speciesID,
           species.sname, 
@@ -504,7 +512,7 @@ const prepResultsStatement = () => {
           JOIN species ON records.speciesID = species.id 
           JOIN files ON records.fileID = files.id `;
 
-    const blocked = STATE.selection ? [] :  STATE.blocked;
+    const blocked = STATE.selection ? [] : STATE.blocked;
     if (blocked.length) resultStatement += ` AND speciesID NOT IN (${prepParams(blocked)}) `;
 
     resultStatement += `
@@ -530,13 +538,19 @@ const prepResultsStatement = () => {
 
 
     // might have two locations with same dates - so need to add files
-    if (['analyse', 'archive'].includes(STATE.mode) && ! STATE.selection) {
+    if (['analyse', 'archive'].includes(STATE.mode) && !STATE.selection) {
         resultStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
     }
-    const range = STATE.mode === 'explore' ? STATE.explore.range : STATE.selection;
+    // Prioritise selection ranges
+    const range = STATE.selection?.start ? STATE.selection : 
+        STATE.mode === 'explore' ? STATE.explore.range : false;
+    
     const useRange = range?.start;
     if (useRange) {
         resultStatement += ' AND dateTime BETWEEN ? AND ? ';
+    }
+    if (STATE.locationID) {
+        resultStatement += ' AND locationID = ? ';
     }
 
     resultStatement += `ORDER BY ${STATE.sortOrder}, confidence DESC, callCount DESC LIMIT ? OFFSET ?`;
@@ -573,7 +587,7 @@ async function onAnalyse({
     COMPLETED = [];
     FILE_QUEUE = filesInScope;
 
-    if (! STATE.selection) {
+    if (!STATE.selection) {
         // Start with a clean memory db
         await createDB();
         //create a copy of files in scope for state, as filesInScope is spliced
@@ -611,8 +625,8 @@ async function onAnalyse({
                 onChangeMode('archive');
                 await getSummary();
             }
-            if (fromDB){
-                await getResults({ topRankin: 5});
+            if (fromDB) {
+                await getResults({ topRankin: 5 });
             } else {
                 await getResults();
             }
@@ -751,8 +765,6 @@ async function getWorkingFile(file) {
             const statsObj = fs.statSync(source_file);
             const sourceMtime = statsObj.mtime;
 
-            //console.log(Date.UTC(sourceMtime));
-
             proxy = await convertFileFormat(source_file, destination, statsObj.size, function (errorMessage) {
                 console.log(errorMessage);
                 return true;
@@ -852,12 +864,12 @@ function addDays(date, days) {
  * @param source_file: the file that exists ( will be different after compression)
  * @returns {Promise<unknown>}
  */
-const getMetadata = async ({ file, proxy = file, source_file = file}) => {
+const getMetadata = async ({ file, proxy = file, source_file = file }) => {
     metadata[file] = { proxy: proxy };
     // CHeck the database first, so we honour any manual updates.
     const savedMeta = await getSavedFileInfo(file);
     // Latitude only provided when updating location
-    const latitude =  savedMeta?.lat || STATE.lat;
+    const latitude = savedMeta?.lat || STATE.lat;
     const longitude = savedMeta?.lon || STATE.lon;
     const row = await diskDB.getAsync('SELECT id FROM locations WHERE lat = ? and lon = ?', latitude, longitude);
     metadata[file].locationID = row?.id;
@@ -1717,10 +1729,15 @@ async function parseMessage(e) {
             if (!SEEN_LIST_UPDATE) {
                 SEEN_LIST_UPDATE = true;
                 STATE.update({ blocked: response.blocked, globalOffset: 0 });
+                
                 if (response['updateResults'] && STATE.db) {
                     // update-results called after setting migrants list, so DB may not be initialized
                     await getResults();
                     await getSummary();
+                    if (['explore', 'chart'].includes(STATE.mode)) {
+                        // Update the seen species list
+                        getSpecies();
+                    }
                 }
             }
             break;
@@ -1811,29 +1828,6 @@ async function setStartEnd(file) {
 }
 
 
-const setWhereWhen = ({ dateRange, species, files, context }) => {
-    let excluded_species_ids = -1;
-    if (!STATE.selection && STATE.blocked.length) {
-        excluded_species_ids = `${STATE.blocked}`;
-    }
-    // NOT the same as a dateRange - this is for analyzing a selection
-    const confidence = STATE.selection && !STATE.userSettingsInSelection ? 50 : STATE.detect.confidence;
-    let where = `${confidence}`;
-    if (files?.length) {
-        const name = context === 'summary' ? 'files.name' : 'name';
-        const filesSQL = files.map(file => `'${prepSQL(file)}'`).join(',');
-        where += ` AND ${name} IN  (${filesSQL})`;
-    }
-
-    //const cname = context === 'summary' ? 'cname' : 's1.cname';
-    if (species) where += ` AND cname =  '${prepSQL(species)}'`;
-    const when = dateRange?.start ? ` AND dateTime BETWEEN ${dateRange.start} AND ${dateRange.end}` : '';
-    return [where, when, excluded_species_ids]
-};
-
-
-
-
 const getSummary = async ({
     species = undefined,
     active = undefined,
@@ -1855,7 +1849,7 @@ const getSummary = async ({
     const speciesForSTMT = species || '%';
     const params = getSummaryParams(speciesForSTMT);
     const summary = await STATE.GET_SUMMARY_SQL.allAsync(...params);
-    
+
     if (DEBUG) console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds");
     const event = interim ? 'update-summary' : 'prediction-done';
     UI.postMessage({
@@ -2011,18 +2005,18 @@ const onSave2DiskDB = async () => {
             WHERE confidence >= ${STATE.detect.confidence} AND speciesID NOT IN (${STATE.blocked})`);
     console.log(response?.changes + ' records added to disk database')
     if (response?.changes) {
-            UI.postMessage({ event: 'diskDB-has-records' });
-            if (!DATASET) {
+        UI.postMessage({ event: 'diskDB-has-records' });
+        if (!DATASET) {
 
-                // Now we have saved the records, set state to DiskDB
-                onChangeMode('archive');
-                UI.postMessage({
-                    event: 'generate-alert',
-                    message: `Database update complete, ${response.changes} records added to the archive in ${((Date.now() - t0) / 1000)} seconds`,
-                    render: true
-                })
-            }
+            // Now we have saved the records, set state to DiskDB
+            onChangeMode('archive');
+            UI.postMessage({
+                event: 'generate-alert',
+                message: `Database update complete, ${response.changes} records added to the archive in ${((Date.now() - t0) / 1000)} seconds`,
+                render: true
+            })
         }
+    }
     await memoryDB.runAsync('END');
 };
 
@@ -2160,18 +2154,22 @@ const getRate = (species) => {
 
 const getSpecies = () => {
     const range = STATE.explore.range;
-    const [where, when] = setWhereWhen({ dateRange: range });
-    diskDB.all(`SELECT DISTINCT cname, sname, COUNT(cname) as count
-                FROM records
-                    JOIN species
-                ON speciesID = id AND confidence >= ${where} ${when}
-                GROUP BY cname
-                ORDER BY cname`, (err, rows) => {
-        if (err) console.log(err); else {
-            UI.postMessage({ event: 'seen-species-list', list: rows })
-        }
+    const confidence = STATE.detect.confidence;
+    let sql = `SELECT cname, locationID
+                    FROM records
+                    JOIN species ON species.id = records.speciesID 
+                    JOIN files on records.fileID = files.id`;
+    
+    if (STATE.mode === 'explore') sql += ` WHERE confidence >= ${confidence}`;
+    if (STATE.blocked.length){
+        sql += ` AND speciesID NOT IN (${STATE.blocked.join(',')})`;
+    }
+    if (range?.start) sql += ` AND datetime BETWEEN ${range.start} AND ${range.end}`;
+    if (STATE.locationID) sql += ` AND locationID = ${STATE.locationID}`;
+    sql += ' GROUP BY cname ORDER BY cname';
+    diskDB.all(sql, (err, rows) => {
+        err ? console.log(err) : UI.postMessage({ event: 'seen-species-list', list: rows })  
     })
-    return true
 };
 
 
@@ -2356,12 +2354,12 @@ const onFileDelete = async (fileName) => {
         onChangeMode('analyse');
         getSpecies();
         UI.postMessage({
-            event: 'generate-alert', 
+            event: 'generate-alert',
             message: `${fileName} 
 and its associated records were deleted successfully`,
             render: true
         });
-        
+
         getResults();
         getSummary();
     } else {
@@ -2439,13 +2437,14 @@ todo: bugs
     Reported region duration tooltip incorrect 
 
 Todo: Database
-     Database delete: records, files (and all associated records). Use when reanalysing
+     ***Database delete: records, files (and all associated records). Use when reanalysing
      Database file path update, batch update - so we can move files around after analysis
      ***Compatibility with updates, esp. when num classes change
         -Create a new database for each model with appropriate num classes?
 
 Todo: Location.
-     Associate lat lon with files, expose lat lon settings in UI. Allow for editing once saved. Filter Explore by location
+     ***Associate lat lon with files, expose lat lon settings in UI. Allow for editing once saved. 
+     Filter Explore, Chart by location
 
 Todo cache:
     Set cache location
@@ -2458,10 +2457,10 @@ Todo: manual entry
     ***get entry to appear in position among existing detections and centre on it
 
 Todo: UI
-    Better tooltips, for all options
-    Sort summary by headers (click on species or header)
+    ***Better tooltips, for all options
+    ***Sort summary by headers (click on species or header)
     ***Have a panel for all analyse settings, not just nocmig mode
-    Align the label on the spec to the right to minimize overlap with axis labels
+    ***Align the label on the spec to the right to minimize overlap with axis labels
 
 
 Todo: Charts

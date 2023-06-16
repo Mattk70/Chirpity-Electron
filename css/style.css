@@ -605,3 +605,9 @@ input[type="range"].vertical {
     /* One more than modal */
     z-index: 1056;
 }
+
+#chartRange, #exploreRange {
+    min-height: 58px;
+    width: 100%;
+    max-width: 400px;
+}

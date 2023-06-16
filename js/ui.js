@@ -485,9 +485,9 @@ function renderFilnamePanel() {
     customiseAnalysisMenu(isSaved === 'text-info');
 }
 
-function customiseAnalysisMenu(saved){
+function customiseAnalysisMenu(saved) {
     const analyseMenu = document.getElementById('analyse');
-    if (saved){
+    if (saved) {
         analyseMenu.innerHTML = `<span class="material-icons-two-tone">upload_file</span> Retrieve Results
         <span class="shortcut float-end">Ctrl+A</span>`;
         enableMenuItem(['reanalyse']);
@@ -498,53 +498,52 @@ function customiseAnalysisMenu(saved){
     }
 }
 
-async function setLocation() {
-    let showLocation;
-    if (LOCATIONS[0] === 'dummy') {
-        worker.postMessage({ action: 'get-locations' });
-        await waitForLocations();
-    }
-    const lat = document.getElementById('customLat');
-    const lon = document.getElementById('customLon');
-    const customPlace = document.getElementById('customPlace');
-    const savedLocationSelect = document.getElementById('savedLocations');
-    const locationAdd = document.getElementById('set-location');
-    if (!LOCATIONS.length) {
-        savedLocationSelect.classList.add('d-none')
-    }
-    else {
-        savedLocationSelect.innerHTML = '<option value="">(Default)</option>'; // clear options
-        savedLocationSelect.classList.remove('d-none');
 
+async function generateLocationList(id) {
+    const defaultText = id === 'savedLocations' ? '(Default)' : 'All';
+    const el = document.getElementById(id);
+    LOCATIONS = undefined;
+    worker.postMessage({ action: 'get-locations' });
+    await waitForLocations();
+    if (!LOCATIONS.length) {
+        el.classList.add('d-none')
+    } else {
+        el.innerHTML = `<option value="">${defaultText}</option>`; // clear options
+        el.classList.remove('d-none');
         LOCATIONS.forEach(loc => {
             const option = document.createElement('option')
             option.value = loc.id;
             option.textContent = loc.place;
-            if (locationID === loc.id) {
-                lat.value = loc.lat;
-                lon.value = loc.lon;
-                customPlace.value = loc.place;
-
-                option.selected = true;
-            }
-            savedLocationSelect.appendChild(option);
+            el.appendChild(option);
         })
-        showLocation = () => {
-            const newLocation = LOCATIONS.find(obj => obj.id === parseInt(savedLocationSelect.value));
-            if (newLocation) {
-                lat.value = newLocation.lat, lon.value = newLocation.lon, customPlace.value = newLocation.place;
-            } else {  //Default location
-                lat.value = config.latitude, lon.value = config.longitude, customPlace.value = config.location;
-            }
+    }
+    return el;
+}
+
+async function setLocation() {
+    const savedLocationSelect = await generateLocationList('savedLocations');
+    const lat = document.getElementById('customLat');
+    const lon = document.getElementById('customLon');
+    const customPlace = document.getElementById('customPlace');
+    const locationAdd = document.getElementById('set-location');
+
+    // Show the current / selected location in the form
+    const showLocation = () => {
+        let newLocation;
+        const id = parseInt(savedLocationSelect.value) || locationID;
+        if (id) {
+            newLocation = LOCATIONS.find(obj => obj.id === id);
+            savedLocationSelect.value = id;
         }
-        savedLocationSelect.addEventListener('change', showLocation)
+        if (newLocation) {
+            lat.value = newLocation.lat, lon.value = newLocation.lon, customPlace.value = newLocation.place;
+        } else {  //Default location
+            lat.value = config.latitude, lon.value = config.longitude, customPlace.value = config.location;
+        }
     }
-    if (!lat.value) {
-        // Use default location
-        lat.value = config.latitude;
-        lon.value = config.longitude;
-        customPlace.value = config.location;
-    }
+    showLocation();
+    savedLocationSelect.addEventListener('change', showLocation);
+
     const addOrDelete = () => {
         if (customPlace.value) {
             locationAdd.innerText = 'Set Location'
@@ -687,7 +686,7 @@ const getSelectionResults = (fromDB) => {
     STATE['selection']['start'] = start.toFixed(3);
     STATE['selection']['end'] = end.toFixed(3);
 
-postAnalyseMessage({
+    postAnalyseMessage({
         filesInScope: [currentFile],
         start: STATE['selection']['start'],
         end: STATE['selection']['end'],
@@ -695,6 +694,7 @@ postAnalyseMessage({
         fromDB: fromDB
     });
 }
+
 
 
 const analyseLink = document.getElementById('analyse');
@@ -907,18 +907,31 @@ const chartsLink = document.getElementById('charts');
 chartsLink.addEventListener('click', async () => {
     // Tell the worker we are in Chart mode
     worker.postMessage({ action: 'change-mode', mode: 'chart' });
+    // Disable analyse file links
+    disableMenuItem(['analyse', 'analyseSelection', 'analyseAll', 'reanalyse', 'reanalyseAll'])
     worker.postMessage({ action: 'get-detected-species-list', range: STATE.chart.range });
+    const locationFilter = await generateLocationList('chart-locations');
     hideAll();
     showElement(['recordsContainer']);
     worker.postMessage({ action: 'chart', species: undefined, range: STATE.chart.range });
 });
 
+const handleLocationFilterChange = (e) => {
+    const location = parseInt(e.target.value) || undefined;
+    worker.postMessage({ action: 'update-state', locationID: location });
+    // Update the seen species list
+    worker.postMessage({ action: 'get-detected-species-list' })
+
+    worker.postMessage({ action: 'filter', species: isSpeciesViewFiltered(true), explore: true });
+}
 
 const exploreLink = document.getElementById('explore');
 exploreLink.addEventListener('click', async () => {
     // Tell the worker we are in Explore mode
     worker.postMessage({ action: 'change-mode', mode: 'explore' });
     worker.postMessage({ action: 'get-detected-species-list', range: STATE.explore.range });
+    const locationFilter = await generateLocationList('explore-locations');
+    locationFilter.addEventListener('change', handleLocationFilterChange);
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
     adjustSpecDims(true)
@@ -1406,7 +1419,7 @@ const setUpWorkerMessaging = () => {
                     onChartData(args);
                     break;
                 case 'generate-alert':
-                    if (args.render){
+                    if (args.render) {
                         renderFilnamePanel();
                     }
                     alert(args.message)
@@ -1420,7 +1433,7 @@ const setUpWorkerMessaging = () => {
                     break;
                 case 'mode-changed':
                     STATE.mode = args.mode;
-                    console.log ('Mode changed to: ' + args.mode);
+                    console.log('Mode changed to: ' + args.mode);
                     break;
                 default:
                     alert(`Unrecognised message from worker:${args.event}`)
@@ -1448,7 +1461,7 @@ function generateBirdOptionList({ store, rows, selected }) {
         const all = document.getElementById('allSpecies');
         const lastSelectedSpecies = selected || STATE.birdList.lastSelectedSpecies;
         listHTML += '<div class="form-floating"><select spellcheck="false" id="bird-list-all" class="input form-select mb-3" aria-label=".form-select" required>';
-        listHTML += '<option value=""></option>';
+        listHTML += '<option value="">All</option>';
         for (const item in sortedList) {
             //const [sname, cname] = labels[item].split('_');
             if (sortedList[item] !== lastSelectedSpecies) {
@@ -1459,7 +1472,7 @@ function generateBirdOptionList({ store, rows, selected }) {
         }
         listHTML += '</select><label for="bird-list-all">Species</label></div>';
     } else {
-        listHTML += '<select id="bird-list-seen" class="form-select"><option value=""></option>';
+        listHTML += '<select id="bird-list-seen" class="form-select"><option value="">All</option>';
         for (const item in rows) {
             listHTML += `<option value="${rows[item].cname}">${rows[item].cname}</option>`;
         }
@@ -3334,6 +3347,10 @@ const handleThresholdChange = (e) => {
         action: 'update-state',
         detect: { confidence: config.detect.confidence }
     });
+    if (STATE.mode == 'explore') {
+        // Update the seen species list
+        worker.postMessage({ action: 'get-detected-species-list' })
+    }
     if (!PREDICTING && !resultTableElement[0].hidden) {
         worker.postMessage({
             action: 'filter',
@@ -3765,7 +3782,7 @@ async function waitForFileLoad() {
 }
 
 async function waitForLocations() {
-    while (LOCATIONS[0] === 'dummy') {
+    while (!LOCATIONS) {
         await delay(100); // Wait for 100 milliseconds before checking again
     }
 }
