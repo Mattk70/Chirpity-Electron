@@ -911,6 +911,7 @@ chartsLink.addEventListener('click', async () => {
     disableMenuItem(['analyse', 'analyseSelection', 'analyseAll', 'reanalyse', 'reanalyseAll'])
     worker.postMessage({ action: 'get-detected-species-list', range: STATE.chart.range });
     const locationFilter = await generateLocationList('chart-locations');
+    locationFilter.addEventListener('change', handleLocationFilterChange);
     hideAll();
     showElement(['recordsContainer']);
     worker.postMessage({ action: 'chart', species: undefined, range: STATE.chart.range });
@@ -921,8 +922,7 @@ const handleLocationFilterChange = (e) => {
     worker.postMessage({ action: 'update-state', locationID: location });
     // Update the seen species list
     worker.postMessage({ action: 'get-detected-species-list' })
-
-    worker.postMessage({ action: 'filter', species: isSpeciesViewFiltered(true), explore: true });
+    if (STATE.mode === 'explore') worker.postMessage({ action: 'filter', species: isSpeciesViewFiltered(true), explore: true });
 }
 
 const exploreLink = document.getElementById('explore');
@@ -2625,7 +2625,7 @@ const summary = document.getElementById('summary');
 summary.addEventListener('click', speciesFilter);
 
 function speciesFilter(e) {
-    if (e.target.tagName === 'TBODY' || e.target.tagName === 'TH') return; // on Drag or clicked header
+    if (['TBODY', 'TH', 'DIV'].includes(e.target.tagName)) return; // on Drag or clicked header
     clearActive();
     let species, range;
     // Am I trying to unfilter?
@@ -2634,7 +2634,9 @@ function speciesFilter(e) {
         species = getSpecies(e.target)
     }
     if (isExplore()) {
-        range = STATE.explore.range
+        range = STATE.explore.range;
+        const list = document.getElementById('bird-list-seen');
+        list.value = species;
     }
     worker.postMessage({
         action: 'filter',

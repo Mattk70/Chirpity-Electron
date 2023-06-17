@@ -542,9 +542,9 @@ const prepResultsStatement = () => {
         resultStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
     }
     // Prioritise selection ranges
-    const range = STATE.selection?.start ? STATE.selection : 
+    const range = STATE.selection?.start ? STATE.selection :
         STATE.mode === 'explore' ? STATE.explore.range : false;
-    
+
     const useRange = range?.start;
     if (useRange) {
         resultStatement += ' AND dateTime BETWEEN ? AND ? ';
@@ -1729,7 +1729,7 @@ async function parseMessage(e) {
             if (!SEEN_LIST_UPDATE) {
                 SEEN_LIST_UPDATE = true;
                 STATE.update({ blocked: response.blocked, globalOffset: 0 });
-                
+
                 if (response['updateResults'] && STATE.db) {
                     // update-results called after setting migrants list, so DB may not be initialized
                     await getResults();
@@ -2021,6 +2021,8 @@ const onSave2DiskDB = async () => {
 };
 
 const getSeasonRecords = async (species, season) => {
+    // Add Location filter
+    const locationFilter = STATE.locationID ? `AND files.locationID = ${STATE.locationID}` : '';
     // Because we're using stmt.prepare, we need to unescape quotes
     const seasonMonth = { spring: "< '07'", autumn: " > '06'" }
     return new Promise(function (resolve, reject) {
@@ -2029,7 +2031,8 @@ const getSeasonRecords = async (species, season) => {
                    MIN(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS minDate
             FROM records
                      JOIN species ON species.id = records.speciesID
-            WHERE species.cname = (?)
+                     JOIN files ON files.id = records.fileID
+            WHERE species.cname = (?) ${locationFilter}
               AND STRFTIME('%m',
                            DATETIME(records.dateTime / 1000, 'unixepoch', 'localtime'))
                 ${seasonMonth[season]}`);
@@ -2045,12 +2048,15 @@ const getSeasonRecords = async (species, season) => {
 
 const getMostCalls = (species) => {
     return new Promise(function (resolve, reject) {
+        // Add Location filter
+        const locationFilter = STATE.locationID ? `AND files.locationID = ${STATE.locationID}` : '';
         diskDB.get(`
             SELECT COUNT(*) as count, 
             DATE(dateTime/1000, 'unixepoch', 'localtime') as date
-            FROM records JOIN species
-            on species.id = records.speciesID
-            WHERE species.cname = '${prepSQL(species)}'
+            FROM records 
+                JOIN species on species.id = records.speciesID
+                JOIN files ON files.id = records.fileID
+            WHERE species.cname = '${prepSQL(species)}' ${locationFilter}
             GROUP BY STRFTIME('%Y', DATETIME(dateTime/1000, 'unixepoch', 'localtime')),
                 STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')),
                 STRFTIME('%d', DATETIME(dateTime/1000, 'unixepoch', 'localtime'))
@@ -2067,6 +2073,8 @@ const getMostCalls = (species) => {
 const getChartTotals = ({
     species = undefined, range = {}
 }) => {
+    // Add Location filter
+    const locationFilter = STATE.locationID ? `AND files.locationID = ${STATE.locationID}` : '';
     const dateRange = range;
     // Work out sensible aggregations from hours difference in daterange
     const hours_diff = dateRange.start ? Math.round((dateRange.end - dateRange.start) / (1000 * 60 * 60)) : 745;
@@ -2102,9 +2110,9 @@ const getChartTotals = ({
             STRFTIME('%H', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Hour,    
             COUNT(*) as count
                     FROM records
-                        JOIN species
-                    ON species.id = speciesID
-                    WHERE species.cname = '${species}' ${dateFilter}
+                        JOIN species ON species.id = speciesID
+                        JOIN files ON files.id = fileID
+                    WHERE species.cname = '${species}' ${dateFilter} ${locationFilter}
                     GROUP BY ${groupBy}
                     ORDER BY ${orderBy};`, (err, rows) => {
             if (err) {
@@ -2123,12 +2131,14 @@ const getRate = (species) => {
     return new Promise(function (resolve, reject) {
         const calls = new Array(52).fill(0);
         const total = new Array(52).fill(0);
-
+        // Add Location filter
+        const locationFilter = STATE.locationID ? `AND files.locationID = ${STATE.locationID}` : '';
 
         diskDB.all(`select STRFTIME('%W', DATE(dateTime / 1000, 'unixepoch', 'localtime')) as week, COUNT(*) as calls
                     from records
                              JOIN species ON species.id = records.speciesID
-                    WHERE species.cname = '${species}'
+                             JOIN files ON files.id = records.fileID
+                    WHERE species.cname = '${species}' ${locationFilter}
                     group by week;`, (err, rows) => {
             for (let i = 0; i < rows.length; i++) {
                 calls[parseInt(rows[i].week) - 1] = rows[i].calls;
@@ -2159,16 +2169,16 @@ const getSpecies = () => {
                     FROM records
                     JOIN species ON species.id = records.speciesID 
                     JOIN files on records.fileID = files.id`;
-    
+
     if (STATE.mode === 'explore') sql += ` WHERE confidence >= ${confidence}`;
-    if (STATE.blocked.length){
+    if (STATE.blocked.length) {
         sql += ` AND speciesID NOT IN (${STATE.blocked.join(',')})`;
     }
     if (range?.start) sql += ` AND datetime BETWEEN ${range.start} AND ${range.end}`;
     if (STATE.locationID) sql += ` AND locationID = ${STATE.locationID}`;
     sql += ' GROUP BY cname ORDER BY cname';
     diskDB.all(sql, (err, rows) => {
-        err ? console.log(err) : UI.postMessage({ event: 'seen-species-list', list: rows })  
+        err ? console.log(err) : UI.postMessage({ event: 'seen-species-list', list: rows })
     })
 };
 
@@ -2444,7 +2454,7 @@ Todo: Database
 
 Todo: Location.
      ***Associate lat lon with files, expose lat lon settings in UI. Allow for editing once saved. 
-     Filter Explore, Chart by location
+     Filter ***Explore, Chart by location
 
 Todo cache:
     Set cache location
