@@ -51,6 +51,25 @@ async function exitHandler(options, exitCode) {
         // size of cache
         await clearCache(tmp);
         console.log('cleaned ' + tmp)
+        // clean up settings.json litter
+        const conf = app.getPath('userData');
+        fs.readdir(conf, (err, files) => {
+            if (err) {
+              console.error('Error reading folder:', err);
+              return;
+            }
+            files.forEach((file) => {
+              if (file.startsWith('settings.json.')) {
+                fs.unlink(path.join(conf, file), (err) => {
+                  if (err) {
+                    console.error('Error deleting file:', err);
+                  } else {
+                    console.log('Deleted file:', file);
+                  }
+                });
+              }
+            });
+          });
     } else {
         console.log('no clean')
 
