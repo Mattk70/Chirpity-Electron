@@ -5,8 +5,7 @@ const p = require('path');
 const SunCalc = require('suncalc2');
 const ffmpeg = require('fluent-ffmpeg');
 const png = require('fast-png');
-const { writeFile, mkdir, readdir } = require('node:fs/promises');
-const { utimes } = require('utimes');
+const { writeFile, mkdir, readdir, utimes } = require('node:fs/promises');
 const stream = require("stream");
 const staticFfmpeg = require('ffmpeg-static-electron');
 const { stat } = require("fs/promises");
@@ -26,7 +25,7 @@ const adding_chirpity_additions = true;
 const dataset_database = DATASET;
 
 
-console.log(staticFfmpeg.path);
+if (DEBUG) console.log(staticFfmpeg.path);
 ffmpeg.setFfmpegPath(staticFfmpeg.path.replace('app.asar', 'app.asar.unpacked'));
 
 let predictionsRequested = {}, predictionsReceived = {}
@@ -635,6 +634,7 @@ async function onAnalyse({
     }
     console.log("FILE_QUEUE has ", FILE_QUEUE.length, 'files', count, 'files ignored')
     for (let i = 0; i < NUM_WORKERS; i++) {
+        onChangeMode('analyse');
         processNextFile({ start: start, end: end, resetResults: STATE.selection === undefined, worker: i });
     }
 }
@@ -734,14 +734,7 @@ const convertFileFormat = (file, destination, size, error) => {
  * @returns {Promise<boolean|*>}
  */
 async function getWorkingFile(file) {
-    // is this file saved?
-    if (STATE.mode !== 'explore') {
-        if (await getSavedFileInfo(file)) {
-            onChangeMode('archive');
-        } else {
-            onChangeMode('analyse');
-        }
-    }
+
     if (metadata[file]?.isComplete && metadata[file]?.proxy) return metadata[file].proxy;
     // find the file
     const source_file = fs.existsSync(file) ? file : await locateFile(file);
@@ -770,7 +763,8 @@ async function getWorkingFile(file) {
                 return true;
             });
             // assign the source file's save time to the proxy file
-            await utimes(proxy, sourceMtime.getTime());
+            const mtime = sourceMtime.getTime();
+            await utimes(proxy, mtime, mtime);
         }
     }
     if (!metadata[file] || !metadata[file].isComplete) {
@@ -868,6 +862,8 @@ const getMetadata = async ({ file, proxy = file, source_file = file }) => {
     metadata[file] = { proxy: proxy };
     // CHeck the database first, so we honour any manual updates.
     const savedMeta = await getSavedFileInfo(file);
+    // If we have the file in db change to archive mode
+    if (savedMeta) onChangeMode('archive');
     // Latitude only provided when updating location
     const latitude = savedMeta?.lat || STATE.lat;
     const longitude = savedMeta?.lon || STATE.lon;
@@ -931,7 +927,7 @@ const getMetadata = async ({ file, proxy = file, source_file = file }) => {
                 });
                 // Update relevant file properties
                 metadata[file].head = headerEnd;
-                metadata[file].header = chunk.slice(0, headerEnd)
+                metadata[file].header = chunk.subarray(0, headerEnd)
                 metadata[file].bytesPerSec = wav.fmt.byteRate;
                 metadata[file].numChannels = wav.fmt.numChannels;
                 metadata[file].sampleRate = wav.fmt.sampleRate;
@@ -1159,7 +1155,7 @@ const fetchAudioBuffer = async ({
     file = '', start = 0, end = metadata[file].duration
 }) => {
     if (end - start < 0.1) return  // prevents dataset creation barfing with  v. short buffers
-    const proxy = metadata[file].proxy; //await getWorkingFile(file);
+    const proxy = metadata[file].proxy;
     if (!proxy) return false
     return new Promise(async (resolve) => {
         const byteStart = convertTimeToBytes(start, metadata[file]);
@@ -2020,9 +2016,11 @@ const onSave2DiskDB = async () => {
     await memoryDB.runAsync('END');
 };
 
+const filterLocation = () => STATE.locationID ? ` AND files.locationID = ${STATE.locationID}` : '';
+
 const getSeasonRecords = async (species, season) => {
     // Add Location filter
-    const locationFilter = STATE.locationID ? `AND files.locationID = ${STATE.locationID}` : '';
+    const locationFilter = filterLocation();
     // Because we're using stmt.prepare, we need to unescape quotes
     const seasonMonth = { spring: "< '07'", autumn: " > '06'" }
     return new Promise(function (resolve, reject) {
@@ -2049,7 +2047,7 @@ const getSeasonRecords = async (species, season) => {
 const getMostCalls = (species) => {
     return new Promise(function (resolve, reject) {
         // Add Location filter
-        const locationFilter = STATE.locationID ? `AND files.locationID = ${STATE.locationID}` : '';
+        const locationFilter = filterLocation();
         diskDB.get(`
             SELECT COUNT(*) as count, 
             DATE(dateTime/1000, 'unixepoch', 'localtime') as date
@@ -2074,7 +2072,7 @@ const getChartTotals = ({
     species = undefined, range = {}
 }) => {
     // Add Location filter
-    const locationFilter = STATE.locationID ? `AND files.locationID = ${STATE.locationID}` : '';
+    const locationFilter = filterLocation();
     const dateRange = range;
     // Work out sensible aggregations from hours difference in daterange
     const hours_diff = dateRange.start ? Math.round((dateRange.end - dateRange.start) / (1000 * 60 * 60)) : 745;
@@ -2132,7 +2130,7 @@ const getRate = (species) => {
         const calls = new Array(52).fill(0);
         const total = new Array(52).fill(0);
         // Add Location filter
-        const locationFilter = STATE.locationID ? `AND files.locationID = ${STATE.locationID}` : '';
+        const locationFilter = filterLocation();
 
         diskDB.all(`select STRFTIME('%W', DATE(dateTime / 1000, 'unixepoch', 'localtime')) as week, COUNT(*) as calls
                     from records
@@ -2175,7 +2173,7 @@ const getSpecies = () => {
         sql += ` AND speciesID NOT IN (${STATE.blocked.join(',')})`;
     }
     if (range?.start) sql += ` AND datetime BETWEEN ${range.start} AND ${range.end}`;
-    if (STATE.locationID) sql += ` AND locationID = ${STATE.locationID}`;
+    sql += filterLocation();
     sql += ' GROUP BY cname ORDER BY cname';
     diskDB.all(sql, (err, rows) => {
         err ? console.log(err) : UI.postMessage({ event: 'seen-species-list', list: rows })
@@ -2185,8 +2183,8 @@ const getSpecies = () => {
 
 const onUpdateFileStart = async (args) => {
     let file = args.file;
-    const newfileMtime = args.start + (metadata[file].duration * 1000);
-    await utimes(file, Math.round(newfileMtime));
+    const newfileMtime = Math.round(args.start + (metadata[file].duration * 1000));
+    await utimes(file, newfileMtime, newfileMtime);
     // update the metadata
     metadata[file].isComplete = false;
     //allow for this file to be compressed...
@@ -2280,7 +2278,6 @@ async function onChartRequest(args) {
     const dateRange = args.range, results = {}, dataRecords = {};
     // Escape apostrophes
     if (args.species) {
-        args.species = prepSQL(args.species);
         t0 = Date.now();
         await getSeasonRecords(args.species, 'spring')
             .then((result) => {
@@ -2309,6 +2306,7 @@ async function onChartRequest(args) {
 
         console.log(`Most calls  chart generation took ${(Date.now() - t0) / 1000} seconds`)
         t0 = Date.now();
+        args.species = prepSQL(args.species);
     }
     const [dataPoints, aggregation] = await getChartTotals(args)
         .then(([rows, dataPoints, aggregation, startDay]) => {
@@ -2454,7 +2452,7 @@ Todo: Database
 
 Todo: Location.
      ***Associate lat lon with files, expose lat lon settings in UI. Allow for editing once saved. 
-     Filter ***Explore, Chart by location
+     ***Filter Explore, Chart by location
 
 Todo cache:
     Set cache location
@@ -2506,6 +2504,7 @@ Todo: Releases
 Todo: IDs
     Search by label,
     Search for comment
+    Add mystery ID option
 
 Todo: Tests & code quality
     Order / group functions semantically
