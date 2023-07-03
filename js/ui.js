@@ -94,8 +94,6 @@ let waveCanvasElement, waveWaveElement,
     resultTableElement = $('#resultTableContainer');
 const contentWrapperElement = $('#contentWrapper');
 //const completeDiv = $('#complete');
-let resultTable = document.getElementById('resultTableBody');
-const selectionTable = document.getElementById('selectionResultTableBody');
 const nocmigButton = document.getElementById('nocmigMode');
 const summaryTable = document.getElementById('summaryTable');
 const progressDiv = document.getElementById('progressDiv');
@@ -154,7 +152,7 @@ diagnostics['System Memory'] = (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) +
 function resetResults() {
     summaryTable.innerText = '';
     pagination.forEach(item => item.classList.add('d-none'));
-    resultTable = document.getElementById('resultTableBody');
+    const resultTable = document.getElementById('resultTableBody');
     resultTable.innerHTML = '';
     predictions = {};
     seenTheDarkness = false;
@@ -176,52 +174,25 @@ function updateProgress(val) {
     progressBar.innerText = val + '%';
 }
 
-async function loadAudioFile(args) {
-    let filePath = args.filePath, originalFileEnd = args.originalFileEnd;
+/**
+ * LoadAudiofile: Called when user opens a file (just opens first file in multiple files)
+ * and when clicking on filename in list of open files.
+ * 
+ * @param {*} filePath: full path to file
+ * @param {*} preserveResults: whether to clear results when opening file (i.e. don't clear results when clicking file in list of open files)
+ *  
+ */
+async function loadAudioFile({ filePath = '', preserveResults = false }) {
     fileLoaded = false;
-    try {
-        fileEnd = fs.statSync(filePath).mtime;
-        worker.postMessage({
-            action: 'file-load-request',
-            file: filePath,
-            preserveResults: args.preserveResults,
-            position: 0,
-            list: config.list,
-            warmup: config.warmup
-        });
-    } catch (e) {
-        const supported_files = ['.mp3', '.wav', '.mpga', '.ogg', '.opus', '.flac', '.m4a', '.aac', '.mpeg', '.mp4'];
-        const dir = p.parse(filePath).dir;
-        const name = p.parse(filePath).name;
-        let file;
-        supported_files.some(ext => {
-            try {
-                file = p.join(dir, name + ext);
-                fileEnd = fs.statSync(file).mtime;
-            } catch (e) {
-                // Try the next extension
-            }
-            return fileEnd;
-        });
-        if (fileEnd) {
-            if (file) {
-                filePath = file;
-            }
-            if (originalFileEnd) {
-                fileEnd = originalFileEnd;
-            }
-            worker.postMessage({
-                action: 'file-load-request',
-                file: filePath,
-                preserveResults: args.preserveResults,
-                position: 0,
-                warmup: config.warmup,
-                list: config.list
-            });
-        } else {
-            alert("Unable to load source file with any supported file extension: " + filePath)
-        }
-    }
+    //if (!preserveResults) worker.postMessage({ action: 'change-mode', mode: 'analyse' })
+    worker.postMessage({
+        action: 'file-load-request',
+        file: filePath,
+        preserveResults: preserveResults,
+        position: 0,
+        list: config.list, // list and warmup are passed to enable abort if file loaderd during predictions
+        warmup: config.warmup
+    });
 }
 
 
@@ -265,7 +236,6 @@ function clearActive() {
     worker.postMessage({ action: 'update-state', selection: false })
     activeRow?.classList.remove('table-active');
     activeRow = undefined;
-    //selectionTable.innerText = '';
 }
 
 const initWavesurfer = ({
@@ -415,6 +385,7 @@ filename.addEventListener('click', openFileInList);
 
 
 function renderFilnamePanel() {
+    if (!currentFile) return;
     const openfile = currentFile;
     const files = fileList;
     let filenameElement = document.getElementById('filename');
@@ -490,11 +461,11 @@ function customiseAnalysisMenu(saved) {
     if (saved) {
         analyseMenu.innerHTML = `<span class="material-icons-two-tone">upload_file</span> Retrieve Results
         <span class="shortcut float-end">Ctrl+A</span>`;
-        enableMenuItem(['reanalyse']);
+        enableMenuItem(['reanalyse', 'reanalyseAll']);
     } else {
         analyseMenu.innerHTML = `<span class="material-icons-two-tone">search</span> Analyse File
         <span class="shortcut float-end">Ctrl+A</span>`;
-        disableMenuItem(['reanalyse']);
+        disableMenuItem(['reanalyse', 'reanalyseAll']);
     }
 }
 
@@ -505,18 +476,13 @@ async function generateLocationList(id) {
     LOCATIONS = undefined;
     worker.postMessage({ action: 'get-locations' });
     await waitForLocations();
-    if (!LOCATIONS.length) {
-        el.classList.add('d-none')
-    } else {
-        el.innerHTML = `<option value="">${defaultText}</option>`; // clear options
-        el.classList.remove('d-none');
-        LOCATIONS.forEach(loc => {
-            const option = document.createElement('option')
-            option.value = loc.id;
-            option.textContent = loc.place;
-            el.appendChild(option);
-        })
-    }
+    el.innerHTML = `<option value="">${defaultText}</option>`; // clear options
+    LOCATIONS.forEach(loc => {
+        const option = document.createElement('option')
+        option.value = loc.id;
+        option.textContent = loc.place;
+        el.appendChild(option);
+    })
     return el;
 }
 
@@ -991,6 +957,7 @@ function createRegion(start, end, label) {
 // We add the handler to the whole table as the body gets replaced and the handlers on it would be wiped
 const results = document.getElementById('results');
 results.addEventListener('click', resultClick);
+const selectionTable = document.getElementById('selectionResultTableBody');
 selectionTable.addEventListener('click', resultClick);
 
 async function resultClick(e) {
@@ -1380,6 +1347,13 @@ const setUpWorkerMessaging = () => {
                 case 'diskDB-has-records':
                     chartsLink.classList.remove('disabled');
                     exploreLink.classList.remove('disabled');
+                    if (currentFile) {
+                        worker.postMessage({
+                            action: 'filter',
+                            species: isSpeciesViewFiltered(true),
+                            active: getActiveRowID(),
+                        }); // no re-prepare
+                    }
                     break;
                 case 'update-summary':
                     updateSummary(args);
@@ -1433,6 +1407,8 @@ const setUpWorkerMessaging = () => {
                     break;
                 case 'mode-changed':
                     STATE.mode = args.mode;
+                    // Update the current file name in the UI
+                    renderFilnamePanel();
                     console.log('Mode changed to: ' + args.mode);
                     break;
                 default:
@@ -1504,15 +1480,6 @@ function unpackNameAttr(el, cname) {
 }
 
 
-function sendFeedback(file, cname, sname, start) {
-    predictions[clickedIndex].cname = cname;
-    predictions[clickedIndex].sname = sname;
-    predictions[clickedIndex].start = start;
-    predictions[clickedIndex].filename =
-        `${cname.replace(/\s+/g, '_')}~${sname.replace(/\s+/g, '_')}~${predictions[clickedIndex].date}.opus`;
-    sendFile('incorrect', predictions[clickedIndex]);
-}
-
 function getSpecies(target) {
     const row = target.closest('tr');
     const speciesCell = row.querySelector('.cname .cname');
@@ -1527,6 +1494,7 @@ const getDetectionContext = (target) => target.closest('table').id;
 $(document).on('change', '#bird-list-seen', function (e) {
 
     // Clear the results table
+    const resultTable = document.getElementById('resultTableBody');
     resultTable.innerText = '';
     const cname = e.target.value;
     const context = e.target.parentNode.classList.contains('chart') ? 'chart' : 'explore';
@@ -2033,8 +2001,10 @@ document.getElementById('timelineSetting').addEventListener('change', timelineTo
 const GLOBAL_ACTIONS = { // eslint-disable-line
     KeyA: async function (e) {
         if (e.ctrlKey) {
-            if (e.shiftKey && AUDACITY_LABELS !== {}) await showSaveDialog();
-            else if (currentFile) analyseLink.click()
+            if (currentFile) {
+                if (e.shiftKey) analyseAllLink.click();
+                else analyseLink.click()
+            }
         }
     },
     KeyE: function (e) {
@@ -2402,10 +2372,9 @@ async function onWorkerLoadedAudio({
         NEXT_BUFFER = undefined;
         if (currentFile !== file) {
             currentFile = file;
+            renderFilnamePanel();
             fileStart = start;
             fileEnd = new Date(fileStart + (currentFileDuration * 1000));
-            // Update the current file name in the UI
-            renderFilnamePanel();
         }
         if (config.timeOfDay) {
             bufferStartTime = new Date(fileStart + (bufferBegin * 1000))
@@ -2430,7 +2399,7 @@ async function onWorkerLoadedAudio({
             clearActive();
         }
         fileLoaded = true;
-        if (activeRow) activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        //if (activeRow) activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 }
 
@@ -2455,11 +2424,12 @@ function onProgress(args) {
 
 
 const updateSummary = ({ summary = [], filterSpecies = '' }) => {
-    let total, summaryHTML = `<table id="resultSummary" class="table table-striped table-dark p-1"><thead>
+    let total, summaryHTML = `<table id="resultSummary" class="table table-dark p-1"><thead>
             <tr>
                 <th class="col-3" scope="col">Max</th>
                 <th class="col-5" scope="col">Species</th>
-                <th class="col-1 text-end" scope="col">Count</th>
+                <th class="col-1 text-end" scope="col">Detections</th>
+                <th class="col-1 text-end" scope="col">Calls</th>
             </tr>
             </thead><tbody id="speciesFilter">`;
 
@@ -2472,10 +2442,11 @@ const updateSummary = ({ summary = [], filterSpecies = '' }) => {
         const selected = item.cname === filterSpecies ? ' text-warning' : '';
         summaryHTML += `<tr tabindex="-1" class="${selected}">
                         <td class="max">${iconizeScore(item.max)}</td>
-                        <td class="cname${selected}">
+                        <td class="cname">
                             <span class="pointer"><span class="cname">${item.cname}</span> <i>${item.sname}</i></span>
-                        </td>                       
-                        <td class="text-end${selected}">${item.count}</td>
+                        </td>
+                        <td class="text-end">${item.count}</td>
+                        <td class="text-end">${item.calls}</td>
                         `;
 
     }
@@ -2553,24 +2524,31 @@ async function onPredictionDone({
         diagnostics['Analysis Rate'] = (diagnostics['Audio Duration'] / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
     }
 
+    // Set active Row
+    const resultTable = document.getElementById('resultTableBody');
     if (active) {
         // Refresh node and scroll to active row:
         activeRow = document.getElementById(active);
         if (activeRow === null) { // because: after an edit the active row may not exist
-            resultTable = document.getElementById('resultTableBody');
             const rows = resultTable.querySelectorAll('tr.daytime, tr.nighttime')
             if (rows.length) {
                 activeRow = rows[rows.length - 1];
-            } else { return }
+            }
         } else {
             activeRow.classList.add('table-active');
         }
+    }
+    else if (STATE.mode === 'analyse') {
+        activeRow = resultTable.querySelector('.table-active');
+        if (!activeRow) {
+            // Select the first row
+            activeRow = resultTable.querySelector('tr:first-child');
+        }
+    }
+    if (activeRow) {
         activeRow.focus();
         activeRow.click();
     }
-    // else {
-    //     document.getElementById('resultTableBody').scrollIntoView({behaviour: 'smooth'});
-    // }
 }
 
 const pagination = document.querySelectorAll('.pagination');
@@ -2674,10 +2652,12 @@ async function renderResult({
     let tr = '';
     if (index <= 1) {
         if (selection) {
+            const selectionTable = document.getElementById('selectionResultTableBody');
             selectionTable.innerHTML = '';
         }
         else {
             showElement(['resultTableContainer', 'resultsHead'], false);
+            const resultTable = document.getElementById('resultTableBody');
             resultTable.innerHTML = '';
         }
     } else if (index % (config.limit + 1) === 0) addPagination(index, 0);
@@ -2764,7 +2744,8 @@ detectionsModalDiv.addEventListener('hide.bs.modal', (e) => {
 
 
 const updateResultTable = (row, isFromDB, isSelection) => {
-    const table = isSelection ? selectionTable : resultTable;
+    const table = isSelection ? document.getElementById('selectionResultTableBody')
+        : document.getElementById('resultTableBody');
     if (isFromDB && !isSelection) {
         if (!resultsBuffer) resultsBuffer = table.cloneNode();
         resultsBuffer.lastElementChild ?
@@ -2812,7 +2793,8 @@ const deleteRecord = (target) => {
                 action: 'delete',
                 file: currentFile,
                 start: start,
-                end: end
+                end: end,
+                active: getActiveRowID(),
             })
         })
         activeRow = undefined;
@@ -2850,7 +2832,7 @@ const deleteSpecies = (target) => {
     const row = target.closest('tr');
     const table = document.getElementById('resultSummary')
     table.deleteRow(row.rowIndex);
-    resultTable = document.getElementById('resultTableBody');
+    const resultTable = document.getElementById('resultTableBody');
     resultTable.innerHTML = '';
 }
 
@@ -2859,13 +2841,6 @@ const getSelectionRange = () => {
         { start: (STATE.selection.start * 1000) + fileStart, end: (STATE.selection.end * 1000) + fileStart } :
         undefined
 }
-
-function formatSpeciesName(filename) {
-    filename = filename.replace(' - ', '~').replace(/\s+/g, '_',);
-    if (!filename.includes('~')) filename = filename + '~' + filename; // dummy latin
-    return filename;
-}
-
 
 function sendFile(mode, result) {
     let start, end, filename;
@@ -2929,7 +2904,7 @@ const iconDict = {
     low: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: rgba(255,0,0,0.5)">--%</span></span>',
     medium: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #fd7e14">--%</span></span>',
     high: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #198754">--%</span></span>',
-    confirmed: '<span class="material-icons-two-tone text-muted" title="Record Archived">star</span>',
+    confirmed: '<span class="material-icons-two-tone text-muted" title="Confirmed Record">star</span>',
 }
 
 
@@ -3056,6 +3031,7 @@ const toggleFullscreen = () => {
         config.fullscreen = true;
         fullscreen.innerText = 'fullscreen_exit';
     }
+    updatePrefs();
     adjustSpecDims(true, 1024);
 }
 
@@ -3537,24 +3513,24 @@ $(document).on('click', function () {
     $("#context-menu").removeClass("show").hide();
 })
 
-$('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('contextmenu', async function (e) {
+async function createContextMenu(e) {
     const target = e.target;
     if (target.classList.contains('circle')) return;
 
     const menu = $("#context-menu");
-    let resultContext, summaryContext = '', selectionContext = '', plural = '';
+    let resultContext, hideInSummary = '', hideInSelection = '', plural = '';
     const inSummary = target.closest('#speciesFilter')
-    if (target.closest('#resultTableBody')) resultContext = true;
+    if (! target.closest('#summaryTable')) resultContext = true;
     else if (inSummary) {
-        summaryContext = 'd-none';
+        hideInSummary = 'd-none';
         plural = 's';
     }
-    else if (target.closest('#selectionResultTableBody')) { selectionContext = 'd-none' }
+    else if (target.closest('#selectionResultTableBody')) { hideInSelection = 'd-none' }
 
     let contextDelete;
 
     // If we haven't clicked the active row or we cleared the region, load the row we clicked
-    if (resultContext || selectionContext || summaryContext) {
+    if (resultContext || hideInSelection || hideInSummary) {
         // Lets check if the summary needs to be filtered
         if (inSummary) {
             if (!target.closest('tr').classList.contains('text-warning')) {
@@ -3566,16 +3542,16 @@ $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('c
             await waitForFileLoad();
         }
     }
-    if (!summaryContext && activeRow === undefined && region === undefined) return;
+    if (!hideInSummary && activeRow === undefined && region === undefined) return;
     const createOrEdit = (['archive', 'explore'].includes(STATE.mode)) && region?.attributes.label ? 'Edit' : 'Create';
 
     menu.html(`
-        <a class="dropdown-item play ${summaryContext} ${selectionContext}"><span class='material-icons-two-tone'>play_circle_filled</span> Play</a>
-        <a class="dropdown-item ${summaryContext} ${selectionContext}" href="#" id="context-analyse-selection">
+        <a class="dropdown-item play ${hideInSummary} ${hideInSelection}"><span class='material-icons-two-tone'>play_circle_filled</span> Play</a>
+        <a class="dropdown-item ${hideInSummary} ${hideInSelection}" href="#" id="context-analyse-selection">
             <span class="material-icons-two-tone">search</span> Analyse
         </a>
-        <div class="dropdown-divider ${summaryContext} ${selectionContext}"></div>
-        <a class="dropdown-item ${summaryContext} ${selectionContext}" id="create-manual-record" href="#">
+        <div class="dropdown-divider ${hideInSummary} ${hideInSelection}"></div>
+        <a class="dropdown-item ${hideInSummary} ${hideInSelection}" id="create-manual-record" href="#">
             <span class="material-icons-two-tone">post_add</span> ${createOrEdit} Archive Record
         </a>
         <a class="dropdown-item" id="context-create-clip" href="#">
@@ -3584,12 +3560,12 @@ $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('c
         <a class="dropdown-item" id="context-xc" href='#' target="xc">
             <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> View Species on Xeno-Canto
         </a>
-        <div class="dropdown-divider ${selectionContext}"></div>
-        <a class="dropdown-item ${selectionContext}" id="context-delete" href="#">
+        <div class="dropdown-divider ${hideInSelection}"></div>
+        <a class="dropdown-item ${hideInSelection}" id="context-delete" href="#">
             <span class='delete material-icons-two-tone'>delete_forever</span> Delete Record${plural}
         </a>
     `);
-    if (!selectionContext) {
+    if (!hideInSelection) {
         const contextAnalyseSelectionLink = document.getElementById('context-analyse-selection');
         contextAnalyseSelectionLink.addEventListener('click', getSelectionResults);
         contextDelete = document.getElementById('context-delete');
@@ -3600,21 +3576,21 @@ $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('c
     }
     // Add event Handlers
     const exporLink = document.getElementById('context-create-clip');
-    summaryContext ? exporLink.addEventListener('click', batchExportAudio) :
+    hideInSummary ? exporLink.addEventListener('click', batchExportAudio) :
         exporLink.addEventListener('click', exportAudio);
-    if (!(selectionContext || summaryContext)) {
+    if (!(hideInSelection || hideInSummary)) {
         document.getElementById('create-manual-record').addEventListener('click', function (e) {
             if (e.target.innerText.indexOf('Edit') !== -1) {
-                showRecordEntryForm('Update', summaryContext);
+                showRecordEntryForm('Update', hideInSummary);
             } else {
-                showRecordEntryForm('Add', summaryContext);
+                showRecordEntryForm('Add', hideInSummary);
             }
         })
     }
     const xc = document.getElementById('context-xc');
-    if (region?.attributes.label || summaryContext) {
+    if (region?.attributes.label || hideInSummary) {
         let cname;
-        if (summaryContext) {
+        if (hideInSummary) {
             const row = target.closest('tr');
             cname = row.querySelector('.cname .cname').innerText;
         } else {
@@ -3653,11 +3629,20 @@ $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('c
     }).addClass("show");
 
     return false; //blocks default Webbrowser right click menu
-})
+}
+
+
+$('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('contextmenu', createContextMenu)
 
 
 const recordEntryModal = new bootstrap.Modal(document.getElementById('record-entry-modal'), { backdrop: 'static' });
-
+const recordEntryHandler = () => {
+    worker.postMessage({
+        action: 'filter',
+        species: isSpeciesViewFiltered(true),
+        active: getActiveRowID(),
+    }); // no re-prepare
+}
 
 async function showRecordEntryForm(mode, batch) {
     const cname = region.attributes.label.replace('?', '');
@@ -3706,17 +3691,10 @@ async function showRecordEntryForm(mode, batch) {
     $('#record-entry-modal-body').html(speciesList + label + comment);
     const action = document.getElementById('record-add')
     action.innerText = mode;
-    action.addEventListener('click', () => {
-        worker.postMessage({
-            action: 'filter',
-            species: isSpeciesViewFiltered(true),
-            active: getActiveRowID(),
-        }); // no re-prepare
-    })
+
+    //action.addEventListener('click', recordEntryHandler)
     if (typeIndex) document.querySelectorAll('input[name="record-label"]')[typeIndex].checked = true;
     // Clear entry on input focus, so list appears
-    const birdListInput = document.getElementById('bird-list-all');
-    // birdListInput.addEventListener('click', () => { birdListInput.value = '' });
     document.removeEventListener('keydown', handleKeyDownDeBounce, true);
     recordEntryModal.show();
 }
@@ -3737,12 +3715,14 @@ const insertManualRecord = (cname, start, end, comment, count, label, action, ba
             toDisk: toDisk
         })
     }
-    insert(true)
-
     if (STATE.mode === 'analyse') {
-        //Update the record in the memory db as well
+        //Update the record in the memory db 
         insert(false)
     }
+    // Insert to disk
+    setTimeout(insert, 500, true)
+    //insert(true)
+
 }
 
 const recordEntryForm = document.getElementById('record-entry-form');

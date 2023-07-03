@@ -5,7 +5,8 @@ const p = require('path');
 const SunCalc = require('suncalc2');
 const ffmpeg = require('fluent-ffmpeg');
 const png = require('fast-png');
-const { writeFile, mkdir, readdir, utimes } = require('node:fs/promises');
+const { writeFile, mkdir, readdir } = require('node:fs/promises');
+const { utimesSync } = require('utimes');
 const stream = require("stream");
 const staticFfmpeg = require('ffmpeg-static-electron');
 const { stat } = require("fs/promises");
@@ -247,9 +248,9 @@ async function handleMessage(e) {
             index = 0;
             if (!predictionDone) onAbort(args);
             if (!memoryDB) await createDB();
-            STATE.update({ db: memoryDB });
             console.log('Worker received audio ' + args.file);
             await loadAudioFile(args);
+            metadata[args.file].isSaved ? onChangeMode('archive') : onChangeMode('analyse');
             break;
         case 'filter':
             if (STATE.db) {
@@ -445,7 +446,7 @@ const prepSummaryStatement = () => {
     const useRange = range?.start;
     let summaryStatement = `
     WITH ranked_records AS (
-        SELECT records.dateTime, records.speciesID, records.confidence, records.fileID, cname, sname,
+        SELECT records.dateTime, records.speciesID, records.confidence, records.fileID, cname, sname, callCount,
           RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
         FROM records
         JOIN files ON files.id = records.fileID
@@ -468,7 +469,7 @@ const prepSummaryStatement = () => {
     summaryStatement += extraClause;
     summaryStatement += `
     )
-    SELECT cname, sname, COUNT(*) as count, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
+    SELECT cname, sname, COUNT(*) as count, SUM(IFNULL(callcount, 1)) as calls, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
       FROM ranked_records
       WHERE ranked_records.rank <= ${STATE.topRankin}
       GROUP BY speciesID
@@ -477,13 +478,14 @@ const prepSummaryStatement = () => {
         'Total' AS sname,
         cname as cname,
         COUNT(*) AS count,
-        ROUND(MAX(ranked_records.confidence) / 10.0, 0) AS max
+        ROUND(MAX(ranked_records.confidence) / 10.0, 0) AS max,
+        1 as making_union_work
       FROM
         ranked_records
         JOIN files ON files.id = ranked_records.fileID
     WHERE confidence >= ? AND cname LIKE ? AND ranked_records.rank <= ${STATE.topRankin} `;
     summaryStatement += extraClause;
-    summaryStatement += 'ORDER BY count DESC, max DESC';
+    summaryStatement += 'ORDER BY cname';
     STATE.GET_SUMMARY_SQL = STATE.db.prepare(summaryStatement);
     //console.log('Summary SQL statement:\n' + summaryStatement)
 }
@@ -633,8 +635,8 @@ async function onAnalyse({
         }
     }
     console.log("FILE_QUEUE has ", FILE_QUEUE.length, 'files', count, 'files ignored')
+    if (! STATE.selection) onChangeMode('analyse');
     for (let i = 0; i < NUM_WORKERS; i++) {
-        onChangeMode('analyse');
         processNextFile({ start: start, end: end, resetResults: STATE.selection === undefined, worker: i });
     }
 }
@@ -764,11 +766,11 @@ async function getWorkingFile(file) {
             });
             // assign the source file's save time to the proxy file
             const mtime = sourceMtime.getTime();
-            await utimes(proxy, mtime, mtime);
+            await utimesSync(proxy, mtime);
         }
     }
-    if (!metadata[file] || !metadata[file].isComplete) {
-        await getMetadata({ file: file, proxy: proxy, source_file: source_file });
+    if (!metadata.file?.isComplete) {
+        await setMetadata({ file: file, proxy: proxy, source_file: source_file });
     }
     return proxy;
 }
@@ -799,7 +801,7 @@ async function locateFile(file) {
     })
     if (!matchingFileExt) {
         UI.postMessage({
-            event: 'generate-alert', message: `Unable to load source file with any supported file extension: ${file}`
+            event: 'generate-alert', message: `Unable to locate source file with any supported file extension: ${file}`
         })
         return false;
     }
@@ -850,7 +852,7 @@ function addDays(date, days) {
 }
 
 /**
- * Called by getWorkingFile, setStartEnd??,
+ * Called by getWorkingFile, setCustomLocation
  * Assigns file metadata to a metadata cache object. file is the key, and is the source file
  * proxy is required if the source file is not a wav to populate the headers
  * @param file: the file name passed to the worker
@@ -858,12 +860,12 @@ function addDays(date, days) {
  * @param source_file: the file that exists ( will be different after compression)
  * @returns {Promise<unknown>}
  */
-const getMetadata = async ({ file, proxy = file, source_file = file }) => {
+const setMetadata = async ({ file, proxy = file, source_file = file }) => {
     metadata[file] = { proxy: proxy };
     // CHeck the database first, so we honour any manual updates.
     const savedMeta = await getSavedFileInfo(file);
-    // If we have the file in db change to archive mode
-    if (savedMeta) onChangeMode('archive');
+    // If we have stored imfo about the file, set the saved flag;
+    metadata[file].isSaved = !!savedMeta;
     // Latitude only provided when updating location
     const latitude = savedMeta?.lat || STATE.lat;
     const longitude = savedMeta?.lon || STATE.lon;
@@ -1563,7 +1565,7 @@ const insertRecord = async (key, speciesID, confidence, file) => {
     }
     await db.runAsync('INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?)',
         metadata[file].fileStart + offset, key, fileID, speciesID, confidence,
-        null, null, key + 3, 0);
+        null, null, key + 3, null);
 }
 
 const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label, toDisk }) => {
@@ -1574,19 +1576,27 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     const { speciesID } = await db.getAsync(`SELECT id as speciesID FROM species
                                         WHERE cname = ?`, cname);
     let res = await db.getAsync(`SELECT id FROM files WHERE name = ?`, file);
-    if (!res) {
-        res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?, ? )',
-            null, file, metadata[file].duration, metadata[file].fileStart, null);
-        fileID = res.lastID;
-        changes = 1;
+    // Manual records can be added off the bat, so there may be no record of the file in either db
+
+    if (!res) { // No file: check the memory db
+        if (toDisk) res = await memoryDB.getAsync('SELECT id FROM files WHERE name = ?', file);
+        if (!res){ // Still no file, add it.
+            res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,? )',
+                fileID, file, metadata[file].duration, metadata[file].fileStart, null);
+            fileID = res.lastID;
+            changes = 1;
+        } else {  // memory db has file
+            fileID = res.id;
+            await diskDB.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,? )',
+                fileID, file, metadata[file].duration, metadata[file].fileStart, null);
+        }
     } else {
         fileID = res.id;
     }
-    if (changes) {
-        const durationSQL = Object.entries(metadata[file].dateDuration)
-            .map(entry => `(${entry.toString()},${fileID})`).join(',');
-        await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
-    }
+    const durationSQL = Object.entries(metadata[file].dateDuration)
+        .map(entry => `(${entry.toString()},${fileID})`).join(',');
+    await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
+
     let response;
     const dateTime = metadata[file].fileStart + startMilliseconds;
     response = await db.runAsync('INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,? )',
@@ -1595,7 +1605,7 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     if (response.changes && toDisk) {
         UI.postMessage({ event: 'diskDB-has-records' });
     }
-    if (STATE.mode !== 'explore' && toDisk) UI.postMessage({ event: 'generate-alert', message: `A ${cname} record has been saved to the archive.` })
+    if (STATE.mode !== 'explore' && toDisk) UI.postMessage({ event: 'generate-alert', message: `${response.changes} ${cname} record has been saved to the archive.` })
 }
 
 const parsePredictions = async (response) => {
@@ -1963,7 +1973,7 @@ const getSavedFileInfo = async (file) => {
     // look for file in the disk DB, ignore extension
     return new Promise(function (resolve) {
         const baseName = file.replace(/^(.*)\..*$/g, '$1%');
-        const stmt = diskDB.prepare('SELECT * FROM files JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)');
+        const stmt = diskDB.prepare('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)');
         stmt.get(baseName, (err, row) => {
             if (err) {
                 console.log('There was an error ', err)
@@ -1990,7 +2000,10 @@ const onSave2DiskDB = async () => {
     }
     await memoryDB.runAsync('BEGIN');
     await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.files SELECT * FROM files`);
-
+    // Set the saved flag on files' metadata
+    for (let file in metadata) {
+        metadata[file].isSaved = true
+    }
     // Update the duration table
     let response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.duration SELECT * FROM duration');
     console.log(response.changes + ' date durations added to disk database');
@@ -2014,6 +2027,7 @@ const onSave2DiskDB = async () => {
         }
     }
     await memoryDB.runAsync('END');
+    console.log("transaction ended");
 };
 
 const filterLocation = () => STATE.locationID ? ` AND files.locationID = ${STATE.locationID}` : '';
@@ -2184,19 +2198,25 @@ const getSpecies = () => {
 const onUpdateFileStart = async (args) => {
     let file = args.file;
     const newfileMtime = Math.round(args.start + (metadata[file].duration * 1000));
-    await utimes(file, newfileMtime, newfileMtime);
-    // update the metadata
-    metadata[file].isComplete = false;
-    //allow for this file to be compressed...
-    await getWorkingFile(file);
+    utimesSync(file, newfileMtime);
     let db = STATE.db;
     db.runAsync('BEGIN');
-    let { id } = await db.getAsync('SELECT id from files where name = ?', file);
-    const { changes } = await db.runAsync('UPDATE files SET filestart = ? where id = ?', args.start, id);
-    console.log(changes ? `Changed ${file}` : `No changes made`);
-    let result = await db.runAsync('UPDATE records set dateTime = (position * 1000) + ? where fileid = ?', args.start, id);
+    let row = await db.getAsync('SELECT id from files where name = ?', file);
+    let result;
+    if (!row) {
+        console.log('File not found in database, adding.');
+        await db.runAsync('INSERT INTO files (id, name, duration, filestart) values (?, ?, ?, ?)', null, file, metadata[file].duration, args.start);
+    }
+    else {
+        const id = row.id;
+        const { changes } = await db.runAsync('UPDATE files SET filestart = ? where id = ?', args.start, id);
+        console.log(changes ? `Changed ${file}` : `No changes made`);
+        result = await db.runAsync('UPDATE records set dateTime = (position * 1000) + ? where fileid = ?', args.start, id);
+        console.log(`Changed ${result.changes} records associated with  ${file}`);
+    }
     db.runAsync('END');
-    console.log(`Changed ${result.changes} records associated with  ${file}`);
+    // update the metadata
+    metadata[file].fileStart = args.start;
 };
 
 
@@ -2208,6 +2228,7 @@ async function onDelete({
     start,
     end,
     species,
+    active,
     // need speciesfiltered because species triggers getSummary to highlight it
     speciesFiltered
 }) {
@@ -2220,6 +2241,10 @@ async function onDelete({
     if (species) {
         sql += ' AND speciesID = (SELECT id FROM species WHERE cname = ?)'
         params.push(species);
+    }
+    // Catch inserted manual records
+    if (STATE.db === memoryDB) {
+        await diskDB.runAsync(sql, ...params);
     }
     let { changes } = await db.runAsync(sql, ...params);
     if (changes) {
@@ -2404,7 +2429,7 @@ async function onSetCustomLocation({ lat, lon, place, file }) {
     }
     // Update file Metadata
     metadata[file].isComplete = false;
-    await getMetadata({
+    await setMetadata({
         file: file,
         proxy: metadata[file].proxy,
     });
