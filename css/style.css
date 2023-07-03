@@ -129,7 +129,7 @@ select {
     max-width: 25em
 }
 .dropdown-menu {
-    min-width: 300px;
+    min-width: 320px;
 }
 
 .shortcut {
