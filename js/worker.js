@@ -356,7 +356,7 @@ const getFiles = async (files, image) => {
         ['.wav', '.flac', '.opus', '.m4a', '.mp3', '.mpga', '.ogg', '.aac', '.mpeg', '.mp4'];
 
     file_list = file_list.filter((file) => {
-        return supported_files.some(ext => file.endsWith(ext))
+        return supported_files.some(ext => file.toLowerCase().endsWith(ext))
     }
     )
     UI.postMessage({ event: 'files', filePaths: file_list });

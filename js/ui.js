@@ -2622,7 +2622,7 @@ function speciesFilter(e) {
     if (isExplore()) {
         range = STATE.explore.range;
         const list = document.getElementById('bird-list-seen');
-        list.value = species;
+        list.value = species || '';
     }
     worker.postMessage({
         action: 'filter',
@@ -2784,7 +2784,6 @@ function setClickedIndex(target) {
 }
 
 const deleteRecord = (target) => {
-    let isBatch = false;
     if (target instanceof PointerEvent) target = activeRow;
     else {
         target.forEach(position => {
