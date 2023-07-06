@@ -635,7 +635,7 @@ async function onAnalyse({
         }
     }
     console.log("FILE_QUEUE has ", FILE_QUEUE.length, 'files', count, 'files ignored')
-    if (! STATE.selection) onChangeMode('analyse');
+    if (!STATE.selection) onChangeMode('analyse');
     for (let i = 0; i < NUM_WORKERS; i++) {
         processNextFile({ start: start, end: end, resetResults: STATE.selection === undefined, worker: i });
     }
@@ -1571,34 +1571,37 @@ const insertRecord = async (key, speciesID, confidence, file) => {
 const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label, toDisk }) => {
     start = parseFloat(start), end = parseFloat(end);
     const startMilliseconds = Math.round(start * 1000);
-    let changes, fileID;
+    let changes, fileID, fileStart;
     const db = toDisk ? diskDB : memoryDB;
     const { speciesID } = await db.getAsync(`SELECT id as speciesID FROM species
                                         WHERE cname = ?`, cname);
-    let res = await db.getAsync(`SELECT id FROM files WHERE name = ?`, file);
+    let res = await db.getAsync(`SELECT id,filestart FROM files WHERE name = ?`, file);
     // Manual records can be added off the bat, so there may be no record of the file in either db
 
     if (!res) { // No file: check the memory db
-        if (toDisk) res = await memoryDB.getAsync('SELECT id FROM files WHERE name = ?', file);
-        if (!res){ // Still no file, add it.
+        if (toDisk) res = await memoryDB.getAsync('SELECT id, filestart FROM files WHERE name = ?', file);
+        if (!res) { // Still no file, add it.
+            fileStart = metadata[file].fileStart;
             res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,? )',
-                fileID, file, metadata[file].duration, metadata[file].fileStart, null);
+                fileID, file, metadata[file].duration, fileStart, null);
             fileID = res.lastID;
             changes = 1;
         } else {  // memory db has file
             fileID = res.id;
+            fileStart = res.filestart;
             await diskDB.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,? )',
-                fileID, file, metadata[file].duration, metadata[file].fileStart, null);
+                fileID, file, metadata[file].duration, fileStart, null);
         }
     } else {
         fileID = res.id;
+        fileStart = res.filestart;
     }
     const durationSQL = Object.entries(metadata[file].dateDuration)
         .map(entry => `(${entry.toString()},${fileID})`).join(',');
     await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
 
     let response;
-    const dateTime = metadata[file].fileStart + startMilliseconds;
+    const dateTime = fileStart + startMilliseconds;
     response = await db.runAsync('INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,? )',
         dateTime, start, fileID, speciesID, 2000, label, comment, end, parseInt(count));
 
@@ -2200,23 +2203,37 @@ const onUpdateFileStart = async (args) => {
     const newfileMtime = Math.round(args.start + (metadata[file].duration * 1000));
     utimesSync(file, newfileMtime);
     let db = STATE.db;
-    db.runAsync('BEGIN');
+    //db.runAsync('BEGIN');
     let row = await db.getAsync('SELECT id from files where name = ?', file);
     let result;
     if (!row) {
         console.log('File not found in database, adding.');
         await db.runAsync('INSERT INTO files (id, name, duration, filestart) values (?, ?, ?, ?)', null, file, metadata[file].duration, args.start);
+        // If no file, no records, so we're done.
     }
     else {
         const id = row.id;
         const { changes } = await db.runAsync('UPDATE files SET filestart = ? where id = ?', args.start, id);
         console.log(changes ? `Changed ${file}` : `No changes made`);
-        result = await db.runAsync('UPDATE records set dateTime = (position * 1000) + ? where fileid = ?', args.start, id);
-        console.log(`Changed ${result.changes} records associated with  ${file}`);
+        // Create temp table, without unique constraits
+        // await db.runAsync('CREATE TABLE temp as SELECT * FROM records WHERE fileID = ?', id);
+        // Fill with new values
+        result = await db.runAsync('UPDATE records set dateTime = (position * 1000) + ? WHERE fileID = ?', args.start, id);
+        // // Delete records for file
+        // await db.runAsync('DELETE FROM records WHERE fileID = ?', id);
+        // // Add new records
+        // await db.runAsync('INSERT INTO records SELECT * from temp');
+        // // Drop temp
+        // await db.runAsync('DROP TABLE temp');
+        // // Rename temp table
+        // console.log(`Changed ${result.changes} records associated with  ${file}`);
+        // // Re-enable the foreign key constraints and recreate the unique constraint
+
     }
-    db.runAsync('END');
+    //db.runAsync('END');
     // update the metadata
-    metadata[file].fileStart = args.start;
+    delete metadata[file];
+    await getWorkingFile(file); 
 };
 
 
