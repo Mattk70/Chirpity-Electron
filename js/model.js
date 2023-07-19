@@ -78,12 +78,12 @@ onmessage = async (e) => {
                     const { chunks, start, fileStart, file, snr, confidence, worker, context, resetResults } = e.data;
                     myModel.useContext = context;
                     myModel.selection = !resetResults;
-                    const result = await myModel.predictChunk(chunks, start, fileStart, file, snr, confidence / 1000);
+                    const [result, filename, startPosition]  = await myModel.predictChunk(chunks, start, fileStart, file, snr, confidence / 1000);
                     response = {
                         message: 'prediction',
-                        file: file,
+                        file: filename,
                         result: result,
-                        fileStart: fileStart,
+                        fileStart: startPosition,
                         worker: worker,
                         selection: myModel.selection
                     };
@@ -445,7 +445,7 @@ class Model {
         const batchKeys = [...Array(numSamples).keys()].map(i => start + this.chunkLength * i);
         const result = await this.predictBatch(specBatch, batchKeys, threshold, confidence);
         this.clearTensorArray(bufferList);
-        return result
+        return [result, file, fileStart];
     }
 
     async clearTensorArray(tensorObj) {
