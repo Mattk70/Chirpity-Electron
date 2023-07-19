@@ -163,15 +163,18 @@ function resetResults() {
 
 /***
  *
- * @param val: float between 0 and 1
+ * @param val: float between 0 and 100
  */
 function updateProgress(val) {
-    if (val) progressBar.value = val;
+    if (val) {
+        progressBar.value = val;
+        val = val.toString();
+        progressBar.innerText = val + '%';
+    }
     else {
         progressBar.removeAttribute('value');
     }
-    val = val.toString();
-    progressBar.innerText = val + '%';
+
 }
 
 /**
@@ -661,7 +664,14 @@ const getSelectionResults = (fromDB) => {
     });
 }
 
-
+// const navbarAnalysis = document.getElementById('navbarAnalysis');
+// navbarAnalysis.addEventListener('click', async () => {
+//     // Switch to Analyse mode
+//     if (STATE.mode !== 'analyse'){
+//         worker.postMessage({ action: 'change-mode', mode: 'analyse' });
+//          worker.postMessage({ action: 'filter' });
+//     }
+// });
 
 const analyseLink = document.getElementById('analyse');
 analyseLink.addEventListener('click', async () => {
@@ -696,7 +706,7 @@ function postAnalyseMessage(args) {
         disableMenuItem(['analyseSelection']);
         const selection = !!args.end;
         const filesInScope = args.filesInScope;
-        updateProgress(0);
+        //updateProgress(0);
         if (!selection) {
             analyseReset();
             resetResults();
@@ -1396,8 +1406,11 @@ const setUpWorkerMessaging = () => {
                     if (args.render) {
                         renderFilnamePanel();
                     }
-                    alert(args.message)
-
+                    if (args.file){ // File is in disk database but not found
+                        let message = args.message;
+                        message += '\nWould you like to remove the file from the Archive?';
+                        if (confirm(message)) deleteFile(args.file)
+                    } else { alert(args.message) }
                     break
                 case 'no-detections-remain':
                     detectionsModal.hide();
@@ -2202,7 +2215,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
                 activeRow.classList.add('table-active')
             }
             activeRow.focus();
-            activeRow.click();
+            if (!activeRow.classList.contains('text-bg-dark') ) activeRow.click();
         }
     }
 };
@@ -2418,7 +2431,7 @@ function onProgress(args) {
             progressDiv.classList.add('d-none');
         }
     } else {
-        updateProgress(0)
+        //updateProgress(0)
     }
 }
 
@@ -2505,11 +2518,6 @@ async function onPredictionDone({
     //Pagination
     total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
     if (action !== 'filter') {
-
-        updateProgress(0)
-
-        //completeDiv.show();
-
         if (AUDACITY_LABELS !== {}) {
             enableMenuItem(['saveLabels']);
             $('.download').removeClass('disabled');
@@ -2545,7 +2553,7 @@ async function onPredictionDone({
             activeRow = resultTable.querySelector('tr:first-child');
         }
     }
-    if (activeRow) {
+    if (! batchInProgress && activeRow) {
         activeRow.focus();
         activeRow.click();
     }
@@ -3542,7 +3550,7 @@ async function createContextMenu(e) {
         }
     }
     if (!hideInSummary && activeRow === undefined && region === undefined) return;
-    const createOrEdit = (['archive', 'explore'].includes(STATE.mode)) && region?.attributes.label ? 'Edit' : 'Create';
+    const createOrEdit = (['archive', 'explore'].includes(STATE.mode)) && (region?.attributes.label || target.closest('#summary')) ? 'Edit' : 'Create';
 
     menu.html(`
         <a class="dropdown-item play ${hideInSummary} ${hideInSelection}"><span class='material-icons-two-tone'>play_circle_filled</span> Play</a>
@@ -3550,8 +3558,8 @@ async function createContextMenu(e) {
             <span class="material-icons-two-tone">search</span> Analyse
         </a>
         <div class="dropdown-divider ${hideInSummary} ${hideInSelection}"></div>
-        <a class="dropdown-item ${hideInSummary} ${hideInSelection}" id="create-manual-record" href="#">
-            <span class="material-icons-two-tone">post_add</span> ${createOrEdit} Archive Record
+        <a class="dropdown-item ${hideInSelection}" id="create-manual-record" href="#">
+            <span class="material-icons-two-tone">post_add</span> ${createOrEdit} Archive Record${plural}
         </a>
         <a class="dropdown-item" id="context-create-clip" href="#">
             <span class="material-icons-two-tone">music_note</span> Export Audio Clip${plural}
@@ -3577,12 +3585,12 @@ async function createContextMenu(e) {
     const exporLink = document.getElementById('context-create-clip');
     hideInSummary ? exporLink.addEventListener('click', batchExportAudio) :
         exporLink.addEventListener('click', exportAudio);
-    if (!(hideInSelection || hideInSummary)) {
+    if (! hideInSelection) {
         document.getElementById('create-manual-record').addEventListener('click', function (e) {
             if (e.target.innerText.indexOf('Edit') !== -1) {
-                showRecordEntryForm('Update', hideInSummary);
+                showRecordEntryForm('Update', !!hideInSummary);
             } else {
-                showRecordEntryForm('Add', hideInSummary);
+                showRecordEntryForm('Add', !!hideInSummary);
             }
         })
     }
@@ -3644,7 +3652,7 @@ const recordEntryHandler = () => {
 }
 
 async function showRecordEntryForm(mode, batch) {
-    const cname = region.attributes.label.replace('?', '');
+    const cname = batch ? document.querySelector('#speciesFilter .text-warning .cname .cname').innerText :  region.attributes.label.replace('?', '');
     let callCount = '', typeIndex = '', commentText = '';
     if (cname && activeRow) {
         // Populate the form with existing values
@@ -3654,16 +3662,18 @@ async function showRecordEntryForm(mode, batch) {
         callCount = callCount.replace('Present', '');
         typeIndex = ['Local', 'Nocmig', ''].indexOf(activeRow.querySelector('.label').innerText);
     }
-    const speciesList = `
+    let speciesList = `
     <div class="row">
         <div class="col-8">
             ${generateBirdOptionList({ store: 'allSpecies', rows: undefined, selected: cname })}
-        </div>
-        <div class="col"><div class="form-floating mb-3">
+        </div>`;
+    if (! batch) {
+        speciesList += `<div class="col"><div class="form-floating mb-3">
             <input type="number" id="call-count" value="${callCount}" class="form-control" min="1">
             <label for="call-count">Call Count</label>
-        </div></div>
-    </div>`;
+        </div></div>`;
+    }
+    speciesList += '</div>';
     const label = `
     <fieldset class="border  ps-3 pt-1">
         <label for="record-label" class="text-muted" style="font-size: .75em">Call Type</label><br>
@@ -3680,13 +3690,12 @@ async function showRecordEntryForm(mode, batch) {
             <label class="form-check-label" for="label-unknown">Not specified</label>
         </div>
     </fieldset>`;
-    const comment = `
-    <div class="form-floating mt-3">
-        <textarea class="form-control" id="record-comment" style="height: 200px">${commentText}</textarea>
-        <label for="floatingTextarea2">Comments</label>
-        <input type='hidden' id='DBmode' value='${mode}'>
-        <input type='hidden' id='batch-mode' value='${batch}'>
-    </div>`;
+    let comment =  '<div class="form-floating mt-3">';
+    if (! batch) comment += `<textarea class="form-control" id="record-comment" style="height: 200px">${commentText}</textarea><label for="record-comment">Comments</label>`;
+    comment += `<input type='hidden' id='DBmode' value='${mode}'>
+            <input type='hidden' id='batch-mode' value='${batch}'>
+            <input type='hidden' id='original-id' value='${cname}'>
+        </div>`;
     $('#record-entry-modal-body').html(speciesList + label + comment);
     const action = document.getElementById('record-add')
     action.innerText = mode;
@@ -3698,16 +3707,18 @@ async function showRecordEntryForm(mode, batch) {
     recordEntryModal.show();
 }
 
-const insertManualRecord = (cname, start, end, comment, count, label, action, batch) => {
+const insertManualRecord = (cname, start, end, comment, count, label, action, batch, originalCname) => {
+    const files = batch ? fileList : currentFile;
     const insert = (toDisk) => {
         worker.postMessage({
             action: 'insert-manual-record',
             cname: cname,
-            start: start.toFixed(3),
-            end: end.toFixed(3),
+            originalCname: originalCname,
+            start: start?.toFixed(3),
+            end: end?.toFixed(3),
             comment: comment,
             count: count || null,
-            file: currentFile,
+            file: files,
             label: label,
             DBaction: action,
             batch: batch,
@@ -3728,36 +3739,45 @@ const recordEntryForm = document.getElementById('record-entry-form');
 recordEntryForm.addEventListener('submit', function (e) {
     e.preventDefault();
     const action = document.getElementById('DBmode').value;
-    const batch = document.getElementById('batch-mode').value;
-    const start = bufferBegin + region.start;
-    const end = bufferBegin + region.end;
+    // cast boolstring to boolean
+    const batch = document.getElementById('batch-mode').value === 'true';
     const cname = document.getElementById('bird-list-all').value;
+    let start, end;
+    if (region){
+        start = bufferBegin + region.start;
+        end = bufferBegin + region.end;
+        region.attributes.label = cname;
+    }
+    const originalCname = document.getElementById('original-id').value;
     // Update the region label
-    region.attributes.label = cname;
-    const count = document.getElementById('call-count').value;
-    const comment = document.getElementById('record-comment').value;
+    const count = document.getElementById('call-count')?.value;
+    const comment = document.getElementById('record-comment')?.value;
     const label = document.querySelector('input[name="record-label"]:checked')?.value || '';
     recordEntryModal.hide();
-    insertManualRecord(cname, start, end, comment, count, label, action)
+    insertManualRecord(cname, start, end, comment, count, label, action, batch, originalCname)
 })
 
 const recordEntryModalDiv = document.getElementById('record-entry-modal')
 recordEntryModalDiv.addEventListener('hidden.bs.modal', enableKeyDownEvent);
 
 const purgeFile = document.getElementById('purge-file');
-purgeFile.addEventListener('click', () => {
-    if (currentFile) {
-        if (confirm(`This will remove ${currentFile} and all its associated data from the database archive. Proceed?`)) {
+purgeFile.addEventListener('click', deleteFile)
+
+function deleteFile(file) {
+    // EventHandler caller 
+    if (typeof file === 'object' && file instanceof Event) {
+        file = currentFile;
+    }
+    if (file) {
+        if (confirm(`This will remove ${file} and all the associated detections from the database archive. Proceed?`)) {
             worker.postMessage({
                 action: 'purge-file',
-                fileName: currentFile
+                fileName: file
             })
         }
         renderFilnamePanel()
-    }
-})
-
-
+    }    
+}
 // Utility functions to wait for file to load
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));

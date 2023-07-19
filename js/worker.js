@@ -29,8 +29,8 @@ const dataset_database = DATASET;
 if (DEBUG) console.log(staticFfmpeg.path);
 ffmpeg.setFfmpegPath(staticFfmpeg.path.replace('app.asar', 'app.asar.unpacked'));
 
-let predictionsRequested = {}, predictionsReceived = {}
-let COMPLETED = [];
+let predictionsRequested = {}, predictionsReceived = {}, filesBeingProcessed = [];
+let canBeRemovedFromCache = [];
 let diskDB, memoryDB;
 
 let t0; // Application profiler
@@ -177,9 +177,9 @@ const clearCache = async (fileCache, sizeLimitInGB) => {
     const requiredSpace = sizeLimitInGB * 1024 ** 3;
     // If Full, clear at least 25% of cache, so we're not doing this too frequently
     if (size > requiredSpace) {
-        // while (size > requiredSpace && COMPLETED.length) {
-        while (COMPLETED.length > 1) {
-            const file = COMPLETED.shift();
+        // while (size > requiredSpace && canBeRemovedFromCache.length) {
+        while (canBeRemovedFromCache.length > 1) {
+            const file = canBeRemovedFromCache.shift();
             const proxy = metadata[file].proxy;
             // Make sure we don't delete original files!
             if (proxy !== file) {
@@ -192,7 +192,7 @@ const clearCache = async (fileCache, sizeLimitInGB) => {
                 size -= stat.size;
             }
         }
-        if (!COMPLETED.length) {
+        if (!canBeRemovedFromCache.length) {
             console.log('All completed files removed from cache')
             // Cache still full?
             if (size > requiredSpace) {
@@ -265,7 +265,13 @@ async function handleMessage(e) {
             getLocations();
             break;
         case 'insert-manual-record':
-            await onInsertManualRecord(args);
+            const count = await onInsertManualRecord(args);
+            if (STATE.mode !== 'explore' && ! args.batch && args.toDisk) {
+                UI.postMessage({
+                    event: 'generate-alert',
+                    message: `${count} ${args.cname} record has been saved to the archive.`
+                })
+            }
             break;
         case 'load-model':
             UI.postMessage({ event: 'spawning' });
@@ -582,11 +588,13 @@ async function onAnalyse({
     STATE.update({ selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined });
 
     console.log(`Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`);
-    //Set global filesInScope for summary to use
+    //Reset GLOBAL variables
     index = 0;
     AUDACITY = {};
-    COMPLETED = [];
+    canBeRemovedFromCache = [];
+    batchChunksToSend = {};
     FILE_QUEUE = filesInScope;
+    filesBeingProcessed = [...filesInScope];
 
     if (!STATE.selection) {
         // Start with a clean memory db
@@ -604,6 +612,7 @@ async function onAnalyse({
             if (result) {
                 console.log(`Skipping ${file.name}, already analysed`)
                 FILE_QUEUE.splice(i, 1)
+                filesBeingProcessed.splice(i, 1)
                 count++
                 continue;
             }
@@ -621,6 +630,7 @@ async function onAnalyse({
                 break;
             }
         }
+        if (allCached && ! reanalyse) filesBeingProcessed = [];
         if (fromDB || allCached && !reanalyse && !STATE.selection) {  // handle circle here
             if (!fromDB) {
                 onChangeMode('archive');
@@ -637,7 +647,7 @@ async function onAnalyse({
     console.log("FILE_QUEUE has ", FILE_QUEUE.length, 'files', count, 'files ignored')
     if (!STATE.selection) onChangeMode('analyse');
     for (let i = 0; i < NUM_WORKERS; i++) {
-        processNextFile({ start: start, end: end, resetResults: STATE.selection === undefined, worker: i });
+        processNextFile({ start: start, end: end, worker: i });
     }
 }
 
@@ -766,7 +776,7 @@ async function getWorkingFile(file) {
             });
             // assign the source file's save time to the proxy file
             const mtime = sourceMtime.getTime();
-            await utimesSync(proxy, mtime);
+            utimesSync(proxy, mtime);
         }
     }
     if (!metadata.file?.isComplete) {
@@ -800,12 +810,23 @@ async function locateFile(file) {
         return filesInFolder.some(matching)
     })
     if (!matchingFileExt) {
-        UI.postMessage({
-            event: 'generate-alert', message: `Unable to locate source file with any supported file extension: ${file}`
-        })
+        notifyMissingFile(file)
         return false;
     }
     return matchingFileExt;
+}
+
+async function notifyMissingFile(file){
+    let missingFile;
+    // Look for the file in te Archive
+    const row = await diskDB.getAsync('SELECT * FROM FILES WHERE name = ?', file);
+    if (row?.id) missingFile = file
+    UI.postMessage({
+        event: 'generate-alert', 
+        message: `Unable to locate source file with any supported file extension: ${file}`,
+        // If we have this file in the archive, but can't find it, prompt to delete it
+        file: missingFile
+    })
 }
 
 async function loadAudioFile({
@@ -1056,29 +1077,12 @@ async function setupCtx(chunk, header) {
  * @param file
  * @param start
  * @param end
- * @param resetResults
  * @returns {Promise<void>}
  */
 
-function getWorker(depth = 0) {
-    console.log("getWorker depth", depth);
-    return new Promise((resolve) => {
-        for (var i = 0; i < predictWorkers.length; i++) {
-            if (predictWorkers[i].isAvailable) {
-                return resolve(i); // Found an available worker, return its position
-            }
-        }
-
-        // No available workers found, wait for a delay and check again
-        setTimeout(() => { resolve(getWorker(depth + 1)) }, 150);
-    })
-
-}
-
 const getPredictBuffers = async ({
-    file = '', start = 0, end = undefined, resetResults = false, worker = undefined
+    file = '', start = 0, end = undefined, worker = undefined
 }) => {
-    //let start = args.start, end = args.end, resetResults = args.resetResults, file = args.file;
     let chunkLength = 72000;
     // Ensure max and min are within range
     start = Math.max(0, start);
@@ -1113,16 +1117,18 @@ const getPredictBuffers = async ({
                 if (++workerInstance >= NUM_WORKERS) {
                     workerInstance = 0;
                 }
-
-                //getWorker().then(worker => { //workerInstance;
                 worker = workerInstance;
-                feedChunksToModel(myArray, chunkStart, file, end, resetResults, worker);
+                feedChunksToModel(myArray, chunkStart, file, end, worker);
                 chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
                 // Now the async stuff is done ==>
                 readStream.resume();
                 //})
             }).catch((err) => {
-                console.error(`PredictBuffer rendering failed: ${err}`);
+                console.error(`PredictBuffer rendering failed: ${err}, file ${file}`);
+                const fileIndex = filesBeingProcessed.indexOf(file);
+                if (fileIndex !== -1) {
+                    canBeRemovedFromCache.concat(filesBeingProcessed.splice(fileIndex,1))
+                }
                 // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
             });
         } else {
@@ -1131,20 +1137,20 @@ const getPredictBuffers = async ({
                 if (++workerInstance >= NUM_WORKERS) {
                     workerInstance = 0;
                 }
-                worker = workerInstance; // await getWorker() //
+                worker = workerInstance; 
             }
             // Create array with 0's (short segment of silence that will trigger the finalChunk flag
             const myArray = new Float32Array(new Array(chunkLength).fill(0));
-            feedChunksToModel(myArray, chunkStart, file, end, resetResults, worker);
+            feedChunksToModel(myArray, chunkStart, file, end, worker);
             readStream.resume();
         }
     })
     readStream.on('end', function () {
         readStream.close();
-        // processNextFile();
     })
     readStream.on('error', err => {
-        console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`)
+        console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
+        if (err.code === 'ENOENT') notifyMissingFile(file);
     })
 }
 
@@ -1192,16 +1198,17 @@ const fetchAudioBuffer = async ({
             readStream.close()
         })
         readStream.on('error', err => {
-            console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`)
+            console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
+            if (err.code === 'ENOENT') notifyMissingFile(file);
         })
     });
 }
 
-async function feedChunksToModel(channelData, chunkStart, file, end, resetResults, worker) {
+
+async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
     predictionsRequested[file]++;
     if (worker === undefined) {
         // pick a worker
-        //worker = await getWorker()
         worker = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
     }
     const objData = {
@@ -1211,7 +1218,7 @@ async function feedChunksToModel(channelData, chunkStart, file, end, resetResult
         file: file,
         start: chunkStart,
         duration: end,
-        resetResults: resetResults,
+        resetResults: !STATE.selection,
         snr: STATE.filters.SNR,
         context: STATE.detect.contextAware,
         confidence: STATE.detect.confidence,
@@ -1219,18 +1226,18 @@ async function feedChunksToModel(channelData, chunkStart, file, end, resetResult
     };
     predictWorkers[worker].isAvailable = false;
     predictWorkers[worker].postMessage(objData, [channelData.buffer]);
+    
 }
 
 async function doPrediction({
     file = '',
     start = 0,
     end = metadata[file].duration,
-    resetResults = false,
     worker = undefined
 }) {
     predictionDone = false;
     predictionStart = new Date();
-    await getPredictBuffers({ file: file, start: start, end: end, resetResults: resetResults, worker: undefined });
+    await getPredictBuffers({ file: file, start: start, end: end, worker: undefined });
     UI.postMessage({ event: 'update-audio-duration', value: metadata[file].duration });
 }
 
@@ -1264,7 +1271,6 @@ const convertSpecsFromExistingSpecs = async (path) => {
                 if (++workerInstance === NUM_WORKERS) {
                     workerInstance = 0;
                 }
-                //workerInstance = await getWorker();
                 const buffer = AudioBuffer.getChannelData(0);
                 predictWorkers[workerInstance].postMessage({
                     message: 'get-spectrogram',
@@ -1329,7 +1335,6 @@ const saveResults2DataSet = (rootDirectory) => {
                         if (++workerInstance === NUM_WORKERS) {
                             workerInstance = 0;
                         }
-                        // workerInstance = await await getWorker();
                         const buffer = AudioBuffer.getChannelData(0);
                         predictWorkers[workerInstance].postMessage({
                             message: 'get-spectrogram',
@@ -1544,6 +1549,7 @@ const terminateWorkers = () => {
 }
 
 const insertRecord = async (key, speciesID, confidence, file) => {
+
     const offset = key * 1000;
     let changes, fileID;
     confidence = Math.round(confidence);
@@ -1568,7 +1574,54 @@ const insertRecord = async (key, speciesID, confidence, file) => {
         null, null, key + 3, null);
 }
 
-const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label, toDisk }) => {
+async function batchInsertRecords(cname, label, toDisk, files, originalCname){
+    const db = toDisk ? diskDB : memoryDB;
+    let params = [originalCname, STATE.detect.confidence];
+    t0 = Date.now();
+    let query = `
+        SELECT * FROM records 
+        WHERE speciesID = (
+            SELECT id FROM species WHERE cname = ?
+        ) 
+        AND confidence >= ? `;
+    if (STATE.mode !== 'explore'){
+        query += `
+            AND fileID in (
+                SELECT id FROM files WHERE name IN (${files.map(() => '?').join(', ')})
+            )`
+        params.push(...files);
+    } else if (STATE.explore.range.start) {
+        query += ` AND dateTime BETWEEN ${STATE.explore.range.start} AND ${STATE.explore.range.end}`;
+    }
+    const records = await STATE.db.allAsync(query, ...params);
+    const updatedID = db.getAsync('SELECT id FROM species WHERE cname = ?', cname);
+    let count = 0;
+    await db.runAsync('BEGIN');
+    for (const item of records) {
+        const {dateTime, speciesID, fileID, position, end, comment, callCount} = item;
+        const {name} = await STATE.db.getAsync('SELECT name FROM files WHERE id = ?', fileID)
+        // Delete existing record
+        const changes = await db.runAsync('DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?', dateTime, speciesID, fileID)
+        count += await onInsertManualRecord({
+            cname: cname, 
+            start: position,
+            end: end,
+            comment: comment,
+            count: callCount,
+            file: name,
+            label: label,
+            toDisk: toDisk,
+            batch: false,
+            originalCname: undefined
+        })
+    }
+    await db.runAsync('END');
+    console.log(`Batch record update  took ${(Date.now() - t0) / 1000} seconds`)
+    if (STATE.mode !== 'explore' && toDisk) UI.postMessage({ event: 'generate-alert', message: `${count} ${cname} records have been saved to the archive.` })
+}
+
+const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label, toDisk, batch, originalCname }) => {
+    if (batch) return batchInsertRecords(cname, label, toDisk, file, originalCname)
     start = parseFloat(start), end = parseFloat(end);
     const startMilliseconds = Math.round(start * 1000);
     let changes, fileID, fileStart;
@@ -1596,9 +1649,12 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
         fileID = res.id;
         fileStart = res.filestart;
     }
-    const durationSQL = Object.entries(metadata[file].dateDuration)
-        .map(entry => `(${entry.toString()},${fileID})`).join(',');
-    await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
+    let durationSQL;
+    if (metadata[file]){ // If we don't have file metadata, the file must be saved already
+        durationSQL = Object.entries(metadata[file].dateDuration)
+            .map(entry => `(${entry.toString()},${fileID})`).join(',');
+        await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
+    } 
 
     let response;
     const dateTime = fileStart + startMilliseconds;
@@ -1608,11 +1664,11 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     if (response.changes && toDisk) {
         UI.postMessage({ event: 'diskDB-has-records' });
     }
-    if (STATE.mode !== 'explore' && toDisk) UI.postMessage({ event: 'generate-alert', message: `${response.changes} ${cname} record has been saved to the archive.` })
+    return response.changes    
 }
 
 const parsePredictions = async (response) => {
-    let file = response.file, batchInProgress = false;
+    let file = response.file, batchInProgress = filesBeingProcessed.length;
     const latestResult = response.result, db = STATE.db;
     if (DEBUG) console.log('worker being used:', response.worker);
 
@@ -1662,12 +1718,14 @@ const parsePredictions = async (response) => {
     }
 
     //STATE.userSettingsInSelection = false;
-
-    const progress = ++predictionsReceived[file] / batchChunksToSend[file];
+    predictionsReceived[file]++;
+    const received = sumObjectValues(predictionsReceived);
+    const total = sumObjectValues(batchChunksToSend);
+    const progress =  received/total;
+    const fileProgress = predictionsReceived[file] / batchChunksToSend[file];
     UI.postMessage({ event: 'progress', progress: progress, file: file });
-    if (!STATE.selection) {
-        if (progress === 1) {
-            COMPLETED.push(file);
+    if (fileProgress === 1) {
+        if (!STATE.selection) {
             db.getAsync('SELECT id FROM files WHERE name = ?', file)
                 .then(row => {
                     if (!row) {
@@ -1681,18 +1739,16 @@ const parsePredictions = async (response) => {
                         });
                     }
                 })
-            console.log(`Prediction done ${FILE_QUEUE.length} files to go`);
-            console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
-            UI.postMessage({ event: 'progress', progress: 1.0, text: '...' });
-            batchInProgress = FILE_QUEUE.length;
-            predictionDone = true;
-        } else if (STATE.increment() === 0) {
-            getSummary({ interim: true });
         }
+        updateFilesBeingProcessed(response.file)
+        console.log(`Prediction done ${filesBeingProcessed.length} files to go`);
+        console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
+        predictionDone = true;
+    } else if (STATE.increment() === 0) {
+        getSummary({ interim: true });
     }
-    return [file, batchInProgress, response.worker]
+    return response.worker
 }
-
 
 async function parseMessage(e) {
     const response = e.data;
@@ -1713,18 +1769,18 @@ async function parseMessage(e) {
         case 'prediction':
             if (!aborted) {
                 predictWorkers[response.worker].isAvailable = true;
-                let [, batchInProgress, worker] = await parsePredictions(response);
+                let worker = await parsePredictions(response);
                 //if (response['finished']) {
 
                 process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, ${response.file},  Prediction requests ${predictionsRequested[response.file]}, predictions received ${predictionsReceived[response.file]}    \n`)
                 if (predictionsReceived[response.file] === predictionsRequested[response.file]) {
                     const limit = 10;
                     clearCache(CACHE_LOCATION, limit);
-                    if (batchInProgress) {
+                    if (filesBeingProcessed.length) {
                         UI.postMessage({
                             event: 'prediction-done', batchInProgress: true,
                         })
-                        processNextFile(worker);
+                        processNextFile({worker: worker});
                     } else if (!STATE.selection) {
                         getSummary();
                     }
@@ -1753,9 +1809,26 @@ async function parseMessage(e) {
     }
 }
 
+/**
+ * Called when a files processing is finished
+ * @param {*} file 
+ */
+function updateFilesBeingProcessed(file) {
+    // This method to determine batch complete
+    const fileIndex = filesBeingProcessed.indexOf(file);
+    if (fileIndex !== -1) {
+        canBeRemovedFromCache.concat(filesBeingProcessed.splice(fileIndex,1))
+        UI.postMessage({ event: 'progress', progress: 1.0, file: file})
+    }
+    if (!filesBeingProcessed.length) {
+        if (! STATE.selection) getSummary();
+        predictionDone = true;
+    }
+}
+
 // Optional Arguments
 async function processNextFile({
-    start = undefined, end = undefined, resetResults = false, worker = undefined
+    start = undefined, end = undefined, worker = undefined
 } = {}) {
     if (FILE_QUEUE.length) {
         predictionDone = false;
@@ -1773,32 +1846,36 @@ async function processNextFile({
             if (!start) [start, end] = await setStartEnd(file);
             if (start === end) {
                 // Nothing to do for this file
-                COMPLETED.push(file);
+                
+                updateFilesBeingProcessed(file);
                 const result = `No detections in ${file}. It has no period within it where predictions would be given`;
                 index++;
                 UI.postMessage({
                     event: 'prediction-ongoing', file: file, result: result, index: index
                 });
-                if (!FILE_QUEUE.length) {
-                    await getSummary();
-                    predictionDone = true;
-                }
-                UI.postMessage({
-                    event: 'prediction-done',
-                    file: file,
-                    audacityLabels: AUDACITY,
-                    batchInProgress: FILE_QUEUE.length
-                });
+                // if (!filesBeingProcessed.length) {
+                //     await getSummary();
+                //     predictionDone = true;
+                // }
+                // UI.postMessage({
+                //     event: 'prediction-done',
+                //     file: file,
+                //     audacityLabels: AUDACITY,
+                //     batchInProgress: filesBeingProcessed.length
+                // });
                 await processNextFile(arguments[0]);
 
             } else {
-                UI.postMessage({
-                    event: 'progress',
-                    text: "<span class='loading'>Scanning</span>",
-                    file: file
-                });
+                console.log('Total predictions received:', sumObjectValues(predictionsReceived))
+                if  (! sumObjectValues(predictionsReceived)){
+                    UI.postMessage({
+                        event: 'progress',
+                        text: "<span class='loading'>Awaiting detections</span>",
+                        file: file
+                    });
+                }
                 await doPrediction({
-                    start: start, end: end, file: file, resetResults: resetResults, worker: worker
+                    start: start, end: end, file: file, worker: worker
                 });
             }
         } else {
@@ -1807,6 +1884,13 @@ async function processNextFile({
     } else {
         predictionDone = true;
     }
+}
+
+function sumObjectValues(obj) {
+  return Object.values(obj).reduce((acc, value) => {
+      acc += value;
+    return acc;
+  }, 0);
 }
 
 async function setStartEnd(file) {
@@ -1868,7 +1952,7 @@ const getSummary = async ({
         audacityLabels: AUDACITY,
         filterSpecies: species,
         active: active,
-        batchInProgress: false,
+        batchInProgress: filesBeingProcessed.length,
         action: action
     })
 };
@@ -2015,7 +2099,9 @@ const onSave2DiskDB = async () => {
             INSERT OR IGNORE INTO disk.records 
                 SELECT * FROM records
             WHERE confidence >= ${STATE.detect.confidence} AND speciesID NOT IN (${STATE.blocked})`);
-    console.log(response?.changes + ' records added to disk database')
+    console.log(response?.changes + ' records added to disk database');
+    await memoryDB.runAsync('END');
+    console.log("transaction ended");
     if (response?.changes) {
         UI.postMessage({ event: 'diskDB-has-records' });
         if (!DATASET) {
@@ -2029,8 +2115,6 @@ const onSave2DiskDB = async () => {
             })
         }
     }
-    await memoryDB.runAsync('END');
-    console.log("transaction ended");
 };
 
 const filterLocation = () => STATE.locationID ? ` AND files.locationID = ${STATE.locationID}` : '';
