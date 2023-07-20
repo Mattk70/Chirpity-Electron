@@ -630,16 +630,14 @@ async function onAnalyse({
                 break;
             }
         }
-        if (allCached && ! reanalyse) filesBeingProcessed = [];
         if (fromDB || allCached && !reanalyse && !STATE.selection) {  // handle circle here
-            if (!fromDB) {
-                onChangeMode('archive');
-                await getSummary();
-            }
+            filesBeingProcessed = [];
             if (fromDB) {
                 await getResults({ topRankin: 5 });
             } else {
+                onChangeMode('archive');
                 await getResults();
+                await getSummary();
             }
             return
         }
