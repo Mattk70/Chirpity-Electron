@@ -383,49 +383,24 @@ const openFileInList = async (e) => {
         await loadAudioFile({ filePath: e.target.id, preserveResults: true })
     }
 }
-const filename = document.getElementById('filename');
-filename.addEventListener('click', openFileInList);
 
+const buildFileMenu = (e) => {
+    //e.preventDefault();
+    e.stopImmediatePropagation();
+    const menu = $('#context-menu');
+    menu.html(`
+    <a class="dropdown-item" id="setLocation"><span
+    class="material-icons-two-tone align-bottom pointer">edit_location_alt</span> Amend File Recording Location</a>
+    <a class="dropdown-item" id="setFileStart"><span
+    class="material-icons-two-tone align-bottom pointer">edit_calendar</span> Amend File Start Time
+    `);
+    positionMenu(menu, e);
+    // Add the setLocation handler
+    const setLocationLink = document.getElementById('setLocation');
+    setLocationLink.addEventListener('click', () => {
+        setLocation()
+    })
 
-function renderFilnamePanel() {
-    if (!currentFile) return;
-    const openfile = currentFile;
-    const files = fileList;
-    let filenameElement = document.getElementById('filename');
-    filenameElement.innerHTML = '';
-    let label = openfile.replace(/^.*[\\\/]/, "");
-    let appendStr;
-    const isSaved = ['archive', 'explore'].includes(STATE.mode) ? 'text-info' : 'text-warning';
-    if (files.length > 1) {
-        appendStr = `<div id="fileContainer" class="btn-group dropup">
-        <button type="button" class="btn btn-dark" id="dropdownMenuButton"><span id="setLocation" title="Amend recording location"
-        class="material-icons-two-tone align-bottom pointer">edit_location_alt</span><span id="setFileStart" title="Amend recording start time"
-                  class="material-icons-two-tone align-bottom pointer">edit_calendar</span> <span class="${isSaved}">${label}</span>
-        </button>
-        <button class="btn btn-dark dropdown-toggle dropdown-toggle-split" type="button" 
-                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-            <span class="visually-hidden">Toggle Dropdown</span>
-        </button>
-        <div class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton">`;
-        files.forEach(item => {
-            if (item !== openfile) {
-                const label = item.replace(/^.*[\\\/]/, "");
-                appendStr += `<a id="${item}" class="dropdown-item openFiles" href="#">
-                <span class="material-icons-two-tone align-bottom">audio_file</span>${label}</a>`;
-            }
-        });
-        appendStr += `</div></div>`;
-    } else {
-        appendStr = `<div id="fileContainer">
-        <button class="btn btn-dark" type="button" id="dropdownMenuButton">
-        <span id="setLocation" title="Amend recording location"
-        class="material-icons-two-tone align-bottom pointer">edit_location_alt</span>
-        <span id="setFileStart" title="Amend recording start time"
-                  class="material-icons-two-tone align-bottom pointer">edit_calendar</span> <span class="${isSaved}">${label}</span>
-        </button></div>`;
-    }
-
-    filenameElement.innerHTML = appendStr;
     //remove filename picker so they don't accumulate!
     const pickers = document.getElementsByClassName('opensright');
     while (pickers.length > 0) {
@@ -449,12 +424,51 @@ function renderFilnamePanel() {
             fileStart = start.toDate().getTime();
             worker.postMessage({ action: 'update-file-start', file: currentFile, start: fileStart });
         });
+        $('#setFileStart').on('show.daterangepicker', function(ev, picker) {
+            //Hack to have the picker dropdown appear next to file name
+            picker.container[0].style.transform = `translateY(-60px)`;
+          });
     })
-    // Add the setLocation handler
-    const setLocationIcon = document.getElementById('setLocation');
-    setLocationIcon.addEventListener('click', () => {
-        setLocation()
-    })
+}
+
+const filename = document.getElementById('filename');
+filename.addEventListener('click', openFileInList);
+filename.addEventListener('contextmenu', buildFileMenu);
+
+function renderFilnamePanel() {
+    if (!currentFile) return;
+    const openfile = currentFile;
+    const files = fileList;
+    let filenameElement = document.getElementById('filename');
+    filenameElement.innerHTML = '';
+    let label = openfile.replace(/^.*[\\\/]/, "");
+    let appendStr;
+    const isSaved = ['archive', 'explore'].includes(STATE.mode) ? 'text-info' : 'text-warning';
+    if (files.length > 1) {
+        appendStr = `<div id="fileContainer" class="btn-group dropup">
+            <span class="${isSaved} d-inline-flex align-items-center">${label}</span>
+        </button>
+        <button class="btn btn-dark dropdown-toggle dropdown-toggle-split" type="button" 
+                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <span class="visually-hidden">Toggle Dropdown</span>
+        </button>
+        <div class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton">`;
+        files.forEach(item => {
+            if (item !== openfile) {
+                const label = item.replace(/^.*[\\\/]/, "");
+                appendStr += `<a id="${item}" class="dropdown-item openFiles" href="#">
+                <span class="material-icons-two-tone align-bottom">audio_file</span>${label}</a>`;
+            }
+        });
+        appendStr += `</div></div>`;
+    } else {
+        appendStr = `<div id="fileContainer">
+        <button class="btn btn-dark" type="button" id="dropdownMenuButton">
+         <span class="${isSaved}">${label}</span>
+        </button></div>`;
+    }
+
+    filenameElement.innerHTML = appendStr;
     // Adapt menu
     customiseAnalysisMenu(isSaved === 'text-info');
 }
@@ -646,11 +660,11 @@ const getSelectionResults = (fromDB) => {
     let start = region.start + bufferBegin;
     // Remove small amount of region to avoid pulling in results from 'end'
     let end = region.end + bufferBegin - 0.001;
-    const mod = end - start % 3;
-    if (end - start < 1.5 || mod < 1.5) {
-        region.end += 1.5;
-        end += 1.5;
-    }
+    // const mod = end - start % 3;
+    // if (end - start < 1.5 || mod < 1.5) {
+    //     region.end += 1.5;
+    //     end += 1.5;
+    // }
     STATE.selection = {};
     STATE['selection']['start'] = start.toFixed(3);
     STATE['selection']['end'] = end.toFixed(3);
@@ -3525,26 +3539,21 @@ async function createContextMenu(e) {
     if (target.classList.contains('circle')) return;
 
     const menu = $("#context-menu");
-    let resultContext, hideInSummary = '', hideInSelection = '', plural = '';
+    let hideInSummary = '', hideInSelection = '', 
+        plural = '', contextDelete;
     const inSummary = target.closest('#speciesFilter')
-    if (! target.closest('#summaryTable')) resultContext = true;
-    else if (inSummary) {
+    const resultContext = ! target.closest('#summaryTable');
+    if (inSummary) {
         hideInSummary = 'd-none';
         plural = 's';
+    } else if (target.closest('#selectionResultTableBody')) { 
+        hideInSelection = 'd-none' 
     }
-    else if (target.closest('#selectionResultTableBody')) { hideInSelection = 'd-none' }
-
-    let contextDelete;
 
     // If we haven't clicked the active row or we cleared the region, load the row we clicked
     if (resultContext || hideInSelection || hideInSummary) {
         // Lets check if the summary needs to be filtered
-        if (inSummary) {
-            if (!target.closest('tr').classList.contains('text-warning')) {
-                target.click() // Wait for file to load
-                await waitForFileLoad();
-            }
-        } else {
+        if (! (inSummary && target.closest('tr').classList.contains('text-warning'))) {
             target.click(); // Wait for file to load
             await waitForFileLoad();
         }
@@ -3613,12 +3622,15 @@ async function createContextMenu(e) {
         xc.classList.add('d-none');
         contextDelete.classList.add('d-none');
     }
+    positionMenu(menu, e);
+}
 
+function positionMenu(menu, event) {
     // Calculate menu positioning:
     const menuWidth = menu.outerWidth();
     const menuHeight = menu.outerHeight();
-    let top = e.pageY - 50;
-    let left = e.pageX;
+    let top = event.pageY - 50;
+    let left = event.pageX;
     // Check if the menu would be displayed partially off-screen on the right
     if (left + menuWidth > window.innerWidth) {
         left = window.innerWidth - menuWidth - 15;
@@ -3634,10 +3646,8 @@ async function createContextMenu(e) {
         top: top,
         left: left
     }).addClass("show");
-
-    return false; //blocks default Webbrowser right click menu
+    //return false; //blocks default Webbrowser right click menu
 }
-
 
 $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('contextmenu', createContextMenu)
 
