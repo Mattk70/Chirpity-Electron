@@ -995,23 +995,25 @@ async function setupCtx(chunk, header) {
     const offlineSource = offlineCtx.createBufferSource();
     offlineSource.buffer = buffer;
     let previousFilter = undefined;
-    if (STATE.filters.highPassFrequency) {
-        // Create a highpass filter to attenuate the noise
-        const highpassFilter = offlineCtx.createBiquadFilter();
-        highpassFilter.type = "highpass"; // Standard second-order resonant highpass filter with 12dB/octave rolloff. Frequencies below the cutoff are attenuated; frequencies above it pass through.
-        highpassFilter.frequency.value = STATE.filters.highPassFrequency //frequency || 0; // This sets the cutoff frequency. 0 is off. 
-        highpassFilter.Q.value = 0; // Indicates how peaked the frequency is around the cutoff. The greater the value, the greater the peak.
-        offlineSource.connect(highpassFilter);
-        previousFilter = highpassFilter;
-    }
-    if (STATE.filters.lowShelfFrequency && STATE.filters.lowShelfAttenuation) {
-        // Create a lowshelf filter to boost or attenuate low-frequency content
-        const lowshelfFilter = offlineCtx.createBiquadFilter();
-        lowshelfFilter.type = 'lowshelf';
-        lowshelfFilter.frequency.value = STATE.filters.lowShelfFrequency; // This sets the cutoff frequency of the lowshelf filter to 1000 Hz
-        lowshelfFilter.gain.value = STATE.filters.lowShelfAttenuation; // This sets the boost or attenuation in decibels (dB)
-        previousFilter ? previousFilter.connect(lowshelfFilter) : offlineSource.connect(lowshelfFilter);
-        previousFilter = lowshelfFilter;
+    if (STATE.filters.active){
+        if (STATE.filters.highPassFrequency) {
+            // Create a highpass filter to attenuate the noise
+            const highpassFilter = offlineCtx.createBiquadFilter();
+            highpassFilter.type = "highpass"; // Standard second-order resonant highpass filter with 12dB/octave rolloff. Frequencies below the cutoff are attenuated; frequencies above it pass through.
+            highpassFilter.frequency.value = STATE.filters.highPassFrequency //frequency || 0; // This sets the cutoff frequency. 0 is off. 
+            highpassFilter.Q.value = 0; // Indicates how peaked the frequency is around the cutoff. The greater the value, the greater the peak.
+            offlineSource.connect(highpassFilter);
+            previousFilter = highpassFilter;
+        }
+        if (STATE.filters.lowShelfFrequency && STATE.filters.lowShelfAttenuation) {
+            // Create a lowshelf filter to boost or attenuate low-frequency content
+            const lowshelfFilter = offlineCtx.createBiquadFilter();
+            lowshelfFilter.type = 'lowshelf';
+            lowshelfFilter.frequency.value = STATE.filters.lowShelfFrequency; // This sets the cutoff frequency of the lowshelf filter to 1000 Hz
+            lowshelfFilter.gain.value = STATE.filters.lowShelfAttenuation; // This sets the boost or attenuation in decibels (dB)
+            previousFilter ? previousFilter.connect(lowshelfFilter) : offlineSource.connect(lowshelfFilter);
+            previousFilter = lowshelfFilter;
+        }
     }
     // // Create a compressor node
     // const compressor = new DynamicsCompressorNode(offlineCtx, {
