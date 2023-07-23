@@ -446,7 +446,7 @@ function renderFilnamePanel() {
     const isSaved = ['archive', 'explore'].includes(STATE.mode) ? 'text-info' : 'text-warning';
     if (files.length > 1) {
         appendStr = `<div id="fileContainer" class="btn-group dropup">
-            <span class="${isSaved} d-inline-flex align-items-center">${label}</span>
+            <span class="filename ${isSaved}">${label}</span>
         </button>
         <button class="btn btn-dark dropdown-toggle dropdown-toggle-split" type="button" 
                 data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -464,7 +464,7 @@ function renderFilnamePanel() {
     } else {
         appendStr = `<div id="fileContainer">
         <button class="btn btn-dark" type="button" id="dropdownMenuButton">
-         <span class="${isSaved}">${label}</span>
+         <span class="filename ${isSaved}">${label}</span>
         </button></div>`;
     }
 
@@ -1254,7 +1254,7 @@ window.onload = async () => {
         longitude: 0.89, // Great Snoring :)
         location: 'Location not set',
         detect: { nocmig: false, contextAware: false, confidence: 45 },
-        filters: { highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: -6, SNR: 0 },
+        filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: -6, SNR: 0 },
         warmup: true,
         backend: 'tensorflow',
         tensorflow: { threads: diagnostics['Cores'], batchSize: 4 },
@@ -3015,6 +3015,18 @@ const contextAwareIconDisplay = () => {
     }
 };
 
+const toggleFilters = () => {
+    config.filters.active = !config.filters.active;
+    worker.postMessage({
+        action: 'update-state',
+        filters: { active: config.filters.active },
+    });
+    updatePrefs();
+    showFilterEffect();
+    filterIconDisplay();
+}
+
+audioFiltersIcon.addEventListener('click', toggleFilters);
 
 const toggleContextAwareMode = () => {
     config.detect.contextAware = !config.detect.contextAware;
@@ -3367,7 +3379,7 @@ const handleThresholdChange = (e) => {
 confidenceRange.addEventListener('input', handleThresholdChange);
 // Filter handling
 const filterIconDisplay = () => {
-    if (config.filters.highPassFrequency || (config.filters.lowShelfAttenuation && config.filters.lowShelfFrequency) || config.filters.SNR) {
+    if (config.filters.active && (config.filters.highPassFrequency || (config.filters.lowShelfAttenuation && config.filters.lowShelfFrequency) || config.filters.SNR)) {
         audioFiltersIcon.classList.add('text-warning');
         audioFiltersIcon.title = 'Experimental audio filters applied';
     } else {
