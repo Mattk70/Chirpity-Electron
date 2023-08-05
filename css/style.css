@@ -364,9 +364,13 @@ footer {
     white-space: nowrap;
 }
 
-.dropdown-menu-dark {
-    max-height: 300px;
-    overflow: auto;
+.filename, .dropdown-menu-dark > a {
+    max-width: 300px;
+    white-space: nowrap; 
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right:5px;
+    align-self: center;
 }
 
 
