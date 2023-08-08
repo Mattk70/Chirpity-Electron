@@ -509,7 +509,8 @@ async function setLocation() {
     const lon = document.getElementById('customLon');
     const customPlace = document.getElementById('customPlace');
     const locationAdd = document.getElementById('set-location');
-
+    const batchWrapper = document.getElementById('location-batch-wrapper');
+    fileList.length > 1 ? batchWrapper.classList.remove('d-none') : batchWrapper.classList.add('d-none');
     // Show the current / selected location in the form
     const showLocation = () => {
         let newLocation;
@@ -561,7 +562,9 @@ async function setLocation() {
 
     const addLocation = () => {
         locationID = parseInt(savedLocationSelect.value);
-        worker.postMessage({ action: 'set-custom-file-location', lat: lat.value, lon: lon.value, place: customPlace.value, file: currentFile })
+        const batch = document.getElementById('batchLocations').checked;
+        const files = batch ? STATE.openFiles : [currentFile];
+        worker.postMessage({ action: 'set-custom-file-location', lat: lat.value, lon: lon.value, place: customPlace.value, files: files })
         locationModal.hide();
     }
     locationAdd.addEventListener('click', addLocation)
