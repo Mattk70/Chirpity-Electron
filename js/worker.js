@@ -582,7 +582,7 @@ async function onAnalyse({
     start = 0,
     end = undefined,
     reanalyse = false,
-    fromDB = false
+    circleClicked = false
 }) {
     // Now we've asked for a new analysis, clear the aborted flag
     aborted = false;
@@ -633,17 +633,20 @@ async function onAnalyse({
                 break;
             }
         }
-        if (fromDB || allCached && !reanalyse && !STATE.selection) {  // handle circle here
+        const retrieveFromDatabase = ((allCached && ! reanalyse && !STATE.selection) || circleClicked);
+        if (retrieveFromDatabase) {
             filesBeingProcessed = [];
-            if (fromDB) {
+            if (circleClicked) {
+                // handle circle here
                 await getResults({ topRankin: 5 });
             } else {
                 onChangeMode('archive');
                 await getResults();
                 await getSummary();
             }
-            return
+            return;
         }
+        
     }
     console.log("FILE_QUEUE has ", FILE_QUEUE.length, 'files', count, 'files ignored')
     if (!STATE.selection) onChangeMode('analyse');
@@ -927,16 +930,6 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
             }
             // Now we have completed the date comparison above, we convert fileStart to millis
             fileStart = fileStart.getTime();
-            // Add dawn and dusk for the file to the metadata
-            let astro = SunCalc.getTimes(fileStart, latitude, longitude);
-            metadata[file].dusk = astro.dusk.getTime();
-            // If file starts after dark, dawn is next day
-            if (fileStart > astro.dusk.getTime()) {
-                astro = SunCalc.getTimes(fileStart + 8.47e+7, latitude, longitude);
-                metadata[file].dawn = astro.dawn.getTime();
-            } else {
-                metadata[file].dawn = astro.dawn.getTime();
-            }
             // We use proxy here as the file *must* be a wav file
             const readStream = fs.createReadStream(proxy);
             readStream.on('data', async chunk => {
@@ -1125,7 +1118,6 @@ const getPredictBuffers = async ({
                 chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
                 // Now the async stuff is done ==>
                 readStream.resume();
-                //})
             }).catch((err) => {
                 console.error(`PredictBuffer rendering failed: ${err}, file ${file}`);
                 const fileIndex = filesBeingProcessed.indexOf(file);
@@ -1207,8 +1199,20 @@ const fetchAudioBuffer = async ({
     });
 }
 
+// Helper function to check if a given time is within daylight hours
+function isDuringDaylight(datetime) {
+    const date = new Date(datetime);
+    const { dawn, dusk } = SunCalc.getTimes(date, STATE.lat, STATE.lon);
+    return datetime >= dawn && datetime <= dusk;
+  }
 
 async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
+    let currentTime = metadata[file].fileStart + ((chunkStart / sampleRate) *  1000);
+    if (STATE.detect.nocmig && isDuringDaylight(currentTime)){
+        console.log('Nocmig mode on, daylight, skipping');
+        batchChunksToSend[file]--;
+        return
+    }
     predictionsRequested[file]++;
     if (worker === undefined) {
         // pick a worker
@@ -1884,21 +1888,31 @@ async function setStartEnd(file) {
     let start, end;
     if (STATE.detect.nocmig) {
         const fileEnd = meta.fileStart + (meta.duration * 1000);
+        const { dusk, dawn } = SunCalc.getTimes(fileEnd, STATE.lat, STATE.lon);
+        const nightDuration = 86400 - ((dusk - dawn) / 1000);
         // If it's dark at the file start, start at 0 ...otherwise start at dusk
-        if (meta.fileStart < meta.dawn || meta.fileStart > meta.dusk) {
+        if (! isDuringDaylight(meta.fileStart)) {
             start = 0;
         } else {
             // not dark at start, is it still light at the end?
-            if (fileEnd <= meta.dusk) {
+            if (isDuringDaylight(fileEnd)) {
                 // No? skip this file
                 return [0, 0];
             } else {
-                // So, it *is* dark by the end of the file
-                start = (meta.dusk - meta.fileStart) / 1000;
+                // So, it *is* dark by the end of the file, find out when dusk began
+                start = (dusk - meta.fileStart) / 1000;
             }
         }
         // Now set the end
-        meta.fileStart < meta.dawn && fileEnd >= meta.dawn ? end = (meta.dawn - meta.fileStart) / 1000 : end = meta.duration;
+        if (meta.duration > nightDuration ) { // file longer than 12 hours - so there may be multiple nights in it
+            end = meta.duration; // Feedchunkstomodel will skip daylight sections when file is decoded
+        } else { 
+            if (isDuringDaylight(fileEnd)){
+                end = (dawn - meta.fileStart) / 1000
+            } else {
+                end = meta.duration;
+            }
+        }
     } else {
         start = 0;
         end = meta.duration;

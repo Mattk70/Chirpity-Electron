@@ -742,7 +742,7 @@ function postAnalyseMessage(args) {
             filesInScope: filesInScope,
             reanalyse: args.reanalyse,
             SNR: config.filters.SNR,
-            fromDB: args.fromDB
+            circleClicked: args.fromDB
         });
     }
 }
