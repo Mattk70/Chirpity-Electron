@@ -154,11 +154,11 @@
   "devDependencies": {
     "electron": "^25.3.0",
     "electron-builder": "^24.4.0",
-    "@tensorflow/tfjs-converter": "^4.8.0"
+    "@tensorflow/tfjs-converter": "4.10.0"
   },
   "dependencies": {
     "@popperjs/core": "^2.9.2",
-    "@tensorflow/tfjs-node": "4.8.0",
+    "@tensorflow/tfjs-node": "4.10.0",
     "bootstrap": "^5.2.2",
     "browser-id3-writer": "^4.4.0",
     "colormap": "^2.3.2",
