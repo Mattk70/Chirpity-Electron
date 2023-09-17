@@ -424,10 +424,10 @@ const buildFileMenu = (e) => {
             fileStart = start.toDate().getTime();
             worker.postMessage({ action: 'update-file-start', file: currentFile, start: fileStart });
         });
-        $('#setFileStart').on('show.daterangepicker', function(ev, picker) {
+        $('#setFileStart').on('show.daterangepicker', function (ev, picker) {
             //Hack to have the picker dropdown appear next to file name
             picker.container[0].style.transform = `translateY(-60px)`;
-          });
+        });
     })
 }
 
@@ -1245,6 +1245,7 @@ window.onload = async () => {
     document.getElementById('contentWrapper').classList.add('loaded');
     // Set config defaults
     const defaultConfig = {
+        seenTour: false,
         UUID: uuidv4(),
         colormap: 'inferno',
         timeOfDay: false,
@@ -1350,6 +1351,10 @@ window.onload = async () => {
         });
         loadModel();
         worker.postMessage({ action: 'clear-cache' })
+        // New users - show the tour
+        if (!config.seenTour) {
+            setTimeout(prepTour, 5000)
+        }
     }
     )
     // establish the message channel
@@ -1420,7 +1425,7 @@ const setUpWorkerMessaging = () => {
                     if (args.render) {
                         renderFilnamePanel();
                     }
-                    if (args.file){ // File is in disk database but not found
+                    if (args.file) { // File is in disk database but not found
                         let message = args.message;
                         message += '\nWould you like to remove the file from the Archive?';
                         if (confirm(message)) deleteFile(args.file)
@@ -2229,7 +2234,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
                 activeRow.classList.add('table-active')
             }
             activeRow.focus();
-            if (!activeRow.classList.contains('text-bg-dark') ) activeRow.click();
+            if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
         }
     }
 };
@@ -2567,7 +2572,7 @@ async function onPredictionDone({
             activeRow = resultTable.querySelector('tr:first-child');
         }
     }
-    if (! batchInProgress && activeRow) {
+    if (!batchInProgress && activeRow) {
         activeRow.focus();
         activeRow.click();
     }
@@ -2984,7 +2989,7 @@ document.getElementById('settingsMenu').addEventListener('click', (e) => {
 
 function setNocmig(on) {
     if (on) {
-        nocmigButton.innerText = 'bedtime';
+        nocmigButton.innerText = 'nights_stay';
         nocmigButton.title = 'Nocmig mode on';
         nocmigButton.classList.add('text-info');
     } else {
@@ -3551,21 +3556,21 @@ async function createContextMenu(e) {
     if (target.classList.contains('circle')) return;
 
     const menu = $("#context-menu");
-    let hideInSummary = '', hideInSelection = '', 
+    let hideInSummary = '', hideInSelection = '',
         plural = '', contextDelete;
     const inSummary = target.closest('#speciesFilter')
-    const resultContext = ! target.closest('#summaryTable');
+    const resultContext = !target.closest('#summaryTable');
     if (inSummary) {
         hideInSummary = 'd-none';
         plural = 's';
-    } else if (target.closest('#selectionResultTableBody')) { 
-        hideInSelection = 'd-none' 
+    } else if (target.closest('#selectionResultTableBody')) {
+        hideInSelection = 'd-none'
     }
 
     // If we haven't clicked the active row or we cleared the region, load the row we clicked
     if (resultContext || hideInSelection || hideInSummary) {
         // Lets check if the summary needs to be filtered
-        if (! (inSummary && target.closest('tr').classList.contains('text-warning'))) {
+        if (!(inSummary && target.closest('tr').classList.contains('text-warning'))) {
             target.click(); // Wait for file to load
             await waitForFileLoad();
         }
@@ -3606,7 +3611,7 @@ async function createContextMenu(e) {
     const exporLink = document.getElementById('context-create-clip');
     hideInSummary ? exporLink.addEventListener('click', batchExportAudio) :
         exporLink.addEventListener('click', exportAudio);
-    if (! hideInSelection) {
+    if (!hideInSelection) {
         document.getElementById('create-manual-record').addEventListener('click', function (e) {
             if (e.target.innerText.indexOf('Edit') !== -1) {
                 showRecordEntryForm('Update', !!hideInSummary);
@@ -3674,7 +3679,7 @@ const recordEntryHandler = () => {
 }
 
 async function showRecordEntryForm(mode, batch) {
-    const cname = batch ? document.querySelector('#speciesFilter .text-warning .cname .cname').innerText :  region.attributes.label.replace('?', '');
+    const cname = batch ? document.querySelector('#speciesFilter .text-warning .cname .cname').innerText : region.attributes.label.replace('?', '');
     let callCount = '', typeIndex = '', commentText = '';
     if (cname && activeRow) {
         // Populate the form with existing values
@@ -3689,7 +3694,7 @@ async function showRecordEntryForm(mode, batch) {
         <div class="col-8">
             ${generateBirdOptionList({ store: 'allSpecies', rows: undefined, selected: cname })}
         </div>`;
-    if (! batch) {
+    if (!batch) {
         speciesList += `<div class="col"><div class="form-floating mb-3">
             <input type="number" id="call-count" value="${callCount}" class="form-control" min="1">
             <label for="call-count">Call Count</label>
@@ -3712,8 +3717,8 @@ async function showRecordEntryForm(mode, batch) {
             <label class="form-check-label" for="label-unknown">Not specified</label>
         </div>
     </fieldset>`;
-    let comment =  '<div class="form-floating mt-3">';
-    if (! batch) comment += `<textarea class="form-control" id="record-comment" style="height: 200px">${commentText}</textarea><label for="record-comment">Comments</label>`;
+    let comment = '<div class="form-floating mt-3">';
+    if (!batch) comment += `<textarea class="form-control" id="record-comment" style="height: 200px">${commentText}</textarea><label for="record-comment">Comments</label>`;
     comment += `<input type='hidden' id='DBmode' value='${mode}'>
             <input type='hidden' id='batch-mode' value='${batch}'>
             <input type='hidden' id='original-id' value='${cname}'>
@@ -3765,7 +3770,7 @@ recordEntryForm.addEventListener('submit', function (e) {
     const batch = document.getElementById('batch-mode').value === 'true';
     const cname = document.getElementById('bird-list-all').value;
     let start, end;
-    if (region){
+    if (region) {
         start = bufferBegin + region.start;
         end = bufferBegin + region.end;
         region.attributes.label = cname;
@@ -3798,7 +3803,7 @@ function deleteFile(file) {
             })
         }
         renderFilnamePanel()
-    }    
+    }
 }
 // Utility functions to wait for file to load
 function delay(ms) {
@@ -3816,3 +3821,52 @@ async function waitForLocations() {
         await delay(100); // Wait for 100 milliseconds before checking again
     }
 }
+
+// TOUR functions
+
+// Initialize the Bootstrap modal
+$('#tourModal').modal({
+    backdrop: 'static', // Prevent closing by clicking outside the modal
+    keyboard: false      // Prevent closing by pressing Esc key
+});
+
+// Function to start the tour
+function startTour() {
+    $('#tourModal').modal('show');
+}
+
+// Function to highlight an element on the page
+function highlightElement(selector) {
+    // Remove any previous highlights
+    $('.highlighted').removeClass('highlighted');
+    // Add a highlight class to the selected element
+    $(selector).addClass('highlighted');
+}
+
+// Event handler for when the carousel slides
+$('#carouselExample').on('slid.bs.carousel', function () {
+    // Get the active carousel item
+    var activeItem = $('#carouselExample .carousel-inner .carousel-item.active');
+    // Get the element selector associated with the current step
+    var elementSelector = activeItem.data('element-selector');
+    // Highlight the corresponding element on the page
+    highlightElement(elementSelector);
+});
+
+// Event handler for closing the modal
+$('#tourModal').on('hidden.bs.modal', function () {
+    // Remove any highlights when the modal is closed
+    $('.highlighted').removeClass('highlighted');
+    config.seenTour = true;
+    updatePrefs()
+});
+
+// Event handler for starting the tour
+const prepTour = () => {
+    if (!fileLoaded) {
+        const example_file = p.join(appPath, 'example.mp3')
+        openFiles({ filePaths: [example_file] })
+    }
+    startTour()
+}
+$('#startTour').on('click', prepTour);

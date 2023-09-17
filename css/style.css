@@ -17,12 +17,41 @@ body {
     font-style: normal;
     font-weight: 400;
     src: local('Material Icons Two Tone'),
-        local('MaterialIconsTwoTone-Regular'),
-        url(../fonts/MaterialIconsTwoTone-Regular.woff2) format('woff2')
+        local('material-icons-two-tone'),
+        url(../fonts/material-icons-two-tone.woff2) format('woff2')
+}
+
+@font-face {
+    font-family: 'Material Icons';
+    font-style: normal;
+    font-weight: 400;
+    src: local('Material Icons'),
+        local('MaterialIcons-Regular'),
+        url(../fonts/MaterialIcons-Regular.ttf)
 }
 
 .material-icons-two-tone {
     font-family: 'Material Icons Two Tone';
+    font-weight: normal;
+    font-style: normal;
+    font-size: x-large;
+    /* Preferred icon size */
+    font-display: block;
+    display: inline-block;
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    vertical-align: top;
+    direction: ltr;
+    padding-bottom: 0;
+    /* Support for all WebKit browsers. */
+    -webkit-font-smoothing: antialiased;
+}
+
+.material-icons {
+    font-family: 'Material Icons';
     font-weight: normal;
     font-style: normal;
     font-size: x-large;
@@ -615,3 +644,14 @@ input[type="range"].vertical {
     width: 100%;
     max-width: 400px;
 }
+
+/* Tour highlighting */
+
+.highlighted {
+    box-shadow: 0 0 10px 5px #ff6;
+}
+
+.carousel { overflow: hidden; padding-bottom: rem; }
+.carousel-caption { top: 100%; }
+.carousel-inner { overflow: visible; }
+.carousel-control-next, .carousel-control-prev { top: 8rem; }

@@ -27,6 +27,95 @@
 <body>
 
 
+    <!-- The modal for the tour -->
+    <div class="modal modal-fade" id="tourModal" tabindex="-1" aria-labelledby="tourModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <div id="carouselExample" class="carousel carousel-dark slide" data-bs-ride="false"
+                        data-bs-wrap="false">
+                        <!-- Carousel indicators -->
+                        <ol class="carousel-indicators">
+                            <li data-bs-target="#carouselExample" data-bs-slide-to="0" class="active"></li>
+                            <li data-bs-target="#carouselExample" data-bs-slide-to="1"></li>
+                            <li data-bs-target="#carouselExample" data-bs-slide-to="2"></li>
+                            <li data-bs-target="#carouselExample" data-bs-slide-to="3"></li>
+                            <li data-bs-target="#carouselExample" data-bs-slide-to="4"></li>
+                            <!-- Add more indicators as needed -->
+                        </ol>
+                        <div class="carousel-inner" style="min-height: 400px;">
+                            <!-- Carousel items -->
+                            <div class="carousel-item active">
+                                <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chiprity Nocmig">
+                                <div class="text-center pb-4">
+                                    <h5>Welcome to Chirpity Nocmig</h5>
+                                    <p>This tour will highlight a few of the key features of the application.</p>
+                                </div>
+                            </div>
+                            <div class="carousel-item" data-element-selector="#navbarSettings">
+                                <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Image 1">
+                                <div class="text-center pb-4">
+                                    <h5>Settings</h5>
+                                    <p>Here is where you set a number of defaults, including your recording location,
+                                        system preferences, audio preferences and spectrogram options.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="carousel-item" data-element-selector="#filter-panel">
+                                <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chiprity Nocmig">
+                                <div class="text-center pb-4">
+                                    <h5>Filter panel</h5>
+                                    <p>The icons here toggle the filters available. These enable Nocmig mode, Audio
+                                        filters, Context-aware mode,
+                                        the detection list to use and confidence threshold. Note, the confidence
+                                        threshold can be adjusted at any time,
+                                        even after a file analysis has taken place.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="carousel-item" data-element-selector="#fileContainer">
+                                <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chiprity Nocmig">
+                                <div class="text-center pb-4">
+                                    <h5>Context Menus</h5>
+                                    <p>Most of the tools can be access within context menus. These pop up when you
+                                        right-click the mouse.
+                                        There are context menus for detections, selected regions on the spectrogram and
+                                        the filename.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="carousel-item" data-element-selector="#navbarRecords">
+                                <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Image 1">
+                                <div class="text-center pb-4">
+                                    <h5>Saved Records</h5>
+                                    <p>You can save records for future reference from the Records menu. Here you will
+                                        also find the Chart and Explore
+                                        sections of the Application. There allow you to revisit the detections you have
+                                        saved and view charts of species'
+                                        occurance over time </p>
+                                </div>
+                            </div>
+                            <!-- Add more carousel items as needed -->
+                        </div>
+                        <!-- Carousel navigation controls -->
+                        <a class="carousel-control-prev" href="#carouselExample" role="button" data-bs-slide="prev">
+                            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">Previous</span>
+                        </a>
+                        <a class="carousel-control-next" href="#carouselExample" role="button" data-bs-slide="next">
+                            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">Next</span>
+                        </a>
+                    </div>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
     <!-- Navigation bar -->
     <div id="navPadding" class="position-absolute top-0 w-100">
         <nav class="navbar navbar-expand-md navbar-dark bg-dark" id="primary_nav_wrap">
@@ -82,7 +171,7 @@
                                     <span class="material-icons-two-tone">unarchive</span> Remove Current File From
                                     Archive
                                 </li>
-                                <li class="dropdown-item d-none" href="#" id="dataset">
+                                <li class="dropdown-item" href="#" id="dataset">
                                     <span class="material-icons-two-tone">dataset</span> Create Dataset
                                 </li>
                             </ul>
@@ -118,7 +207,7 @@
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" role="button"
+                            <a class="nav-link dropdown-toggle" href="#" role="button" id="navbarSettings"
                                 data-bs-toggle="dropdown">Settings</a>
                             <ul id="settingsMenu" class="nav-item dropdown-menu">
                                 <li>
@@ -505,10 +594,11 @@
                                         <span class="material-icons-two-tone">help</span> Keyboard Shortcuts</a></li>
                                 <li><a class="dropdown-item" id="diagnostics" href="#">
                                         <span class="material-icons-two-tone">insights</span> Diagnostics</a></li>
+                                <li><a class="dropdown-item" id="startTour" href="#">
+                                        <span class="material-icons-two-tone">tour</span> Show Tour</a></li>
                             </ul>
                         </li>
                     </ul>
-
                 </div>
                 <!-- navbar-collapse.// -->
                 <img src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"
@@ -579,7 +669,7 @@
         <!-- Analyse selection modal -->
         <div class="modal fade" id="detectionsModal" tabindex="-1" aria-labelledby="detectionsModalLabel"
             aria-hidden="true">
-            <div class="modal-dialog  moda modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header justify-content-center text-bg-dark">
                         <h5 class="modal-title" id="detectionsModalLabel">Audio Selection Analysis</h5>
@@ -661,7 +751,7 @@
                                                 <label for="savedLocations"></label>
                                                 <select class="form-control" id="savedLocations">
                                                 </select>
-                                              </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -706,7 +796,8 @@
             </div>
             <div class="col" id="exploreSpeciesSearch">
                 <div id="explore-location-list" class="form-floating">
-                    <select  spellcheck="false" class="input form-select mb-3" aria-label=".form-select" id="explore-locations"></select>
+                    <select spellcheck="false" class="input form-select mb-3" aria-label=".form-select"
+                        id="explore-locations"></select>
                     <label for="explore-locations">Location</label>
                 </div>
             </div>
@@ -754,10 +845,10 @@
             <div class="container-fluid p-1 text-bg-dark d-inline-flex" id="controlsWrapper" style="max-height: 50px">
 
                 <div id="filename" class="col-auto ps-1 overflow-visible flex-nowrap"></div>
-                <div class="col-auto btn-group bg-dark me-2 ps-1 text-nowrap" role="group">
+                <div class="col-auto btn-group bg-dark ms-2 me-2 text-nowrap" role="group">
                     <button id="playToggle" class="p-1 pe-2 btn btn-outline-secondary">
-                        <i class="material-icons-two-tone ">play_arrow</i><span
-                            class="align-middle d-none d-lg-inline">Play </span>
+                        <i class="material-icons-two-tone ">play_circle_outline</i><span
+                            class="align-middle d-none d-lg-inline"> Play </span>
                         /
                         <i class="material-icons-two-tone">pause</i><span
                             class="align-middle d-none d-lg-inline-block">Pause</span>
@@ -780,9 +871,9 @@
                 <div id="complete" class="col-2 pe-2" style="display:none">
                 </div>
                 <div class="col pe-1">
-                    <div class="btn-group float-end">
+                    <div class="btn-group float-end" id="filter-panel">
                         <span style="max-width: 70px" title="Nocmig mode on" id="nocmigMode"
-                            class="material-icons-two-tone btn btn-outline-secondary p-1 pt-2">bedtime</span>
+                            class="material-icons btn btn-outline-secondary p-1 pt-2">bedtime</span>
                         <span style="max-width: 70px" id="audioFiltersIcon" title="Experimental audio filters applied"
                             class="material-icons-two-tone btn btn-outline-secondary p-1 pt-2">blur_on</span>
                         <span style="max-width: 70px" id="context-mode" title="Context Aware mode enabled"
@@ -849,7 +940,8 @@
                     </div>
                     <div class="col" id="exploreSpeciesSearch">
                         <div id="chart-location-list" class="form-floating">
-                            <select spellcheck="false" class="input form-select mb-3" aria-label=".form-select" id="chart-locations"></select>
+                            <select spellcheck="false" class="input form-select mb-3" aria-label=".form-select"
+                                id="chart-locations"></select>
                             <label for="explore-locations">Location</label>
                         </div>
                     </div>

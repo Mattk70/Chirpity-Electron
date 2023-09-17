@@ -16,18 +16,18 @@
         Ideally, files will be those recorded by your digital recorder with their original
         timestamp. In this scenario, you will be able to take advantage of the <b>Time of Day</b> mode for the spectrogram timeline, which will show the actual time calls were
         detected. If not, you can still display (and store) the correct time of day for the file and detections if you edit its start time.
-        This can be edited by selecting the appropriate date and time on the
-        <span class="material-icons-two-tone align-bottom">edit_calendar</span>
-                    icon next to the file name on the transport controls panel.
+        This can be edited by right-clicking the filename in the control bar. 
+        <img src="Help/amend file.png" alt="The context menu accessed from the filename contains options to amend the file's start time and the recording location" class="m-3 rounded float-end img-fluid w-50">
 
     </li>
     <li>Choose whether to use <b>Nocmig mode.</b> Once the file is loaded, the spectrogram will appear, along with transport controls for
         navigating the audio. A <i>nocmig mode</i> button (<span
-                class="material-icons-two-tone align-bottom">dark_mode</span>) will also appear on the
+                class="material-icons-two-tone align-bottom">nights_stay</span>) will also appear on the
         right hand side. Nocmig mode takes its
         cue from the file creation date and time. It limits the analysis to calls occurring both after the end of civil
-        twilight and before the beginning of civil twilight the following day. Currently, the location used for
-        dawn/dusk calculations is set to Luton. In future releases, it will be possible to set your own location. <b>N.B.</b>
+        twilight and before the beginning of civil twilight the following day. The default location used for
+        dawn/dusk calculations can be set from the settings menu, and a custom location can be applied to an individual file or open files
+         <b>N.B.</b>
         If active, Nocmig mode is temporarily disabled for the Analysis of selections.
     </li>
     <li>
@@ -38,23 +38,19 @@
     </li>
 </ol>
 <h5 class="pt-2">Exploring Detections</h5>
+<img src="Help/detection menu.png" alt="" class="m-3 rounded float-end img-fluid w-50">
 <ol start="4">
     <li>
         As the model makes detections, they appear in a table below the spectrogram. Clicking the detection's row in
-        the table will cause the playhead to jump to the start of that detection. Press <b>P</b>, or the
-        <span class='material-icons-two-tone play pointer align-bottom'>play_circle_filled</span> icon to play the detection.
-        Alternatively, you may press the SpaceBar to play from the beginning of the selection and continue playing the
+        the table will cause the playhead to jump to the start of that detection and highlight it's location on the spectrogram.
+        Right-clicking the row will bring up the detection context menu. This contains options specific to the currently highlighted detection.
+        You may press the SpaceBar to play from the beginning of the selection and continue playing the
         audio until you press the SpaceBar again. Clicking the spectrogram will move the playhead to that position.
-        Playback will continue, so this allows you to replay a call repeatedly.
+        If currently playing, playback will continue, so this allows you to replay a call repeatedly.
     </li>
     <li>
-        Selecting the <img src="img/logo/XC.png" alt="XC"> icon will open a search result (in your default web broswer)
-        for the detected species' nocturnal flight calls on the Xeno Canto website. Here you can compare the result to
-        Nocmig recordings uploaded by others.
-    </li>
-    <li>
-        If multiple detections apply for a given time period, a <span class='material-icons-two-tone'>sync</span> icon will be displayed in the
-        Other IDs table column. Clicking this will open rows beneath with the details of those species.
+        If multiple detections apply for a given time period, a circle will be displayed next to the Species' name.
+        Clicking this circle will display the other species detected in the region, and the confidence given to those IDs.
     </li>
 </ol>
 <h5 class="pt-2">Summary and Filtering Detections</h5>
@@ -71,19 +67,17 @@
 <ol start="8">
     <li>Sometimes, a call is missed or a detection is erroneous due to the position of the analysis window in relation
         to the call. The window can be moved by dragging it, or you can create a new window by clicking and
-        dragging out a custom region on the spectrogram. Once you have a new region, select <b>Analysis > Analyse
-            selected interval</b> from the menu. The custom detection is placed at the top of the results table.
-        <b>N.B.</b> The detection threshold is much reduced for custom detections, so exercise appropriate caution since
-        false positives are more likely. Uncoloured confidence icons should be treated as a "wild guess", even
-        considered by the model more likely to be wrong than right.
+        dragging out a custom region on the spectrogram. Once you have a new region, select 
+        <span class="material-icons-two-tone">search</span> <b>Analyse</b> from the context menu or <b>Analysis > Analyse
+        selected interval</b> from the menu. 
+        The detections for the selected region appear in an overlay window and can be saved to the results or discarded.
     </li>
 </ol>
 
 <h5 class="pt-2">Amending Results</h5>
 <ol start="10">
-    <li>It is possible to exclude results from what will be saved by selecting the exclude icon <span
-            class="material-icons-two-tone align-bottom">clear</span> . This can be selected on a per-detection basis in
-        the results table, or a per-species basis in the summary.
+    <li>It is possible to remove results from what will be saved by selecting  <span class='delete material-icons-two-tone'>delete_forever</span> <b>Delete Record</b> in the context menu.
+        This can be selected on a per-detection basis in the results table, or a per-species basis in the summary.
     </li>
 
 </ol>
@@ -93,21 +87,19 @@
     <li>There are several ways to save results:
         <ol>
 
-            <li>Once the analysis is complete, and after you have made any amendments, you can save the results to a database.
-            After this, any time you re-analyse a file, it will bring in the results from the database records. You can also explore and chart saved records.
+            <li>Once the analysis is complete, and after you have made any amendments, you can save the results to a database <b>Records > Save to Archive </b>
+            After this, it will bring in the results from the database records. You can also explore and chart saved records.
 
             <li>Save the detections as a label file in Audacity format. Press <b>Ctrl-A</b> or select <b>File > Save
                 Audacity Labels</b> from the menu. By default, the label file will have the same name as the audio file,
                 with a ".txt" extension.
             </li>
             <li>
-                Save a 3-second audio clip of a detection (in MP3 format). To do this, click the <span
-                    class='material-icons-two-tone align-bottom'>file_download</span> icon in the result table. By default, the filename will contain the species and
-                timestamp of the detection identifying its position in the original audio file. These files are saved in the Opus format.
-            </li>
-            <li>
-                Save a custom clip. Select a region of the spectrogram by dragging the mouse over the area of audio
-                you want to save. From the File menu, select <b>Export Selected Audio</b> to bring up a file save dialog.
+                Export an audio clip of a detection. To do this, select <span class="material-icons-two-tone">
+                    music_note
+                </span><b>Export Audio Clip</b> on the context menu. By default, the filename will contain the species and
+                timestamp of the detection identifying its position in the original audio file. The <b>Settings</b> menu allows you
+                to control the format and quality of the exported files as well as apply padding and a fade effect to the beginning and end of the audio.
             </li>
         </ol>
     </li>
