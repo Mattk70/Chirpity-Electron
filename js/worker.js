@@ -873,6 +873,8 @@ function addDays(date, days) {
     return result;
 }
 
+
+
 /**
  * Called by getWorkingFile, setCustomLocation
  * Assigns file metadata to a metadata cache object. file is the key, and is the source file
@@ -1296,9 +1298,24 @@ const saveResults2DataSet = (rootDirectory) => {
     let promise = Promise.resolve();
     let promises = [];
     let count = 0;
+    const db2ResultSQL = `SELECT DISTINCT dateTime AS timestamp, 
+    files.duration, 
+    files.filestart,
+    files.name AS file, 
+    position,
+    species.sname, 
+    species.cname, 
+    confidence AS score, 
+    label, 
+    comment
+                        FROM records
+                            JOIN species
+                        ON species.id = records.speciesID
+                            JOIN files ON records.fileID = files.id
+                          WHERE speciesID NOT IN (${prepParams(STATE.blocked)}) 
+                          AND confidence >= ${STATE.detect.confidence}`;
 
-
-    memoryDB.each(`${db2ResultSQL}`, async (err, result) => {
+    memoryDB.each(db2ResultSQL, ...STATE.blocked, async (err, result) => {
         // Check for level of ambient noise activation
         let ambient, threshold, value = 50;
         // adding_chirpity_additions is a flag for curated files, if true we assume every detection is correct
@@ -1887,24 +1904,33 @@ function sumObjectValues(obj) {
   }, 0);
 }
 
+function onSameDay(timestamp1, timestamp2) {
+    const date1Str = new Date(timestamp1).toLocaleDateString();
+    const date2Str = new Date(timestamp2).toLocaleDateString();
+    return date1Str === date2Str;
+  }
+
 async function setStartEnd(file) {
     const meta = metadata[file];
     let start, end;
     if (STATE.detect.nocmig) {
         const fileEnd = meta.fileStart + (meta.duration * 1000);
         const { dusk, dawn } = SunCalc.getTimes(fileEnd, STATE.lat, STATE.lon);
-        const nightDuration = 86400 - ((dusk - dawn) / 1000);
+        const secondsInDay = 84600;
+        const nightDuration = secondsInDay - ((dusk - dawn) / 1000);
+        const sameDay = onSameDay(fileEnd, meta.fileStart)
         // If it's dark at the file start, start at 0 ...otherwise start at dusk
         if (! isDuringDaylight(meta.fileStart)) {
             start = 0;
         } else {
-            // not dark at start, is it still light at the end?
-            if (isDuringDaylight(fileEnd)) {
+            // not dark at start, is it still light at the end and on the same day?
+            if (isDuringDaylight(fileEnd) && sameDay ) {
                 // No? skip this file
                 return [0, 0];
             } else {
                 // So, it *is* dark by the end of the file, find out when dusk began
-                start = (dusk - meta.fileStart) / 1000;
+                if (sameDay) start = (dusk - meta.fileStart) / 1000;
+                else start = ((dusk - meta.fileStart) / 1000) - secondsInDay;
             }
         }
         // Now set the end
@@ -2546,20 +2572,7 @@ async function getLocations() {
     UI.postMessage({ event: 'location-list', locations: locations })
 }
 
-// const db2ResultSQL = `SELECT DISTINCT dateTime AS timestamp, 
-//   files.duration, 
-//   files.filestart,
-//   files.name AS file, 
-//   position,
-//   species.sname, 
-//   species.cname, 
-//   confidence AS score, 
-//   label, 
-//   comment
-//                       FROM records
-//                           JOIN species
-//                       ON species.id = records.speciesID
-//                           JOIN files ON records.fileID = files.id`;
+
 
 
 

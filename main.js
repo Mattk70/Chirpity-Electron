@@ -45,6 +45,12 @@ const clearCache = (file_cache) => {
     })
 }
 
+if (fs.existsSync('Help/example.mp3')){
+    console.log('file found')
+    fs.renameSync('Help/example.mp3', path.join(app.getPath('userData'), 'example.mp3'))
+
+}
+
 async function exitHandler(options, exitCode) {
     if (options.cleanup) {
         const tmp = path.join(app.getPath('temp'), 'chirpity');
