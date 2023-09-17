@@ -133,7 +133,7 @@ async function loadDB(path) {
 let metadata = {};
 let index = 0, AUDACITY = {}, predictionStart;
 let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
-let predictWorkers = [], predictionDone = true, aborted = false;
+let predictWorkers = [], aborted = false;
 
 // Set up the audio context:
 const audioCtx = new AudioContext({ latencyHint: 'interactive', sampleRate: sampleRate });
@@ -246,7 +246,7 @@ async function handleMessage(e) {
             break;
         case 'file-load-request':
             index = 0;
-            if (!predictionDone) onAbort(args);
+            if (filesBeingProcessed.length) onAbort(args);
             if (!memoryDB) await createDB();
             console.log('Worker received audio ' + args.file);
             await loadAudioFile(args);
@@ -365,6 +365,9 @@ const getFiles = async (files, image) => {
         return supported_files.some(ext => file.toLowerCase().endsWith(ext))
     }
     )
+    file_list.forEach(file => {
+         STATE.db.getAsync('INSERT OR IGNORE INTO files VALUES (null, ?, null, null, null)', file);
+    })
     UI.postMessage({ event: 'files', filePaths: file_list });
     return file_list;
 }
@@ -660,13 +663,13 @@ function onAbort({
     FILE_QUEUE = [];
     index = 0;
     console.log("abort received")
-    if (!predictionDone) {
+    if (filesBeingProcessed.length) {
         //restart the worker
         UI.postMessage({ event: 'spawning' });
         terminateWorkers();
         spawnWorkers(model, list, BATCH_SIZE, NUM_WORKERS)
     }
-    predictionDone = true;
+    filesBeingProcessed = [];
     predictionsReceived = {};
     predictionsRequested = {};
     //UI.postMessage({ event: 'prediction-done', batchInProgress: true });
@@ -893,7 +896,7 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
     // Latitude only provided when updating location
     const latitude = savedMeta?.lat || STATE.lat;
     const longitude = savedMeta?.lon || STATE.lon;
-    const row = await diskDB.getAsync('SELECT id FROM locations WHERE lat = ? and lon = ?', latitude, longitude);
+    const row = await STATE.db.getAsync('SELECT id FROM locations WHERE lat = ? and lon = ?', latitude, longitude);
     metadata[file].locationID = row?.id;
 
     metadata[file].duration = savedMeta?.duration || await getDuration(proxy);
@@ -1241,7 +1244,6 @@ async function doPrediction({
     end = metadata[file].duration,
     worker = undefined
 }) {
-    predictionDone = false;
     predictionStart = new Date();
     await getPredictBuffers({ file: file, start: start, end: end, worker: undefined });
     UI.postMessage({ event: 'update-audio-duration', value: metadata[file].duration });
@@ -1764,7 +1766,6 @@ const parsePredictions = async (response) => {
         updateFilesBeingProcessed(response.file)
         console.log(`Prediction done ${filesBeingProcessed.length} files to go`);
         console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
-        predictionDone = true;
     } else if (STATE.increment() === 0) {
         getSummary({ interim: true });
     }
@@ -1843,7 +1844,6 @@ function updateFilesBeingProcessed(file) {
     }
     if (!filesBeingProcessed.length) {
         if (! STATE.selection) getSummary();
-        predictionDone = true;
     }
 }
 
@@ -1852,8 +1852,6 @@ async function processNextFile({
     start = undefined, end = undefined, worker = undefined
 } = {}) {
     if (FILE_QUEUE.length) {
-        predictionDone = false;
-
         let file = FILE_QUEUE.shift()
         if (DATASET && FILE_QUEUE.length % 100 === 0) {
             await onSave2DiskDB();
@@ -1892,9 +1890,7 @@ async function processNextFile({
         } else {
             await processNextFile(arguments[0]);
         }
-    } else {
-        predictionDone = true;
-    }
+    } 
 }
 
 function sumObjectValues(obj) {
@@ -2533,7 +2529,7 @@ was not found in the Archve databasse.`});
     }
 }
 
-async function onSetCustomLocation({ lat, lon, place, file }) {
+async function onSetCustomLocation({ lat, lon, place, files }) {
 
     if (!place) {
         const { id } = await diskDB.getAsync(`SELECT ID FROM locations WHERE lat = ? AND lon = ?`, lat, lon);
@@ -2547,23 +2543,30 @@ async function onSetCustomLocation({ lat, lon, place, file }) {
         const result = await diskDB.runAsync(`
         INSERT INTO locations VALUES (?, ?, ?, ?)
             ON CONFLICT(lat,lon) DO UPDATE SET place = excluded.place`, null, lat, lon, place);
-
         const { id } = await diskDB.getAsync(`SELECT ID FROM locations WHERE lat = ? AND lon = ?`, lat, lon);
-        await STATE.db.runAsync('UPDATE files SET locationID = ? WHERE name = ?', id, file);
-        // state.db is set onAnalyse, so check if the file is saved
-        if (STATE.db === memoryDB) {
-            const fileSaved = await getSavedFileInfo(file)
-            if (fileSaved) {
-                await diskDB.runAsync('UPDATE files SET locationID = ? WHERE name = ?', id, file);
+        for(const file of files) {
+            await STATE.db.runAsync('UPDATE files SET locationID = ? WHERE name = ?', id, file);
+            // state.db is set onAnalyse, so check if the file is saved
+            if (STATE.db === memoryDB) {
+                const fileSaved = await getSavedFileInfo(file)
+                if (fileSaved) {
+                    await diskDB.runAsync('UPDATE files SET locationID = ? WHERE name = ?', id, file);
+                }
             }
         }
     }
     // Update file Metadata
-    metadata[file].isComplete = false;
-    await setMetadata({
-        file: file,
-        proxy: metadata[file].proxy,
-    });
+    for(const file of files) {
+        let proxy;
+        if (metadata[file]) {
+            metadata[file].isComplete = false;
+            proxy = metadata[file].proxy;
+        }
+        await setMetadata({
+            file: file,
+            proxy: proxy
+        });
+    }
     await getLocations();
 }
 
