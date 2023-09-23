@@ -9,7 +9,7 @@ const settings = require('electron-settings');
 let files = [];
 let blockerID = 1;
 
-const DEBUG = true;
+const DEBUG = false;
 //Updater
 //const server = 'https://chirpity-electron-releases.vercel.app';
 //console.log('process platform ' + process.platform)
@@ -45,11 +45,7 @@ const clearCache = (file_cache) => {
     })
 }
 
-if (fs.existsSync('Help/example.mp3')){
-    console.log('file found')
-    fs.renameSync('Help/example.mp3', path.join(app.getPath('userData'), 'example.mp3'))
 
-}
 
 async function exitHandler(options, exitCode) {
     if (options.cleanup) {
@@ -228,6 +224,8 @@ app.whenReady().then(async () => {
     ipcMain.handle('getPath', () => app.getPath('userData'));
     ipcMain.handle('getTemp', () => app.getPath('temp'));
     ipcMain.handle('getVersion', () => app.getVersion());
+    ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
+
 
     await createWorker();
     await createWindow();

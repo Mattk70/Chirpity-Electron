@@ -1,6 +1,6 @@
 {
   "name": "chirpity",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
@@ -19,12 +19,14 @@
       "!dist${/*}",
       "!BirdNet${/*}",
       "!*fixed_roll*${/*}",
+      "!Help/example.mp3",
       "!BirdNET_GLOBAL_3K_V2.2_Labels.txt",
       "!venv${/*}",
-      "!24000_v9${/*}",
       "!*git*${/*}",
       "!package-lock.json",
-      "!poetry-lock*",
+      "!poetry.lock*",
+      "!pyproject.toml",
+      "!README.md",
       "!.idea",
       "!saved_model$(/*)",
       "model_config.json",
@@ -35,6 +37,7 @@
       "node_modules/ffprobe-static-electron/index.js",
       "node_modules/ffprobe-static-electron/package.json"
     ],
+    "extraResources": ["./Help/example.mp3"],
     "fileAssociations": [
       {
         "ext": "mp3",

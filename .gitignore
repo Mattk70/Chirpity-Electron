@@ -109,3 +109,16 @@ packages
 
 #Package directory
 dist/
+
+#vscode
+.vscode/
+
+# idea
+.idea/
+
+# git
+.gitingnore
+
+.package-lock.json
+poetry.lock
+pyproject.toml

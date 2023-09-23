@@ -17,8 +17,10 @@
         timestamp. In this scenario, you will be able to take advantage of the <b>Time of Day</b> mode for the spectrogram timeline, which will show the actual time calls were
         detected. If not, you can still display (and store) the correct time of day for the file and detections if you edit its start time.
         This can be edited by right-clicking the filename in the control bar. 
-        <img src="Help/amend file.png" alt="The context menu accessed from the filename contains options to amend the file's start time and the recording location" class="m-3 rounded float-end img-fluid w-50">
-
+        <figure class="figure float-end m-3">
+            <img src="Help/amend file.png" alt="The context menu accessed from the filename contains options to amend the file's start time and the recording location" class="rounded figure-img float-end img-fluid">
+            <figcaption class="figure-caption text-muted text-end">File name context menu.</figcaption>
+        </figure>
     </li>
     <li>Choose whether to use <b>Nocmig mode.</b> Once the file is loaded, the spectrogram will appear, along with transport controls for
         navigating the audio. A <i>nocmig mode</i> button (<span
@@ -38,12 +40,17 @@
     </li>
 </ol>
 <h5 class="pt-2">Exploring Detections</h5>
-<img src="Help/detection menu.png" alt="" class="m-3 rounded float-end img-fluid w-50">
+
 <ol start="4">
     <li>
         As the model makes detections, they appear in a table below the spectrogram. Clicking the detection's row in
         the table will cause the playhead to jump to the start of that detection and highlight it's location on the spectrogram.
-        Right-clicking the row will bring up the detection context menu. This contains options specific to the currently highlighted detection.
+        Right-clicking the row will bring up the detection context menu. 
+        <figure class="figure float-end m-3">
+            <img src="Help/detection menu.png" alt="The context menu accessed from a detection contains options to inspect and amend the record" class="rounded figure-img float-end img-fluid">
+            <figcaption class="figure-caption text-muted text-end">Detection context menu.</figcaption>
+        </figure>
+        This contains options specific to the currently highlighted detection.
         You may press the SpaceBar to play from the beginning of the selection and continue playing the
         audio until you press the SpaceBar again. Clicking the spectrogram will move the playhead to that position.
         If currently playing, playback will continue, so this allows you to replay a call repeatedly.
