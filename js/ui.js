@@ -1283,6 +1283,11 @@ window.onload = async () => {
                 config[key] = defaultConfig[key];
             }
         });
+        // Update model if old models in config
+        if (! ['v1', 'v2'].includes(config.model) ) {
+            config.model = 'v2';
+            updatePrefs()
+        }
 
         // Initialize Spectrogram
         initWavesurfer({});
@@ -1356,7 +1361,7 @@ window.onload = async () => {
         worker.postMessage({ action: 'clear-cache' })
         // New users - show the tour
         if (!config.seenTour) {
-            setTimeout(prepTour, 5000)
+            setTimeout(prepTour, 2000)
         }
     }
     )
@@ -3865,9 +3870,9 @@ $('#tourModal').on('hidden.bs.modal', function () {
 });
 
 // Event handler for starting the tour
-const prepTour = () => {
+const prepTour = async () => {
     if (!fileLoaded) {
-        const example_file = p.join(appPath, 'example.mp3')
+        const example_file = await window.electron.getAudio()
         openFiles({ filePaths: [example_file] })
     }
     startTour()

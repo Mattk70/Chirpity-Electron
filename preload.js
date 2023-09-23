@@ -48,6 +48,7 @@ contextBridge.exposeInMainWorld('electron', {
     getPath: () => ipcRenderer.invoke('getPath'),
     getTemp: () => ipcRenderer.invoke('getTemp'),
     getVersion: () => ipcRenderer.invoke('getVersion'),
+    getAudio: () => ipcRenderer.invoke('getAudio'),
 });
 
 contextBridge.exposeInMainWorld('module', {
