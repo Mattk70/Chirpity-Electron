@@ -281,7 +281,7 @@ async function handleMessage(e) {
             if (predictWorkers.length) terminateWorkers();
             spawnWorkers(args.model, args.list, BATCH_SIZE, args.threads);
             break;
-        case 'open-files':
+        case 'get-valid-files-list':
             await getFiles(args.files)
             break;
         case 'post':

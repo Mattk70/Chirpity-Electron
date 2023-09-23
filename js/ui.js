@@ -580,11 +580,11 @@ async function setLocation() {
 
 /**
  * We post the list to the worker as it has node and that allows it easier access to the
- * required filesystem routines
+ * required filesystem routines, returns valid audio file list
  * @param filePaths
  */
-const openFiles = ({ filePaths }) => {
-    worker.postMessage({ action: 'open-files', files: filePaths })
+const filterValidFiles = ({ filePaths }) => {
+    worker.postMessage({ action: 'get-valid-files-list', files: filePaths })
 }
 
 async function onOpenFiles(args) {
@@ -3178,7 +3178,7 @@ document.addEventListener('drop', async (event) => {
         // Using the path attribute to get absolute file path
         filelist.push(f.path);
     }
-    if (filelist.length) openFiles({ filePaths: filelist })
+    if (filelist.length) filterValidFiles({ filePaths: filelist })
 });
 
 
@@ -3872,8 +3872,10 @@ $('#tourModal').on('hidden.bs.modal', function () {
 // Event handler for starting the tour
 const prepTour = async () => {
     if (!fileLoaded) {
-        const example_file = await window.electron.getAudio()
-        openFiles({ filePaths: [example_file] })
+        const example_file = await window.electron.getAudio();
+        // create a canvas for the audio spec
+        showElement(['spectrogramWrapper'], false);
+        await loadAudioFile({ filePath: example_file });
     }
     startTour()
 }
