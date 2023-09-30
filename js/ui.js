@@ -885,7 +885,7 @@ const export2audio = document.getElementById('export2audio');
 export2audio.addEventListener('click', batchExportAudio);
 
 async function batchExportAudio(e) {
-    const species = isSpeciesViewFiltered(true) || getSpecies(e.target);
+    const species = isSpeciesViewFiltered(true); // || getSpecies(e.target);
     if (!species) {
         alert("Filter results by species to export audio files");
         return
@@ -2036,7 +2036,7 @@ const setTimelinePreferences = () => {
 }
 
 const timelineToggle = (fromKeys) => {
-    if (fromKeys) {
+    if (fromKeys === true) {
         timelineSetting.value === 'timeOfDay' ? timelineSetting.value = 'timecode' : timelineSetting.value = 'timeOfDay'
     }
     config.timeOfDay = timelineSetting.value === 'timeOfDay'; //toggle setting
