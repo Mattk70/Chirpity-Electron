@@ -638,6 +638,10 @@ input[type="range"].vertical {
     /* One more than modal */
     z-index: 1056;
 }
+#tourModal {
+    /* One more than modal */
+    z-index: 1057;
+}
 
 #chartRange, #exploreRange {
     min-height: 58px;
