@@ -19,7 +19,7 @@ let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on every change
 
-const DEBUG = false;
+const DEBUG = true;
 
 const DATASET = false;
 const adding_chirpity_additions = true;
@@ -262,7 +262,7 @@ async function handleMessage(e) {
             getSpecies();
             break;
         case 'get-locations':
-            getLocations();
+            getLocations({db: STATE.db, file: args.file});
             break;
         case 'insert-manual-record':
             const count = await onInsertManualRecord(args);
@@ -365,27 +365,10 @@ const getFiles = async (files, image) => {
         return supported_files.some(ext => file.toLowerCase().endsWith(ext))
     }
     )
-    file_list.forEach(file => {
-         STATE.db.getAsync('INSERT OR IGNORE INTO files VALUES (null, ?, null, null, null)', file);
-    })
     UI.postMessage({ event: 'files', filePaths: file_list });
     return file_list;
 }
 
-// Get a list of files in a folder and subfolders
-// const getFilesInDirectory = async dir => {
-//     const files = await readdir(dir, { withFileTypes: true });
-//     let file_map = files.map(async file => {
-//         const path = p.join(dir, file.name);
-//         if (file.isDirectory()) return await getFilesInDirectory(path);
-//         if (file.isFile() || file.isSymbolicLink()) {
-//             return path
-//         }
-//         return 0;
-//     });
-//     file_map = (await Promise.all(file_map)).flat(Infinity)
-//     return file_map
-// }
 
 const getFilesInDirectory = async (dir) => {
     const files = [];
@@ -600,8 +583,8 @@ async function onAnalyse({
     filesBeingProcessed = [...filesInScope];
 
     if (!STATE.selection) {
-        // Start with a clean memory db
-        await createDB();
+        // Clear records from the memory db
+        await memoryDB.runAsync('DELETE FROM records; VACUUM');
         //create a copy of files in scope for state, as filesInScope is spliced
         STATE.setFiles([...filesInScope]);
     }
@@ -888,21 +871,24 @@ function addDays(date, days) {
  * @returns {Promise<unknown>}
  */
 const setMetadata = async ({ file, proxy = file, source_file = file }) => {
-    metadata[file] = { proxy: proxy };
+    metadata[file] ??= { proxy: proxy };
+    metadata[file].proxy ??= proxy;
     // CHeck the database first, so we honour any manual updates.
     const savedMeta = await getSavedFileInfo(file);
     // If we have stored imfo about the file, set the saved flag;
     metadata[file].isSaved = !!savedMeta;
     // Latitude only provided when updating location
-    const latitude = savedMeta?.lat || STATE.lat;
-    const longitude = savedMeta?.lon || STATE.lon;
-    const row = await STATE.db.getAsync('SELECT id FROM locations WHERE lat = ? and lon = ?', latitude, longitude);
-    metadata[file].locationID = row?.id;
+    // const latitude = savedMeta?.lat || STATE.lat;
+    // const longitude = savedMeta?.lon || STATE.lon;
+    // const row = await STATE.db.getAsync('SELECT id FROM locations WHERE lat = ? and lon = ?', latitude, longitude);
+
+    // using the nullish coalescing operator
+    metadata[file].locationID ??= savedMeta?.locationID;
 
     metadata[file].duration = savedMeta?.duration || await getDuration(proxy);
 
     return new Promise((resolve) => {
-        if (metadata[file]?.isComplete) {
+        if (metadata[file].isComplete) {
             resolve(metadata[file])
         } else {
             let fileStart, fileEnd;
@@ -1202,19 +1188,19 @@ const fetchAudioBuffer = async ({
 }
 
 // Helper function to check if a given time is within daylight hours
-function isDuringDaylight(datetime) {
+function isDuringDaylight(datetime, lat, lon) {
     const date = new Date(datetime);
-    const { dawn, dusk } = SunCalc.getTimes(date, STATE.lat, STATE.lon);
+    const { dawn, dusk } = SunCalc.getTimes(date, lat, lon);
     return datetime >= dawn && datetime <= dusk;
   }
 
 async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
     let currentTime = metadata[file].fileStart + ((chunkStart / sampleRate) *  1000);
-    if (STATE.detect.nocmig && isDuringDaylight(currentTime)){
-        console.log('Nocmig mode on, daylight, skipping');
-        batchChunksToSend[file]--;
-        return
-    }
+    // if (STATE.detect.nocmig && isDuringDaylight(currentTime)){
+    //     console.log('Nocmig mode on, daylight, skipping');
+    //     batchChunksToSend[file]--;
+    //     return
+    // }
     predictionsRequested[file]++;
     if (worker === undefined) {
         // pick a worker
@@ -1494,6 +1480,19 @@ const bufferToAudio = ({
                 )
             }
         }
+        // This code doesn't weork: error opening filters
+        // if (STATE.filters.active){
+        //     ffmpgCommand = ffmpgCommand.audioFilters(
+        //          {
+        //              filter: 'lowshelf',
+        //              options: `gain=${STATE.filters.lowShelfAttenuation}:f=${STATE.filters.lowShelfFrequency}`
+        //          },
+        //          {
+        //              filter: 'highpass',
+        //              options: `f=${STATE.filters.highPassFrequency}:poles=1`
+        //          } 
+        //      )
+        //  }
         ffmpgCommand.on('start', function (commandLine) {
             if (DEBUG) console.log('FFmpeg command: ' + commandLine);
         })
@@ -1906,43 +1905,100 @@ function onSameDay(timestamp1, timestamp2) {
     return date1Str === date2Str;
   }
 
+
+// Function to calculate nighttime boundaries for an audio file
+function calculateNighttimeBoundaries(fileStart, fileEnd, latitude, longitude) {
+    const boundaries = [];
+    // Initialize the current date to the start date of the audio file
+    let startDate = new Date(fileStart);
+    let stopDate = new Date(fileEnd);
+    let remainingFileDuration = stopDate - startDate;
+    while (startDate < stopDate) {
+        let start, end;
+      // Calculate dusk and dawn times for the current date
+      // Add the boundaries to the array
+      const {dawn, dusk} = SunCalc.getTimes (startDate, latitude, longitude);
+      const lengthOfNight = dawn.setDate(dawn.getDate() + 1) - dusk;
+      if (isDuringDaylight(startDate, latitude, longitude)){
+        const offset = dusk - startDate;
+        if (offset > remainingFileDuration) {
+            boundaries.push({ start: 0, end: 0})
+            return boundaries;
+        }
+        start = offset / 1000;
+        remainingFileDuration = remainingFileDuration - offset;
+      } else {
+        start = 0;
+      }
+      // end
+      if (remainingFileDuration < lengthOfNight){
+        end = start + (remainingFileDuration / 1000);
+      } else {
+        end = start + (lengthOfNight.getTime() / 1000);
+      }
+      boundaries.push({ start: start, end: end});
+      // Move to the next day
+      startDate.setDate(startDate.getDate() + 1);
+    };
+    if (boundaries.length > 1){
+        UI.postMessage({event: "generate-alert", message: `Nocmig mode doesn't yet work for files over 24 hours' duration. 
+Only the first 24 hours of the file will be processed.`})
+    }
+    return boundaries;
+  }
+
 async function setStartEnd(file) {
     const meta = metadata[file];
-    let start, end;
+    let boundaries;
+    //let start, end;
     if (STATE.detect.nocmig) {
         const fileEnd = meta.fileStart + (meta.duration * 1000);
-        const { dusk, dawn } = SunCalc.getTimes(fileEnd, STATE.lat, STATE.lon);
-        const secondsInDay = 84600;
-        const nightDuration = secondsInDay - ((dusk - dawn) / 1000);
-        const sameDay = onSameDay(fileEnd, meta.fileStart)
-        // If it's dark at the file start, start at 0 ...otherwise start at dusk
-        if (! isDuringDaylight(meta.fileStart)) {
-            start = 0;
-        } else {
-            // not dark at start, is it still light at the end and on the same day?
-            if (isDuringDaylight(fileEnd) && sameDay ) {
-                // No? skip this file
-                return [0, 0];
-            } else {
-                // So, it *is* dark by the end of the file, find out when dusk began
-                if (sameDay) start = (dusk - meta.fileStart) / 1000;
-                else start = ((dusk - meta.fileStart) / 1000) - secondsInDay;
-            }
-        }
-        // Now set the end
-        if (meta.duration > nightDuration ) { // file longer than 12 hours - so there may be multiple nights in it
-            end = meta.duration; // Feedchunkstomodel will skip daylight sections when file is decoded
-        } else { 
-            if (isDuringDaylight(fileEnd)){
-                end = (dawn - meta.fileStart) / 1000
-            } else {
-                end = meta.duration;
-            }
-        }
+        const sameDay = onSameDay(fileEnd, meta.fileStart);
+        const result = await STATE.db.getAsync('SELECT * FROM locations WHERE id = ?', meta.locationID);
+        const {lat, lon} = result ? {lat: result.lat, lon: result.lon} : {lat: STATE.lat, lon: STATE.lon};
+        boundaries = calculateNighttimeBoundaries(meta.fileStart, fileEnd, lat, lon);
+        //const {dawn, dusk} = boundaries[0];
+        // let dusk, dawn;
+        // const astro = SunCalc.getTimes(fileEnd, lat, lon);
+        // dawn = astro.dawn;
+        // dusk = astro.dusk;
+        // if (!sameDay){
+        //     const nextday = meta.fileStart.getDate() + 1;
+        //     const astro2 = SunCalc.getTimes(nextday, lat, lon);
+        //     dawn = astro2.dawn;
+        // }
+        
+        // const secondsInDay = 84600;
+        // const nightDuration = secondsInDay - ((dusk - dawn) / 1000);
+        
+        // // If it's dark at the file start, start at 0 ...otherwise start at dusk
+        // if (! isDuringDaylight(meta.fileStart, lat, lon)) {
+        //     start = 0;
+        // } else {
+        //     // not dark at start, is it still light at the end and on the same day?
+        //     if (isDuringDaylight(fileEnd, lat, lon) && sameDay ) {
+        //         // No? skip this file
+        //         return [0, 0];
+        //     } else {
+        //         // So, it *is* dark by the end of the file, find out when dusk began
+        //         if (sameDay) start = (dusk - meta.fileStart) / 1000;
+        //         else start = ((dusk - meta.fileStart) / 1000);
+        //     }
+        // }
+        // // Now set the end
+        // if (meta.duration > nightDuration ) { // file longer than 12 hours - so there may be multiple nights in it
+        //     end = meta.duration; // Feedchunkstomodel will skip daylight sections when file is decoded
+        // } else { 
+        //     if (isDuringDaylight(fileEnd, lat, lon)){
+        //         end = (dawn - meta.fileStart) / 1000
+        //     } else {
+        //         end = meta.duration;
+        //     }
+        // }
     } else {
-        start = 0;
-        end = meta.duration;
+        boundaries = [{ start: 0, end: meta.duration}];
     }
+    const {start, end} = boundaries[0];
     return [start, end];
 }
 
@@ -2134,6 +2190,7 @@ const onSave2DiskDB = async () => {
 
             // Now we have saved the records, set state to DiskDB
             onChangeMode('archive');
+            getLocations({db: STATE.db, file: args.file});
             UI.postMessage({
                 event: 'generate-alert',
                 message: `Database update complete, ${response.changes} records added to the archive in ${((Date.now() - t0) / 1000)} seconds`,
@@ -2529,50 +2586,46 @@ was not found in the Archve databasse.`});
     }
 }
 
-async function onSetCustomLocation({ lat, lon, place, files }) {
-
+async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
     if (!place) {
-        const { id } = await diskDB.getAsync(`SELECT ID FROM locations WHERE lat = ? AND lon = ?`, lat, lon);
-        const result = await diskDB.runAsync(`DELETE FROM locations WHERE lat = ? AND lon = ?`, lat, lon);
+        const { id } = await db.getAsync(`SELECT ID FROM locations WHERE lat = ? AND lon = ?`, lat, lon);
+        const result = await db.runAsync(`DELETE FROM locations WHERE lat = ? AND lon = ?`, lat, lon);
         if (result.changes) {
-            await diskDB.runAsync(`UPDATE files SET locationID = null WHERE locationID = ?`, id);
+            await db.runAsync(`UPDATE files SET locationID = null WHERE locationID = ?`, id);
         }
         lat = undefined, lon = undefined;
     } else {
-        // Always save new locations to diskdb
-        const result = await diskDB.runAsync(`
+        const result = await db.runAsync(`
         INSERT INTO locations VALUES (?, ?, ?, ?)
             ON CONFLICT(lat,lon) DO UPDATE SET place = excluded.place`, null, lat, lon, place);
-        const { id } = await diskDB.getAsync(`SELECT ID FROM locations WHERE lat = ? AND lon = ?`, lat, lon);
+        const { id } = await db.getAsync(`SELECT ID FROM locations WHERE lat = ? AND lon = ?`, lat, lon);
         for(const file of files) {
-            await STATE.db.runAsync('UPDATE files SET locationID = ? WHERE name = ?', id, file);
+            await db.runAsync('UPDATE files SET locationID = ? WHERE name = ?', id, file);
+            // we may not have set the metadata for the file
+            if (metadata[file]){
+                metadata[file].locationID = id;
+            } else {
+                metadata[file] = {}
+                metadata[file].locationID = id;
+                metadata[file].isComplete = false;
+            }
+            // tell the UI the file has a location id
+            UI.postMessage({event: 'file-location-id', file: file, id: id});
             // state.db is set onAnalyse, so check if the file is saved
-            if (STATE.db === memoryDB) {
+            if (db === memoryDB) {
                 const fileSaved = await getSavedFileInfo(file)
                 if (fileSaved) {
-                    await diskDB.runAsync('UPDATE files SET locationID = ? WHERE name = ?', id, file);
+                    onSetCustomLocation(lat, lon, place, [file], diskDB)
                 }
             }
         }
     }
-    // Update file Metadata
-    for(const file of files) {
-        let proxy;
-        if (metadata[file]) {
-            metadata[file].isComplete = false;
-            proxy = metadata[file].proxy;
-        }
-        await setMetadata({
-            file: file,
-            proxy: proxy
-        });
-    }
-    await getLocations();
+    await getLocations({db: db, file: files[0]});
 }
 
-async function getLocations() {
-    const locations = await diskDB.allAsync('SELECT * FROM locations ORDER BY place')
-    UI.postMessage({ event: 'location-list', locations: locations })
+async function getLocations({db = STATE.db, file}) {
+    const locations = await db.allAsync('SELECT * FROM locations ORDER BY place')
+    UI.postMessage({ event: 'location-list', locations: locations, currentLocation: metadata[file]?.locationID })
 }
 
 

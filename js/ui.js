@@ -1,4 +1,4 @@
-let seenTheDarkness = false, shownDaylightBanner = false, LOCATIONS = ['dummy'], locationID = undefined;
+let seenTheDarkness = false, shownDaylightBanner = false, LOCATIONS, locationID = undefined;
 let labels = [];
 
 const STATE = {
@@ -114,6 +114,8 @@ const audioFormat = document.getElementById('format');
 const audioDownmix = document.getElementById('downmix');
 const audioFiltersIcon = document.getElementById('audioFiltersIcon')
 const contextAwareIcon = document.getElementById('context-mode');
+const defaultLat = document.getElementById('latitude');
+const defaultLon = document.getElementById('longitude');
 let batchInProgress = false;
 let activeRow;
 let predictions = {},
@@ -186,7 +188,7 @@ function updateProgress(val) {
  *  
  */
 async function loadAudioFile({ filePath = '', preserveResults = false }) {
-    fileLoaded = false;
+    fileLoaded = false; locationID = undefined;
     //if (!preserveResults) worker.postMessage({ action: 'change-mode', mode: 'analyse' })
     worker.postMessage({
         action: 'file-load-request',
@@ -490,8 +492,8 @@ function customiseAnalysisMenu(saved) {
 async function generateLocationList(id) {
     const defaultText = id === 'savedLocations' ? '(Default)' : 'All';
     const el = document.getElementById(id);
-    LOCATIONS = undefined;
-    worker.postMessage({ action: 'get-locations' });
+    LOCATIONS = undefined; 
+    worker.postMessage({ action: 'get-locations', file: currentFile});
     await waitForLocations();
     el.innerHTML = `<option value="">${defaultText}</option>`; // clear options
     LOCATIONS.forEach(loc => {
@@ -503,33 +505,41 @@ async function generateLocationList(id) {
     return el;
 }
 
+const  FILE_LOCATION_MAP = {};
+const onFileLocationID = ({ file, id }) => FILE_LOCATION_MAP[file] = id;
+
+
 async function setLocation() {
     const savedLocationSelect = await generateLocationList('savedLocations');
-    const lat = document.getElementById('customLat');
-    const lon = document.getElementById('customLon');
-    const customPlace = document.getElementById('customPlace');
+    const latEl = document.getElementById('customLat');
+    const lonEl = document.getElementById('customLon');
+    const customPlaceEl = document.getElementById('customPlace');
     const locationAdd = document.getElementById('set-location');
     const batchWrapper = document.getElementById('location-batch-wrapper');
     fileList.length > 1 ? batchWrapper.classList.remove('d-none') : batchWrapper.classList.add('d-none');
+    // Use the current file location for lat, lon, place or use defaults
+
+
     // Show the current / selected location in the form
-    const showLocation = () => {
+    const showLocation = (fromSelect) => {
         let newLocation;
-        const id = parseInt(savedLocationSelect.value) || locationID;
+        // CHeck if currentfile has a location id
+        const id = fromSelect ? parseInt(savedLocationSelect.value) : FILE_LOCATION_MAP[currentFile];
         if (id) {
             newLocation = LOCATIONS.find(obj => obj.id === id);
             savedLocationSelect.value = id;
+            latEl.value = newLocation.lat, lonEl.value = newLocation.lon, customPlaceEl.value = newLocation.place;
         }
-        if (newLocation) {
-            lat.value = newLocation.lat, lon.value = newLocation.lon, customPlace.value = newLocation.place;
-        } else {  //Default location
-            lat.value = config.latitude, lon.value = config.longitude, customPlace.value = config.location;
+        else {  //Default location
+            latEl.value = config.latitude, lonEl.value = config.longitude, customPlaceEl.value = config.location;
         }
     }
     showLocation();
-    savedLocationSelect.addEventListener('change', showLocation);
-
+    savedLocationSelect.addEventListener('change', function(e) {
+        showLocation(true);
+    })
     const addOrDelete = () => {
-        if (customPlace.value) {
+        if (customPlaceEl.value) {
             locationAdd.innerText = 'Set Location'
             locationAdd.classList.remove('btn-danger');
             locationAdd.classList.add('button-primary');
@@ -540,7 +550,7 @@ async function setLocation() {
         }
     }
     // Highlight delete
-    customPlace.addEventListener('keyup', addOrDelete);
+    customPlaceEl.addEventListener('keyup', addOrDelete);
     addOrDelete();
     const locationModalDiv = document.getElementById('locationModal');
     const locationModal = new bootstrap.Modal(locationModalDiv);
@@ -551,12 +561,18 @@ async function setLocation() {
     const locationForm = document.getElementById('locationForm');
 
     const displayLocation = async () => {
-        const place = await getLocation(lat, lon);
-        if (place) customPlace.value = place;
-        else customPlace.ariaPlaceholder = 'Location not recognised';
+        const place = await getLocation(latEl.value, lonEl.value, false);
+        if (place) {
+            customPlaceEl.value = place;
+
+        }
+        else {
+            customPlaceEl.value = '';
+            customPlaceEl.ariaPlaceholder = 'Location not recognised';
+        }
     }
 
-    [lat, lon].forEach(el => {
+    [latEl, lonEl].forEach(el => {
         el.addEventListener('blur', displayLocation)
     })
 
@@ -564,7 +580,7 @@ async function setLocation() {
         locationID = parseInt(savedLocationSelect.value);
         const batch = document.getElementById('batchLocations').checked;
         const files = batch ? STATE.openFiles : [currentFile];
-        worker.postMessage({ action: 'set-custom-file-location', lat: lat.value, lon: lon.value, place: customPlace.value, files: files })
+        worker.postMessage({ action: 'set-custom-file-location', lat: latEl.value, lon: lonEl.value, place: customPlaceEl.value, files: files })
         locationModal.hide();
     }
     locationAdd.addEventListener('click', addLocation)
@@ -749,64 +765,57 @@ function postAnalyseMessage(args) {
 
 
 /// Lat / lon
-const defaultLat = document.getElementById('latitude')
-const defaultLon = document.getElementById('longitude')
 const place = document.getElementById('place')
 $('#latitude, #longitude').on('focus', function () {
     document.removeEventListener('keydown', handleKeyDownDeBounce, true);
 })
 
-function getLocation(lat, lon) {
-    return new Promise((resolve, reject) => {
-        let usingDefault = false;
-        if (!lat) {
-            lat = defaultLat; lon = defaultLon;
-            usingDefault = true;
+function getLocation(lat, lon, isDefault) {
+    return new Promise(async (resolve, reject) => {
+        if (! LOCATIONS) {
+            worker.postMessage({ action: 'get-locations', file: currentFile});
+            await waitForLocations();
         }
-        if (lat.value && lon.value) {
-            const storedLocation = LOCATIONS.find(obj => obj.lat === lat && obj.lon === lon);
-            if (storedLocation) return resolve(storedLocation.place);
+        const storedLocation = LOCATIONS.find(obj => obj.lat === lat && obj.lon === lon);
+        if (storedLocation) return resolve(storedLocation.place);
 
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat.value}&lon=${lon.value}&zoom=14`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network error: ' + response);
-                    }
-                    return response.json()
-                })
-                .then(data => {
-                    const address = data.display_name;
-                    if (address) {
-                        if (usingDefault) {
-                            config.latitude = lat.value;
-                            config.longitude = lon.value;
-                            config.location = address;
-                            updatePrefs();
-                        }
-                    }
-                    resolve(address);
-                })
-                .catch(error => {
-                    console.log("got an error connecting to OpenStreetMap")
-                    // If we have a number for default lat & lon, go ahead and use it.
-                    if (!isNaN(lat.value) && !isNaN(lon.value)) {
-                        config.latitude = lat.value;
-                        config.longitude = lon.value;
-                        updatePrefs();
-                    }
-                    reject(error);
-                })
-        } else {
-            resolve(undefined)
-        }
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network error: ' + JSON.stringify(response));
+                }
+                return response.json()
+            })
+            .then(data => {
+                const address = data.display_name;
+                LOCATIONS.push({id: LOCATIONS.length + 1, lat: lat, lon: lon, place: place})
+                resolve(address);
+            })
+            .catch(error => {
+                console.log("got an error connecting to OpenStreetMap")
+                reject(error);
+            })
     })
 }
 $('#latitude, #longitude').on('blur', async function () {
     enableKeyDownEvent();
-    const address = await getLocation();
+    const lat = document.getElementById('latitude').value;
+    const lon = document.getElementById('longitude').value;
+    const address = await getLocation(lat, lon, true);
     const content = address ? '<span class="material-icons-two-tone">fmd_good</span> ' + address :
         '<span class="material-icons-two-tone text-danger">fmd_bad</span> Location not recognised';
-    place.innerHTML = content;
+    if (address){
+        place.innerHTML = content;
+        config.latitude = lat;
+        config.longitude = lon;
+        config.location = address;
+        updatePrefs();
+        worker.postMessage({
+            action: 'update-state',
+            lat: config.latitude,
+            lon: config.longitude,
+        });
+    }
 })
 
 
@@ -1288,7 +1297,8 @@ window.onload = async () => {
             config.model = 'v2';
             updatePrefs()
         }
-
+        // switch off fullscreen mode - we don't want to persist that setting
+        config.fullscreen = false;
         // Initialize Spectrogram
         initWavesurfer({});
         // Set UI option state
@@ -1378,8 +1388,8 @@ const setUpWorkerMessaging = () => {
             const args = e.data;
             const event = args.event;
             switch (event) {
-                case 'model-ready':
-                    onModelReady(args);
+                case 'chart-data':
+                    onChartData(args);
                     break;
                 case 'diskDB-has-records':
                     chartsLink.classList.remove('disabled');
@@ -1392,42 +1402,11 @@ const setUpWorkerMessaging = () => {
                         }); // no re-prepare
                     }
                     break;
-                case 'update-summary':
-                    updateSummary(args);
+                case 'file-location-id':
+                    onFileLocationID(args);
                     break;
                 case 'files':
                     onOpenFiles(args);
-                    break;
-                case 'seen-species-list':
-                    generateBirdList('seenSpecies', args.list);
-                    break;
-                case 'prediction-done':
-                    onPredictionDone(args);
-                    break;
-                case 'progress':
-                    onProgress(args);
-                    break;
-                case 'prediction-ongoing':
-                    renderResult(args);
-                    break;
-                case 'update-audio-duration':
-                    diagnostics['Audio Duration'] ?
-                        diagnostics['Audio Duration'] += args.value :
-                        diagnostics['Audio Duration'] = args.value;
-                    break;
-                case 'spawning':
-                    displayWarmUpMessage();
-                    break;
-                case 'promptToSave':
-                    if (confirm("Save results to your archive?")) {
-                        worker.postMessage({ action: 'save2db' })
-                    }
-                    break;
-                case 'worker-loaded-audio':
-                    onWorkerLoadedAudio(args);
-                    break;
-                case 'chart-data':
-                    onChartData(args);
                     break;
                 case 'generate-alert':
                     if (args.render) {
@@ -1438,18 +1417,53 @@ const setUpWorkerMessaging = () => {
                         message += '\nWould you like to remove the file from the Archive?';
                         if (confirm(message)) deleteFile(args.file)
                     } else { alert(args.message) }
-                    break
-                case 'no-detections-remain':
-                    detectionsModal.hide();
                     break;
                 case 'location-list':
                     LOCATIONS = args.locations;
+                    locationID = args.currentLocation;
+                    break;
+                case 'model-ready':
+                    onModelReady(args);
                     break;
                 case 'mode-changed':
                     STATE.mode = args.mode;
                     // Update the current file name in the UI
                     renderFilnamePanel();
                     console.log('Mode changed to: ' + args.mode);
+                    break;
+                case 'no-detections-remain':
+                    detectionsModal.hide();
+                    break;
+                case 'prediction-done':
+                    onPredictionDone(args);
+                    break;
+                case 'prediction-ongoing':
+                    renderResult(args);
+                    break;
+                case 'progress':
+                    onProgress(args);
+                    break;
+                case 'promptToSave':
+                    if (confirm("Save results to your archive?")) {
+                        worker.postMessage({ action: 'save2db' })
+                    }
+                    break;
+                case 'seen-species-list':
+                    generateBirdList('seenSpecies', args.list);
+                    break;
+                case 'spawning':
+                    displayWarmUpMessage();
+                    break;
+                case 'update-audio-duration':
+                    diagnostics['Audio Duration'] ?
+                        diagnostics['Audio Duration'] += args.value :
+                        diagnostics['Audio Duration'] = args.value;
+                    break;
+                case 'update-summary':
+                    updateSummary(args);
+                    break;
+                case 'worker-loaded-audio':
+                    onWorkerLoadedAudio(args);
                     break;
                 default:
                     alert(`Unrecognised message from worker:${args.event}`)
@@ -3828,6 +3842,7 @@ async function waitForLocations() {
     while (!LOCATIONS) {
         await delay(100); // Wait for 100 milliseconds before checking again
     }
+    return;
 }
 
 // TOUR functions
@@ -3859,6 +3874,20 @@ $('#carouselExample').on('slid.bs.carousel', function () {
     var elementSelector = activeItem.data('element-selector');
     // Highlight the corresponding element on the page
     highlightElement(elementSelector);
+    if (elementSelector === "#fileContainer"){
+        // Create and dispatch a new 'contextmenu' event
+        const element = document.getElementById('filename');
+        var contextMenuEvent = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            clientY: element.offsetTop + (2 * element.offsetHeight),
+            clientX: 20
+        });
+        buildFileMenu(contextMenuEvent)
+        //element.dispatchEvent(contextMenuEvent);
+    } else{
+        $("#context-menu").removeClass("show");
+    }
 });
 
 // Event handler for closing the modal
