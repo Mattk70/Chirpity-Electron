@@ -2411,7 +2411,7 @@ async function onWorkerLoadedAudio({
     //if (preserveResults) completeDiv.hide();
     console.log(`UI received worker-loaded-audio: ${file}, buffered: ${contents === undefined}`);
     if (contents) {
-        currentBuffer = new AudioBuffer({ length: contents.length, numberOfChannels: 1, sampleRate: 24000 });
+        currentBuffer = new AudioBuffer({ length: contents.length, numberOfChannels: 1, sampleRate: 48000 });
         currentBuffer.copyToChannel(contents, 0);
     } else {
         currentBuffer = buffer;
