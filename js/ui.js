@@ -128,9 +128,8 @@ contentWrapperElement.height(bodyElement.height() - 80);
 
 // Set default Options
 let config;
-const sampleRate = 24000;
-const audioCtx = new AudioContext({ latencyHint: 'interactive', sampleRate: sampleRate });
-
+let sampleRate = 24000;
+let audioCtx;
 
 /** Collect Diagnostics Information
  Diagnostics keys:
@@ -251,6 +250,7 @@ const initWavesurfer = ({
     if (wavesurfer) {
         wavesurfer.pause();
     }
+    const audioCtx = new AudioContext({ latencyHint: 'interactive', sampleRate: sampleRate });
     // Setup waveform and spec views
     wavesurfer = WaveSurfer.create({
         container: document.querySelector('#waveform'),
@@ -1293,7 +1293,7 @@ window.onload = async () => {
             }
         });
         // Update model if old models in config
-        if (! ['v1', 'v2'].includes(config.model) ) {
+        if (! ['v1', 'v2', 'v3'].includes(config.model) ) {
             config.model = 'v2';
             updatePrefs()
         }
@@ -2350,6 +2350,7 @@ function displayWarmUpMessage() {
 function onModelReady(args) {
     modelReady = true;
     labels = args.labels;
+    sampleRate = args.sampleRate;
     warmupText.classList.add('d-none');
     if (fileLoaded) {
         enableMenuItem(['analyse'])
@@ -2411,7 +2412,7 @@ async function onWorkerLoadedAudio({
     //if (preserveResults) completeDiv.hide();
     console.log(`UI received worker-loaded-audio: ${file}, buffered: ${contents === undefined}`);
     if (contents) {
-        currentBuffer = new AudioBuffer({ length: contents.length, numberOfChannels: 1, sampleRate: 48000 });
+        currentBuffer = new AudioBuffer({ length: contents.length, numberOfChannels: 1, sampleRate: sampleRate });
         currentBuffer.copyToChannel(contents, 0);
     } else {
         currentBuffer = buffer;

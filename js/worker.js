@@ -278,7 +278,15 @@ async function handleMessage(e) {
             break;
         case 'load-model':
             UI.postMessage({ event: 'spawning' });
-            BATCH_SIZE = parseInt(args.batchSize);
+            if (args.model === 'v3'){
+                BATCH_SIZE = 1;
+                sampleRate = 48000;
+            } else {
+                BATCH_SIZE =  parseInt(args.batchSize);
+                sampleRate = 24000;
+            }
+            setAudioContext(sampleRate);
+            memoryDB = null;
             BACKEND = args.backend;
             STATE.update({ model: args.model });
             if (predictWorkers.length) terminateWorkers();
@@ -1548,7 +1556,7 @@ function spawnWorkers(model, list, batchSize, threads) {
     // And be ready to receive the list:
     SEEN_LIST_UPDATE = false;
     for (let i = 0; i < threads; i++) {
-        const workerSrc = model === 'v3' ? 'BirdNet' : 'model`';
+        const workerSrc = model === 'v3' ? 'BirdNet' : 'model';
         const worker = new Worker(`./js/${workerSrc}.js`, { type: 'module' });
         worker.isAvailable = true;
         predictWorkers.push(worker)
@@ -1784,12 +1792,13 @@ async function parseMessage(e) {
             // Now we have what we need to populate a database...
             // Load the archive db
             await loadDB(appPath);
+            if (!memoryDB) await createDB();
             break;
         case 'model-ready':
             sampleRate = response['sampleRate'];
             const backend = response['backend'];
             console.log(backend);
-            UI.postMessage({ event: 'model-ready', message: 'ready', backend: backend, labels: LABELS })
+            UI.postMessage({ event: 'model-ready', message: 'ready', backend: backend, labels: LABELS, sampleRate:sampleRate })
             break;
         case 'prediction':
             if (!aborted) {
