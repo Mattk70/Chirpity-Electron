@@ -132,11 +132,14 @@ async function loadDB(path) {
 
 let metadata = {};
 let index = 0, AUDACITY = {}, predictionStart;
-let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
+let sampleRate = 48000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
 let predictWorkers = [], aborted = false;
-
+let audioCtx;
 // Set up the audio context:
-const audioCtx = new AudioContext({ latencyHint: 'interactive', sampleRate: sampleRate });
+function setAudioContext(rate) {
+    audioCtx = new AudioContext({ latencyHint: 'interactive', sampleRate: sampleRate });
+}
+setAudioContext(sampleRate);
 
 let UI;
 let FILE_QUEUE = [];
@@ -1545,7 +1548,8 @@ function spawnWorkers(model, list, batchSize, threads) {
     // And be ready to receive the list:
     SEEN_LIST_UPDATE = false;
     for (let i = 0; i < threads; i++) {
-        const worker = new Worker('./js/model.js', { type: 'module' });
+        const workerSrc = model === 'v3' ? 'BirdNet' : 'model`';
+        const worker = new Worker(`./js/${workerSrc}.js`, { type: 'module' });
         worker.isAvailable = true;
         predictWorkers.push(worker)
         console.log('loading a worker')
