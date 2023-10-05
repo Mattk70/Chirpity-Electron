@@ -1,7 +1,7 @@
 const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs');
 const path = require('path');
-let DEBUG = true;
+let DEBUG = false;
 let BACKEND;
 
 //GLOBALS
