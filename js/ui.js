@@ -492,8 +492,8 @@ function customiseAnalysisMenu(saved) {
 async function generateLocationList(id) {
     const defaultText = id === 'savedLocations' ? '(Default)' : 'All';
     const el = document.getElementById(id);
-    LOCATIONS = undefined; 
-    worker.postMessage({ action: 'get-locations', file: currentFile});
+    LOCATIONS = undefined;
+    worker.postMessage({ action: 'get-locations', file: currentFile });
     await waitForLocations();
     el.innerHTML = `<option value="">${defaultText}</option>`; // clear options
     LOCATIONS.forEach(loc => {
@@ -505,7 +505,7 @@ async function generateLocationList(id) {
     return el;
 }
 
-const  FILE_LOCATION_MAP = {};
+const FILE_LOCATION_MAP = {};
 const onFileLocationID = ({ file, id }) => FILE_LOCATION_MAP[file] = id;
 
 
@@ -535,7 +535,7 @@ async function setLocation() {
         }
     }
     showLocation();
-    savedLocationSelect.addEventListener('change', function(e) {
+    savedLocationSelect.addEventListener('change', function (e) {
         showLocation(true);
     })
     const addOrDelete = () => {
@@ -772,8 +772,8 @@ $('#latitude, #longitude').on('focus', function () {
 
 function getLocation(lat, lon, isDefault) {
     return new Promise(async (resolve, reject) => {
-        if (! LOCATIONS) {
-            worker.postMessage({ action: 'get-locations', file: currentFile});
+        if (!LOCATIONS) {
+            worker.postMessage({ action: 'get-locations', file: currentFile });
             await waitForLocations();
         }
         const storedLocation = LOCATIONS.find(obj => obj.lat === lat && obj.lon === lon);
@@ -788,7 +788,7 @@ function getLocation(lat, lon, isDefault) {
             })
             .then(data => {
                 const address = data.display_name;
-                LOCATIONS.push({id: LOCATIONS.length + 1, lat: lat, lon: lon, place: place})
+                LOCATIONS.push({ id: LOCATIONS.length + 1, lat: lat, lon: lon, place: place })
                 resolve(address);
             })
             .catch(error => {
@@ -804,7 +804,7 @@ $('#latitude, #longitude').on('blur', async function () {
     const address = await getLocation(lat, lon, true);
     const content = address ? '<span class="material-icons-two-tone">fmd_good</span> ' + address :
         '<span class="material-icons-two-tone text-danger">fmd_bad</span> Location not recognised';
-    if (address){
+    if (address) {
         place.innerHTML = content;
         config.latitude = lat;
         config.longitude = lon;
@@ -1257,6 +1257,7 @@ window.onload = async () => {
     document.getElementById('contentWrapper').classList.add('loaded');
     // Set config defaults
     const defaultConfig = {
+        lastUpdatePrompt: 0,
         seenTour: false,
         UUID: uuidv4(),
         colormap: 'inferno',
@@ -1293,7 +1294,7 @@ window.onload = async () => {
             }
         });
         // Update model if old models in config
-        if (! ['v1', 'v2', 'v3'].includes(config.model) ) {
+        if (!['v2', 'v3'].includes(config.model)) {
             config.model = 'v2';
             updatePrefs()
         }
@@ -1373,6 +1374,8 @@ window.onload = async () => {
         if (!config.seenTour) {
             setTimeout(prepTour, 2000)
         }
+        // check for new version
+        fetchAndCheckVersion()
     }
     )
     // establish the message channel
@@ -1380,6 +1383,8 @@ window.onload = async () => {
 
     // Set footer year
     $('#year').text(new Date().getFullYear());
+
+
 }
 
 const setUpWorkerMessaging = () => {
@@ -3875,7 +3880,7 @@ $('#carouselExample').on('slid.bs.carousel', function () {
     var elementSelector = activeItem.data('element-selector');
     // Highlight the corresponding element on the page
     highlightElement(elementSelector);
-    if (elementSelector === "#fileContainer"){
+    if (elementSelector === "#fileContainer") {
         // Create and dispatch a new 'contextmenu' event
         const element = document.getElementById('filename');
         var contextMenuEvent = new MouseEvent('contextmenu', {
@@ -3886,7 +3891,7 @@ $('#carouselExample').on('slid.bs.carousel', function () {
         });
         buildFileMenu(contextMenuEvent)
         //element.dispatchEvent(contextMenuEvent);
-    } else{
+    } else {
         $("#context-menu").removeClass("show");
     }
 });
@@ -3910,3 +3915,138 @@ const prepTour = async () => {
     startTour()
 }
 $('#startTour').on('click', prepTour);
+
+// Hand-rolled version handling.
+const helpUpdate = document.getElementById('update');
+helpUpdate.addEventListener('click', () => {
+    fetchAndCheckVersion(true)
+})
+
+function setHeaders() {
+    const username = "nocmig";
+    const password = "nocmig";
+    const headers = new Headers({
+        'Authorization': 'Basic ' + btoa(username + ':' + password),
+    });
+    return headers;
+}
+
+function fetchAndCheckVersion(force) {
+    const unique = new Date().getTime();
+    const url = `https://birds.mattkirkland.co.uk/latest.version#${unique}`;
+    const headers = setHeaders();
+
+    fetch(url, { headers })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            const fetchedVersion = data.version;
+            const notes = data.notes
+            // Comparing the versions
+            if (compareVersions(fetchedVersion, version) > 0) {
+                helpUpdate.classList.remove('d-none');
+                // Just a daily nag ...
+                if (unique - config.lastUpdatePrompt < 86400000 && !force) return
+                const message = `Version ${fetchedVersion} available!
+_____________________________________________________________________
+
+Release notes: 
+${notes}
+_____________________________________________________________________
+Download Now?`
+                if (confirm(message)) {
+                    const url = `https://birds.mattkirkland.co.uk/chirpity%20Setup%20${fetchedVersion}.exe`;
+                    const chunks = [];
+                    fetch(url, { headers })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! Status: ${response.status}`);
+                            }
+                            // Get content length from headers to calculate progress
+                            const contentLength = response.headers.get('Content-Length');
+
+                            // Initialize variables for progress tracking
+                            let receivedBytes = 0;
+
+                            // Create a ReadableStream to consume the response body
+                            const reader = response.body.getReader();
+                            const tracking = document.getElementById('update-progress');
+                            const progressBar = document.getElementById('update-progress-bar');
+                            tracking.classList.remove('d-none');
+                            // Function to handle chunks of data
+                            function read() {
+                                reader.read().then(({ value, done }) => {
+                                    if (done) {
+                                        tracking.classList.add('d-none');
+                                        console.log('Download complete!');
+                                        // Create a Blob from the fetched data
+                                        // Combine the chunks into a single Uint8Array
+                                        const uint8Array = new Uint8Array(receivedBytes);
+                                        let offset = 0;
+                                        for (const chunk of chunks) {
+                                            uint8Array.set(chunk, offset);
+                                            offset += chunk.length;
+                                        }
+
+                                        // Create a Blob from the Uint8Array
+                                        const blob = new Blob([uint8Array]);
+                                        // Create a data URL from the Blob
+                                        const blobUrl = URL.createObjectURL(blob);
+                                        const link = document.createElement('a');
+                                        link.href = blobUrl;
+                                        link.download = `Chirpity Installer ${fetchedVersion}.exe`;
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                        URL.revokeObjectURL(blobUrl);
+                                    } else {
+                                        // Update receivedBytes and calculate progress
+                                        receivedBytes += value.byteLength;
+                                        const progress = (receivedBytes / contentLength) * 100;
+                                        progressBar.value = parseInt(progress);
+                                        // Append the chunk to the chunks array
+                                        chunks.push(value);
+                                        // Continue reading the next chunk
+                                        read()
+
+                                    }
+                                });
+                            }
+                            // Start reading the chunks
+                            read();
+                        })
+                        .catch(error => {
+                            console.log(error)
+                            alert('There was an error when downloading, please try again');
+                        });
+                }
+                else {
+                    // Do something if the update is deferred.
+                    config.lastUpdatePrompt = new Date().getTime()
+                    updatePrefs()
+                }
+            } else {
+                helpUpdate.classList.add('d-none');
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+        });
+}
+
+// Function to compare version strings
+function compareVersions(a, b) {
+    const partsA = a.split('.').map(Number);
+    const partsB = b.split('.').map(Number);
+
+    for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+        if (partsA[i] > partsB[i]) return 1;
+        if (partsA[i] < partsB[i]) return -1;
+    }
+
+    return 0;
+}
