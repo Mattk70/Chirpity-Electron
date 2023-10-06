@@ -2,7 +2,7 @@ const {contextBridge, ipcRenderer} = require("electron");
 const fs = require('fs');
 const colormap = require("colormap");
 const p = require('path');
-const SunCalc = require('suncalc2');
+const SunCalc = require('suncalc');
 const {v4: uuidv4} = require("uuid");
 const os = require('os')
 

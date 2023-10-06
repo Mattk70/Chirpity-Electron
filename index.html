@@ -457,8 +457,8 @@
                                                             <div class="row pe-3">
                                                                 <label class="col" for="model-to-use">Model:</label>
                                                                 <select class="form-control col" id="model-to-use">
-                                                                    <option value="v1">V 1.0</option>
-                                                                    <option value="v2">V 2.0</option>
+                                                                    <option value="v2">Chirpity</option>
+                                                                    <option value="v3">BirdNet</option>
                                                                 </select>
                                                             </div>
                                                         </div>
@@ -584,6 +584,8 @@
                                 Help
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                                <li><a class="dropdown-item" id="update" href="#">
+                                    <span class="material-icons-two-tone text-info">browser_updated</span>Update Available!</a></li>
                                 <li><a class="dropdown-item" id="usage" href="#">
                                         <span class="material-icons-two-tone">help</span> Usage</a></li>
                                 <li><a class="dropdown-item" id="settings" href="#">
@@ -1006,8 +1008,10 @@
 
     <!-- Footer -->
     <footer class="p-1 text-bg-primary" id="footer">
-        <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span><br><a
-                href="https://www.flaticon.com/free-icons/">Some icons created by Freepik - Flaticon</a></small>
+        <div class="d-none text-sm-start" id="update-progress">Downloading update: 
+            <progress value="0" id="update-progress-bar" max="100" style="width:100px"></progress>
+        </div>
+        <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span><br></small>
     </footer>
     <script defer src="node_modules/wavesurfer.js/dist/wavesurfer.min.js"></script>
     <script defer src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js"></script>
