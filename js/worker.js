@@ -1875,8 +1875,9 @@ async function processNextFile({
             if (end) {
                 // If we have an end value already, we're analysing a selection
             }
-            let boundaries;
+            let boundaries = [];
             if (!start) boundaries = await setStartEnd(file);
+            else boundaries.push({start: start, end: end});
             for (let i = 0; i < boundaries.length; i++){
                 const {start, end} = boundaries[i];
                 if (start === end) {
