@@ -2,7 +2,7 @@ const { ipcRenderer } = require('electron');
 const fs = require('fs');
 const wavefileReader = require('wavefile-reader');
 const p = require('path');
-const SunCalc = require('suncalc2');
+const SunCalc = require('suncalc');
 const ffmpeg = require('fluent-ffmpeg');
 const png = require('fast-png');
 const { writeFile, mkdir, readdir } = require('node:fs/promises');
@@ -19,7 +19,7 @@ let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on every change
 
-const DEBUG = true;
+const DEBUG = false;
 
 const DATASET = false;
 const adding_chirpity_additions = true;
@@ -132,11 +132,14 @@ async function loadDB(path) {
 
 let metadata = {};
 let index = 0, AUDACITY = {}, predictionStart;
-let sampleRate = 24000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
+let sampleRate = 48000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
 let predictWorkers = [], aborted = false;
-
+let audioCtx;
 // Set up the audio context:
-const audioCtx = new AudioContext({ latencyHint: 'interactive', sampleRate: sampleRate });
+function setAudioContext(rate) {
+    audioCtx = new AudioContext({ latencyHint: 'interactive', sampleRate: sampleRate });
+}
+setAudioContext(sampleRate);
 
 let UI;
 let FILE_QUEUE = [];
@@ -262,11 +265,11 @@ async function handleMessage(e) {
             getSpecies();
             break;
         case 'get-locations':
-            getLocations({db: STATE.db, file: args.file});
+            getLocations({ db: STATE.db, file: args.file });
             break;
         case 'insert-manual-record':
             const count = await onInsertManualRecord(args);
-            if (STATE.mode !== 'explore' && ! args.batch && args.toDisk) {
+            if (STATE.mode !== 'explore' && !args.batch && args.toDisk) {
                 UI.postMessage({
                     event: 'generate-alert',
                     message: `${count} ${args.cname} record has been saved to the archive.`
@@ -275,7 +278,15 @@ async function handleMessage(e) {
             break;
         case 'load-model':
             UI.postMessage({ event: 'spawning' });
-            BATCH_SIZE = parseInt(args.batchSize);
+            if (args.model === 'v3') {
+                BATCH_SIZE = 1;
+                sampleRate = 48000;
+            } else {
+                BATCH_SIZE = parseInt(args.batchSize);
+                sampleRate = 24000;
+            }
+            setAudioContext(sampleRate);
+            memoryDB = null;
             BACKEND = args.backend;
             STATE.update({ model: args.model });
             if (predictWorkers.length) terminateWorkers();
@@ -616,7 +627,7 @@ async function onAnalyse({
                 break;
             }
         }
-        const retrieveFromDatabase = ((allCached && ! reanalyse && !STATE.selection) || circleClicked);
+        const retrieveFromDatabase = ((allCached && !reanalyse && !STATE.selection) || circleClicked);
         if (retrieveFromDatabase) {
             filesBeingProcessed = [];
             if (circleClicked) {
@@ -629,7 +640,7 @@ async function onAnalyse({
             }
             return;
         }
-        
+
     }
     console.log("FILE_QUEUE has ", FILE_QUEUE.length, 'files', count, 'files ignored')
     if (!STATE.selection) onChangeMode('analyse');
@@ -700,6 +711,7 @@ const convertFileFormat = (file, destination, size, error) => {
                 // HERE YOU GET THE TOTAL TIME
                 const a = data.duration.split(':');
                 totalTime = parseInt(a[0]) * 3600 + parseInt(a[1]) * 60 + parseFloat(a[2]);
+                metadata[file] = {duration: totalTime}
                 //totalTime = parseInt(data.duration.replace(/:/g, ''))
             })
             .on('progress', (progress) => {
@@ -803,13 +815,13 @@ async function locateFile(file) {
     return matchingFileExt;
 }
 
-async function notifyMissingFile(file){
+async function notifyMissingFile(file) {
     let missingFile;
     // Look for the file in te Archive
     const row = await diskDB.getAsync('SELECT * FROM FILES WHERE name = ?', file);
     if (row?.id) missingFile = file
     UI.postMessage({
-        event: 'generate-alert', 
+        event: 'generate-alert',
         message: `Unable to locate source file with any supported file extension: ${file}`,
         // If we have this file in the archive, but can't find it, prompt to delete it
         file: missingFile
@@ -885,7 +897,7 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
     // using the nullish coalescing operator
     metadata[file].locationID ??= savedMeta?.locationID;
 
-    metadata[file].duration = savedMeta?.duration || await getDuration(proxy);
+    metadata[file].duration ??= savedMeta?.duration || await getDuration(proxy);
 
     return new Promise((resolve) => {
         if (metadata[file].isComplete) {
@@ -979,7 +991,7 @@ async function setupCtx(chunk, header) {
     const offlineSource = offlineCtx.createBufferSource();
     offlineSource.buffer = buffer;
     let previousFilter = undefined;
-    if (STATE.filters.active){
+    if (STATE.filters.active) {
         if (STATE.filters.highPassFrequency) {
             // Create a highpass filter to attenuate the noise
             const highpassFilter = offlineCtx.createBiquadFilter();
@@ -1110,7 +1122,7 @@ const getPredictBuffers = async ({
                 console.error(`PredictBuffer rendering failed: ${err}, file ${file}`);
                 const fileIndex = filesBeingProcessed.indexOf(file);
                 if (fileIndex !== -1) {
-                    canBeRemovedFromCache.concat(filesBeingProcessed.splice(fileIndex,1))
+                    canBeRemovedFromCache.concat(filesBeingProcessed.splice(fileIndex, 1))
                 }
                 // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
             });
@@ -1120,7 +1132,7 @@ const getPredictBuffers = async ({
                 if (++workerInstance >= NUM_WORKERS) {
                     workerInstance = 0;
                 }
-                worker = workerInstance; 
+                worker = workerInstance;
             }
             // Create array with 0's (short segment of silence that will trigger the finalChunk flag
             const myArray = new Float32Array(new Array(chunkLength).fill(0));
@@ -1192,10 +1204,10 @@ function isDuringDaylight(datetime, lat, lon) {
     const date = new Date(datetime);
     const { dawn, dusk } = SunCalc.getTimes(date, lat, lon);
     return datetime >= dawn && datetime <= dusk;
-  }
+}
 
 async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
-    let currentTime = metadata[file].fileStart + ((chunkStart / sampleRate) *  1000);
+    let currentTime = metadata[file].fileStart + ((chunkStart / sampleRate) * 1000);
     // if (STATE.detect.nocmig && isDuringDaylight(currentTime)){
     //     console.log('Nocmig mode on, daylight, skipping');
     //     batchChunksToSend[file]--;
@@ -1221,7 +1233,7 @@ async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
     };
     predictWorkers[worker].isAvailable = false;
     predictWorkers[worker].postMessage(objData, [channelData.buffer]);
-    
+
 }
 
 async function doPrediction({
@@ -1545,7 +1557,8 @@ function spawnWorkers(model, list, batchSize, threads) {
     // And be ready to receive the list:
     SEEN_LIST_UPDATE = false;
     for (let i = 0; i < threads; i++) {
-        const worker = new Worker('./js/model.js', { type: 'module' });
+        const workerSrc = model === 'v3' ? 'BirdNet' : 'model';
+        const worker = new Worker(`./js/${workerSrc}.js`, { type: 'module' });
         worker.isAvailable = true;
         predictWorkers.push(worker)
         console.log('loading a worker')
@@ -1596,7 +1609,7 @@ const insertRecord = async (key, speciesID, confidence, file) => {
         null, null, key + 3, null);
 }
 
-async function batchInsertRecords(cname, label, toDisk, files, originalCname){
+async function batchInsertRecords(cname, label, toDisk, files, originalCname) {
     const db = toDisk ? diskDB : memoryDB;
     let params = [originalCname, STATE.detect.confidence];
     t0 = Date.now();
@@ -1606,7 +1619,7 @@ async function batchInsertRecords(cname, label, toDisk, files, originalCname){
             SELECT id FROM species WHERE cname = ?
         ) 
         AND confidence >= ? `;
-    if (STATE.mode !== 'explore'){
+    if (STATE.mode !== 'explore') {
         query += `
             AND fileID in (
                 SELECT id FROM files WHERE name IN (${files.map(() => '?').join(', ')})
@@ -1620,12 +1633,12 @@ async function batchInsertRecords(cname, label, toDisk, files, originalCname){
     let count = 0;
     await db.runAsync('BEGIN');
     for (const item of records) {
-        const {dateTime, speciesID, fileID, position, end, comment, callCount} = item;
-        const {name} = await STATE.db.getAsync('SELECT name FROM files WHERE id = ?', fileID)
+        const { dateTime, speciesID, fileID, position, end, comment, callCount } = item;
+        const { name } = await STATE.db.getAsync('SELECT name FROM files WHERE id = ?', fileID)
         // Delete existing record
         const changes = await db.runAsync('DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?', dateTime, speciesID, fileID)
         count += await onInsertManualRecord({
-            cname: cname, 
+            cname: cname,
             start: position,
             end: end,
             comment: comment,
@@ -1672,11 +1685,11 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
         fileStart = res.filestart;
     }
     let durationSQL;
-    if (metadata[file]){ // If we don't have file metadata, the file must be saved already
+    if (metadata[file]) { // If we don't have file metadata, the file must be saved already
         durationSQL = Object.entries(metadata[file].dateDuration)
             .map(entry => `(${entry.toString()},${fileID})`).join(',');
         await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
-    } 
+    }
 
     let response;
     const dateTime = fileStart + startMilliseconds;
@@ -1686,7 +1699,7 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     if (response.changes && toDisk) {
         UI.postMessage({ event: 'diskDB-has-records' });
     }
-    return response.changes    
+    return response.changes
 }
 
 const parsePredictions = async (response) => {
@@ -1743,7 +1756,7 @@ const parsePredictions = async (response) => {
     predictionsReceived[file]++;
     const received = sumObjectValues(predictionsReceived);
     const total = sumObjectValues(batchChunksToSend);
-    const progress =  received/total;
+    const progress = received / total;
     const fileProgress = predictionsReceived[file] / batchChunksToSend[file];
     UI.postMessage({ event: 'progress', progress: progress, file: file });
     if (fileProgress === 1) {
@@ -1780,12 +1793,13 @@ async function parseMessage(e) {
             // Now we have what we need to populate a database...
             // Load the archive db
             await loadDB(appPath);
+            if (!memoryDB) await createDB();
             break;
         case 'model-ready':
             sampleRate = response['sampleRate'];
             const backend = response['backend'];
             console.log(backend);
-            UI.postMessage({ event: 'model-ready', message: 'ready', backend: backend, labels: LABELS })
+            UI.postMessage({ event: 'model-ready', message: 'ready', backend: backend, labels: LABELS, sampleRate: sampleRate })
             break;
         case 'prediction':
             if (!aborted) {
@@ -1801,7 +1815,7 @@ async function parseMessage(e) {
                         UI.postMessage({
                             event: 'prediction-done', batchInProgress: true,
                         })
-                        processNextFile({worker: worker});
+                        processNextFile({ worker: worker });
                     } else if (!STATE.selection) {
                         getSummary();
                     }
@@ -1838,11 +1852,11 @@ function updateFilesBeingProcessed(file) {
     // This method to determine batch complete
     const fileIndex = filesBeingProcessed.indexOf(file);
     if (fileIndex !== -1) {
-        canBeRemovedFromCache.concat(filesBeingProcessed.splice(fileIndex,1))
-        UI.postMessage({ event: 'progress', progress: 1.0, file: file})
+        canBeRemovedFromCache.concat(filesBeingProcessed.splice(fileIndex, 1))
+        UI.postMessage({ event: 'progress', progress: 1.0, file: file })
     }
     if (!filesBeingProcessed.length) {
-        if (! STATE.selection) getSummary();
+        if (!STATE.selection) getSummary();
     }
 }
 
@@ -1861,91 +1875,107 @@ async function processNextFile({
             if (end) {
                 // If we have an end value already, we're analysing a selection
             }
-            if (!start) [start, end] = await setStartEnd(file);
-            if (start === end) {
-                // Nothing to do for this file
-                
-                updateFilesBeingProcessed(file);
-                const result = `No detections in ${file}. It has no period within it where predictions would be given`;
-                index++;
-                UI.postMessage({
-                    event: 'prediction-ongoing', file: file, result: result, index: index
-                });
-                await processNextFile(arguments[0]);
+            let boundaries = [];
+            if (!start) boundaries = await setStartEnd(file);
+            else boundaries.push({start: start, end: end});
+            for (let i = 0; i < boundaries.length; i++){
+                const {start, end} = boundaries[i];
+                if (start === end) {
+                    // Nothing to do for this file
 
-            } else {
-                console.log('Total predictions received:', sumObjectValues(predictionsReceived))
-                if  (! sumObjectValues(predictionsReceived)){
+                    updateFilesBeingProcessed(file);
+                    const result = `No detections in ${file}. It has no period within it where predictions would be given`;
+                    index++;
                     UI.postMessage({
-                        event: 'progress',
-                        text: "<span class='loading'>Awaiting detections</span>",
-                        file: file
+                        event: 'prediction-ongoing', file: file, result: result, index: index
+                    });
+                    await processNextFile(arguments[0]);
+
+                } else {
+                    console.log('Total predictions received:', sumObjectValues(predictionsReceived))
+                    if (!sumObjectValues(predictionsReceived)) {
+                        UI.postMessage({
+                            event: 'progress',
+                            text: "<span class='loading'>Awaiting detections</span>",
+                            file: file
+                        });
+                    }
+                    await doPrediction({
+                        start: start, end: end, file: file, worker: worker
                     });
                 }
-                await doPrediction({
-                    start: start, end: end, file: file, worker: worker
-                });
             }
         } else {
             await processNextFile(arguments[0]);
         }
-    } 
+    }
 }
 
 function sumObjectValues(obj) {
-  return Object.values(obj).reduce((acc, value) => {
-      acc += value;
-    return acc;
-  }, 0);
+    return Object.values(obj).reduce((acc, value) => {
+        acc += value;
+        return acc;
+    }, 0);
 }
 
 function onSameDay(timestamp1, timestamp2) {
     const date1Str = new Date(timestamp1).toLocaleDateString();
     const date2Str = new Date(timestamp2).toLocaleDateString();
     return date1Str === date2Str;
-  }
+}
 
 
-// Function to calculate nighttime boundaries for an audio file
+// Function to calculate the active intervals for an audio file in nocmig mode
+
 function calculateNighttimeBoundaries(fileStart, fileEnd, latitude, longitude) {
-    const boundaries = [];
-    // Initialize the current date to the start date of the audio file
-    let startDate = new Date(fileStart);
-    let stopDate = new Date(fileEnd);
-    let remainingFileDuration = stopDate - startDate;
-    while (startDate < stopDate) {
-        let start, end;
-      // Calculate dusk and dawn times for the current date
-      // Add the boundaries to the array
-      const {dawn, dusk} = SunCalc.getTimes (startDate, latitude, longitude);
-      const lengthOfNight = dawn.setDate(dawn.getDate() + 1) - dusk;
-      if (isDuringDaylight(startDate, latitude, longitude)){
-        const offset = dusk - startDate;
-        if (offset > remainingFileDuration) {
-            boundaries.push({ start: 0, end: 0})
-            return boundaries;
-        }
-        start = offset / 1000;
-        remainingFileDuration = remainingFileDuration - offset;
-      } else {
-        start = 0;
-      }
-      // end
-      if (remainingFileDuration < lengthOfNight){
-        end = start + (remainingFileDuration / 1000);
-      } else {
-        end = start + (lengthOfNight.getTime() / 1000);
-      }
-      boundaries.push({ start: start, end: end});
-      // Move to the next day
-      startDate.setDate(startDate.getDate() + 1);
-    };
-    if (boundaries.length > 1){
-        UI.postMessage({event: "generate-alert", message: `Nocmig mode doesn't yet work for files over 24 hours' duration. 
-Only the first 24 hours of the file will be processed.`})
+    const activeIntervals = [];
+    const maxFileOffset = (fileEnd - fileStart) / 1000;
+    const dayNightBoundaries = [];
+    //testing
+    const startTime = new Date(fileStart);
+    //needed
+    const endTime = new Date(fileEnd);
+    endTime.setHours(23, 59, 59, 999);
+    for (let currentDay = new Date(fileStart); 
+        currentDay <= endTime; 
+        currentDay.setDate(currentDay.getDate() + 1)) {
+            const {dawn, dusk} = SunCalc.getTimes(currentDay, latitude, longitude)
+            dayNightBoundaries.push(dawn.getTime(), dusk.getTime())
     }
-    return boundaries;
-  }
+
+    for (let i = 0; i < dayNightBoundaries.length; i++){
+        const offset = (dayNightBoundaries[i] - fileStart) / 1000;
+        // negative offsets are boundaries before the file starts.
+        // If the file starts during daylight, we move on
+        if (offset < 0){
+            if (!isDuringDaylight(fileStart, latitude, longitude) && i > 0) {
+                activeIntervals.push({start: 0})
+            }
+            continue;
+        }
+        // Now handle 'all daylight' files
+        if (offset >= maxFileOffset){
+            if (isDuringDaylight(fileEnd, latitude, longitude)) {
+                if (! activeIntervals.length) {
+                    activeIntervals.push({start: 0, end: 0})
+                    return activeIntervals
+                }
+            }
+        }
+        // The list pattern is [dawn, dusk, dawn, dusk,...]
+        // So every second item is a start trigger
+        if (i % 2 !== 0){
+            if (offset > maxFileOffset) break;
+            activeIntervals.push({start: Math.max(offset, 0)});
+        // and the others are a stop trigger
+        } else {
+            if (!activeIntervals.length) activeIntervals.push({start: 0})
+            activeIntervals[activeIntervals.length -1].end = Math.min(offset, maxFileOffset);
+        }
+    }
+    activeIntervals[activeIntervals.length -1].end ??= maxFileOffset;
+    return activeIntervals;
+}
 
 async function setStartEnd(file) {
     const meta = metadata[file];
@@ -1955,51 +1985,14 @@ async function setStartEnd(file) {
         const fileEnd = meta.fileStart + (meta.duration * 1000);
         const sameDay = onSameDay(fileEnd, meta.fileStart);
         const result = await STATE.db.getAsync('SELECT * FROM locations WHERE id = ?', meta.locationID);
-        const {lat, lon} = result ? {lat: result.lat, lon: result.lon} : {lat: STATE.lat, lon: STATE.lon};
+        const { lat, lon } = result ? { lat: result.lat, lon: result.lon } : { lat: STATE.lat, lon: STATE.lon };
         boundaries = calculateNighttimeBoundaries(meta.fileStart, fileEnd, lat, lon);
-        //const {dawn, dusk} = boundaries[0];
-        // let dusk, dawn;
-        // const astro = SunCalc.getTimes(fileEnd, lat, lon);
-        // dawn = astro.dawn;
-        // dusk = astro.dusk;
-        // if (!sameDay){
-        //     const nextday = meta.fileStart.getDate() + 1;
-        //     const astro2 = SunCalc.getTimes(nextday, lat, lon);
-        //     dawn = astro2.dawn;
-        // }
-        
-        // const secondsInDay = 84600;
-        // const nightDuration = secondsInDay - ((dusk - dawn) / 1000);
-        
-        // // If it's dark at the file start, start at 0 ...otherwise start at dusk
-        // if (! isDuringDaylight(meta.fileStart, lat, lon)) {
-        //     start = 0;
-        // } else {
-        //     // not dark at start, is it still light at the end and on the same day?
-        //     if (isDuringDaylight(fileEnd, lat, lon) && sameDay ) {
-        //         // No? skip this file
-        //         return [0, 0];
-        //     } else {
-        //         // So, it *is* dark by the end of the file, find out when dusk began
-        //         if (sameDay) start = (dusk - meta.fileStart) / 1000;
-        //         else start = ((dusk - meta.fileStart) / 1000);
-        //     }
-        // }
-        // // Now set the end
-        // if (meta.duration > nightDuration ) { // file longer than 12 hours - so there may be multiple nights in it
-        //     end = meta.duration; // Feedchunkstomodel will skip daylight sections when file is decoded
-        // } else { 
-        //     if (isDuringDaylight(fileEnd, lat, lon)){
-        //         end = (dawn - meta.fileStart) / 1000
-        //     } else {
-        //         end = meta.duration;
-        //     }
-        // }
     } else {
-        boundaries = [{ start: 0, end: meta.duration}];
+        boundaries = [{ start: 0, end: meta.duration }];
     }
-    const {start, end} = boundaries[0];
-    return [start, end];
+    // const { start, end } = boundaries[0];
+    // return [start, end];
+    return boundaries;
 }
 
 
@@ -2190,7 +2183,7 @@ const onSave2DiskDB = async () => {
 
             // Now we have saved the records, set state to DiskDB
             onChangeMode('archive');
-            getLocations({db: STATE.db, file: args.file});
+            getLocations({ db: STATE.db, file: args.file });
             UI.postMessage({
                 event: 'generate-alert',
                 message: `Database update complete, ${response.changes} records added to the archive in ${((Date.now() - t0) / 1000)} seconds`,
@@ -2400,7 +2393,7 @@ const onUpdateFileStart = async (args) => {
     //db.runAsync('END');
     // update the metadata
     delete metadata[file];
-    await getWorkingFile(file); 
+    await getWorkingFile(file);
 };
 
 
@@ -2599,10 +2592,10 @@ async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
         INSERT INTO locations VALUES (?, ?, ?, ?)
             ON CONFLICT(lat,lon) DO UPDATE SET place = excluded.place`, null, lat, lon, place);
         const { id } = await db.getAsync(`SELECT ID FROM locations WHERE lat = ? AND lon = ?`, lat, lon);
-        for(const file of files) {
+        for (const file of files) {
             await db.runAsync('UPDATE files SET locationID = ? WHERE name = ?', id, file);
             // we may not have set the metadata for the file
-            if (metadata[file]){
+            if (metadata[file]) {
                 metadata[file].locationID = id;
             } else {
                 metadata[file] = {}
@@ -2610,7 +2603,7 @@ async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
                 metadata[file].isComplete = false;
             }
             // tell the UI the file has a location id
-            UI.postMessage({event: 'file-location-id', file: file, id: id});
+            UI.postMessage({ event: 'file-location-id', file: file, id: id });
             // state.db is set onAnalyse, so check if the file is saved
             if (db === memoryDB) {
                 const fileSaved = await getSavedFileInfo(file)
@@ -2620,10 +2613,10 @@ async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
             }
         }
     }
-    await getLocations({db: db, file: files[0]});
+    await getLocations({ db: db, file: files[0] });
 }
 
-async function getLocations({db = STATE.db, file}) {
+async function getLocations({ db = STATE.db, file }) {
     const locations = await db.allAsync('SELECT * FROM locations ORDER BY place')
     UI.postMessage({ event: 'location-list', locations: locations, currentLocation: metadata[file]?.locationID })
 }

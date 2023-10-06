@@ -136,12 +136,13 @@ div#contentWrapper {
     position: absolute;
     top: 56px;
     width: 100%;
-    opacity:0;
+    opacity: 0;
     transition: opacity 2.5s ease;
 }
 
 div#contentWrapper.loaded {
-        opacity: 1; /* Change background opacity to 1 when the body has the "loaded" class */
+    opacity: 1;
+    /* Change background opacity to 1 when the body has the "loaded" class */
 }
 
 .zoom {
@@ -157,6 +158,7 @@ select {
     /* Add some space below the input */
     max-width: 25em
 }
+
 .dropdown-menu {
     min-width: 320px;
 }
@@ -166,6 +168,7 @@ select {
     font-size: 14px;
     vertical-align: -webkit-baseline-middle;
 }
+
 ul {
     /* Remove default list styling */
     list-style-type: none;
@@ -393,12 +396,13 @@ footer {
     white-space: nowrap;
 }
 
-.filename, .dropdown-menu-dark > a {
+.filename,
+.dropdown-menu-dark>a {
     max-width: 300px;
-    white-space: nowrap; 
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    padding-right:5px;
+    padding-right: 5px;
     align-self: center;
 }
 
@@ -638,12 +642,14 @@ input[type="range"].vertical {
     /* One more than modal */
     z-index: 1056;
 }
+
 #tourModal {
     /* One more than modal */
     z-index: 1057;
 }
 
-#chartRange, #exploreRange {
+#chartRange,
+#exploreRange {
     min-height: 58px;
     width: 100%;
     max-width: 400px;
@@ -655,7 +661,34 @@ input[type="range"].vertical {
     box-shadow: 0 0 10px 5px #ff6;
 }
 
-.carousel { overflow: hidden; padding-bottom: rem; }
-.carousel-caption { top: 100%; }
-.carousel-inner { overflow: visible; }
-.carousel-control-next, .carousel-control-prev { top: 8rem; }
+.carousel {
+    overflow: hidden;
+    padding-bottom: rem;
+}
+
+.carousel-caption {
+    top: 100%;
+}
+
+.carousel-inner {
+    overflow: visible;
+}
+
+.carousel-control-next,
+.carousel-control-prev {
+    top: 8rem;
+}
+
+#update-progress-bar {
+    width: 100%;
+    height: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    overflow: hidden;
+    background-color: #f1f1f1; /* Set the background color for the entire progress bar */
+  }
+
+  /* Style the filled-in part for WebKit browsers (Chrome, Safari) */
+  #update-progress-bar::-webkit-progress-value {
+    background-color: #4CAF50; /* Set the color for WebKit browsers */
+  }
