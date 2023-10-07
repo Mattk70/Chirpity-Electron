@@ -1,6 +1,6 @@
 {
   "name": "chirpity",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
@@ -162,14 +162,14 @@
   "dependencies": {
     "@popperjs/core": "^2.9.2",
     "@tensorflow/tfjs-node": "4.10.0",
-    "bootstrap": "^5.2.2",
+    "bootstrap": "5.2.2",
     "browser-id3-writer": "^4.4.0",
     "colormap": "^2.3.2",
     "electron-settings": "^4.0.2",
     "fast-png": "^6.1.0",
     "ffmpeg-static-electron": "^2.0.3",
     "fluent-ffmpeg": "^2.1.2",
-    "jquery": "^3.6.3",
+    "jquery": "3.6.3",
     "sqlite3": "^5.1.6",
     "suncalc": "^1.9.0",
     "uuid": "^8.3.2",

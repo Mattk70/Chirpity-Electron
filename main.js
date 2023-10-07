@@ -9,7 +9,7 @@ const settings = require('electron-settings');
 let files = [];
 let blockerID = 1;
 
-const DEBUG = true;
+const DEBUG = false;
 //Updater
 //const server = 'https://chirpity-electron-releases.vercel.app';
 //console.log('process platform ' + process.platform)
