@@ -1,168 +1,186 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Chirpity Nocmig usage guide</title>
-    <style>
-.responsive-container {
-	position: relative;
-	padding-bottom: 53.25%;
-	padding-top: 30px;
-	height: 0;
-	overflow: hidden;
-}
-.responsive-container,
-	.responsive-container iframe {
-	max-width: 1280px;
-	max-height: 720px;
-}
-.responsive-container iframe {
-	position: absolute;
-	top: 0; left: 0;
-	width: 100%;
-	height: 100%;
-}
-    </style>
 </head>
+
 <body>
-    <h4 class="text-center text-bg-dark">
-        <div class="row">
-          <!-- Video 1 -->
-          <div class="col-md-6 mb-4">
-            <h2>Demo Chirpity in Use</h2>
-            <div class="responsive-container">
-            <div class="embed-responsive embed-responsive-16by9">
-              <iframe width="230" height="158" src="https://www.youtube.com/embed/5_37FMPRkwY?si=qnQNUKJJyuCJ_U4b?vq=hd720&cc_load_policy=1" title="YouTube video player" frameborder="0" allow="picture-in-picture" allowfullscreen></iframe>
+    <h4 class="text-center bg-dark text-white p-3">Suggested Workflow</h4>
+    <div class="row mb-3">
+        <div class="col-sm-6">
+            <div class="card">
+                <div class="card-header">Using Chirpity</div>
+                <div class="card-body">
+                    <iframe width="100%" height="100%"
+                        src="https://www.youtube.com/embed/5_37FMPRkwY?si=qnQNUKJJyuCJ_U4b?vq=hd720&cc_load_policy=1"
+                        title="YouTube video player" frameborder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowfullscreen></iframe>
+                    <p class="card-text">An introductary tour of the key features of Chirpity. Best viewed in fullscreen
+                        mode</p>
+                </div>
             </div>
-          </div>
-          </div>
-      
-          <!-- Video 2 -->
-          <div class="col-md-6 mb-4">
-            <h2>Settings walkthrough</h2>
-            <div class="responsive-container">
-
-            <div class="embed-responsive embed-responsive-16by9">
-              <iframe width="230" height="158" src="https://www.youtube.com/embed/zMdu8P2CBQo?si=3yqm8AgYBDbCaeYO?vq=hd720" title="YouTube video player" frameborder="0" allow="picture-in-picture;" allowfullscreen></iframe>
-            </div>
-          </div>
-          </div>
         </div>
-      </div>
-<h4 class="text-center bg-dark text-white p-3">Suggested Workflow</h4>
-<ol>
-    <li>Open an audio file or files. There are a three ways to do this:
-        <ol>
-            <li>Right-click on the audio file(s) in Windows Explorer and select "Open with" > Chirpity Nocmig</li>
-            <li>In the Chirpity Nocmig application, select File > Open Audio File or press Ctrl-O and select the files to open</li>
-            <li>Drag and drop the files or folders onto the Chirpity Nocmig application</li>
-        </ol>
-        Ideally, files will be those recorded by your digital recorder with their original
-        timestamp. In this scenario, you will be able to take advantage of the <b>Time of Day</b> mode for the spectrogram timeline, which will show the actual time calls were
-        detected. If not, you can still display (and store) the correct time of day for the file and detections if you edit its start time.
-        This can be edited by right-clicking the filename in the control bar. 
-        <figure class="figure float-end m-3">
-            <img src="Help/amend file.png" alt="The context menu accessed from the filename contains options to amend the file's start time and the recording location" class="rounded figure-img float-end img-fluid">
-            <figcaption class="figure-caption text-muted text-end">File name context menu.</figcaption>
-        </figure>
-    </li>
-    <li>Choose whether to use <b>Nocmig mode.</b> Once the file is loaded, the spectrogram will appear, along with transport controls for
-        navigating the audio. A <i>nocmig mode</i> button (<span
+        <div class="col-sm-6">
+            <div class="card">
+                <div class="card-header">Chirpity Settings</div>
+                <div class="card-body">
+                    <iframe width="100%" height="100%"
+                        src="https://www.youtube.com/embed/zMdu8P2CBQo?si=kK3FwkQ9_QMeawe6?vq=hd720"
+                        title="YouTube video player" frameborder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowfullscreen></iframe>
+                    <p class="card-text">An overview of the settings menu in Chirpity. Best viewed in fullscreen mode
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <ol>
+        <li>Open an audio file or files. There are a three ways to do this:
+            <ol>
+                <li>Right-click on the audio file(s) in Windows Explorer and select "Open with" > Chirpity Nocmig</li>
+                <li>In the Chirpity Nocmig application, select File > Open Audio File or press Ctrl-O and select the
+                    files to open</li>
+                <li>Drag and drop the files or folders onto the Chirpity Nocmig application</li>
+            </ol>
+            Ideally, files will be those recorded by your digital recorder with their original
+            timestamp. In this scenario, you will be able to take advantage of the <b>Time of Day</b> mode for the
+            spectrogram timeline, which will show the actual time calls were
+            detected. If not, you can still display (and store) the correct time of day for the file and detections if
+            you edit its start time.
+            This can be edited by right-clicking the filename in the control bar.
+            <figure class="figure float-end m-3">
+                <img src="Help/amend file.png"
+                    alt="The context menu accessed from the filename contains options to amend the file's start time and the recording location"
+                    class="rounded figure-img float-end img-fluid">
+                <figcaption class="figure-caption text-muted text-end">File name context menu.</figcaption>
+            </figure>
+        </li>
+        <li>Choose whether to use <b>Nocmig mode.</b> Once the file is loaded, the spectrogram will appear, along with
+            transport controls for
+            navigating the audio. A <i>nocmig mode</i> button (<span
                 class="material-icons-two-tone align-bottom">nights_stay</span>) will also appear on the
-        right hand side. Nocmig mode takes its
-        cue from the file creation date and time. It limits the analysis to calls occurring both after the end of civil
-        twilight and before the beginning of civil twilight the following day. The default location used for
-        dawn/dusk calculations can be set from the settings menu, and a custom location can be applied to an individual file or open files
-         <b>N.B.</b>
-        If active, Nocmig mode is temporarily disabled for the Analysis of selections.
-    </li>
-    <li>
-        Having determined whether to use Nocmig mode, select &quot;<i>Analyse entire file</i>&quot; from the
-        <b>Analysis</b> menu. Depending on the file length, this may take several minutes. A progress indicator will
-        appear as a guide to how long this is likely to take. To stop the analysis at any point, press the <b>Esc</b>
-        key.
-    </li>
-</ol>
-<h5 class="pt-2">Exploring Detections</h5>
+            right hand side. Nocmig mode takes its
+            cue from the file creation date and time. It limits the analysis to calls occurring both after the end of
+            civil
+            twilight and before the beginning of civil twilight the following day. The default location used for
+            dawn/dusk calculations can be set from the settings menu, and a custom location can be applied to an
+            individual file or open files
+            <b>N.B.</b>
+            If active, Nocmig mode is temporarily disabled for the Analysis of selections.
+        </li>
+        <li>
+            Having determined whether to use Nocmig mode, select &quot;<i>Analyse entire file</i>&quot; from the
+            <b>Analysis</b> menu. Depending on the file length, this may take several minutes. A progress indicator will
+            appear as a guide to how long this is likely to take. To stop the analysis at any point, press the
+            <b>Esc</b>
+            key.
+        </li>
+    </ol>
+    <h5 class="pt-2">Exploring Detections</h5>
 
-<ol start="4">
-    <li>
-        As the model makes detections, they appear in a table below the spectrogram. Clicking the detection's row in
-        the table will cause the playhead to jump to the start of that detection and highlight it's location on the spectrogram.
-        Right-clicking the row will bring up the detection context menu. 
-        <figure class="figure float-end m-3">
-            <img src="Help/detection menu.png" alt="The context menu accessed from a detection contains options to inspect and amend the record" class="rounded figure-img float-end img-fluid">
-            <figcaption class="figure-caption text-muted text-end">Detection context menu.</figcaption>
-        </figure>
-        This contains options specific to the currently highlighted detection.
-        You may press the SpaceBar to play from the beginning of the selection and continue playing the
-        audio until you press the SpaceBar again. Clicking the spectrogram will move the playhead to that position.
-        If currently playing, playback will continue, so this allows you to replay a call repeatedly.
-    </li>
-    <li>
-        If multiple detections apply for a given time period, a circle will be displayed next to the Species' name.
-        Clicking this circle will display the other species detected in the region, and the confidence given to those IDs.
-    </li>
-</ol>
-<h5 class="pt-2">Summary and Filtering Detections</h5>
-<ol start="7">
-    <li>
-        A summary table appears to the left of the results once the model has completed its analysis. Importantly, this
-        table allows you to filter the results displayed in the main results
-        table. Click the species name in the summary to limit
-        the display to that single species. This is <i>extremely</i> useful if several hundred Robin calls were
-        detected!
-    </li>
-</ol>
-<h5 class="pt-2">Custom "Deep Dive" Detections</h5>
-<ol start="8">
-    <li>Sometimes, a call is missed or a detection is erroneous due to the position of the analysis window in relation
-        to the call. The window can be moved by dragging it, or you can create a new window by clicking and
-        dragging out a custom region on the spectrogram. Once you have a new region, select 
-        <span class="material-icons-two-tone">search</span> <b>Analyse</b> from the context menu or <b>Analysis > Analyse
-        selected interval</b> from the menu. 
-        The detections for the selected region appear in an overlay window and can be saved to the results or discarded.
-    </li>
-</ol>
+    <ol start="4">
+        <li>
+            As the model makes detections, they appear in a table below the spectrogram. Clicking the detection's row in
+            the table will cause the playhead to jump to the start of that detection and highlight it's location on the
+            spectrogram.
+            Right-clicking the row will bring up the detection context menu.
+            <figure class="figure float-end m-3">
+                <img src="Help/detection menu.png"
+                    alt="The context menu accessed from a detection contains options to inspect and amend the record"
+                    class="rounded figure-img float-end img-fluid">
+                <figcaption class="figure-caption text-muted text-end">Detection context menu.</figcaption>
+            </figure>
+            This contains options specific to the currently highlighted detection.
+            You may press the SpaceBar to play from the beginning of the selection and continue playing the
+            audio until you press the SpaceBar again. Clicking the spectrogram will move the playhead to that position.
+            If currently playing, playback will continue, so this allows you to replay a call repeatedly.
+        </li>
+        <li>
+            If multiple detections apply for a given time period, a circle will be displayed next to the Species' name.
+            Clicking this circle will display the other species detected in the region, and the confidence given to
+            those IDs.
+        </li>
+    </ol>
+    <h5 class="pt-2">Summary and Filtering Detections</h5>
+    <ol start="7">
+        <li>
+            A summary table appears to the left of the results once the model has completed its analysis. Importantly,
+            this
+            table allows you to filter the results displayed in the main results
+            table. Click the species name in the summary to limit
+            the display to that single species. This is <i>extremely</i> useful if several hundred Robin calls were
+            detected!
+        </li>
+    </ol>
+    <h5 class="pt-2">Custom "Deep Dive" Detections</h5>
+    <ol start="8">
+        <li>Sometimes, a call is missed or a detection is erroneous due to the position of the analysis window in
+            relation
+            to the call. The window can be moved by dragging it, or you can create a new window by clicking and
+            dragging out a custom region on the spectrogram. Once you have a new region, select
+            <span class="material-icons-two-tone">search</span> <b>Analyse</b> from the context menu or <b>Analysis >
+                Analyse
+                selected interval</b> from the menu.
+            The detections for the selected region appear in an overlay window and can be saved to the results or
+            discarded.
+        </li>
+    </ol>
 
-<h5 class="pt-2">Amending Results</h5>
-<ol start="10">
-    <li>It is possible to remove results from what will be saved by selecting  <span class='delete material-icons-two-tone'>delete_forever</span> <b>Delete Record</b> in the context menu.
-        This can be selected on a per-detection basis in the results table, or a per-species basis in the summary.
-    </li>
+    <h5 class="pt-2">Amending Results</h5>
+    <ol start="10">
+        <li>It is possible to remove results from what will be saved by selecting <span
+                class='delete material-icons-two-tone'>delete_forever</span> <b>Delete Record</b> in the context menu.
+            This can be selected on a per-detection basis in the results table, or a per-species basis in the summary.
+        </li>
 
-</ol>
+    </ol>
 
-<h5 class="pt-2">Saving Results</h5>
-<ol start="10">
-    <li>There are several ways to save results:
-        <ol>
+    <h5 class="pt-2">Saving Results</h5>
+    <ol start="10">
+        <li>There are several ways to save results:
+            <ol>
 
-            <li>Once the analysis is complete, and after you have made any amendments, you can save the results to a database <b>Records > Save to Archive </b>
-            After this, it will bring in the results from the database records. You can also explore and chart saved records.
+                <li>Once the analysis is complete, and after you have made any amendments, you can save the results to a
+                    database <b>Records > Save to Archive </b>
+                    After this, it will bring in the results from the database records. You can also explore and chart
+                    saved records.
 
-            <li>Save the detections as a label file in Audacity format. Press <b>Ctrl-A</b> or select <b>File > Save
-                Audacity Labels</b> from the menu. By default, the label file will have the same name as the audio file,
-                with a ".txt" extension.
-            </li>
-            <li>
-                Export an audio clip of a detection. To do this, select <span class="material-icons-two-tone">
-                    music_note
-                </span><b>Export Audio Clip</b> on the context menu. By default, the filename will contain the species and
-                timestamp of the detection identifying its position in the original audio file. The <b>Settings</b> menu allows you
-                to control the format and quality of the exported files as well as apply padding and a fade effect to the beginning and end of the audio.
-            </li>
-        </ol>
-    </li>
-</ol>
+                <li>Save the detections as a label file in Audacity format. Press <b>Ctrl-A</b> or select <b>File > Save
+                        Audacity Labels</b> from the menu. By default, the label file will have the same name as the
+                    audio file,
+                    with a ".txt" extension.
+                </li>
+                <li>
+                    Export an audio clip of a detection. To do this, select <span class="material-icons-two-tone">
+                        music_note
+                    </span><b>Export Audio Clip</b> on the context menu. By default, the filename will contain the
+                    species and
+                    timestamp of the detection identifying its position in the original audio file. The <b>Settings</b>
+                    menu allows you
+                    to control the format and quality of the exported files as well as apply padding and a fade effect
+                    to the beginning and end of the audio.
+                </li>
+            </ol>
+        </li>
+    </ol>
 
-<h5 id="reload" class="pt-2">Restoring Results</h5>
-<p>When you save your detections in Chirpity Nocmig, a database is updated with the details of the detections. If you
-reload your file at a later date, and select analyse file, the saved results are restored. <b>N.B.</b> If the original file is missing because it has
-since been compressed to one of the supported formats ('.mp3', '.wav', '.mpga', '.ogg', '.opus', '.flac', '.aac'), so long as it
-retains the same name, but with a new extension, Chirpity will find and load that file instead and, rather than take its
-cue from this file's creation time, use the original one.</p>
-<p>From the records menu, you can also browse saved detections by species, and within a date range of your choosing.
-    Furthermore, you can generate charts of the species detected over time.</p>
+    <h5 id="reload" class="pt-2">Restoring Results</h5>
+    <p>When you save your detections in Chirpity Nocmig, a database is updated with the details of the detections. If
+        you
+        reload your file at a later date, and select analyse file, the saved results are restored. <b>N.B.</b> If the
+        original file is missing because it has
+        since been compressed to one of the supported formats ('.mp3', '.wav', '.mpga', '.ogg', '.opus', '.flac',
+        '.aac'), so long as it
+        retains the same name, but with a new extension, Chirpity will find and load that file instead and, rather than
+        take its
+        cue from this file's creation time, use the original one.</p>
+    <p>From the records menu, you can also browse saved detections by species, and within a date range of your choosing.
+        Furthermore, you can generate charts of the species detected over time.</p>
 </body>
+
 </html>
