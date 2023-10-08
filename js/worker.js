@@ -2362,8 +2362,8 @@ const onUpdateFileStart = async (args) => {
     let file = args.file;
     const newfileMtime = Math.round(args.start + (metadata[file].duration * 1000));
     utimesSync(file, newfileMtime);
+    metadata[file].fileStart = args.start;
     let db = STATE.db;
-    //db.runAsync('BEGIN');
     let row = await db.getAsync('SELECT id from files where name = ?', file);
     let result;
     if (!row) {
@@ -2375,25 +2375,9 @@ const onUpdateFileStart = async (args) => {
         const id = row.id;
         const { changes } = await db.runAsync('UPDATE files SET filestart = ? where id = ?', args.start, id);
         console.log(changes ? `Changed ${file}` : `No changes made`);
-        // Create temp table, without unique constraits
-        // await db.runAsync('CREATE TABLE temp as SELECT * FROM records WHERE fileID = ?', id);
         // Fill with new values
         result = await db.runAsync('UPDATE records set dateTime = (position * 1000) + ? WHERE fileID = ?', args.start, id);
-        // // Delete records for file
-        // await db.runAsync('DELETE FROM records WHERE fileID = ?', id);
-        // // Add new records
-        // await db.runAsync('INSERT INTO records SELECT * from temp');
-        // // Drop temp
-        // await db.runAsync('DROP TABLE temp');
-        // // Rename temp table
-        // console.log(`Changed ${result.changes} records associated with  ${file}`);
-        // // Re-enable the foreign key constraints and recreate the unique constraint
-
     }
-    //db.runAsync('END');
-    // update the metadata
-    delete metadata[file];
-    await getWorkingFile(file);
 };
 
 

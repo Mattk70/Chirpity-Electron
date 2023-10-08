@@ -1,4 +1,5 @@
 let seenTheDarkness = false, shownDaylightBanner = false, LOCATIONS, locationID = undefined;
+const load0 = Date.now()
 let labels = [];
 
 const STATE = {
@@ -402,35 +403,89 @@ const buildFileMenu = (e) => {
     setLocationLink.addEventListener('click', () => {
         setLocation()
     })
-
-    //remove filename picker so they don't accumulate!
-    const pickers = document.getElementsByClassName('opensright');
-    while (pickers.length > 0) {
-        pickers[0].parentNode.removeChild(pickers[0]);
-    }
-    //Before adding this one
-    $(function () {
-        $('#setFileStart').daterangepicker({
-            singleDatePicker: true,
-            showDropdowns: true,
-            startDate: moment(fileStart),
-            minYear: 2015,
-            maxDate: moment(),
-            maxYear: parseInt(moment().format('YYYY')),
-            timePicker: true,
-            timePicker24Hour: true,
-            locale: {
-                applyLabel: 'Set Recording Start Time'
-            }
-        }, function (start, end, label) {
-            fileStart = start.toDate().getTime();
-            worker.postMessage({ action: 'update-file-start', file: currentFile, start: fileStart });
-        });
-        $('#setFileStart').on('show.daterangepicker', function (ev, picker) {
-            //Hack to have the picker dropdown appear next to file name
-            picker.container[0].style.transform = `translateY(-60px)`;
-        });
+    const setFileStartLink = document.getElementById('setFileStart');
+    setFileStartLink.addEventListener('click', () => {
+        showDatePicker()
     })
+}
+
+function getDatetimeLocalFromEpoch(date) {
+    // Assuming you have a Date object, for example:
+    const myDate = new Date(date);
+    let datePart = myDate.toLocaleDateString({year:'numberic', month:'2-digit', day:'2-digit'});
+    datePart = datePart.split('/').reverse().join('-');
+    const timePart = myDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    // Combine date and time parts in the format expected by datetime-local input
+    const isoDate = datePart + 'T' + timePart;
+    return isoDate;
+}
+
+function showDatePicker() {
+    // Create a form element
+    const form = document.createElement("form");
+    form.classList.add("mt-3", "mb-3", "p-3", "rounded", "text-bg-light", 'position-relative');
+    form.style.zIndex = "1000";
+    // Create a label for the datetime-local input
+    const label = document.createElement("label");
+    label.innerHTML = "Select New Date and Time:";
+    label.classList.add("form-label");
+    form.appendChild(label);
+
+    // Create the datetime-local input
+    const datetimeInput = document.createElement("input");
+    datetimeInput.setAttribute("type", "datetime-local");
+    datetimeInput.setAttribute("id", "fileStart");
+    datetimeInput.setAttribute("value", getDatetimeLocalFromEpoch(fileStart));
+    datetimeInput.setAttribute("max", getDatetimeLocalFromEpoch(new Date()));
+    datetimeInput.classList.add("form-control");
+    form.appendChild(datetimeInput);
+
+    // Create a submit button
+    const submitButton = document.createElement("button");
+    submitButton.innerHTML = "Submit";
+    submitButton.classList.add("btn", "btn-primary", "mt-2");
+    form.appendChild(submitButton);
+
+    // Create a cancel button
+    var cancelButton = document.createElement("button");
+    cancelButton.innerHTML = "Cancel";
+    cancelButton.classList.add("btn", "btn-secondary", "mt-2", "ms-2");
+    form.appendChild(cancelButton);
+
+    // Append the form to the filename element
+    const domElement = document.getElementById("filename");
+    domElement.appendChild(form);
+    document.removeEventListener('keydown', handleKeyDownDeBounce, true);
+    // Add submit event listener to the form
+    form.addEventListener("submit", function (event) {
+        event.preventDefault();
+
+        // Get the datetime-local value
+        const newStart = document.getElementById("fileStart").value;
+        // Convert the datetime-local value to milliseconds
+        const testDate = new Date(newStart);
+        const timestamp = new Date(newStart).getTime();
+
+        // Send the data to the worker
+        worker.postMessage({ action: 'update-file-start', file: currentFile, start: timestamp });
+        fileStart = timestamp;
+        // update the timeline
+        postBufferUpdate({ file: currentFile, begin: bufferBegin })
+        // Remove the form from the DOM
+        form.remove();
+        document.addEventListener('keydown', handleKeyDownDeBounce, true);
+    });
+    // Add click event listener to the cancel button
+    cancelButton.addEventListener("click", function () {
+        // Remove the form from the DOM
+        form.remove();
+        document.addEventListener('keydown', handleKeyDownDeBounce, true);
+        // Get the user's time zone
+        var userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+        console.log("User's Time Zone:", userTimeZone);
+
+    });
 }
 
 const filename = document.getElementById('filename');
@@ -1254,7 +1309,7 @@ function updatePrefs() {
 /////////////////////////  Window Handlers ////////////////////////////
 let appPath, tempPath;
 window.onload = async () => {
-    document.getElementById('contentWrapper').classList.add('loaded');
+    contentWrapperElement.addClass('loaded');
     // Set config defaults
     const defaultConfig = {
         lastUpdatePrompt: 0,
@@ -1383,7 +1438,6 @@ window.onload = async () => {
 
     // Set footer year
     $('#year').text(new Date().getFullYear());
-
 
 }
 
@@ -2565,7 +2619,7 @@ async function onPredictionDone({
     //Pagination
     total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
     if (action !== 'filter') {
-        if (AUDACITY_LABELS !== {}) {
+        if (! isEmptyObject(AUDACITY_LABELS)) {
             enableMenuItem(['saveLabels']);
             $('.download').removeClass('disabled');
         } else {
@@ -3106,7 +3160,8 @@ fullscreen.addEventListener('click', toggleFullscreen);
 
 const diagnosticMenu = document.getElementById('diagnostics');
 diagnosticMenu.addEventListener('click', async function () {
-    diagnostics['Model'] = config.model;
+    const modelToUse = document.getElementById('model-to-use');
+    diagnostics['Model'] = modelToUse.options[modelToUse.selectedIndex].text;
     diagnostics['Backend'] = config.backend;
     diagnostics['Batch size'] = config[config.backend].batchSize;
     diagnostics['Threads'] = config[config.backend].threads;
@@ -3875,15 +3930,15 @@ function highlightElement(selector) {
 // Event handler for when the carousel slides
 $('#carouselExample').on('slid.bs.carousel', function () {
     // Get the active carousel item
-    var activeItem = $('#carouselExample .carousel-inner .carousel-item.active');
+    const activeItem = $('#carouselExample .carousel-inner .carousel-item.active');
     // Get the element selector associated with the current step
-    var elementSelector = activeItem.data('element-selector');
+    const elementSelector = activeItem.data('element-selector');
     // Highlight the corresponding element on the page
     highlightElement(elementSelector);
     if (elementSelector === "#fileContainer") {
         // Create and dispatch a new 'contextmenu' event
         const element = document.getElementById('filename');
-        var contextMenuEvent = new MouseEvent('contextmenu', {
+        const contextMenuEvent = new MouseEvent('contextmenu', {
             bubbles: true,
             cancelable: true,
             clientY: element.offsetTop + (2 * element.offsetHeight),
