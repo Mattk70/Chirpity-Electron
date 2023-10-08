@@ -463,7 +463,6 @@ function showDatePicker() {
         // Get the datetime-local value
         const newStart = document.getElementById("fileStart").value;
         // Convert the datetime-local value to milliseconds
-        const testDate = new Date(newStart);
         const timestamp = new Date(newStart).getTime();
 
         // Send the data to the worker
@@ -480,11 +479,6 @@ function showDatePicker() {
         // Remove the form from the DOM
         form.remove();
         document.addEventListener('keydown', handleKeyDownDeBounce, true);
-        // Get the user's time zone
-        var userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-        console.log("User's Time Zone:", userTimeZone);
-
     });
 }
 
@@ -1624,14 +1618,6 @@ $(document).on('change', '#bird-list-seen', function (e) {
 
 })
 
-// $(document).on('focus', '.bird-list', function (e) {
-//     document.removeEventListener('keydown', handleKeyDownDeBounce, true);
-//     e.target.value = '';
-// })
-
-// $(document).on('blur', '.bird-list', function (e) {
-//     document.addEventListener('keydown', handleKeyDownDeBounce, true);
-// })
 
 // Chart functions
 function getDateOfISOWeek(w) {
