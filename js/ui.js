@@ -412,9 +412,9 @@ const buildFileMenu = (e) => {
 function getDatetimeLocalFromEpoch(date) {
     // Assuming you have a Date object, for example:
     const myDate = new Date(date);
-    let datePart = myDate.toLocaleDateString({year:'numberic', month:'2-digit', day:'2-digit'});
+    let datePart = myDate.toLocaleDateString('en-GB', {year:"numeric", month:"2-digit", day:"2-digit"});
     datePart = datePart.split('/').reverse().join('-');
-    const timePart = myDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const timePart = myDate.toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit" }).replace(/\s.M$/, '');
     // Combine date and time parts in the format expected by datetime-local input
     const isoDate = datePart + 'T' + timePart;
     return isoDate;
