@@ -377,9 +377,9 @@ async function showOpenDialog() {
     if (!files.canceled) await onOpenFiles({ filePaths: files.filePaths });
 }
 
-function powerSave(on) {
-    return window.electron.powerSaveBlocker(on);
-}
+// function powerSave(on) {
+//     return window.electron.powerSaveBlocker(on);
+// }
 
 const openFileInList = async (e) => {
     if (!PREDICTING && e.target.tagName === 'A') {
@@ -2029,11 +2029,11 @@ modelToUse.addEventListener('change', function (e) {
 const handleBackendChange = (e) => {
     config.backend = e.target.value;
     if (config.backend === 'webgl') {
-        powerSave(true)
+        //powerSave(true)
         SNRSlider.disabled = true;
         config.filters.SNR = 0;
     } else {
-        powerSave(false)
+       // powerSave(false)
         contextAware.disabled = false;
         if (contextAware.checked) {
             config.detect.contextAware = true;
@@ -3974,7 +3974,7 @@ function setHeaders() {
 
 function fetchAndCheckVersion(force) {
     const unique = new Date().getTime();
-    const url = `https://birds.mattkirkland.co.uk/latest.version#${unique}`;
+    const url = `https://birds.mattkirkland.co.uk/latest.version?${unique}`;
     const headers = setHeaders();
 
     fetch(url, { headers })
