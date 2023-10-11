@@ -128,7 +128,7 @@ onmessage = async (e) => {
                 break;
             case 'list':
                 myModel.list = e.data.list;
-                console.log(`Setting list to ${myModel.list}`);
+                if (DEBUG) console.log(`Setting list to ${myModel.list}`);
                 myModel.setList();
                 postMessage({ message: 'update-list', blocked: BLOCKED_IDS, updateResults: true });
                 break;
@@ -159,7 +159,6 @@ class Model {
     }
 
     async loadModel() {
-        console.log('loading model')
         if (this.model_loaded === false) {
             // Model files must be in a different folder than the js, assets files
             if (DEBUG) console.log('loading model from ', this.appPath + 'model.json')
