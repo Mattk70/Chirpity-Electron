@@ -280,7 +280,8 @@ const initWavesurfer = ({
     // Set click event that removes all regions
 
     waveElement.mousedown(function () {
-        clearActive();
+        resetRegions();
+        //clearActive();
     });
     // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
