@@ -277,6 +277,8 @@ async function handleMessage(e) {
             }
             break;
         case 'load-model':
+            SEEN_LABELS = false;
+            SEEN_MODEL_READY = false;
             UI.postMessage({ event: 'spawning' });
             if (args.model === 'v3') {
                 BATCH_SIZE = 1;
@@ -1784,6 +1786,7 @@ const parsePredictions = async (response) => {
     return response.worker
 }
 
+let SEEN_LABELS = false, SEEN_MODEL_READY = false;
 async function parseMessage(e) {
     const response = e.data;
     switch (response['message']) {
@@ -1792,14 +1795,20 @@ async function parseMessage(e) {
             LABELS = response['labels'];
             // Now we have what we need to populate a database...
             // Load the archive db
-            await loadDB(appPath);
-            if (!memoryDB) await createDB();
+            if (!SEEN_LABELS) {
+                SEEN_LABELS = true;
+                await loadDB(appPath);
+                if (!memoryDB) await createDB();
+            }
             break;
         case 'model-ready':
-            sampleRate = response['sampleRate'];
-            const backend = response['backend'];
-            console.log(backend);
-            UI.postMessage({ event: 'model-ready', message: 'ready', backend: backend, labels: LABELS, sampleRate: sampleRate })
+            if (! SEEN_MODEL_READY){
+                SEEN_MODEL_READY = true;
+                sampleRate = response['sampleRate'];
+                const backend = response['backend'];
+                console.log(backend);
+                UI.postMessage({ event: 'model-ready', message: 'ready', backend: backend, labels: LABELS, sampleRate: sampleRate })
+            }
             break;
         case 'prediction':
             if (!aborted) {
