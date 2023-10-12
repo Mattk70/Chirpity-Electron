@@ -105,6 +105,7 @@ const colourmap = document.getElementById('colourmap');
 const batchSizeValue = document.getElementById('batch-size-value');
 const nocmig = document.getElementById('nocmig');
 const contextAware = document.getElementById('context');
+const debugMode = document.getElementById('debug-mode');
 const audioFade = document.getElementById('fade');
 const audioBitrate = document.getElementById('bitrate');
 const audioQuality = document.getElementById('quality');
@@ -1324,7 +1325,8 @@ window.onload = async () => {
         tensorflow: { threads: diagnostics['Cores'], batchSize: 4 },
         webgl: { threads: 1, batchSize: 4 },
         audio: { format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false },
-        limit: 500
+        limit: 500,
+        debug: false
     };
     // Load preferences and override defaults
     [appPath, tempPath] = await getPaths();
@@ -1386,6 +1388,7 @@ window.onload = async () => {
         setNocmig(config.detect.nocmig);
         contextAware.checked = config.detect.contextAware;
         contextAwareIconDisplay();
+        debugMode.checked = config.debug;
         showThreshold(config.detect.confidence);
         SNRSlider.value = config.filters.SNR;
         SNRThreshold.innerText = config.filters.SNR;
@@ -3111,6 +3114,11 @@ const toggleContextAwareMode = () => {
 }
 contextAwareIcon.addEventListener('click', toggleContextAwareMode)
 
+debugMode.addEventListener('click', () =>{
+    config.debug = !config.debug;
+    debugMode.checked = config.debug;
+    updatePrefs()
+})
 
 nocmigButton.addEventListener('click', changeNocmigMode);
 nocmig.addEventListener('change', changeNocmigMode)

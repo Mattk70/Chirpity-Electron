@@ -108,23 +108,19 @@ const createDB = async (file) => {
 }
 
 async function loadDB(path) {
-    if (path) {
-        const file = dataset_database ? p.join(path, `archive_dataset${LABELS.length}.sqlite`) : p.join(path, `archive${LABELS.length}.sqlite`)
-        if (!fs.existsSync(file)) {
-            await createDB(file);
-        } else if (diskDB?.filename !== file) {
-            diskDB = new sqlite3.Database(file);
-            STATE.update({ db: diskDB });
-            await diskDB.runAsync('VACUUM');
-            await diskDB.runAsync('PRAGMA foreign_keys = ON');
-            const { count } = await diskDB.getAsync('SELECT COUNT(*) as count FROM records')
-            if (count) {
-                UI.postMessage({ event: 'diskDB-has-records' })
-            }
-            console.log("Opened and cleaned disk db " + file)
+    const file = dataset_database ? p.join(path, `archive_dataset${LABELS.length}.sqlite`) : p.join(path, `archive${LABELS.length}.sqlite`)
+    if (!fs.existsSync(file)) {
+        await createDB(file);
+    } else if (diskDB?.filename !== file) {
+        diskDB = new sqlite3.Database(file);
+        STATE.update({ db: diskDB });
+        await diskDB.runAsync('VACUUM');
+        await diskDB.runAsync('PRAGMA foreign_keys = ON');
+        const { count } = await diskDB.getAsync('SELECT COUNT(*) as count FROM records')
+        if (count) {
+            UI.postMessage({ event: 'diskDB-has-records' })
         }
-    } else {
-        const db = await createDB();
+        console.log("Opened and cleaned disk db " + file)
     }
     return true
 }
@@ -713,7 +709,7 @@ const convertFileFormat = (file, destination, size, error) => {
                 // HERE YOU GET THE TOTAL TIME
                 const a = data.duration.split(':');
                 totalTime = parseInt(a[0]) * 3600 + parseInt(a[1]) * 60 + parseFloat(a[2]);
-                metadata[file] = {duration: totalTime}
+                metadata[file] = { duration: totalTime }
                 //totalTime = parseInt(data.duration.replace(/:/g, ''))
             })
             .on('progress', (progress) => {
@@ -1802,7 +1798,7 @@ async function parseMessage(e) {
             }
             break;
         case 'model-ready':
-            if (! SEEN_MODEL_READY){
+            if (!SEEN_MODEL_READY) {
                 SEEN_MODEL_READY = true;
                 sampleRate = response['sampleRate'];
                 const backend = response['backend'];
@@ -1886,9 +1882,9 @@ async function processNextFile({
             }
             let boundaries = [];
             if (!start) boundaries = await setStartEnd(file);
-            else boundaries.push({start: start, end: end});
-            for (let i = 0; i < boundaries.length; i++){
-                const {start, end} = boundaries[i];
+            else boundaries.push({ start: start, end: end });
+            for (let i = 0; i < boundaries.length; i++) {
+                const { start, end } = boundaries[i];
                 if (start === end) {
                     // Nothing to do for this file
 
@@ -1945,44 +1941,44 @@ function calculateNighttimeBoundaries(fileStart, fileEnd, latitude, longitude) {
     //needed
     const endTime = new Date(fileEnd);
     endTime.setHours(23, 59, 59, 999);
-    for (let currentDay = new Date(fileStart); 
-        currentDay <= endTime; 
+    for (let currentDay = new Date(fileStart);
+        currentDay <= endTime;
         currentDay.setDate(currentDay.getDate() + 1)) {
-            const {dawn, dusk} = SunCalc.getTimes(currentDay, latitude, longitude)
-            dayNightBoundaries.push(dawn.getTime(), dusk.getTime())
+        const { dawn, dusk } = SunCalc.getTimes(currentDay, latitude, longitude)
+        dayNightBoundaries.push(dawn.getTime(), dusk.getTime())
     }
 
-    for (let i = 0; i < dayNightBoundaries.length; i++){
+    for (let i = 0; i < dayNightBoundaries.length; i++) {
         const offset = (dayNightBoundaries[i] - fileStart) / 1000;
         // negative offsets are boundaries before the file starts.
         // If the file starts during daylight, we move on
-        if (offset < 0){
+        if (offset < 0) {
             if (!isDuringDaylight(fileStart, latitude, longitude) && i > 0) {
-                activeIntervals.push({start: 0})
+                activeIntervals.push({ start: 0 })
             }
             continue;
         }
         // Now handle 'all daylight' files
-        if (offset >= maxFileOffset){
+        if (offset >= maxFileOffset) {
             if (isDuringDaylight(fileEnd, latitude, longitude)) {
-                if (! activeIntervals.length) {
-                    activeIntervals.push({start: 0, end: 0})
+                if (!activeIntervals.length) {
+                    activeIntervals.push({ start: 0, end: 0 })
                     return activeIntervals
                 }
             }
         }
         // The list pattern is [dawn, dusk, dawn, dusk,...]
         // So every second item is a start trigger
-        if (i % 2 !== 0){
+        if (i % 2 !== 0) {
             if (offset > maxFileOffset) break;
-            activeIntervals.push({start: Math.max(offset, 0)});
-        // and the others are a stop trigger
+            activeIntervals.push({ start: Math.max(offset, 0) });
+            // and the others are a stop trigger
         } else {
-            if (!activeIntervals.length) activeIntervals.push({start: 0})
-            activeIntervals[activeIntervals.length -1].end = Math.min(offset, maxFileOffset);
+            if (!activeIntervals.length) activeIntervals.push({ start: 0 })
+            activeIntervals[activeIntervals.length - 1].end = Math.min(offset, maxFileOffset);
         }
     }
-    activeIntervals[activeIntervals.length -1].end ??= maxFileOffset;
+    activeIntervals[activeIntervals.length - 1].end ??= maxFileOffset;
     return activeIntervals;
 }
 
