@@ -1,4 +1,4 @@
-const {app, dialog, ipcMain, MessageChannelMain, BrowserWindow, globalShortcut} = require('electron');
+const { app, dialog, ipcMain, MessageChannelMain, BrowserWindow, globalShortcut } = require('electron');
 //app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
 
 const fs = require("fs");
@@ -7,9 +7,38 @@ const path = require('path');
 const settings = require('electron-settings');
 //require('update-electron-app')();
 let files = [];
-let blockerID = 1;
+//let blockerID = 1;
+let DEBUG = true;
 
-const DEBUG = true;
+
+
+try {
+    // Specify the file path
+    const filePath = path.join(app.getPath('userData'), 'config.json');
+
+    // Read the contents of the file synchronously
+    const fileContent = fs.readFileSync(filePath, 'utf-8');
+    const config = JSON.parse(fileContent);
+    DEBUG = config.debug;
+    // Output the content to the console
+    console.log('File Content:', fileContent);
+}
+catch (error) {
+    // Handle errors, for example, file not found
+    console.error('Error reading file:', error.message);
+}
+
+
+// fs.readFileSync(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
+//     if (err) {
+//         console.log('JSON parse error ' + err);
+//         // Do nothing
+
+//     } else {
+//         const config = JSON.parse(data);
+//         DEBUG = config.debug;
+//     }
+
 //Updater
 //const server = 'https://chirpity-electron-releases.vercel.app';
 //console.log('process platform ' + process.platform)
@@ -38,7 +67,7 @@ process.stdin.resume();//so the program will not close instantly
 const clearCache = (file_cache) => {
     return new Promise((resolve) => {
         // clear & recreate file cache folder
-        fs.rmSync(file_cache, {recursive: true, force: true});
+        fs.rmSync(file_cache, { recursive: true, force: true });
         fs.mkdir(file_cache, (err, path) => {
             resolve(path);
         })
@@ -57,21 +86,21 @@ async function exitHandler(options, exitCode) {
         const conf = app.getPath('userData');
         fs.readdir(conf, (err, files) => {
             if (err) {
-              console.error('Error reading folder:', err);
-              return;
+                console.error('Error reading folder:', err);
+                return;
             }
             files.forEach((file) => {
-              if (file.startsWith('settings.json.')) {
-                fs.unlink(path.join(conf, file), (err) => {
-                  if (err) {
-                    console.error('Error deleting file:', err);
-                  } else {
-                    console.log('Deleted file:', file);
-                  }
-                });
-              }
+                if (file.startsWith('settings.json.')) {
+                    fs.unlink(path.join(conf, file), (err) => {
+                        if (err) {
+                            console.error('Error deleting file:', err);
+                        } else {
+                            console.log('Deleted file:', file);
+                        }
+                    });
+                }
             });
-          });
+        });
     } else {
         console.log('no clean')
 
@@ -85,14 +114,14 @@ async function exitHandler(options, exitCode) {
 }
 
 //do something when app is closing
-process.on('exit', exitHandler.bind(null, {cleanup: true}));
+process.on('exit', exitHandler.bind(null, { cleanup: true }));
 //catches ctrl+c event (but not in main process!)
-process.on('SIGINT', exitHandler.bind(null, {exit: true}));
+process.on('SIGINT', exitHandler.bind(null, { exit: true }));
 // catches "kill pid" (for example: nodemon restart)
-process.on('SIGUSR1', exitHandler.bind(null, {exit: true}));
-process.on('SIGUSR2', exitHandler.bind(null, {exit: true}));
+process.on('SIGUSR1', exitHandler.bind(null, { exit: true }));
+process.on('SIGUSR2', exitHandler.bind(null, { exit: true }));
 //catches uncaught exceptions
-process.on('uncaughtException', exitHandler.bind(null, {exit: true}));
+process.on('uncaughtException', exitHandler.bind(null, { exit: true }));
 
 let mainWindow;
 let workerWindow;
@@ -239,7 +268,7 @@ app.whenReady().then(async () => {
         // access the worker.
         if (event.senderFrame === mainWindow.webContents.mainFrame) {
             // Create a new channel ...
-            const {port1, port2} = new MessageChannelMain()
+            const { port1, port2 } = new MessageChannelMain()
             // ... send one end to the worker ...
             workerWindow.webContents.postMessage('new-client', null, [port1])
             // ... and the other end to the UI window.
@@ -280,7 +309,7 @@ app.whenReady().then(async () => {
     });
 
 
-    mainWindow.webContents.setWindowOpenHandler(({url, frameName}) => {
+    mainWindow.webContents.setWindowOpenHandler(({ url, frameName }) => {
         require('electron').shell.openExternal(url);
         return {
             action: 'deny',
@@ -304,24 +333,24 @@ app.whenReady().then(async () => {
         })
     });
 
-//
-//    setInterval(() => {
-//        autoUpdater.checkForUpdates()
-//    }, 6000000)
+    //
+    //    setInterval(() => {
+    //        autoUpdater.checkForUpdates()
+    //    }, 6000000)
 
-//    autoUpdater.on('error', message => {
-//        mainWindow.webContents.send('update-error', {error: message});
-//        console.error('There was a problem updating the application')
-//        console.error(message)
-//    })
-//
-//    autoUpdater.on('update-not-available', message => {
-//        mainWindow.webContents.send('update-not-available', {message: 'update-not-available'});
-//    })
-//
-//    autoUpdater.on('update-available', message => {
-//        mainWindow.webContents.send('update-available', {message: 'update-available'});
-//    })
+    //    autoUpdater.on('error', message => {
+    //        mainWindow.webContents.send('update-error', {error: message});
+    //        console.error('There was a problem updating the application')
+    //        console.error(message)
+    //    })
+    //
+    //    autoUpdater.on('update-not-available', message => {
+    //        mainWindow.webContents.send('update-not-available', {message: 'update-not-available'});
+    //    })
+    //
+    //    autoUpdater.on('update-available', message => {
+    //        mainWindow.webContents.send('update-available', {message: 'update-available'});
+    //    })
 });
 
 
@@ -387,7 +416,7 @@ ipcMain.handle('saveFile', (event, arg) => {
     // Show file dialog to select audio file
     let currentFile = arg.currentFile.substr(0, arg.currentFile.lastIndexOf(".")) + ".txt";
     dialog.showSaveDialog({
-        filters: [{name: 'Text Files', extensions: ['txt']}],
+        filters: [{ name: 'Text Files', extensions: ['txt'] }],
         defaultPath: currentFile
     }).then(file => {
         // Stating whether dialog operation was cancelled or not.
@@ -411,7 +440,7 @@ ipcMain.handle('saveFile', (event, arg) => {
     }).catch(err => {
         console.log(err)
     });
-    mainWindow.webContents.send('saveFile', {message: 'file saved!'});
+    mainWindow.webContents.send('saveFile', { message: 'file saved!' });
 });
 
 // function showMemory(){
