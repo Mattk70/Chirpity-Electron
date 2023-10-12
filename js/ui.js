@@ -2224,12 +2224,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             if (wavesurfer.spectrogram.fftSamples > 64) {
                 wavesurfer.spectrogram.fftSamples /= 2;
                 const position = wavesurfer.getCurrentTime() / windowLength;
-                const currentRegion = region ? {
-                    start: region.start,
-                    end: region.end,
-                    label: region.attributes?.label
-                } : undefined;
-                postBufferUpdate({ begin: bufferBegin, position: position, region: currentRegion })
+                postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion() })
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
@@ -2241,12 +2236,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             if (wavesurfer.spectrogram.fftSamples > 64) {
                 wavesurfer.spectrogram.fftSamples /= 2;
                 const position = wavesurfer.getCurrentTime() / windowLength;
-                const currentRegion = region ? {
-                    start: region.start,
-                    end: region.end,
-                    label: region.attributes?.label
-                } : undefined;
-                postBufferUpdate({ begin: bufferBegin, position: position, region: currentRegion })
+                postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion() })
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
@@ -2258,12 +2248,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             if (wavesurfer.spectrogram.fftSamples <= 2048) {
                 wavesurfer.spectrogram.fftSamples *= 2;
                 const position = wavesurfer.getCurrentTime() / windowLength;
-                const currentRegion = region ? {
-                    start: region.start,
-                    end: region.end,
-                    label: region.attributes?.label
-                } : undefined;
-                postBufferUpdate({ begin: bufferBegin, position: position, region: currentRegion })
+                postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion() })
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
@@ -2275,12 +2260,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             if (wavesurfer.spectrogram.fftSamples <= 2048) {
                 wavesurfer.spectrogram.fftSamples *= 2;
                 const position = wavesurfer.getCurrentTime() / windowLength;
-                const currentRegion = region ? {
-                    start: region.start,
-                    end: region.end,
-                    label: region.attributes?.label
-                } : undefined;
-                postBufferUpdate({ begin: bufferBegin, position: position, region: currentRegion })
+                postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion() })
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
@@ -2306,6 +2286,15 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         }
     }
 };
+
+//returns a region object with the start and end of the region supplied
+function getRegion(){
+    return region ? {
+        start: region.start + bufferBegin,
+        end: region.end + bufferBegin,
+        label: region.attributes?.label
+    } : undefined;
+}
 
 const postBufferUpdate = ({
     file = currentFile,
@@ -3466,7 +3455,7 @@ const filterIconDisplay = () => {
 const showFilterEffect = () => {
     if (fileLoaded) {
         const position = wavesurfer.getCurrentTime() / windowLength;
-        postBufferUpdate({ begin: bufferBegin, position: position })
+        postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion() })
     }
 }
 
