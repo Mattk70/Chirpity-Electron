@@ -1,4 +1,4 @@
-const {app, dialog, ipcMain, MessageChannelMain, BrowserWindow, powerSaveBlocker, globalShortcut} = require('electron');
+const {app, dialog, ipcMain, MessageChannelMain, BrowserWindow, globalShortcut} = require('electron');
 //app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
 
 const fs = require("fs");
@@ -9,7 +9,7 @@ const settings = require('electron-settings');
 let files = [];
 let blockerID = 1;
 
-const DEBUG = false;
+const DEBUG = true;
 //Updater
 //const server = 'https://chirpity-electron-releases.vercel.app';
 //console.log('process platform ' + process.platform)
@@ -346,16 +346,16 @@ app.on('activate', async () => {
 //     dialog[method](mainWindow, params);
 // });
 
-ipcMain.handle('powerSaveBlocker', (event, on) => {
-    //Stop system sleep
-    if (on) {
-        blockerID = powerSaveBlocker.start('prevent-app-suspension');
-        console.log("Power save blocked", blockerID);
-    } else if (powerSaveBlocker.isStarted(blockerID)) {
-        powerSaveBlocker.stop(blockerID);
-        console.log("Power save resumed", blockerID);
-    }
-})
+// ipcMain.handle('powerSaveBlocker', (event, on) => {
+//     //Stop system sleep
+//     if (on) {
+//         blockerID = powerSaveBlocker.start('prevent-app-suspension');
+//         console.log("Power save blocked", blockerID);
+//     } else if (powerSaveBlocker.isStarted(blockerID)) {
+//         powerSaveBlocker.stop(blockerID);
+//         console.log("Power save resumed", blockerID);
+//     }
+// })
 
 ipcMain.handle('openFiles', async (config) => {
     // Show file dialog to select audio file
