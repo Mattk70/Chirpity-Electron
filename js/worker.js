@@ -246,7 +246,6 @@ async function handleMessage(e) {
         case 'file-load-request':
             index = 0;
             if (filesBeingProcessed.length) onAbort(args);
-            if (!memoryDB) await createDB();
             console.log('Worker received audio ' + args.file);
             await loadAudioFile(args);
             metadata[args.file].isSaved ? onChangeMode('archive') : onChangeMode('analyse');
