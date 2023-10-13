@@ -834,7 +834,8 @@ async function loadAudioFile({
     region = false,
     preserveResults = false,
     play = false,
-    queued = false
+    queued = false,
+    goToRegion = true
 }) {
     const found = await getWorkingFile(file);
     if (found) {
@@ -853,7 +854,8 @@ async function loadAudioFile({
                     fileRegion: region,
                     preserveResults: preserveResults,
                     play: play,
-                    queued: queued
+                    queued: queued,
+                    goToRegion
                 }, [audioArray.buffer]);
             })
             .catch(e => {
