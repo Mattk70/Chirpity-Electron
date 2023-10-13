@@ -37,6 +37,11 @@
       "node_modules/ffprobe-static-electron/index.js",
       "node_modules/ffprobe-static-electron/package.json"
     ],
+    "publish": {
+      "provider": "vercel",
+      "url": "https://chirpity-electron-releases.vercel.app",
+      "channel": "latest"
+    },
     "extraResources": ["./Help/example.mp3"],
     "fileAssociations": [
       {

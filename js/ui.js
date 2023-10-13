@@ -2425,21 +2425,21 @@ function onModelReady(args) {
 }
 
 
-// worker.onmessage('update-error', async (event, args) => {
-//     console.error('update error' + args.error)
-// })
-//
-// worker.onmessage('update-not-available', async (event, args) => {
-//     console.log('update not available ' + args.message)
-// })
-//
-// worker.onmessage('update-available', async (event, args) => {
-//     console.log('update available ' + args.message)
-// })
-//
-// worker.onmessage('update-downloaded', async (event, args) => {
-//     console.log('update downloaded' + args.releaseNotes)
-// })
+window.onmessage('update-error', async (event, args) => {
+    console.error('update error' + args.error)
+})
+
+window.onmessage('update-not-available', async (event, args) => {
+    console.log('update not available ' + args.message)
+})
+
+window.onmessage('update-available', async (event, args) => {
+    console.log('update available ' + args.message)
+})
+
+window.onmessage('update-downloaded', async (event, args) => {
+    console.log('update downloaded' + args.releaseNotes)
+})
 
 /***
  *  Called when a new file or buffer is loaded by the worker

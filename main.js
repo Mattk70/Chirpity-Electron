@@ -1,4 +1,4 @@
-const { app, dialog, ipcMain, MessageChannelMain, BrowserWindow, globalShortcut } = require('electron');
+const { app, dialog, ipcMain, autoUpdater, MessageChannelMain, BrowserWindow, globalShortcut } = require('electron');
 //app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
 
 const fs = require("fs");
@@ -20,8 +20,6 @@ try {
     const fileContent = fs.readFileSync(filePath, 'utf-8');
     const config = JSON.parse(fileContent);
     DEBUG = config.debug;
-    // Output the content to the console
-    console.log('File Content:', fileContent);
 }
 catch (error) {
     // Handle errors, for example, file not found
@@ -29,38 +27,9 @@ catch (error) {
 }
 
 
-// fs.readFileSync(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
-//     if (err) {
-//         console.log('JSON parse error ' + err);
-//         // Do nothing
 
-//     } else {
-//         const config = JSON.parse(data);
-//         DEBUG = config.debug;
-//     }
 
-//Updater
-//const server = 'https://chirpity-electron-releases.vercel.app';
-//console.log('process platform ' + process.platform)
-//console.log('app version  ' + app.getVersion())
-//const url = `${server}/update/${process.platform}/${app.getVersion()}`
-//
-//autoUpdater.setFeedURL({url})
 
-//Update handling
-//autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName) => {
-//    const dialogOpts = {
-//        type: 'info',
-//        buttons: ['Restart', 'Later'],
-//        title: 'Application Update',
-//        message: process.platform === 'win32' ? releaseNotes : releaseName,
-//        detail: 'A new version has been downloaded. Restart the application to apply the updates.'
-//    }
-//
-//    dialog.showMessageBox(dialogOpts).then((returnValue) => {
-//        if (returnValue.response === 0) autoUpdater.quitAndInstall()
-//    })
-//})
 process.stdin.resume();//so the program will not close instantly
 
 
@@ -258,6 +227,7 @@ app.whenReady().then(async () => {
 
     await createWorker();
     await createWindow();
+
     // We'll be sending one end of this channel to the main world of the
     // context-isolated page.
 
@@ -332,25 +302,44 @@ app.whenReady().then(async () => {
             }
         })
     });
+    //Updater
+    const server = 'https://chirpity-electron-releases.vercel.app';
+    console.log('process platform ' + process.platform)
+    console.log('app version  ' + app.getVersion())
+    const url = `${server}/update/${process.platform}/${app.getVersion()}`
 
-    //
-    //    setInterval(() => {
-    //        autoUpdater.checkForUpdates()
-    //    }, 6000000)
+    autoUpdater.setFeedURL({ url })
 
-    //    autoUpdater.on('error', message => {
-    //        mainWindow.webContents.send('update-error', {error: message});
-    //        console.error('There was a problem updating the application')
-    //        console.error(message)
-    //    })
-    //
-    //    autoUpdater.on('update-not-available', message => {
-    //        mainWindow.webContents.send('update-not-available', {message: 'update-not-available'});
-    //    })
-    //
-    //    autoUpdater.on('update-available', message => {
-    //        mainWindow.webContents.send('update-available', {message: 'update-available'});
-    //    })
+    //Update handling
+    autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName) => {
+        const dialogOpts = {
+            type: 'info',
+            buttons: ['Restart', 'Later'],
+            title: 'Application Update',
+            message: process.platform === 'win32' ? releaseNotes : releaseName,
+            detail: 'A new version has been downloaded. Restart the application to apply the updates.'
+        }
+
+        dialog.showMessageBox(dialogOpts).then((returnValue) => {
+            if (returnValue.response === 0) autoUpdater.quitAndInstall()
+        })
+    })
+    autoUpdater.on('error', message => {
+        mainWindow.webContents.send('update-error', { error: message });
+        console.error('There was a problem updating the application')
+        console.error(message)
+    })
+
+    autoUpdater.on('update-not-available', message => {
+        mainWindow.webContents.send('update-not-available', { message: 'update-not-available' });
+    })
+
+    autoUpdater.on('update-available', message => {
+        mainWindow.webContents.send('update-available', { message: 'update-available' });
+    })
+
+    autoUpdater.checkForUpdates()
+
 });
 
 
