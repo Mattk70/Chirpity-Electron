@@ -352,6 +352,7 @@ function zoomSpec(direction) {
         let offsetSeconds = wavesurfer.getCurrentTime();
         let position = offsetSeconds / windowLength;
         let timeNow = bufferBegin + offsetSeconds;
+        const oldBufferBegin = bufferBegin;
         if (direction === 'zoomIn') {
             if (windowLength < 1.5) return;
             windowLength /= 2;
@@ -370,7 +371,17 @@ function zoomSpec(direction) {
         }
         // Keep playhead at same time in file
         position = (timeNow - bufferBegin) / windowLength;
-        postBufferUpdate({ begin: bufferBegin, position: position })
+        // adjust region start time to new window start time
+        let region = getRegion();
+        if (region) {
+            const duration = region.end - region.start;
+            region.start = region.start + (oldBufferBegin - bufferBegin);
+            region.end = region.start + duration;
+            const {start, end} = region;
+            if (start < 0 || start > windowLength || end > windowLength) region = undefined;
+
+        }
+        postBufferUpdate({ begin: bufferBegin, position: position, region: region, goToRegion: false })
     }
 }
 
@@ -1020,7 +1031,7 @@ const checkWidth = (text) => {
 }
 
 
-function createRegion(start, end, label) {
+function createRegion(start, end, label, goToRegion) {
     wavesurfer.pause();
     resetRegions();
     wavesurfer.addRegion({
@@ -1037,8 +1048,10 @@ function createRegion(start, end, label) {
     if (region.clientWidth <= checkWidth(text)) {
         region.style.writingMode = 'vertical-rl';
     }
-    const progress = start / wavesurfer.getDuration();
-    wavesurfer.seekAndCenter(progress);
+    if (goToRegion) {
+        const progress = start / wavesurfer.getDuration();
+        wavesurfer.seekAndCenter(progress);
+    }
 }
 
 // We add the handler to the whole table as the body gets replaced and the handlers on it would be wiped
@@ -2165,11 +2178,20 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     KeyC: function (e) {
         // Center window on playhead
         if (e.ctrlKey && currentBuffer) {
+            const saveBufferBegin = bufferBegin;
             const middle = bufferBegin + wavesurfer.getCurrentTime();
             bufferBegin = middle - windowLength / 2;
             bufferBegin = Math.max(0, bufferBegin);
             bufferBegin = Math.min(bufferBegin, currentFileDuration - windowLength)
-            postBufferUpdate({ begin: bufferBegin, position: 0.5 })
+            // Move the region if needed
+            let region = getRegion();
+            if (region){
+                const shift = saveBufferBegin - bufferBegin;
+                region.start += shift;
+                region.end += shift;
+                if (region.start < 0 || region.end > windowLength) region = undefined;
+            }
+            postBufferUpdate({ begin: bufferBegin, position: 0.5, region: region, goToRegion: false})
         }
     },
     PageUp: function () {
@@ -2227,7 +2249,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             if (wavesurfer.spectrogram.fftSamples > 64) {
                 wavesurfer.spectrogram.fftSamples /= 2;
                 const position = wavesurfer.getCurrentTime() / windowLength;
-                postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion() })
+                postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
@@ -2239,7 +2261,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             if (wavesurfer.spectrogram.fftSamples > 64) {
                 wavesurfer.spectrogram.fftSamples /= 2;
                 const position = wavesurfer.getCurrentTime() / windowLength;
-                postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion() })
+                postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
@@ -2251,7 +2273,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             if (wavesurfer.spectrogram.fftSamples <= 2048) {
                 wavesurfer.spectrogram.fftSamples *= 2;
                 const position = wavesurfer.getCurrentTime() / windowLength;
-                postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion() })
+                postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
@@ -2263,7 +2285,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             if (wavesurfer.spectrogram.fftSamples <= 2048) {
                 wavesurfer.spectrogram.fftSamples *= 2;
                 const position = wavesurfer.getCurrentTime() / windowLength;
-                postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion() })
+                postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
                 console.log(wavesurfer.spectrogram.fftSamples);
             }
         } else {
@@ -2293,8 +2315,8 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
 //returns a region object with the start and end of the region supplied
 function getRegion(){
     return region ? {
-        start: region.start + bufferBegin,
-        end: region.end + bufferBegin,
+        start: region.start,
+        end: region.end,
         label: region.attributes?.label
     } : undefined;
 }
@@ -2306,6 +2328,7 @@ const postBufferUpdate = ({
     play = false,
     resetSpec = false,
     region = undefined,
+    goToRegion = true,
     queued = false
 }) => {
     fileLoaded = false
@@ -2318,6 +2341,7 @@ const postBufferUpdate = ({
         play: play,
         resetSpec: resetSpec,
         region: region,
+        goToRegion: goToRegion,
         queued: queued
     });
 }
@@ -2442,7 +2466,8 @@ async function onWorkerLoadedAudio({
     contents = undefined,
     fileRegion = undefined,
     play = false,
-    queued = false
+    queued = false,
+    goToRegion = true
 }) {
     fileLoaded = true, locationID = location;
     const resetSpec = !currentFile;
@@ -2484,7 +2509,7 @@ async function onWorkerLoadedAudio({
             if (fileList.length > 1) enableMenuItem(['analyseAll'])
         }
         if (fileRegion) {
-            createRegion(fileRegion.start, fileRegion.end, fileRegion.label);
+            createRegion(fileRegion.start, fileRegion.end, fileRegion.label, goToRegion);
             if (fileRegion.play) {
                 region.play()
             }
