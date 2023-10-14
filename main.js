@@ -32,14 +32,25 @@ let files = [];
 let DEBUG = false;
 
 
-autoUpdater.autoDownload = true;
+autoUpdater.autoDownload = false;
 
 autoUpdater.on('checking-for-update', function () {
     sendStatusToWindow('Checking for update...');
 });
 
 autoUpdater.on('update-available', function (info) {
-    sendStatusToWindow('Update available.');
+    // Display dialog to the user
+    dialog.showMessageBox({
+        type: 'info',
+        title: 'Update Available',
+        message: 'A new version is available. Do you want to download it now?',
+        buttons: ['Yes', 'No']
+    }).then((result) => {
+        if (result.response === 0) {
+            // User clicked 'Yes', start the download
+            autoUpdater.downloadUpdate();
+        }
+    });
 });
 
 autoUpdater.on('update-not-available', function (info) {
@@ -58,13 +69,18 @@ autoUpdater.on('download-progress', function (progressObj) {
 });
 
 autoUpdater.on('update-downloaded', function (info) {
-    sendStatusToWindow('Update downloaded; will install in 10 seconds');
-});
-
-autoUpdater.on('update-downloaded', function (info) {
-    setTimeout(function () {
-        autoUpdater.quitAndInstall();
-    }, 10000);
+    // Display dialog for installing now or later
+    dialog.showMessageBox({
+        type: 'info',
+        title: 'Update Downloaded',
+        message: 'Update downloaded; do you want to install it now?',
+        buttons: ['Yes', 'Later']
+    }).then((result) => {
+        if (result.response === 0) {
+            // User clicked 'Yes', install the update
+            autoUpdater.quitAndInstall();
+        }
+    });
 });
 
 function sendStatusToWindow(message) {
