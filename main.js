@@ -93,7 +93,7 @@ autoUpdater.on('update-downloaded', function (info) {
     dialog.showMessageBox({
         type: 'info',
         title: 'Update Downloaded',
-        message: 'Update downloaded; do you want to install it now?',
+        message: 'Update downloaded; do you want to install it?',
         buttons: ['Yes', 'No']
     }).then((result) => {
         if (result.response === 0) {
