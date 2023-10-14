@@ -7,18 +7,6 @@ Electron app for sound file analysis with Chirpity.
 Author: Matthew Kirkland
 
 
-
-Credit to Stefan Kahl:
-
-```
-@phdthesis{kahl2019identifying,
-  title={{Identifying Birds by Sound: Large-scale Acoustic Event Recognition for Avian Activity Monitoring}},
-  author={Kahl, Stefan},
-  year={2019},
-  school={Chemnitz University of Technology}
-}
-```
-
 ## Application setup
 
 First, clone the project and install all dependencies:
