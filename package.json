@@ -1,6 +1,6 @@
 {
   "name": "chirpity",
-  "version": "0.9.6",
+  "version": "0.9.6.1",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
@@ -17,8 +17,7 @@
     "publish": [{
       "provider": "github",
       "owner": "Mattk70",
-      "repo": "https://github.com/Mattk70/Chirpity-Electron",
-      "private": true
+      "repo": "https://github.com/Mattk70/Chirpity-Electron"
     }],
     "files": [
       "**/*",
