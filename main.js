@@ -38,7 +38,18 @@ autoUpdater.on('checking-for-update', function () {
 });
 
 autoUpdater.on('update-available', function (info) {
-    sendStatusToWindow('Update available.');
+    // Display dialog to the user
+    dialog.showMessageBox({
+        type: 'info',
+        title: 'Update Available',
+        message: 'A new version is available. Do you want to download it now?',
+        buttons: ['Yes', 'No']
+    }).then((result) => {
+        if (result.response === 0) {
+            // User clicked 'Yes', start the download
+            autoUpdater.downloadUpdate();
+        }
+    });
 });
 
 autoUpdater.on('update-not-available', function (info) {
@@ -58,9 +69,18 @@ autoUpdater.on('download-progress', function (progressObj) {
 
 
 autoUpdater.on('update-downloaded', function (info) {
-    setTimeout(function () {
-        autoUpdater.quitAndInstall();
-    }, 10000);
+    // Display dialog for installing now or later
+    dialog.showMessageBox({
+        type: 'info',
+        title: 'Update Downloaded',
+        message: 'Update downloaded; do you want to install it now?',
+        buttons: ['Yes', 'Later']
+    }).then((result) => {
+        if (result.response === 0) {
+            // User clicked 'Yes', install the update
+            autoUpdater.quitAndInstall();
+        }
+    });
 });
 
 function sendStatusToWindow(message) {
@@ -296,7 +316,6 @@ app.whenReady().then(async () => {
     ipcMain.handle('getTemp', () => app.getPath('temp'));
     ipcMain.handle('getVersion', () => app.getVersion());
     ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
-
 
     await createWorker();
     await createWindow();
