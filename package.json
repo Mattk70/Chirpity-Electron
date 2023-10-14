@@ -1,6 +1,6 @@
 {
   "name": "chirpity",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
@@ -186,6 +186,7 @@
     "wavesurfer.js": "^6.6.3",
     "utimes": "^5.1.1",
     "electron-updater": "6.1.4",
-    "electron-log": "4.4.8"
+    "electron-log": "4.4.8",
+    "axios": "1.5.1"
   }
 }
