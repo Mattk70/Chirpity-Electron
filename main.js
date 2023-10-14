@@ -1,5 +1,26 @@
-const { app, dialog, ipcMain, autoUpdater, MessageChannelMain, BrowserWindow, globalShortcut } = require('electron');
+const { app, dialog, ipcMain, MessageChannelMain, BrowserWindow, globalShortcut } = require('electron');
+const { autoUpdater } = require("electron-updater")
+const log = require('electron-log');
 //app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
+//-------------------------------------------------------------------
+// Logging
+
+// This logging setup is not required for auto-updates to work,
+// but it sure makes debugging easier :)
+//-------------------------------------------------------------------
+autoUpdater.logger = log;
+autoUpdater.logger.transports.file.level = 'info';
+
+autoUpdater.setFeedURL({
+    provider: "github",
+    owner: "Mattk70",
+    repo: "Chirpity-Electron",
+    private: true
+});
+
+log.transports.file.resolvePathFn = () => path.join(APP_DATA, 'logs/main.log');
+log.info('App starting...');
+
 
 const fs = require("fs");
 const os = require('os');
@@ -8,9 +29,47 @@ const settings = require('electron-settings');
 //require('update-electron-app')();
 let files = [];
 //let blockerID = 1;
-let DEBUG = true;
+let DEBUG = false;
 
 
+autoUpdater.autoDownload = true;
+
+autoUpdater.on('checking-for-update', function () {
+    sendStatusToWindow('Checking for update...');
+});
+
+autoUpdater.on('update-available', function (info) {
+    sendStatusToWindow('Update available.');
+});
+
+autoUpdater.on('update-not-available', function (info) {
+    sendStatusToWindow('Update not available.');
+});
+
+autoUpdater.on('error', function (err) {
+    sendStatusToWindow('Error in auto-updater.');
+});
+
+autoUpdater.on('download-progress', function (progressObj) {
+    let log_message = "Download speed: " + progressObj.bytesPerSecond;
+    log_message = log_message + ' - Downloaded ' + parseInt(progressObj.percent) + '%';
+    log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
+    sendStatusToWindow(log_message);
+});
+
+autoUpdater.on('update-downloaded', function (info) {
+    sendStatusToWindow('Update downloaded; will install in 10 seconds');
+});
+
+autoUpdater.on('update-downloaded', function (info) {
+    setTimeout(function () {
+        autoUpdater.quitAndInstall();
+    }, 10000);
+});
+
+function sendStatusToWindow(message) {
+    console.log(message);
+}
 
 try {
     // Specify the file path
@@ -68,6 +127,23 @@ async function exitHandler(options, exitCode) {
                         }
                     });
                 }
+            });
+        });
+        // Remove old logs
+        const logs = path.join(app.getPath('userData'), 'logs');
+        fs.readdir(logs, (err, files) => {
+            if (err) {
+                console.error('Error reading folder:', err);
+                return;
+                }
+            files.forEach((file) => {
+                    fs.unlink(path.join(logs, file), (err) => {
+                        if (err) {
+                            console.error('Error deleting file:', err);
+                        } else {
+                            console.log('Deleted file:', file);
+                        }
+                    });
             });
         });
     } else {
@@ -302,53 +378,11 @@ app.whenReady().then(async () => {
             }
         })
     });
-    //Updater
-    const server = 'https://chirpity-electron-releases.vercel.app';
-    console.log('process platform ' + process.platform)
-    console.log('app version  ' + app.getVersion())
-    const url = `${server}/update/${process.platform}/${app.getVersion()}`
-
-    autoUpdater.setFeedURL({ url })
-
     //Update handling
-    autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName) => {
-        const dialogOpts = {
-            type: 'info',
-            buttons: ['Restart', 'Later'],
-            title: 'Application Update',
-            message: process.platform === 'win32' ? releaseNotes : releaseName,
-            detail: 'A new version has been downloaded. Restart the application to apply the updates.'
-        }
-
-        dialog.showMessageBox(dialogOpts).then((returnValue) => {
-            if (returnValue.response === 0) autoUpdater.quitAndInstall()
-        })
-    })
-    autoUpdater.on('error', message => {
-        mainWindow.webContents.send('update-error', { error: message });
-        console.error('There was a problem updating the application')
-        console.error(message)
-    })
-
-    autoUpdater.on('update-not-available', message => {
-        mainWindow.webContents.send('update-not-available', { message: 'update-not-available' });
-    })
-
-    autoUpdater.on('update-available', message => {
-        mainWindow.webContents.send('update-available', { message: 'update-available' });
-    })
-
-    autoUpdater.checkForUpdates()
+    autoUpdater.checkForUpdatesAndNotify()
 
 });
 
-
-// app.on('before-quit', async () =>
-// {
-//     console.log('before quit fired')
-//     workerWindow.webContents.postMessage('new-client', {action: 'clear-cache'})
-//     await session.defaultSession.clearStorageData();
-// })
 
 app.on('activate', async () => {
     if (mainWindow === null) {
@@ -360,20 +394,6 @@ app.on('activate', async () => {
     }
 });
 
-// ipcMain.handle('dialog', (event, method, params) => {
-//     dialog[method](mainWindow, params);
-// });
-
-// ipcMain.handle('powerSaveBlocker', (event, on) => {
-//     //Stop system sleep
-//     if (on) {
-//         blockerID = powerSaveBlocker.start('prevent-app-suspension');
-//         console.log("Power save blocked", blockerID);
-//     } else if (powerSaveBlocker.isStarted(blockerID)) {
-//         powerSaveBlocker.stop(blockerID);
-//         console.log("Power save resumed", blockerID);
-//     }
-// })
 
 ipcMain.handle('openFiles', async (config) => {
     // Show file dialog to select audio file
@@ -431,8 +451,3 @@ ipcMain.handle('saveFile', (event, arg) => {
     });
     mainWindow.webContents.send('saveFile', { message: 'file saved!' });
 });
-
-// function showMemory(){
-//     console.log(`${process.memoryUsage().rss / 1024 / 1024} MB`)
-// }
-// setInterval(showMemory, 2000)

@@ -1,11 +1,12 @@
 {
   "name": "chirpity",
-  "version": "0.9.3",
+  "version": "0.10.0",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
     "start": "electron  .",
-    "export": "electron-builder build -w  --x64 "
+    "export": "electron-builder build -w  --x64 ",
+    "publish": "electron-builder --win -p always"
   },
   "repository": {
     "type": "git",
@@ -13,6 +14,12 @@
   },
 
   "build": {
+    "publish": [{
+      "provider": "github",
+      "owner": "Mattk70",
+      "repo": "https://github.com/Mattk70/Chirpity-Electron",
+      "private": true
+    }],
     "files": [
       "**/*",
       "!test*${/*}",
@@ -37,11 +44,6 @@
       "node_modules/ffprobe-static-electron/index.js",
       "node_modules/ffprobe-static-electron/package.json"
     ],
-    "publish": {
-      "provider": "vercel",
-      "url": "https://chirpity-electron-releases.vercel.app",
-      "channel": "latest"
-    },
     "extraResources": ["./Help/example.mp3"],
     "fileAssociations": [
       {
@@ -131,6 +133,8 @@
       ]
     },
     "win": {
+      "publish": ["github"],
+      "verifyUpdateCodeSignature": false,
       "asar": true,
       "icon": "./img/icon/icon.png",
       "files": [
@@ -161,7 +165,7 @@
   "homepage": "https://github.com/mattk70/Chirpity-Electron#readme",
   "devDependencies": {
     "electron": "^25.3.0",
-    "electron-builder": "^24.4.0",
+    "electron-builder": "24.6.4",
     "@tensorflow/tfjs-converter": "4.10.0"
   },
   "dependencies": {
@@ -180,6 +184,8 @@
     "uuid": "^8.3.2",
     "wavefile-reader": "^1.1.1",
     "wavesurfer.js": "^6.6.3",
-    "utimes": "^5.1.1"
+    "utimes": "^5.1.1",
+    "electron-updater": "6.1.4",
+    "electron-log": "4.4.8"
   }
 }

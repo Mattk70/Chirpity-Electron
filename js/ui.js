@@ -1441,7 +1441,7 @@ window.onload = async () => {
             setTimeout(prepTour, 2000)
         }
         // check for new version
-        fetchAndCheckVersion()
+        //fetchAndCheckVersion()
     }
     )
     // establish the message channel
@@ -2424,22 +2424,6 @@ function onModelReady(args) {
 
 }
 
-
-window.onmessage('update-error', async (event, args) => {
-    console.error('update error' + args.error)
-})
-
-window.onmessage('update-not-available', async (event, args) => {
-    console.log('update not available ' + args.message)
-})
-
-window.onmessage('update-available', async (event, args) => {
-    console.log('update available ' + args.message)
-})
-
-window.onmessage('update-downloaded', async (event, args) => {
-    console.log('update downloaded' + args.releaseNotes)
-})
 
 /***
  *  Called when a new file or buffer is loaded by the worker
@@ -3980,137 +3964,3 @@ const prepTour = async () => {
 }
 $('#startTour').on('click', prepTour);
 
-// Hand-rolled version handling.
-const helpUpdate = document.getElementById('update');
-helpUpdate.addEventListener('click', () => {
-    fetchAndCheckVersion(true)
-})
-
-function setHeaders() {
-    const username = "nocmig";
-    const password = "nocmig";
-    const headers = new Headers({
-        'Authorization': 'Basic ' + btoa(username + ':' + password),
-    });
-    return headers;
-}
-
-function fetchAndCheckVersion(force) {
-    const unique = new Date().getTime();
-    const url = `https://birds.mattkirkland.co.uk/latest.version?${unique}`;
-    const headers = setHeaders();
-
-    fetch(url, { headers })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            const fetchedVersion = data.version;
-            const notes = data.notes
-            // Comparing the versions
-            if (compareVersions(fetchedVersion, version) > 0) {
-                helpUpdate.classList.remove('d-none');
-                // Just a daily nag ...
-                if (unique - config.lastUpdatePrompt < 86400000 && !force) return
-                const message = `Version ${fetchedVersion} available!
-_____________________________________________________________________
-
-Release notes: 
-${notes}
-_____________________________________________________________________
-Download Now?`
-                if (confirm(message)) {
-                    const url = `https://birds.mattkirkland.co.uk/chirpity%20Setup%20${fetchedVersion}.exe`;
-                    const chunks = [];
-                    fetch(url, { headers })
-                        .then(response => {
-                            if (!response.ok) {
-                                throw new Error(`HTTP error! Status: ${response.status}`);
-                            }
-                            // Get content length from headers to calculate progress
-                            const contentLength = response.headers.get('Content-Length');
-
-                            // Initialize variables for progress tracking
-                            let receivedBytes = 0;
-
-                            // Create a ReadableStream to consume the response body
-                            const reader = response.body.getReader();
-                            const tracking = document.getElementById('update-progress');
-                            const progressBar = document.getElementById('update-progress-bar');
-                            tracking.classList.remove('d-none');
-                            // Function to handle chunks of data
-                            function read() {
-                                reader.read().then(({ value, done }) => {
-                                    if (done) {
-                                        tracking.classList.add('d-none');
-                                        console.log('Download complete!');
-                                        // Create a Blob from the fetched data
-                                        // Combine the chunks into a single Uint8Array
-                                        const uint8Array = new Uint8Array(receivedBytes);
-                                        let offset = 0;
-                                        for (const chunk of chunks) {
-                                            uint8Array.set(chunk, offset);
-                                            offset += chunk.length;
-                                        }
-
-                                        // Create a Blob from the Uint8Array
-                                        const blob = new Blob([uint8Array]);
-                                        // Create a data URL from the Blob
-                                        const blobUrl = URL.createObjectURL(blob);
-                                        const link = document.createElement('a');
-                                        link.href = blobUrl;
-                                        link.download = `Chirpity Installer ${fetchedVersion}.exe`;
-                                        document.body.appendChild(link);
-                                        link.click();
-                                        document.body.removeChild(link);
-                                        URL.revokeObjectURL(blobUrl);
-                                    } else {
-                                        // Update receivedBytes and calculate progress
-                                        receivedBytes += value.byteLength;
-                                        const progress = (receivedBytes / contentLength) * 100;
-                                        progressBar.value = parseInt(progress);
-                                        // Append the chunk to the chunks array
-                                        chunks.push(value);
-                                        // Continue reading the next chunk
-                                        read()
-
-                                    }
-                                });
-                            }
-                            // Start reading the chunks
-                            read();
-                        })
-                        .catch(error => {
-                            console.log(error)
-                            alert('There was an error when downloading, please try again');
-                        });
-                }
-                else {
-                    // Do something if the update is deferred.
-                    config.lastUpdatePrompt = new Date().getTime()
-                    updatePrefs()
-                }
-            } else {
-                helpUpdate.classList.add('d-none');
-            }
-        })
-        .catch(error => {
-            console.error('Fetch error:', error);
-        });
-}
-
-// Function to compare version strings
-function compareVersions(a, b) {
-    const partsA = a.split('.').map(Number);
-    const partsB = b.split('.').map(Number);
-
-    for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
-        if (partsA[i] > partsB[i]) return 1;
-        if (partsA[i] < partsB[i]) return -1;
-    }
-
-    return 0;
-}
