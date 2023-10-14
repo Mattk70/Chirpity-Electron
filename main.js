@@ -21,6 +21,23 @@ autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = 'info';
 
 // Updates
+// Function to fetch release notes from GitHub API with authentication
+async function fetchReleaseNotes(version) {
+    try {
+        const accessToken = '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'; // Replace with your GitHub access token
+        const headers = { Authorization: `Bearer ${accessToken}`,"X-GitHub-Api-Version": "2023-10-11" };
+
+        const response = await axios.get(`https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest`, { headers });
+        log.info(JSON.stringify(response))
+        if (response.data && response.data.body) {
+            return response.data.body;
+        }
+    } catch (error) {
+        console.error('Error fetching release notes:', error);
+    }
+    return 'Release notes not available.';
+}
+
 autoUpdater.setFeedURL({
     provider: "github",
     owner: "Mattk70",
@@ -37,12 +54,15 @@ autoUpdater.on('checking-for-update', function () {
     sendStatusToWindow('Checking for update...');
 });
 
-autoUpdater.on('update-available', function (info) {
-    // Display dialog to the user
+autoUpdater.on('update-available', async function (info) {
+    // Fetch release notes from GitHub API
+    const releaseNotes = await fetchReleaseNotes(info.version);
+    log.info(JSON.stringify(info))
+    // Display dialog to the user with release notes
     dialog.showMessageBox({
         type: 'info',
         title: 'Update Available',
-        message: 'A new version is available. Do you want to download it now?',
+        message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to download it now?`,
         buttons: ['Yes', 'No']
     }).then((result) => {
         if (result.response === 0) {
