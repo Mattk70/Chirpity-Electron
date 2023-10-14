@@ -17,18 +17,18 @@ let DEBUG = false;
 // This logging setup is not required for auto-updates to work,
 // but it sure makes debugging easier :)
 //-------------------------------------------------------------------
+
+console.log = log.log;
+console.warn = log.warn;
+console.error = log.error;
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = 'info';
 
 // Updates
-// Function to fetch release notes from GitHub API with authentication
+// Function to fetch release notes from GitHub API
 async function fetchReleaseNotes(version) {
     try {
-        const accessToken = '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'; // Replace with your GitHub access token
-        const headers = { Authorization: `Bearer ${accessToken}`,"X-GitHub-Api-Version": "2023-10-11" };
-
-        const response = await axios.get(`https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest`, { headers });
-        log.info(JSON.stringify(response))
+        const response = await axios.get(`https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest`);
         if (response.data && response.data.body) {
             return response.data.body;
         }
@@ -38,12 +38,12 @@ async function fetchReleaseNotes(version) {
     return 'Release notes not available.';
 }
 
-autoUpdater.setFeedURL({
-    provider: "github",
-    owner: "Mattk70",
-    repo: "Chirpity-Electron",
-    private: true
-});
+// autoUpdater.setFeedURL({
+//     provider: "github",
+//     owner: "Mattk70",
+//     repo: "Chirpity-Electron",
+//     private: true
+// });
 
 autoUpdater.autoDownload = false;
 log.transports.file.resolvePathFn = () => path.join(APP_DATA, 'logs/main.log');
@@ -62,7 +62,7 @@ autoUpdater.on('update-available', async function (info) {
     dialog.showMessageBox({
         type: 'info',
         title: 'Update Available',
-        message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to download it now?`,
+        message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
         buttons: ['Yes', 'No']
     }).then((result) => {
         if (result.response === 0) {
@@ -89,18 +89,7 @@ autoUpdater.on('download-progress', function (progressObj) {
 
 
 autoUpdater.on('update-downloaded', function (info) {
-    // Display dialog for installing now or later
-    dialog.showMessageBox({
-        type: 'info',
-        title: 'Update Downloaded',
-        message: 'Update downloaded; do you want to install it?',
-        buttons: ['Yes', 'No']
-    }).then((result) => {
-        if (result.response === 0) {
-            // User clicked 'Yes', install the update
             autoUpdater.quitAndInstall();
-        }
-    });
 });
 
 function sendStatusToWindow(message) {
