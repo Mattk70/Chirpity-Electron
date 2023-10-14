@@ -45,7 +45,7 @@ autoUpdater.setFeedURL({
     private: true
 });
 
-autoUpdater.autoDownload = true;
+autoUpdater.autoDownload = false;
 log.transports.file.resolvePathFn = () => path.join(APP_DATA, 'logs/main.log');
 log.info('App starting...');
 
@@ -94,7 +94,7 @@ autoUpdater.on('update-downloaded', function (info) {
         type: 'info',
         title: 'Update Downloaded',
         message: 'Update downloaded; do you want to install it now?',
-        buttons: ['Yes', 'Later']
+        buttons: ['Yes', 'No']
     }).then((result) => {
         if (result.response === 0) {
             // User clicked 'Yes', install the update
