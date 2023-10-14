@@ -1,9 +1,16 @@
 const { app, dialog, ipcMain, MessageChannelMain, BrowserWindow, globalShortcut } = require('electron');
 const { autoUpdater } = require("electron-updater")
 const log = require('electron-log');
-const axios = require('axios'); // Add this line to use Axios for GitHub HTTP requests
-
 //app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
+const fs = require("fs");
+const os = require('os');
+const path = require('path');
+const settings = require('electron-settings');
+//require('update-electron-app')();
+let files = [];
+let DEBUG = false;
+
+
 //-------------------------------------------------------------------
 // Logging
 
@@ -13,6 +20,7 @@ const axios = require('axios'); // Add this line to use Axios for GitHub HTTP re
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = 'info';
 
+// Updates
 autoUpdater.setFeedURL({
     provider: "github",
     owner: "Mattk70",
@@ -20,61 +28,19 @@ autoUpdater.setFeedURL({
     private: true
 });
 
+autoUpdater.autoDownload = true;
 log.transports.file.resolvePathFn = () => path.join(APP_DATA, 'logs/main.log');
 log.info('App starting...');
 
-
-const fs = require("fs");
-const os = require('os');
-const path = require('path');
-const settings = require('electron-settings');
-//require('update-electron-app')();
-let files = [];
-//let blockerID = 1;
-let DEBUG = false;
-
-
-// Update handling
-// Function to fetch release notes from GitHub API with authentication
-async function fetchReleaseNotes(version) {
-    try {
-        const accessToken = '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'; // Replace with your GitHub access token
-        const headers = { Authorization: `Bearer ${accessToken}` };
-
-        const response = await axios.get(`https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/tags/v${version}`, { headers });
-
-        if (response.data && response.data.body) {
-            return response.data.body;
-        }
-    } catch (error) {
-        console.error('Error fetching release notes:', error);
-    }
-    return 'Release notes not available.';
-}
-
-autoUpdater.autoDownload = false;
 
 autoUpdater.on('checking-for-update', function () {
     sendStatusToWindow('Checking for update...');
 });
 
-autoUpdater.on('update-available', async function (info) {
-    // Fetch release notes from GitHub API
-    const releaseNotes = await fetchReleaseNotes(info.version);
-
-    // Display dialog to the user with release notes
-    dialog.showMessageBox({
-        type: 'info',
-        title: 'Update Available',
-        message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to download it now?`,
-        buttons: ['Yes', 'No']
-    }).then((result) => {
-        if (result.response === 0) {
-            // User clicked 'Yes', start the download
-            autoUpdater.downloadUpdate();
-        }
-    });
+autoUpdater.on('update-available', function (info) {
+    sendStatusToWindow('Update available.');
 });
+
 autoUpdater.on('update-not-available', function (info) {
     sendStatusToWindow('Update not available.');
 });
@@ -90,25 +56,18 @@ autoUpdater.on('download-progress', function (progressObj) {
     sendStatusToWindow(log_message);
 });
 
+
 autoUpdater.on('update-downloaded', function (info) {
-    // Display dialog for installing now or later
-    dialog.showMessageBox({
-        type: 'info',
-        title: 'Update Downloaded',
-        message: 'Update downloaded; do you want to install it now?',
-        buttons: ['Yes', 'Later']
-    }).then((result) => {
-        if (result.response === 0) {
-            // User clicked 'Yes', install the update
-            autoUpdater.quitAndInstall();
-        }
-    });
+    setTimeout(function () {
+        autoUpdater.quitAndInstall();
+    }, 10000);
 });
 
 function sendStatusToWindow(message) {
     console.log(message);
 }
 
+// Debug mode
 try {
     // Specify the file path
     const filePath = path.join(app.getPath('userData'), 'config.json');
