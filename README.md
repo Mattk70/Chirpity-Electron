@@ -1,6 +1,6 @@
 # Chirpity-Electron
 
-Electron app for sound file analysis with Chirpity. 
+Electron app to identify the calls of nocturnal migrants from audio files. 
 
 Author: Matthew Kirkland
 
