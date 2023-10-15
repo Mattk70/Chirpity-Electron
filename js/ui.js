@@ -3964,3 +3964,13 @@ const prepTour = async () => {
 }
 $('#startTour').on('click', prepTour);
 
+// Function to display update download progress
+const tracking = document.getElementById('update-progress');
+const updateProgressBar = document.getElementById('update-progress-bar');
+window.ipcRenderer.on('download-progress', (event, progressObj) => {
+    tracking.classList.remove('d-none')
+    // Update your UI with the progress information
+    updateProgressBar.value = progressObj.percent;
+    if (progressObj.percent > 99) tracking.classList.add('d-none')
+});
+   
