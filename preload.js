@@ -74,7 +74,7 @@ window.addEventListener('DOMContentLoaded', () => {
         tracking.classList.remove('d-none')
         // Update your UI with the progress information
         updateProgressBar.value = value;
+        // Hide progress when done
         if (progressObj.percent > 99) tracking.classList.add('d-none')
-        // You can now perform actions in your UI based on the received message
     });
   })

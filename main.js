@@ -6,6 +6,7 @@ const fs = require("fs");
 const os = require('os');
 const path = require('path');
 const settings = require('electron-settings');
+const axios = require('axios');
 //require('update-electron-app')();
 let files = [];
 let DEBUG = false;
