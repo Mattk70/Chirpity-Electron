@@ -41,6 +41,7 @@ ipcRenderer.once('provide-worker-channel', async (event) => {
 
 
 contextBridge.exposeInMainWorld('electron', {
+    onDownloadProgress: (callback) => ipcRenderer.on('download-progress', callback),
     saveFile: (args) => ipcRenderer.invoke('saveFile', args),
     selectDirectory: () => ipcRenderer.invoke('selectDirectory'),
     openDialog: (method, config) => ipcRenderer.invoke('openFiles', method, config),
@@ -60,5 +61,20 @@ contextBridge.exposeInMainWorld('module', {
     os: os
 });
 
-// Expose ipcRenderer to the renderer process
-contextBridge.exposeInMainWorld('ipcRenderer', ipcRenderer);
+
+// Listen for messages from the main process
+// Function to display update download progress
+
+
+window.addEventListener('DOMContentLoaded', () => {
+    const tracking = document.getElementById('update-progress');
+    const updateProgressBar = document.getElementById('update-progress-bar');
+    ipcRenderer.on('download-progress', (_event, value) => {
+        console.log(value); // Log the message to the console
+        tracking.classList.remove('d-none')
+        // Update your UI with the progress information
+        updateProgressBar.value = value;
+        if (progressObj.percent > 99) tracking.classList.add('d-none')
+        // You can now perform actions in your UI based on the received message
+    });
+  })
