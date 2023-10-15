@@ -1,5 +1,3 @@
-<b>This repo is currently under development.</b>
-
 # Chirpity-Electron
 
 Electron app for sound file analysis with Chirpity. 
