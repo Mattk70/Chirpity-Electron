@@ -30,8 +30,7 @@ autoUpdater.logger.transports.file.level = 'info';
 async function fetchReleaseNotes(version) {
     try {
         const response = await axios.get(`https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest`);
-        const release = JSON.parse(response);
-        if (release.data && release.data.body) {
+        if (response.data && response.data.body) {
             return response.data.body;
         }
     } catch (error) {
