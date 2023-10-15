@@ -29,7 +29,8 @@ autoUpdater.logger.transports.file.level = 'info';
 async function fetchReleaseNotes(version) {
     try {
         const response = await axios.get(`https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest`);
-        if (response.data && response.data.body) {
+        const release = JSON.parse(response);
+        if (release.data && release.data.body) {
             return response.data.body;
         }
     } catch (error) {
@@ -38,12 +39,7 @@ async function fetchReleaseNotes(version) {
     return 'Release notes not available.';
 }
 
-// autoUpdater.setFeedURL({
-//     provider: "github",
-//     owner: "Mattk70",
-//     repo: "Chirpity-Electron",
-//     private: true
-// });
+
 
 autoUpdater.autoDownload = false;
 log.transports.file.resolvePathFn = () => path.join(APP_DATA, 'logs/main.log');
@@ -218,7 +214,10 @@ async function windowStateKeeper(windowName) {
             windowState = window.getBounds();
         }
         windowState.isMaximized = window.isMaximized();
-        await settings.set(`windowState.${windowName}`, windowState);
+        try {
+            await settings.set(`windowState.${windowName}`, windowState);
+        } catch (error) {
+        }
     }
 
     function track(win) {

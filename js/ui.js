@@ -3967,7 +3967,7 @@ $('#startTour').on('click', prepTour);
 // Function to display update download progress
 const tracking = document.getElementById('update-progress');
 const updateProgressBar = document.getElementById('update-progress-bar');
-window.ipcRenderer.on('download-progress', (event, progressObj) => {
+window.electron.onDownloadProgress((_event, progressObj) => {
     tracking.classList.remove('d-none')
     // Update your UI with the progress information
     updateProgressBar.value = progressObj.percent;
