@@ -31,9 +31,7 @@ After that, we can initialize the source directory with:
 npm init
 ```
 
-Follow the prompt to setup ```package.json```.
-
-Now, we need to install <i>electron</I> with:
+Now, we need to install project dependencoies with:
 
 ```
 npm install --save-dev
