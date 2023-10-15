@@ -59,3 +59,6 @@ contextBridge.exposeInMainWorld('module', {
     uuidv4: uuidv4,
     os: os
 });
+
+// Expose ipcRenderer to the renderer process
+contextBridge.exposeInMainWorld('ipcRenderer', ipcRenderer);
