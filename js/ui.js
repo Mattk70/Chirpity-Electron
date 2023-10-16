@@ -1,5 +1,4 @@
 let seenTheDarkness = false, shownDaylightBanner = false, LOCATIONS, locationID = undefined;
-const load0 = Date.now()
 let labels = [];
 
 const STATE = {
@@ -1365,6 +1364,7 @@ window.onload = async () => {
         }
         // switch off fullscreen mode - we don't want to persist that setting
         config.fullscreen = false;
+        // switch off debug mode we don't want this to be remembered
         // Initialize Spectrogram
         initWavesurfer({});
         // Set UI option state
