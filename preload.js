@@ -75,6 +75,6 @@ window.addEventListener('DOMContentLoaded', () => {
         // Update your UI with the progress information
         updateProgressBar.value = progressObj.percent;
         // Hide progress when done
-        if (progressObj.percent > 99) tracking.classList.add('d-none')
+        if (progressObj.percent === 100) tracking.classList.add('d-none')
     });
   })
