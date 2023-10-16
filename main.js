@@ -47,33 +47,19 @@ log.info('App starting...');
 
 
 autoUpdater.on('checking-for-update', function () {
-    sendStatusToWindow('Checking for update...');
+    logUpdateStatus('Checking for update...');
 });
 
 autoUpdater.on('update-available', async function (info) {
-    // Fetch release notes from GitHub API
-    const releaseNotes = await fetchReleaseNotes(info.version);
-    log.info(JSON.stringify(info))
-    // Display dialog to the user with release notes
-    dialog.showMessageBox({
-        type: 'info',
-        title: 'Update Available',
-        message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
-        buttons: ['Yes', 'No']
-    }).then((result) => {
-        if (result.response === 0) {
-            // User clicked 'Yes', start the download
-            autoUpdater.downloadUpdate();
-        }
-    });
+    autoUpdater.downloadUpdate();
 });
 
 autoUpdater.on('update-not-available', function (info) {
-    sendStatusToWindow('Update not available.');
+    logUpdateStatus('Update not available.');
 });
 
 autoUpdater.on('error', function (err) {
-    sendStatusToWindow('Error in auto-updater.');
+    logUpdateStatus('Error in auto-updater.');
 });
 
 autoUpdater.on('download-progress', function (progressObj) {
@@ -81,31 +67,29 @@ autoUpdater.on('download-progress', function (progressObj) {
 });
 
 
-autoUpdater.on('update-downloaded', function (info) {
+autoUpdater.on('update-downloaded', async function (info) {
+        // Fetch release notes from GitHub API
+        const releaseNotes = await fetchReleaseNotes(info.version);
+        log.info(JSON.stringify(info))
+        // Display dialog to the user with release notes
+        dialog.showMessageBox({
+            type: 'info',
+            title: 'Update Available',
+            message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
+            buttons: ['Now', 'Install on Exit'],
+            defaultId: 1,
+            noLink: true
+        }).then((result) => {
+            if (result.response === 0) {
+                // User clicked 'Yes', start the download
             autoUpdater.quitAndInstall();
+        }
+    });
 });
 
-function sendStatusToWindow(message) {
+function logUpdateStatus(message) {
     console.log(message);
 }
-
-// Debug mode
-try {
-    // Specify the file path
-    const filePath = path.join(app.getPath('userData'), 'config.json');
-
-    // Read the contents of the file synchronously
-    const fileContent = fs.readFileSync(filePath, 'utf-8');
-    const config = JSON.parse(fileContent);
-    DEBUG = config.debug;
-}
-catch (error) {
-    // Handle errors, for example, file not found
-    console.error('Error reading file:', error.message);
-}
-
-
-
 
 
 process.stdin.resume();//so the program will not close instantly
@@ -165,6 +149,7 @@ async function exitHandler(options, exitCode) {
                     });
             });
         });
+        // Disable debug mode here?
     } else {
         console.log('no clean')
 
@@ -315,13 +300,27 @@ async function createWorker() {
     console.log("worker created");
 }
 
-// This method will be called when Electron has finished
+// This method will be called when Electron has finished loading
 app.whenReady().then(async () => {
     ipcMain.handle('getPath', () => app.getPath('userData'));
     ipcMain.handle('getTemp', () => app.getPath('temp'));
     ipcMain.handle('getVersion', () => app.getVersion());
     ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
 
+    // Debug mode
+    try {
+        // Specify the file path
+        const filePath = path.join(app.getPath('userData'), 'config.json');
+
+        // Read the contents of the file synchronously
+        const fileContent = fs.readFileSync(filePath, 'utf-8');
+        const config = JSON.parse(fileContent);
+        DEBUG = config.debug;
+    }
+    catch (error) {
+        // Handle errors, for example, file not found
+        console.error('Error reading file:', error.message);
+    }
     await createWorker();
     await createWindow();
 

@@ -69,11 +69,11 @@ contextBridge.exposeInMainWorld('module', {
 window.addEventListener('DOMContentLoaded', () => {
     const tracking = document.getElementById('update-progress');
     const updateProgressBar = document.getElementById('update-progress-bar');
-    ipcRenderer.on('download-progress', (_event, value) => {
-        console.log(value); // Log the message to the console
+    ipcRenderer.on('download-progress', (_event, progressObj) => {
+        console.log(progressObj.percent); // Log the message to the console
         tracking.classList.remove('d-none')
         // Update your UI with the progress information
-        updateProgressBar.value = value;
+        updateProgressBar.value = progressObj.percent;
         // Hide progress when done
         if (progressObj.percent > 99) tracking.classList.add('d-none')
     });
