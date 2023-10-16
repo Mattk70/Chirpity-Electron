@@ -41,7 +41,7 @@ async function fetchReleaseNotes(version) {
 
 
 
-autoUpdater.autoDownload = false;
+
 log.transports.file.resolvePathFn = () => path.join(APP_DATA, 'logs/main.log');
 log.info('App starting...');
 
@@ -76,7 +76,7 @@ autoUpdater.on('update-downloaded', async function (info) {
             type: 'info',
             title: 'Update Available',
             message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
-            buttons: ['Now', 'Install on Exit'],
+            buttons: ['Quit and Install', 'Install after Exit'],
             defaultId: 1,
             noLink: true
         }).then((result) => {
@@ -399,6 +399,7 @@ app.whenReady().then(async () => {
         })
     });
     //Update handling
+    autoUpdater.autoDownload = false;
     autoUpdater.checkForUpdatesAndNotify()
 
 });
