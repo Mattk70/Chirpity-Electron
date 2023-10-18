@@ -2557,6 +2557,11 @@ const updateSummary = ({ summary = [], filterSpecies = '' }) => {
     const old_summary = document.getElementById('summaryTable');
     const buffer = old_summary.cloneNode();
     buffer.innerHTML = summaryHTML;
+    // Make the star icon look good on black
+    const starIcons = buffer.getElementsByClassName('material-icons-two-tone');
+    [...starIcons].forEach(icon =>{
+        icon.classList.add('text-bg-light', 'rounded-5')
+    })
     old_summary.replaceWith(buffer);
     const currentFilter = document.querySelector('#speciesFilter tr.text-warning');
     if (currentFilter) {
@@ -2812,7 +2817,6 @@ async function renderResult({
         const activeTable = active ? 'table-active' : '';
         const labelHTML = label ? tags[label] : '';
         const hide = selection ? 'd-none' : '';
-
         const countIcon = count > 1 ? `<span class="circle pointer" title="Click to view the ${count} detections at this timecode">${count}</span>` : '';
         const XC_type = cname.indexOf('(song)') !== -1 ? "song" : "nocturnal flight call";
         tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${end || position + 3}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
@@ -2860,6 +2864,7 @@ const updateResultTable = (row, isFromDB, isSelection) => {
         table.lastElementChild ? table.lastElementChild.insertAdjacentHTML('afterend', row) :
             table.innerHTML = row;
     }
+    //showSortIcon()
 };
 
 const isExplore = () => {
@@ -3000,7 +3005,7 @@ const iconDict = {
     low: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: rgba(255,0,0,0.5)">--%</span></span>',
     medium: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #fd7e14">--%</span></span>',
     high: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #198754">--%</span></span>',
-    confirmed: '<span class="material-icons-two-tone text-muted" title="Confirmed Record">star</span>',
+    confirmed: '<span class="material-icons-two-tone" title="Confirmed Record">verified</span>',
 }
 
 
@@ -3222,9 +3227,24 @@ timeSort.forEach(el => {
     });
 })
 
+function showSortIcon() {
+    const timeHeadings = document.getElementsByClassName('time-sort-icon');
+    const speciesHeadings = document.getElementsByClassName('species-sort-icon');
+
+    const sortOrderIncludesDesc = STATE.sortOrder.includes('DESC');
+
+    [...timeHeadings].forEach(heading => {
+        heading.classList.toggle('d-none', sortOrderIncludesDesc);
+    });
+
+    [...speciesHeadings].forEach(heading => {
+        heading.classList.toggle('d-none', !sortOrderIncludesDesc);
+    });
+}
 
 const setSortOrder = (order) => {
     STATE.sortOrder = order;
+    showSortIcon()
     worker.postMessage({ action: 'update-state', sortOrder: order })
     worker.postMessage({
         action: 'filter',

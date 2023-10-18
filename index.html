@@ -930,16 +930,12 @@
                     <table id='results' class="text-center table w-100 align-middle">
                         <thead id="resultsHead" class="d-none">
                             <tr class="bg-dark">
-                                <!-- <th class="col">#</th> -->
-                                <th class="time-sort col text-start timeOfDay">Time</th>
-                                <th class="time-sort text-start timestamp pointer">Position</th>
-                                <th id="confidence-sort" class="text-start pointer">Species</th>
+                                <th class="time-sort col text-start timeOfDay" title="Sort results by detection time"><span class="text-muted material-icons-two-tone time-sort-icon">sort</span> Time</th>
+                                <th class="time-sort text-start timestamp pointer" title="Sort results by detection time"><span class="text-muted material-icons-two-tone time-sort-icon">sort</span> Position</th>
+                                <th id="confidence-sort" class="text-start pointer" title="Sort results by detection confidence"><span class="text-muted material-icons-two-tone species-sort-icon  d-none">sort</span> Species</th>
                                 <th class="text-end">Calls</th>
-                                <!-- <th class="col">Play</th> -->
-                                <!-- <th class="col">XC</th> -->
                                 <th class="col">Label</th>
                                 <th class="col text-end">Notes</th>
-                                <!-- <th class="col text-end">Delete</th> -->
                             </tr>
                         </thead>
                         <tbody class="text-dark" id="resultTableBody">
