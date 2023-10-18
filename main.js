@@ -59,7 +59,7 @@ autoUpdater.on('update-not-available', function (info) {
 });
 
 autoUpdater.on('error', function (err) {
-    logUpdateStatus('Error in auto-updater.');
+    logUpdateStatus('Error in auto-updater:' + err);
 });
 
 autoUpdater.on('download-progress', function (progressObj) {
