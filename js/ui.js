@@ -3660,7 +3660,7 @@ async function createContextMenu(e) {
         hideInSummary = 'd-none';
         plural = 's';
     } else if (target.closest('#selectionResultTableBody')) {
-        hideInSelection = 'd-none'
+        hideInSelection = 'd-none';
     }
 
     // If we haven't clicked the active row or we cleared the region, load the row we clicked
@@ -3671,7 +3671,7 @@ async function createContextMenu(e) {
             await waitForFileLoad();
         }
     }
-    if (!hideInSummary && activeRow === undefined && region === undefined) return;
+    if (region === undefined && ! inSummary) return;
     const createOrEdit = (['archive', 'explore'].includes(STATE.mode)) && (region?.attributes.label || target.closest('#summary')) ? 'Edit' : 'Create';
 
     menu.html(`
@@ -3728,7 +3728,7 @@ async function createContextMenu(e) {
         const sname = getSnameFromCname(cname);
         const XC_type = cname.indexOf('(song)') !== -1 ? "song" :
             cname.indexOf('call)') !== -1 ? "nocturnal flight call" : "";
-        xc.href = `https://xeno-canto.org/explore?query=${sname}%20type:"${XC_type}`;
+        xc.href = `https://xeno-canto.org/explore?query=${sname}%20type:"${XC_type}"`;
         xc.classList.remove('d-none');
     }
     else {
