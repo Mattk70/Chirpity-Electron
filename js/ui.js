@@ -3217,7 +3217,8 @@ batchSizeSlider.addEventListener('change', (e) => {
 // Listeners to sort results table
 const confidenceSort = document.getElementById('confidence-sort');
 confidenceSort.addEventListener('click', () => {
-    setSortOrder('score DESC ')
+    const sortBy = STATE.sortOrder === 'score DESC ' ? 'score ASC ' : 'score DESC ';
+    setSortOrder(sortBy)
 });
 
 const timeSort = document.querySelectorAll('.time-sort');
@@ -3231,14 +3232,20 @@ function showSortIcon() {
     const timeHeadings = document.getElementsByClassName('time-sort-icon');
     const speciesHeadings = document.getElementsByClassName('species-sort-icon');
 
-    const sortOrderIncludesDesc = STATE.sortOrder.includes('DESC');
+    const sortOrderScore = STATE.sortOrder.includes('score');
 
     [...timeHeadings].forEach(heading => {
-        heading.classList.toggle('d-none', sortOrderIncludesDesc);
+        heading.classList.toggle('d-none', sortOrderScore);
     });
 
     [...speciesHeadings].forEach(heading => {
-        heading.classList.toggle('d-none', !sortOrderIncludesDesc);
+        heading.classList.toggle('d-none', !sortOrderScore);
+        if (sortOrderScore && STATE.sortOrder.indexOf('ASC') !== -1){
+            // Flip the sort icon
+            heading.classList.add('flipped')
+        } else {
+            heading.classList.remove('flipped')
+        }
     });
 }
 
