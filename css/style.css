@@ -9,32 +9,26 @@ body {
 }
 
 @font-face {
-    font-family: 'Material Icons Two Tone';
-    font-style: normal;
-    font-weight: 400;
-    src: local('Material Icons Two Tone'),
-        local('material-icons-two-tone'),
-        url(../fonts/material-icons-two-tone.woff2) format('woff2')
+    font-family: 'Material Symbols Outlined';
+    src: local('Material Sumbols Outlined'),
+        local('material-symbols-outlined'),
+        url(../fonts/material-symbols-outlined.woff2) format('woff2')
 }
 
-.material-icons-two-tone {
-    font-family: 'Material Icons Two Tone';
-    font-weight: normal;
-    font-style: normal;
-    font-size: x-large;
-    /* Preferred icon size */
-    font-display: block;
-    display: inline-block;
-    line-height: 1;
-    text-transform: none;
-    letter-spacing: normal;
-    word-wrap: normal;
-    white-space: nowrap;
-    vertical-align: top;
-    direction: ltr;
-    padding-bottom: 0;
-    /* Support for all WebKit browsers. */
-    -webkit-font-smoothing: antialiased;
+
+.material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+  font-variation-settings:  'FILL' 1,
+  'wght' 500,
+  'GRAD' 0,
+  'opsz' 24;
+  font-display: block;
+  font-size: x-large;
+  display: inline-block;
+  line-height: 1;
+  white-space: nowrap;
+  vertical-align: top;
+  padding-bottom: 0;
 }
 
 .navbar {

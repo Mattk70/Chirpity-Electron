@@ -6,13 +6,14 @@
   "scripts": {
     "start": "electron  .",
     "export": "electron-builder build -w  --x64 ",
-    "publish": "electron-builder --win -p always"
+    "publish": "electron-builder --win -p always",
+    "minify": "terser js/*.js --output dist",
+    "postpack": "npm run minify"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mattk70/Chirpity-Electron.git"
   },
-
   "build": {
     "publish": [{
       "provider": "github",
@@ -35,6 +36,7 @@
       "!README.md",
       "!.idea",
       "!saved_model$(/*)",
+      "!**/*.js.map",
       "model_config.json",
       "node_modules/ffmpeg-static-electron/bin/${os}/${arch}/ffmpeg",
       "node_modules/ffmpeg-static-electron/index.js",
@@ -165,7 +167,8 @@
   "devDependencies": {
     "electron": "^25.3.0",
     "electron-builder": "24.6.4",
-    "@tensorflow/tfjs-converter": "4.10.0"
+    "@tensorflow/tfjs-converter": "4.10.0",
+    "terser": "5.22.0"
   },
   "dependencies": {
     "@popperjs/core": "^2.9.2",

@@ -405,9 +405,9 @@ const buildFileMenu = (e) => {
     const menu = $('#context-menu');
     menu.html(`
     <a class="dropdown-item" id="setLocation"><span
-    class="material-icons-two-tone align-bottom pointer">edit_location_alt</span> Amend File Recording Location</a>
+    class="material-symbols-outlined align-bottom pointer">edit_location_alt</span> Amend File Recording Location</a>
     <a class="dropdown-item" id="setFileStart"><span
-    class="material-icons-two-tone align-bottom pointer">edit_calendar</span> Amend File Start Time
+    class="material-symbols-outlined align-bottom pointer">edit_calendar</span> Amend File Start Time
     `);
     positionMenu(menu, e);
     // Add the setLocation handler
@@ -520,7 +520,7 @@ function renderFilnamePanel() {
             if (item !== openfile) {
                 const label = item.replace(/^.*[\\\/]/, "");
                 appendStr += `<a id="${item}" class="dropdown-item openFiles" href="#">
-                <span class="material-icons-two-tone align-bottom">audio_file</span>${label}</a>`;
+                <span class="material-symbols-outlined align-bottom">audio_file</span>${label}</a>`;
             }
         });
         appendStr += `</div></div>`;
@@ -539,11 +539,11 @@ function renderFilnamePanel() {
 function customiseAnalysisMenu(saved) {
     const analyseMenu = document.getElementById('analyse');
     if (saved) {
-        analyseMenu.innerHTML = `<span class="material-icons-two-tone">upload_file</span> Retrieve Results
+        analyseMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> Retrieve Results
         <span class="shortcut float-end">Ctrl+A</span>`;
         enableMenuItem(['reanalyse', 'reanalyseAll']);
     } else {
-        analyseMenu.innerHTML = `<span class="material-icons-two-tone">search</span> Analyse File
+        analyseMenu.innerHTML = `<span class="material-symbols-outlined">search</span> Analyse File
         <span class="shortcut float-end">Ctrl+A</span>`;
         disableMenuItem(['reanalyse', 'reanalyseAll']);
     }
@@ -863,8 +863,8 @@ $('#latitude, #longitude').on('blur', async function () {
     const lat = document.getElementById('latitude').value;
     const lon = document.getElementById('longitude').value;
     const address = await getLocation(lat, lon, true);
-    const content = address ? '<span class="material-icons-two-tone">fmd_good</span> ' + address :
-        '<span class="material-icons-two-tone text-danger">fmd_bad</span> Location not recognised';
+    const content = address ? '<span class="material-symbols-outlined">fmd_good</span> ' + address :
+        '<span class="material-symbols-outlined text-danger">fmd_bad</span> Location not recognised';
     if (address) {
         place.innerHTML = content;
         config.latitude = lat;
@@ -1422,7 +1422,7 @@ window.onload = async () => {
         numberOfThreads.innerText = config[config.backend].threads;
         defaultLat.value = config.latitude;
         defaultLon.value = config.longitude;
-        place.innerHTML = '<span class="material-icons-two-tone">fmd_good</span>' + config.location;
+        place.innerHTML = '<span class="material-symbols-outlined">fmd_good</span>' + config.location;
 
         worker.postMessage({
             action: 'update-state',
@@ -2558,10 +2558,10 @@ const updateSummary = ({ summary = [], filterSpecies = '' }) => {
     const buffer = old_summary.cloneNode();
     buffer.innerHTML = summaryHTML;
     // Make the star icon look good on black
-    const starIcons = buffer.getElementsByClassName('material-icons-two-tone');
-    [...starIcons].forEach(icon =>{
-        icon.classList.add('text-bg-light', 'rounded-5')
-    })
+    // const starIcons = buffer.getElementsByClassName('material-symbols-outlined');
+    // [...starIcons].forEach(icon =>{
+    //     icon.classList.add('text-bg-light', 'rounded-5')
+    // })
     old_summary.replaceWith(buffer);
     const currentFilter = document.querySelector('#speciesFilter tr.text-warning');
     if (currentFilter) {
@@ -2794,13 +2794,13 @@ async function renderResult({
             if ((index - 1) % config.limit !== 0) {
                 // Show the twilight start bar
                 tr += `<tr class="text-bg-dark"><td colspan="20" class="text-center text-white">
-                Start of civil twilight <span class="material-icons-two-tone text-warning align-bottom">wb_twilight</span>
+                Start of civil twilight <span class="material-symbols-outlined text-warning align-bottom">wb_twilight</span>
                 </td></tr>`;
             }
             shownDaylightBanner = true;
         }
         const commentHTML = comment ?
-            `<span title="${comment}" class='material-icons-two-tone pointer'>comment</span>` : '';
+            `<span title="${comment}" class='material-symbols-outlined pointer'>comment</span>` : '';
         const isUncertain = score < 65 ? '&#63;' : '';
         // result.filename  and result.date used for feedback
         result.date = timestamp;
@@ -3005,7 +3005,7 @@ const iconDict = {
     low: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: rgba(255,0,0,0.5)">--%</span></span>',
     medium: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #fd7e14">--%</span></span>',
     high: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #198754">--%</span></span>',
-    confirmed: '<span class="material-icons-two-tone" title="Confirmed Record">verified</span>',
+    confirmed: '<span class="material-symbols-outlined" title="Confirmed Record">verified</span>',
 }
 
 
@@ -3656,7 +3656,7 @@ $(document).on('click', function () {
 
 async function createContextMenu(e) {
     const target = e.target;
-    if (target.classList.contains('circle')) return;
+    if (target.classList.contains('circle') || target.closest('thead')) return;
 
     const menu = $("#context-menu");
     let hideInSummary = '', hideInSelection = '',
@@ -3682,23 +3682,23 @@ async function createContextMenu(e) {
     const createOrEdit = (['archive', 'explore'].includes(STATE.mode)) && (region?.attributes.label || target.closest('#summary')) ? 'Edit' : 'Create';
 
     menu.html(`
-        <a class="dropdown-item play ${hideInSummary} ${hideInSelection}"><span class='material-icons-two-tone'>play_circle_filled</span> Play</a>
+        <a class="dropdown-item play ${hideInSummary} ${hideInSelection}"><span class='material-symbols-outlined'>play_circle</span> Play</a>
         <a class="dropdown-item ${hideInSummary} ${hideInSelection}" href="#" id="context-analyse-selection">
-            <span class="material-icons-two-tone">search</span> Analyse
+            <span class="material-symbols-outlined">search</span> Analyse
         </a>
         <div class="dropdown-divider ${hideInSummary} ${hideInSelection}"></div>
         <a class="dropdown-item ${hideInSelection}" id="create-manual-record" href="#">
-            <span class="material-icons-two-tone">post_add</span> ${createOrEdit} Archive Record${plural}
+            <span class="material-symbols-outlined">post_add</span> ${createOrEdit} Archive Record${plural}
         </a>
         <a class="dropdown-item" id="context-create-clip" href="#">
-            <span class="material-icons-two-tone">music_note</span> Export Audio Clip${plural}
+            <span class="material-symbols-outlined">music_note</span> Export Audio Clip${plural}
         </a>
         <a class="dropdown-item" id="context-xc" href='#' target="xc">
             <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> View Species on Xeno-Canto
         </a>
         <div class="dropdown-divider ${hideInSelection}"></div>
         <a class="dropdown-item ${hideInSelection}" id="context-delete" href="#">
-            <span class='delete material-icons-two-tone'>delete_forever</span> Delete Record${plural}
+            <span class='delete material-symbols-outlined'>delete_forever</span> Delete Record${plural}
         </a>
     `);
     if (!hideInSelection) {
