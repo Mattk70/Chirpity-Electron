@@ -10,7 +10,7 @@ const axios = require('axios');
 //require('update-electron-app')();
 let files = [];
 let DEBUG = false;
-
+let unsavedRecords = false;
 
 //-------------------------------------------------------------------
 // Logging
@@ -68,20 +68,20 @@ autoUpdater.on('download-progress', function (progressObj) {
 
 
 autoUpdater.on('update-downloaded', async function (info) {
-        // Fetch release notes from GitHub API
-        const releaseNotes = await fetchReleaseNotes(info.version);
-        log.info(JSON.stringify(info))
-        // Display dialog to the user with release notes
-        dialog.showMessageBox({
-            type: 'info',
-            title: 'Update Available',
-            message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
-            buttons: ['Quit and Install', 'Install after Exit'],
-            defaultId: 1,
-            noLink: true
-        }).then((result) => {
-            if (result.response === 0) {
-                // User clicked 'Yes', start the download
+    // Fetch release notes from GitHub API
+    const releaseNotes = await fetchReleaseNotes(info.version);
+    log.info(JSON.stringify(info))
+    // Display dialog to the user with release notes
+    dialog.showMessageBox({
+        type: 'info',
+        title: 'Update Available',
+        message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
+        buttons: ['Quit and Install', 'Install after Exit'],
+        defaultId: 1,
+        noLink: true
+    }).then((result) => {
+        if (result.response === 0) {
+            // User clicked 'Yes', start the download
             autoUpdater.quitAndInstall();
         }
     });
@@ -138,21 +138,21 @@ async function exitHandler(options, exitCode) {
             if (err) {
                 console.error('Error reading folder:', err);
                 return;
-                }
+            }
             files.forEach((file) => {
-                    fs.unlink(path.join(logs, file), (err) => {
-                        if (err) {
-                            console.error('Error deleting file:', err);
-                        } else {
-                            console.log('Deleted file:', file);
-                        }
-                    });
+                fs.unlink(path.join(logs, file), (err) => {
+                    if (err) {
+                        console.error('Error deleting file:', err);
+                    } else {
+                        console.log('Deleted file:', file);
+                    }
+                });
             });
         });
         // Disable debug mode here?
     } else {
         console.log('no clean')
-
+        
     }
     if (exitCode || exitCode === 0) {
         console.log(exitCode);
@@ -178,7 +178,7 @@ let workerWindow;
 
 async function windowStateKeeper(windowName) {
     let window, windowState;
-
+    
     async function setBounds() {
         // Restore from settings
         if (await settings.has(`windowState.${windowName}`)) {
@@ -193,7 +193,7 @@ async function windowStateKeeper(windowName) {
             };
         }
     }
-
+    
     async function saveState() {
         if (!windowState.isMaximized) {
             windowState = window.getBounds();
@@ -204,14 +204,14 @@ async function windowStateKeeper(windowName) {
         } catch (error) {
         }
     }
-
+    
     function track(win) {
         window = win;
         ['resize', 'move', 'close'].forEach(event => {
             win.on(event, saveState);
         });
     }
-
+    
     await setBounds();
     return ({
         x: windowState.x,
@@ -227,7 +227,7 @@ async function createWindow() {
     // Create the browser window.
     // Get window state
     const mainWindowStateKeeper = await windowStateKeeper('main');
-
+    
     mainWindow = new BrowserWindow({
         show: false,
         title: "Chirpity Nocmig",
@@ -235,7 +235,7 @@ async function createWindow() {
         y: mainWindowStateKeeper.y,
         width: mainWindowStateKeeper.width,
         height: mainWindowStateKeeper.height,
-
+        
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: true,
@@ -245,19 +245,19 @@ async function createWindow() {
     });
     // Track window state
     mainWindowStateKeeper.track(mainWindow);
-
+    
     // Set icon
     mainWindow.setIcon(__dirname + '/img/icon/icon.png');
-
+    
     // Hide nav bar
     mainWindow.setMenuBarVisibility(false);
-
+    
     // and load the index.html of the app.
     mainWindow.loadFile('index.html');
-
+    
     // Open the DevTools. Comment out for release
     if (DEBUG) mainWindow.webContents.openDevTools();
-
+    
     mainWindow.once('ready-to-show', () => {
         mainWindow.show()
     })
@@ -268,6 +268,22 @@ async function createWindow() {
             app.quit()
         })
     }
+    
+    mainWindow.on('close', (e) => {
+        if (unsavedRecords){
+            const choice = dialog.showMessageBoxSync(mainWindow, {
+                type: 'warning',
+                buttons: ['Yes', 'No'],
+                title: 'Unsaved Records',
+                message: 'There are unsaved records, are you sure you want to exit?',
+            });
+            
+            if (choice === 1) {
+                e.preventDefault(); // Prevent the app from closing
+            }
+        }
+    });
+    
 }
 
 
@@ -292,7 +308,7 @@ async function createWorker() {
     mainWindowStateKeeper.track(workerWindow);
     workerWindow.setIcon(__dirname + '/img/icon/icon.png');
     await workerWindow.loadFile('worker.html');
-
+    
     workerWindow.on('closed', () => {
         workerWindow = null;
     });
@@ -306,12 +322,12 @@ app.whenReady().then(async () => {
     ipcMain.handle('getTemp', () => app.getPath('temp'));
     ipcMain.handle('getVersion', () => app.getVersion());
     ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
-
+    
     // Debug mode
     try {
         // Specify the file path
         const filePath = path.join(app.getPath('userData'), 'config.json');
-
+        
         // Read the contents of the file synchronously
         const fileContent = fs.readFileSync(filePath, 'utf-8');
         const config = JSON.parse(fileContent);
@@ -323,10 +339,10 @@ app.whenReady().then(async () => {
     }
     await createWorker();
     await createWindow();
-
+    
     // We'll be sending one end of this channel to the main world of the
     // context-isolated page.
-
+    
     // We can't use ipcMain.handle() here, because the reply needs to transfer a
     // MessagePort.
     ipcMain.on('request-worker-channel', (event) => {
@@ -342,9 +358,14 @@ app.whenReady().then(async () => {
             // Now the main window and the worker can communicate with each other
             // without going through the main process!
         }
+        // Listen for the 'update-variable' message from the renderer process
+        ipcMain.on('unsaved-records', (_event, data) => {
+            unsavedRecords = data.newValue; // Update the variable with the new value
+            console.log('Unsaved records:', unsavedRecords);
+        });
     });
-
-
+    
+    
     if (process.platform === 'darwin') {
         //const appIcon = new Tray('./img/icon/icon.png')
         app.dock.setIcon(__dirname + '/img/icon/icon.png');
@@ -359,7 +380,7 @@ app.whenReady().then(async () => {
             app.quit()
         })
     }
-
+    
     app.on('activate', async () => {
         const windowsOpen = BrowserWindow.getAllWindows().length
         if (!windowsOpen) {
@@ -369,19 +390,19 @@ app.whenReady().then(async () => {
             await createWindow();
         }
     });
-
+    
     app.on('open-file', (event, path) => {
         files.push(path);
     });
-
-
+    
+    
     mainWindow.webContents.setWindowOpenHandler(({ url, frameName }) => {
         require('electron').shell.openExternal(url);
         return {
             action: 'deny',
         }
     });
-
+    
     workerWindow.webContents.on('render-process-gone', (e, details) => {
         console.log(e);
         console.log(details);
@@ -390,7 +411,7 @@ app.whenReady().then(async () => {
             title: 'Crash report',
             detail: 'Oh no! The model has crashed. Try lowering the batch size and / or number of threads in settings'
         };
-
+        
         dialog.showMessageBox(dialogOpts).then((returnValue) => {
             if (returnValue.response === 0) {
                 //app.relaunch();
@@ -401,7 +422,7 @@ app.whenReady().then(async () => {
     //Update handling
     autoUpdater.autoDownload = false;
     autoUpdater.checkForUpdatesAndNotify()
-
+    
 });
 
 
@@ -409,7 +430,7 @@ app.on('activate', async () => {
     if (mainWindow === null) {
         await createWindow();
     }
-
+    
     if (workerWindow == null) {
         await createWorker();
     }
@@ -462,10 +483,10 @@ ipcMain.handle('saveFile', (event, arg) => {
                 str += " " + (parseFloat(AUDACITY_LABELS[i].score) * 100).toFixed(0) + "%\r\n";
             }
             fs.writeFile(file.filePath.toString(),
-                str, function (err) {
-                    if (err) throw err;
-                    console.log('Saved!');
-                });
+            str, function (err) {
+                if (err) throw err;
+                console.log('Saved!');
+            });
         }
     }).catch(err => {
         console.log(err)
