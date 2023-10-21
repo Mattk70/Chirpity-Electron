@@ -30,7 +30,7 @@
       "!BirdNET_GLOBAL_3K_V2.2_Labels.txt",
       "!venv${/*}",
       "!*git*${/*}",
-      "!package-lock.json",
+      "package-lock.json",
       "!poetry.lock*",
       "!pyproject.toml",
       "!README.md",

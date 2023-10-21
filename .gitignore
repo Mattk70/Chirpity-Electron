@@ -119,6 +119,5 @@ dist/
 # git
 .gitingnore
 
-.package-lock.json
 poetry.lock
 pyproject.toml
