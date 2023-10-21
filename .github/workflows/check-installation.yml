@@ -19,6 +19,6 @@ jobs:
             node-version: 16.13.x
       - run: echo "🍏 Node setup status is ${{ job.status }}."
       - name: Install
-        run: npm ci
+        run: npm@8 ci
       - run: echo "Install's status is ${{ job.status }}."
 
