@@ -303,7 +303,7 @@ async function handleMessage(e) {
             await saveAudio(args.file, args.start, args.end, args.filename, args.metadata);
             break;
         case 'save2db':
-            await onSave2DiskDB();
+            await onSave2DiskDB(args);
             break;
         case 'set-custom-file-location':
             onSetCustomLocation(args);
@@ -1697,6 +1697,8 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
 
     if (response.changes && toDisk) {
         UI.postMessage({ event: 'diskDB-has-records' });
+    } else {
+        UI.postMessage({event: 'unsaved-records'});
     }
     return response.changes
 }
@@ -1873,7 +1875,7 @@ async function processNextFile({
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
         if (DATASET && FILE_QUEUE.length % 100 === 0) {
-            await onSave2DiskDB();
+            await onSave2DiskDB({file: file});
             console.log("Saved results to disk db", FILE_QUEUE.length, "files remaining")
         }
         const found = await getWorkingFile(file);
@@ -2157,7 +2159,7 @@ const getSavedFileInfo = async (file) => {
  *  Transfers data in memoryDB to diskDB
  * @returns {Promise<unknown>}
  */
-const onSave2DiskDB = async () => {
+const onSave2DiskDB = async (args) => {
     t0 = Date.now();
     if (STATE.db === diskDB) {
         UI.postMessage({
@@ -2425,6 +2427,8 @@ async function onDelete({
         // Update the seen species list
         if (db === diskDB) {
             getSpecies();
+        }else {
+            UI.postMessage({event: 'unsaved-records'});
         }
     }
 }
@@ -2460,6 +2464,8 @@ async function onDeleteSpecies({
         if (db === diskDB) {
             // Update the seen species list
             getSpecies();
+        } else {
+            UI.postMessage({event: 'unsaved-records'});
         }
     }
 }

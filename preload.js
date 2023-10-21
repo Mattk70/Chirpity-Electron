@@ -40,7 +40,9 @@ ipcRenderer.once('provide-worker-channel', async (event) => {
 })
 
 
+
 contextBridge.exposeInMainWorld('electron', {
+    unsavedRecords: (isTrue) => ipcRenderer.send('unsaved-records', { newValue: isTrue }),
     onDownloadProgress: (callback) => ipcRenderer.on('download-progress', callback),
     saveFile: (args) => ipcRenderer.invoke('saveFile', args),
     selectDirectory: () => ipcRenderer.invoke('selectDirectory'),

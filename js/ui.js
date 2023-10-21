@@ -687,7 +687,9 @@ async function onOpenFiles(args) {
 
     await loadAudioFile({ filePath: fileList[0] });
     disableMenuItem(['analyseSelection', 'analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'export2audio', 'save2db'])
-
+    // Clear unsaved records warning
+    window.electron.unsavedRecords(false);
+    document.getElementById('unsaved-icon').classList.add('d-none');
     // Reset the buffer playhead and zoom:
     bufferBegin = 0;
     windowLength = 20;
@@ -938,7 +940,7 @@ function hideAll() {
 
 const save2dbLink = document.getElementById('save2db');
 save2dbLink.addEventListener('click', async () => {
-    worker.postMessage({ action: 'save2db' })
+    worker.postMessage({ action: 'save2db', file: currentFile })
     renderFilnamePanel();
 });
 
@@ -1481,6 +1483,8 @@ const setUpWorkerMessaging = () => {
                 case 'generate-alert':
                     if (args.render) {
                         renderFilnamePanel();
+                        window.electron.unsavedRecords(false);
+                        document.getElementById('unsaved-icon').classList.add('d-none');
                     }
                     if (args.file) { // File is in disk database but not found
                         let message = args.message;
@@ -1513,17 +1517,15 @@ const setUpWorkerMessaging = () => {
                 case 'progress':
                     onProgress(args);
                     break;
-                case 'promptToSave':
-                    if (confirm("Save results to your archive?")) {
-                        worker.postMessage({ action: 'save2db' })
-                    }
-                    break;
                 case 'seen-species-list':
                     generateBirdList('seenSpecies', args.list);
                     break;
                 case 'spawning':
                     displayWarmUpMessage();
                     break;
+                case 'unsaved-records':
+                    window.electron.unsavedRecords(true);
+                    document.getElementById('unsaved-icon').classList.remove('d-none');
                 case 'update-audio-duration':
                     diagnostics['Audio Duration'] ?
                         diagnostics['Audio Duration'] += args.value :
@@ -2143,7 +2145,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     },
     KeyS: function (e) {
         if (e.ctrlKey) {
-            worker.postMessage({ action: 'save2db' });
+            worker.postMessage({ action: 'save2db', file: currentFile});
         }
     },
     KeyT: function (e) {
@@ -3735,7 +3737,7 @@ async function createContextMenu(e) {
         const sname = getSnameFromCname(cname);
         const XC_type = cname.indexOf('(song)') !== -1 ? "song" :
             cname.indexOf('call)') !== -1 ? "nocturnal flight call" : "";
-        xc.href = `https://xeno-canto.org/explore?query=${sname}%20type:"${XC_type}"`;
+        xc.href = `https://xeno-canto.org/explore?query=${sname}%20type:"${XC_type}`;
         xc.classList.remove('d-none');
     }
     else {

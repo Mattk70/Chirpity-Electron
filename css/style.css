@@ -10,6 +10,7 @@ body {
 
 @font-face {
     font-family: 'Material Symbols Outlined';
+    font-display: block;
     src: local('Material Sumbols Outlined'),
         local('material-symbols-outlined'),
         url(../fonts/material-symbols-outlined.woff2) format('woff2')
