@@ -5,21 +5,22 @@
   "main": "main.js",
   "scripts": {
     "start": "electron  .",
-    "export": "electron-builder build -w  --x64 ",
+    "export": "electron-builder build -m ",
     "publish": "electron-builder --win -p always",
-    "minify": "terser js/*.js --output dist",
-    "postpack": "npm run minify"
+    "test": "./test/playwright.js"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mattk70/Chirpity-Electron.git"
   },
   "build": {
-    "publish": [{
-      "provider": "github",
-      "owner": "Mattk70",
-      "repo": "https://github.com/Mattk70/Chirpity-Electron"
-    }],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Mattk70",
+        "repo": "https://github.com/Mattk70/Chirpity-Electron"
+      }
+    ],
     "files": [
       "**/*",
       "!test*${/*}",
@@ -45,7 +46,9 @@
       "node_modules/ffprobe-static-electron/index.js",
       "node_modules/ffprobe-static-electron/package.json"
     ],
-    "extraResources": ["./Help/example.mp3"],
+    "extraResources": [
+      "./Help/example.mp3"
+    ],
     "fileAssociations": [
       {
         "ext": "mp3",
@@ -134,7 +137,9 @@
       ]
     },
     "win": {
-      "publish": ["github"],
+      "publish": [
+        "github"
+      ],
       "verifyUpdateCodeSignature": false,
       "asar": true,
       "icon": "./img/icon/icon.png",
@@ -165,30 +170,33 @@
   },
   "homepage": "https://github.com/mattk70/Chirpity-Electron#readme",
   "devDependencies": {
+    "@playwright/test": "^1.39.0",
+    "@tensorflow/tfjs-converter": "4.10.0",
     "electron": "^25.3.0",
     "electron-builder": "24.6.4",
-    "@tensorflow/tfjs-converter": "4.10.0",
-    "terser": "5.22.0"
+    "electron-playwright-helpers": "^1.6.0",
+    "playwright": "^1.39.0",
+    "jimp": "0.22.10"
   },
   "dependencies": {
     "@popperjs/core": "^2.9.2",
     "@tensorflow/tfjs-node": "4.10.0",
+    "axios": "1.5.1",
     "bootstrap": "5.2.2",
     "browser-id3-writer": "^4.4.0",
     "colormap": "^2.3.2",
+    "electron-log": "4.4.8",
     "electron-settings": "^4.0.2",
+    "electron-updater": "6.1.4",
     "fast-png": "^6.1.0",
     "ffmpeg-static-electron": "^2.0.3",
     "fluent-ffmpeg": "^2.1.2",
     "jquery": "3.6.3",
     "sqlite3": "^5.1.6",
     "suncalc": "^1.9.0",
+    "utimes": "^5.1.1",
     "uuid": "^8.3.2",
     "wavefile-reader": "^1.1.1",
-    "wavesurfer.js": "^6.6.3",
-    "utimes": "^5.1.1",
-    "electron-updater": "6.1.4",
-    "electron-log": "4.4.8",
-    "axios": "1.5.1"
+    "wavesurfer.js": "^6.6.3"
   }
 }

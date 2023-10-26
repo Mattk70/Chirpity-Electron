@@ -1390,7 +1390,6 @@ window.onload = async () => {
         colourmap.value = config.colormap;
         // Nocmig mode state
         console.log('nocmig mode is ' + config.detect.nocmig);
-
         // Audio preferences:
         audioFormat.value = config.audio.format;
         audioBitrate.value = config.audio.bitrate;
@@ -1447,6 +1446,7 @@ window.onload = async () => {
     }
     )
     // establish the message channel
+
     setUpWorkerMessaging()
 
     // Set footer year
