@@ -331,7 +331,8 @@ app.whenReady().then(async () => {
         // Read the contents of the file synchronously
         const fileContent = fs.readFileSync(filePath, 'utf-8');
         const config = JSON.parse(fileContent);
-        DEBUG = config.debug;
+        DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
+        console.log('CI mode' , process.env.CI)
     }
     catch (error) {
         // Handle errors, for example, file not found
@@ -348,6 +349,9 @@ app.whenReady().then(async () => {
     ipcMain.on('request-worker-channel', (event) => {
         // For security reasons, let's make sure only the frames we expect can
         // access the worker.
+        console.log('event.senderfromae ',  event.senderFrame)
+        console.log('mainWindow.webContents.mainFrame ',  mainWindow.webContents.mainFrame)
+        console.log('mainWindow.webContents.mainFrame =  event.senderfromae',  mainWindow.webContents.mainFrame === event.senderFrame)
         if (event.senderFrame === mainWindow.webContents.mainFrame) {
             // Create a new channel ...
             const { port1, port2 } = new MessageChannelMain()
@@ -358,7 +362,7 @@ app.whenReady().then(async () => {
             // Now the main window and the worker can communicate with each other
             // without going through the main process!
         }
-        // Listen for the 'update-variable' message from the renderer process
+        // Listen for the 'unsaved-records' message from the renderer process
         ipcMain.on('unsaved-records', (_event, data) => {
             unsavedRecords = data.newValue; // Update the variable with the new value
             console.log('Unsaved records:', unsavedRecords);
