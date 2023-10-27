@@ -1319,6 +1319,7 @@ function updatePrefs() {
 /////////////////////////  Window Handlers ////////////////////////////
 let appPath, tempPath;
 window.onload = async () => {
+    window.electron.requestWorkerChannel();
     contentWrapperElement.addClass('loaded');
     // Set config defaults
     const defaultConfig = {

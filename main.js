@@ -349,9 +349,6 @@ app.whenReady().then(async () => {
     ipcMain.on('request-worker-channel', (event) => {
         // For security reasons, let's make sure only the frames we expect can
         // access the worker.
-        console.log('event.senderfromae ',  event.senderFrame)
-        console.log('mainWindow.webContents.mainFrame ',  mainWindow.webContents.mainFrame)
-        console.log('mainWindow.webContents.mainFrame =  event.senderfromae',  mainWindow.webContents.mainFrame === event.senderFrame)
         if (event.senderFrame === mainWindow.webContents.mainFrame) {
             // Create a new channel ...
             const { port1, port2 } = new MessageChannelMain()
@@ -439,6 +436,17 @@ app.on('activate', async () => {
         await createWorker();
     }
 });
+
+ipcMain.handle('request-worker-channel', async (_event) =>{
+           // Create a new channel ...
+           const { port1, port2 } = new MessageChannelMain()
+           // ... send one end to the worker ...
+           workerWindow.webContents.postMessage('new-client', null, [port1])
+           // ... and the other end to the UI window.
+           mainWindow.webContents.postMessage('provide-worker-channel', null, [port2])
+           // Now the main window and the worker can communicate with each other
+           // without going through the main process!
+})
 
 
 ipcMain.handle('openFiles', async (config) => {

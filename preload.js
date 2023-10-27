@@ -15,7 +15,7 @@ const windowLoaded = new Promise(resolve => {
 
 // We request that the main process sends us a channel we can use to
 // communicate with the worker.
-ipcRenderer.send('request-worker-channel');
+
 // now see if we have files to load
 ipcRenderer.send('file-to-load');
 
@@ -42,6 +42,7 @@ ipcRenderer.once('provide-worker-channel', async (event) => {
 
 
 contextBridge.exposeInMainWorld('electron', {
+    requestWorkerChannel: () => ipcRenderer.invoke('request-worker-channel'),
     unsavedRecords: (isTrue) => ipcRenderer.send('unsaved-records', { newValue: isTrue }),
     onDownloadProgress: (callback) => ipcRenderer.on('download-progress', callback),
     saveFile: (args) => ipcRenderer.invoke('saveFile', args),
@@ -63,6 +64,7 @@ contextBridge.exposeInMainWorld('module', {
     os: os
 });
 
+//
 
 // Listen for messages from the main process
 // Function to display update download progress
