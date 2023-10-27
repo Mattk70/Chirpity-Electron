@@ -74,8 +74,6 @@ test.afterAll(async () => {
 
 test('Page title is correct', async () => {
   page = await electronApp.waitForEvent('window')
-
-  page.pause()
   const title = await page.title()
   expect(title).toBe('Chirpity Bird Call Detection')
 })
@@ -87,11 +85,26 @@ test(`"Open File" works`, async () => {
   const fileOpen = await page.$('#open')
   expect(fileOpen).toBeTruthy()
   await fileOpen?.click();
+  //await page.waitForFunction(() => fileLoaded === true, { timeout: 10000, polling: 100 });
+
   const fileName = await page.$('#spectrogram') 
   expect(fileName).toBeTruthy() 
   await page.screenshot({ path: 'intro.png' })
-  
+  const selector = 'wave';
+  await page.waitForFunction(selector => !!document.querySelector(selector), selector);
+  await page.keyboard.press('Control+A')
+  const selector2 = '#resultsHead';
+  await page.waitForFunction(selector2 => !!document.querySelector(selector2), selector2);
+  const summary = await page.$('#summary')
+  const shown = await summary?.isVisible()
+  console.log(shown)
+  expect(shown).toBe(true)
+  //await page.pause()
+  // console.log(summary)
+  // expect(summary.isHidden()).toBe(false)
 })
+
+
 
 
 // test('send IPC message from renderer', async () => {

@@ -6,8 +6,7 @@
   "scripts": {
     "start": "electron  .",
     "export": "electron-builder build -m ",
-    "publish": "electron-builder --win -p always",
-    "test": "./test/playwright.js"
+    "publish": "electron-builder --win -p always"
   },
   "repository": {
     "type": "git",
