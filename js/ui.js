@@ -2655,7 +2655,9 @@ async function onPredictionDone({
         activeRow.click();
     }
 }
-
+function getFileLoaded(){
+    return fileLoaded
+}
 const pagination = document.querySelectorAll('.pagination');
 pagination.forEach(item => {
     item.addEventListener('click', (e) => {
