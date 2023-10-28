@@ -393,6 +393,7 @@ app.whenReady().then(async () => {
     
     app.on('open-file', (event, path) => {
         files.push(path);
+        console.log('file passed to open: ', path)
     });
     
     

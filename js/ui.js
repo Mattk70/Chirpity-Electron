@@ -57,10 +57,8 @@ const establishMessageChannel =
 
 
 async function getPaths() {
-    const pathPromise = window.electron.getPath();
-    const tempPromise = window.electron.getTemp();
-    const appPath = await pathPromise;
-    const tempPath = await tempPromise;
+    const appPath = await window.electron.getPath();
+    const tempPath = await window.electron.getTemp();
     console.log('path is ', appPath, 'temp is ', tempPath);
     return [appPath, tempPath];
 }
@@ -3439,7 +3437,7 @@ const setConfidence = (e) => {
 
 thresholdDisplay.addEventListener('click', () => {
     confidenceSliderDisplay.classList.remove('d-none');
-    confidenceTimerTimeout = setTimeout(hideConfidenceSlider, 750)
+    confidenceTimerTimeout = setTimeout(hideConfidenceSlider, 1750)
 })
 
 const hideConfidenceSlider = () => {
@@ -3447,7 +3445,7 @@ const hideConfidenceSlider = () => {
 }
 let confidenceTimerTimeout;
 confidenceSliderDisplay.addEventListener('mouseout', () => {
-    confidenceTimerTimeout = setTimeout(hideConfidenceSlider, 2000)
+    confidenceTimerTimeout = setTimeout(hideConfidenceSlider, 3000)
 })
 
 confidenceSliderDisplay.addEventListener('mouseenter', () => {
