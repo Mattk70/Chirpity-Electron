@@ -65,7 +65,6 @@ test.beforeAll(async () => {
       console.log(msg.text())
     })
   })
-
 })
 
 test.afterAll(async () => {
@@ -80,25 +79,23 @@ test('Page title is correct', async () => {
 
 
 test(`"Open File" works`, async () => {
-  const fileMenu = await page.$('#navbarDropdown')
-  await fileMenu?.click()
-  const fileOpen = await page.$('#open')
-  expect(fileOpen).toBeTruthy()
-  await fileOpen?.click();
-  //await page.waitForFunction(() => fileLoaded === true, { timeout: 10000, polling: 100 });
-
-  const fileName = await page.$('#spectrogram') 
-  expect(fileName).toBeTruthy() 
+  const fileMenu = page.locator('#navbarDropdown')
+  await fileMenu.click()
+  const fileOpen = page.locator('#open')
+  const messagePromise = page.waitForEvent('console')
+  await fileOpen.click()
+  const msg = await messagePromise
+  const spectrogram = page.locator('wave').first()
+  spectrogram.waitFor({state: 'visible'})
+  await spectrogram.click()
+  const analyseMenu =  page.locator('#navbarAnalysis')
+  await analyseMenu.click()
+  const analyse =  page.locator('#analyse')
+  await analyse.click()
+  const results = page.locator('#resultTableContainer')
+  await results.waitFor({state: 'visible'})
   await page.screenshot({ path: 'intro.png' })
-  const selector = 'wave';
-  await page.waitForFunction(selector => !!document.querySelector(selector), selector);
-  await page.keyboard.press('Control+A')
-  const selector2 = '#resultsHead';
-  await page.waitForFunction(selector2 => !!document.querySelector(selector2), selector2);
-  const summary = await page.$('#summary')
-  const shown = await summary?.isVisible()
-  console.log(shown)
-  expect(shown).toBe(true)
+
   //await page.pause()
   // console.log(summary)
   // expect(summary.isHidden()).toBe(false)
