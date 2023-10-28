@@ -448,6 +448,10 @@ ipcMain.handle('request-worker-channel', async (_event) =>{
            // without going through the main process!
 })
 
+ipcMain.handle('unsaved-records', (_event, data) => {
+    unsavedRecords = data.newValue; // Update the variable with the new value
+    console.log('Unsaved records:', unsavedRecords);
+});
 
 ipcMain.handle('openFiles', async (config) => {
     // Show file dialog to select audio file
