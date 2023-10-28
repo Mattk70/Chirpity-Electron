@@ -1332,13 +1332,13 @@ window.onload = async () => {
         model: 'v2',
         latitude: 52.87,
         longitude: 0.89, // Great Snoring :)
-        location: 'Location not set',
+        location: 'Great Snoring, North Norfolk, Norfolk, England, United Kingdom',
         detect: { nocmig: false, contextAware: false, confidence: 45 },
-        filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: -6, SNR: 0 },
+        filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 18, SNR: 0 },
         warmup: true,
         backend: 'tensorflow',
-        tensorflow: { threads: diagnostics['Cores'], batchSize: 4 },
-        webgl: { threads: 1, batchSize: 4 },
+        tensorflow: { threads: diagnostics['Cores'], batchSize: 32 },
+        webgl: { threads: 2, batchSize: 32 },
         audio: { format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false },
         limit: 500,
         debug: false
@@ -2655,9 +2655,7 @@ async function onPredictionDone({
         activeRow.click();
     }
 }
-function getFileLoaded(){
-    return fileLoaded
-}
+
 const pagination = document.querySelectorAll('.pagination');
 pagination.forEach(item => {
     item.addEventListener('click', (e) => {
@@ -4006,3 +4004,7 @@ window.electron.onDownloadProgress((_event, progressObj) => {
     if (progressObj.percent > 99) tracking.classList.add('d-none')
 });
    
+// CI functions
+function getFileLoaded() {return fileLoaded};
+function donePredicting() {return !PREDICTING};
+function  getAudacityLabels() {return AUDACITY_LABELS[currentFile]};

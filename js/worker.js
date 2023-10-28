@@ -2119,8 +2119,7 @@ const sendResult = (index, result, fromDBQuery) => {
     if (typeof result === 'object') {
         // Convert confidence back to % value
         result.score = (result.score / 10).toFixed(0)
-
-        // Recreate Audacity labels
+        // Recreate Audacity labels (will create filtered view of labels if filtered)
         const audacity = {
             timestamp: `${result.position}\t${result.position + WINDOW_SIZE}`,
             cname: result.cname,
