@@ -249,8 +249,9 @@ async function createWindow() {
     // Set icon
     mainWindow.setIcon(__dirname + '/img/icon/icon.png');
     
-    // Hide nav bar
-    mainWindow.setMenuBarVisibility(false);
+    // Hide nav bar excpet in ci mode
+
+    mainWindow.setMenuBarVisibility(!!process.env.CI);
     
     // and load the index.html of the app.
     mainWindow.loadFile('index.html');
@@ -331,7 +332,8 @@ app.whenReady().then(async () => {
         // Read the contents of the file synchronously
         const fileContent = fs.readFileSync(filePath, 'utf-8');
         const config = JSON.parse(fileContent);
-        DEBUG = config.debug;
+        DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
+        console.log('CI mode' , process.env.CI)
     }
     catch (error) {
         // Handle errors, for example, file not found
@@ -339,32 +341,6 @@ app.whenReady().then(async () => {
     }
     await createWorker();
     await createWindow();
-    
-    // We'll be sending one end of this channel to the main world of the
-    // context-isolated page.
-    
-    // We can't use ipcMain.handle() here, because the reply needs to transfer a
-    // MessagePort.
-    ipcMain.on('request-worker-channel', (event) => {
-        // For security reasons, let's make sure only the frames we expect can
-        // access the worker.
-        if (event.senderFrame === mainWindow.webContents.mainFrame) {
-            // Create a new channel ...
-            const { port1, port2 } = new MessageChannelMain()
-            // ... send one end to the worker ...
-            workerWindow.webContents.postMessage('new-client', null, [port1])
-            // ... and the other end to the UI window.
-            event.senderFrame.postMessage('provide-worker-channel', null, [port2])
-            // Now the main window and the worker can communicate with each other
-            // without going through the main process!
-        }
-        // Listen for the 'update-variable' message from the renderer process
-        ipcMain.on('unsaved-records', (_event, data) => {
-            unsavedRecords = data.newValue; // Update the variable with the new value
-            console.log('Unsaved records:', unsavedRecords);
-        });
-    });
-    
     
     if (process.platform === 'darwin') {
         //const appIcon = new Tray('./img/icon/icon.png')
@@ -437,6 +413,21 @@ app.on('activate', async () => {
     }
 });
 
+ipcMain.handle('request-worker-channel', async (_event) =>{
+           // Create a new channel ...
+           const { port1, port2 } = new MessageChannelMain()
+           // ... send one end to the worker ...
+           workerWindow.webContents.postMessage('new-client', null, [port1])
+           // ... and the other end to the UI window.
+           mainWindow.webContents.postMessage('provide-worker-channel', null, [port2])
+           // Now the main window and the worker can communicate with each other
+           // without going through the main process!
+})
+
+ipcMain.handle('unsaved-records', (_event, data) => {
+    unsavedRecords = data.newValue; // Update the variable with the new value
+    console.log('Unsaved records:', unsavedRecords);
+});
 
 ipcMain.handle('openFiles', async (config) => {
     // Show file dialog to select audio file
