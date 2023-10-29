@@ -1317,6 +1317,7 @@ function updatePrefs() {
 /////////////////////////  Window Handlers ////////////////////////////
 let appPath, tempPath;
 window.onload = async () => {
+    window.electron.requestWorkerChannel();
     contentWrapperElement.addClass('loaded');
     // Set config defaults
     const defaultConfig = {
@@ -1329,13 +1330,13 @@ window.onload = async () => {
         model: 'v2',
         latitude: 52.87,
         longitude: 0.89, // Great Snoring :)
-        location: 'Location not set',
+        location: 'Great Snoring, North Norfolk, Norfolk, England, United Kingdom',
         detect: { nocmig: false, contextAware: false, confidence: 45 },
-        filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: -6, SNR: 0 },
+        filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 18, SNR: 0 },
         warmup: true,
         backend: 'tensorflow',
-        tensorflow: { threads: diagnostics['Cores'], batchSize: 4 },
-        webgl: { threads: 1, batchSize: 4 },
+        tensorflow: { threads: diagnostics['Cores'], batchSize: 32 },
+        webgl: { threads: 2, batchSize: 32 },
         audio: { format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false },
         limit: 500,
         debug: false
@@ -1388,7 +1389,6 @@ window.onload = async () => {
         colourmap.value = config.colormap;
         // Nocmig mode state
         console.log('nocmig mode is ' + config.detect.nocmig);
-
         // Audio preferences:
         audioFormat.value = config.audio.format;
         audioBitrate.value = config.audio.bitrate;
@@ -1445,6 +1445,7 @@ window.onload = async () => {
     }
     )
     // establish the message channel
+
     setUpWorkerMessaging()
 
     // Set footer year
@@ -3682,12 +3683,12 @@ async function createContextMenu(e) {
     const createOrEdit = (['archive', 'explore'].includes(STATE.mode)) && (region?.attributes.label || target.closest('#summary')) ? 'Edit' : 'Create';
 
     menu.html(`
-        <a class="dropdown-item play ${hideInSummary} ${hideInSelection}"><span class='material-symbols-outlined'>play_circle</span> Play</a>
+        <a class="dropdown-item play ${hideInSummary}"><span class='material-symbols-outlined'>play_circle</span> Play</a>
         <a class="dropdown-item ${hideInSummary} ${hideInSelection}" href="#" id="context-analyse-selection">
             <span class="material-symbols-outlined">search</span> Analyse
         </a>
-        <div class="dropdown-divider ${hideInSummary} ${hideInSelection}"></div>
-        <a class="dropdown-item ${hideInSelection}" id="create-manual-record" href="#">
+        <div class="dropdown-divider ${hideInSummary}"></div>
+        <a class="dropdown-item" id="create-manual-record" href="#">
             <span class="material-symbols-outlined">post_add</span> ${createOrEdit} Archive Record${plural}
         </a>
         <a class="dropdown-item" id="context-create-clip" href="#">
@@ -4001,3 +4002,7 @@ window.electron.onDownloadProgress((_event, progressObj) => {
     if (progressObj.percent > 99) tracking.classList.add('d-none')
 });
    
+// CI functions
+function getFileLoaded() {return fileLoaded};
+function donePredicting() {return !PREDICTING};
+function  getAudacityLabels() {return AUDACITY_LABELS[currentFile]};
