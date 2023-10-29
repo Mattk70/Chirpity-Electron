@@ -3685,12 +3685,12 @@ async function createContextMenu(e) {
     const createOrEdit = (['archive', 'explore'].includes(STATE.mode)) && (region?.attributes.label || target.closest('#summary')) ? 'Edit' : 'Create';
 
     menu.html(`
-        <a class="dropdown-item play ${hideInSummary} ${hideInSelection}"><span class='material-symbols-outlined'>play_circle</span> Play</a>
+        <a class="dropdown-item play ${hideInSummary}"><span class='material-symbols-outlined'>play_circle</span> Play</a>
         <a class="dropdown-item ${hideInSummary} ${hideInSelection}" href="#" id="context-analyse-selection">
             <span class="material-symbols-outlined">search</span> Analyse
         </a>
-        <div class="dropdown-divider ${hideInSummary} ${hideInSelection}"></div>
-        <a class="dropdown-item ${hideInSelection}" id="create-manual-record" href="#">
+        <div class="dropdown-divider ${hideInSummary}"></div>
+        <a class="dropdown-item" id="create-manual-record" href="#">
             <span class="material-symbols-outlined">post_add</span> ${createOrEdit} Archive Record${plural}
         </a>
         <a class="dropdown-item" id="context-create-clip" href="#">
