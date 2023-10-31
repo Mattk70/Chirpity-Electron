@@ -1,0 +1,16 @@
+
+
+
+['SplitV', 'Max', 'Min', 'Sub', 'RealDiv', 'Multiply', 'Slice', 'Concat', 'Reshape', 'ZerosLike', 'Complex', 'FFT', 'Real', 'Imag', 'ComplexAbs', 'Pack', 'Transpose', 'Reverse', 'ExpandDims', 'ResizeBilinear', 'Cast', 'Conv2D', 'Add', 'Sigmoid', 'FusedDepthwiseConv2D', 'fusedDepthwiseConv2d__op', 'Mean', 'StridedSlice', 'BatchMatMul', '_FusedMatMul', 'fusedMatMul__op', 'Identity', 'Maximum', 'Greater', 'Tile', 'Select', 'TopK', 'Square', 'GreaterEqual']
+
+{
+  "kernels": ['SplitV', 'Max', 'Min', 'Sub', 'RealDiv', 'Multiply', 'Slice', 'Concat', 'Reshape', 'ZerosLike', 'Complex', 'FFT', 'Real', 'Imag', 'ComplexAbs', 'Pack', 'Transpose', 'Reverse', 'ExpandDims', 'ResizeBilinear', 'Cast', 'Conv2D', 'Add', 'Sigmoid', 'FusedDepthwiseConv2D', 'fusedDepthwiseConv2d__op', 'Mean', 'StridedSlice', 'BatchMatMul', '_FusedMatMul', 'fusedMatMul__op', 'Identity', 'Maximum', 'Greater', 'Tile', 'Select', 'TopK', 'Square', 'GreaterEqual'],
+  "backends": [
+      "tensorflow", "webgl"
+  ],
+  "models": [
+      "./model/model.json"
+  ],
+  "outputPath": "./custom_tfjs",
+  "forwardModeOnly": true
+}

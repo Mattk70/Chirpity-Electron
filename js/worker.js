@@ -267,7 +267,8 @@ async function handleMessage(e) {
             if (STATE.mode !== 'explore' && !args.batch && args.toDisk) {
                 UI.postMessage({
                     event: 'generate-alert',
-                    message: `${count} ${args.cname} record has been saved to the archive.`
+                    message: `${count} ${args.cname} record has been saved to the archive.`,
+                    savedToDB: true
                 })
             }
             break;
@@ -1651,7 +1652,7 @@ async function batchInsertRecords(cname, label, toDisk, files, originalCname) {
     }
     await db.runAsync('END');
     console.log(`Batch record update  took ${(Date.now() - t0) / 1000} seconds`)
-    if (STATE.mode !== 'explore' && toDisk) UI.postMessage({ event: 'generate-alert', message: `${count} ${cname} records have been saved to the archive.` })
+    if (STATE.mode !== 'explore' && toDisk) UI.postMessage({ event: 'generate-alert', message: `${count} ${cname} records have been saved to the archive.`, savedToDB: true })
 }
 
 const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label, toDisk, batch, originalCname }) => {
