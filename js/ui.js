@@ -496,7 +496,7 @@ const filename = document.getElementById('filename');
 filename.addEventListener('click', openFileInList);
 filename.addEventListener('contextmenu', buildFileMenu);
 
-function renderFilnamePanel() {
+function renderFilenamePanel() {
     if (!currentFile) return;
     const openfile = currentFile;
     const files = fileList;
@@ -939,7 +939,7 @@ function hideAll() {
 const save2dbLink = document.getElementById('save2db');
 save2dbLink.addEventListener('click', async () => {
     worker.postMessage({ action: 'save2db', file: currentFile })
-    renderFilnamePanel();
+    renderFilenamePanel();
 });
 
 const export2audio = document.getElementById('export2audio');
@@ -1465,13 +1465,6 @@ const setUpWorkerMessaging = () => {
                 case 'diskDB-has-records':
                     chartsLink.classList.remove('disabled');
                     exploreLink.classList.remove('disabled');
-                    if (currentFile) {
-                        worker.postMessage({
-                            action: 'filter',
-                            species: isSpeciesViewFiltered(true),
-                            active: getActiveRowID(),
-                        }); // no re-prepare
-                    }
                     break;
                 case 'file-location-id':
                     onFileLocationID(args);
@@ -1481,7 +1474,7 @@ const setUpWorkerMessaging = () => {
                     break;
                 case 'generate-alert':
                     if (args.render) {
-                        renderFilnamePanel();
+                        renderFilenamePanel();
                         window.electron.unsavedRecords(false);
                         document.getElementById('unsaved-icon').classList.add('d-none');
                     }
@@ -1489,7 +1482,16 @@ const setUpWorkerMessaging = () => {
                         let message = args.message;
                         message += '\nWould you like to remove the file from the Archive?';
                         if (confirm(message)) deleteFile(args.file)
-                    } else { alert(args.message) }
+                    } else { 
+                        if (args.savedToDB){
+                        worker.postMessage({
+                            action: 'filter',
+                            species: isSpeciesViewFiltered(true),
+                            active: getActiveRowID(),
+                        }); // no re-prepare
+                        }
+                        alert(args.message) 
+                    }
                     break;
                 case 'location-list':
                     LOCATIONS = args.locations;
@@ -1501,7 +1503,7 @@ const setUpWorkerMessaging = () => {
                 case 'mode-changed':
                     STATE.mode = args.mode;
                     // Update the current file name in the UI
-                    renderFilnamePanel();
+                    renderFilenamePanel();
                     console.log('Mode changed to: ' + args.mode);
                     break;
                 case 'no-detections-remain':
@@ -2475,7 +2477,7 @@ async function onWorkerLoadedAudio({
         NEXT_BUFFER = undefined;
         if (currentFile !== file) {
             currentFile = file;
-            renderFilnamePanel();
+            renderFilenamePanel();
             fileStart = start;
             fileEnd = new Date(fileStart + (currentFileDuration * 1000));
         }
@@ -3906,7 +3908,7 @@ function deleteFile(file) {
                 fileName: file
             })
         }
-        renderFilnamePanel()
+        renderFilenamePanel()
     }
 }
 // Utility functions to wait for file to load
