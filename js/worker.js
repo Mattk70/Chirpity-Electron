@@ -10,6 +10,7 @@ const { utimesSync } = require('utimes');
 const stream = require("stream");
 const staticFfmpeg = require('ffmpeg-static-electron');
 const { stat } = require("fs/promises");
+const {writeToPath} = require('@fast-csv/format');
 import { State } from './state.js';
 import { sqlite3 } from './database.js';
 
@@ -419,7 +420,7 @@ const getResultsParams = (species, confidence, offset, limit, topRankin) => {
     if (STATE.locationID) {
         params.push(STATE.locationID);
     }
-    params.push(limit, offset);
+    if (limit !== Infinity) params.push(limit, offset);
     return params
 }
 
@@ -491,7 +492,7 @@ const prepSummaryStatement = () => {
     //console.log('Summary SQL statement:\n' + summaryStatement)
 }
 
-const prepResultsStatement = () => {
+const prepResultsStatement = (noLimit) => {
     let resultStatement = `
     WITH ranked_records AS (
         SELECT 
@@ -554,8 +555,8 @@ const prepResultsStatement = () => {
     if (STATE.locationID) {
         resultStatement += ' AND locationID = ? ';
     }
-
-    resultStatement += `ORDER BY ${STATE.sortOrder}, confidence DESC, callCount DESC LIMIT ? OFFSET ?`;
+    const useLimit = noLimit ? '' : 'LIMIT ?  OFFSET ?';
+    resultStatement += `ORDER BY ${STATE.sortOrder}, confidence DESC, callCount DESC ${useLimit}`;
     STATE.GET_RESULT_SQL = STATE.db.prepare(resultStatement);
     //console.log('Results SQL statement:\n' + resultStatement)
 }
@@ -2062,7 +2063,7 @@ const getResults = async ({
     topRankin = STATE.topRankin,
     exportTo = undefined
 } = {}) => {
-    prepResultsStatement();
+    prepResultsStatement(limit === Infinity);
     let confidence = STATE.detect.confidence;
     if (offset === undefined) { // Get offset state
         if (species) {
@@ -2082,38 +2083,123 @@ const getResults = async ({
     const speciesForSTMT = species || '%';
     const params = getResultsParams(speciesForSTMT, confidence, offset, limit, topRankin);
     const result = await STATE.GET_RESULT_SQL.allAsync(...params);
+    if (exportTo && limit === Infinity){
+        // Format the values
+        const formattedValues = result.map(formatCSVValues);
+        // Create a write stream for the CSV file
+        let filename = species ? species : 'All';
+        filename += '_detections.csv';
+        const filePath = p.join(exportTo, filename);
+        writeToPath(filePath, formattedValues, {headers: true})
+            .on('error', err => UI.postMessage({event: 'generate-alert', message: `Cannot save file ${filePath}\nbecause it is open in another application`}))
+            .on('finish', () => {
+                UI.postMessage({event: 'generate-alert', message: filePath + ' has been written successfully.'});
+            });
+    }
+    else {
 
-    for (let i = 0; i < result.length; i++) {
-        const r = result[i];
-        if (exportTo) {
-            // Format date to YYYY-MM-DD-HH-MM-ss
-            const dateString = new Date(r.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
-            const filename = `${r.cname}-${dateString}.${STATE.audio.format}`
-            console.log(`Exporting from ${r.file}, position ${r.position}, into folder ${exportTo}`)
-            saveAudio(r.file, r.position, r.position + 3, filename, metadata, exportTo)
-            if (i === result.length - 1) UI.postMessage({ event: 'generate-alert', message: `${result.length} files saved` })
+        for (let i = 0; i < result.length; i++) {
+            const r = result[i];
+            if (exportTo) {
+                if (limit){
+                    // Format date to YYYY-MM-DD-HH-MM-ss
+                    const dateString = new Date(r.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
+                    const filename = `${r.cname}-${dateString}.${STATE.audio.format}`
+                    console.log(`Exporting from ${r.file}, position ${r.position}, into folder ${exportTo}`)
+                    saveAudio(r.file, r.position, r.position + 3, filename, metadata, exportTo)
+                    if (i === result.length - 1) UI.postMessage({ event: 'generate-alert', message: `${result.length} files saved` })
+                } 
+            }
+            else if (species && context !== 'explore') {
+                // get a number for the circle
+                const { count } = await STATE.db.getAsync(`SELECT COUNT(*) as count FROM records WHERE dateTime = ?
+                                                    AND confidence >= ?`, r.timestamp, confidence);
+                r.count = count;
+                sendResult(++index, r, true);
+            } else {
+                sendResult(++index, r, true)
+            }
         }
-        else if (species && context !== 'explore') {
-            // get a number for the circle
-            const { count } = await STATE.db.getAsync(`SELECT COUNT(*) as count FROM records WHERE dateTime = ?
-                                                 AND confidence >= ?`, r.timestamp, confidence);
-            r.count = count;
-            sendResult(++index, r, true);
-        } else {
-            sendResult(++index, r, true)
+        console.log("Get Results took", (Date.now() - t0) / 1000, " seconds");
+        if (!result.length) {
+            if (STATE.selection) {
+                // No more detections in the selection
+                sendResult(++index, 'No detections found in the selection', true)
+            } else {
+                species = species || '';
+                sendResult(++index, `No ${species} detections found.`, true)
+            }
         }
     }
-    console.log("Get Results took", (Date.now() - t0) / 1000, " seconds");
-    if (!result.length) {
-        if (STATE.selection) {
-            // No more detections in the selection
-            sendResult(++index, 'No detections found in the selection', true)
-        } else {
-            species = species || '';
-            sendResult(++index, `No ${species} detections found.`, true)
-        }
-    }
+
 };
+
+// Function to format the CSV export
+function formatCSVValues(obj) {
+    // Create a copy of the original object to avoid modifying it directly
+    const modifiedObj = { ...obj };
+
+    // Step 1: Remove specified keys
+    delete modifiedObj.confidence_rank;
+    delete modifiedObj.filestart;
+    delete modifiedObj.speciesID;
+    delete modifiedObj.duration;
+    modifiedObj.score /= 1000;
+    modifiedObj.score = modifiedObj.score.toString().replace(/^2$/, 'confirmed');
+    // Step 2: Multiply 'end' by 1000 and add 'timestamp'
+    modifiedObj.end = (modifiedObj.end - modifiedObj.position) * 1000  + modifiedObj.timestamp;
+
+    // Step 3: Convert 'timestamp' and 'end' to a formatted string
+    //const date = new Date(modifiedObj.timestamp);
+    modifiedObj.timestamp = formatDate(modifiedObj.timestamp)
+    const end = new Date(modifiedObj.end);
+    modifiedObj.end = end.toISOString().slice(0, 19).replace('T', ' ');
+    // Rename the headers
+    modifiedObj['File'] = modifiedObj.file
+    delete modifiedObj.file;
+    modifiedObj['Detection start'] = modifiedObj.timestamp
+    delete modifiedObj.timestamp;
+    modifiedObj['Detection end'] = modifiedObj.end
+    delete modifiedObj.end;
+    modifiedObj['Common name'] = modifiedObj.cname
+    delete modifiedObj.cname;
+    modifiedObj['Latin name'] = modifiedObj.sname
+    delete modifiedObj.sname;
+    modifiedObj['Confidence'] = modifiedObj.score
+    delete modifiedObj.score;
+    modifiedObj['Label'] = modifiedObj.label
+    delete modifiedObj.label;
+    modifiedObj['Comment'] = modifiedObj.comment
+    delete modifiedObj.comment;
+    modifiedObj['Call count'] = modifiedObj.callCount
+    delete modifiedObj.callCount;
+    modifiedObj['File offset'] = secondsToHHMMSS(modifiedObj.position)
+    delete modifiedObj.position;
+    return modifiedObj;
+}
+
+function secondsToHHMMSS(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
+  
+    const HH = String(hours).padStart(2, '0');
+    const MM = String(minutes).padStart(2, '0');
+    const SS = String(remainingSeconds).padStart(2, '0');
+  
+    return `${HH}:${MM}:${SS}`;
+  }
+
+const formatDate = (timestamp) =>{
+    const date = new Date(timestamp);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
 
 const sendResult = (index, result, fromDBQuery) => {
     const file = result.file;
@@ -2617,40 +2703,23 @@ async function getLocations({ db = STATE.db, file }) {
     UI.postMessage({ event: 'location-list', locations: locations, currentLocation: metadata[file]?.locationID })
 }
 
-
-
-
-
 /*
 todo: bugs
-    ***when analysing second batch of results, the first results linger.
-    ***manual records entry doesn't preserve species in explore mode
-    ***save records to db doesn't work with updaterecord!
-    ***AUDACITY results for multiple files doesn't work well, as it puts labels in by position only. Need to make audacity an object,
-        and return the result for the current file only #######
-    ***In explore, editID doesn't change the label of the region to the new species
-    ***Analyse selection returns just the file in which the selection is requested
     Reported region duration tooltip incorrect 
 
 Todo: Database
-     ***Database delete: records, files (and all associated records). Use when reanalysing
      Database file path update, batch update - so we can move files around after analysis
      ***Compatibility with updates, esp. when num classes change
         -Create a new database for each model with appropriate num classes?
 
 Todo: Location.
-     ***Associate lat lon with files, expose lat lon settings in UI. Allow for editing once saved. 
-     ***Filter Explore, Chart by location
 
 Todo cache:
     Set cache location
     Control cache size in settings
 
 Todo: manual entry
-    ***check creation of manual entries
-    ***indicate manual entry/confirmed entry
-    save entire selected range as one entry. By default or as an option?
-    ***get entry to appear in position among existing detections and centre on it
+
 
 Todo: UI
     ***Better tooltips, for all options

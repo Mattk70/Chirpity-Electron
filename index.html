@@ -135,12 +135,16 @@
                                 <li><a id="open" class="dropdown-item" href="#">
                                         <span class="material-symbols-outlined">file_open</span> Open Audio
                                         File(s) <span class="shortcut float-end">Ctrl+O</span></a></li>
-                                <li><a class="dropdown-item disabled" id="saveLabels" href="#">
-                                        <span class="material-symbols-outlined">label</span> Save Audacity
-                                        Labels</a></li>
+                                        <hr class="dropdown-divider">
+                                <li><a class="dropdown-item disabled" id="saveCSV" href="#">
+                                        <span class="material-symbols-outlined">ios_share</span> Export Results
+                                        to CSV</a></li>                                        
                                 <li><a class="dropdown-item disabled" id="export-audio" href="#">
                                         <span class="material-symbols-outlined">music_note</span> Export Selected
                                         Audio <span class="shortcut float-end">Ctrl+E</span></a></li>
+                                <li><a class="dropdown-item disabled" id="saveLabels" href="#">
+                                        <span class="material-symbols-outlined">label</span> Save Audacity
+                                        Labels</a></li>
                                 <li>
                                     <hr class="dropdown-divider">
                                 <li><a class="dropdown-item" href="#" id="exit">
@@ -577,11 +581,11 @@
                                                     <div class="col pe-0">
                                                         <div class="form-group rounded p-2 mb-2 text-bg-danger">
                                                             <span class="circle me-2"
-                                                                title="Enter debug mode (requires Chirpity relaunch)">?</span>
+                                                                title="Enter debug mode (requires Chirpity relaunch to take effect)">?</span>
                                                             <div class="form-check form-switch">
                                                                 <input class="form-check-input" type="checkbox"
                                                                     role="switch" id="debug-mode">
-                                                                <label class="form-check-label" for="debug-mode">Debug mode (requires application relaunch)</label>
+                                                                <label class="form-check-label" for="debug-mode">Debug mode</label>
                                                             </div>
 
                                                         </div>
@@ -656,7 +660,40 @@
                         </button>
                     </div>
                     <form id="record-entry-form">
-                        <div id="record-entry-modal-body" class="modal-body"></div>
+                        <div id="record-entry-modal-body" class="modal-body">
+                            <div class="row">
+                                <div class="col-8" id="record-entry-birdlist"></div>
+                                <div class="col hide-in-batch">
+                                    <div class="form-floating mb-3">
+                                        <input type="number" id="call-count" class="form-control" min="1">
+                                        <label for="call-count">Call Count</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <fieldset class="border  ps-3 pt-1">
+                                <label for="record-label" class="text-muted" style="font-size: .75em">Call Type</label><br>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="record-label" id="label-local" value="Local">
+                                    <label class="form-check-label" for="label-local">Local</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="record-label" id="label-nocmig" value="Nocmig">
+                                        <label class="form-check-label" for="label-nocmig">Nocmig</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="record-label" id="label-unknown" value="">
+                                    <label class="form-check-label" for="label-unknown">Not specified</label>
+                                </div>
+                            </fieldset>
+                            <div class="form-floating mt-3 hide-in-batch">
+                                <textarea class="form-control" id="record-comment" style="height: 200px"></textarea>
+                                <label for="record-comment">Comments</label>
+                                <input type='hidden' id='DBmode'>
+                                <input type='hidden' id='batch-mode'>
+                                <input type='hidden' id='original-id'>
+                            </div>
+
+                        </div>
                         <div class="modal-footer justify-content-center">
                             <button id="record-add" type="submit" class="btn btn-success">Add</button>
                             <button id="record-dismiss" type="button" class="btn btn-danger"
