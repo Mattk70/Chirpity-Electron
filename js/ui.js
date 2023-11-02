@@ -482,13 +482,11 @@ function showDatePicker() {
         postBufferUpdate({ file: currentFile, begin: bufferBegin })
         // Remove the form from the DOM
         form.remove();
-        document.addEventListener('keydown', handleKeyDownDeBounce, true);
     });
     // Add click event listener to the cancel button
     cancelButton.addEventListener("click", function () {
         // Remove the form from the DOM
         form.remove();
-        document.addEventListener('keydown', handleKeyDownDeBounce, true);
     });
 }
 
@@ -614,7 +612,7 @@ async function setLocation() {
     const locationModalDiv = document.getElementById('locationModal');
     const locationModal = new bootstrap.Modal(locationModalDiv);
     locationModal.show();
-    document.removeEventListener('keydown', handleKeyDownDeBounce, true);
+    //document.removeEventListener('keydown', handleKeyDownDeBounce, true);
 
     // Submit action
     const locationForm = document.getElementById('locationForm');
@@ -644,7 +642,6 @@ async function setLocation() {
     }
     locationAdd.addEventListener('click', addLocation)
     const onModalDismiss = () => {
-        enableKeyDownEvent();
         locationForm.reset();
         locationAdd.removeEventListener('click', addLocation);
         locationModalDiv.removeEventListener('hide.bs.modal', onModalDismiss);
@@ -826,10 +823,10 @@ function postAnalyseMessage(args) {
 
 
 /// Lat / lon
-const place = document.getElementById('place')
-$('#latitude, #longitude').on('focus', function () {
-    document.removeEventListener('keydown', handleKeyDownDeBounce, true);
-})
+// const place = document.getElementById('place')
+// $('#latitude, #longitude').on('focus', function () {
+//     document.removeEventListener('keydown', handleKeyDownDeBounce, true);
+// })
 
 function getLocation(lat, lon, isDefault) {
     return new Promise(async (resolve, reject) => {
@@ -859,7 +856,6 @@ function getLocation(lat, lon, isDefault) {
     })
 }
 $('#latitude, #longitude').on('blur', async function () {
-    enableKeyDownEvent();
     const lat = document.getElementById('latitude').value;
     const lon = document.getElementById('longitude').value;
     const address = await getLocation(lat, lon, true);
@@ -947,10 +943,12 @@ export2audio.addEventListener('click', batchExportAudio);
 
 async function batchExportAudio(e) {
     const species = isSpeciesViewFiltered(true); // || getSpecies(e.target);
-    if (!species) {
-        alert("Filter results by species to export audio files");
-        return
-    }
+    species ? exportData(limit, species) : alert("Filter results by species to export audio files");
+}
+
+const export2CSV = ()  => exportData(isSpeciesViewFiltered(true), Infinity);
+
+async function exportData(species, limit){
     const response = await window.electron.selectDirectory('selectDirectory');
     if (!response.canceled) {
         const directory = response.filePaths[0];
@@ -960,7 +958,7 @@ async function batchExportAudio(e) {
             species: species,
             files: isExplore() ? [] : fileList,
             explore: isExplore(),
-            limit: 100,
+            limit: limit,
             range: isExplore() ? STATE.explore.range : undefined
         })
     }
@@ -997,6 +995,7 @@ exploreLink.addEventListener('click', async () => {
     locationFilter.addEventListener('change', handleLocationFilterChange);
     hideAll();
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
+    enableMenuItem(['saveCSV']);
     adjustSpecDims(true)
     worker.postMessage({ action: 'filter', species: undefined, range: STATE.explore.range, explore: true }); // re-prepare
 });
@@ -1005,13 +1004,6 @@ const datasetLink = document.getElementById('dataset');
 datasetLink.addEventListener('click', async () => {
     worker.postMessage({ action: 'create-dataset' });
 });
-
-// $('.spec-labels').on('mousedown', (e) => {
-//     e.stopImmediatePropagation();
-//     console.log('label draggggggggggggg')
-// })
-
-// thresholdLink.addEventListener('keypress', handleThresholdChange );
 
 const checkWidth = (text) => {
     // Create a temporary element to measure the width of the text
@@ -1332,7 +1324,7 @@ window.onload = async () => {
         longitude: 0.89, // Great Snoring :)
         location: 'Great Snoring, North Norfolk, Norfolk, England, United Kingdom',
         detect: { nocmig: false, contextAware: false, confidence: 45 },
-        filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 18, SNR: 0 },
+        filters: { active: true, highPassFrequency: 250, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0 },
         warmup: true,
         backend: 'tensorflow',
         tensorflow: { threads: diagnostics['Cores'], batchSize: 32 },
@@ -1489,8 +1481,9 @@ const setUpWorkerMessaging = () => {
                             species: isSpeciesViewFiltered(true),
                             active: getActiveRowID(),
                         }); // no re-prepare
+                        } else {
+                            alert(args.message) 
                         }
-                        alert(args.message) 
                     }
                     break;
                 case 'location-list':
@@ -1887,6 +1880,7 @@ $(document).on('click', '.play', function () {
 
 
 function handleKeyDownDeBounce(e) {
+    console.log('keydown handler called')
     e.preventDefault();
     waitForFinalEvent(function () {
         handleKeyDown(e);
@@ -1913,9 +1907,6 @@ function handleKeyDown(e) {
     });
 }
 
-function enableKeyDownEvent() {
-    document.addEventListener('keydown', handleKeyDownDeBounce, true);
-}
 
 
 ///////////// Nav bar Option handlers //////////////
@@ -2353,14 +2344,14 @@ const postBufferUpdate = ({
 const goto = new bootstrap.Modal(document.getElementById('gotoModal'));
 const showGoToPosition = () => {
     if (currentFile) {
-        document.removeEventListener('keydown', handleKeyDownDeBounce, true);
+        //document.removeEventListener('keydown', handleKeyDownDeBounce, true);
         goto.show();
 
     }
 }
 
 const gotoModal = document.getElementById('gotoModal')
-gotoModal.addEventListener('hidden.bs.modal', enableKeyDownEvent)
+//gotoModal.addEventListener('hidden.bs.modal', enableKeyDownEvent)
 
 gotoModal.addEventListener('shown.bs.modal', () => {
     document.getElementById('timeInput').focus()
@@ -2616,10 +2607,10 @@ async function onPredictionDone({
     total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
     if (action !== 'filter') {
         if (! isEmptyObject(AUDACITY_LABELS)) {
-            enableMenuItem(['saveLabels']);
+            enableMenuItem(['saveLabels', 'saveCSV']);
             $('.download').removeClass('disabled');
         } else {
-            disableMenuItem(['saveLabels']);
+            disableMenuItem(['saveLabels', 'saveCSV']);
         }
         if (currentFile) enableMenuItem(['analyse'])
 
@@ -2803,7 +2794,7 @@ async function renderResult({
             shownDaylightBanner = true;
         }
         const commentHTML = comment ?
-            `<span title="${comment}" class='material-symbols-outlined pointer'>comment</span>` : '';
+            `<span title="${comment.replaceAll('\"', '&quot;')}" class='material-symbols-outlined pointer'>comment</span>` : '';
         const isUncertain = score < 65 ? '&#63;' : '';
         // result.filename  and result.date used for feedback
         result.date = timestamp;
@@ -3034,6 +3025,7 @@ const exportAudio = () => {
 
 document.getElementById('open').addEventListener('click', showOpenDialog);
 document.getElementById('saveLabels').addEventListener('click', showSaveDialog);
+document.getElementById('saveCSV').addEventListener('click', export2CSV);
 document.getElementById('export-audio').addEventListener('click', exportAudio);
 
 
@@ -3389,7 +3381,20 @@ $(function () {
 
 
 document.addEventListener("DOMContentLoaded", function () {
-    enableKeyDownEvent();
+    document.addEventListener("keydown", handleKeyDownDeBounce, true);
+    const formFields = document.querySelectorAll("input, textarea, select");
+    // Disable keyboard shortcuts when any form field gets focus
+    formFields.forEach((formField) => {
+        formField.addEventListener("focus", () => {
+            console.log("focus")
+            document.removeEventListener("keydown", handleKeyDownDeBounce, true);
+        });
+    
+        formField.addEventListener("blur", () => {
+            console.log('blur')
+            document.addEventListener("keydown", handleKeyDownDeBounce, true);
+        });
+    });
     // make menu an accordion for smaller screens
     if (window.innerWidth < 768) {
 
@@ -3769,7 +3774,6 @@ function positionMenu(menu, event) {
         top: top,
         left: left
     }).addClass("show");
-    //return false; //blocks default Webbrowser right click menu
 }
 
 $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('contextmenu', createContextMenu)
@@ -3784,91 +3788,31 @@ const recordEntryHandler = () => {
     }); // no re-prepare
 }
 
+const recordEntryForm = document.getElementById('record-entry-form');
+
 async function showRecordEntryForm(mode, batch) {
     const cname = batch ? document.querySelector('#speciesFilter .text-warning .cname .cname').innerText : region.attributes.label.replace('?', '');
     let callCount = '', typeIndex = '', commentText = '';
     if (cname && activeRow) {
         // Populate the form with existing values
         commentText = activeRow.querySelector('.comment > span')?.title || '';
-
-        callCount = activeRow.querySelector('.call-count').innerText;
-        callCount = callCount.replace('Present', '');
+        callCount = activeRow.querySelector('.call-count').innerText.replace('Present', '');
         typeIndex = ['Local', 'Nocmig', ''].indexOf(activeRow.querySelector('.label').innerText);
     }
-    let speciesList = `
-    <div class="row">
-        <div class="col-8">
-            ${generateBirdOptionList({ store: 'allSpecies', rows: undefined, selected: cname })}
-        </div>`;
-    if (!batch) {
-        speciesList += `<div class="col"><div class="form-floating mb-3">
-            <input type="number" id="call-count" value="${callCount}" class="form-control" min="1">
-            <label for="call-count">Call Count</label>
-        </div></div>`;
-    }
-    speciesList += '</div>';
-    const label = `
-    <fieldset class="border  ps-3 pt-1">
-        <label for="record-label" class="text-muted" style="font-size: .75em">Call Type</label><br>
-        <div class="form-check form-check-inline">
-            <input class="form-check-input" type="radio" name="record-label" id="label-local" value="Local">
-            <label class="form-check-label" for="label-local">Local</label>
-        </div>
-        <div class="form-check form-check-inline">
-                <input class="form-check-input" type="radio" name="record-label" id="label-nocmig" value="Nocmig">
-                <label class="form-check-label" for="label-nocmig">Nocmig</label>
-        </div>
-        <div class="form-check form-check-inline">
-            <input class="form-check-input" type="radio" name="record-label" id="label-unknown" value="">
-            <label class="form-check-label" for="label-unknown">Not specified</label>
-        </div>
-    </fieldset>`;
-    let comment = '<div class="form-floating mt-3">';
-    if (!batch) comment += `<textarea class="form-control" id="record-comment" style="height: 200px">${commentText}</textarea><label for="record-comment">Comments</label>`;
-    comment += `<input type='hidden' id='DBmode' value='${mode}'>
-            <input type='hidden' id='batch-mode' value='${batch}'>
-            <input type='hidden' id='original-id' value='${cname}'>
-        </div>`;
-    $('#record-entry-modal-body').html(speciesList + label + comment);
-    const action = document.getElementById('record-add')
-    action.innerText = mode;
-
-    //action.addEventListener('click', recordEntryHandler)
-    if (typeIndex) document.querySelectorAll('input[name="record-label"]')[typeIndex].checked = true;
-    // Clear entry on input focus, so list appears
-    document.removeEventListener('keydown', handleKeyDownDeBounce, true);
+    const recordEntryBirdList = recordEntryForm.querySelector('#record-entry-birdlist');
+    recordEntryBirdList.innerHTML = generateBirdOptionList({ store: 'allSpecies', rows: undefined, selected: cname });
+    const batchHide = recordEntryForm.querySelectorAll('.hide-in-batch');
+    batchHide.forEach(el => batch ? el.classList.add('d-none') : el.classList.remove('d-none'));
+    recordEntryForm.querySelector('#call-count').value = callCount;
+    recordEntryForm.querySelector('#record-comment').value = commentText;
+    recordEntryForm.querySelector('#DBmode').value = mode;
+    recordEntryForm.querySelector('#batch-mode').value = batch;
+    recordEntryForm.querySelector('#original-id').value = cname;
+    recordEntryForm.querySelector('#record-add').innerText = mode;
+    if (typeIndex) recordEntryForm.querySelectorAll('input[name="record-label"]')[typeIndex].checked = true;
     recordEntryModal.show();
 }
 
-const insertManualRecord = (cname, start, end, comment, count, label, action, batch, originalCname) => {
-    const files = batch ? fileList : currentFile;
-    const insert = (toDisk) => {
-        worker.postMessage({
-            action: 'insert-manual-record',
-            cname: cname,
-            originalCname: originalCname,
-            start: start?.toFixed(3),
-            end: end?.toFixed(3),
-            comment: comment,
-            count: count || null,
-            file: files,
-            label: label,
-            DBaction: action,
-            batch: batch,
-            toDisk: toDisk
-        })
-    }
-    if (STATE.mode === 'analyse') {
-        //Update the record in the memory db 
-        insert(false)
-    }
-    // Insert to disk
-    setTimeout(insert, 500, true)
-    //insert(true)
-
-}
-
-const recordEntryForm = document.getElementById('record-entry-form');
 recordEntryForm.addEventListener('submit', function (e) {
     e.preventDefault();
     const action = document.getElementById('DBmode').value;
@@ -3890,8 +3834,36 @@ recordEntryForm.addEventListener('submit', function (e) {
     insertManualRecord(cname, start, end, comment, count, label, action, batch, originalCname)
 })
 
-const recordEntryModalDiv = document.getElementById('record-entry-modal')
-recordEntryModalDiv.addEventListener('hidden.bs.modal', enableKeyDownEvent);
+
+const insertManualRecord = (cname, start, end, comment, count, label, action, batch, originalCname) => {
+    const files = batch ? fileList : currentFile;
+    const insert = (toDisk) => {
+        worker.postMessage({
+            action: 'insert-manual-record',
+            cname: cname,
+            originalCname: originalCname,
+            start: start?.toFixed(3),
+            end: end?.toFixed(3),
+            comment: comment,
+            count: count || null,
+            file: files,
+            label: label,
+            DBaction: action,
+            batch: batch,
+            toDisk: toDisk
+        })
+
+    }
+    if (STATE.mode === 'analyse') {
+        //Update the record in the memory db 
+        insert(false)
+    }
+    // Insert to disk
+    setTimeout(insert, 500, true)
+    //insert(true)
+
+}
+
 
 const purgeFile = document.getElementById('purge-file');
 purgeFile.addEventListener('click', deleteFile)
