@@ -2852,13 +2852,11 @@ const updateResultTable = (row, isFromDB, isSelection) => {
             if (!detectionsModal || !detectionsModal._isShown) {
                 detectionsModal = new bootstrap.Modal('#detectionsModal', { backdrop: 'static' });
                 detectionsModal.show();
-                //clearActive()
             }
         }
         table.lastElementChild ? table.lastElementChild.insertAdjacentHTML('afterend', row) :
             table.innerHTML = row;
     }
-    //showSortIcon()
 };
 
 const isExplore = () => {
