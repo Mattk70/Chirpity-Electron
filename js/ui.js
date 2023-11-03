@@ -1313,7 +1313,6 @@ window.onload = async () => {
     contentWrapperElement.addClass('loaded');
     // Set config defaults
     const defaultConfig = {
-        lastUpdatePrompt: 0,
         seenTour: false,
         UUID: uuidv4(),
         colormap: 'inferno',
@@ -1351,7 +1350,7 @@ window.onload = async () => {
             }
         });
         // Update model if old models in config
-        if (!['v2', 'v3'].includes(config.model)) {
+        if (!['v2', 'v3', 'v4'].includes(config.model)) {
             config.model = 'v2';
             updatePrefs()
         }
@@ -3077,6 +3076,11 @@ const changeNocmigMode = () => {
         detect: { nocmig: config.detect.nocmig },
     });
     updatePrefs();
+    worker.postMessage({
+        action: 'filter',
+        species: isSpeciesViewFiltered(true),
+        updateSummary: true
+    })
 }
 
 const contextAwareIconDisplay = () => {

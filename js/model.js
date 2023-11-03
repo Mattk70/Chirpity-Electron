@@ -10,7 +10,7 @@ const MIGRANTS = new Set(["Pluvialis dominica_American Golden Plover", "Acanthis
 const NOT_BIRDS = ['Ambient Noise_Ambient Noise', 'Animal_Animal', 'Cat_Cat', 'Church Bells_Church Bells', 'Cough_Cough', 'Dog_Dog', 'Human_Human', 'Laugh_Laugh', 'Rain_Rain', 'Red Fox_Red Fox', 'Sneeze_Sneeze', 'Snoring_Snoring', 'Thunder_Thunder', 'Vehicle_Vehicle', 'Water Drops_Water Drops', 'Waves_Waves', 'Wind_Wind'];
 const MYSTERIES = ['Unknown Sp._Unknown Sp.'];
 const GRAYLIST = [];
-const GOLDEN_LIST = [] // ["Turdus iliacus_Redwing (call)", "Turdus philomelos_Song Thrush (call)"] // "Erithacus rubecula_Robin (song)", "Erithacus rubecula_Robin (call)"];
+const GOLDEN_LIST = [];
 let BLOCKED_IDS = [];
 let SUPPRESSED_IDS = [];
 let ENHANCED_IDS = [];
@@ -176,9 +176,7 @@ class Model {
         if (tf.getBackend() === 'webgl') {
             tf.tidy(() => {
                 const warmupResult = this.model.predict(tf.zeros(this.inputShape), { batchSize: this.batchSize });
-                warmupResult.arraySync();
-                // see if we can get padding compiled at this point
-                this.padBatch(tf.zeros([1, this.inputShape[1], this.inputShape[2], this.inputShape[3]]), { batchSize: this.batchSize })
+                const synced = warmupResult.arraySync();
             })
         }
         if (DEBUG) console.log('WarmUp end', tf.memory().numTensors)
@@ -213,15 +211,16 @@ class Model {
         GOLDEN_LIST.forEach(species => ENHANCED_IDS.push(this.labels.indexOf(species)))
     }
 
-    normalize(spec) {
+    normalise(spec) {
         return tf.tidy(() => {
-            // console.log('Pre-norm### Min is: ', spec.min().dataSync(), 'Max is: ', spec.max().dataSync())
             const spec_max = tf.max(spec, [1, 2]).reshape([-1, 1, 1, 1])
-            // const spec_min = tf.min(spec, [1, 2]).reshape([-1, 1, 1, 1])
-            spec = spec.mul(255);
-            spec = spec.div(spec_max);
-            // spec = tf.sub(spec, spec_min).div(tf.sub(spec_max, spec_min));
-            // console.log('{Post norm#### Min is: ', spec.min().dataSync(), 'Max is: ', spec.max().dataSync())
+            if (this.version === 'v4'){
+                const spec_min = tf.min(spec, [1, 2]).reshape([-1, 1, 1, 1])
+                spec = tf.sub(spec, spec_min).div(tf.sub(spec_max, spec_min));
+            } else {
+                spec = spec.mul(255);
+                spec = spec.div(spec_max);
+            }
             return spec
         })
     }
@@ -231,10 +230,6 @@ class Model {
             const { mean, variance } = tf.moments(spectrograms, 2);
             const peak = tf.div(variance, mean)
             let snr = tf.squeeze(tf.max(peak, 1));
-            //snr = tf.sub(255, snr)  // bigger number, less signal
-            // const MEAN = mean.arraySync()
-            // const VARIANCE = variance.arraySync()
-            // const PEAK = peak.arraySync()
             return snr
         })
     }
@@ -255,7 +250,7 @@ class Model {
             specBatch = tf.expandDims(specBatch, -1);
             //specBatch = tf.slice4d(specBatch, [0, 1, 0, 0], [-1, img_height, img_width, -1]);
             specBatch = tf.image.resizeBilinear(specBatch, [img_height, img_width], true);
-            return this.version === 'v1' ? specBatch : this.normalize(specBatch)
+            return  this.normalise(specBatch)
         })
     }
 
@@ -368,12 +363,6 @@ class Model {
         if (newPrediction) newPrediction.dispose();
         keys = keys.map(key => (key / CONFIG.sampleRate).toFixed(3));
         return [keys, topIndices, topValues];
-        // return keys.reduce((acc, key, index) => {
-        //     // convert key (samples) to milliseconds
-        //     const position = (key / CONFIG.sampleRate).toFixed(3);
-        //     acc[position] = array_of_predictions[index];
-        //     return acc;
-        // }, {});
     }
 
     makeSpectrogram(signal) {
@@ -384,28 +373,9 @@ class Model {
         })
     }
 
-    /*    normalizeTensor(audio) {
-            return tf.tidy(() => {
-                const tensor = tf.tensor1d(audio);
-                const {mean, variance} = tf.moments(tensor);
-                const stdDev = variance.sqrt();
-                const normalizedTensor = tensor.sub(mean).div(stdDev.mul(tf.scalar(2)));
-                return normalizedTensor;
-            })
-        }*/
-
-    /*    normalise_audio = (signal) => {
-            return tf.tidy(() => {
-                //signal = tf.tensor1d(signal);
-                const sigMax = tf.max(signal);
-                const sigMin = tf.min(signal);
-                return signal.sub(sigMin).div(sigMax.sub(sigMin)).mul(255).sub(127.5);
-            })
-        };*/
 
     normalise_audio = (signal) => {
         return tf.tidy(() => {
-            //signal = tf.tensor1d(signal, 'float32');
             const sigMax = tf.max(signal);
             const sigMin = tf.min(signal);
             const range = sigMax.sub(sigMin);
@@ -434,9 +404,7 @@ class Model {
         // Turn the audio into a spec tensor
         bufferList = tf.tidy(() => {
             return bufferList.map(x => {
-                let normal = this.normalise_audio(x);
-                x.dispose();
-                return this.makeSpectrogram(normal);
+                return this.version === 'v4' ? this.makeSpectrogram(x) : this.makeSpectrogram(this.normalise_audio(x));
             })
         });
         const specBatch = tf.stack(bufferList);
