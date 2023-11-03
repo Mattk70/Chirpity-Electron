@@ -1880,7 +1880,6 @@ $(document).on('click', '.play', function () {
 
 
 function handleKeyDownDeBounce(e) {
-    console.log('keydown handler called')
     e.preventDefault();
     waitForFinalEvent(function () {
         handleKeyDown(e);
@@ -3386,12 +3385,10 @@ document.addEventListener("DOMContentLoaded", function () {
     // Disable keyboard shortcuts when any form field gets focus
     formFields.forEach((formField) => {
         formField.addEventListener("focus", () => {
-            console.log("focus")
             document.removeEventListener("keydown", handleKeyDownDeBounce, true);
         });
     
         formField.addEventListener("blur", () => {
-            console.log('blur')
             document.addEventListener("keydown", handleKeyDownDeBounce, true);
         });
     });
