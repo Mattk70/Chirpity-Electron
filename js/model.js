@@ -104,15 +104,13 @@ onmessage = async (e) => {
                 const signal = tf.tensor1d(buffer, 'float32');
                 const bufferTensor = myModel.normalise_audio(signal);
                 signal.dispose();
-                // const mymax = tf.max(bufferTensor).dataSync()
-                // const mymin = tf.min(bufferTensor).dataSync()
                 const imageTensor = tf.tidy(() => {
                     return myModel.makeSpectrogram(bufferTensor);
                 });
-                image = tf.tidy(() => {
+                image = await tf.tidy(() => {
                     let spec = myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), spec_height, spec_width);
                     const spec_max = tf.max(spec);
-                    return spec.mul(255).div(spec_max).dataSync();
+                    return spec.mul(255).div(spec_max).data();
                 });
                 bufferTensor.dispose();
                 imageTensor.dispose();
@@ -171,13 +169,13 @@ class Model {
         }
     }
 
-    warmUp(batchSize) {
+    async warmUp(batchSize) {
         this.batchSize = parseInt(batchSize);
         this.inputShape[0] = this.batchSize;
         if (tf.getBackend() === 'webgl') {
-            tf.tidy(() => {
+            await tf.tidy(() => {
                 const warmupResult = this.model.predict(tf.zeros(this.inputShape), { batchSize: this.batchSize });
-                const synced = warmupResult.arraySync();
+                const synced = warmupResult.array();
             })
         }
         if (DEBUG) console.log('WarmUp end', tf.memory().numTensors)
@@ -306,7 +304,7 @@ class Model {
             const keysTensor = tf.stack(keys); // + 1 tensor
             const snr = this.getSNR(TensorBatch)
             const condition = tf.greaterEqual(snr, threshold); // + 1 tensor
-            if (DEBUG) console.log('SNR is: ', snr.dataSync())
+            if (DEBUG) console.log('SNR is: ', await snr.data())
             snr.dispose();
             // Avoid mask cannot be scalar error at end of predictions
             let newCondition;
@@ -329,7 +327,7 @@ class Model {
                 if (DEBUG) console.log("No surviving tensors in batch", maskedTensorBatch.shape[0])
                 return []
             } else {
-                keys = maskedKeysTensor.dataSync();
+                keys = await maskedKeysTensor.data();
                 maskedKeysTensor.dispose(); // - 1 tensor
                 if (DEBUG) console.log("surviving tensors in batch", maskedTensorBatch.shape[0])
             }
@@ -352,14 +350,12 @@ class Model {
         if (maskedTensorBatch) maskedTensorBatch.dispose();
 
         const finalPrediction = newPrediction || prediction;
-        //new
         const { indices, values } = tf.topk(finalPrediction, 5, true)
-        const topIndices = indices.arraySync();
-        const topValues = values.arraySync();
+        const topIndices = await indices.array();
+        const topValues = await values.array();
         indices.dispose();
         values.dispose();
-        // end new
-        // const array_of_predictions = finalPrediction.arraySync()
+
         finalPrediction.dispose();
         if (newPrediction) newPrediction.dispose();
         keys = keys.map(key => (key / CONFIG.sampleRate).toFixed(3));
