@@ -175,7 +175,6 @@
   "homepage": "https://github.com/mattk70/Chirpity-Electron#readme",
   "devDependencies": {
     "@playwright/test": "^1.39.0",
-    "@tensorflow/tfjs-converter": "4.10.0",
     "electron": "^25.3.0",
     "electron-builder": "24.6.4",
     "electron-playwright-helpers": "^1.6.0",
@@ -186,6 +185,7 @@
   "dependencies": {
     "@fast-csv/format": "^4.3.5",
     "@popperjs/core": "^2.9.2",
+    "@tensorflow/tfjs-backend-webgpu": "^4.12.0",
     "@tensorflow/tfjs-node": "^4.12.0",
     "axios": "1.5.1",
     "bootstrap": "5.2.2",

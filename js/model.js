@@ -1,4 +1,5 @@
 const tf = require('@tensorflow/tfjs-node');
+require('@tensorflow/tfjs-backend-webgpu');
 const fs = require('fs');
 const path = require('path');
 let DEBUG = false;
@@ -213,9 +214,9 @@ class Model {
 
     normalise(spec) {
         return tf.tidy(() => {
-            const spec_max = tf.max(spec, [1, 2]).reshape([-1, 1, 1, 1])
+            const spec_max = tf.max(spec, [1, 2], true)
             if (this.version === 'v4'){
-                const spec_min = tf.min(spec, [1, 2]).reshape([-1, 1, 1, 1])
+                const spec_min = tf.min(spec, [1, 2], true)
                 spec = tf.sub(spec, spec_min).div(tf.sub(spec_max, spec_min));
             } else {
                 spec = spec.mul(255);

@@ -1327,6 +1327,7 @@ window.onload = async () => {
         warmup: true,
         backend: 'tensorflow',
         tensorflow: { threads: diagnostics['Cores'], batchSize: 32 },
+        webgpu: { threads: 2, batchSize: 32 },
         webgl: { threads: 2, batchSize: 32 },
         audio: { format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false },
         limit: 500,
