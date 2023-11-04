@@ -189,22 +189,11 @@ class Model {
             // find the position of the blocked items in the label list
             NOT_BIRDS.forEach(notBird => BLOCKED_IDS.push(this.labels.indexOf(notBird)))
         } else if (this.list === 'migrants') {
-            let v1_migrants;
-            if (this.version === 'v1') {
-                // strip (call) from migrants set
-                v1_migrants = new Set();
-                MIGRANTS.forEach((element) => {
-                    const newElement = element.replace(' (call)', '');
-                    v1_migrants.add(newElement);
-                })
-
-            }
-            const listToCheck = v1_migrants || MIGRANTS;
+            const listToCheck = MIGRANTS;
             for (let i = 0; i < this.labels.length; i++) {
                 const item = this.labels[i];
                 if (!listToCheck.has(item) && !MYSTERIES.includes(item)) BLOCKED_IDS.push(i);
             }
-
         }
         GRAYLIST.forEach(species => SUPPRESSED_IDS.push(this.labels.indexOf(species)))
         GOLDEN_LIST.forEach(species => ENHANCED_IDS.push(this.labels.indexOf(species)))
@@ -393,16 +382,15 @@ class Model {
         const numSamples = buffer.shape / this.chunkLength;
         let buffers = tf.reshape(buffer, [numSamples, this.chunkLength]);
         buffer.dispose();
-        const bufferList = this.normalise_audio_batch(buffers);
-        buffers.dispose();
+        const bufferList = this.version !== 'v4' ? this.normalise_audio_batch(buffers) : buffers;
         const specBatch = tf.tidy(() => {
             const bufferArray = tf.unstack(bufferList);
             const toStack = bufferArray.map(x => {
                 return this.makeSpectrogram(x)
-                //return this.version === 'v2' ? this.makeSpectrogram(x) : this.makeSpectrogram(this.normalise_audio(x));
             })
             return this.fixUpSpecBatch(tf.stack(toStack))
         });
+        buffers.dispose();
         bufferList.dispose();
         //const specBatch = tf.stack(bufferList);
         const batchKeys = [...Array(numSamples).keys()].map(i => start + this.chunkLength * i);
