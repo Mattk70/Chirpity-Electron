@@ -69,7 +69,7 @@ const createDB = async (file) => {
     await db.runAsync(`CREATE TABLE records(
         dateTime INTEGER, position INTEGER, fileID INTEGER, 
         speciesID INTEGER, confidence INTEGER, label  TEXT, 
-        comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, isDaylight INTEGER,
+        comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER,
         UNIQUE (dateTime, fileID, speciesID),
         CONSTRAINT fk_files
             FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE, 
@@ -1595,8 +1595,9 @@ const terminateWorkers = () => {
     predictWorkers = [];
 }
 
-const insertRecord = async (timestamp, timestamp, key, speciesID, confidence, file) => {
+const insertRecord = async (timestamp, key, speciesID, confidence, file) => {
     const isDaylight = isDuringDaylight(timestamp, STATE.lat, STATE.lon);
+    const offset = key * 1000;
     let changes, fileID;
     confidence = Math.round(confidence);
     const db = memoryDB; //STATE.db;
