@@ -2574,7 +2574,8 @@ async function onPredictionDone({
     offset = 0,
     action = undefined
 }) {
-
+    // Reset daylight banner
+    shownDaylightBanner = false;
     AUDACITY_LABELS = audacityLabels;
     enableMenuItem(['save2db', 'export2audio']);
     // Defer further processing until batch complete
@@ -2663,8 +2664,7 @@ pagination.forEach(item => {
             const limit = config.limit;
             const offset = (clicked - 1) * limit;
             const species = isSpeciesViewFiltered(true);
-            // Reset daylight banner
-            shownDaylightBanner = false;
+
             worker.postMessage({
                 action: 'filter',
                 species: species,

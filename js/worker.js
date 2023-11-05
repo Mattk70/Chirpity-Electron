@@ -69,7 +69,7 @@ const createDB = async (file) => {
     await db.runAsync(`CREATE TABLE records(
         dateTime INTEGER, position INTEGER, fileID INTEGER, 
         speciesID INTEGER, confidence INTEGER, label  TEXT, 
-        comment  TEXT, end INTEGER, callCount INTEGER,
+        comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER,
         UNIQUE (dateTime, fileID, speciesID),
         CONSTRAINT fk_files
             FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE, 
@@ -120,6 +120,14 @@ async function loadDB(path) {
         const { count } = await diskDB.getAsync('SELECT COUNT(*) as count FROM records')
         if (count) {
             UI.postMessage({ event: 'diskDB-has-records' })
+        }
+        const sql = 'PRAGMA table_info(records)';
+        const result = await  diskDB.allAsync(sql);
+        // Update legacy tables
+        const columnExists = result.some((column) => column.name === 'isDaylight');
+        if (!columnExists) {
+            await diskDB.runAsync('ALTER TABLE records ADD COLUMN isDaylight INTEGER')
+            console.log('Added isDaylight column to records table')
         }
         console.log("Opened and cleaned disk db " + file)
     }
@@ -448,7 +456,7 @@ const prepSummaryStatement = () => {
     const useRange = range?.start;
     let summaryStatement = `
     WITH ranked_records AS (
-        SELECT records.dateTime, records.speciesID, records.confidence, records.fileID, cname, sname, callCount,
+        SELECT records.dateTime, records.speciesID, records.confidence, records.fileID, cname, sname, callCount, isDaylight,
           RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
         FROM records
         JOIN files ON files.id = records.fileID
@@ -460,6 +468,9 @@ const prepSummaryStatement = () => {
     }
     else if (useRange) {
         extraClause += ' AND dateTime BETWEEN ? AND ? ';
+    }
+    if (STATE.detect.nocmig){
+        extraClause += ' AND isDaylight != 1 ';
     }
     if (STATE.blocked.length) {
         const excluded = prepParams(STATE.blocked);
@@ -1584,8 +1595,8 @@ const terminateWorkers = () => {
     predictWorkers = [];
 }
 
-const insertRecord = async (key, speciesID, confidence, file) => {
-
+const insertRecord = async (timestamp, key, speciesID, confidence, file) => {
+    const isDaylight = isDuringDaylight(timestamp, STATE.lat, STATE.lon)
     const offset = key * 1000;
     let changes, fileID;
     confidence = Math.round(confidence);
@@ -1605,9 +1616,9 @@ const insertRecord = async (key, speciesID, confidence, file) => {
         // No "OR IGNORE" in this statement because it should only run when the file is new
         await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
     }
-    await db.runAsync('INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?)',
+    await db.runAsync('INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?)',
         metadata[file].fileStart + offset, key, fileID, speciesID, confidence,
-        null, null, key + 3, null);
+        null, null, key + 3, null, isDaylight);
 }
 
 async function batchInsertRecords(cname, label, toDisk, files, originalCname) {
@@ -1726,7 +1737,7 @@ const parsePredictions = async (response) => {
             updateUI = (confidence > STATE.detect.confidence &&
                 STATE.blocked.indexOf(speciesID) === -1);
             //save all results to  db, regardless of confidence
-            if (!STATE.selection) await insertRecord(key, speciesID, confidence, file);
+            if (!STATE.selection) await insertRecord(timestamp, key, speciesID, confidence, file);
             if (STATE.selection || updateUI) {
                 let end, confidenceRequired;
                 if (STATE.selection) {
