@@ -1,5 +1,4 @@
 const tf = require('@tensorflow/tfjs-node');
-require('@tensorflow/tfjs-backend-webgpu');
 const fs = require('fs');
 const path = require('path');
 let DEBUG = false;
