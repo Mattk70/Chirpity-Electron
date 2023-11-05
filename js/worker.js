@@ -69,7 +69,7 @@ const createDB = async (file) => {
     await db.runAsync(`CREATE TABLE records(
         dateTime INTEGER, position INTEGER, fileID INTEGER, 
         speciesID INTEGER, confidence INTEGER, label  TEXT, 
-        comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER,
+        comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, isDaylight INTEGER,
         UNIQUE (dateTime, fileID, speciesID),
         CONSTRAINT fk_files
             FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE, 
@@ -1595,9 +1595,8 @@ const terminateWorkers = () => {
     predictWorkers = [];
 }
 
-const insertRecord = async (timestamp, key, speciesID, confidence, file) => {
-    const isDaylight = isDuringDaylight(timestamp, STATE.lat, STATE.lon)
-    const offset = key * 1000;
+const insertRecord = async (timestamp, timestamp, key, speciesID, confidence, file) => {
+    const isDaylight = isDuringDaylight(timestamp, STATE.lat, STATE.lon);
     let changes, fileID;
     confidence = Math.round(confidence);
     const db = memoryDB; //STATE.db;
@@ -1705,8 +1704,9 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
 
     let response;
     const dateTime = fileStart + startMilliseconds;
-    response = await db.runAsync('INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,? )',
-        dateTime, start, fileID, speciesID, 2000, label, comment, end, parseInt(count));
+    const isDaylight = isDuringDaylight(dateTime, STATE.lat, STATE.lon);
+    response = await db.runAsync('INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,?,?)',
+        dateTime, start, fileID, speciesID, 2000, label, comment, end, parseInt(count), isDaylight);
 
     if (response.changes && toDisk) {
         UI.postMessage({ event: 'diskDB-has-records' });
