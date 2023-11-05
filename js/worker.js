@@ -1596,7 +1596,7 @@ const terminateWorkers = () => {
 }
 
 const insertRecord = async (timestamp, key, speciesID, confidence, file) => {
-    const isDaylight = isDuringDaylight(timestamp, metadata[file].latitude, metadata[file].longitude)
+    const isDaylight = isDuringDaylight(timestamp, STATE.lat, STATE.lon);
     let changes, fileID;
     confidence = Math.round(confidence);
     const db = memoryDB; //STATE.db;
@@ -1704,7 +1704,7 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
 
     let response;
     const dateTime = fileStart + startMilliseconds;
-    const isDaylight = isDuringDaylight(dateTime, metadata[file].latitude, metadata[file].longitude)
+    const isDaylight = isDuringDaylight(dateTime, STATE.lat, STATE.lon);
     response = await db.runAsync('INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,?,?)',
         dateTime, start, fileID, speciesID, 2000, label, comment, end, parseInt(count), isDaylight);
 
