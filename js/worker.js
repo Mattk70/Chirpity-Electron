@@ -456,7 +456,7 @@ const prepSummaryStatement = () => {
     const useRange = range?.start;
     let summaryStatement = `
     WITH ranked_records AS (
-        SELECT records.dateTime, records.speciesID, records.confidence, records.fileID, cname, sname, callCount, isDaylight
+        SELECT records.dateTime, records.speciesID, records.confidence, records.fileID, cname, sname, callCount, isDaylight,
           RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
         FROM records
         JOIN files ON files.id = records.fileID
@@ -470,7 +470,7 @@ const prepSummaryStatement = () => {
         extraClause += ' AND dateTime BETWEEN ? AND ? ';
     }
     if (STATE.detect.nocmig){
-        extraClause += ' AND isDaylight IS NOT TRUE ';
+        extraClause += ' AND isDaylight != 1 ';
     }
     if (STATE.blocked.length) {
         const excluded = prepParams(STATE.blocked);
@@ -1596,7 +1596,8 @@ const terminateWorkers = () => {
 }
 
 const insertRecord = async (timestamp, key, speciesID, confidence, file) => {
-    const isDaylight = isDuringDaylight(timestamp, metadata[file].latitude, metadata[file].longitude)
+    const isDaylight = isDuringDaylight(timestamp, STATE.lat, STATE.lon);
+    const offset = key * 1000;
     let changes, fileID;
     confidence = Math.round(confidence);
     const db = memoryDB; //STATE.db;
@@ -1616,7 +1617,7 @@ const insertRecord = async (timestamp, key, speciesID, confidence, file) => {
         await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
     }
     await db.runAsync('INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?)',
-        timestamp, key, fileID, speciesID, confidence,
+        metadata[file].fileStart + offset, key, fileID, speciesID, confidence,
         null, null, key + 3, null, isDaylight);
 }
 
@@ -1704,7 +1705,7 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
 
     let response;
     const dateTime = fileStart + startMilliseconds;
-    const isDaylight = isDuringDaylight(dateTime, metadata[file].latitude, metadata[file].longitude)
+    const isDaylight = isDuringDaylight(dateTime, STATE.lat, STATE.lon);
     response = await db.runAsync('INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,?,?)',
         dateTime, start, fileID, speciesID, 2000, label, comment, end, parseInt(count), isDaylight);
 
