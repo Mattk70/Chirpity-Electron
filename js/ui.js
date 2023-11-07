@@ -1140,7 +1140,7 @@ function adjustSpecDims(redraw, fftSamples) {
                     reset: false
                 });
             } else {
-                wavesurfer.setOptions({height:specHeight});
+                wavesurfer.setHeight(specHeight);
             }
             initSpectrogram(specHeight, fftSamples);
             specCanvasElement.width('100%');
