@@ -201,7 +201,7 @@ async function loadAudioFile({ filePath = '', preserveResults = false }) {
 
 function updateSpec({ buffer, play = false, position = 0, resetSpec = false }) {
     //updateElementCache();
-    wavesurfer.getDecodedData(buffer);
+    wavesurfer.loadDecodedBuffer(buffer);
     //waveCanvasElement.width('100%');
     //specCanvasElement.width('100%');
     //$('.spec-labels').width('55px');
@@ -273,7 +273,7 @@ const initWavesurfer = ({
     initRegion();
     initSpectrogram();
     createTimeline();
-    if (audio) wavesurfer.getDecodedData(audio);
+    if (audio) wavesurfer.loadDecodedBuffer(audio);
     colourmap.value = config.colormap;
     // Set click event that removes all regions
 
