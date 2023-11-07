@@ -227,7 +227,7 @@ function createTimeline() {
 }
 
 const resetRegions = () => {
-    if (wavesurfer) wavesurfer.regions.clearRegions();
+    if (wavesurfer) wavesurfer.clearRegions();
     region = undefined;
     disableMenuItem(['analyseSelection', 'export-audio']);
     if (fileLoaded) enableMenuItem(['analyse']);
