@@ -1937,14 +1937,14 @@ function handleKeyDown(e) {
 
 function initRegion() {
     if (wavesurfer.regions) wavesurfer.destroyPlugin('regions');
-    wavesurfer.regions = wavesurfer.registerPlugin(WaveSurfer.Regions.create({
+    wavesurfer.addPlugin(wavesurfer.regions.create({
         formatTimeCallback: formatRegionTooltip,
         dragSelection: true,
         // Region length bug (likely mine) means I don't trust leangths > 60 seconds
         maxLength: config[config.backend].batchSize * 3,
         slop: 5,
         color: "rgba(255, 255, 255, 0.2)"
-    })
+    }).initPlugin('Region')
     )
 }
 
