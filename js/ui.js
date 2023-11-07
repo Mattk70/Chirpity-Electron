@@ -223,7 +223,7 @@ function createTimeline() {
         primaryFontColor: 'white',
         secondaryFontColor: 'white',
         fontSize: 14
-    })).initPlugin('Timeline');
+    })).initPlugin('timeline');
 }
 
 const resetRegions = () => {
@@ -1937,15 +1937,15 @@ function handleKeyDown(e) {
 
 function initRegion() {
     if (wavesurfer.regions) wavesurfer.destroyPlugin('regions');
-    wavesurfer.addPlugin(wavesurfer.regions.create({
+    wavesurfer.addPlugin(WaveSurfer.regions.create({
         formatTimeCallback: formatRegionTooltip,
         dragSelection: true,
         // Region length bug (likely mine) means I don't trust leangths > 60 seconds
         maxLength: config[config.backend].batchSize * 3,
         slop: 5,
         color: "rgba(255, 255, 255, 0.2)"
-    }).initPlugin('Region')
-    )
+    })
+    ).initPlugin('regions')
 }
 
 function initSpectrogram(height, fftSamples) {
@@ -1981,7 +1981,7 @@ function initSpectrogram(height, fftSamples) {
         colorMap: colormap({
             colormap: config.colormap, nshades: 256, format: 'float'
         }),
-    })).initPlugin('Spectrogram')
+    })).initPlugin('spectrogram')
     updateElementCache();
 }
 
