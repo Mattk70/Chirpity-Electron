@@ -1111,11 +1111,12 @@
             let map, marker;
             function updateMap(lat,lng){
                 // Update the marker's position
+                if (!marker) marker = L.marker([lat, lng]).addTo(map);
                 marker.setLatLng([lat, lng]);
                 // Center the map view on the new marker position
                 map.setView([lat, lng]);
             }
-            function placeMap(divID){
+            async function placeMap(divID){
                 map?.remove(); marker = undefined;
                 map = L.map(divID);
                 if (divID === 'settingsMap'){
@@ -1125,22 +1126,47 @@
                     latTxt = 'customLat';
                     lonTxt = 'customLon';
                 }
-                const showMap = () => {
-                    
-                    const latEl = document.getElementById(latTxt);
-                    const lonEl = document.getElementById(lonTxt);
-                    
-                    // Ensure lat and lon values are parsed as floats
-                    const latValue = parseFloat(latEl.value);
-                    const lonValue = parseFloat(lonEl.value);
-                    
-                    map.setView([latValue, lonValue], 11);
-                    const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        maxZoom: 15,
-                        minZoom: 3,
-                        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    }).addTo(map);
-                    if (!marker) marker = L.marker([latValue, lonValue]).addTo(map);
+                const showMap = (where) => {
+                    if (where === 'customLocationMap'){
+                        const markerGroup = L.featureGroup(); // Create a feature group to hold the markers
+
+                        const bounds = L.latLngBounds(); // Create bounds to include all markers
+
+                        LOCATIONS.forEach(markerData => {
+                            const { lat, lon } = markerData;
+                            
+                            const marker = L.marker([lat, lon]).addTo(markerGroup);
+                            
+                            bounds.extend(marker.getLatLng()); // Extend the bounds to include this marker
+                        });
+                        map.fitBounds(bounds)
+                        const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            maxZoom: 15,
+                            minZoom: 3,
+                            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                        }).addTo(map);
+                        markerGroup.addTo(map)
+                        markerGroup.on('click', function (e) {
+                            onMapClick(e)
+                        });
+
+                    } else{
+                        const latEl = document.getElementById(latTxt);
+                        const lonEl = document.getElementById(lonTxt);
+                        
+                        // Ensure lat and lon values are parsed as floats
+                        const latValue = parseFloat(latEl.value);
+                        const lonValue = parseFloat(lonEl.value);
+                        
+                        map.setView([latValue, lonValue], 11);
+                        const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            maxZoom: 15,
+                            minZoom: 3,
+                            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                        }).addTo(map);
+                        if (!marker) marker = L.marker([latValue, lonValue]).addTo(map);
+                        marker.on('click', onMapClick);
+                    }
                 }
                 
                 const latEl = document.getElementById(latTxt);
@@ -1150,7 +1176,7 @@
                 lonEl.addEventListener('change', showMap);
                 // const settingMenu = document.getElementById('navbarSettings')
                 // settingMenu.addEventListener('click', showMap);
-                showMap();
+                showMap(divID);
                 async function onMapClick(e) {
                     const {lat, lng} = e.latlng;
                     const target = e.originalEvent.srcElement.id;
@@ -1165,10 +1191,12 @@
                     const address = await fetchLocationAddress(lat.toFixed(2), lng.toFixed(2));
                     fillLocation(address, lat, lng, target);
                     updateMap(lat, lng)
-
+                    // Stop propagation of the click event to the map
+                    L.DomEvent.stopPropagation(e);
                     updatePrefs();
                 }
                 map.on('click', onMapClick);
+                
             }
             
         </script>
