@@ -564,7 +564,47 @@ async function generateLocationList(id) {
 
 const FILE_LOCATION_MAP = {};
 const onFileLocationID = ({ file, id }) => FILE_LOCATION_MAP[file] = id;
+const locationModalDiv = document.getElementById('locationModal');
+locationModalDiv.addEventListener('shown.bs.modal', () =>{
+    placeMap('customLocationMap')
+})
+//document
 
+// showLocation: Show the currently selected location in the form inputs
+const showLocation = async (fromSelect) => {
+    let newLocation;
+    const latEl = document.getElementById('customLat');
+    const lonEl = document.getElementById('customLon');
+    const customPlaceEl = document.getElementById('customPlace');
+    const locationSelect = document.getElementById('savedLocations');
+    // CHeck if currentfile has a location id
+    const id = fromSelect ? parseInt(locationSelect.value) : FILE_LOCATION_MAP[currentFile];
+
+    if (id) {
+        newLocation = LOCATIONS.find(obj => obj.id === id);
+        //locationSelect.value = id;
+        latEl.value = newLocation.lat, lonEl.value = newLocation.lon, customPlaceEl.value = newLocation.place;
+        updateMap(newLocation.lat, newLocation.lon)
+    }
+    else {  //Default location
+        const savedLocationSelect = await generateLocationList('savedLocations');
+        latEl.value = config.latitude, lonEl.value = config.longitude, customPlaceEl.value = config.location;
+    }
+}
+
+const displayLocationAddress = async () => {
+    const latEl = document.getElementById('customLat');
+    const lonEl = document.getElementById('customLon');
+    const customPlaceEl = document.getElementById('customPlace');
+    const place = await fetchLocationAddress(latEl.value, lonEl.value, false);
+    if (place) {
+        customPlaceEl.value = place;
+    }
+    else {
+        customPlaceEl.value = 'Location not available';
+        customPlaceEl.ariaPlaceholder = 'Location not available';
+    }
+}
 
 async function setLocation() {
     const savedLocationSelect = await generateLocationList('savedLocations');
@@ -575,23 +615,7 @@ async function setLocation() {
     const batchWrapper = document.getElementById('location-batch-wrapper');
     fileList.length > 1 ? batchWrapper.classList.remove('d-none') : batchWrapper.classList.add('d-none');
     // Use the current file location for lat, lon, place or use defaults
-
-
-    // Show the current / selected location in the form
-    const showLocation = (fromSelect) => {
-        let newLocation;
-        // CHeck if currentfile has a location id
-        const id = fromSelect ? parseInt(savedLocationSelect.value) : FILE_LOCATION_MAP[currentFile];
-        if (id) {
-            newLocation = LOCATIONS.find(obj => obj.id === id);
-            savedLocationSelect.value = id;
-            latEl.value = newLocation.lat, lonEl.value = newLocation.lon, customPlaceEl.value = newLocation.place;
-        }
-        else {  //Default location
-            latEl.value = config.latitude, lonEl.value = config.longitude, customPlaceEl.value = config.location;
-        }
-    }
-    showLocation();
+    showLocation(false);
     savedLocationSelect.addEventListener('change', function (e) {
         showLocation(true);
     })
@@ -609,28 +633,17 @@ async function setLocation() {
     // Highlight delete
     customPlaceEl.addEventListener('keyup', addOrDelete);
     addOrDelete();
-    const locationModalDiv = document.getElementById('locationModal');
     const locationModal = new bootstrap.Modal(locationModalDiv);
     locationModal.show();
-    //document.removeEventListener('keydown', handleKeyDownDeBounce, true);
+    
 
     // Submit action
     const locationForm = document.getElementById('locationForm');
 
-    const displayLocation = async () => {
-        const place = await getLocation(latEl.value, lonEl.value, false);
-        if (place) {
-            customPlaceEl.value = place;
 
-        }
-        else {
-            customPlaceEl.value = '';
-            customPlaceEl.ariaPlaceholder = 'Location not recognised';
-        }
-    }
 
     [latEl, lonEl].forEach(el => {
-        el.addEventListener('blur', displayLocation)
+        el.addEventListener('blur', displayLocationAddress)
     })
 
     const addLocation = () => {
@@ -828,7 +841,7 @@ function postAnalyseMessage(args) {
 //     document.removeEventListener('keydown', handleKeyDownDeBounce, true);
 // })
 
-function getLocation(lat, lon, isDefault) {
+function fetchLocationAddress(lat, lon) {
     return new Promise(async (resolve, reject) => {
         if (!LOCATIONS) {
             worker.postMessage({ action: 'get-locations', file: currentFile });
@@ -846,25 +859,30 @@ function getLocation(lat, lon, isDefault) {
             })
             .then(data => {
                 const address = data.display_name;
-                LOCATIONS.push({ id: LOCATIONS.length + 1, lat: lat, lon: lon, place: place })
+                LOCATIONS.push({ id: LOCATIONS.length + 1, lat: lat, lon: lon, place: address })
                 resolve(address);
             })
             .catch(error => {
-                console.log("got an error connecting to OpenStreetMap")
+                console.log("There was a problem connecting to OpenStreetMap")
                 reject(error);
             })
     })
 }
 $('#latitude, #longitude').on('blur', async function () {
-    const lat = document.getElementById('latitude').value;
-    const lon = document.getElementById('longitude').value;
-    const address = await getLocation(lat, lon, true);
-    const content = address ? '<span class="material-symbols-outlined">fmd_good</span> ' + address :
-        '<span class="material-symbols-outlined text-danger">fmd_bad</span> Location not recognised';
-    if (address) {
+    const lat = parseFloat(document.getElementById('latitude').value).toFixed(2);
+    const lon = parseFloat(document.getElementById('longitude').value).toFixed(2);
+    const address = await fetchLocationAddress(lat, lon, true);
+    fillLocation(address, lat, lon)
+    updateMap
+})
+
+const fillLocation = (address, lat, lon, divID) =>{
+    
+    if (divID === 'settingsMap') {
+        const content = '<span class="material-symbols-outlined">fmd_good</span> ' + address;
         place.innerHTML = content;
-        config.latitude = lat;
-        config.longitude = lon;
+        config.latitude = lat.toFixed(2);
+        config.longitude = lon.toFixed(2);
         config.location = address;
         updatePrefs();
         worker.postMessage({
@@ -872,10 +890,17 @@ $('#latitude, #longitude').on('blur', async function () {
             lat: config.latitude,
             lon: config.longitude,
         });
+    } else {
+        const latEl = document.getElementById('customLat');
+        const lonEl = document.getElementById('customLon');
+        const customPlaceEl = document.getElementById('customPlace');
+        latEl.value = lat.toFixed(2);
+        lonEl.value = lon.toFixed(2);
+        customPlaceEl.value = address;
+        updateMap(lat, lon);
     }
-})
-
-
+        
+}
 
 
 // Menu bar functions
@@ -1123,7 +1148,7 @@ function adjustSpecDims(redraw, fftSamples) {
             $('.spec-labels').width('55px')
         }
         if (wavesurfer && redraw) {
-            wavesurfer.drawBuffer();
+            //wavesurfer.setOptions({});
         }
         specOffset = specWrapperElement.offsetHeight;
     } else {
@@ -1313,7 +1338,6 @@ window.onload = async () => {
     contentWrapperElement.addClass('loaded');
     // Set config defaults
     const defaultConfig = {
-        lastUpdatePrompt: 0,
         seenTour: false,
         UUID: uuidv4(),
         colormap: 'inferno',
@@ -1328,6 +1352,7 @@ window.onload = async () => {
         warmup: true,
         backend: 'tensorflow',
         tensorflow: { threads: diagnostics['Cores'], batchSize: 32 },
+        webgpu: { threads: 2, batchSize: 32 },
         webgl: { threads: 2, batchSize: 32 },
         audio: { format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false },
         limit: 500,
@@ -1351,7 +1376,7 @@ window.onload = async () => {
             }
         });
         // Update model if old models in config
-        if (!['v2', 'v3'].includes(config.model)) {
+        if (!['v2', 'v3', 'v4'].includes(config.model)) {
             config.model = 'v2';
             updatePrefs()
         }
@@ -1880,7 +1905,6 @@ $(document).on('click', '.play', function () {
 
 
 function handleKeyDownDeBounce(e) {
-    console.log('keydown handler called')
     e.preventDefault();
     waitForFinalEvent(function () {
         handleKeyDown(e);
@@ -1957,7 +1981,7 @@ function initSpectrogram(height, fftSamples) {
         colorMap: colormap({
             colormap: config.colormap, nshades: 256, format: 'float'
         }),
-    })).initPlugin('spectrogram');
+    })).initPlugin('spectrogram')
     updateElementCache();
 }
 
@@ -2575,7 +2599,8 @@ async function onPredictionDone({
     offset = 0,
     action = undefined
 }) {
-
+    // Reset daylight banner
+    shownDaylightBanner = false;
     AUDACITY_LABELS = audacityLabels;
     enableMenuItem(['save2db', 'export2audio']);
     // Defer further processing until batch complete
@@ -2664,8 +2689,7 @@ pagination.forEach(item => {
             const limit = config.limit;
             const offset = (clicked - 1) * limit;
             const species = isSpeciesViewFiltered(true);
-            // Reset daylight banner
-            shownDaylightBanner = false;
+
             worker.postMessage({
                 action: 'filter',
                 species: species,
@@ -3076,6 +3100,11 @@ const changeNocmigMode = () => {
         detect: { nocmig: config.detect.nocmig },
     });
     updatePrefs();
+    worker.postMessage({
+        action: 'filter',
+        species: isSpeciesViewFiltered(true),
+        updateSummary: true
+    })
 }
 
 const contextAwareIconDisplay = () => {
@@ -3384,12 +3413,10 @@ document.addEventListener("DOMContentLoaded", function () {
     // Disable keyboard shortcuts when any form field gets focus
     formFields.forEach((formField) => {
         formField.addEventListener("focus", () => {
-            console.log("focus")
             document.removeEventListener("keydown", handleKeyDownDeBounce, true);
         });
     
         formField.addEventListener("blur", () => {
-            console.log('blur')
             document.addEventListener("keydown", handleKeyDownDeBounce, true);
         });
     });
