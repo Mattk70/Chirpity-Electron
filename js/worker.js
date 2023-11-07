@@ -2680,7 +2680,9 @@ async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
         if (result.changes) {
             await db.runAsync(`UPDATE files SET locationID = null WHERE locationID = ?`, id);
         }
-        lat = undefined, lon = undefined;
+        if (db === memoryDB) {
+            onSetCustomLocation({lat: lat, lon: lon, place: undefined, files: undefined, db: diskDB})
+        }
     } else {
         const result = await db.runAsync(`
         INSERT INTO locations VALUES (?, ?, ?, ?)
@@ -2702,7 +2704,7 @@ async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
             if (db === memoryDB) {
                 const fileSaved = await getSavedFileInfo(file)
                 if (fileSaved) {
-                    onSetCustomLocation(lat, lon, place, [file], diskDB)
+                    onSetCustomLocation({lat: lat, lon: lon, place: place, files: [file], db: diskDB})
                 }
             }
         }
