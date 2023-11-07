@@ -10,7 +10,7 @@ const MIGRANTS = new Set(["Pluvialis dominica_American Golden Plover", "Acanthis
 const NOT_BIRDS = ['Ambient Noise_Ambient Noise', 'Animal_Animal', 'Cat_Cat', 'Church Bells_Church Bells', 'Cough_Cough', 'Dog_Dog', 'Human_Human', 'Laugh_Laugh', 'Rain_Rain', 'Red Fox_Red Fox', 'Sneeze_Sneeze', 'Snoring_Snoring', 'Thunder_Thunder', 'Vehicle_Vehicle', 'Water Drops_Water Drops', 'Waves_Waves', 'Wind_Wind'];
 const MYSTERIES = ['Unknown Sp._Unknown Sp.'];
 const GRAYLIST = [];
-const GOLDEN_LIST = [] // ["Turdus iliacus_Redwing (call)", "Turdus philomelos_Song Thrush (call)"] // "Erithacus rubecula_Robin (song)", "Erithacus rubecula_Robin (call)"];
+const GOLDEN_LIST = [];
 let BLOCKED_IDS = [];
 let SUPPRESSED_IDS = [];
 let ENHANCED_IDS = [];
@@ -103,8 +103,6 @@ onmessage = async (e) => {
                 const signal = tf.tensor1d(buffer, 'float32');
                 const bufferTensor = myModel.normalise_audio(signal);
                 signal.dispose();
-                // const mymax = tf.max(bufferTensor).dataSync()
-                // const mymin = tf.min(bufferTensor).dataSync()
                 const imageTensor = tf.tidy(() => {
                     return myModel.makeSpectrogram(bufferTensor);
                 });
@@ -170,15 +168,13 @@ class Model {
         }
     }
 
-    warmUp(batchSize) {
+    async warmUp(batchSize) {
         this.batchSize = parseInt(batchSize);
         this.inputShape[0] = this.batchSize;
         if (tf.getBackend() === 'webgl') {
             tf.tidy(() => {
                 const warmupResult = this.model.predict(tf.zeros(this.inputShape), { batchSize: this.batchSize });
-                warmupResult.arraySync();
-                // see if we can get padding compiled at this point
-                this.padBatch(tf.zeros([1, this.inputShape[1], this.inputShape[2], this.inputShape[3]]), { batchSize: this.batchSize })
+                const synced = warmupResult.arraySync();
             })
         }
         if (DEBUG) console.log('WarmUp end', tf.memory().numTensors)
@@ -192,36 +188,26 @@ class Model {
             // find the position of the blocked items in the label list
             NOT_BIRDS.forEach(notBird => BLOCKED_IDS.push(this.labels.indexOf(notBird)))
         } else if (this.list === 'migrants') {
-            let v1_migrants;
-            if (this.version === 'v1') {
-                // strip (call) from migrants set
-                v1_migrants = new Set();
-                MIGRANTS.forEach((element) => {
-                    const newElement = element.replace(' (call)', '');
-                    v1_migrants.add(newElement);
-                })
-
-            }
-            const listToCheck = v1_migrants || MIGRANTS;
+            const listToCheck = MIGRANTS;
             for (let i = 0; i < this.labels.length; i++) {
                 const item = this.labels[i];
                 if (!listToCheck.has(item) && !MYSTERIES.includes(item)) BLOCKED_IDS.push(i);
             }
-
         }
         GRAYLIST.forEach(species => SUPPRESSED_IDS.push(this.labels.indexOf(species)))
         GOLDEN_LIST.forEach(species => ENHANCED_IDS.push(this.labels.indexOf(species)))
     }
 
-    normalize(spec) {
+    normalise(spec) {
         return tf.tidy(() => {
-            // console.log('Pre-norm### Min is: ', spec.min().dataSync(), 'Max is: ', spec.max().dataSync())
-            const spec_max = tf.max(spec, [1, 2]).reshape([-1, 1, 1, 1])
-            // const spec_min = tf.min(spec, [1, 2]).reshape([-1, 1, 1, 1])
-            spec = spec.mul(255);
-            spec = spec.div(spec_max);
-            // spec = tf.sub(spec, spec_min).div(tf.sub(spec_max, spec_min));
-            // console.log('{Post norm#### Min is: ', spec.min().dataSync(), 'Max is: ', spec.max().dataSync())
+             const spec_max = tf.max(spec, [1, 2], true)
+            // if (this.version === 'v4'){
+            //     const spec_min = tf.min(spec, [1, 2], true)
+            //     spec = tf.sub(spec, spec_min).div(tf.sub(spec_max, spec_min));
+            // } else {
+                spec = spec.mul(255);
+                spec = spec.div(spec_max);
+            // }
             return spec
         })
     }
@@ -231,31 +217,7 @@ class Model {
             const { mean, variance } = tf.moments(spectrograms, 2);
             const peak = tf.div(variance, mean)
             let snr = tf.squeeze(tf.max(peak, 1));
-            //snr = tf.sub(255, snr)  // bigger number, less signal
-            // const MEAN = mean.arraySync()
-            // const VARIANCE = variance.arraySync()
-            // const PEAK = peak.arraySync()
             return snr
-        })
-    }
-
-
-    fixUpSpecBatch(specBatch, h, w) {
-        const img_height = h || this.height;
-        const img_width = w || this.width;
-        return tf.tidy(() => {
-            /*
-            Try out taking log of spec when SNR is below threshold?
-            */
-            //specBatch = tf.log1p(specBatch).mul(20);
-            // Swap axes to fit output shape
-            specBatch = tf.transpose(specBatch, [0, 2, 1]);
-            specBatch = tf.reverse(specBatch, [1]);
-            // Add channel axis
-            specBatch = tf.expandDims(specBatch, -1);
-            //specBatch = tf.slice4d(specBatch, [0, 1, 0, 0], [-1, img_height, img_width, -1]);
-            specBatch = tf.image.resizeBilinear(specBatch, [img_height, img_width], true);
-            return this.version === 'v1' ? specBatch : this.normalize(specBatch)
         })
     }
 
@@ -298,9 +260,9 @@ class Model {
         })
     }
 
-    async predictBatch(specs, keys, threshold, confidence) {
-        const TensorBatch = this.fixUpSpecBatch(specs); // + 1 tensor
-        specs.dispose(); // - 1 tensor
+    async predictBatch(TensorBatch, keys, threshold, confidence) {
+        // const TensorBatch = this.fixUpSpecBatch(specs); // + 1 tensor
+        // specs.dispose(); // - 1 tensor
         let paddedTensorBatch, maskedTensorBatch;
         if (BACKEND === 'webgl' && TensorBatch.shape[0] < this.batchSize) {
             // WebGL works best when all batches are the same size
@@ -310,7 +272,7 @@ class Model {
             const keysTensor = tf.stack(keys); // + 1 tensor
             const snr = this.getSNR(TensorBatch)
             const condition = tf.greaterEqual(snr, threshold); // + 1 tensor
-            if (DEBUG) console.log('SNR is: ', snr.dataSync())
+            if (DEBUG) console.log('SNR is: ', await snr.data())
             snr.dispose();
             // Avoid mask cannot be scalar error at end of predictions
             let newCondition;
@@ -333,7 +295,7 @@ class Model {
                 if (DEBUG) console.log("No surviving tensors in batch", maskedTensorBatch.shape[0])
                 return []
             } else {
-                keys = maskedKeysTensor.dataSync();
+                keys = await maskedKeysTensor.data();
                 maskedKeysTensor.dispose(); // - 1 tensor
                 if (DEBUG) console.log("surviving tensors in batch", maskedTensorBatch.shape[0])
             }
@@ -356,24 +318,18 @@ class Model {
         if (maskedTensorBatch) maskedTensorBatch.dispose();
 
         const finalPrediction = newPrediction || prediction;
-        //new
         const { indices, values } = tf.topk(finalPrediction, 5, true)
+        //const adjusted_values  = tf.div(1, tf.add(1, tf.exp(tf.mul(tf.neg(10), values.sub(0.6)))));
+
         const topIndices = indices.arraySync();
         const topValues = values.arraySync();
         indices.dispose();
         values.dispose();
-        // end new
-        // const array_of_predictions = finalPrediction.arraySync()
+
         finalPrediction.dispose();
         if (newPrediction) newPrediction.dispose();
         keys = keys.map(key => (key / CONFIG.sampleRate).toFixed(3));
         return [keys, topIndices, topValues];
-        // return keys.reduce((acc, key, index) => {
-        //     // convert key (samples) to milliseconds
-        //     const position = (key / CONFIG.sampleRate).toFixed(3);
-        //     acc[position] = array_of_predictions[index];
-        //     return acc;
-        // }, {});
     }
 
     makeSpectrogram(signal) {
@@ -383,36 +339,32 @@ class Model {
             return spec;
         })
     }
-
-    /*    normalizeTensor(audio) {
-            return tf.tidy(() => {
-                const tensor = tf.tensor1d(audio);
-                const {mean, variance} = tf.moments(tensor);
-                const stdDev = variance.sqrt();
-                const normalizedTensor = tensor.sub(mean).div(stdDev.mul(tf.scalar(2)));
-                return normalizedTensor;
-            })
-        }*/
-
-    /*    normalise_audio = (signal) => {
-            return tf.tidy(() => {
-                //signal = tf.tensor1d(signal);
-                const sigMax = tf.max(signal);
-                const sigMin = tf.min(signal);
-                return signal.sub(sigMin).div(sigMax.sub(sigMin)).mul(255).sub(127.5);
-            })
-        };*/
-
-    normalise_audio = (signal) => {
+    fixUpSpecBatch(specBatch, h, w) {
+        const img_height = h || this.height;
+        const img_width = w || this.width;
         return tf.tidy(() => {
-            //signal = tf.tensor1d(signal, 'float32');
-            const sigMax = tf.max(signal);
-            const sigMin = tf.min(signal);
-            const range = sigMax.sub(sigMin);
-            //return signal.sub(sigMin).div(range).mul(tf.scalar(8192.0, 'float32')).sub(tf.scalar(4095, 'float32'))
-            return signal.sub(sigMin).div(range).mul(tf.scalar(2)).sub(tf.scalar(1))
+            /*
+            Try out taking log of spec when SNR is below threshold?
+            */
+            //specBatch = tf.log1p(specBatch).mul(20);
+            // Swap axes to fit output shape
+            specBatch = tf.transpose(specBatch, [0, 2, 1]);
+            specBatch = tf.reverse(specBatch, [1]);
+            // Add channel axis
+            specBatch = tf.expandDims(specBatch, -1);
+            //specBatch = tf.slice4d(specBatch, [0, 1, 0, 0], [-1, img_height, img_width, -1]);
+            specBatch = tf.image.resizeBilinear(specBatch, [img_height, img_width], true);
+            return  this.normalise(specBatch)
         })
-    };
+    }
+    normalise_audio_batch = (tensor) => {
+        return tf.tidy(() => {        
+        const sigMax = tf.max(tensor, 1, true);
+        const sigMin = tf.min(tensor, 1, true);
+        const normalized = tensor.sub(sigMin).div(sigMax.sub(sigMin)).mul(tf.scalar(2)).sub(tf.scalar(1));
+        return normalized;
+        })
+    }
 
     async predictChunk(audioBuffer, start, fileStart, file, threshold, confidence) {
         if (DEBUG) console.log('predictCunk begin', tf.memory().numTensors);
@@ -429,25 +381,21 @@ class Model {
         }
         const buffer = paddedBuffer || audioBuffer;
         const numSamples = buffer.shape / this.chunkLength;
-        let bufferList = tf.split(buffer, numSamples);
+        let buffers = tf.reshape(buffer, [numSamples, this.chunkLength]);
         buffer.dispose();
-        // Turn the audio into a spec tensor
-        bufferList = tf.tidy(() => {
-            return bufferList.map(x => {
-                let normal = this.normalise_audio(x);
-                x.dispose();
-                return this.makeSpectrogram(normal);
+        const bufferList = this.version !== 'v4' ? this.normalise_audio_batch(buffers) : buffers;
+        const specBatch = tf.tidy(() => {
+            const bufferArray = tf.unstack(bufferList);
+            const toStack = bufferArray.map(x => {
+                return this.makeSpectrogram(x)
             })
+            return this.fixUpSpecBatch(tf.stack(toStack))
         });
-        const specBatch = tf.stack(bufferList);
+        buffers.dispose();
+        bufferList.dispose();
+        //const specBatch = tf.stack(bufferList);
         const batchKeys = [...Array(numSamples).keys()].map(i => start + this.chunkLength * i);
         const result = await this.predictBatch(specBatch, batchKeys, threshold, confidence);
-        this.clearTensorArray(bufferList);
         return [result, file, fileStart];
-    }
-
-    async clearTensorArray(tensorObj) {
-        // Dispose of accumulated kept tensors in model tensor array
-        tensorObj.forEach(tensor => tensor.dispose());
     }
 }
