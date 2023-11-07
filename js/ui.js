@@ -212,7 +212,7 @@ function updateSpec({ buffer, play = false, position = 0, resetSpec = false }) {
 }
 
 function createTimeline() {
-    wavesurfer.registerPlugin(WaveSurfer.Timeline.create({
+    wavesurfer.addPlugin(WaveSurfer.timeline.create({
         container: '#timeline',
         formatTimeCallback: formatTimeCallback,
         timeInterval: timeInterval,
@@ -223,7 +223,7 @@ function createTimeline() {
         primaryFontColor: 'white',
         secondaryFontColor: 'white',
         fontSize: 14
-    }));
+    })).initPlugin('Timeline');
 }
 
 const resetRegions = () => {
@@ -1963,7 +1963,7 @@ function initSpectrogram(height, fftSamples) {
         height = fftSamples / 2
     }
     if (wavesurfer.spectrogram) wavesurfer.destroyPlugin('spectrogram');
-    wavesurfer.registerPlugin(WaveSurfer.Spectrogram.create({
+    wavesurfer.addPlugin(WaveSurfer.spectrogram.create({
         //deferInit: false,
         wavesurfer: wavesurfer,
         container: "#spectrogram",
@@ -1981,7 +1981,7 @@ function initSpectrogram(height, fftSamples) {
         colorMap: colormap({
             colormap: config.colormap, nshades: 256, format: 'float'
         }),
-    }))
+    })).initPlugin('Spectrogram')
     updateElementCache();
 }
 
