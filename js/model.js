@@ -200,14 +200,14 @@ class Model {
 
     normalise(spec) {
         return tf.tidy(() => {
-            const spec_max = tf.max(spec, [1, 2], true)
-            if (this.version === 'v4'){
-                const spec_min = tf.min(spec, [1, 2], true)
-                spec = tf.sub(spec, spec_min).div(tf.sub(spec_max, spec_min));
-            } else {
+             const spec_max = tf.max(spec, [1, 2], true)
+            // if (this.version === 'v4'){
+            //     const spec_min = tf.min(spec, [1, 2], true)
+            //     spec = tf.sub(spec, spec_min).div(tf.sub(spec_max, spec_min));
+            // } else {
                 spec = spec.mul(255);
                 spec = spec.div(spec_max);
-            }
+            // }
             return spec
         })
     }
@@ -319,6 +319,8 @@ class Model {
 
         const finalPrediction = newPrediction || prediction;
         const { indices, values } = tf.topk(finalPrediction, 5, true)
+        //const adjusted_values  = tf.div(1, tf.add(1, tf.exp(tf.mul(tf.neg(10), values.sub(0.6)))));
+
         const topIndices = indices.arraySync();
         const topValues = values.arraySync();
         indices.dispose();
