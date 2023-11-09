@@ -1605,7 +1605,7 @@ function generateBirdOptionList({ store, rows, selected }) {
 
 
 
-const getActiveRowID = () => activeRow?.id;
+const getActiveRowID = () => activeRow?.rowIndex - 1;
 
 const isSpeciesViewFiltered = (sendSpecies) => {
     const filtered = document.querySelector('#speciesFilter tr.text-warning');
@@ -2658,7 +2658,7 @@ async function onPredictionDone({
     const resultTable = document.getElementById('resultTableBody');
     if (active) {
         // Refresh node and scroll to active row:
-        activeRow = document.getElementById(active);
+        activeRow = resultTable.rows[active];
         if (activeRow === null) { // because: after an edit the active row may not exist
             const rows = resultTable.querySelectorAll('tr.daytime, tr.nighttime')
             if (rows.length) {
@@ -3730,7 +3730,7 @@ async function createContextMenu(e) {
         }
     }
     if (region === undefined && ! inSummary) return;
-    //const createOrEdit = (['archive', 'explore'].includes(STATE.mode)) && (region?.attributes.label || target.closest('#summary')) ? 'Edit' : 'Create';
+    const createOrEdit = (['archive', 'explore'].includes(STATE.mode)) && (region?.attributes.label || target.closest('#summary')) ? 'Edit' : 'Create';
 
     menu.html(`
         <a class="dropdown-item play ${hideInSummary}"><span class='material-symbols-outlined'>play_circle</span> Play</a>
@@ -3739,7 +3739,7 @@ async function createContextMenu(e) {
         </a>
         <div class="dropdown-divider ${hideInSummary}"></div>
         <a class="dropdown-item" id="create-manual-record" href="#">
-            <span class="material-symbols-outlined">edit_document</span> Edit Record${plural}
+            <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} Record${plural}
         </a>
         <a class="dropdown-item" id="context-create-clip" href="#">
             <span class="material-symbols-outlined">music_note</span> Export Audio Clip${plural}
@@ -3752,6 +3752,8 @@ async function createContextMenu(e) {
             <span class='delete material-symbols-outlined'>delete_forever</span> Delete Record${plural}
         </a>
     `);
+    const modalTitle = document.getElementById('record-entry-modal-label');
+    modalTitle.innerText = `${createOrEdit} Record`;
     if (!hideInSelection) {
         const contextAnalyseSelectionLink = document.getElementById('context-analyse-selection');
         contextAnalyseSelectionLink.addEventListener('click', getSelectionResults);
