@@ -1,5 +1,5 @@
 let seenTheDarkness = false, shownDaylightBanner = false, LOCATIONS, locationID = undefined;
-let labels = [];
+let labels = [], DELETE_HISTORY = [];
 
 const STATE = {
     mode: 'analyse',
@@ -1027,7 +1027,7 @@ exploreLink.addEventListener('click', async () => {
 
 const datasetLink = document.getElementById('dataset');
 datasetLink.addEventListener('click', async () => {
-    worker.postMessage({ action: 'create-dataset' });
+    worker.postMessage({ action: 'create-dataset', species: isSpeciesViewFiltered(true) });
 });
 
 const checkWidth = (text) => {
@@ -1500,7 +1500,7 @@ const setUpWorkerMessaging = () => {
                         message += '\nWould you like to remove the file from the Archive?';
                         if (confirm(message)) deleteFile(args.file)
                     } else { 
-                        if (args.savedToDB){
+                        if (args.filter){
                         worker.postMessage({
                             action: 'filter',
                             species: isSpeciesViewFiltered(true),
@@ -2141,17 +2141,36 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             }
         }
     },
-    KeyE: function (e) {
-        if (e.ctrlKey && region) exportAudio();
+    KeyC: function (e) {
+        // Center window on playhead
+        if (e.ctrlKey && currentBuffer) {
+            const saveBufferBegin = bufferBegin;
+            const middle = bufferBegin + wavesurfer.getCurrentTime();
+            bufferBegin = middle - windowLength / 2;
+            bufferBegin = Math.max(0, bufferBegin);
+            bufferBegin = Math.min(bufferBegin, currentFileDuration - windowLength)
+            // Move the region if needed
+            let region = getRegion();
+            if (region){
+                const shift = saveBufferBegin - bufferBegin;
+                region.start += shift;
+                region.end += shift;
+                if (region.start < 0 || region.end > windowLength) region = undefined;
+            }
+            postBufferUpdate({ begin: bufferBegin, position: 0.5, region: region, goToRegion: false})
+        }
     },
     KeyD: function (e) {
         if (e.ctrlKey && e.shiftKey) worker.postMessage({ action: 'convert-dataset' });
     },
-    KeyG: function (e) {
-        if (e.ctrlKey) showGoToPosition();
+    KeyE: function (e) {
+        if (e.ctrlKey && region) exportAudio();
     },
     KeyF: function (e) {
         if (e.ctrlKey) toggleFullscreen();
+    },
+    KeyG: function (e) {
+        if (e.ctrlKey) showGoToPosition();
     },
     KeyO: async function (e) {
         if (e.ctrlKey) await showOpenDialog();
@@ -2166,6 +2185,9 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     },
     KeyT: function (e) {
         if (e.ctrlKey) timelineToggle(true);
+    },
+    KeyZ: function (e) {
+        if (e.ctrlKey && DELETE_HISTORY.length) insertManualRecord(...DELETE_HISTORY.pop());
     },
     Escape: function () {
         if (PREDICTING) {
@@ -2191,25 +2213,6 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         if (currentBuffer) {
             bufferBegin = currentFileDuration - windowLength;
             postBufferUpdate({ begin: bufferBegin, position: 1 })
-        }
-    },
-    KeyC: function (e) {
-        // Center window on playhead
-        if (e.ctrlKey && currentBuffer) {
-            const saveBufferBegin = bufferBegin;
-            const middle = bufferBegin + wavesurfer.getCurrentTime();
-            bufferBegin = middle - windowLength / 2;
-            bufferBegin = Math.max(0, bufferBegin);
-            bufferBegin = Math.min(bufferBegin, currentFileDuration - windowLength)
-            // Move the region if needed
-            let region = getRegion();
-            if (region){
-                const shift = saveBufferBegin - bufferBegin;
-                region.start += shift;
-                region.end += shift;
-                if (region.start < 0 || region.end > windowLength) region = undefined;
-            }
-            postBufferUpdate({ begin: bufferBegin, position: 0.5, region: region, goToRegion: false})
         }
     },
     PageUp: function () {
@@ -2327,7 +2330,13 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
             activeRow.focus();
             if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
         }
-    }
+    },
+    Delete: function () {
+        if (activeRow) deleteRecord(activeRow);
+    },
+    Backspace: function () {
+        if (activeRow) deleteRecord(activeRow);
+    },
 };
 
 //returns a region object with the start and end of the region supplied
@@ -2902,7 +2911,8 @@ function setClickedIndex(target) {
 }
 
 const deleteRecord = (target) => {
-    if (target instanceof PointerEvent) target = activeRow;
+    if (target === activeRow) {}
+    else if (target instanceof PointerEvent) target = activeRow;
     else {
         target.forEach(position => {
             const [start, end] = position;
@@ -2923,6 +2933,14 @@ const deleteRecord = (target) => {
     const [file, start, end,] = unpackNameAttr(target);
     const setting = target.closest('table');
     const row = target.closest('tr');
+    let cname = target.querySelector('.cname').innerText;
+    let [species, confidence] = cname.split('\n');
+    confidence = parseInt(confidence.replace('%', '')) * 10;
+    const comment = target.querySelector('.comment').innerText;
+    const label = target.querySelector('.label').innerText;
+    let callCount = target.querySelector('.call-count').innerText;
+    callCount = callCount.replace('Present', '');
+    DELETE_HISTORY.push([species, start, end, comment, callCount, label, null, null, null, confidence])
 
     worker.postMessage({
         action: 'delete',
@@ -3712,7 +3730,7 @@ async function createContextMenu(e) {
         }
     }
     if (region === undefined && ! inSummary) return;
-    const createOrEdit = (['archive', 'explore'].includes(STATE.mode)) && (region?.attributes.label || target.closest('#summary')) ? 'Edit' : 'Create';
+    //const createOrEdit = (['archive', 'explore'].includes(STATE.mode)) && (region?.attributes.label || target.closest('#summary')) ? 'Edit' : 'Create';
 
     menu.html(`
         <a class="dropdown-item play ${hideInSummary}"><span class='material-symbols-outlined'>play_circle</span> Play</a>
@@ -3721,7 +3739,7 @@ async function createContextMenu(e) {
         </a>
         <div class="dropdown-divider ${hideInSummary}"></div>
         <a class="dropdown-item" id="create-manual-record" href="#">
-            <span class="material-symbols-outlined">post_add</span> ${createOrEdit} Archive Record${plural}
+            <span class="material-symbols-outlined">edit_document</span> Edit Record${plural}
         </a>
         <a class="dropdown-item" id="context-create-clip" href="#">
             <span class="material-symbols-outlined">music_note</span> Export Audio Clip${plural}
@@ -3860,33 +3878,22 @@ recordEntryForm.addEventListener('submit', function (e) {
 })
 
 
-const insertManualRecord = (cname, start, end, comment, count, label, action, batch, originalCname) => {
+const insertManualRecord = (cname, start, end, comment, count, label, action, batch, originalCname, confidence) => {
     const files = batch ? fileList : currentFile;
-    const insert = (toDisk) => {
-        worker.postMessage({
-            action: 'insert-manual-record',
-            cname: cname,
-            originalCname: originalCname,
-            start: start?.toFixed(3),
-            end: end?.toFixed(3),
-            comment: comment,
-            count: count || null,
-            file: files,
-            label: label,
-            DBaction: action,
-            batch: batch,
-            toDisk: toDisk
-        })
-
-    }
-    if (STATE.mode === 'analyse') {
-        //Update the record in the memory db 
-        insert(false)
-    }
-    // Insert to disk
-    setTimeout(insert, 500, true)
-    //insert(true)
-
+    worker.postMessage({
+        action: 'insert-manual-record',
+        cname: cname,
+        originalCname: originalCname,
+        start: start?.toFixed(3),
+        end: end?.toFixed(3),
+        comment: comment,
+        count: count || null,
+        file: files,
+        label: label,
+        DBaction: action,
+        batch: batch,
+        confidence: confidence
+    })
 }
 
 
