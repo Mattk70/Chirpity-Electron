@@ -241,7 +241,7 @@ async function handleMessage(e) {
             convertSpecsFromExistingSpecs();
             break;
         case 'create-dataset':
-            saveResults2DataSet();
+            saveResults2DataSet(args);
             break;
         case 'delete':
             await onDelete(args)
@@ -271,13 +271,16 @@ async function handleMessage(e) {
         case 'get-locations':
             getLocations({ db: STATE.db, file: args.file });
             break;
+        case 'get-valid-files-list':
+            await getFiles(args.files)
+            break;
         case 'insert-manual-record':
             const count = await onInsertManualRecord(args);
-            if (STATE.mode !== 'explore' && !args.batch && args.toDisk) {
+            if (STATE.mode !== 'explore' && !args.batch) {
                 UI.postMessage({
                     event: 'generate-alert',
                     message: `${count} ${args.cname} record has been saved to the archive.`,
-                    savedToDB: true
+                    filter: true
                 })
             }
             break;
@@ -298,9 +301,6 @@ async function handleMessage(e) {
             STATE.update({ model: args.model });
             if (predictWorkers.length) terminateWorkers();
             spawnWorkers(args.model, args.list, BATCH_SIZE, args.threads);
-            break;
-        case 'get-valid-files-list':
-            await getFiles(args.files)
             break;
         case 'post':
             await uploadOpus(args);
@@ -1303,14 +1303,14 @@ const convertSpecsFromExistingSpecs = async (path) => {
     }
 }
 
-const saveResults2DataSet = (rootDirectory) => {
-    if (!rootDirectory) rootDirectory = '/mnt/608E21D98E21A88C/Users/simpo/PycharmProjects/Data/test';
+const saveResults2DataSet = ({species}) => {
+    const rootDirectory = 'C:/Users/simpo/PycharmProjects/Data/test';
     const height = 256, width = 384;
     let t0 = Date.now()
     let promise = Promise.resolve();
     let promises = [];
     let count = 0;
-    const db2ResultSQL = `SELECT DISTINCT dateTime AS timestamp, 
+    let db2ResultSQL = `SELECT DISTINCT dateTime AS timestamp, 
     files.duration, 
     files.filestart,
     files.name AS file, 
@@ -1326,8 +1326,12 @@ const saveResults2DataSet = (rootDirectory) => {
                             JOIN files ON records.fileID = files.id
                           WHERE speciesID NOT IN (${prepParams(STATE.blocked)}) 
                           AND confidence >= ${STATE.detect.confidence}`;
-
-    memoryDB.each(db2ResultSQL, ...STATE.blocked, async (err, result) => {
+    let params = STATE.blocked;
+    if (species) {
+        db2ResultSQL += ` AND species.cname = ?`;
+        params.push(species)
+    }
+    memoryDB.each(db2ResultSQL, ...params, async (err, result) => {
         // Check for level of ambient noise activation
         let ambient, threshold, value = 50;
         // adding_chirpity_additions is a flag for curated files, if true we assume every detection is correct
@@ -1348,9 +1352,12 @@ const saveResults2DataSet = (rootDirectory) => {
         promise = promise.then(async function () {
             let score = result.score;
             if (score >= threshold) {
-                const [_, folder] = p.dirname(result.file).match(/^.*\/(.*)$/)
+                const folders = p.dirname(result.file).split(p.sep); //.match(/^.*\/(.*)$/)
+                species = result.cname.replaceAll(' ', '_');
+                const sname = result.sname.replaceAll(' ', '_');
+                const folder = `${species}~${sname}`;
                 // get start and end from timestamp
-                const start = (result.timestamp - result.filestart) / 1000;
+                const start = result.position;
                 let end = start + 3;
 
                 // filename format: <source file>_<confidence>_<start>.png
@@ -1621,8 +1628,8 @@ const insertRecord = async (timestamp, key, speciesID, confidence, file) => {
         null, null, key + 3, null, isDaylight);
 }
 
-async function batchInsertRecords(cname, label, toDisk, files, originalCname) {
-    const db = toDisk ? diskDB : memoryDB;
+async function batchInsertRecords(cname, label, files, originalCname) {
+    const db = STATE.db;
     let params = [originalCname, STATE.detect.confidence];
     t0 = Date.now();
     let query = `
@@ -1657,7 +1664,6 @@ async function batchInsertRecords(cname, label, toDisk, files, originalCname) {
             count: callCount,
             file: name,
             label: label,
-            toDisk: toDisk,
             batch: false,
             originalCname: undefined
         })
@@ -1665,14 +1671,15 @@ async function batchInsertRecords(cname, label, toDisk, files, originalCname) {
     await db.runAsync('END');
     console.log(`Batch record update  took ${(Date.now() - t0) / 1000} seconds`)
     if (STATE.mode !== 'explore' && toDisk) UI.postMessage({ event: 'generate-alert', message: `${count} ${cname} records have been saved to the archive.`, savedToDB: true })
+
 }
 
-const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label, toDisk, batch, originalCname }) => {
-    if (batch) return batchInsertRecords(cname, label, toDisk, file, originalCname)
+const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label, batch, originalCname, confidence }) => {
+    if (batch) return batchInsertRecords(cname, label, file, originalCname)
     start = parseFloat(start), end = parseFloat(end);
     const startMilliseconds = Math.round(start * 1000);
     let changes, fileID, fileStart;
-    const db = toDisk ? diskDB : memoryDB;
+    const db = STATE.db; // toDisk ? diskDB : memoryDB;
     const { speciesID } = await db.getAsync(`SELECT id as speciesID FROM species
                                         WHERE cname = ?`, cname);
     let res = await db.getAsync(`SELECT id,filestart FROM files WHERE name = ?`, file);
@@ -1706,10 +1713,11 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     let response;
     const dateTime = fileStart + startMilliseconds;
     const isDaylight = isDuringDaylight(dateTime, STATE.lat, STATE.lon);
+    confidence = confidence || 2000;
     response = await db.runAsync('INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,?,?)',
-        dateTime, start, fileID, speciesID, 2000, label, comment, end, parseInt(count), isDaylight);
+        dateTime, start, fileID, speciesID, confidence, label, comment, end, parseInt(count), isDaylight);
 
-    if (response.changes && toDisk) {
+    if (response.changes && STATE.db === diskDB) {
         UI.postMessage({ event: 'diskDB-has-records' });
     } else {
         UI.postMessage({event: 'unsaved-records'});

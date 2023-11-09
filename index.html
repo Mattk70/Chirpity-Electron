@@ -189,7 +189,7 @@
                                 <span class="material-symbols-outlined">unarchive</span> Remove Current File From
                                 Archive
                             </li>
-                            <li class="dropdown-item d-none" href="#" id="dataset">
+                            <li class="dropdown-item" href="#" id="dataset">
                                 <span class="material-symbols-outlined">dataset</span> Create Dataset
                             </li>
                         </ul>
@@ -912,8 +912,8 @@
                     </span> Analyse</a>
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item" id="create-manual-record" href="#"><span class="material-symbols-outlined">
-                        post_add
-                    </span> Create Archive Record</a>
+                        edit_document
+                    </span> Edit Record</a>
                     <a class="dropdown-item" id="context-create-clip" href="#"><span class="material-symbols-outlined">
                         music_note
                     </span> Export Audio Clip</a>
@@ -940,7 +940,7 @@
                             <!-- Controls view -->
                             <div class="container-fluid p-1 text-bg-dark d-inline-flex" id="controlsWrapper" style="max-height: 50px">
                                 <div id="filename" class="col-auto ps-1 overflow-visible flex-nowrap"></div>
-                                <div id="unsaved-icon" class="material-symbols-outlined ms-2 me-2 text-warning d-none" title="There are unsaved records">warning</div>
+                                <div id="unsaved-icon" class="material-symbols-outlined ms-2 me-2 text-warning d-none" title="There are unsaved edits">warning</div>
                                 <div class="col-auto btn-group bg-dark ms-2 me-2 text-nowrap" role="group">
                                     <button id="playToggle" class="p-1 pe-2 btn btn-outline-secondary">
                                         <span class="material-symbols-outlined ">play_circle</span><span
@@ -1130,7 +1130,7 @@
                     lonTxt = 'customLon';
                 }
                 const showMap = (where) => {
-                    if (where === 'customLocationMap'){
+                    if (where === 'customLocationMap' && LOCATIONS.length){
                         const markerGroup = L.featureGroup(); // Create a feature group to hold the markers
 
                         const bounds = L.latLngBounds(); // Create bounds to include all markers
