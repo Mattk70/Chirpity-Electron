@@ -1683,45 +1683,37 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     const { speciesID } = await db.getAsync(`SELECT id as speciesID FROM species
                                         WHERE cname = ?`, cname);
     let res = await db.getAsync(`SELECT id,filestart FROM files WHERE name = ?`, file);
-    // Manual records can be added off the bat, so there may be no record of the file in either db
+    
 
-    if (!res) { // No file: check the memory db
-        if (toDisk) res = await memoryDB.getAsync('SELECT id, filestart FROM files WHERE name = ?', file);
-        if (!res) { // Still no file, add it.
-            fileStart = metadata[file].fileStart;
-            res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,? )',
-                fileID, file, metadata[file].duration, fileStart, null);
-            fileID = res.lastID;
-            changes = 1;
-        } else {  // memory db has file
-            fileID = res.id;
-            fileStart = res.filestart;
-            await diskDB.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,? )',
-                fileID, file, metadata[file].duration, fileStart, null);
-        }
+    if (!res) { 
+    // Manual records can be added off the bat, so there may be no record of the file in either db
+        fileStart = metadata[file].fileStart;
+        res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,? )',
+            fileID, file, metadata[file].duration, fileStart, null);
+        fileID = res.lastID;
+        changes = 1;
+        let durationSQL = Object.entries(metadata[file].dateDuration)
+            .map(entry => `(${entry.toString()},${fileID})`).join(',');
+        await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
     } else {
         fileID = res.id;
         fileStart = res.filestart;
     }
-    let durationSQL;
-    if (metadata[file]) { // If we don't have file metadata, the file must be saved already
-        durationSQL = Object.entries(metadata[file].dateDuration)
-            .map(entry => `(${entry.toString()},${fileID})`).join(',');
-        await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
-    }
 
-    let response;
     const dateTime = fileStart + startMilliseconds;
     const isDaylight = isDuringDaylight(dateTime, STATE.lat, STATE.lon);
     confidence = confidence || 2000;
-    response = await db.runAsync('INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,?,?)',
+    // Delete an existing record if it exists
+    const result = await db.getAsync(`SELECT id as originalSpeciesID FROM species WHERE cname = ?`, originalCname);
+    if (result?.originalSpeciesID) await db.runAsync('DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?', dateTime, result.originalSpeciesID, fileID)
+    const response = await db.runAsync('INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,?,?)',
         dateTime, start, fileID, speciesID, confidence, label, comment, end, parseInt(count), isDaylight);
 
-    if (response.changes && STATE.db === diskDB) {
-        UI.postMessage({ event: 'diskDB-has-records' });
-    } else {
-        UI.postMessage({event: 'unsaved-records'});
+    if (response.changes){
+        STATE.db === diskDB ? UI.postMessage({ event: 'diskDB-has-records' }) : UI.postMessage({event: 'unsaved-records'});
     }
+    let test = await db.allAsync('SELECT * from records where datetime = ?', dateTime)
+    console.log('After insert: ',JSON.stringify(test));
     return response.changes
 }
 
