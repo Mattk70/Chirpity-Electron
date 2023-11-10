@@ -2664,7 +2664,7 @@ async function onPredictionDone({
     if (active) {
         // Refresh node and scroll to active row:
         activeRow = resultTable.rows[active];
-        if (activeRow) { // because: after an edit the active row may not exist
+        if (! activeRow) { // because: after an edit the active row may not exist
             const rows = resultTable.querySelectorAll('tr.daytime, tr.nighttime')
             if (rows.length) {
                 activeRow = rows[rows.length - 1];
@@ -2940,7 +2940,11 @@ const deleteRecord = (target) => {
     const row = target.closest('tr');
     let cname = target.querySelector('.cname').innerText;
     let [species, confidence] = cname.split('\n');
-    confidence = parseInt(confidence.replace('%', '')) * 10;
+    // confirmed records don't have a confidence bar
+    if (!confidence) {
+        species =  species.slice(0, -9); // remove ' verified'
+        confidence = 2000;
+    } else { confidence = parseInt(confidence.replace('%', '')) * 10 }
     const comment = target.querySelector('.comment').innerText;
     const label = target.querySelector('.label').innerText;
     let callCount = target.querySelector('.call-count').innerText;
