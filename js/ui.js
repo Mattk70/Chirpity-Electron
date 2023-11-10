@@ -65,13 +65,13 @@ async function getPaths() {
 
 
 let version;
-let diagnostics = {};
+let DIAGNOSTICS = {};
 
 window.electron.getVersion()
     .then((appVersion) => {
         version = appVersion;
         console.log('App version: ', appVersion);
-        diagnostics['Chirpity Version'] = version;
+        DIAGNOSTICS['Chirpity Version'] = version;
     })
     .catch(e => {
         console.log('Error getting app version:', e)
@@ -130,8 +130,8 @@ let config;
 let sampleRate = 24000;
 let audioCtx;
 
-/** Collect Diagnostics Information
- Diagnostics keys:
+/** Collect DIAGNOSTICS Information
+ DIAGNOSTICS keys:
  GPUx - name of GPU(s)
  backend: tensorflow backend in use
  warmup: time to warm up model (seconds)
@@ -145,9 +145,9 @@ let audioCtx;
 // Timers
 let t0_warmup, t1_warmup, t0_analysis, t1_analysis;
 
-diagnostics['CPU'] = os.cpus()[0].model;
-diagnostics['Cores'] = os.cpus().length;
-diagnostics['System Memory'] = (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) + ' GB';
+DIAGNOSTICS['CPU'] = os.cpus()[0].model;
+DIAGNOSTICS['Cores'] = os.cpus().length;
+DIAGNOSTICS['System Memory'] = (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) + ' GB';
 
 function resetResults() {
     summaryTable.innerText = '';
@@ -715,9 +715,9 @@ async function showSaveDialog() {
 }
 
 function resetDiagnostics() {
-    delete diagnostics['Audio Duration'];
-    delete diagnostics['Analysis Rate'];
-    delete diagnostics['Analysis Duration'];
+    delete DIAGNOSTICS['Audio Duration'];
+    delete DIAGNOSTICS['Analysis Rate'];
+    delete DIAGNOSTICS['Analysis Duration'];
 }
 
 // Worker listeners
@@ -727,7 +727,7 @@ function analyseReset() {
     resetDiagnostics();
     AUDACITY_LABELS = {};
     progressDiv.classList.remove('d-none');
-    // Diagnostics
+    // DIAGNOSTICS
     t0_analysis = Date.now();
 }
 
@@ -1355,7 +1355,7 @@ window.onload = async () => {
         filters: { active: true, highPassFrequency: 250, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0 },
         warmup: true,
         backend: 'tensorflow',
-        tensorflow: { threads: diagnostics['Cores'], batchSize: 32 },
+        tensorflow: { threads: DIAGNOSTICS['Cores'], batchSize: 32 },
         webgpu: { threads: 2, batchSize: 32 },
         webgl: { threads: 2, batchSize: 32 },
         audio: { format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false },
@@ -1438,7 +1438,7 @@ window.onload = async () => {
         lowShelfAttenuationThreshold.innerText = lowShelfAttenuation.value + 'dB';
         filterIconDisplay();
 
-        ThreadSlider.max = diagnostics['Cores'];
+        ThreadSlider.max = DIAGNOSTICS['Cores'];
         ThreadSlider.value = config[config.backend].threads;
         numberOfThreads.innerText = config[config.backend].threads;
         defaultLat.value = config.latitude;
@@ -1550,9 +1550,9 @@ const setUpWorkerMessaging = () => {
                     window.electron.unsavedRecords(true);
                     document.getElementById('unsaved-icon').classList.remove('d-none');
                 case 'update-audio-duration':
-                    diagnostics['Audio Duration'] ?
-                        diagnostics['Audio Duration'] += args.value :
-                        diagnostics['Audio Duration'] = args.value;
+                    DIAGNOSTICS['Audio Duration'] ?
+                        DIAGNOSTICS['Audio Duration'] += args.value :
+                        DIAGNOSTICS['Audio Duration'] = args.value;
                     break;
                 case 'update-summary':
                     updateSummary(args);
@@ -2451,7 +2451,7 @@ function onModelReady(args) {
     }
     if (region) enableMenuItem(['analyseSelection'])
     t1_warmup = Date.now();
-    diagnostics['Warm Up'] = ((t1_warmup - t0_warmup) / 1000).toFixed(2) + ' seconds';
+    DIAGNOSTICS['Warm Up'] = ((t1_warmup - t0_warmup) / 1000).toFixed(2) + ' seconds';
 
 }
 
@@ -2652,11 +2652,11 @@ async function onPredictionDone({
         }
         if (currentFile) enableMenuItem(['analyse'])
 
-        // Diagnostics:
+        // DIAGNOSTICS:
         t1_analysis = Date.now();
         const analysisTime = ((t1_analysis - t0_analysis) / 1000).toFixed(2);
-        diagnostics['Analysis Duration'] = analysisTime + ' seconds';
-        diagnostics['Analysis Rate'] = (diagnostics['Audio Duration'] / analysisTime).toFixed(0) + 'x faster than real time performance.';
+        DIAGNOSTICS['Analysis Duration'] = analysisTime + ' seconds';
+        DIAGNOSTICS['Analysis Rate'] = (DIAGNOSTICS['Audio Duration'] / analysisTime).toFixed(0) + 'x faster than real time performance.';
     }
 
     // Set active Row
@@ -3204,15 +3204,15 @@ fullscreen.addEventListener('click', toggleFullscreen);
 const diagnosticMenu = document.getElementById('diagnostics');
 diagnosticMenu.addEventListener('click', async function () {
     const modelToUse = document.getElementById('model-to-use');
-    diagnostics['Model'] = modelToUse.options[modelToUse.selectedIndex].text;
-    diagnostics['Backend'] = config.backend;
-    diagnostics['Batch size'] = config[config.backend].batchSize;
-    diagnostics['Threads'] = config[config.backend].threads;
-    diagnostics['Context'] = config.detect.contextAware;
-    diagnostics['SNR'] = config.filters.SNR;
-    diagnostics['List'] = config.list;
+    DIAGNOSTICS['Model'] = modelToUse.options[modelToUse.selectedIndex].text;
+    DIAGNOSTICS['Backend'] = config.backend;
+    DIAGNOSTICS['Batch size'] = config[config.backend].batchSize;
+    DIAGNOSTICS['Threads'] = config[config.backend].threads;
+    DIAGNOSTICS['Context'] = config.detect.contextAware;
+    DIAGNOSTICS['SNR'] = config.filters.SNR;
+    DIAGNOSTICS['List'] = config.list;
     let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
-    for (let [key, value] of Object.entries(diagnostics)) {
+    for (let [key, value] of Object.entries(DIAGNOSTICS)) {
         if (key === 'Audio Duration') { // Format duration as days, hours,minutes, etc.
             if (value < 3600) {
                 value = new Date(value * 1000).toISOString().substring(14, 19);
