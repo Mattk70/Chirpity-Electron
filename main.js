@@ -6,7 +6,6 @@ const fs = require("fs");
 const os = require('os');
 const path = require('path');
 const settings = require('electron-settings');
-const axios = require('axios');
 //require('update-electron-app')();
 let files = [];
 let DEBUG = false;
@@ -29,9 +28,15 @@ autoUpdater.logger.transports.file.level = 'info';
 // Function to fetch release notes from GitHub API
 async function fetchReleaseNotes(version) {
     try {
-        const response = await axios.get(`https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest`);
-        if (response.data && response.data.body) {
-            return response.data.body;
+        const response = await fetch('https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest');
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data && data.body) {
+                return data.body;
+            }
+        } else {
+            console.error('Error fetching release notes:', response.statusText);
         }
     } catch (error) {
         console.error('Error fetching release notes:', error);
