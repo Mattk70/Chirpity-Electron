@@ -276,13 +276,13 @@ async function handleMessage(e) {
             break;
         case 'insert-manual-record':
             const count = await onInsertManualRecord(args);
-            if (STATE.mode !== 'explore' && !args.batch) {
+            // if (STATE.mode !== 'explore' && !args.batch) {
                 UI.postMessage({
                     event: 'generate-alert',
-                    message: `${count} ${args.cname} record has been saved to the archive.`,
+                    // message: `${count} ${args.cname} record has been saved to the archive.`,
                     filter: true
                 })
-            }
+            // }
             break;
         case 'load-model':
             SEEN_LABELS = false;
@@ -645,8 +645,10 @@ async function onAnalyse({
                 await getResults({ topRankin: 5 });
             } else {
                 onChangeMode('archive');
+                FILE_QUEUE.forEach(file => UI.postMessage({ event: 'update-audio-duration', value: metadata[file].duration }))
                 await getResults();
                 await getSummary();
+
             }
             return;
         }
@@ -1670,7 +1672,6 @@ async function batchInsertRecords(cname, label, files, originalCname) {
     }
     await db.runAsync('END');
     console.log(`Batch record update  took ${(Date.now() - t0) / 1000} seconds`)
-    if (STATE.mode !== 'explore' && toDisk) UI.postMessage({ event: 'generate-alert', message: `${count} ${cname} records have been saved to the archive.`, savedToDB: true })
 
 }
 
@@ -1679,7 +1680,7 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     start = parseFloat(start), end = parseFloat(end);
     const startMilliseconds = Math.round(start * 1000);
     let changes, fileID, fileStart;
-    const db = STATE.db; // toDisk ? diskDB : memoryDB;
+    const db = STATE.db;
     const { speciesID } = await db.getAsync(`SELECT id as speciesID FROM species
                                         WHERE cname = ?`, cname);
     let res = await db.getAsync(`SELECT id,filestart FROM files WHERE name = ?`, file);
@@ -1712,8 +1713,8 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     if (response.changes){
         STATE.db === diskDB ? UI.postMessage({ event: 'diskDB-has-records' }) : UI.postMessage({event: 'unsaved-records'});
     }
-    let test = await db.allAsync('SELECT * from records where datetime = ?', dateTime)
-    console.log('After insert: ',JSON.stringify(test));
+    // let test = await db.allAsync('SELECT * from records where datetime = ?', dateTime)
+    // console.log('After insert: ',JSON.stringify(test));
     return response.changes
 }
 
@@ -1793,9 +1794,8 @@ const parsePredictions = async (response) => {
         updateFilesBeingProcessed(response.file)
         console.log(`Prediction done ${filesBeingProcessed.length} files to go`);
         console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
-    } else if (STATE.increment() === 0) {
-        getSummary({ interim: true });
     }
+    getSummary({ interim: true });
     return response.worker
 }
 
@@ -2500,19 +2500,17 @@ async function onDelete({
     speciesFiltered
 }) {
     const db = STATE.db;
-    const { filestart } = await db.getAsync('SELECT filestart from files WHERE name = ?', file);
+    const { id, filestart } = await db.getAsync('SELECT id, filestart from files WHERE name = ?', file);
     const datetime = filestart + (parseFloat(start) * 1000);
     end = parseFloat(end);
-    const params = [datetime, end];
-    let sql = 'DELETE FROM records WHERE datetime = ? AND end = ?';
+    const params = [id, datetime, end];
+    let sql = 'DELETE FROM records WHERE fileID = ? AND datetime = ? AND end = ?';
     if (species) {
         sql += ' AND speciesID = (SELECT id FROM species WHERE cname = ?)'
         params.push(species);
     }
-    // Catch inserted manual records
-    if (STATE.db === memoryDB) {
-        await diskDB.runAsync(sql, ...params);
-    }
+    let test = await db.allAsync('SELECT * from records WHERE speciesID = (SELECT id FROM species WHERE cname = ?)', species)
+    console.log('After insert: ',JSON.stringify(test));
     let { changes } = await db.runAsync(sql, ...params);
     if (changes) {
         if (STATE.mode !== 'selection') {
@@ -2525,7 +2523,7 @@ async function onDelete({
         // Update the seen species list
         if (db === diskDB) {
             getSpecies();
-        }else {
+        } else {
             UI.postMessage({event: 'unsaved-records'});
         }
     }
