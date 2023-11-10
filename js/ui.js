@@ -676,6 +676,7 @@ async function onOpenFiles(args) {
     hideAll();
     showElement(['spectrogramWrapper'], false);
     resetResults();
+    resetDiagnostics();
     //completeDiv.hide();
     // Store the file list and Load First audio file
     fileList = args.filePaths;
@@ -713,11 +714,17 @@ async function showSaveDialog() {
     await window.electron.saveFile({ currentFile: currentFile, labels: AUDACITY_LABELS[currentFile] });
 }
 
+function resetDiagnostics() {
+    delete diagnostics['Audio Duration'];
+    delete diagnostics['Analysis Rate'];
+    delete diagnostics['Analysis Duration'];
+}
+
 // Worker listeners
 function analyseReset() {
     fileNumber.innerText = '';
     PREDICTING = true;
-    delete diagnostics['Audio Duration'];
+    resetDiagnostics();
     AUDACITY_LABELS = {};
     progressDiv.classList.remove('d-none');
     // Diagnostics
@@ -815,9 +822,6 @@ function postAnalyseMessage(args) {
             analyseReset();
             resetResults();
             refreshResultsView();
-        } else {
-            //progressDiv.classList.remove('d-none');
-            delete diagnostics['Audio Duration'];
         }
         if (filesInScope.length > 1) {
             batchInProgress = true;
@@ -2650,8 +2654,9 @@ async function onPredictionDone({
 
         // Diagnostics:
         t1_analysis = Date.now();
-        diagnostics['Analysis Duration'] = ((t1_analysis - t0_analysis) / 1000).toFixed(2) + ' seconds';
-        diagnostics['Analysis Rate'] = (diagnostics['Audio Duration'] / ((t1_analysis - t0_analysis) / 1000)).toFixed(0) + 'x faster than real time performance.';
+        const analysisTime = ((t1_analysis - t0_analysis) / 1000).toFixed(2);
+        diagnostics['Analysis Duration'] = analysisTime + ' seconds';
+        diagnostics['Analysis Rate'] = (diagnostics['Audio Duration'] / analysisTime).toFixed(0) + 'x faster than real time performance.';
     }
 
     // Set active Row
@@ -2659,7 +2664,7 @@ async function onPredictionDone({
     if (active) {
         // Refresh node and scroll to active row:
         activeRow = resultTable.rows[active];
-        if (activeRow === null) { // because: after an edit the active row may not exist
+        if (activeRow) { // because: after an edit the active row may not exist
             const rows = resultTable.querySelectorAll('tr.daytime, tr.nighttime')
             if (rows.length) {
                 activeRow = rows[rows.length - 1];
@@ -3730,7 +3735,7 @@ async function createContextMenu(e) {
         }
     }
     if (region === undefined && ! inSummary) return;
-    const createOrEdit = (['archive', 'explore'].includes(STATE.mode)) && (region?.attributes.label || target.closest('#summary')) ? 'Edit' : 'Create';
+    const createOrEdit = ((region?.attributes.label || target.closest('#summary'))) ? 'Edit' : 'Create';
 
     menu.html(`
         <a class="dropdown-item play ${hideInSummary}"><span class='material-symbols-outlined'>play_circle</span> Play</a>
