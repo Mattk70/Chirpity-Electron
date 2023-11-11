@@ -32,6 +32,10 @@ body {
   padding-bottom: 0;
 }
 
+.leaflet-marker-icon-default {
+    filter: hue-rotate(150deg)
+}
+
 .navbar {
     z-index: 5;
 }

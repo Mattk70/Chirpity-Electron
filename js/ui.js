@@ -583,26 +583,46 @@ const showLocation = async (fromSelect) => {
     if (id) {
         newLocation = LOCATIONS.find(obj => obj.id === id);
         //locationSelect.value = id;
-        latEl.value = newLocation.lat, lonEl.value = newLocation.lon, customPlaceEl.value = newLocation.place;
-        updateMap(newLocation.lat, newLocation.lon)
+        if (newLocation){
+            latEl.value = newLocation.lat, lonEl.value = newLocation.lon, customPlaceEl.value = newLocation.place;
+        } else {
+            latEl.value = config.latitude, lonEl.value = config.longitude, customPlaceEl.value = config.location;
+        }
     }
     else {  //Default location
         const savedLocationSelect = await generateLocationList('savedLocations');
         latEl.value = config.latitude, lonEl.value = config.longitude, customPlaceEl.value = config.location;
     }
+    // make sure the  map is initialised
+    if (!map) placeMap('customLocationMap')
+    updateMap(latEl.value, lonEl.value)
 }
 
-const displayLocationAddress = async () => {
-    const latEl = document.getElementById('customLat');
-    const lonEl = document.getElementById('customLon');
-    const customPlaceEl = document.getElementById('customPlace');
-    const place = await fetchLocationAddress(latEl.value, lonEl.value, false);
-    if (place) {
-        customPlaceEl.value = place;
-    }
-    else {
-        customPlaceEl.value = 'Location not available';
-        customPlaceEl.ariaPlaceholder = 'Location not available';
+const displayLocationAddress = async (where) => {
+    const custom = where.indexOf('custom') > -1;
+    let latEl, lonEl, placeEl, place;
+    if (custom){
+        latEl = document.getElementById('customLat');
+        lonEl = document.getElementById('customLon');
+        placeEl = document.getElementById('customPlace');
+        address = await fetchLocationAddress(latEl.value, lonEl.value, false);
+        placeEl.value = address ? address : 'Location not available';
+    } else {
+        latEl = document.getElementById('latitude');
+        lonEl = document.getElementById('longitude');
+        placeEl = document.getElementById('place');
+        address = await fetchLocationAddress(latEl.value, lonEl.value, false);
+        const content = '<span class="material-symbols-outlined">fmd_good</span> ' + address;
+        placeEl.innerHTML = content;
+        config.latitude = parseFloat(latEl.value).toFixed(2);
+        config.longitude = parseFloat(lonEl.value).toFixed(2);
+        config.location = address;
+        updatePrefs();
+        worker.postMessage({
+            action: 'update-state',
+            lat: config.latitude,
+            lon: config.longitude,
+        });
     }
 }
 
@@ -640,11 +660,6 @@ async function setLocation() {
     // Submit action
     const locationForm = document.getElementById('locationForm');
 
-
-
-    [latEl, lonEl].forEach(el => {
-        el.addEventListener('blur', displayLocationAddress)
-    })
 
     const addLocation = () => {
         locationID = parseInt(savedLocationSelect.value);
@@ -718,6 +733,8 @@ function resetDiagnostics() {
     delete DIAGNOSTICS['Audio Duration'];
     delete DIAGNOSTICS['Analysis Rate'];
     delete DIAGNOSTICS['Analysis Duration'];
+    //reset delete history too
+    DELETE_HISTORY = [];
 }
 
 // Worker listeners
@@ -839,12 +856,6 @@ function postAnalyseMessage(args) {
 }
 
 
-/// Lat / lon
-// const place = document.getElementById('place')
-// $('#latitude, #longitude').on('focus', function () {
-//     document.removeEventListener('keydown', handleKeyDownDeBounce, true);
-// })
-
 function fetchLocationAddress(lat, lon) {
     return new Promise(async (resolve, reject) => {
         if (!LOCATIONS) {
@@ -871,39 +882,6 @@ function fetchLocationAddress(lat, lon) {
                 reject(error);
             })
     })
-}
-$('#latitude, #longitude').on('blur', async function () {
-    const lat = parseFloat(document.getElementById('latitude').value).toFixed(2);
-    const lon = parseFloat(document.getElementById('longitude').value).toFixed(2);
-    const address = await fetchLocationAddress(lat, lon, true);
-    fillLocation(address, lat, lon)
-    updateMap
-})
-
-const fillLocation = (address, lat, lon, divID) =>{
-    
-    if (divID === 'settingsMap') {
-        const content = '<span class="material-symbols-outlined">fmd_good</span> ' + address;
-        place.innerHTML = content;
-        config.latitude = lat.toFixed(2);
-        config.longitude = lon.toFixed(2);
-        config.location = address;
-        updatePrefs();
-        worker.postMessage({
-            action: 'update-state',
-            lat: config.latitude,
-            lon: config.longitude,
-        });
-    } else {
-        const latEl = document.getElementById('customLat');
-        const lonEl = document.getElementById('customLon');
-        const customPlaceEl = document.getElementById('customPlace');
-        latEl.value = lat.toFixed(2);
-        lonEl.value = lon.toFixed(2);
-        customPlaceEl.value = address;
-        updateMap(lat, lon);
-    }
-        
 }
 
 
@@ -2391,7 +2369,9 @@ const gotoModal = document.getElementById('gotoModal')
 //gotoModal.addEventListener('hidden.bs.modal', enableKeyDownEvent)
 
 gotoModal.addEventListener('shown.bs.modal', () => {
-    document.getElementById('timeInput').focus()
+    const timeInput = document.getElementById('timeInput')
+    timeInput.value  = '';
+    timeInput.focus()
 })
 
 
