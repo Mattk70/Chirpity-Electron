@@ -1795,7 +1795,7 @@ const parsePredictions = async (response) => {
         console.log(`Prediction done ${filesBeingProcessed.length} files to go`);
         console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
     }
-    getSummary({ interim: true });
+    if (!STATE.selection) getSummary({ interim: true });
     return response.worker
 }
 
