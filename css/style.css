@@ -631,3 +631,7 @@ input[type="range"].vertical {
   #update-progress-bar::-webkit-progress-value {
     background-color: #4CAF50; /* Set the color for WebKit browsers */
   }
+
+  .form-select {
+    font-size: 0.74rem;
+  }

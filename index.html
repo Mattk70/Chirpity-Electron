@@ -31,11 +31,6 @@
 </head>
 
 <body>
-<<<<<<< HEAD
-=======
-    
-    
->>>>>>> wavesurfer-upgrade
     <!-- The modal for the tour -->
     <div class="modal modal-fade" id="tourModal" tabindex="-1" aria-labelledby="tourModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -229,7 +224,7 @@
                                     data-bs-toggle="dropdown">Settings</a>
                                     <ul id="settingsMenu" class="nav-item dropdown-menu">
                                         <li>
-                                            <form id="settingsForm">
+                                            <form id="settingsForm" class="fs-6">
                                                 <div class="row">
                                                     <div class="col-6 pe-0">
                                                         <fieldset class="border rounded m-2 p-1">
@@ -254,7 +249,7 @@
                                                                 title="Filters the detections returned in results.">?</span>
                                                                 <div class="row pe-3">
                                                                     <label class="col-auto ps-0" for="list-to-use">Show:</label>
-                                                                    <select class="form-control col" id="list-to-use">
+                                                                    <select class="form-select col" id="list-to-use">
                                                                         <option value="migrants">Nocturnal Birds</option>
                                                                         <option value="birds">Birds</option>
                                                                         <option value="everything">Everything</option>
@@ -384,7 +379,7 @@
                                                                 <div class="form-group rounded p-2 mb-2 bg-light">
                                                                     <div class="row pe-3">
                                                                         <label class="col" for="colourmap">Colourmap:</label>
-                                                                        <select class="form-control col" id="colourmap">
+                                                                        <select class="form-select col" id="colourmap">
                                                                             <option value="greys">Greyscale</option>
                                                                             <option value="bone">Bone</option>
                                                                             <option value="turbidity">Turbidity</option>
@@ -415,7 +410,7 @@
                                                                 <div class="form-group rounded p-2 mb-2 bg-light">
                                                                     <div class="row pe-3">
                                                                         <label class="col" for="timelineSetting">Timeline:</label>
-                                                                        <select class="form-control col" id="timelineSetting">
+                                                                        <select class="form-select col" id="timelineSetting">
                                                                             <option value="timecode">Timecode</option>
                                                                             <option value="timeOfDay">Time of day</option>
                                                                         </select>
@@ -483,7 +478,7 @@
                                                                 <div class="form-group rounded p-2 mb-2 bg-light">
                                                                     <div class="row pe-3">
                                                                         <label class="col" for="model-to-use">Model:</label>
-                                                                        <select class="form-control col" id="model-to-use">
+                                                                        <select class="form-select col" id="model-to-use">
                                                                             <option value="v2">Chirpity</option>
                                                                             <option value="v3">BirdNet</option>
                                                                             <option value="v4">Test chirp</option>
@@ -517,7 +512,7 @@
                                                                 <div class="form-group rounded p-2 mb-2 bg-light">
                                                                     <div class="row pe-3">
                                                                         <label class="col" for="format">Format:</label>
-                                                                        <select class="form-control col" id="format">
+                                                                        <select class="form-select col" id="format">
                                                                             <option value="wav">WAV</option>
                                                                             <option value="flac">FLAC</option>
                                                                             <option value="mp3">MP3</option>
@@ -558,7 +553,7 @@
                                                                     <div class="form-group rounded p-2 mb-2 bg-light">
                                                                         <div id="bitrate-container" class="row pe-3 ease">
                                                                             <label class="col" for="bitrate">Bitrate:</label>
-                                                                            <select class="form-control col" id="bitrate">
+                                                                            <select class="form-select col" id="bitrate">
                                                                                 <option value="320">320 kbps</option>
                                                                                 <option value="192">192 kbps</option>
                                                                                 <option value="160">160 kbps</option>
@@ -567,9 +562,9 @@
                                                                             </select>
                                                                         </div>
                                                                         <div id="quality-container" class="row pe-3 ease">
-                                                                            <label class="col" for="quality">Compression
+                                                                            <label class="col-2" for="quality">Compression
                                                                                 Level:</label>
-                                                                                <select class="form-control col" id="quality">
+                                                                                <select class="form-select col" id="quality">
                                                                                     <option value="0">0</option>
                                                                                     <option value="1">1</option>
                                                                                     <option value="2">2</option>
@@ -826,7 +821,7 @@
                                 <h5 class="modal-title" id="gotoModalLabel">Set Location</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
-                            <form id="locationForm">
+                            <form id="locationForm" class="fs-6">
                                 <div class="modal-body">
                                     <fieldset class="border rounded m-2 p-1">
                                         <legend class="h6">Pick A Saved Location</legend>
@@ -835,7 +830,7 @@
                                                 <div class="input-group col">
                                                     <div class="form-group w-100">
                                                         <label for="savedLocations"></label>
-                                                        <select class="form-control" id="savedLocations">
+                                                        <select class="form-select" id="savedLocations">
                                                         </select>
                                                     </div>
                                                 </div>

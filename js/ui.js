@@ -2556,7 +2556,7 @@ const updateSummary = ({ summary = [], filterSpecies = '' }) => {
         summaryHTML += `<tr tabindex="-1" class="${selected}">
                         <td class="max">${iconizeScore(item.max)}</td>
                         <td class="cname">
-                            <span class="pointer"><span class="cname">${item.cname}</span> <i>${item.sname}</i></span>
+                            <span class="pointer"><span class="cname">${item.cname}</span> <br><i>${item.sname}</i></span>
                         </td>
                         <td class="text-end">${item.count}</td>
                         <td class="text-end">${item.calls}</td>
@@ -2568,17 +2568,9 @@ const updateSummary = ({ summary = [], filterSpecies = '' }) => {
     const old_summary = document.getElementById('summaryTable');
     const buffer = old_summary.cloneNode();
     buffer.innerHTML = summaryHTML;
-    // Make the star icon look good on black
-    // const starIcons = buffer.getElementsByClassName('material-symbols-outlined');
-    // [...starIcons].forEach(icon =>{
-    //     icon.classList.add('text-bg-light', 'rounded-5')
-    // })
     old_summary.replaceWith(buffer);
     const currentFilter = document.querySelector('#speciesFilter tr.text-warning');
-    if (currentFilter) {
-        //const filterRow = currentFilter.rowIndex;
-        currentFilter.focus();
-    }
+    if (currentFilter) currentFilter.focus();
     return total;
 }
 
