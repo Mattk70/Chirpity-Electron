@@ -1357,7 +1357,7 @@ const saveResults2DataSet = ({species}) => {
                 const folders = p.dirname(result.file).split(p.sep); //.match(/^.*\/(.*)$/)
                 species = result.cname.replaceAll(' ', '_');
                 const sname = result.sname.replaceAll(' ', '_');
-                const folder = `${species}~${sname}`;
+                const folder = `${sname}~${species}`;
                 // get start and end from timestamp
                 const start = result.position;
                 let end = start + 3;
@@ -2509,8 +2509,8 @@ async function onDelete({
         sql += ' AND speciesID = (SELECT id FROM species WHERE cname = ?)'
         params.push(species);
     }
-    let test = await db.allAsync('SELECT * from records WHERE speciesID = (SELECT id FROM species WHERE cname = ?)', species)
-    console.log('After insert: ',JSON.stringify(test));
+    // let test = await db.allAsync('SELECT * from records WHERE speciesID = (SELECT id FROM species WHERE cname = ?)', species)
+    // console.log('After insert: ',JSON.stringify(test));
     let { changes } = await db.runAsync(sql, ...params);
     if (changes) {
         if (STATE.mode !== 'selection') {
