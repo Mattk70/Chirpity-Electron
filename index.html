@@ -165,26 +165,26 @@
                             Records
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="navbarRecords">
-                            <li class="dropdown-item disabled" href="#" id="save2db">
+                            <li class="dropdown-item disabled" id="save2db">
                                 <span class="material-symbols-outlined">archive</span> Save to Archive
                                 <span class="shortcut float-end">Ctrl+S</span>
                             </li>
-                            <li class="dropdown-item " href="#" id="export2audio">
+                            <li class="dropdown-item"  id="export2audio">
                                 <span class="material-symbols-outlined">music_note</span> Export Audio Clips
                             </li>
                             <li class="dropdown-divider"></li>
-                            <li class="dropdown-item disabled" href="#" id="charts">
+                            <li class="dropdown-item disabled" id="charts">
                                 <span class="material-symbols-outlined">assessment</span> View charts
                             </li>
-                            <li class="dropdown-item disabled" href="#" id="explore">
+                            <li class="dropdown-item disabled" id="explore">
                                 <span class="material-symbols-outlined">explore</span> Explore Archive
                             </li>
                             <li class="dropdown-divider"></li>
-                            <li class="dropdown-item" href="#" id="purge-file">
+                            <li class="dropdown-item" id="purge-file">
                                 <span class="material-symbols-outlined">unarchive</span> Remove Current File From
                                 Archive
                             </li>
-                            <li class="dropdown-item" href="#" id="dataset">
+                            <li class="dropdown-item" id="dataset">
                                 <span class="material-symbols-outlined">dataset</span> Create Dataset
                             </li>
                         </ul>
@@ -332,7 +332,7 @@
                                                                     <div class="form-group rounded p-2 mb-2 bg-light">
                                                                         <span class="circle"
                                                                         title="When enabled, removes low frequency noise below the threshold.">?</span>
-                                                                        <label for="HPValue" class="form-label">
+                                                                        <label for="HighPassFrequency" class="form-label">
                                                                             High Pass filter:
                                                                         </label>
                                                                         <div class="input-group me-0 p-0">
@@ -433,117 +433,42 @@
                                                                                     name="backend" id="tensorflow"
                                                                                     value="tensorflow" checked>
                                                                                     <label class="form-check-label" for="tensorflow">
-                                                                                    CPU
+                                                                                        CPU
                                                                                     </label>
                                                                                 </div>
-                                                                            <div class="form-check">
-                                                                                <input class="form-check-input" type="radio"
-                                                                                name="backend" id="webgl" value="webgl">
-                                                                                <label class="form-check-label" for="webgl">
-                                                                                    GPU
-                                                                                </label>
+                                                                                <div class="form-check">
+                                                                                    <input class="form-check-input" type="radio"
+                                                                                    name="backend" id="webgl" value="webgl">
+                                                                                    <label class="form-check-label" for="webgl">
+                                                                                        GPU
+                                                                                    </label>
+                                                                                </div>
+                                                                                <!-- <div class="form-check">
+                                                                                    <input class="form-check-input" type="radio"
+                                                                                    name="backend" id="webgpu" value="webgpu">
+                                                                                    <label class="form-check-label" for="webgpu">
+                                                                                        WebGPU
+                                                                                    </label>
+                                                                                </div> -->
                                                                             </div>
-                                                                            <!-- <div class="form-check">
-                                                                                <input class="form-check-input" type="radio"
-                                                                                name="backend" id="webgpu" value="webgpu">
-                                                                                <label class="form-check-label" for="webgpu">
-                                                                                    WebGPU
-                                                                                </label>
-                                                                            </div> -->
-                                                                        </div>
-                                                                        <div class="col"><span class="circle"
-                                                                            title="The GPU backend may speed up processing if you have a dedicated graphics card.">?</span>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="col pe-0">
-                                                                <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                    <span class="circle"
-                                                                    title="The number of parallel predictions to run">?</span>
-                                                                    <label for="thread-slider">Threads:</label>
-                                                                    <div class="input-group">
-                                                                        <input type="range" class="form-control-range"
-                                                                        id="thread-slider" min="1" max="24">
-                                                                        <div class="input-group-append">
-                                                                            <span class="input-group-text"
-                                                                            id="threads-value">12</span>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div class="row">
-                                                            <div class="col ps-0">
-                                                                <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                    <div class="row pe-3">
-                                                                        <label class="col" for="model-to-use">Model:</label>
-                                                                        <select class="form-select col" id="model-to-use">
-                                                                            <option value="v2">Chirpity</option>
-                                                                            <option value="v3">BirdNet</option>
-                                                                            <option value="v4">Test chirp</option>
-                                                                        </select>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="col pe-0">
-                                                                <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                    <span class="circle"
-                                                                    title="Optimising the batch size can increase processing speed on longer files.&#10;If it is too large, Chirpity may run out of memory and crash when predicting.&#10;If that happens, reduce batch size.">?</span>
-                                                                    <label for="batch-size">Batch Size:</label>
-                                                                    <div class="input-group">
-                                                                        <input type="range" class="form-control-range"
-                                                                        id="batch-size" min="0" max="7">
-                                                                        <div class="input-group-append">
-                                                                            <span class="input-group-text"
-                                                                            id="batch-size-value">2</span>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </fieldset>
-                                                <fieldset class="border rounded m-2 p-1">
-                                                    <legend style="font-size: large">Audio Export</legend>
-                                                    <div class="container">
-                                                        <div class="row">
-                                                            <div class="col ps-0">
-                                                                <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                    <div class="row pe-3">
-                                                                        <label class="col" for="format">Format:</label>
-                                                                        <select class="form-select col" id="format">
-                                                                            <option value="wav">WAV</option>
-                                                                            <option value="flac">FLAC</option>
-                                                                            <option value="mp3">MP3</option>
-                                                                            <!-- <option value="m4a">M4A</option> -->
-                                                                            <option value="opus">Opus</option>
-                                                                        </select>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="col pe-0">
-                                                                <div class="form-group rounded p-2 pe-0 mb-2 bg-light">
-                                                                    <div class="row pe-3">
-                                                                        <label class="col">Decorators:</label>
-                                                                        <div class="col">
-                                                                            <div class="form-check">
-                                                                                <input class="form-check-input" type="checkbox"
-                                                                                id="padding" value="2" checked>
-                                                                                <label class="form-check-label" for="padding">
-                                                                                    Pad
-                                                                                </label>
-                                                                            </div>
-                                                                            <div class="form-check">
-                                                                                <input class="form-check-input" type="checkbox"
-                                                                                id="fade" disabled value="1">
-                                                                                <label class="form-check-label" for="fade">
-                                                                                    Fade
-                                                                                </label>
+                                                                            <div class="col"><span class="circle"
+                                                                                title="The GPU backend may speed up processing if you have a dedicated graphics card.">?</span>
                                                                             </div>
                                                                         </div>
-                                                                        <div class="col"><span class="circle" title="'Pad' adds 2 seconds before and after a selection to the exported audio. 
-                                                                            'Fade' adds a 1 second fade effect to the start and end of the audio">?</span></div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col pe-0">
+                                                                    <div class="form-group rounded p-2 mb-2 bg-light">
+                                                                        <span class="circle"
+                                                                        title="The number of parallel predictions to run">?</span>
+                                                                        <label for="thread-slider">Threads:</label>
+                                                                        <div class="input-group">
+                                                                            <input type="range" class="form-control-range"
+                                                                            id="thread-slider" min="1" max="24">
+                                                                            <div class="input-group-append">
+                                                                                <span class="input-group-text"
+                                                                                id="threads-value">12</span>
+                                                                            </div>
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -551,665 +476,721 @@
                                                             <div class="row">
                                                                 <div class="col ps-0">
                                                                     <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                        <div id="bitrate-container" class="row pe-3 ease">
-                                                                            <label class="col" for="bitrate">Bitrate:</label>
-                                                                            <select class="form-select col" id="bitrate">
-                                                                                <option value="320">320 kbps</option>
-                                                                                <option value="192">192 kbps</option>
-                                                                                <option value="160">160 kbps</option>
-                                                                                <option value="128">128 kbps</option>
-                                                                                <option value="96">96 kbps</option>
+                                                                        <div class="row pe-3">
+                                                                            <label class="col" for="model-to-use">Model:</label>
+                                                                            <select class="form-select col" id="model-to-use">
+                                                                                <option value="v2">Chirpity</option>
+                                                                                <option value="v3">BirdNet</option>
+                                                                                <option value="v4">Test chirp</option>
                                                                             </select>
                                                                         </div>
-                                                                        <div id="quality-container" class="row pe-3 ease">
-                                                                            <label class="col-2" for="quality">Compression
-                                                                                Level:</label>
-                                                                                <select class="form-select col" id="quality">
-                                                                                    <option value="0">0</option>
-                                                                                    <option value="1">1</option>
-                                                                                    <option value="2">2</option>
-                                                                                    <option value="3">3</option>
-                                                                                    <option value="4">4</option>
-                                                                                    <option value="5">5</option>
-                                                                                    <option value="6">6</option>
-                                                                                    <option value="7">7</option>
-                                                                                    <option value="8">8</option>
-                                                                                    <option value="9">9</option>
-                                                                                    <option value="10">10</option>
-                                                                                </select>
-                                                                            </div>
-                                                                        </div>
                                                                     </div>
-                                                                    <div class="col pe-0">
-                                                                        <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                            <span class="circle me-2"
-                                                                            title="When enabled, stereo audio will be downmixed to mono">?</span>
-                                                                            <div class="form-check form-switch">
-                                                                                <input class="form-check-input" type="checkbox"
-                                                                                role="switch" id="downmix">
-                                                                                <label class="form-check-label" for="downmix">Convert to
-                                                                                    mono</label>
-                                                                                    
-                                                                                </div>
-                                                                                
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div class="row">
-                                                                        <div class="col pe-0">
-                                                                            <div class="form-group rounded p-2 mb-2 text-bg-danger">
-                                                                                <span class="circle me-2"
-                                                                                title="Enter debug mode (requires Chirpity relaunch to take effect)">?</span>
-                                                                                <div class="form-check form-switch">
-                                                                                    <input class="form-check-input" type="checkbox"
-                                                                                    role="switch" id="debug-mode">
-                                                                                    <label class="form-check-label" for="debug-mode">Debug mode</label>
-                                                                                </div>
-                                                                                
+                                                                </div>
+                                                                <div class="col pe-0">
+                                                                    <div class="form-group rounded p-2 mb-2 bg-light">
+                                                                        <span class="circle"
+                                                                        title="Optimising the batch size can increase processing speed on longer files.&#10;If it is too large, Chirpity may run out of memory and crash when predicting.&#10;If that happens, reduce batch size.">?</span>
+                                                                        <label for="batch-size">Batch Size:</label>
+                                                                        <div class="input-group">
+                                                                            <input type="range" class="form-control-range"
+                                                                            id="batch-size" min="0" max="7">
+                                                                            <div class="input-group-append">
+                                                                                <span class="input-group-text"
+                                                                                id="batch-size-value">2</span>
                                                                             </div>
                                                                         </div>
                                                                     </div>
                                                                 </div>
-                                                            </fieldset>
-                                                        </form>
-                                                    </li>
-                                                </ul>
-                                            </li>
-                                            <li class="nav-item dropdown active">
-                                                <a class="nav-link dropdown-toggle" href="#" id="help" role="button"
-                                                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                                Help
-                                            </a>
-                                            <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
-                                                <!-- <li><a class="dropdown-item" id="update" href="#">
-                                                    <span class="material-symbols-outlined text-info">browser_updated</span>Update Available!</a></li> -->
-                                                    <li><a class="dropdown-item" id="usage" href="#">
-                                                        <span class="material-symbols-outlined">help</span> Usage</a>
-                                                    </li>
-                                                    <li>
-                                                        <a class="dropdown-item" id="settings" href="#">
-                                                            <span class="material-symbols-outlined">help</span> Settings
+                                                            </div>
+                                                        </div>
+                                                    </fieldset>
+                                                    <fieldset class="border rounded m-2 p-1">
+                                                        <legend style="font-size: large">Audio Export</legend>
+                                                        <div class="container">
+                                                            <div class="row">
+                                                                <div class="col ps-0">
+                                                                    <div class="form-group rounded p-2 mb-2 bg-light">
+                                                                        <div class="row pe-3">
+                                                                            <label class="col" for="format">Format:</label>
+                                                                            <select class="form-select col" id="format">
+                                                                                <option value="wav">WAV</option>
+                                                                                <option value="flac">FLAC</option>
+                                                                                <option value="mp3">MP3</option>
+                                                                                <!-- <option value="m4a">M4A</option> -->
+                                                                                <option value="opus">Opus</option>
+                                                                            </select>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col pe-0">
+                                                                    <div class="form-group rounded p-2 pe-0 mb-2 bg-light">
+                                                                        <div class="row pe-3">
+                                                                            <label class="col">Decorators:</label>
+                                                                            <div class="col">
+                                                                                <div class="form-check">
+                                                                                    <input class="form-check-input" type="checkbox"
+                                                                                    id="padding" value="2" checked>
+                                                                                    <label class="form-check-label" for="padding">
+                                                                                        Pad
+                                                                                    </label>
+                                                                                </div>
+                                                                                <div class="form-check">
+                                                                                    <input class="form-check-input" type="checkbox"
+                                                                                    id="fade" disabled value="1">
+                                                                                    <label class="form-check-label" for="fade">
+                                                                                        Fade
+                                                                                    </label>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div class="col"><span class="circle" title="'Pad' adds 2 seconds before and after a selection to the exported audio. 
+                                                                                'Fade' adds a 1 second fade effect to the start and end of the audio">?</span></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="row">
+                                                                    <div class="col ps-0">
+                                                                        <div class="form-group rounded p-2 mb-2 bg-light">
+                                                                            <div id="bitrate-container" class="row pe-3 ease">
+                                                                                <label class="col" for="bitrate">Bitrate:</label>
+                                                                                <select class="form-select col" id="bitrate">
+                                                                                    <option value="320">320 kbps</option>
+                                                                                    <option value="192">192 kbps</option>
+                                                                                    <option value="160">160 kbps</option>
+                                                                                    <option value="128">128 kbps</option>
+                                                                                    <option value="96">96 kbps</option>
+                                                                                </select>
+                                                                            </div>
+                                                                            <div id="quality-container" class="row pe-3 ease">
+                                                                                <label class="col-2" for="quality">Compression
+                                                                                    Level:</label>
+                                                                                    <select class="form-select col" id="quality">
+                                                                                        <option value="0">0</option>
+                                                                                        <option value="1">1</option>
+                                                                                        <option value="2">2</option>
+                                                                                        <option value="3">3</option>
+                                                                                        <option value="4">4</option>
+                                                                                        <option value="5">5</option>
+                                                                                        <option value="6">6</option>
+                                                                                        <option value="7">7</option>
+                                                                                        <option value="8">8</option>
+                                                                                        <option value="9">9</option>
+                                                                                        <option value="10">10</option>
+                                                                                    </select>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div class="col pe-0">
+                                                                            <div class="form-group rounded p-2 mb-2 bg-light">
+                                                                                <span class="circle me-2"
+                                                                                title="When enabled, stereo audio will be downmixed to mono">?</span>
+                                                                                <div class="form-check form-switch">
+                                                                                    <input class="form-check-input" type="checkbox"
+                                                                                    role="switch" id="downmix">
+                                                                                    <label class="form-check-label" for="downmix">Convert to
+                                                                                        mono</label>
+                                                                                        
+                                                                                    </div>
+                                                                                    
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div class="row">
+                                                                            <div class="col pe-0">
+                                                                                <div class="form-group rounded p-2 mb-2 text-bg-danger">
+                                                                                    <span class="circle me-2"
+                                                                                    title="Enter debug mode (requires Chirpity relaunch to take effect)">?</span>
+                                                                                    <div class="form-check form-switch">
+                                                                                        <input class="form-check-input" type="checkbox"
+                                                                                        role="switch" id="debug-mode">
+                                                                                        <label class="form-check-label" for="debug-mode">Debug mode</label>
+                                                                                    </div>
+                                                                                    
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </fieldset>
+                                                            </form>
+                                                        </li>
+                                                    </ul>
+                                                </li>
+                                                <li class="nav-item dropdown active">
+                                                    <a class="nav-link dropdown-toggle" href="#" id="help" role="button"
+                                                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                                    Help
+                                                </a>
+                                                <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                                                    <!-- <li><a class="dropdown-item" id="update" href="#">
+                                                        <span class="material-symbols-outlined text-info">browser_updated</span>Update Available!</a></li> -->
+                                                        <li><a class="dropdown-item" id="usage" href="#">
+                                                            <span class="material-symbols-outlined">help</span> Usage</a>
+                                                        </li>
+                                                        <li>
+                                                            <a class="dropdown-item" id="settings" href="#">
+                                                                <span class="material-symbols-outlined">help</span> Settings
+                                                            </a>
+                                                        </li>
+                                                        <li><a class="dropdown-item" id="keyboard" href="#">
+                                                            <span class="material-symbols-outlined">help</span> Keyboard Shortcuts
                                                         </a>
                                                     </li>
-                                                    <li><a class="dropdown-item" id="keyboard" href="#">
-                                                        <span class="material-symbols-outlined">help</span> Keyboard Shortcuts
+                                                    <li><a class="dropdown-item" id="diagnostics" href="#">
+                                                        <span class="material-symbols-outlined">insights</span> Diagnostics
                                                     </a>
                                                 </li>
-                                                <li><a class="dropdown-item" id="diagnostics" href="#">
-                                                    <span class="material-symbols-outlined">insights</span> Diagnostics
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a class="dropdown-item" id="startTour" href="#">
-                                                    <span class="material-symbols-outlined">tour</span> Show Tour
-                                                </a>
-                                            </li>
-                                        </ul>
-                                    </li>
-                                </ul>
+                                                <li>
+                                                    <a class="dropdown-item" id="startTour" href="#">
+                                                        <span class="material-symbols-outlined">tour</span> Show Tour
+                                                    </a>
+                                                </li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <!-- navbar-collapse.// -->
+                                <img src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"
+                                height="40" />
                             </div>
-                            <!-- navbar-collapse.// -->
-                            <img src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"
-                            height="40" />
-                        </div>
-                        <!-- container-fluid.// -->
-                    </nav>
-                </div>
-                <!-- Content wrapper -->
-                <div id="contentWrapper">
-                    <!-- DIV to Hold the bird list  -->
-                    <div id="allSpecies" class="d-none"></div>
-                    <div id="seenSpecies" class="d-none"></div>
-                    
-                    <!-- Diagnostic Modal -->
-                    <div class="modal fade" id="diagnosticsModal" tabindex="-1" aria-labelledby="diagnosticsModalLabel"
-                    aria-hidden="true">
-                    <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
-                        <div class="modal-content">
-                            <div class="modal-header justify-content-center">
-                                <h5 class="modal-title" id="diagnosticsModalLabel">Diagnostic Information</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
-                                </button>
-                            </div>
-                            <div id="diagnosticsModalBody" class="modal-body"></div>
-                            <div class="modal-footer justify-content-center">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                            </div>
-                        </div>
+                            <!-- container-fluid.// -->
+                        </nav>
                     </div>
-                </div>
-                <!-- Record Entry Modal -->
-                <div class="modal fade" id="record-entry-modal" tabindex="-1" aria-labelledby="record-entry-modal-label"
-                aria-hidden="true">
-                <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
-                    <div class="modal-content">
-                        <div class="modal-header justify-content-center">
-                            <h5 class="modal-title" id="record-entry-modal-label">Edit Record</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
-                            </button>
-                        </div>
-                        <form id="record-entry-form">
-                            <div id="record-entry-modal-body" class="modal-body">
-                                <div class="row">
-                                    <div class="col-8" id="record-entry-birdlist"></div>
-                                    <div class="col hide-in-batch">
-                                        <div class="form-floating mb-3">
-                                            <input type="number" id="call-count" class="form-control" min="1">
-                                            <label for="call-count">Call Count</label>
-                                        </div>
+                    <!-- Content wrapper -->
+                    <div id="contentWrapper">
+                        <!-- DIV to Hold the bird list  -->
+                        <div id="allSpecies" class="d-none"></div>
+                        <div id="seenSpecies" class="d-none"></div>
+                        
+                        <!-- Diagnostic Modal -->
+                        <div class="modal fade" id="diagnosticsModal" tabindex="-1" aria-labelledby="diagnosticsModalLabel" aria-hidden="true">
+                            <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
+                                <div class="modal-content">
+                                    <div class="modal-header justify-content-center">
+                                        <h5 class="modal-title" id="diagnosticsModalLabel">Diagnostic Information</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div id="diagnosticsModalBody" class="modal-body"></div>
+                                    <div class="modal-footer justify-content-center">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                                     </div>
                                 </div>
-                                <fieldset class="border  ps-3 pt-1">
-                                    <label for="record-label" class="text-muted" style="font-size: .75em">Call Type</label><br>
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="radio" name="record-label" id="label-local" value="Local">
-                                        <label class="form-check-label" for="label-local">Local</label>
+                            </div>
+                        </div>  
+                        <!-- Record Entry Modal -->
+                        <div class="modal fade" id="record-entry-modal" tabindex="-1" aria-labelledby="record-entry-modal-label" aria-hidden="true">
+                            <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
+                                <div class="modal-content">
+                                    <div class="modal-header justify-content-center">
+                                        <h5 class="modal-title" id="record-entry-modal-label">Edit Record</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="radio" name="record-label" id="label-nocmig" value="Nocmig">
-                                        <label class="form-check-label" for="label-nocmig">Nocmig</label>
-                                    </div>
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="radio" name="record-label" id="label-unknown" value="">
-                                        <label class="form-check-label" for="label-unknown">Not specified</label>
-                                    </div>
-                                </fieldset>
-                                <div class="form-floating mt-3 hide-in-batch">
-                                    <textarea class="form-control" id="record-comment" style="height: 200px"></textarea>
-                                    <label for="record-comment">Comments</label>
-                                    <input type='hidden' id='DBmode'>
-                                    <input type='hidden' id='batch-mode'>
-                                    <input type='hidden' id='original-id'>
-                                </div>
-                                
-                            </div>
-                            <div class="modal-footer justify-content-center">
-                                <button id="record-add" type="submit" class="btn btn-success">Add</button>
-                                <button id="record-dismiss" type="button" class="btn btn-danger"
-                                data-bs-dismiss="modal">Dismiss</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-            <!-- Help Modal -->
-            <div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
-                <div class="modal-dialog  modal-xl modal-dialog-centered modal-dialog-scrollable">
-                    <div class="modal-content">
-                        <div class="modal-header justify-content-center">
-                            <h5 class="modal-title" id="helpModalLabel">Help</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div id="helpModalBody" class="modal-body"></div>
-                        <div class="modal-footer justify-content-center">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- Analyse selection modal -->
-            <div class="modal fade" id="detectionsModal" tabindex="-1" aria-labelledby="detectionsModalLabel"
-            aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header justify-content-center text-bg-dark">
-                        <h5 class="modal-title" id="detectionsModalLabel">Audio Selection Analysis</h5>
-                    </div>
-                    <div id="detectionsModalBody" class="modal-body p-0 ">
-                        <table id='selectionResults' class="text-center table w-100 align-middle">
-                            <thead id="selectionResultsHead">
-                                <tr class="text-bg-dark">
-                                    <th class="text-start timeOfDay">Time</th>
-                                    <th class="text-start timestamp">Position</th>
-                                    <th class="text-start">Species</th>
-                                    <!-- <th class="text-end">Calls</th>
-                                        <th class="col">Play</th>
-                                        <th class="col">XC</th>
-                                        <th class="">Label</th>
-                                        <th class="col">Notes</th>
-                                        <th class="col text-end">Delete</th> -->
-                                    </tr>
-                                </thead>
-                                <tbody class="text-dark" id="selectionResultTableBody">
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="modal-footer justify-content-center">
-                            <!-- <button id="detections-add" type="button" class="btn btn-success"
-                                data-bs-dismiss="modal">Confirm</button>
-                                <button id="detections-dismiss" type="button" class="btn btn-danger"
-                                data-bs-dismiss="modal">Discard All</button> -->
-                                
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <!-- Goto Modal -->
-                <div class="modal fade" id="gotoModal" tabindex="-1" aria-labelledby="gotoModalLabel" aria-hidden="true">
-                    <div class="modal-dialog modal-dialog-centered modal-sm">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="gotoModalLabel">Go to Position</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <div class="modal-body">
-                                <form id="gotoForm">
-                                    <div class="mb-3">
-                                        <label for="timeInput" class="form-label">
-                                            <input type="text" class="form-control" id="timeInput" name="timeInput"
-                                            placeholder="Enter timecode">
-                                            <small id="gotoHelp" class="form-text text-muted">Accepts seconds, mm:ss and
-                                                hh:mm:ss.</small>
-                                            </label>
-                                        </div>
-                                    </form>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                    <button type="button" class="btn btn-primary" id="go">Go</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Location Modal -->
-                    <div class="modal fade" id="locationModal" tabindex="-1" aria-labelledby="locationModalLabel"
-                    aria-hidden="true">
-                    <div class="modal-dialog modal-dialog-centered">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="gotoModalLabel">Set Location</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <form id="locationForm" class="fs-6">
-                                <div class="modal-body">
-                                    <fieldset class="border rounded m-2 p-1">
-                                        <legend class="h6">Pick A Saved Location</legend>
-                                        <div class="form-group rounded p-2 mb-2 bg-light">
+                                    <form id="record-entry-form">
+                                        <div id="record-entry-modal-body" class="modal-body">
                                             <div class="row">
-                                                <div class="input-group col">
-                                                    <div class="form-group w-100">
-                                                        <label for="savedLocations"></label>
-                                                        <select class="form-select" id="savedLocations">
-                                                        </select>
+                                                <div class="col-8" id="record-entry-birdlist"></div>
+                                                <div class="col hide-in-batch">
+                                                    <div class="form-floating mb-3">
+                                                        <input type="number" id="call-count" class="form-control" min="1">
+                                                        <label for="call-count">Call Count</label>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </fieldset>
-                                    <fieldset class="border rounded m-2 p-1">
-                                        <legend class="h6">Add, Edit or Delete Location</legend>
-                                        <div class="form-group rounded p-2 mb-2 bg-light">
-                                            <div class="row">
-                                                <div class="input-group col">
-                                                    <span class="input-group-text pe-2">Lat:</span>
-                                                    <input id="customLat" type="text" class="form-control ps-2"
-                                                    placeholder="0.0" aria-label="Latitude" aria-describedby="customLat"
-                                                    required>
-                                                    
-                                                    <span class="input-group-text pe-2">Lon:</span>
-                                                    <input id="customLon" type="text" class="form-control ps-2"
-                                                    placeholder="0.0" aria-label="Longitude" aria-describedby="customLon"
-                                                    required>
+                                            <fieldset class="border  ps-3 pt-1">
+                                                <label for="record-label" class="text-muted" style="font-size: .75em">Call Type</label><br>
+                                                <div class="form-check form-check-inline">
+                                                    <input class="form-check-input" type="radio" name="record-label" id="label-local" value="Local">
+                                                    <label class="form-check-label" for="label-local">Local</label>
                                                 </div>
-                                                <div id="customLocationMap" class="mt-2 border border-secondary rounded" style="height: 200px"></div>
+                                                <div class="form-check form-check-inline">
+                                                    <input class="form-check-input" type="radio" name="record-label" id="label-nocmig" value="Nocmig">
+                                                    <label class="form-check-label" for="label-nocmig">Nocmig</label>
+                                                </div>
+                                                <div class="form-check form-check-inline">
+                                                    <input class="form-check-input" type="radio" name="record-label" id="label-unknown" value="">
+                                                    <label class="form-check-label" for="label-unknown">Not specified</label>
+                                                </div>
+                                            </fieldset>
+                                            <div class="form-floating mt-3 hide-in-batch">
+                                                <textarea class="form-control" id="record-comment" style="height: 200px"></textarea>
+                                                <label for="record-comment">Comments</label>
+                                                <input type='hidden' id='DBmode'>
+                                                <input type='hidden' id='batch-mode'>
+                                                <input type='hidden' id='original-id'>
                                             </div>
                                             
-                                            <div class="row">
-                                                <div class="input-group col">
-                                                    <textarea class="mt-2 w-100" id="customPlace" spellcheck="false"
-                                                    maxlength="100" required>...</textarea>
-                                                </div>
-                                            </div>
-                                            <div class="row d-none" id="location-batch-wrapper">
-                                                <div class="input-group col mt-2">
-                                                    <input class="form-check-input" type="checkbox" value="" id="batchLocations">
-                                                    <label class="form-check-label ps-2" for="batchLocations">
-                                                        Update ALL open files to this location
-                                                    </label> 
-                                                </div>
-                                            </div>
                                         </div>
-                                    </fieldset>
+                                        <div class="modal-footer justify-content-center">
+                                            <button id="record-add" type="submit" class="btn btn-success">Add</button>
+                                            <button id="record-dismiss" type="button" class="btn btn-danger" data-bs-dismiss="modal">Dismiss</button>
+                                        </div>
+                                    </form>
                                 </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                    <button type="button" class="btn btn-primary" id="set-location">Set Location</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-                <!-- Explore Div -->
-                <div id="exploreWrapper" class="p-1 row g-1 d-none justify-content-evenly">
-                    <div class="species-selector col" id="exploreSpeciesSearch">
-                        <div id="explore-list" class="explore bird-list-wrapper form-floating"></div>
-                    </div>
-                    <div class="col" id="exploreSpeciesSearch">
-                        <div id="explore-location-list" class="form-floating">
-                            <select spellcheck="false" class="input form-select mb-3" aria-label=".form-select"
-                            id="explore-locations"></select>
-                            <label for="explore-locations">Location</label>
-                        </div>
-                    </div>
-                    <div class="col align-middle">
-                        <div class="btn btn-light me-2 pt-3" id="exploreRange">
-                            <i class="material-symbols-outlined align-bottom">date_range</i>&nbsp;
-                            <span>Apply a date filter</span> <i class="material-symbols-outlined float-end">expand_more</i>
-                        </div>
-                    </div>
-                </div>
-                <!-- context menu-->
-                <div class="dropdown-menu dropdown-menu-sm" id="context-menu">
-                    <a class="dropdown-item play"><span class='material-symbols-outlined'>play_circle</span> Play</a>
-                    <a class="dropdown-item" href="#" id="context-analyse-selection"><span class="material-symbols-outlined">
-                        search
-                    </span> Analyse</a>
-                    <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" id="create-manual-record" href="#"><span class="material-symbols-outlined">
-                        edit_document
-                    </span> Edit Record</a>
-                    <a class="dropdown-item" id="context-create-clip" href="#"><span class="material-symbols-outlined">
-                        music_note
-                    </span> Export Audio Clip</a>
-                    <a class="dropdown-item d-none" id="context-xc" href='#' target="xc">
-                        <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> Explore on
-                        Xeno-Canto</a>
-                        
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item d-none" id="context-delete" href="#">
-                            <span class='delete material-symbols-outlined'>delete_forever</span> Delete Record</a>
-                            
-                        </div>
-                        <!-- End context menu -->
-                        <!-- Spectrogram view -->
-                        <div class="w-100 d-none" id="spectrogramWrapper">
-                            <div>
-                                <div class="bg-dark border border-secondary w-100" id="timeline"></div>
-                                <div class="w-100" id="spectrogram">
-                                    <span title="Toggle Fullscreen mode (Ctrl+F)" id="fullscreen"
-                                    class="material-symbols-outlined btn btn-outline-secondary p-1 pointer d-none">fullscreen</span>
-                                </div>
-                                <div class="w-100" id="waveform"></div>
                             </div>
-                            <!-- Controls view -->
-                            <div class="container-fluid p-1 text-bg-dark d-inline-flex" id="controlsWrapper" style="max-height: 50px">
-                                <div id="filename" class="col-auto ps-1 overflow-visible flex-nowrap"></div>
-                                <div id="unsaved-icon" class="material-symbols-outlined ms-2 me-2 text-warning d-none" title="There are unsaved edits">warning</div>
-                                <div class="col-auto btn-group bg-dark ms-2 me-2 text-nowrap" role="group">
-                                    <button id="playToggle" class="p-1 pe-2 btn btn-outline-secondary">
-                                        <span class="material-symbols-outlined ">play_circle</span><span
-                                        class="align-middle d-none d-lg-inline"> Play </span>
-                                        /
-                                        <span class="material-symbols-outlined">pause</span><span
-                                        class="align-middle d-none d-lg-inline-block">Pause</span>
-                                    </button>
-                                </div>
-                                
-                                <div class="col btn-group bg-dark  pe-2" role="group">
-                                    <button id="zoomIn" title="Zoom into the spectrogram (Ctrl +)" class="btn btn-outline-secondary"
-                                    style="max-width: 70px">
-                                    <span class="material-symbols-outlined zoom">zoom_in</span>
-                                </button>
-                                <button id="zoomOut" title="Zoom out of the spectrogram (Ctrl -)" class="btn btn-outline-secondary"
-                                style="max-width: 70px"><span class="material-symbols-outlined zoom align-middle">zoom_out</span>
-                            </button>
                         </div>
-                        <div id="progressDiv" class="col-2 d-none"><span id="fileNumber"></span><br>
-                            <progress id="progress-bar" max="100" style="width:90%"></progress>
+                        <!-- Help Modal -->
+                        <div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+                            <div class="modal-dialog  modal-xl modal-dialog-centered modal-dialog-scrollable">
+                                <div class="modal-content">
+                                    <div class="modal-header justify-content-center">
+                                        <h5 class="modal-title" id="helpModalLabel">Help</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div id="helpModalBody" class="modal-body"></div>
+                                    <div class="modal-footer justify-content-center">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Analyse selection modal -->
+                        <div class="modal fade" id="detectionsModal" tabindex="-1" aria-labelledby="detectionsModalLabel" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                                <div class="modal-content">
+                                    <div class="modal-header justify-content-center text-bg-dark">
+                                        <h5 class="modal-title" id="detectionsModalLabel">Audio Selection Analysis</h5>
+                                    </div>
+                                    <div id="detectionsModalBody" class="modal-body p-0 ">
+                                        <table id='selectionResults' class="text-center table w-100 align-middle">
+                                            <thead id="selectionResultsHead">
+                                                <tr class="text-bg-dark">
+                                                    <th class="text-start timeOfDay">Time</th>
+                                                    <th class="text-start timestamp">Position</th>
+                                                    <th class="text-start">Species</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="text-dark" id="selectionResultTableBody">
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="modal-footer justify-content-center">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         
-                        <div id="complete" class="col-2 pe-2" style="display:none">
-                        </div>
-                        <div class="col pe-1">
-                            <div class="btn-group float-end" id="filter-panel">
-                                <span style="max-width: 70px" title="Nocmig mode on" id="nocmigMode"
-                                class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">nights_stay</span>
-                                <span style="max-width: 70px" id="audioFiltersIcon" title="Experimental audio filters applied"
-                                class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">blur_on</span>
-                                <span style="max-width: 70px" id="context-mode" title="Context Aware mode enabled"
-                                class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2 text-warning">swap_horiz</span>
-                                <span style="max-width: 70px" id="list-icon" class="btn btn-outline-secondary p-1"><img
-                                    class="icon" src="img/migrants.png" alt="migrants"></span>
-                                    <span style="max-width: 70px" title="Prediction confidence threshold" id="threshold-value"
-                                    class="btn btn-outline-secondary p-1 fs-5"><b>50%</b>
-                                </span>
-                                <span id="confidenceSliderContainer" class="d-none">
-                                    <label for="confidenceValue" class="visually-hidden">confidence</label><input type="range"
-                                    class="form-range vertical position-absolute" step="5" min="5" id="confidenceValue">
-                                </span>
+                        <!-- Goto Modal -->
+                        <div class="modal fade" id="gotoModal" tabindex="-1" aria-labelledby="gotoModalLabel" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered modal-sm">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="gotoModalLabel">Go to Position</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <form id="gotoForm">
+                                            <div class="mb-3">
+                                                <label for="timeInput" class="form-label">
+                                                    <input type="text" class="form-control" id="timeInput" name="timeInput"
+                                                    placeholder="Enter timecode">
+                                                    <small id="gotoHelp" class="form-text text-muted">Accepts seconds, mm:ss and
+                                                        hh:mm:ss.</small>
+                                                    </label>
+                                                </div>
+                                            </form>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="button" class="btn btn-primary" id="go">Go</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Location Modal -->
+                            <div class="modal fade" id="locationModal" tabindex="-1" aria-labelledby="locationModalLabel"
+                            aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="locationModalLabel">Set Location</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <form id="locationForm" class="fs-6">
+                                        <div class="modal-body">
+                                            <fieldset class="border rounded m-2 p-1">
+                                                <legend class="h6">Pick A Saved Location</legend>
+                                                <div class="form-group rounded p-2 mb-2 bg-light">
+                                                    <div class="row">
+                                                        <div class="input-group col">
+                                                            <div class="form-group w-100">
+                                                                <label for="savedLocations"></label>
+                                                                <select class="form-select" id="savedLocations">
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </fieldset>
+                                            <fieldset class="border rounded m-2 p-1">
+                                                <legend class="h6">Add, Edit or Delete Location</legend>
+                                                <div class="form-group rounded p-2 mb-2 bg-light">
+                                                    <div class="row">
+                                                        <div class="input-group col">
+                                                            <span class="input-group-text pe-2">Lat:</span>
+                                                            <input id="customLat" type="text" class="form-control ps-2"
+                                                            placeholder="0.0" aria-label="Latitude" aria-describedby="customLat"
+                                                            required>
+                                                            
+                                                            <span class="input-group-text pe-2">Lon:</span>
+                                                            <input id="customLon" type="text" class="form-control ps-2"
+                                                            placeholder="0.0" aria-label="Longitude" aria-describedby="customLon"
+                                                            required>
+                                                        </div>
+                                                        <div id="customLocationMap" class="mt-2 border border-secondary rounded" style="height: 200px"></div>
+                                                    </div>
+                                                    
+                                                    <div class="row">
+                                                        <div class="input-group col">
+                                                            <textarea class="mt-2 w-100" id="customPlace" spellcheck="false"
+                                                            maxlength="100" required>...</textarea>
+                                                        </div>
+                                                    </div>
+                                                    <div class="row d-none" id="location-batch-wrapper">
+                                                        <div class="input-group col mt-2">
+                                                            <input class="form-check-input" type="checkbox" value="" id="batchLocations">
+                                                            <label class="form-check-label ps-2" for="batchLocations">
+                                                                Update ALL open files to this location
+                                                            </label> 
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </fieldset>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="button" class="btn btn-primary" id="set-location">Set Location</button>
+                                        </div>
+                                    </form>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-                <!-- Result container -->
-                <div class="d-none" id="resultTableContainer">
-                    <div class="row g-0 h-100">
-                        <div class="col-4 h-100 overflow-auto" id="summary">
-                            <!-- Summary table -->
-                            <!--                <div class="rounded-border">-->
-                                <div id='summaryTable'></div>
-                                <!--                </div>-->
+                        <!-- Explore Div -->
+                        <div id="exploreWrapper" class="p-1 row g-1 d-none justify-content-evenly">
+                            <div class="species-selector col" id="exploreSpeciesSearch">
+                                <div id="explore-list" class="explore bird-list-wrapper form-floating"></div>
                             </div>
-                            <!-- Results table -->
-                            <div class="col-8 ps-1 pe-0 h-100 position-relative overflow-auto" id="resultsDiv">
-                                <nav aria-label="Identification results">
-                                    <ul class="m-2 pagination justify-content-center"></ul>
-                                </nav>
-                                <table id='results' class="text-center table w-100 align-middle">
-                                    <thead id="resultsHead" class="d-none">
-                                        <tr class="bg-dark">
-                                            <th class="time-sort col text-start timeOfDay pointer" title="Sort results by detection time"><span class="text-muted material-symbols-outlined time-sort-icon">sort</span> Time</th>
-                                            <th class="time-sort text-start timestamp pointer" title="Sort results by detection time"><span class="text-muted material-symbols-outlined time-sort-icon">sort</span> Position</th>
-                                            <th id="confidence-sort" class="text-start pointer" title="Sort results by detection confidence"><span class="text-muted material-symbols-outlined species-sort-icon  d-none">sort</span> Species</th>
-                                            <th class="text-end">Calls</th>
-                                            <th class="col">Label</th>
-                                            <th class="col text-end">Notes</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="text-dark" id="resultTableBody">
-                                    </tbody>
-                                </table>
-                                <nav aria-label="Identification results">
-                                    <ul class="m-2 pagination justify-content-center"></ul>
-                                </nav>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <!-- Records container -->
-                <div class="d-none h-100 overflow-auto" id="recordsContainer">
-                    <div class="container-fluid">
-                        <div class="row p-1 g-1 justify-content-evenly">
                             <div class="col">
-                                <div id="speciesSearch" class="species-selector">
-                                    <div id="chart-list" class="chart bird-list-wrapper form-floating"></div>
-                                </div>
-                            </div>
-                            <div class="col" id="exploreSpeciesSearch">
-                                <div id="chart-location-list" class="form-floating">
+                                <div id="explore-location-list" class="form-floating">
                                     <select spellcheck="false" class="input form-select mb-3" aria-label=".form-select"
-                                    id="chart-locations"></select>
+                                    id="explore-locations"></select>
                                     <label for="explore-locations">Location</label>
                                 </div>
                             </div>
-                            <div class="col">
-                                <div class="btn btn-light pt-3" id="chartRange">
+                            <div class="col align-middle">
+                                <div class="btn btn-light me-2 pt-3" id="exploreRange">
                                     <i class="material-symbols-outlined align-bottom">date_range</i>&nbsp;
-                                    <span>Apply a date filter</span> <i
-                                    class="material-symbols-outlined  align-bottom">expand_more</i>
+                                    <span>Apply a date filter</span> <i class="material-symbols-outlined float-end">expand_more</i>
                                 </div>
                             </div>
                         </div>
-                        <div class="row">
-                            <div id='dataRecords' class="col-3">
-                                <table class="table table-striped border border-dark rounded-border mt-5">
-                                    <tbody id="recordsTableBody">
-                                        <tr>
-                                            <th id="speciesName" class="text-center" colspan="2"></th>
-                                        </tr>
-                                        <tr>
-                                            <th>Earliest Spring Record</th>
-                                            <td id="earliestSpring"></td>
-                                        </tr>
-                                        <tr>
-                                            <th>Latest Spring Record</th>
-                                            <td id="latestSpring"></td>
-                                        </tr>
-                                        <tr>
-                                            <th>Earliest Autumn Record</th>
-                                            <td id="earliestAutumn"></td>
-                                        </tr>
-                                        <tr>
-                                            <th>Latest Autumn Record</th>
-                                            <td id="latestAutumn"></td>
-                                        </tr>
-                                        <tr>
-                                            <th>Most Calls in 24 hours</th>
-                                            <td id="mostDetections"></td>
-                                        </tr>
-                                        <tr class="fst-italic text-sm-start">
-                                            <th>Chart generated in:</th>
-                                            <td id="genTime"></td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                        <!-- context menu-->
+                        <div class="dropdown-menu dropdown-menu-sm" id="context-menu">
+                            <a class="dropdown-item play"><span class='material-symbols-outlined'>play_circle</span> Play</a>
+                            <a class="dropdown-item" href="#" id="context-analyse-selection"><span class="material-symbols-outlined">
+                                search
+                            </span> Analyse</a>
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item" id="create-manual-record" href="#"><span class="material-symbols-outlined">
+                                edit_document
+                            </span> Edit Record</a>
+                            <a class="dropdown-item" id="context-create-clip" href="#"><span class="material-symbols-outlined">
+                                music_note
+                            </span> Export Audio Clip</a>
+                            <a class="dropdown-item d-none" id="context-xc" href='#' target="xc">
+                                <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> Explore on
+                                Xeno-Canto</a>
+                                
+                                <div class="dropdown-divider"></div>
+                                <a class="dropdown-item d-none" id="context-delete" href="#">
+                                    <span class='delete material-symbols-outlined'>delete_forever</span> Delete Record</a>
+                                    
+                                </div>
+                                <!-- End context menu -->
+                                <!-- Spectrogram view -->
+                                <div class="w-100 d-none" id="spectrogramWrapper">
+                                    <div>
+                                        <div class="bg-dark border border-secondary w-100" id="timeline"></div>
+                                        <div class="w-100" id="spectrogram">
+                                            <span title="Toggle Fullscreen mode (Ctrl+F)" id="fullscreen"
+                                            class="material-symbols-outlined btn btn-outline-secondary p-1 pointer d-none">fullscreen</span>
+                                        </div>
+                                        <div class="w-100" id="waveform"></div>
+                                    </div>
+                                    <!-- Controls view -->
+                                    <div class="container-fluid p-1 text-bg-dark d-inline-flex" id="controlsWrapper" style="max-height: 50px">
+                                        <div id="filename" class="col-auto ps-1 overflow-visible flex-nowrap"></div>
+                                        <div id="unsaved-icon" class="material-symbols-outlined ms-2 me-2 text-warning d-none" title="There are unsaved edits">warning</div>
+                                        <div class="col-auto btn-group bg-dark ms-2 me-2 text-nowrap" role="group">
+                                            <button id="playToggle" class="p-1 pe-2 btn btn-outline-secondary">
+                                                <span class="material-symbols-outlined ">play_circle</span><span
+                                                class="align-middle d-none d-lg-inline"> Play </span>
+                                                /
+                                                <span class="material-symbols-outlined">pause</span><span
+                                                class="align-middle d-none d-lg-inline-block">Pause</span>
+                                            </button>
+                                        </div>
+                                        
+                                        <div class="col btn-group bg-dark  pe-2" role="group">
+                                            <button id="zoomIn" title="Zoom into the spectrogram (Ctrl +)" class="btn btn-outline-secondary"
+                                            style="max-width: 70px">
+                                            <span class="material-symbols-outlined zoom">zoom_in</span>
+                                        </button>
+                                        <button id="zoomOut" title="Zoom out of the spectrogram (Ctrl -)" class="btn btn-outline-secondary"
+                                        style="max-width: 70px"><span class="material-symbols-outlined zoom align-middle">zoom_out</span>
+                                    </button>
+                                </div>
+                                <div id="progressDiv" class="col-2 d-none"><span id="fileNumber"></span><br>
+                                    <progress id="progress-bar" max="100" style="width:90%"></progress>
+                                </div>
+                                
+                                <div id="complete" class="col-2 pe-2" style="display:none">
+                                </div>
+                                <div class="col pe-1">
+                                    <div class="btn-group float-end" id="filter-panel">
+                                        <span style="max-width: 70px" title="Nocmig mode on" id="nocmigMode"
+                                        class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">nights_stay</span>
+                                        <span style="max-width: 70px" id="audioFiltersIcon" title="Experimental audio filters applied"
+                                        class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">blur_on</span>
+                                        <span style="max-width: 70px" id="context-mode" title="Context Aware mode enabled"
+                                        class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2 text-warning">swap_horiz</span>
+                                        <span style="max-width: 70px" id="list-icon" class="btn btn-outline-secondary p-1"><img
+                                            class="icon" src="img/migrants.png" alt="migrants"></span>
+                                            <span style="max-width: 70px" title="Prediction confidence threshold" id="threshold-value"
+                                            class="btn btn-outline-secondary p-1 fs-5"><b>50%</b>
+                                        </span>
+                                        <span id="confidenceSliderContainer" class="d-none">
+                                            <label for="confidenceValue" class="visually-hidden">confidence</label><input type="range"
+                                            class="form-range vertical position-absolute" step="5" min="5" id="confidenceValue">
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="col-9">
-                            <div class="chart-outer">
-                                <div class="border border-dark rounded-3" id="chart-week"></div>
+                        <!-- Result container -->
+                        <div class="d-none" id="resultTableContainer">
+                            <div class="row g-0 h-100">
+                                <div class="col-4 h-100 overflow-auto" id="summary">
+                                    <!-- Summary table -->
+                                    <div id='summaryTable'></div>
+                                </div>
+                                <!-- Results table -->
+                                <div class="col-8 ps-1 pe-0 h-100 position-relative overflow-auto" id="resultsDiv">
+                                    <nav aria-label="Identification results">
+                                        <ul class="m-2 pagination justify-content-center"></ul>
+                                    </nav>
+                                    <table id='results' class="text-center table w-100 align-middle">
+                                        <thead id="resultsHead" class="d-none">
+                                            <tr class="bg-dark">
+                                                <th class="time-sort col text-start timeOfDay pointer" title="Sort results by detection time"><span class="text-muted material-symbols-outlined time-sort-icon">sort</span> Time</th>
+                                                <th class="time-sort text-start timestamp pointer" title="Sort results by detection time"><span class="text-muted material-symbols-outlined time-sort-icon">sort</span> Position</th>
+                                                <th id="confidence-sort" class="text-start pointer" title="Sort results by detection confidence"><span class="text-muted material-symbols-outlined species-sort-icon  d-none">sort</span> Species</th>
+                                                <th class="text-end">Calls</th>
+                                                <th class="col">Label</th>
+                                                <th class="col text-end">Notes</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="text-dark" id="resultTableBody">
+                                        </tbody>
+                                    </table>
+                                    <nav aria-label="Identification results">
+                                        <ul class="m-2 pagination justify-content-center"></ul>
+                                    </nav>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Records container -->
+                        <div class="d-none h-100 overflow-auto" id="recordsContainer">
+                            <div class="container-fluid">
+                                <div class="row p-1 g-1 justify-content-evenly">
+                                    <div class="col">
+                                        <div id="speciesSearch" class="species-selector">
+                                            <div id="chart-list" class="chart bird-list-wrapper form-floating"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col">
+                                        <div id="chart-location-list" class="form-floating">
+                                            <select spellcheck="false" class="input form-select mb-3" aria-label=".form-select"
+                                            id="chart-locations"></select>
+                                            <label for="explore-locations">Location</label>
+                                        </div>
+                                    </div>
+                                    <div class="col">
+                                        <div class="btn btn-light pt-3" id="chartRange">
+                                            <i class="material-symbols-outlined align-bottom">date_range</i>&nbsp;
+                                            <span>Apply a date filter</span> <i
+                                            class="material-symbols-outlined  align-bottom">expand_more</i>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div id='dataRecords' class="col-3">
+                                        <table class="table table-striped border border-dark rounded-border mt-5">
+                                            <tbody id="recordsTableBody">
+                                                <tr>
+                                                    <th id="speciesName" class="text-center" colspan="2"></th>
+                                                </tr>
+                                                <tr>
+                                                    <th>Earliest Spring Record</th>
+                                                    <td id="earliestSpring"></td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Latest Spring Record</th>
+                                                    <td id="latestSpring"></td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Earliest Autumn Record</th>
+                                                    <td id="earliestAutumn"></td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Latest Autumn Record</th>
+                                                    <td id="latestAutumn"></td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Most Calls in 24 hours</th>
+                                                    <td id="mostDetections"></td>
+                                                </tr>
+                                                <tr class="fst-italic text-sm-start">
+                                                    <th>Chart generated in:</th>
+                                                    <td id="genTime"></td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    <div class="col-9">
+                                        <div class="chart-outer">
+                                            <div class="border border-dark rounded-3" id="chart-week"></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-        
-        
-        <!-- Footer -->
-        <footer class="p-1 text-bg-primary" id="footer">
-            <div class="d-none text-sm-start" id="update-progress">Downloading update: 
-                <progress value="0" id="update-progress-bar" max="100" style="width:100px"></progress>
-            </div>
-            <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span><br></small>
-        </footer>
-        <script src="node_modules/wavesurfer.js/dist/wavesurfer.min.js"></script>
-        <script  src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js"></script>
-        <script  src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js"></script>
-        <script  src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.regions.min.js"></script>
-        <script defer src="js/highcharts.js"></script>
-        <script defer src="js/series-label.js"></script>
-        <script defer src="js/exporting.js"></script>
-        <script defer src="js/export-data.js"></script>
-        <script defer src="js/accessibility.js"></script>
-        <script defer src="js/no-data-to-display.js"></script>
-        <script defer src="./js/ui.js"></script>
-        <script>
-            let map, marker;
-            async function onMapClick(e) {
-                    const {lat, lng} = e.latlng;
-                    const target = map.getContainer().id;
-                    if (target === 'settingsMap'){
-                        const latEl = document.getElementById('latitude')
-                        const lonEl = document.getElementById('longitude')
-                        latEl.value = config.latitude = lat.toFixed(2); 
-                        lonEl.value = config.longitude = lng.toFixed(2);
-                        const placeEl = document.getElementById('place');
-                        placeEl.innerHTML = 'Fetching...'
-                    } else {
-                        const latEl = document.getElementById('customLat')
-                        const lonEl = document.getElementById('customLon')
-                        latEl.value = lat.toFixed(2); 
-                        lonEl.value = lng.toFixed(2);
-                        const customPlaceEl = document.getElementById('customPlace');
-                        customPlaceEl.value = 'Fetching...'
-                    }
-                    updateMap(lat, lng);
-                    displayLocationAddress(target);
-                    // Stop propagation of the click event to the map
-                    L.DomEvent.stopPropagation(e);
-            }
-
-            const showMap = (where) => {
-                if (where === 'customLocationMap' && LOCATIONS.length){
-                    const markerGroup = L.featureGroup(); // Create a feature group to hold the markers
-                    const bounds = L.latLngBounds(); // Create bounds to include all markers
-                    // Add default location
-                    const marker = L.marker([config.latitude, config.longitude]).addTo(markerGroup);
-
-                    bounds.extend(marker.getLatLng()); // Extend the bounds to include this marker
-                
-                    LOCATIONS.forEach(markerData => {
-                        const { lat, lon } = markerData;
                         
-                        const marker = L.marker([lat, lon]).addTo(markerGroup);
+                        <!-- Footer -->
+                        <footer class="p-1 text-bg-primary" id="footer">
+                            <div class="d-none text-sm-start" id="update-progress">Downloading update: 
+                                <progress value="0" id="update-progress-bar" max="100" style="width:100px"></progress>
+                            </div>
+                            <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span><br></small>
+                        </footer>
+                        <script src="node_modules/wavesurfer.js/dist/wavesurfer.min.js"></script>
+                        <script  src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js"></script>
+                        <script  src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js"></script>
+                        <script  src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.regions.min.js"></script>
+                        <script defer src="js/highcharts.js"></script>
+                        <script defer src="js/series-label.js"></script>
+                        <script defer src="js/exporting.js"></script>
+                        <script defer src="js/export-data.js"></script>
+                        <script defer src="js/accessibility.js"></script>
+                        <script defer src="js/no-data-to-display.js"></script>
+                        <script defer src="./js/ui.js"></script>
+                        <script>
+                            let map, marker;
+                            async function onMapClick(e) {
+                                const {lat, lng} = e.latlng;
+                                const target = map.getContainer().id;
+                                if (target === 'settingsMap'){
+                                    const latEl = document.getElementById('latitude')
+                                    const lonEl = document.getElementById('longitude')
+                                    latEl.value = config.latitude = lat.toFixed(2); 
+                                    lonEl.value = config.longitude = lng.toFixed(2);
+                                    const placeEl = document.getElementById('place');
+                                    placeEl.innerHTML = 'Fetching...'
+                                } else {
+                                    const latEl = document.getElementById('customLat')
+                                    const lonEl = document.getElementById('customLon')
+                                    latEl.value = lat.toFixed(2); 
+                                    lonEl.value = lng.toFixed(2);
+                                    const customPlaceEl = document.getElementById('customPlace');
+                                    customPlaceEl.value = 'Fetching...'
+                                }
+                                updateMap(lat, lng);
+                                displayLocationAddress(target);
+                                // Stop propagation of the click event to the map
+                                L.DomEvent.stopPropagation(e);
+                            }
+                            
+                            const showMap = (where) => {
+                                if (where === 'customLocationMap' && LOCATIONS.length){
+                                    const markerGroup = L.featureGroup(); // Create a feature group to hold the markers
+                                    const bounds = L.latLngBounds(); // Create bounds to include all markers
+                                    // Add default location
+                                    const marker = L.marker([config.latitude, config.longitude]).addTo(markerGroup);
+                                    
+                                    bounds.extend(marker.getLatLng()); // Extend the bounds to include this marker
+                                    
+                                    LOCATIONS.forEach(markerData => {
+                                        const { lat, lon } = markerData;
+                                        
+                                        const marker = L.marker([lat, lon]).addTo(markerGroup);
+                                        
+                                        bounds.extend(marker.getLatLng()); // Extend the bounds to include this marker
+                                    });
+                                    
+                                    map.fitBounds(bounds)
+                                    const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                                        maxZoom: 15,
+                                        minZoom: 3,
+                                        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                                    }).addTo(map);
+                                    markerGroup.addTo(map)
+                                    const firstMarkerEl = document.querySelector('.leaflet-marker-icon')
+                                    firstMarkerEl.classList.add('leaflet-marker-icon-default')
+                                    markerGroup.on('click', function (e) {
+                                        onMapClick(e)
+                                    });
+                                } else{
+                                    map.setView([config.latitude, config.longitude], 11);
+                                    const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                                        maxZoom: 15,
+                                        minZoom: 3,
+                                        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                                    }).addTo(map);
+                                    if (!marker) marker = L.marker([config.latitude, config.longitude]).addTo(map);
+                                    const firstMarkerEl = document.querySelector('.leaflet-marker-icon')
+                                    firstMarkerEl.classList.add('leaflet-marker-icon-default')
+                                    marker.on('click', onMapClick);
+                                }
+                            }
+                            const latLonElements = ['latitude', 'longitude', 'customLat', 'customLon'];
+                            latLonElements.forEach(el => {
+                                const where = el.indexOf('custom') > -1 ? 'customLocationMap' : 'settingsMap';
+                                el = document.getElementById(el);
+                                el.addEventListener('change', () => {
+                                    showMap(where);
+                                    displayLocationAddress(where);
+                                });
+                            })
+                            
+                            function updateMap(lat,lng){
+                                // Update the marker's position
+                                if (!marker) marker = L.marker([lat, lng]).addTo(map);
+                                marker.setLatLng([lat, lng]);
+                                // Center the map view on the new marker position
+                                map.setView([lat, lng]);
+                            }
+                            async function placeMap(divID){
+                                map?.remove(); marker = undefined;
+                                map = L.map(divID);
+                                if (divID === 'settingsMap'){
+                                    latTxt = 'latitude';
+                                    lonTxt = 'longitude';
+                                } else{
+                                    latTxt = 'customLat';
+                                    lonTxt = 'customLon';
+                                }
+                                const latEl = document.getElementById(latTxt);
+                                const lonEl = document.getElementById(lonTxt);
+                                
+                                showMap(divID);
+                                map.on('click', onMapClick);
+                                
+                            }
+                            
+                        </script>
                         
-                        bounds.extend(marker.getLatLng()); // Extend the bounds to include this marker
-                    });
-            
-                    map.fitBounds(bounds)
-                    const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        maxZoom: 15,
-                        minZoom: 3,
-                        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    }).addTo(map);
-                    markerGroup.addTo(map)
-                    const firstMarkerEl = document.querySelector('.leaflet-marker-icon')
-                    firstMarkerEl.classList.add('leaflet-marker-icon-default')
-                    markerGroup.on('click', function (e) {
-                        onMapClick(e)
-                    });
-                } else{
-                    map.setView([config.latitude, config.longitude], 11);
-                    const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        maxZoom: 15,
-                        minZoom: 3,
-                        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    }).addTo(map);
-                    if (!marker) marker = L.marker([config.latitude, config.longitude]).addTo(map);
-                    const firstMarkerEl = document.querySelector('.leaflet-marker-icon')
-                    firstMarkerEl.classList.add('leaflet-marker-icon-default')
-                    marker.on('click', onMapClick);
-                }
-            }
-            const latLonElements = ['latitude', 'longitude', 'customLat', 'customLon'];
-            latLonElements.forEach(el => {
-                const where = el.indexOf('custom') > -1 ? 'customLocationMap' : 'settingsMap';
-                el = document.getElementById(el);
-                el.addEventListener('change', () => {
-                    showMap(where);
-                    displayLocationAddress(where);
-                });
-            })
-
-            function updateMap(lat,lng){
-                // Update the marker's position
-                if (!marker) marker = L.marker([lat, lng]).addTo(map);
-                marker.setLatLng([lat, lng]);
-                // Center the map view on the new marker position
-                map.setView([lat, lng]);
-            }
-            async function placeMap(divID){
-                map?.remove(); marker = undefined;
-                map = L.map(divID);
-                if (divID === 'settingsMap'){
-                    latTxt = 'latitude';
-                    lonTxt = 'longitude';
-                } else{
-                    latTxt = 'customLat';
-                    lonTxt = 'customLon';
-                }
-                const latEl = document.getElementById(latTxt);
-                const lonEl = document.getElementById(lonTxt);
-
-                showMap(divID);
-                map.on('click', onMapClick);
-
-            }
-            
-        </script>
-        
-    </body>
-    
-    </html>
+                    </body>
+                    
+                    </html>

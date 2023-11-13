@@ -2554,13 +2554,13 @@ const updateSummary = ({ summary = [], filterSpecies = '' }) => {
         }
         const selected = item.cname === filterSpecies ? ' text-warning' : '';
         summaryHTML += `<tr tabindex="-1" class="${selected}">
-                        <td class="max">${iconizeScore(item.max)}</td>
-                        <td class="cname">
-                            <span class="pointer"><span class="cname">${item.cname}</span> <br><i>${item.sname}</i></span>
-                        </td>
-                        <td class="text-end">${item.count}</td>
-                        <td class="text-end">${item.calls}</td>
-                        `;
+                            <td class="max">${iconizeScore(item.max)}</td>
+                            <td class="cname">
+                                <span class="pointer"><span class="cname">${item.cname}</span> <br><i>${item.sname}</i></span>
+                            </td>
+                            <td class="text-end">${item.count}</td>
+                            <td class="text-end">${item.calls}</td>
+                        </tr>`;
 
     }
     summaryHTML += '</tbody></table>';
