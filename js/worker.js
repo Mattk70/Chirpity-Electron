@@ -22,7 +22,7 @@ let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on ever
 
 const DEBUG = false;
 
-const DATASET = true;
+const DATASET = false;
 const adding_chirpity_additions = true;
 const dataset_database = DATASET;
 
@@ -1306,7 +1306,7 @@ const convertSpecsFromExistingSpecs = async (path) => {
 }
 
 const saveResults2DataSet = ({species}) => {
-    const rootDirectory = 'C:/Users/simpo/PycharmProjects/Data/New Dataset';
+    const rootDirectory = 'C:/Users/simpo/PycharmProjects/Data/Test Dataset';
     const height = 256, width = 384;
     let t0 = Date.now()
     let promise = Promise.resolve();
@@ -1829,7 +1829,7 @@ async function parseMessage(e) {
                 let worker = await parsePredictions(response);
                 //if (response['finished']) {
 
-                process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, ${response.file},  Prediction requests ${predictionsRequested[response.file]}, predictions received ${predictionsReceived[response.file]}    \n`)
+                //process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, ${response.file},  Prediction requests ${predictionsRequested[response.file]}, predictions received ${predictionsReceived[response.file]}    \n`)
                 if (predictionsReceived[response.file] === predictionsRequested[response.file]) {
                     const limit = 10;
                     clearCache(CACHE_LOCATION, limit);
@@ -1882,10 +1882,11 @@ function updateFilesBeingProcessed(file) {
     }
 }
 
+
 // Optional Arguments
 async function processNextFile({
     start = undefined, end = undefined, worker = undefined
-} = {}) {
+} = {}) { 
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
         if (DATASET && FILE_QUEUE.length % 100 === 0) {
