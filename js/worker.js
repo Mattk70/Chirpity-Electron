@@ -470,7 +470,7 @@ const prepSummaryStatement = () => {
         extraClause += ' AND dateTime BETWEEN ? AND ? ';
     }
     if (STATE.detect.nocmig){
-        extraClause += ' AND isDaylight != 1 ';
+        extraClause += ' AND (isDaylight != 1 OR isDaylight IS NULL) ';
     }
     if (STATE.blocked.length) {
         const excluded = prepParams(STATE.blocked);
