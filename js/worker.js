@@ -22,7 +22,7 @@ let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on ever
 
 const DEBUG = false;
 
-const DATASET = false;
+const DATASET = true;
 const adding_chirpity_additions = true;
 const dataset_database = DATASET;
 
@@ -1306,7 +1306,7 @@ const convertSpecsFromExistingSpecs = async (path) => {
 }
 
 const saveResults2DataSet = ({species}) => {
-    const rootDirectory = 'C:/Users/simpo/PycharmProjects/Data/test';
+    const rootDirectory = 'C:/Users/simpo/PycharmProjects/Data/New Dataset';
     const height = 256, width = 384;
     let t0 = Date.now()
     let promise = Promise.resolve();
