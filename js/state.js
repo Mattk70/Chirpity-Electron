@@ -71,7 +71,7 @@ export class State {
     }
 
     increment() {
-        if (++this.predictionCount === 5) {
+        if (++this.predictionCount === 20) {
             this.predictionCount = 0
         }
         return this.predictionCount;

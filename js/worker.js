@@ -22,7 +22,7 @@ let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on ever
 
 const DEBUG = false;
 
-const DATASET = false;
+const DATASET = true;
 const adding_chirpity_additions = true;
 const dataset_database = DATASET;
 
@@ -80,6 +80,8 @@ const createDB = async (file) => {
         CONSTRAINT fk_files
             FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`);
     await db.runAsync('CREATE INDEX idx_datetime ON records(dateTime)');
+    await db.runAsync('CREATE INDEX idx_species ON records(speciesID)');
+    await db.runAsync('CREATE INDEX idx_files ON records(fileID)');
     if (archiveMode) {
         for (let i = 0; i < LABELS.length; i++) {
             const [sname, cname] = LABELS[i].replaceAll("'", "''").split('_');
@@ -129,6 +131,10 @@ async function loadDB(path) {
             await diskDB.runAsync('ALTER TABLE records ADD COLUMN isDaylight INTEGER')
             console.log('Added isDaylight column to records table')
         }
+        const datetime =  diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_datetime ON records(dateTime)');
+        const species = diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_species ON records(speciesID)');
+        const files =  diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_files ON records(fileID)');
+        await Promise.all([datetime, species, files]);
         console.log("Opened and cleaned disk db " + file)
     }
     return true
@@ -261,8 +267,11 @@ async function handleMessage(e) {
             break;
         case 'filter':
             if (STATE.db) {
-                await getResults(args);
-                await getSummary(args);
+                t0 = Date.now()
+                await Promise.all([getSummary(args), getResults(args)]);
+                // await getSummary(args);
+                // await getResults(args)
+                console.warn('Filter took ', (Date.now() - t0) / 1000, 'seconds')
             }
             break;
         case 'get-detected-species-list':
@@ -410,28 +419,6 @@ const getFilesInDirectory = async (dir) => {
 
 const prepParams = (list) => list.map(item => '?').join(',');
 
-
-const getResultsParams = (species, confidence, offset, limit, topRankin) => {
-    const blocked = (STATE.blocked.length && !STATE.selection) ?
-        STATE.blocked : [];
-    const params = [];
-    if (blocked.length) params.push(...blocked);
-
-    params.push(topRankin, confidence, species);
-    if (['analyse', 'archive'].includes(STATE.mode) && !STATE.selection) {
-        params.push(...STATE.filesToAnalyse);
-    }
-    if (STATE.selection) params.push(STATE.selection.start, STATE.selection.end);
-    else if (STATE.explore.range.start !== undefined) {
-        params.push(STATE.explore.range.start, STATE.explore.range.end);
-    }
-    if (STATE.locationID) {
-        params.push(STATE.locationID);
-    }
-    if (limit !== Infinity) params.push(limit, offset);
-    return params
-}
-
 const getSummaryParams = (species) => {
     const blocked = STATE.blocked.length && !STATE.selection ? STATE.blocked : [];
     const range = STATE.mode === 'explore' ? STATE.explore.range : STATE.selection?.range;
@@ -445,21 +432,19 @@ const getSummaryParams = (species) => {
     extraParams.push(...blocked);
     if (STATE.locationID) extraParams.push(STATE.locationID);
     params.push(...extraParams);
-    params.push(STATE.detect.confidence, species);
-    params.push(...extraParams);
+    if (species) params.push(species);
     return params
 }
 
-const prepSummaryStatement = () => {
+const prepSummaryStatement = (species) => {
     const blocked = STATE.blocked.length && !STATE.selection ? STATE.blocked : [];
     const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
     const useRange = range?.start;
     let summaryStatement = `
     WITH ranked_records AS (
-        SELECT records.dateTime, records.speciesID, records.confidence, records.fileID, cname, sname, callCount, isDaylight,
+        SELECT records.dateTime, records.confidence, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, COALESCE(isDaylight, 0) as isDaylight,
           RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
         FROM records
-        JOIN files ON files.id = records.fileID
         JOIN species ON species.id = records.speciesID
         WHERE confidence >=  ? `;
     let extraClause = '';
@@ -470,40 +455,58 @@ const prepSummaryStatement = () => {
         extraClause += ' AND dateTime BETWEEN ? AND ? ';
     }
     if (STATE.detect.nocmig){
-        extraClause += ' AND (isDaylight != 1 OR isDaylight IS NULL) ';
+        extraClause += ' AND isDaylight != 1 ';
     }
-    if (STATE.blocked.length) {
-        const excluded = prepParams(STATE.blocked);
+    if (blocked.length) {
+        const excluded = prepParams(blocked);
         extraClause += ` AND speciesID NOT IN (${excluded}) `;
     }
+
     if (STATE.locationID) {
         extraClause += ' AND locationID = ? ';
     }
     summaryStatement += extraClause;
     summaryStatement += `
     )
-    SELECT cname, sname, COUNT(*) as count, SUM(IFNULL(callcount, 1)) as calls, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
+    SELECT cname, sname, COUNT(*) as count, SUM(callcount) as calls, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
       FROM ranked_records
       WHERE ranked_records.rank <= ${STATE.topRankin}
       GROUP BY speciesID
     UNION ALL
     SELECT
         'Total' AS sname,
-        cname as cname,
+        1 as cname,
         COUNT(*) AS count,
-        ROUND(MAX(ranked_records.confidence) / 10.0, 0) AS max,
+        1 AS max,
         1 as making_union_work
       FROM
-        ranked_records
-        JOIN files ON files.id = ranked_records.fileID
-    WHERE confidence >= ? AND cname LIKE ? AND ranked_records.rank <= ${STATE.topRankin} `;
-    summaryStatement += extraClause;
-    summaryStatement += 'ORDER BY cname';
+        ranked_records`;
+    if (species) summaryStatement += ` WHERE cname = ? `;
+    summaryStatement += ' ORDER BY cname';
+    //summaryStatement += extraClause;
+    //summaryStatement += 'ORDER BY cname';
     STATE.GET_SUMMARY_SQL = STATE.db.prepare(summaryStatement);
     //console.log('Summary SQL statement:\n' + summaryStatement)
 }
 
-const prepResultsStatement = (noLimit) => {
+
+const getResultsParams = (species, confidence, offset, limit, topRankin) => {
+    const params = [];
+    params.push(confidence);
+    if (species) params.push(species);
+    const blocked = (! species && STATE.blocked.length && !STATE.selection) ?
+        STATE.blocked : [];
+    if (blocked.length) params.push(...blocked);
+    if (['analyse', 'archive'].includes(STATE.mode) && !STATE.selection) {
+        params.push(...STATE.filesToAnalyse);
+    }
+
+    if (limit !== Infinity) params.push(limit, offset);
+    params.push(topRankin);
+    return params
+}
+
+const prepResultsStatement = (species, noLimit) => {
     let resultStatement = `
     WITH ranked_records AS (
         SELECT 
@@ -521,16 +524,41 @@ const prepResultsStatement = (noLimit) => {
           records.comment, 
           records.end,
           records.callCount,
+          records.isDaylight,
           RANK() OVER (PARTITION BY records.dateTime, records.fileID ORDER BY records.confidence DESC) AS confidence_rank
         FROM records 
           JOIN species ON records.speciesID = species.id 
-          JOIN files ON records.fileID = files.id `;
+          JOIN files ON records.fileID = files.id 
+          WHERE confidence >= ?
+    `;
 
-    const blocked = STATE.selection ? [] : STATE.blocked;
+    if (species) resultStatement+=  ` AND speciesID = (SELECT id FROM species WHERE cname = ?) `;
+    
+    const blocked = STATE.selection || species ? [] : STATE.blocked;
     if (blocked.length) resultStatement += ` AND speciesID NOT IN (${prepParams(blocked)}) `;
+    // might have two locations with same dates - so need to add files
+    if (['analyse', 'archive'].includes(STATE.mode) && !STATE.selection) {
+        resultStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+    }
+    // Prioritise selection ranges
+    const range = STATE.selection?.start ? STATE.selection :
+        STATE.mode === 'explore' ? STATE.explore.range : false;
 
-    resultStatement += `
-    )
+    const useRange = range?.start;  
+    if (useRange) {
+        resultStatement += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
+    }
+    if (STATE.selection) resultStatement += ` AND name = '${FILE_QUEUE[0]}' `;
+    if (STATE.locationID) {
+        resultStatement += ` AND locationID = ${STATE.locationID} `;
+    }
+    if (STATE.detect.nocmig){
+        resultStatement += ' AND isDaylight != 1 ';
+    }
+    const limitClause = noLimit ? '' : 'LIMIT ?  OFFSET ?';
+    resultStatement += ` ORDER BY ${STATE.sortOrder}, confidence DESC, callCount DESC ${limitClause} `;
+
+    resultStatement += `)
       SELECT 
         dateTime as timestamp, 
         duration, 
@@ -548,37 +576,11 @@ const prepResultsStatement = (noLimit) => {
         confidence_rank
       FROM 
         ranked_records 
-        WHERE confidence_rank <= ? AND confidence >= ? AND cname LIKE ? `;
+        WHERE confidence_rank <= ? `;
 
-
-    // might have two locations with same dates - so need to add files
-    if (['analyse', 'archive'].includes(STATE.mode) && !STATE.selection) {
-        resultStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
-    }
-    // Prioritise selection ranges
-    const range = STATE.selection?.start ? STATE.selection :
-        STATE.mode === 'explore' ? STATE.explore.range : false;
-
-    const useRange = range?.start;
-    if (useRange) {
-        resultStatement += ' AND dateTime BETWEEN ? AND ? ';
-    }
-    if (STATE.locationID) {
-        resultStatement += ' AND locationID = ? ';
-    }
-    const useLimit = noLimit ? '' : 'LIMIT ?  OFFSET ?';
-    resultStatement += `ORDER BY ${STATE.sortOrder}, confidence DESC, callCount DESC ${useLimit}`;
     STATE.GET_RESULT_SQL = STATE.db.prepare(resultStatement);
-    //console.log('Results SQL statement:\n' + resultStatement)
 }
 
-// const prepStatements = () => {
-//     const t0 = performance.now()
-//     prepResultsStatement();
-//     prepSummaryStatement();
-//     console.log(STATE);
-//     console.log(`database Statement prep took ${performance.now() - t0}` )
-// };
 
 // Not an arrow function. Async function has access to arguments - so we can pass them to processnextfile
 async function onAnalyse({
@@ -601,7 +603,7 @@ async function onAnalyse({
     canBeRemovedFromCache = [];
     batchChunksToSend = {};
     FILE_QUEUE = filesInScope;
-    filesBeingProcessed = [...filesInScope];
+
 
     if (!STATE.selection) {
         // Clear records from the memory db
@@ -611,15 +613,15 @@ async function onAnalyse({
     }
 
     let count = 0;
-    if (DATASET) {
+    if (DATASET  && !STATE.selection) {
         for (let i = FILE_QUEUE.length - 1; i >= 0; i--) {
             let file = FILE_QUEUE[i];
             //STATE.db = diskDB;
             const result = await diskDB.getAsync('SELECT name FROM files WHERE name = ?', file);
-            if (result) {
-                console.log(`Skipping ${file.name}, already analysed`)
+            if (result && result.name !== FILE_QUEUE[0]) {
+                console.log(`Skipping ${file}, already analysed`)
                 FILE_QUEUE.splice(i, 1)
-                filesBeingProcessed.splice(i, 1)
+                //filesBeingProcessed.splice(i, 1)
                 count++
                 continue;
             }
@@ -646,8 +648,7 @@ async function onAnalyse({
             } else {
                 onChangeMode('archive');
                 FILE_QUEUE.forEach(file => UI.postMessage({ event: 'update-audio-duration', value: metadata[file].duration }))
-                await getResults();
-                await getSummary();
+                await Promise.all([getSummary(), getResults()]);
 
             }
             return;
@@ -656,6 +657,9 @@ async function onAnalyse({
     }
     console.log("FILE_QUEUE has ", FILE_QUEUE.length, 'files', count, 'files ignored')
     if (!STATE.selection) onChangeMode('analyse');
+
+    filesBeingProcessed = [...FILE_QUEUE];
+
     for (let i = 0; i < NUM_WORKERS; i++) {
         processNextFile({ start: start, end: end, worker: i });
     }
@@ -733,7 +737,7 @@ const convertFileFormat = (file, destination, size, error) => {
                 const time = parseInt(a[0]) * 3600 + parseInt(a[1]) * 60 + parseFloat(a[2]);
                 // AND HERE IS THE CALCULATION
                 const extractionProgress = time / totalTime;
-                process.stdout.write(`Processing: ${((time / totalTime) * 100).toFixed(0)}% converted\r`);
+                //process.stdout.write(`Processing: ${((time / totalTime) * 100).toFixed(0)}% converted\r`);
                 UI.postMessage({
                     event: 'progress', text: 'Extracting file', progress: extractionProgress
                 })
@@ -780,9 +784,8 @@ async function getWorkingFile(file) {
             // get some metadata from the source file
             const statsObj = fs.statSync(source_file);
             const sourceMtime = statsObj.mtime;
-
             proxy = await convertFileFormat(source_file, destination, statsObj.size, function (errorMessage) {
-                console.log(errorMessage);
+                console.log('An error occurred converting to wav: ', errorMessage);
                 return true;
             });
             // assign the source file's save time to the proxy file
@@ -945,7 +948,21 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
             // Now we have completed the date comparison above, we convert fileStart to millis
             fileStart = fileStart.getTime();
             // We use proxy here as the file *must* be a wav file
-            const readStream = fs.createReadStream(proxy);
+            let readStream;
+            try {
+                // Your code that may throw a TypeError
+                readStream = fs.createReadStream(proxy);
+            } catch (error) {
+                if (error instanceof TypeError) {
+                  // Handle the TypeError
+                  console.error('Caught a TypeError setmetadata:', error.message);
+                } else {
+                  // Handle other types of errors
+                  console.error('An unexpected error occurred:', error.message);
+                }
+              }
+              
+
             readStream.on('data', async chunk => {
                 let wav = new wavefileReader.WaveFileReader();
                 wav.fromBuffer(chunk);
@@ -1108,9 +1125,22 @@ const getPredictBuffers = async ({
     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for WINDOW_SIZE second chunks
     const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * WINDOW_SIZE;
     const proxy = metadata[file].proxy;
-    const readStream = fs.createReadStream(proxy, {
-        start: byteStart, end: byteEnd, highWaterMark: highWaterMark
-    });
+    let readStream;
+    try {
+        // Your code that may throw a TypeError
+        readStream = fs.createReadStream(proxy, {
+            start: byteStart, end: byteEnd, highWaterMark: highWaterMark
+        });
+    } catch (error) {
+        if (error instanceof TypeError) {
+          // Handle the TypeError
+          console.error('Caught a TypeError get predictbuffers:', error.message);
+        } else {
+          // Handle other types of errors
+          console.error('An unexpected error occurred:', error.message);
+        }
+      }
+    
     let chunkStart = start * sampleRate;
     readStream.on('data', async chunk => {
         // Ensure data is processed in order
@@ -1766,7 +1796,7 @@ const parsePredictions = async (response) => {
                 };
             }
         }
-    }
+    } 
 
     //STATE.userSettingsInSelection = false;
     predictionsReceived[file]++;
@@ -1795,7 +1825,7 @@ const parsePredictions = async (response) => {
         console.log(`Prediction done ${filesBeingProcessed.length} files to go`);
         console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
     }
-    if (!STATE.selection) getSummary({ interim: true });
+    if (!STATE.selection && (!DATASET || STATE.increment() === 0)  ) getSummary({ interim: true });
     return response.worker
 }
 
@@ -1854,8 +1884,7 @@ async function parseMessage(e) {
 
                 if (response['updateResults'] && STATE.db) {
                     // update-results called after setting migrants list, so DB may not be initialized
-                    await getResults();
-                    await getSummary();
+                    await Promise.all([getSummary(), getResults()]);
                     if (['explore', 'chart'].includes(STATE.mode)) {
                         // Update the seen species list
                         getSpecies();
@@ -1889,10 +1918,10 @@ async function processNextFile({
 } = {}) { 
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
-        if (DATASET && FILE_QUEUE.length % 100 === 0) {
-            await onSave2DiskDB({file: file});
-            console.log("Saved results to disk db", FILE_QUEUE.length, "files remaining")
-        }
+        // if (DATASET && FILE_QUEUE.length % 100 === 0) {
+        //     await onSave2DiskDB({file: file});
+        //     console.log("Saved results to disk db", FILE_QUEUE.length, "files remaining")
+        // }
         const found = await getWorkingFile(file);
         if (found) {
             if (end) {
@@ -1912,6 +1941,7 @@ async function processNextFile({
                     UI.postMessage({
                         event: 'prediction-ongoing', file: file, result: result, index: index
                     });
+                    console.log('Recursion: start = end')
                     await processNextFile(arguments[0]);
 
                 } else {
@@ -1929,6 +1959,7 @@ async function processNextFile({
                 }
             }
         } else {
+            console.log('Recursion: not found')
             await processNextFile(arguments[0]);
         }
     }
@@ -2027,7 +2058,7 @@ const getSummary = async ({
     topRankin = STATE.topRankin
 } = {}) => {
     const db = STATE.db;
-    prepSummaryStatement();
+    prepSummaryStatement(species);
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
     let range, files = [];
     if (['explore', 'chart'].includes(STATE.mode)) {
@@ -2037,8 +2068,8 @@ const getSummary = async ({
     }
 
     t0 = Date.now();
-    const speciesForSTMT = species || '%';
-    const params = getSummaryParams(speciesForSTMT);
+    //const speciesForSTMT = species || '%';
+    const params = getSummaryParams(species);
     const summary = await STATE.GET_SUMMARY_SQL.allAsync(...params);
 
     if (DEBUG) console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds");
@@ -2071,12 +2102,11 @@ const getSummary = async ({
 const getResults = async ({
     species = undefined,
     context = 'results',
-    limit = 500,
+    limit = STATE.limit,
     offset = undefined,
     topRankin = STATE.topRankin,
     exportTo = undefined
 } = {}) => {
-    prepResultsStatement(limit === Infinity);
     let confidence = STATE.detect.confidence;
     if (offset === undefined) { // Get offset state
         if (species) {
@@ -2093,11 +2123,13 @@ const getResults = async ({
     let index = offset;
     AUDACITY = {};
     let t0 = Date.now();
-    const speciesForSTMT = species || '%';
-    const params = getResultsParams(speciesForSTMT, confidence, offset, limit, topRankin);
+
+    const params = getResultsParams(species, confidence, offset, limit, topRankin);
+    prepResultsStatement(species, limit === Infinity);
+
     const result = await STATE.GET_RESULT_SQL.allAsync(...params);
     if (exportTo && limit === Infinity){
-        // Format the values
+        // CSV export. Format the values
         const formattedValues = result.map(formatCSVValues);
         // Create a write stream for the CSV file
         let filename = species ? species : 'All';
@@ -2115,7 +2147,7 @@ const getResults = async ({
             const r = result[i];
             if (exportTo) {
                 if (limit){
-                    // Format date to YYYY-MM-DD-HH-MM-ss
+                    // Audio export. Format date to YYYY-MM-DD-HH-MM-ss
                     const dateString = new Date(r.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
                     const filename = `${r.cname}-${dateString}.${STATE.audio.format}`
                     console.log(`Exporting from ${r.file}, position ${r.position}, into folder ${exportTo}`)
@@ -2239,18 +2271,13 @@ const sendResult = (index, result, fromDBQuery) => {
 
 
 const getSavedFileInfo = async (file) => {
-    // look for file in the disk DB, ignore extension
-    return new Promise(function (resolve) {
-        const baseName = file.replace(/^(.*)\..*$/g, '$1%');
-        const stmt = diskDB.prepare('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)');
-        stmt.get(baseName, (err, row) => {
-            if (err) {
-                console.log('There was an error ', err)
-            } else {
-                resolve(row)
-            }
-        })
-    })
+    // look for file in the disk DB, ignore extension        
+        let row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name = ?',file);
+        if (!row) {
+            const baseName = file.replace(/^(.*)\..*$/g, '$1%');
+            row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)',baseName);
+        }
+        return row
 };
 
 
@@ -2663,8 +2690,7 @@ and its associated records were deleted successfully`,
             render: true
         });
 
-        getResults();
-        getSummary();
+        await Promise.all([getSummary(), getResults()]);
     } else {
         UI.postMessage({
             event: 'generate-alert', message: `${fileName} 

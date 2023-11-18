@@ -494,13 +494,30 @@ const filename = document.getElementById('filename');
 filename.addEventListener('click', openFileInList);
 filename.addEventListener('contextmenu', buildFileMenu);
 
+function extractFileNameAndFolder(path) {
+    const regex = /[\\\/]([^\\\/]+)[\\\/]([^\\\/]+)$/; // Regular expression to match the parent folder and file name
+  
+    const match = path.match(regex);
+  
+    if (match) {
+      const parentFolder = match[1];
+      const fileName = match[2];
+      return { parentFolder, fileName };
+    } else {
+      // Return a default value or handle the case where the path doesn't match the pattern
+      return { parentFolder: '', fileName: '' };
+    }
+  }
+
 function renderFilenamePanel() {
     if (!currentFile) return;
     const openfile = currentFile;
     const files = fileList;
     let filenameElement = document.getElementById('filename');
     filenameElement.innerHTML = '';
-    let label = openfile.replace(/^.*[\\\/]/, "");
+    //let label = openfile.replace(/^.*[\\\/]/, "");
+    const {parentFolder, fileName}  = extractFileNameAndFolder(openfile)
+    const label = `${parentFolder}/${fileName}`;
     let appendStr;
     const isSaved = ['archive', 'explore'].includes(STATE.mode) ? 'text-info' : 'text-warning';
     if (files.length > 1) {
@@ -1431,7 +1448,8 @@ window.onload = async () => {
             lon: config.longitude,
             detect: config.detect,
             filters: config.filters,
-            audio: config.audio
+            audio: config.audio,
+            limit: config.limit
         });
         loadModel();
         worker.postMessage({ action: 'clear-cache' })
@@ -2205,10 +2223,12 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         }
     },
     ArrowUp: function () {
-        if (currentBuffer) {
-            const position = wavesurfer.getCurrentTime() / windowLength;
-            bufferBegin = Math.max(0, bufferBegin - windowLength);
-            postBufferUpdate({ begin: bufferBegin, position: position })
+        if (activeRow) {
+            activeRow.classList.remove('table-active')
+            activeRow = activeRow.previousSibling || activeRow;
+            activeRow.classList.add('table-active')
+            activeRow.focus();
+            if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
         }
     },
     PageDown: function () {
@@ -2219,10 +2239,12 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         }
     },
     ArrowDown: function () {
-        if (currentBuffer) {
-            const position = wavesurfer.getCurrentTime() / windowLength;
-            bufferBegin = Math.min(bufferBegin + windowLength, currentFileDuration - windowLength);
-            postBufferUpdate({ begin: bufferBegin, position: position })
+        if (activeRow) {
+            activeRow.classList.remove('table-active')
+            activeRow = activeRow.nextSibling || activeRow;
+            activeRow.classList.add('table-active')
+            activeRow.focus();
+            if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
         }
     },
     ArrowLeft: function () {
@@ -2891,6 +2913,7 @@ const deleteRecord = (target) => {
     if (target === activeRow) {}
     else if (target instanceof PointerEvent) target = activeRow;
     else {
+        //I'm not sure what triggers this
         target.forEach(position => {
             const [start, end] = position;
             worker.postMessage({
@@ -2950,6 +2973,8 @@ const deleteSpecies = (target) => {
     table.deleteRow(row.rowIndex);
     const resultTable = document.getElementById('resultTableBody');
     resultTable.innerHTML = '';
+    // Highlight the next row
+    if (row.rowIndex) row.rowIndex.click()
 }
 
 const getSelectionRange = () => {
@@ -3335,7 +3360,7 @@ $(function () {
             },
             timePicker: true,
             timePicker24Hour: true,
-            timePickerIncrement: 60,
+            timePickerIncrement: 5,
             startDate: start,
             endDate: end,
             opens: "left",
@@ -3804,8 +3829,8 @@ function positionMenu(menu, event) {
 
 $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('contextmenu', createContextMenu)
 
-
-const recordEntryModal = new bootstrap.Modal(document.getElementById('record-entry-modal'), { backdrop: 'static' });
+const recordEntryModalDiv = document.getElementById('record-entry-modal')
+const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, { backdrop: 'static' });
 const recordEntryHandler = () => {
     worker.postMessage({
         action: 'filter',
@@ -3815,8 +3840,10 @@ const recordEntryHandler = () => {
 }
 
 const recordEntryForm = document.getElementById('record-entry-form');
+let focusBirdList;
 
 async function showRecordEntryForm(mode, batch) {
+    document.removeEventListener("keydown", handleKeyDownDeBounce, true);
     const cname = batch ? document.querySelector('#speciesFilter .text-warning .cname .cname').innerText : region.attributes.label.replace('?', '');
     let callCount = '', typeIndex = '', commentText = '';
     if (cname && activeRow) {
@@ -3826,6 +3853,10 @@ async function showRecordEntryForm(mode, batch) {
         typeIndex = ['Local', 'Nocmig', ''].indexOf(activeRow.querySelector('.label').innerText);
     }
     const recordEntryBirdList = recordEntryForm.querySelector('#record-entry-birdlist');
+    focusBirdList = () => {
+        const allBirdList = document.getElementById('bird-list-all')
+        allBirdList.focus()
+    }
     recordEntryBirdList.innerHTML = generateBirdOptionList({ store: 'allSpecies', rows: undefined, selected: cname });
     const batchHide = recordEntryForm.querySelectorAll('.hide-in-batch');
     batchHide.forEach(el => batch ? el.classList.add('d-none') : el.classList.remove('d-none'));
@@ -3836,9 +3867,13 @@ async function showRecordEntryForm(mode, batch) {
     recordEntryForm.querySelector('#original-id').value = cname;
     recordEntryForm.querySelector('#record-add').innerText = mode;
     if (typeIndex) recordEntryForm.querySelectorAll('input[name="record-label"]')[typeIndex].checked = true;
+    recordEntryModalDiv.addEventListener('shown.bs.modal', focusBirdList)
     recordEntryModal.show();
 }
 
+recordEntryModalDiv.addEventListener('hide.bs.modal', () => {
+    document.addEventListener("keydown", handleKeyDownDeBounce, true)
+})
 recordEntryForm.addEventListener('submit', function (e) {
     e.preventDefault();
     const action = document.getElementById('DBmode').value;
@@ -3856,6 +3891,7 @@ recordEntryForm.addEventListener('submit', function (e) {
     const count = document.getElementById('call-count')?.value;
     const comment = document.getElementById('record-comment')?.value;
     const label = document.querySelector('input[name="record-label"]:checked')?.value || '';
+
     recordEntryModal.hide();
     insertManualRecord(cname, start, end, comment, count, label, action, batch, originalCname)
 })
