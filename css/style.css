@@ -8,6 +8,21 @@ body {
     background: #f8f9fa;
 }
 
+.overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 9999;
+}
+
+.spinner-border {
+    width: 5rem; 
+    height: 5rem;
+    border-width: .8rem;
+    color: #212529;
+}
+
 @font-face {
     font-family: 'Material Symbols Outlined';
     font-display: block;
