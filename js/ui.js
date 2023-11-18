@@ -63,7 +63,15 @@ async function getPaths() {
     return [appPath, tempPath];
 }
 
+// Function to show the loading spinner
+function showLoadingSpinner() {
+    document.getElementById('loadingOverlay').classList.remove('d-none');
+}
 
+// Function to hide the loading spinner
+function hideLoadingSpinner() {
+    document.getElementById('loadingOverlay').classList.add('d-none');
+}
 let version;
 let DIAGNOSTICS = {};
 
@@ -1021,6 +1029,7 @@ exploreLink.addEventListener('click', async () => {
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
     enableMenuItem(['saveCSV']);
     adjustSpecDims(true)
+    showLoadingSpinner();
     worker.postMessage({ action: 'filter', species: undefined, range: STATE.explore.range, explore: true }); // re-prepare
 });
 
@@ -1510,6 +1519,9 @@ const setUpWorkerMessaging = () => {
                             alert(args.message) 
                         }
                     }
+                    break;
+                case 'hide-spinner':
+                    hideLoadingSpinner();
                     break;
                 case 'location-list':
                     LOCATIONS = args.locations;
@@ -2653,6 +2665,7 @@ async function onPredictionDone({
         DIAGNOSTICS['Analysis Rate'] = (DIAGNOSTICS['Audio Duration'] / analysisTime).toFixed(0) + 'x faster than real time performance.';
     }
 
+    
     // Set active Row
     const resultTable = document.getElementById('resultTableBody');
     if (active) {
@@ -2697,7 +2710,7 @@ pagination.forEach(item => {
             const limit = config.limit;
             const offset = (clicked - 1) * limit;
             const species = isSpeciesViewFiltered(true);
-
+            showLoadingSpinner();
             worker.postMessage({
                 action: 'filter',
                 species: species,
@@ -2758,6 +2771,7 @@ function speciesFilter(e) {
     }); // no re-prepare
     seenTheDarkness = false;
     shownDaylightBanner = false;
+    showLoadingSpinner();
     document.getElementById('results').scrollTop = 0;
 }
 

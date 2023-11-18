@@ -269,9 +269,8 @@ async function handleMessage(e) {
             if (STATE.db) {
                 t0 = Date.now()
                 await Promise.all([getSummary(args), getResults(args)]);
-                // await getSummary(args);
-                // await getResults(args)
-                console.warn('Filter took ', (Date.now() - t0) / 1000, 'seconds')
+                UI.postMessage({event: 'hide-spinner'});
+                if (DEBUG) console.log('Filter took ', (Date.now() - t0) / 1000, 'seconds')
             }
             break;
         case 'get-detected-species-list':
