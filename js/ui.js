@@ -1029,7 +1029,6 @@ exploreLink.addEventListener('click', async () => {
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
     enableMenuItem(['saveCSV']);
     adjustSpecDims(true)
-    showLoadingSpinner();
     worker.postMessage({ action: 'filter', species: undefined, range: STATE.explore.range, explore: true }); // re-prepare
 });
 
@@ -1550,6 +1549,9 @@ const setUpWorkerMessaging = () => {
                     break;
                 case 'seen-species-list':
                     generateBirdList('seenSpecies', args.list);
+                    break;
+                case 'show-spinner':
+                    showLoadingSpinner();
                     break;
                 case 'spawning':
                     displayWarmUpMessage();

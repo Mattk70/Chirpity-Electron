@@ -268,9 +268,10 @@ async function handleMessage(e) {
         case 'filter':
             if (STATE.db) {
                 t0 = Date.now()
+                UI.postMessage({event: 'show-spinner'});
                 await Promise.all([getSummary(args), getResults(args)]);
-                UI.postMessage({event: 'hide-spinner'});
                 if (DEBUG) console.log('Filter took ', (Date.now() - t0) / 1000, 'seconds')
+                
             }
             break;
         case 'get-detected-species-list':
@@ -333,6 +334,7 @@ async function handleMessage(e) {
             await onUpdateFileStart(args)
             break;
         case 'update-list':
+            UI.postMessage({event: 'show-spinner'});
             SEEN_LIST_UPDATE = false;
             predictWorkers.forEach(worker =>
                 worker.postMessage({ message: 'list', list: args.list }))
@@ -2175,7 +2177,7 @@ const getResults = async ({
             }
         }
     }
-
+    UI.postMessage({event: 'hide-spinner'});
 };
 
 // Function to format the CSV export
