@@ -64,12 +64,14 @@ async function getPaths() {
 }
 
 // Function to show the loading spinner
-function showLoadingSpinner() {
-    document.getElementById('loadingOverlay').classList.remove('d-none');
+function showLoadingSpinner(durationThreshold) {
+    window.loadingTimer = setTimeout(function () {
+        document.getElementById('loadingOverlay').classList.remove('d-none');
+    }, durationThreshold);
 }
-
 // Function to hide the loading spinner
 function hideLoadingSpinner() {
+    clearTimeout(window.loadingTimer);
     document.getElementById('loadingOverlay').classList.add('d-none');
 }
 let version;
@@ -799,11 +801,6 @@ const getSelectionResults = (fromDB) => {
     let start = region.start + bufferBegin;
     // Remove small amount of region to avoid pulling in results from 'end'
     let end = region.end + bufferBegin - 0.001;
-    // const mod = end - start % 3;
-    // if (end - start < 1.5 || mod < 1.5) {
-    //     region.end += 1.5;
-    //     end += 1.5;
-    // }
     STATE.selection = {};
     STATE['selection']['start'] = start.toFixed(3);
     STATE['selection']['end'] = end.toFixed(3);
@@ -816,15 +813,6 @@ const getSelectionResults = (fromDB) => {
         fromDB: fromDB
     });
 }
-
-// const navbarAnalysis = document.getElementById('navbarAnalysis');
-// navbarAnalysis.addEventListener('click', async () => {
-//     // Switch to Analyse mode
-//     if (STATE.mode !== 'analyse'){
-//         worker.postMessage({ action: 'change-mode', mode: 'analyse' });
-//          worker.postMessage({ action: 'filter' });
-//     }
-// });
 
 const analyseLink = document.getElementById('analyse');
 analyseLink.addEventListener('click', async () => {
@@ -1015,7 +1003,7 @@ const handleLocationFilterChange = (e) => {
     worker.postMessage({ action: 'update-state', locationID: location });
     // Update the seen species list
     worker.postMessage({ action: 'get-detected-species-list' })
-    if (STATE.mode === 'explore') worker.postMessage({ action: 'filter', species: isSpeciesViewFiltered(true), explore: true });
+    if (STATE.mode === 'explore') worker.postMessage({ action: 'filter', species: isSpeciesViewFiltered(true), updateSummary: true });
 }
 
 const exploreLink = document.getElementById('explore');
@@ -1029,7 +1017,7 @@ exploreLink.addEventListener('click', async () => {
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
     enableMenuItem(['saveCSV']);
     adjustSpecDims(true)
-    worker.postMessage({ action: 'filter', species: undefined, range: STATE.explore.range, explore: true }); // re-prepare
+    worker.postMessage({ action: 'filter', species: undefined, range: STATE.explore.range, updateSummary: true }); // re-prepare
 });
 
 const datasetLink = document.getElementById('dataset');
@@ -1498,7 +1486,7 @@ const setUpWorkerMessaging = () => {
                     onOpenFiles(args);
                     break;
                 case 'generate-alert':
-                    if (args.render) {
+                    if (args.updateFilenamePanel) {
                         renderFilenamePanel();
                         window.electron.unsavedRecords(false);
                         document.getElementById('unsaved-icon').classList.add('d-none');
@@ -1509,11 +1497,12 @@ const setUpWorkerMessaging = () => {
                         if (confirm(message)) deleteFile(args.file)
                     } else { 
                         if (args.filter){
-                        worker.postMessage({
-                            action: 'filter',
-                            species: isSpeciesViewFiltered(true),
-                            active: getActiveRowID(),
-                        }); // no re-prepare
+                            worker.postMessage({
+                                action: 'filter',
+                                species: isSpeciesViewFiltered(true),
+                                active: getActiveRowID(),
+                                updateSummary: true
+                            }); // no re-prepare
                         } else {
                             alert(args.message) 
                         }
@@ -1535,9 +1524,6 @@ const setUpWorkerMessaging = () => {
                     renderFilenamePanel();
                     console.log('Mode changed to: ' + args.mode);
                     break;
-                case 'no-detections-remain':
-                    detectionsModal.hide();
-                    break;
                 case 'prediction-done':
                     onPredictionDone(args);
                     break;
@@ -1551,7 +1537,7 @@ const setUpWorkerMessaging = () => {
                     generateBirdList('seenSpecies', args.list);
                     break;
                 case 'show-spinner':
-                    showLoadingSpinner();
+                    showLoadingSpinner(500);
                     break;
                 case 'spawning':
                     displayWarmUpMessage();
@@ -1666,7 +1652,7 @@ $(document).on('change', '#bird-list-seen', function (e) {
     } else {
         action = 'filter';
     }
-    worker.postMessage({ action: action, species: cname, range: STATE[context].range }) // no re-prepare
+    worker.postMessage({ action: action, species: cname, range: STATE[context].range, updateSummary: true }) // no re-prepare
 
 })
 
@@ -2571,6 +2557,11 @@ function onProgress(args) {
     }
 }
 
+function updatePagination(total, offset) {
+        //Pagination
+        total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
+    
+}
 
 const updateSummary = ({ summary = [], filterSpecies = '' }) => {
     let total, summaryHTML = `<table id="resultSummary" class="table table-dark p-1"><thead>
@@ -2651,6 +2642,7 @@ async function onPredictionDone({
     }
     //Pagination
     total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
+    
     if (action !== 'filter') {
         if (! isEmptyObject(AUDACITY_LABELS)) {
             enableMenuItem(['saveLabels', 'saveCSV']);
@@ -2712,7 +2704,6 @@ pagination.forEach(item => {
             const limit = config.limit;
             const offset = (clicked - 1) * limit;
             const species = isSpeciesViewFiltered(true);
-            showLoadingSpinner();
             worker.postMessage({
                 action: 'filter',
                 species: species,
@@ -2758,7 +2749,14 @@ function speciesFilter(e) {
     clearActive();
     let species, range;
     // Am I trying to unfilter?
-    if (!e.target.closest('tr').classList.contains('text-warning')) {
+    if (e.target.closest('tr').classList.contains('text-warning')) {
+        e.target.closest('tr').classList.remove('text-warning');
+    } else {
+        //Clear any highlighted rows
+        const tableRows = summary.querySelectorAll('tr');
+        tableRows.forEach(row => {row.classList.remove('text-warning');})
+        // Add a highlight to the current row
+        e.target.closest('tr').classList.add('text-warning');
         // Clicked on unfiltered species
         species = getSpecies(e.target)
     }
@@ -2773,7 +2771,6 @@ function speciesFilter(e) {
     }); // no re-prepare
     seenTheDarkness = false;
     shownDaylightBanner = false;
-    showLoadingSpinner();
     document.getElementById('results').scrollTop = 0;
 }
 
@@ -2986,11 +2983,13 @@ const deleteSpecies = (target) => {
     // Clear the record in the UI
     const row = target.closest('tr');
     const table = document.getElementById('resultSummary')
-    table.deleteRow(row.rowIndex);
+    const rowClicked = row.rowIndex;
+    table.deleteRow(rowClicked);
     const resultTable = document.getElementById('resultTableBody');
     resultTable.innerHTML = '';
     // Highlight the next row
-    if (row.rowIndex) row.rowIndex.click()
+    const newRow = table.rows[rowClicked]
+    newRow?.click();
 }
 
 const getSelectionRange = () => {
@@ -3412,6 +3411,7 @@ $(function () {
                         action: 'filter',
                         species: STATE.explore.species,
                         range: STATE.explore.range,
+                        updateSummary: true
                     }); // re-prepare
                 }
                 // Update the seen species list
@@ -3437,6 +3437,7 @@ $(function () {
                     worker.postMessage({
                         action: 'filter',
                         species: isSpeciesViewFiltered(true),
+                        updateSummary: true
                     }); // re-prepare
                 }
                 // Update the seen species list
@@ -3554,6 +3555,7 @@ const handleThresholdChange = (e) => {
         worker.postMessage({
             action: 'filter',
             species: isSpeciesViewFiltered(true),
+            updateSummary: true
         }); // no re-prepare
     }
 }
@@ -3847,13 +3849,7 @@ $('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('c
 
 const recordEntryModalDiv = document.getElementById('record-entry-modal')
 const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, { backdrop: 'static' });
-const recordEntryHandler = () => {
-    worker.postMessage({
-        action: 'filter',
-        species: isSpeciesViewFiltered(true),
-        active: getActiveRowID(),
-    }); // no re-prepare
-}
+
 
 const recordEntryForm = document.getElementById('record-entry-form');
 let focusBirdList;
