@@ -240,7 +240,7 @@ async function handleMessage(e) {
             break;
         case 'clear-cache':
             CACHE_LOCATION = p.join(TEMP, 'chirpity');
-            if (!fs.existsSync(CACHE_LOCATION)) fs.mkdirSync(CACHE_LOCATION);
+            fs.existsSync(CACHE_LOCATION) || fs.mkdirSync(CACHE_LOCATION);
             await clearCache(CACHE_LOCATION, 0);  // belt and braces - in dev mode, ctrl-c in console will prevent cache clear on exit
             break;
         case 'convert-dataset':
@@ -260,7 +260,7 @@ async function handleMessage(e) {
             break;
         case 'file-load-request':
             index = 0;
-            if (filesBeingProcessed.length) onAbort(args);
+            filesBeingProcessed.length && onAbort(args);
             console.log('Worker received audio ' + args.file);
             await loadAudioFile(args);
             metadata[args.file].isSaved ? onChangeMode('archive') : onChangeMode('analyse');
@@ -269,8 +269,10 @@ async function handleMessage(e) {
             if (STATE.db) {
                 t0 = Date.now()
                 UI.postMessage({event: 'show-spinner'});
-                await Promise.all([getSummary(args), getResults(args)]);
-                if (DEBUG) console.log('Filter took ', (Date.now() - t0) / 1000, 'seconds')
+                await getResults(args);
+                args.updateSummary && await getSummary(args);
+                //await Promise.all([getResults(args), getSummary(args)]);
+                DEBUG && console.log('Filter took ', (Date.now() - t0) / 1000, 'seconds')
                 
             }
             break;
@@ -308,7 +310,7 @@ async function handleMessage(e) {
             memoryDB = null;
             BACKEND = args.backend;
             STATE.update({ model: args.model });
-            if (predictWorkers.length) terminateWorkers();
+            predictWorkers.length && terminateWorkers();
             spawnWorkers(args.model, args.list, BATCH_SIZE, args.threads);
             break;
         case 'post':
@@ -359,7 +361,7 @@ ipcRenderer.on('new-client', (event) => {
 })
 
 async function onChangeMode(mode) {
-    if (!memoryDB) await createDB();
+    memoryDB || await createDB();
     UI.postMessage({ event: 'mode-changed', mode: mode })
     STATE.changeMode({
         mode: mode,
@@ -431,9 +433,9 @@ const getSummaryParams = (species) => {
     }
     else if (useRange) params.push(range.start, range.end);
     extraParams.push(...blocked);
-    if (STATE.locationID) extraParams.push(STATE.locationID);
+    STATE.locationID && extraParams.push(STATE.locationID);
     params.push(...extraParams);
-    if (species) params.push(species);
+    species && params.push(species);
     return params
 }
 
@@ -443,9 +445,10 @@ const prepSummaryStatement = (species) => {
     const useRange = range?.start;
     let summaryStatement = `
     WITH ranked_records AS (
-        SELECT records.dateTime, records.confidence, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, COALESCE(isDaylight, 0) as isDaylight,
+        SELECT records.dateTime, records.confidence, files.name, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, COALESCE(isDaylight, 0) as isDaylight,
           RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
         FROM records
+        JOIN files ON files.id = records.fileID
         JOIN species ON species.id = records.speciesID
         WHERE confidence >=  ? `;
     let extraClause = '';
@@ -494,15 +497,12 @@ const prepSummaryStatement = (species) => {
 const getResultsParams = (species, confidence, offset, limit, topRankin) => {
     const params = [];
     params.push(confidence);
-    if (species) params.push(species);
+    species && params.push(species);
     const blocked = (! species && STATE.blocked.length && !STATE.selection) ?
         STATE.blocked : [];
-    if (blocked.length) params.push(...blocked);
-    if (['analyse', 'archive'].includes(STATE.mode) && !STATE.selection) {
-        params.push(...STATE.filesToAnalyse);
-    }
-
-    if (limit !== Infinity) params.push(limit, offset);
+    blocked.length && params.push(...blocked);
+    ['analyse', 'archive'].includes(STATE.mode) && !STATE.selection && params.push(...STATE.filesToAnalyse);
+    limit !== Infinity && params.push(limit, offset);
     params.push(topRankin);
     return params
 }
@@ -649,7 +649,7 @@ async function onAnalyse({
             } else {
                 onChangeMode('archive');
                 FILE_QUEUE.forEach(file => UI.postMessage({ event: 'update-audio-duration', value: metadata[file].duration }))
-                await Promise.all([getSummary(), getResults()]);
+                await Promise.all([getResults(), getSummary()] );
 
             }
             return;
@@ -657,7 +657,7 @@ async function onAnalyse({
 
     }
     console.log("FILE_QUEUE has ", FILE_QUEUE.length, 'files', count, 'files ignored')
-    if (!STATE.selection) onChangeMode('analyse');
+    STATE.selection || onChangeMode('analyse');
 
     filesBeingProcessed = [...FILE_QUEUE];
 
@@ -1190,7 +1190,7 @@ const getPredictBuffers = async ({
     })
     readStream.on('error', err => {
         console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
-        if (err.code === 'ENOENT') notifyMissingFile(file);
+        err.code === 'ENOENT' && notifyMissingFile(file);
     })
 }
 
@@ -1239,7 +1239,7 @@ const fetchAudioBuffer = async ({
         })
         readStream.on('error', err => {
             console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
-            if (err.code === 'ENOENT') notifyMissingFile(file);
+            err.code === 'ENOENT' && notifyMissingFile(file);
         })
     });
 }
@@ -1301,7 +1301,7 @@ const speciesMatch = (path, sname) => {
 }
 
 const convertSpecsFromExistingSpecs = async (path) => {
-    if (!path) path = '/mnt/608E21D98E21A88C/Users/simpo/PycharmProjects/Data/New_Dataset';
+    path ??= '/mnt/608E21D98E21A88C/Users/simpo/PycharmProjects/Data/New_Dataset';
     const file_list = await getFiles([path], true);
     for (let i = 0; i < file_list.length; i++) {
         const parts = p.parse(file_list[i]);
@@ -1469,7 +1469,7 @@ const bufferToAudio = ({
     let bitrate = STATE.audio.bitrate;
     let quality = parseInt(STATE.audio.quality);
     let downmix = STATE.audio.downmix;
-    if (!format) format = STATE.audio.format;
+    format ??= STATE.audio.format;
     const bitrateMap = { 24000: '24k', 16000: '16k', 12000: '12k', 8000: '8k', 44100: '44k', 22050: '22k', 11025: '11k' };
     if (format === 'mp3') {
         audioCodec = 'libmp3lame';
@@ -1558,7 +1558,7 @@ const bufferToAudio = ({
         //      )
         //  }
         ffmpgCommand.on('start', function (commandLine) {
-            if (DEBUG) console.log('FFmpeg command: ' + commandLine);
+            DEBUG && console.log('FFmpeg command: ' + commandLine);
         })
         ffmpgCommand.on('error', (err) => {
             console.log('An error occurred: ' + err.message);
@@ -1737,7 +1737,7 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     confidence = confidence || 2000;
     // Delete an existing record if it exists
     const result = await db.getAsync(`SELECT id as originalSpeciesID FROM species WHERE cname = ?`, originalCname);
-    if (result?.originalSpeciesID) await db.runAsync('DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?', dateTime, result.originalSpeciesID, fileID)
+    result?.originalSpeciesID && await db.runAsync('DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?', dateTime, result.originalSpeciesID, fileID)
     const response = await db.runAsync('INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,?,?)',
         dateTime, start, fileID, speciesID, confidence, label, comment, end, parseInt(count), isDaylight);
 
@@ -1752,7 +1752,7 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
 const parsePredictions = async (response) => {
     let file = response.file, batchInProgress = filesBeingProcessed.length;
     const latestResult = response.result, db = STATE.db;
-    if (DEBUG) console.log('worker being used:', response.worker);
+    DEBUG && console.log('worker being used:', response.worker);
 
 
     let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
@@ -1770,7 +1770,7 @@ const parsePredictions = async (response) => {
             updateUI = (confidence > STATE.detect.confidence &&
                 STATE.blocked.indexOf(speciesID) === -1);
             //save all results to  db, regardless of confidence
-            if (!STATE.selection) await insertRecord(timestamp, key, speciesID, confidence, file);
+            STATE.selection || await insertRecord(timestamp, key, speciesID, confidence, file);
             if (STATE.selection || updateUI) {
                 let end, confidenceRequired;
                 if (STATE.selection) {
@@ -1826,7 +1826,7 @@ const parsePredictions = async (response) => {
         console.log(`Prediction done ${filesBeingProcessed.length} files to go`);
         console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
     }
-    if (!STATE.selection && (!DATASET || STATE.increment() === 0)  ) getSummary({ interim: true });
+    !STATE.selection && (!DATASET || STATE.increment() === 0) && getSummary({ interim: true });
     return response.worker
 }
 
@@ -1842,7 +1842,7 @@ async function parseMessage(e) {
             if (!SEEN_LABELS) {
                 SEEN_LABELS = true;
                 await loadDB(appPath);
-                if (!memoryDB) await createDB();
+                memoryDB || await createDB();
             }
             break;
         case 'model-ready':
@@ -1885,7 +1885,7 @@ async function parseMessage(e) {
 
                 if (response['updateResults'] && STATE.db) {
                     // update-results called after setting migrants list, so DB may not be initialized
-                    await Promise.all([getSummary(), getResults()]);
+                    await Promise.all([getResults(), getSummary()] );
                     if (['explore', 'chart'].includes(STATE.mode)) {
                         // Update the seen species list
                         getSpecies();
@@ -2024,7 +2024,7 @@ function calculateNighttimeBoundaries(fileStart, fileEnd, latitude, longitude) {
             activeIntervals.push({ start: Math.max(offset, 0) });
             // and the others are a stop trigger
         } else {
-            if (!activeIntervals.length) activeIntervals.push({ start: 0 })
+            activeIntervals.length || activeIntervals.push({ start: 0 })
             activeIntervals[activeIntervals.length - 1].end = Math.min(offset, maxFileOffset);
         }
     }
@@ -2056,7 +2056,6 @@ const getSummary = async ({
     active = undefined,
     interim = false,
     action = undefined,
-    topRankin = STATE.topRankin
 } = {}) => {
     const db = STATE.db;
     prepSummaryStatement(species);
@@ -2073,7 +2072,7 @@ const getSummary = async ({
     const params = getSummaryParams(species);
     const summary = await STATE.GET_SUMMARY_SQL.allAsync(...params);
 
-    if (DEBUG) console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds");
+    DEBUG && console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds");
     const event = interim ? 'update-summary' : 'prediction-done';
     UI.postMessage({
         event: event,
@@ -2153,7 +2152,7 @@ const getResults = async ({
                     const filename = `${r.cname}-${dateString}.${STATE.audio.format}`
                     console.log(`Exporting from ${r.file}, position ${r.position}, into folder ${exportTo}`)
                     saveAudio(r.file, r.position, r.position + 3, filename, metadata, exportTo)
-                    if (i === result.length - 1) UI.postMessage({ event: 'generate-alert', message: `${result.length} files saved` })
+                    i === result.length - 1 && UI.postMessage({ event: 'generate-alert', message: `${result.length} files saved` })
                 } 
             }
             else if (species && context !== 'explore') {
@@ -2322,7 +2321,7 @@ const onSave2DiskDB = async (args) => {
             UI.postMessage({
                 event: 'generate-alert',
                 message: `Database update complete, ${response.changes} records added to the archive in ${((Date.now() - t0) / 1000)} seconds`,
-                render: true
+                updateFilenamePanel: true
             })
         }
     }
@@ -2564,28 +2563,20 @@ async function onDeleteSpecies({
     speciesFiltered
 }) {
     const db = STATE.db;
-    const speciesSQL = prepSQL(species);
+    const params = [species];
     let SQL = `DELETE FROM records 
-            WHERE speciesID = (SELECT id FROM species WHERE cname = '${speciesSQL}')`;
+            WHERE speciesID = (SELECT id FROM species WHERE cname = ?)`;
     if (STATE.mode === 'analyse') {
-        const filesSQL = STATE.filesToAnalyse.map(file => `'${prepSQL(file)}'`).join(',');
-        const rows = await db.allAsync(`SELECT id FROM files WHERE NAME IN (${filesSQL})`);
+        const rows = await db.allAsync(`SELECT id FROM files WHERE NAME IN (${prepParams(STATE.filesToAnalyse)})`, ...STATE.filesToAnalyse);
         const ids = rows.map(row => row.id).join(',');
         SQL += ` AND fileID in (${ids})`;
     }
-    if (STATE.mode === 'explore') {
+    else if (STATE.mode === 'explore') {
         const { start, end } = STATE.explore.range;
         if (start) SQL += ` AND dateTime BETWEEN ${start} AND ${end}`
     }
-    let { changes } = await db.runAsync(SQL);
+    let { changes } = await db.runAsync(SQL, ...params);
     if (changes) {
-        if (STATE.mode !== 'selection') {
-            // Update the summary table
-            if (speciesFiltered === false) {
-                delete arguments[0].species
-            }
-            await getSummary(arguments[0]);
-        }
         if (db === diskDB) {
             // Update the seen species list
             getSpecies();
@@ -2688,10 +2679,10 @@ const onFileDelete = async (fileName) => {
             event: 'generate-alert',
             message: `${fileName} 
 and its associated records were deleted successfully`,
-            render: true
+            updateFilenamePanel: true
         });
 
-        await Promise.all([getSummary(), getResults()]);
+        await Promise.all([getResults(), getSummary()] );
     } else {
         UI.postMessage({
             event: 'generate-alert', message: `${fileName} 
