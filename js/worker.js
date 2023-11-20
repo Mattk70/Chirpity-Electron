@@ -132,9 +132,10 @@ async function loadDB(path) {
             console.log('Added isDaylight column to records table')
         }
         const datetime =  diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_datetime ON records(dateTime)');
+        const covering_total  =  diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_covering_total ON records (confidence, isDaylight)');
         const species = diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_species ON records(speciesID)');
         const files =  diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_files ON records(fileID)');
-        await Promise.all([datetime, species, files]);
+        await Promise.all([datetime, species, files, covering_total]);
         console.log("Opened and cleaned disk db " + file)
     }
     return true
@@ -271,8 +272,10 @@ async function handleMessage(e) {
                 UI.postMessage({event: 'show-spinner'});
                 await getResults(args);
                 args.updateSummary && await getSummary(args);
+                const t1 = Date.now()
+                await getTotal(args);
                 //await Promise.all([getResults(args), getSummary(args)]);
-                DEBUG && console.log('Filter took ', (Date.now() - t0) / 1000, 'seconds')
+                DEBUG && console.log('Filter took ', (Date.now() - t0) / 1000, 'seconds', '\nGettotal took ', (Date.now() - t1) / 1000, 'seconds',)
                 
             }
             break;
@@ -475,23 +478,42 @@ const prepSummaryStatement = (species) => {
     SELECT cname, sname, COUNT(*) as count, SUM(callcount) as calls, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
       FROM ranked_records
       WHERE ranked_records.rank <= ${STATE.topRankin}
-      GROUP BY speciesID
-    UNION ALL
-    SELECT
-        'Total' AS sname,
-        1 as cname,
-        COUNT(*) AS count,
-        1 AS max,
-        1 as making_union_work
-      FROM
-        ranked_records`;
+      GROUP BY speciesID`;
     if (species) summaryStatement += ` WHERE cname = ? `;
     summaryStatement += ' ORDER BY cname';
-    //summaryStatement += extraClause;
-    //summaryStatement += 'ORDER BY cname';
     STATE.GET_SUMMARY_SQL = STATE.db.prepare(summaryStatement);
     //console.log('Summary SQL statement:\n' + summaryStatement)
 }
+
+const getTotal = async ({species = undefined, offset = 0}) => {
+    let params = [];
+    const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
+    const useRange = range?.start;
+    let SQL = ` WITH MaxConfidencePerDateTime AS (
+                    SELECT confidence FROM records `;
+    if (['analyse', 'archive'].includes(STATE.mode)) {
+        SQL += ' JOIN files on files.id = records.fileid ';
+    }
+    SQL += ` WHERE confidence >= ${STATE.detect.confidence} `;
+    if (species) {
+        params.push(species);
+        SQL += ' AND speciesID = (SELECT id from species WHERE cname = ?) '; 
+        }// This will overcount as there may be a valid species ranked above it
+    else if (STATE.blocked.length) SQL += ` AND speciesID not in (${STATE.blocked}) `;
+    if (useRange) SQL += ` AND dateTime BETWEEN ${range.start} AND ${range.start} `;
+    if (STATE.detect.nocmig) SQL += ' AND COALESCE(isDaylight, 0) != 1 ';
+    if (STATE.locationID) SQL += ` AND locationID =  ${STATE.locationID}`;
+    if (['analyse', 'archive'].includes(STATE.mode)) {
+        SQL += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+        params.push(...STATE.filesToAnalyse)
+    }
+    SQL += ' ) '
+    SQL += `SELECT COUNT(confidence) AS total FROM MaxConfidencePerDateTime`;
+
+    const {total} = await STATE.db.getAsync(SQL, ...params)
+    UI.postMessage({event: 'total-records', total: total, offset: offset, species: species})
+}
+
 
 
 const getResultsParams = (species, confidence, offset, limit, topRankin) => {
