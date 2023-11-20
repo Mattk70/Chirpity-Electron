@@ -159,9 +159,9 @@ DIAGNOSTICS['CPU'] = os.cpus()[0].model;
 DIAGNOSTICS['Cores'] = os.cpus().length;
 DIAGNOSTICS['System Memory'] = (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) + ' GB';
 
-function resetResults() {
-    summaryTable.innerText = '';
-    pagination.forEach(item => item.classList.add('d-none'));
+function resetResults(clearSummary, clearPagination) {
+    if (clearSummary) summaryTable.innerText = '';
+    clearPagination && pagination.forEach(item => item.classList.add('d-none'));
     const resultTable = document.getElementById('resultTableBody');
     resultTable.innerHTML = '';
     predictions = {};
@@ -717,7 +717,7 @@ const filterValidFiles = ({ filePaths }) => {
 async function onOpenFiles(args) {
     hideAll();
     showElement(['spectrogramWrapper'], false);
-    resetResults();
+    resetResults(true, true);
     resetDiagnostics();
     //completeDiv.hide();
     // Store the file list and Load First audio file
@@ -850,7 +850,7 @@ function postAnalyseMessage(args) {
         //updateProgress(0);
         if (!selection) {
             analyseReset();
-            resetResults();
+            resetResults(true, true);
             refreshResultsView();
         }
         if (filesInScope.length > 1) {
@@ -1003,6 +1003,7 @@ const handleLocationFilterChange = (e) => {
     worker.postMessage({ action: 'update-state', locationID: location });
     // Update the seen species list
     worker.postMessage({ action: 'get-detected-species-list' })
+    worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
     if (STATE.mode === 'explore') worker.postMessage({ action: 'filter', species: isSpeciesViewFiltered(true), updateSummary: true });
 }
 
@@ -1017,7 +1018,8 @@ exploreLink.addEventListener('click', async () => {
     showElement(['exploreWrapper', 'spectrogramWrapper'], false);
     enableMenuItem(['saveCSV']);
     adjustSpecDims(true)
-    worker.postMessage({ action: 'filter', species: undefined, range: STATE.explore.range, updateSummary: true }); // re-prepare
+    worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
+    worker.postMessage({ action: 'filter', species: undefined, range: STATE.explore.range, updateSummary: true }); 
 });
 
 const datasetLink = document.getElementById('dataset');
@@ -1541,6 +1543,9 @@ const setUpWorkerMessaging = () => {
                     break;
                 case 'spawning':
                     displayWarmUpMessage();
+                    break;
+                case 'total-records':
+                    updatePagination(args.total, args.offset);
                     break;
                 case 'unsaved-records':
                     window.electron.unsavedRecords(true);
@@ -2557,10 +2562,20 @@ function onProgress(args) {
     }
 }
 
-function updatePagination(total, offset) {
+function updatePagination(total, offset, species) {
         //Pagination
         total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
-    
+        // adjust offset if threshold changes the total. Not perfect, but still
+        // if (total < offset) {
+        //     offset -= config.limit;
+        //     if (species) {
+        //         const filteredOffset = {};
+        //         filteredOffset[species] = offset;
+        //         worker.postMessage({ action: 'update-state', filteredOffset: filteredOffset })
+        //     } else {
+        //         worker.postMessage({ action: 'update-state', globalOffset: offset })
+        //     }
+        // }
 }
 
 const updateSummary = ({ summary = [], filterSpecies = '' }) => {
@@ -2575,10 +2590,6 @@ const updateSummary = ({ summary = [], filterSpecies = '' }) => {
 
     for (let i = 0; i < summary.length; i++) {
         const item = summary[i];
-        if (item.cname === 'Total') {
-            total = item.count;
-            continue
-        }
         const selected = item.cname === filterSpecies ? ' text-warning' : '';
         summaryHTML += `<tr tabindex="-1" class="${selected}">
                             <td class="max">${iconizeScore(item.max)}</td>
@@ -2598,7 +2609,6 @@ const updateSummary = ({ summary = [], filterSpecies = '' }) => {
     old_summary.replaceWith(buffer);
     const currentFilter = document.querySelector('#speciesFilter tr.text-warning');
     if (currentFilter) currentFilter.focus();
-    return total;
 }
 
 async function onPredictionDone({
@@ -2628,20 +2638,8 @@ async function onPredictionDone({
         resultsBuffer = undefined;
     }
 
-    const total = updateSummary({ summary: summary, filterSpecies: filterSpecies });
-    // adjust offset if threshold changes the total. Not perfect, but still
-    if (total < offset) {
-        offset -= config.limit;
-        if (filterSpecies) {
-            const filteredOffset = {};
-            filteredOffset[filterSpecies] = offset;
-            worker.postMessage({ action: 'update-state', filteredOffset: filteredOffset })
-        } else {
-            worker.postMessage({ action: 'update-state', globalOffset: offset })
-        }
-    }
-    //Pagination
-    total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
+    updateSummary({ summary: summary, filterSpecies: filterSpecies });
+
     
     if (action !== 'filter') {
         if (! isEmptyObject(AUDACITY_LABELS)) {
@@ -2709,7 +2707,8 @@ pagination.forEach(item => {
                 species: species,
                 offset: offset,
                 limit: limit,
-            }); // no re-prepare
+            }); 
+            resetResults(false, false)
         }
     })
 })
@@ -2769,9 +2768,7 @@ function speciesFilter(e) {
         action: 'filter',
         species: species
     }); // no re-prepare
-    seenTheDarkness = false;
-    shownDaylightBanner = false;
-    document.getElementById('results').scrollTop = 0;
+    resetResults(false, false);
 }
 
 
@@ -2798,10 +2795,12 @@ async function renderResult({
         }
         else {
             showElement(['resultTableContainer', 'resultsHead'], false);
-            const resultTable = document.getElementById('resultTableBody');
-            resultTable.innerHTML = '';
+            // const resultTable = document.getElementById('resultTableBody');
+            // resultTable.innerHTML = '';
         }
-    } else if (index % (config.limit + 1) === 0) addPagination(index, 0);
+    }  else if (!isFromDB && index % (config.limit + 1) === 0) {
+        addPagination(index, 0)
+    }
     if (!isFromDB && index > config.limit) {
         return
     }
@@ -3139,6 +3138,7 @@ const changeNocmigMode = () => {
         detect: { nocmig: config.detect.nocmig },
     });
     updatePrefs();
+    worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}}); 
     worker.postMessage({
         action: 'filter',
         species: isSpeciesViewFiltered(true),
@@ -3406,7 +3406,7 @@ $(function () {
                     });
                 } else if (this.id === 'exploreRange') {
                     STATE.explore.range = dateRange;
-                    worker.postMessage({ action: 'update-state', explore: STATE.explore })
+                    worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}, explore: STATE.explore}); 
                     worker.postMessage({
                         action: 'filter',
                         species: STATE.explore.species,
@@ -3552,6 +3552,7 @@ const handleThresholdChange = (e) => {
         worker.postMessage({ action: 'get-detected-species-list' })
     }
     if (!PREDICTING && !resultTableElement[0].hidden) {
+        worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
         worker.postMessage({
             action: 'filter',
             species: isSpeciesViewFiltered(true),
