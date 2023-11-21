@@ -132,7 +132,7 @@ async function loadDB(path) {
             console.log('Added isDaylight column to records table')
         }
         // const datetime =  diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_datetime ON records (dateTime)');
-        const covering_total  =  diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_covering_total ON records (confidence, isDaylight)');
+        //const covering_total  =  diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_covering_total ON records (confidence, isDaylight)');
         // const species = diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_species ON records (speciesID)');
         //await Promise.all([datetime, species, files, covering_total]);
         console.log("Opened and cleaned disk db " + file)
@@ -2191,7 +2191,7 @@ const getResults = async ({
             }
         }
     }
-    UI.postMessage({event: 'hide-spinner'});
+    STATE.selection || UI.postMessage({event: 'results-complete'});
 };
 
 // Function to format the CSV export
