@@ -20,7 +20,7 @@ let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on every change
 
-const DEBUG = false;
+const DEBUG = true;
 
 const DATASET = true;
 const adding_chirpity_additions = true;
@@ -79,9 +79,9 @@ const createDB = async (file) => {
         UNIQUE (day, fileID),
         CONSTRAINT fk_files
             FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`);
-    // await db.runAsync('CREATE INDEX idx_datetime ON records(dateTime)');
-    // await db.runAsync('CREATE INDEX idx_species ON records(speciesID)');
-    // await db.runAsync('CREATE INDEX idx_files ON records(fileID)');
+    await db.runAsync('CREATE INDEX idx_datetime ON records(dateTime)');
+    await db.runAsync('CREATE INDEX idx_species ON records(speciesID)');
+    await db.runAsync('CREATE INDEX idx_files ON records(fileID)');
     if (archiveMode) {
         for (let i = 0; i < LABELS.length; i++) {
             const [sname, cname] = LABELS[i].replaceAll("'", "''").split('_');
@@ -132,7 +132,7 @@ async function loadDB(path) {
             console.log('Added isDaylight column to records table')
         }
         // const datetime =  diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_datetime ON records (dateTime)');
-        // const covering_total  =  diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_covering_total ON records (confidence, isDaylight)');
+        const covering_total  =  diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_covering_total ON records (confidence, isDaylight)');
         // const species = diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_species ON records (speciesID)');
         //await Promise.all([datetime, species, files, covering_total]);
         console.log("Opened and cleaned disk db " + file)
@@ -270,12 +270,12 @@ async function handleMessage(e) {
                 t0 = Date.now()
                 UI.postMessage({event: 'show-spinner'});
                 await getResults(args);
-                args.updateSummary && await getSummary(args);
                 const t1 = Date.now()
+                args.updateSummary && await getSummary(args);
+                const t2 = Date.now()
                 await getTotal(args);
                 //await Promise.all([getResults(args), getSummary(args)]);
-                console.log('Filter took ', (Date.now() - t0) / 1000, 'seconds', '\nGettotal took ', (Date.now() - t1) / 1000, 'seconds',)
-                
+                console.log('Filter took ', (Date.now() - t0) / 1000, 'seconds', '\nGetTotal took ', (Date.now() - t2) / 1000, 'seconds', '\nGetSummary took ', (t2 - t1) / 1000, 'seconds')
             }
             break;
         case 'get-detected-species-list':
@@ -437,7 +437,6 @@ const getSummaryParams = (species) => {
     extraParams.push(...blocked);
     STATE.locationID && extraParams.push(STATE.locationID);
     params.push(...extraParams);
-    species && params.push(species);
     return params
 }
 
@@ -477,9 +476,7 @@ const prepSummaryStatement = (species) => {
     SELECT cname, sname, COUNT(*) as count, SUM(callcount) as calls, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
       FROM ranked_records
       WHERE ranked_records.rank <= ${STATE.topRankin}
-      GROUP BY speciesID`;
-    if (species) summaryStatement += ` WHERE cname = ? `;
-    summaryStatement += ' ORDER BY cname';
+      GROUP BY speciesID  ORDER BY cname`;
     STATE.GET_SUMMARY_SQL = STATE.db.prepare(summaryStatement);
     //console.log('Summary SQL statement:\n' + summaryStatement)
 }
@@ -2143,8 +2140,6 @@ const getResults = async ({
 
     let index = offset;
     AUDACITY = {};
-    let t0 = Date.now();
-
     const params = getResultsParams(species, confidence, offset, limit, topRankin);
     prepResultsStatement(species, limit === Infinity);
 
@@ -2186,7 +2181,6 @@ const getResults = async ({
                 sendResult(++index, r, true)
             }
         }
-        console.log("Get Results took", (Date.now() - t0) / 1000, " seconds");
         if (!result.length) {
             if (STATE.selection) {
                 // No more detections in the selection

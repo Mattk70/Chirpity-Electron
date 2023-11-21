@@ -163,7 +163,7 @@ function resetResults(clearSummary, clearPagination) {
     if (clearSummary) summaryTable.innerText = '';
     clearPagination && pagination.forEach(item => item.classList.add('d-none'));
     const resultTable = document.getElementById('resultTableBody');
-    resultTable.innerHTML = '';
+    resultsBuffer = resultTable.cloneNode(false)
     predictions = {};
     seenTheDarkness = false;
     shownDaylightBanner = false;
@@ -1511,6 +1511,9 @@ const setUpWorkerMessaging = () => {
                     }
                     break;
                 case 'hide-spinner':
+                    const table = document.getElementById('resultTableBody')
+                    table.replaceWith(resultsBuffer);
+                    document.getElementById('resultsDiv').scrollTo({ top: 0, left: 0, behavior: "smooth" });
                     hideLoadingSpinner();
                     break;
                 case 'location-list':
@@ -2635,7 +2638,7 @@ async function onPredictionDone({
     if (resultsBuffer) {
         const results = document.getElementById('resultTableBody');
         results.replaceWith(resultsBuffer);
-        resultsBuffer = undefined;
+        // resultsBuffer = undefined;
     }
 
     updateSummary({ summary: summary, filterSpecies: filterSpecies });
@@ -2874,7 +2877,7 @@ async function renderResult({
 }
 
 
-let resultsBuffer, detectionsModal;
+let resultsBuffer = document.getElementById('resultTableBody').cloneNode(false), detectionsModal;
 const detectionsModalDiv = document.getElementById('detectionsModal')
 
 detectionsModalDiv.addEventListener('hide.bs.modal', (e) => {
@@ -2886,11 +2889,11 @@ const updateResultTable = (row, isFromDB, isSelection) => {
     const table = isSelection ? document.getElementById('selectionResultTableBody')
         : document.getElementById('resultTableBody');
     if (isFromDB && !isSelection) {
-        if (!resultsBuffer) resultsBuffer = table.cloneNode();
+        //if (!resultsBuffer) resultsBuffer = table.cloneNode();
         resultsBuffer.lastElementChild ?
             resultsBuffer.lastElementChild.insertAdjacentHTML('afterend', row) :
             resultsBuffer.innerHTML = row;
-        table.replaceWith(resultsBuffer);
+        
     } else {
         if (isSelection) {
             if (!detectionsModal || !detectionsModal._isShown) {
@@ -3139,6 +3142,7 @@ const changeNocmigMode = () => {
     });
     updatePrefs();
     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}}); 
+    resetResults(true, true);
     worker.postMessage({
         action: 'filter',
         species: isSpeciesViewFiltered(true),
