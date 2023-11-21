@@ -1505,15 +1505,16 @@ const setUpWorkerMessaging = () => {
                                 active: getActiveRowID(),
                                 updateSummary: true
                             }); // no re-prepare
+                            resetResults(true, false)
                         } else {
                             alert(args.message) 
                         }
                     }
                     break;
-                case 'hide-spinner':
+                case 'results-complete':
                     const table = document.getElementById('resultTableBody')
                     table.replaceWith(resultsBuffer);
-                    document.getElementById('resultsDiv').scrollTo({ top: 0, left: 0, behavior: "smooth" });
+                    //document.getElementById('resultsDiv').scrollTo({ top: 0, left: 0, behavior: "smooth" });
                     hideLoadingSpinner();
                     break;
                 case 'location-list':
@@ -2565,20 +2566,9 @@ function onProgress(args) {
     }
 }
 
-function updatePagination(total, offset, species) {
+function updatePagination(total, offset) {
         //Pagination
         total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
-        // adjust offset if threshold changes the total. Not perfect, but still
-        // if (total < offset) {
-        //     offset -= config.limit;
-        //     if (species) {
-        //         const filteredOffset = {};
-        //         filteredOffset[species] = offset;
-        //         worker.postMessage({ action: 'update-state', filteredOffset: filteredOffset })
-        //     } else {
-        //         worker.postMessage({ action: 'update-state', globalOffset: offset })
-        //     }
-        // }
 }
 
 const updateSummary = ({ summary = [], filterSpecies = '' }) => {
