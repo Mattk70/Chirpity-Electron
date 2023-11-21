@@ -3509,27 +3509,19 @@ const setConfidence = (e) => {
     handleThresholdChange(e);
 }
 
-thresholdDisplay.addEventListener('click', () => {
-    confidenceSliderDisplay.classList.remove('d-none');
-    confidenceTimerTimeout = setTimeout(hideConfidenceSlider, 1750)
+thresholdDisplay.addEventListener('click', (e) => {
+    e.stopPropagation();
+    confidenceSliderDisplay.classList.toggle('d-none');
+    // confidenceTimerTimeout = setTimeout(hideConfidenceSlider, 1750)
 })
-
+confidenceSlider.addEventListener('click', (e) => {
+    e.stopPropagation();
+})
 const hideConfidenceSlider = () => {
     confidenceSliderDisplay.classList.add('d-none');
 }
-let confidenceTimerTimeout;
-confidenceSliderDisplay.addEventListener('mouseout', () => {
-    confidenceTimerTimeout = setTimeout(hideConfidenceSlider, 3000)
-})
+confidenceSliderDisplay.addEventListener('change', setConfidence);
 
-confidenceSliderDisplay.addEventListener('mouseenter', () => {
-    if (confidenceTimerTimeout) clearTimeout(confidenceTimerTimeout)
-})
-
-confidenceSliderDisplay.addEventListener('input', setConfidence);
-confidenceSliderDisplay.addEventListener('mouseup', (e) => {
-    hideConfidenceSlider()
-});
 
 function showThreshold(threshold) {
     thresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
@@ -3728,6 +3720,7 @@ function getSnameFromCname(cname) {
 
 $(document).on('click', function () {
     $("#context-menu").removeClass("show").hide();
+    hideConfidenceSlider();
 })
 
 async function createContextMenu(e) {

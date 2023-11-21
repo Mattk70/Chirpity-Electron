@@ -79,9 +79,9 @@ const createDB = async (file) => {
         UNIQUE (day, fileID),
         CONSTRAINT fk_files
             FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`);
-    await db.runAsync('CREATE INDEX idx_datetime ON records(dateTime)');
-    await db.runAsync('CREATE INDEX idx_species ON records(speciesID)');
-    await db.runAsync('CREATE INDEX idx_files ON records(fileID)');
+    // await db.runAsync('CREATE INDEX idx_datetime ON records(dateTime)');
+    // await db.runAsync('CREATE INDEX idx_species ON records(speciesID)');
+    // await db.runAsync('CREATE INDEX idx_files ON records(fileID)');
     if (archiveMode) {
         for (let i = 0; i < LABELS.length; i++) {
             const [sname, cname] = LABELS[i].replaceAll("'", "''").split('_');
@@ -131,11 +131,10 @@ async function loadDB(path) {
             await diskDB.runAsync('ALTER TABLE records ADD COLUMN isDaylight INTEGER')
             console.log('Added isDaylight column to records table')
         }
-        const datetime =  diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_datetime ON records(dateTime)');
-        const covering_total  =  diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_covering_total ON records (confidence, isDaylight)');
-        const species = diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_species ON records(speciesID)');
-        const files =  diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_files ON records(fileID)');
-        await Promise.all([datetime, species, files, covering_total]);
+        // const datetime =  diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_datetime ON records (dateTime)');
+        // const covering_total  =  diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_covering_total ON records (confidence, isDaylight)');
+        // const species = diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_species ON records (speciesID)');
+        //await Promise.all([datetime, species, files, covering_total]);
         console.log("Opened and cleaned disk db " + file)
     }
     return true
@@ -275,7 +274,7 @@ async function handleMessage(e) {
                 const t1 = Date.now()
                 await getTotal(args);
                 //await Promise.all([getResults(args), getSummary(args)]);
-                DEBUG && console.log('Filter took ', (Date.now() - t0) / 1000, 'seconds', '\nGettotal took ', (Date.now() - t1) / 1000, 'seconds',)
+                console.log('Filter took ', (Date.now() - t0) / 1000, 'seconds', '\nGettotal took ', (Date.now() - t1) / 1000, 'seconds',)
                 
             }
             break;
@@ -491,9 +490,9 @@ const getTotal = async ({species = undefined, offset = 0}) => {
     const useRange = range?.start;
     let SQL = ` WITH MaxConfidencePerDateTime AS (
                     SELECT confidence FROM records `;
-    if (['analyse', 'archive'].includes(STATE.mode)) {
-        SQL += ' JOIN files on files.id = records.fileid ';
-    }
+    // if (['analyse', 'archive'].includes(STATE.mode)) {
+    //     SQL += ' JOIN files on files.id = records.fileid ';
+    // }
     SQL += ` WHERE confidence >= ${STATE.detect.confidence} `;
     if (species) {
         params.push(species);
@@ -503,10 +502,10 @@ const getTotal = async ({species = undefined, offset = 0}) => {
     if (useRange) SQL += ` AND dateTime BETWEEN ${range.start} AND ${range.start} `;
     if (STATE.detect.nocmig) SQL += ' AND COALESCE(isDaylight, 0) != 1 ';
     if (STATE.locationID) SQL += ` AND locationID =  ${STATE.locationID}`;
-    if (['analyse', 'archive'].includes(STATE.mode)) {
-        SQL += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
-        params.push(...STATE.filesToAnalyse)
-    }
+    // if (['analyse', 'archive'].includes(STATE.mode)) {
+    //     SQL += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+    //     params.push(...STATE.filesToAnalyse)
+    // }
     SQL += ' ) '
     SQL += `SELECT COUNT(confidence) AS total FROM MaxConfidencePerDateTime`;
 
