@@ -424,7 +424,7 @@ const getFilesInDirectory = async (dir) => {
 
 const prepParams = (list) => list.map(item => '?').join(',');
 
-const getSummaryParams = (species) => {
+const getSummaryParams = () => {
     const blocked = STATE.blocked.length && !STATE.selection ? STATE.blocked : [];
     const range = STATE.mode === 'explore' ? STATE.explore.range : STATE.selection?.range;
     const useRange = range?.start;
@@ -440,7 +440,7 @@ const getSummaryParams = (species) => {
     return params
 }
 
-const prepSummaryStatement = (species) => {
+const prepSummaryStatement = () => {
     const blocked = STATE.blocked.length && !STATE.selection ? STATE.blocked : [];
     const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
     const useRange = range?.start;
