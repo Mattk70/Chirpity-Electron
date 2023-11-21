@@ -3549,6 +3549,7 @@ const handleThresholdChange = (e) => {
     }
     if (!PREDICTING && !resultTableElement[0].hidden) {
         worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
+        resetResults(true, true);
         worker.postMessage({
             action: 'filter',
             species: isSpeciesViewFiltered(true),
