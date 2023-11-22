@@ -20,7 +20,7 @@ let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on every change
 
-const DEBUG = true;
+const DEBUG = false;
 
 const DATASET = true;
 const adding_chirpity_additions = true;
@@ -73,15 +73,15 @@ const createDB = async (file) => {
         UNIQUE (dateTime, fileID, speciesID),
         CONSTRAINT fk_files
             FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE, 
-        FOREIGN KEY (speciesID) REFERENCES species(id))`);
+            FOREIGN KEY (speciesID) REFERENCES species(id))`);
     await db.runAsync(`CREATE TABLE duration(
         day INTEGER, duration INTEGER, fileID INTEGER,
         UNIQUE (day, fileID),
         CONSTRAINT fk_files
             FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`);
-    await db.runAsync('CREATE INDEX idx_datetime ON records(dateTime)');
-    await db.runAsync('CREATE INDEX idx_species ON records(speciesID)');
-    await db.runAsync('CREATE INDEX idx_files ON records(fileID)');
+    // await db.runAsync('CREATE INDEX idx_datetime ON records(dateTime)');
+    // await db.runAsync('CREATE INDEX idx_species ON records(speciesID)');
+    // await db.runAsync('CREATE INDEX idx_files ON records(fileID)');
     if (archiveMode) {
         for (let i = 0; i < LABELS.length; i++) {
             const [sname, cname] = LABELS[i].replaceAll("'", "''").split('_');
@@ -134,7 +134,8 @@ async function loadDB(path) {
         // const datetime =  diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_datetime ON records (dateTime)');
         //const covering_total  =  diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_covering_total ON records (confidence, isDaylight)');
         // const species = diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_species ON records (speciesID)');
-        //await Promise.all([datetime, species, files, covering_total]);
+        // const files = diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_files ON records (fileID)');
+        // await Promise.all([species, files]);
         console.log("Opened and cleaned disk db " + file)
     }
     return true
@@ -290,11 +291,7 @@ async function handleMessage(e) {
         case 'insert-manual-record':
             const count = await onInsertManualRecord(args);
             // if (STATE.mode !== 'explore' && !args.batch) {
-                UI.postMessage({
-                    event: 'generate-alert',
-                    // message: `${count} ${args.cname} record has been saved to the archive.`,
-                    filter: true
-                })
+
             // }
             break;
         case 'load-model':
@@ -611,7 +608,7 @@ async function onAnalyse({
 }) {
     // Now we've asked for a new analysis, clear the aborted flag
     aborted = false;
-
+    predictionStart = new Date();
     // Set the appropraite selection range if this is a selection analysis
     STATE.update({ selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined });
 
@@ -1305,7 +1302,6 @@ async function doPrediction({
     end = metadata[file].duration,
     worker = undefined
 }) {
-    predictionStart = new Date();
     await getPredictBuffers({ file: file, start: start, end: end, worker: undefined });
     UI.postMessage({ event: 'update-audio-duration', value: metadata[file].duration });
 }
@@ -1724,7 +1720,7 @@ async function batchInsertRecords(cname, label, files, originalCname) {
 
 }
 
-const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label, batch, originalCname, confidence }) => {
+const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label, batch, originalCname, confidence, active }) => {
     if (batch) return batchInsertRecords(cname, label, file, originalCname)
     start = parseFloat(start), end = parseFloat(end);
     const startMilliseconds = Math.round(start * 1000);
@@ -1764,7 +1760,12 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     }
     // let test = await db.allAsync('SELECT * from records where datetime = ?', dateTime)
     // console.log('After insert: ',JSON.stringify(test));
-    return response.changes
+    UI.postMessage({
+        event: 'generate-alert',
+        // message: `${count} ${args.cname} record has been saved to the archive.`,
+        filter: true, 
+        active: active
+    })
 }
 
 const parsePredictions = async (response) => {
@@ -1831,7 +1832,7 @@ const parsePredictions = async (response) => {
                     if (!row) {
                         const result = `No predictions found in ${file}`;
                         UI.postMessage({
-                            event: 'prediction-ongoing',
+                            event: 'new-result',
                             file: file,
                             result: result,
                             index: index,
@@ -1841,10 +1842,10 @@ const parsePredictions = async (response) => {
                 })
         }
         updateFilesBeingProcessed(response.file)
-        console.log(`Prediction done ${filesBeingProcessed.length} files to go`);
-        console.log('Analysis took ' + (new Date() - predictionStart) / 1000 + ' seconds.');
+        console.log(`File ${file} processed after ${(new Date() - predictionStart) / 1000} seconds: ${filesBeingProcessed.length} files to go`);
     }
-    !STATE.selection && (!DATASET || STATE.increment() === 0) && getSummary({ interim: true });
+    //!STATE.selection && (!DATASET || STATE.increment() === 0) &&
+     getSummary({ interim: true });
     return response.worker
 }
 
@@ -1883,9 +1884,9 @@ async function parseMessage(e) {
                     const limit = 10;
                     clearCache(CACHE_LOCATION, limit);
                     if (filesBeingProcessed.length) {
-                        UI.postMessage({
-                            event: 'prediction-done', batchInProgress: true,
-                        })
+                        // UI.postMessage({
+                        //     event: 'prediction-done', batchInProgress: true,
+                        // })
                         processNextFile({ worker: worker });
                     } else if (!STATE.selection) {
                         getSummary();
@@ -1958,13 +1959,12 @@ async function processNextFile({
                     const result = `No detections in ${file}. It has no period within it where predictions would be given`;
                     index++;
                     UI.postMessage({
-                        event: 'prediction-ongoing', file: file, result: result, index: index
+                        event: 'new-result', file: file, result: result, index: index
                     });
                     console.log('Recursion: start = end')
                     await processNextFile(arguments[0]);
 
                 } else {
-                    console.log('Total predictions received:', sumObjectValues(predictionsReceived))
                     if (!sumObjectValues(predictionsReceived)) {
                         UI.postMessage({
                             event: 'progress',
@@ -2091,7 +2091,7 @@ const getSummary = async ({
     const summary = await STATE.GET_SUMMARY_SQL.allAsync(...params);
 
     DEBUG && console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds");
-    const event = interim ? 'update-summary' : 'prediction-done';
+    const event = interim ? 'update-summary' : 'summary-complate';
     UI.postMessage({
         event: event,
         summary: summary,
@@ -2123,7 +2123,8 @@ const getResults = async ({
     limit = STATE.limit,
     offset = undefined,
     topRankin = STATE.topRankin,
-    exportTo = undefined
+    exportTo = undefined,
+    active = undefined
 } = {}) => {
     let confidence = STATE.detect.confidence;
     if (offset === undefined) { // Get offset state
@@ -2191,7 +2192,7 @@ const getResults = async ({
             }
         }
     }
-    STATE.selection || UI.postMessage({event: 'results-complete'});
+    STATE.selection || UI.postMessage({event: 'results-complete', active: active});
 };
 
 // Function to format the CSV export
@@ -2272,10 +2273,11 @@ const sendResult = (index, result, fromDBQuery) => {
             cname: result.cname,
             score: Number(result.score) / 100
         };
-        AUDACITY[file] ? AUDACITY[file].push(audacity) : AUDACITY[file] = [audacity];
+        AUDACITY[file] ??= [];
+        AUDACITY[file].push(audacity);
     }
     UI.postMessage({
-        event: 'prediction-ongoing',
+        event: 'new-result',
         file: file,
         result: result,
         index: index,

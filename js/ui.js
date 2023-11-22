@@ -1020,6 +1020,7 @@ exploreLink.addEventListener('click', async () => {
     adjustSpecDims(true)
     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
     worker.postMessage({ action: 'filter', species: undefined, range: STATE.explore.range, updateSummary: true }); 
+    resetResults(true, true)
 });
 
 const datasetLink = document.getElementById('dataset');
@@ -1474,19 +1475,13 @@ const setUpWorkerMessaging = () => {
             const args = e.data;
             const event = args.event;
             switch (event) {
-                case 'chart-data':
-                    onChartData(args);
-                    break;
+                case 'chart-data': onChartData(args); break;
                 case 'diskDB-has-records':
                     chartsLink.classList.remove('disabled');
                     exploreLink.classList.remove('disabled');
                     break;
-                case 'file-location-id':
-                    onFileLocationID(args);
-                    break;
-                case 'files':
-                    onOpenFiles(args);
-                    break;
+                case 'file-location-id': onFileLocationID(args); break;
+                case 'files': onOpenFiles(args); break;
                 case 'generate-alert':
                     if (args.updateFilenamePanel) {
                         renderFilenamePanel();
@@ -1502,7 +1497,7 @@ const setUpWorkerMessaging = () => {
                             worker.postMessage({
                                 action: 'filter',
                                 species: isSpeciesViewFiltered(true),
-                                active: getActiveRowID(),
+                                active: args.active,
                                 updateSummary: true
                             }); // no re-prepare
                             resetResults(true, false)
@@ -1512,61 +1507,38 @@ const setUpWorkerMessaging = () => {
                     }
                     break;
                 case 'results-complete':
-                    const table = document.getElementById('resultTableBody')
-                    table.replaceWith(resultsBuffer);
-                    //document.getElementById('resultsDiv').scrollTo({ top: 0, left: 0, behavior: "smooth" });
+                    onResultsComplete(args);
                     hideLoadingSpinner();
                     break;
                 case 'location-list':
                     LOCATIONS = args.locations;
                     locationID = args.currentLocation;
                     break;
-                case 'model-ready':
-                    onModelReady(args);
-                    break;
+                case 'model-ready': onModelReady(args); break;
                 case 'mode-changed':
                     STATE.mode = args.mode;
                     // Update the current file name in the UI
                     renderFilenamePanel();
-                    console.log('Mode changed to: ' + args.mode);
+                    config.debug && console.log('Mode changed to: ' + args.mode);
                     break;
-                case 'prediction-done':
-                    onPredictionDone(args);
-                    break;
-                case 'prediction-ongoing':
-                    renderResult(args);
-                    break;
-                case 'progress':
-                    onProgress(args);
-                    break;
-                case 'seen-species-list':
-                    generateBirdList('seenSpecies', args.list);
-                    break;
-                case 'show-spinner':
-                    showLoadingSpinner(500);
-                    break;
-                case 'spawning':
-                    displayWarmUpMessage();
-                    break;
-                case 'total-records':
-                    updatePagination(args.total, args.offset);
-                    break;
+                case 'summary-complate': onSummaryComplete(args); break;
+                case 'new-result': renderResult(args); break;
+                case 'progress': onProgress(args); break;
+                case 'seen-species-list': generateBirdList('seenSpecies', args.list); break;
+                case 'show-spinner': showLoadingSpinner(500); break;
+                case 'spawning': displayWarmUpMessage(); break;
+                case 'total-records': updatePagination(args.total, args.offset); break;
                 case 'unsaved-records':
                     window.electron.unsavedRecords(true);
                     document.getElementById('unsaved-icon').classList.remove('d-none');
+                    break;
                 case 'update-audio-duration':
-                    DIAGNOSTICS['Audio Duration'] ?
-                        DIAGNOSTICS['Audio Duration'] += args.value :
-                        DIAGNOSTICS['Audio Duration'] = args.value;
+                    DIAGNOSTICS['Audio Duration'] ??= 0;
+                    DIAGNOSTICS['Audio Duration'] += args.value;
                     break;
-                case 'update-summary':
-                    updateSummary(args);
-                    break;
-                case 'worker-loaded-audio':
-                    onWorkerLoadedAudio(args);
-                    break;
-                default:
-                    alert(`Unrecognised message from worker:${args.event}`)
+                case 'update-summary': updateSummary(args); break;
+                case 'worker-loaded-audio': onWorkerLoadedAudio(args); break;
+                default: alert(`Unrecognised message from worker:${args.event}`)
             }
         })
     })
@@ -2604,60 +2576,20 @@ const updateSummary = ({ summary = [], filterSpecies = '' }) => {
     if (currentFilter) currentFilter.focus();
 }
 
-async function onPredictionDone({
-    filterSpecies = undefined,
-    batchInProgress = false,
-    audacityLabels = {},
-    file = undefined,
-    summary = [],
-    active = undefined,
-    offset = 0,
-    action = undefined
-}) {
-    // Reset daylight banner
-    shownDaylightBanner = false;
-    AUDACITY_LABELS = audacityLabels;
-    enableMenuItem(['save2db', 'export2audio']);
-    // Defer further processing until batch complete
-    if (batchInProgress) {
-        progressDiv.classList.remove('d-none');
-        return;
-    } else {
-        PREDICTING = false;
-    }
-    if (resultsBuffer) {
-        const results = document.getElementById('resultTableBody');
-        results.replaceWith(resultsBuffer);
-        // resultsBuffer = undefined;
-    }
-
-    updateSummary({ summary: summary, filterSpecies: filterSpecies });
-
-    
-    if (action !== 'filter') {
-        if (! isEmptyObject(AUDACITY_LABELS)) {
-            enableMenuItem(['saveLabels', 'saveCSV']);
-            $('.download').removeClass('disabled');
-        } else {
-            disableMenuItem(['saveLabels', 'saveCSV']);
-        }
-        if (currentFile) enableMenuItem(['analyse'])
-
-        // DIAGNOSTICS:
-        t1_analysis = Date.now();
-        const analysisTime = ((t1_analysis - t0_analysis) / 1000).toFixed(2);
-        DIAGNOSTICS['Analysis Duration'] = analysisTime + ' seconds';
-        DIAGNOSTICS['Analysis Rate'] = (DIAGNOSTICS['Audio Duration'] / analysisTime).toFixed(0) + 'x faster than real time performance.';
-    }
-
-    
+/*
+onResultsComplete is called when the last result is sent
+*/
+function onResultsComplete({active = undefined} = {}){
+    let table = document.getElementById('resultTableBody');
+    table.replaceWith(resultsBuffer);
+    table = document.getElementById('resultTableBody');
+    PREDICTING = false;
     // Set active Row
-    const resultTable = document.getElementById('resultTableBody');
     if (active) {
         // Refresh node and scroll to active row:
-        activeRow = resultTable.rows[active];
+        activeRow = table.rows[active];
         if (! activeRow) { // because: after an edit the active row may not exist
-            const rows = resultTable.querySelectorAll('tr.daytime, tr.nighttime')
+            const rows = table.querySelectorAll('tr.daytime, tr.nighttime')
             if (rows.length) {
                 activeRow = rows[rows.length - 1];
             }
@@ -2665,18 +2597,50 @@ async function onPredictionDone({
             activeRow.classList.add('table-active');
         }
     }
-    else if (STATE.mode === 'analyse') {
-        activeRow = resultTable.querySelector('.table-active');
+    else { // if (STATE.mode === 'analyse') {
+        activeRow = table.querySelector('.table-active');
         if (!activeRow) {
             // Select the first row
-            activeRow = resultTable.querySelector('tr:first-child');
+            activeRow = table.querySelector('tr:first-child');
+            activeRow.classList.add('table-active');
+            document.getElementById('resultsDiv').scrollTo({ top: 0, left: 0, behavior: "smooth" });
         }
     }
+
     if (!batchInProgress && activeRow) {
         activeRow.focus();
         activeRow.click();
     }
+    // DIAGNOSTICS:
+    t1_analysis = Date.now();
+    const analysisTime = ((t1_analysis - t0_analysis) / 1000).toFixed(2);
+    DIAGNOSTICS['Analysis Duration'] = analysisTime + ' seconds';
+    DIAGNOSTICS['Analysis Rate'] = (DIAGNOSTICS['Audio Duration'] / analysisTime).toFixed(0) + 'x faster than real time performance.';
 }
+
+
+
+/* 
+onSummaryComplete is called when getSummary finishes.
+*/
+function onSummaryComplete({
+    filterSpecies = undefined,
+    audacityLabels = {},
+    summary = [],
+    active = undefined,
+}) {
+    updateSummary({ summary: summary, filterSpecies: filterSpecies });
+    // Why do we do audacity labels here?
+    AUDACITY_LABELS = audacityLabels;
+    if (! isEmptyObject(AUDACITY_LABELS)) {
+        enableMenuItem(['saveLabels', 'saveCSV', 'save2db', 'export2audio']);
+        $('.download').removeClass('disabled');
+    } else {
+        disableMenuItem(['saveLabels', 'saveCSV']);
+    }
+    if (currentFile) enableMenuItem(['analyse'])
+}
+
 
 const pagination = document.querySelectorAll('.pagination');
 pagination.forEach(item => {
@@ -3912,7 +3876,8 @@ const insertManualRecord = (cname, start, end, comment, count, label, action, ba
         label: label,
         DBaction: action,
         batch: batch,
-        confidence: confidence
+        confidence: confidence,
+        active: activeRow.rowIndex - 1
     })
 }
 
