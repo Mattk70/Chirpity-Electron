@@ -8,7 +8,7 @@
 
 <table class="table table-hover p-1">
     <tr>
-        <td colspan="2" class="text-center bg-dark text-white"><h5>Predictions</h5></td>
+        <td colspan="2" class="text-center text-bg-light"><h5>Predictions</h5></td>
     </tr>
     <tr>
         <th>Set Threshold</th>
@@ -34,16 +34,9 @@
             excluded).</p>
             <p><b>All birds</b>. Include birdsong as well as calls, also includes species not known to call at night.
             </p>
-            <p><b>Everything</b>. This full list comprises 305 bird species and the following non-bird classes:</p>
-            <ul>
-                <li><b>Ambient noise:</b> wind, rain, pops and bangs. Things that go bump in the night...</li>
-                <li><b>Animals:</b> cats, dogs, bats, etc.</li>
-                <li><b>Human:</b> voices, whistles, etc.</li>
-                <li><b>Vehicles:</b> Wheel and engine noise of cars, trucks, trains and aircraft. Also sirens and alarms
-                    (including domestic burglar alarms) and horns.
-                </li>
+            <p><b>Everything</b>. In addition to birds, show non-bird detections including segments that were considered noise.
             </ul>
-            <p>If you wish to see the full list of species Chirpity <i>Nocmig</i> was trained on, just explore the list
+            <p>If you wish to see the full list of the 320 species Chirpity <i>Nocmig</i> was trained on, just explore the list
                 offered when correcting a prediction.</p>
         </td>
     </tr>
@@ -55,21 +48,51 @@
         </td>
     </tr>
     <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Experimental Features</h5></td>
+    </tr>
+    <tr>
         <th>Context Mode</th>
         <td> In this mode, Chirpity will use the surrounding context when making predictions. This helps mitigate
             against false positive detections.
         </td>
     </tr>
-    <tr>
-        <td colspan="2" class="text-center bg-dark text-white"><h5>Location</h5></td>
-    </tr>
-    <tr>
-        <th>Location</th>
-        <td> Set the location to use for calculating the start and end of civil twilight.
+        <th>SNR filter</th>
+        <td>The SNR (Signal to Noise Ratio) filter can only be enabled when using the CPU backend. When enabled, Chirpity will disregard audio segments with no distinct sound event.
+            A stronger signal is required for a prediction to be attempted when higher signal-to-noise values are set.
+            The purpose is to deliver significant speed gains, however, the setting may cause Chirpity to miss quieter, more distant calls.
         </td>
     </tr>
     <tr>
-        <td colspan="2" class="text-center bg-dark text-white"><h5>Spectrogram</h5></td>
+        <th>High Pass filter</th>
+        <td> This applies a filter to the audio, removing the sound below the frequency selected. 
+            Intended primarily for recordings made in in urban settings, this is desirable to compensate for strong low-frequency noise which is not present in the training data.
+        </td>
+    </tr>
+    <tr>
+        <th>Low Shelf filter</th>
+        <td> This applies an audio filter similar to the High Pass filter, however, rather than simply remove noise, it reduces the volume of low frequency noise. 
+            You can set the threshold frequency, and the strength of the filter to apply (Attenuation).
+            Also intended for recordings made in in urban settings, this helps tune the audio to the noise profile of the training data.
+        </td>
+    </tr>
+    <tr>
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Location</h5></td>
+    </tr>
+    <tr>
+        <th>Location</th>
+        <td>
+            <figure class="figure float-end m-3">
+                <img src="Help/amend file.png"
+                    alt="The context menu accessed from the filename contains options to amend the file's start time and the recording location"
+                    class="rounded figure-img float-end img-fluid">
+                <figcaption class="figure-caption text-muted text-end">File name context menu.</figcaption>
+            </figure>
+            Set the default location to use for calculating the start and end of civil twilight. This setting can be overriden for individual files by assigning a custom location in the filename context menu.
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Spectrogram</h5></td>
     </tr>
     <tr>
         <td><b>Colourmap</b></td>
@@ -84,18 +107,14 @@
                 </li>
                 <li>
                     <b>Time of Day</b> relies on file timestamps to determine the actual time of detected calls.
-                    If a file's timestamp does not reflect the recording time, an inaccurate reading will result.
-                    To edit the start time of the current file,
-                    select the desired date and time using the <span
-                        class="material-symbols-outlined align-bottom">edit_calendar</span>
-                    icon located next to the file name on the transport controls panel.
-
+                    If a file's timestamp does not reflect the recording time, the readonig will be inaccurate.
+                    To edit the start time of the current file, set the desired date and time using the filename context menu.
                 </li>
             </ul>
         </td>
     </tr>
     <tr>
-        <td colspan="2" class="text-center bg-dark text-white"><h5>System</h5></td>
+        <td colspan="2" class="text-center text-bg-light"><h5>System</h5></td>
     </tr>
     <tr>
         <th>Backend</th>
@@ -125,13 +144,6 @@
             Larger values lead to faster processing, especially on long files.
             However, setting it too high for your machine can cause the Chirpity model to crash due to memory limitations.
             If this happens, set a lower value and restart Chirpity.
-        </td>
-    </tr>
-    <tr>
-        <th>Signal to Noise threshold</th>
-        <td>This setting is exclusive to the CPU backend. When enabled, Chirpity will disregard audio sections with unclear signals.
-            The strength of the signal required for a prediction to be attempted increases with a higher signal-to-noise value.
-            This results in significant speed gains, but may cause Chirpity to miss quieter, more distant calls.
         </td>
     </tr>
 </table>
