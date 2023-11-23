@@ -476,7 +476,6 @@ function showDatePicker() {
     // Append the form to the filename element
     const domElement = document.getElementById("filename");
     domElement.appendChild(form);
-    document.removeEventListener('keydown', handleKeyDownDeBounce, true);
     // Add submit event listener to the form
     form.addEventListener("submit", function (event) {
         event.preventDefault();
@@ -499,6 +498,7 @@ function showDatePicker() {
         // Remove the form from the DOM
         form.remove();
     });
+    toggleKeyDownForFormInputs()
 }
 
 const filename = document.getElementById('filename');
@@ -2360,9 +2360,7 @@ const postBufferUpdate = ({
 const goto = new bootstrap.Modal(document.getElementById('gotoModal'));
 const showGoToPosition = () => {
     if (currentFile) {
-        //document.removeEventListener('keydown', handleKeyDownDeBounce, true);
         goto.show();
-
     }
 }
 
@@ -2605,7 +2603,10 @@ function onResultsComplete({active = undefined} = {}){
         }
     }
 
-    if (activeRow) activeRow.click();
+    if (activeRow) {
+        activeRow.focus();
+        activeRow.click();
+    }
     // DIAGNOSTICS:
     t1_analysis = Date.now();
     const analysisTime = ((t1_analysis - t0_analysis) / 1000).toFixed(2);
@@ -3374,7 +3375,7 @@ $(function () {
         });
 
         $(this).on('cancel.daterangepicker', function () {
-            $(this).children('span').html('Apply a date filter');
+            $(this).children('span:not(.material-symbols-outlined)').html('Apply a date filter');
             if (worker) {
                 if (this.id === 'chartRange') {
                     STATE.chart.range = { start: undefined, end: undefined };
@@ -3402,8 +3403,7 @@ $(function () {
 });
 
 
-document.addEventListener("DOMContentLoaded", function () {
-    document.addEventListener("keydown", handleKeyDownDeBounce, true);
+function toggleKeyDownForFormInputs(){
     const formFields = document.querySelectorAll("input, textarea, select");
     // Disable keyboard shortcuts when any form field gets focus
     formFields.forEach((formField) => {
@@ -3415,6 +3415,11 @@ document.addEventListener("DOMContentLoaded", function () {
             document.addEventListener("keydown", handleKeyDownDeBounce, true);
         });
     });
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+    document.addEventListener("keydown", handleKeyDownDeBounce, true);
+    toggleKeyDownForFormInputs();
     // make menu an accordion for smaller screens
     if (window.innerWidth < 768) {
 
@@ -3804,7 +3809,6 @@ const recordEntryForm = document.getElementById('record-entry-form');
 let focusBirdList;
 
 async function showRecordEntryForm(mode, batch) {
-    document.removeEventListener("keydown", handleKeyDownDeBounce, true);
     const cname = batch ? document.querySelector('#speciesFilter .text-warning .cname .cname').innerText : region.attributes.label.replace('?', '');
     let callCount = '', typeIndex = '', commentText = '';
     if (cname && activeRow) {
@@ -3829,12 +3833,10 @@ async function showRecordEntryForm(mode, batch) {
     recordEntryForm.querySelector('#record-add').innerText = mode;
     if (typeIndex) recordEntryForm.querySelectorAll('input[name="record-label"]')[typeIndex].checked = true;
     recordEntryModalDiv.addEventListener('shown.bs.modal', focusBirdList)
+    toggleKeyDownForFormInputs()
     recordEntryModal.show();
 }
 
-recordEntryModalDiv.addEventListener('hide.bs.modal', () => {
-    document.addEventListener("keydown", handleKeyDownDeBounce, true)
-})
 recordEntryForm.addEventListener('submit', function (e) {
     e.preventDefault();
     const action = document.getElementById('DBmode').value;
