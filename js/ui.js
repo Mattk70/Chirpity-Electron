@@ -125,7 +125,6 @@ const audioFiltersIcon = document.getElementById('audioFiltersIcon')
 const contextAwareIcon = document.getElementById('context-mode');
 const defaultLat = document.getElementById('latitude');
 const defaultLon = document.getElementById('longitude');
-let batchInProgress = false;
 let activeRow;
 let predictions = {},
     clickedIndex, currentFileDuration;
@@ -159,11 +158,13 @@ DIAGNOSTICS['CPU'] = os.cpus()[0].model;
 DIAGNOSTICS['Cores'] = os.cpus().length;
 DIAGNOSTICS['System Memory'] = (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) + ' GB';
 
-function resetResults(clearSummary, clearPagination) {
+function resetResults({clearSummary, clearPagination, clearResults}) {
     if (clearSummary) summaryTable.innerText = '';
+
     clearPagination && pagination.forEach(item => item.classList.add('d-none'));
     const resultTable = document.getElementById('resultTableBody');
     resultsBuffer = resultTable.cloneNode(false)
+    if (clearResults) resultTable.innerText = '';
     predictions = {};
     seenTheDarkness = false;
     shownDaylightBanner = false;
@@ -717,7 +718,7 @@ const filterValidFiles = ({ filePaths }) => {
 async function onOpenFiles(args) {
     hideAll();
     showElement(['spectrogramWrapper'], false);
-    resetResults(true, true);
+    resetResults({clearSummary: true, clearPagination: true, clearResults: true});
     resetDiagnostics();
     //completeDiv.hide();
     // Store the file list and Load First audio file
@@ -850,11 +851,8 @@ function postAnalyseMessage(args) {
         //updateProgress(0);
         if (!selection) {
             analyseReset();
-            resetResults(true, true);
             refreshResultsView();
-        }
-        if (filesInScope.length > 1) {
-            batchInProgress = true;
+            resetResults({clearSummary: true, clearPagination: true, clearResults: true});
         }
         worker.postMessage({
             action: 'analyse',
@@ -1020,7 +1018,7 @@ exploreLink.addEventListener('click', async () => {
     adjustSpecDims(true)
     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
     worker.postMessage({ action: 'filter', species: undefined, range: STATE.explore.range, updateSummary: true }); 
-    resetResults(true, true)
+    resetResults({clearSummary: true, clearPagination: true, clearResults: true});
 });
 
 const datasetLink = document.getElementById('dataset');
@@ -1500,7 +1498,7 @@ const setUpWorkerMessaging = () => {
                                 active: args.active,
                                 updateSummary: true
                             }); // no re-prepare
-                            resetResults(true, false)
+                            resetResults({clearSummary: true, clearPagination: true, clearResults: true});
                         } else {
                             alert(args.message) 
                         }
@@ -2607,10 +2605,7 @@ function onResultsComplete({active = undefined} = {}){
         }
     }
 
-    if (!batchInProgress && activeRow) {
-        activeRow.focus();
-        activeRow.click();
-    }
+    if (activeRow) activeRow.click();
     // DIAGNOSTICS:
     t1_analysis = Date.now();
     const analysisTime = ((t1_analysis - t0_analysis) / 1000).toFixed(2);
@@ -2665,7 +2660,7 @@ pagination.forEach(item => {
                 offset: offset,
                 limit: limit,
             }); 
-            resetResults(false, false)
+            resetResults({clearSummary: false, clearPagination: false, clearResults: false});
         }
     })
 })
@@ -2724,8 +2719,8 @@ function speciesFilter(e) {
     worker.postMessage({
         action: 'filter',
         species: species
-    }); // no re-prepare
-    resetResults(false, false);
+    });
+    resetResults({clearSummary: false, clearPagination: false, clearResults: false});
 }
 
 
@@ -3096,7 +3091,8 @@ const changeNocmigMode = () => {
     });
     updatePrefs();
     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}}); 
-    resetResults(true, true);
+
+    resetResults({clearSummary: true, clearPagination: true, clearResults: false});
     worker.postMessage({
         action: 'filter',
         species: isSpeciesViewFiltered(true),
@@ -3503,7 +3499,7 @@ const handleThresholdChange = (e) => {
     }
     if (!PREDICTING && !resultTableElement[0].hidden) {
         worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
-        resetResults(true, true);
+        resetResults({clearSummary: true, clearPagination: true, clearResults: false});
         worker.postMessage({
             action: 'filter',
             species: isSpeciesViewFiltered(true),
@@ -3877,7 +3873,7 @@ const insertManualRecord = (cname, start, end, comment, count, label, action, ba
         DBaction: action,
         batch: batch,
         confidence: confidence,
-        active: activeRow.rowIndex - 1
+        active: activeRow.rowIndex - 1 //  have to account for the header row
     })
 }
 

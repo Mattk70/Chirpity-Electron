@@ -698,7 +698,6 @@ function onAbort({
     filesBeingProcessed = [];
     predictionsReceived = {};
     predictionsRequested = {};
-    //UI.postMessage({ event: 'prediction-done', batchInProgress: true });
 }
 
 const getDuration = async (src) => {
@@ -1769,7 +1768,7 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
 }
 
 const parsePredictions = async (response) => {
-    let file = response.file, batchInProgress = filesBeingProcessed.length;
+    let file = response.file;
     const latestResult = response.result, db = STATE.db;
     DEBUG && console.log('worker being used:', response.worker);
 
@@ -1884,9 +1883,6 @@ async function parseMessage(e) {
                     const limit = 10;
                     clearCache(CACHE_LOCATION, limit);
                     if (filesBeingProcessed.length) {
-                        // UI.postMessage({
-                        //     event: 'prediction-done', batchInProgress: true,
-                        // })
                         processNextFile({ worker: worker });
                     } else if (!STATE.selection) {
                         getSummary();
@@ -2099,7 +2095,6 @@ const getSummary = async ({
         audacityLabels: AUDACITY,
         filterSpecies: species,
         active: active,
-        batchInProgress: filesBeingProcessed.length,
         action: action
     })
 };
