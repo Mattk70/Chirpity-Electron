@@ -2721,7 +2721,7 @@ async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
             await db.runAsync('UPDATE files SET locationID = ? WHERE name = ?', id, file);
             // we may not have set the metadata for the file
             if (metadata[file]) {
-                metadata[file].locationID = id;
+                metadata[file].locationID = id; 
             } else {
                 metadata[file] = {}
                 metadata[file].locationID = id;
@@ -2745,77 +2745,4 @@ async function getLocations({ db = STATE.db, file }) {
     const locations = await db.allAsync('SELECT * FROM locations ORDER BY place')
     UI.postMessage({ event: 'location-list', locations: locations, currentLocation: metadata[file]?.locationID })
 }
-
-/*
-todo: bugs
-    Reported region duration tooltip incorrect 
-
-Todo: Database
-     Database file path update, batch update - so we can move files around after analysis
-     ***Compatibility with updates, esp. when num classes change
-        -Create a new database for each model with appropriate num classes?
-
-Todo: Location.
-
-Todo cache:
-    Set cache location
-    Control cache size in settings
-
-Todo: manual entry
-
-
-Todo: UI
-    ***Better tooltips, for all options
-    ***Sort summary by headers (click on species or header)
-    ***Have a panel for all analyse settings, not just nocmig mode
-    ***Align the label on the spec to the right to minimize overlap with axis labels
-
-
-Todo: Charts
-    Allow better control of aggregation (e.g) hourly over a week
-    Permit inclusion of hours recorded in other date ranges
-    Allow choice of chart type
-    Rip out highcharts, use chart.js.
-    Allow multiple species comparison, e.g. compare Song Thrush and Redwing peak migration periods
-
-Todo: Explore
-    ***Make summary range aware
-    ***Make seen species list range aware
-
-Todo: Performance
-    ***Smaller model faster - but retaining accuracy? Read up on Knowledge distillation
-    *** Spawn several prediction workers
-
-Todo: model.
-     Improve accuracy, accuracy accuracy!
-        - refine training
-        - ***(look at snr for false positives impact
-     Establish classes protocol. What's in, what name to give it
-     Speed - knowledge distillation??
-
-Todo: Releases
-     Limit features for free users
-     Premium features are??
-     Upsell premium features
-     Automatic updates
-     Implement version protocol
-     ***Better way to link js model to checkpoint model: USE same folder names
-
-Todo: IDs
-    Search by label,
-    Search for comment
-    Add mystery ID option
-
-Todo: Tests & code quality
-    Order / group functions semantically
-    Investigate unit tests
-    Investigate coverage
-    Integrate with commit?
-    Document code, jsdoc?
-    Use de-referencing on all args parameters
-    Shorten functions
-    Review all global vars: set global var policy. Capitalise all globals
-    Make use of const functions / arrow vs. normal ones consistent.
-    **Review use of async functions
-    **Make Locatefile() case insensitive
- */
+ 
