@@ -2598,7 +2598,7 @@ function onResultsComplete({active = undefined} = {}){
         if (!activeRow) {
             // Select the first row
             activeRow = table.querySelector('tr:first-child');
-            activeRow.classList.add('table-active');
+            activeRow?.classList.add('table-active');
             document.getElementById('resultsDiv').scrollTo({ top: 0, left: 0, behavior: "smooth" });
         }
     }
