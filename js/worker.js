@@ -22,7 +22,7 @@ let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on ever
 
 const DEBUG = false;
 
-const DATASET = true;
+const DATASET = false;
 const adding_chirpity_additions = true;
 const dataset_database = DATASET;
 
@@ -1844,7 +1844,7 @@ const parsePredictions = async (response) => {
         console.log(`File ${file} processed after ${(new Date() - predictionStart) / 1000} seconds: ${filesBeingProcessed.length} files to go`);
     }
     //!STATE.selection && (!DATASET || STATE.increment() === 0) &&
-     getSummary({ interim: true });
+    getSummary({ interim: true });
     return response.worker
 }
 
@@ -1886,6 +1886,7 @@ async function parseMessage(e) {
                         processNextFile({ worker: worker });
                     } else if (!STATE.selection) {
                         getSummary();
+                        UI.postMessage({event: 'analysis-complete'})
                     }
                 }
             }

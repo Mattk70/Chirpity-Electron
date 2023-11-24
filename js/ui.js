@@ -1473,6 +1473,7 @@ const setUpWorkerMessaging = () => {
             const args = e.data;
             const event = args.event;
             switch (event) {
+                case 'analysis-complete': onAnalysisComplete(); break;
                 case 'chart-data': onChartData(args); break;
                 case 'diskDB-has-records':
                     chartsLink.classList.remove('disabled');
@@ -2607,14 +2608,16 @@ function onResultsComplete({active = undefined} = {}){
         activeRow.focus();
         activeRow.click();
     }
+}
+
+function onAnalysisComplete(){
+    PREDICTING = false;
     // DIAGNOSTICS:
     t1_analysis = Date.now();
     const analysisTime = ((t1_analysis - t0_analysis) / 1000).toFixed(2);
     DIAGNOSTICS['Analysis Duration'] = analysisTime + ' seconds';
     DIAGNOSTICS['Analysis Rate'] = (DIAGNOSTICS['Audio Duration'] / analysisTime).toFixed(0) + 'x faster than real time performance.';
 }
-
-
 
 /* 
 onSummaryComplete is called when getSummary finishes.
