@@ -211,11 +211,7 @@ async function loadAudioFile({ filePath = '', preserveResults = false }) {
 
 
 function updateSpec({ buffer, play = false, position = 0, resetSpec = false }) {
-    //updateElementCache();
     wavesurfer.loadDecodedBuffer(buffer);
-    //waveCanvasElement.width('100%');
-    //specCanvasElement.width('100%');
-    //$('.spec-labels').width('55px');
     wavesurfer.seekTo(position);
     play ? wavesurfer.play() : wavesurfer.pause();
     if (resetSpec) adjustSpecDims(true);
@@ -923,10 +919,7 @@ function setHeight(el, val) {
 
 function showElement(id_list, makeFlex = true, empty = false) {
     id_list.forEach(id => {
-        //const thisElement = $('#' + id);
         const thisElement = document.getElementById(id);
-        //thisElement.show();
-        //thisElement.removeClass('d-none');
         thisElement.classList.remove('d-none');
         if (makeFlex) thisElement.classList.add('d-flex');
         if (empty) {
