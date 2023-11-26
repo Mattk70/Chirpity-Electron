@@ -3451,43 +3451,42 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 // Confidence thresholds
-const thresholdDisplay = document.getElementById('threshold-value');
-const confidenceDisplay = document.getElementById('confidence-value');
-const confidenceSliderDisplay = document.getElementById('confidenceSliderContainer');
-const confidenceSlider = document.getElementById('confidenceValue');
-const confidenceRange = document.getElementById('confidence');
-
+const filterPanelThresholdDisplay = document.getElementById('threshold-value'); // confidence % display in panel
+const settingsPanelThresholdDisplay = document.getElementById('confidence-value');  // confidence % display in settings
+const confidenceSliderDisplay = document.getElementById('confidenceSliderContainer'); // confidence span for slider in panel - show-hide
+const filterPanelRangeInput = document.getElementById('confidenceValue'); // panel range input 
+const settingsPanelRangeInput = document.getElementById('confidence'); // confidence range input in settings
 
 const setConfidence = (e) => {
-
-    confidenceRange.value = e.target.value;
+    //settingsPanelRangeInput.value = e.target.value;
     handleThresholdChange(e);
 }
 
-thresholdDisplay.addEventListener('click', (e) => {
+filterPanelThresholdDisplay.addEventListener('click', (e) => {
     e.stopPropagation();
     confidenceSliderDisplay.classList.toggle('d-none');
-    // confidenceTimerTimeout = setTimeout(hideConfidenceSlider, 1750)
 })
-confidenceSlider.addEventListener('click', (e) => {
+filterPanelRangeInput.addEventListener('click', (e) => {
     e.stopPropagation();
 })
+
 const hideConfidenceSlider = () => {
     confidenceSliderDisplay.classList.add('d-none');
 }
-confidenceSliderDisplay.addEventListener('change', setConfidence);
 
 
-function showThreshold(threshold) {
-    thresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
-    confidenceDisplay.innerHTML = `<b>${threshold}%</b>`;
-    confidenceSlider.value = threshold;
-    confidenceRange.value = threshold;
+function showThreshold(e) {
+    const threshold = e instanceof Event ? parseInt(e.target.value) : e;
+    filterPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
+    settingsPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
+    filterPanelRangeInput.value = threshold;
+    settingsPanelRangeInput.value = threshold;
 }
+settingsPanelRangeInput.addEventListener('input', showThreshold);
+filterPanelRangeInput.addEventListener('input', showThreshold);
 
 const handleThresholdChange = (e) => {
     const threshold = parseInt(e.target.value);
-    showThreshold(threshold);
     config.detect.confidence = threshold;
     updatePrefs();
     worker.postMessage({
@@ -3505,10 +3504,13 @@ const handleThresholdChange = (e) => {
             action: 'filter',
             species: isSpeciesViewFiltered(true),
             updateSummary: true
-        }); // no re-prepare
+        });
     }
 }
-confidenceRange.addEventListener('input', handleThresholdChange);
+filterPanelRangeInput.addEventListener('change', handleThresholdChange);
+settingsPanelRangeInput.addEventListener('change', handleThresholdChange);
+
+
 // Filter handling
 const filterIconDisplay = () => {
     if (config.filters.active && (config.filters.highPassFrequency || (config.filters.lowShelfAttenuation && config.filters.lowShelfFrequency) || config.filters.SNR)) {

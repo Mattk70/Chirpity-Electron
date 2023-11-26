@@ -2060,8 +2060,6 @@ async function setStartEnd(file) {
     } else {
         boundaries = [{ start: 0, end: meta.duration }];
     }
-    // const { start, end } = boundaries[0];
-    // return [start, end];
     return boundaries;
 }
 
@@ -2083,7 +2081,6 @@ const getSummary = async ({
     }
 
     t0 = Date.now();
-    //const speciesForSTMT = species || '%';
     const params = getSummaryParams(species);
     const summary = await STATE.GET_SUMMARY_SQL.allAsync(...params);
 
@@ -2105,7 +2102,6 @@ const getSummary = async ({
  *
  * @param files: files to query for detections
  * @param species: filter for SQL query
- * @param context: can be 'results', 'resultSummary' or 'selectionResults'
  * @param limit: the pagination limit per page
  * @param offset: is the SQL query offset to use
  * @param topRankin: return results >= to this rank for each datetime
@@ -2115,7 +2111,6 @@ const getSummary = async ({
  */
 const getResults = async ({
     species = undefined,
-    context = 'results',
     limit = STATE.limit,
     offset = undefined,
     topRankin = STATE.topRankin,
@@ -2168,7 +2163,7 @@ const getResults = async ({
                     i === result.length - 1 && UI.postMessage({ event: 'generate-alert', message: `${result.length} files saved` })
                 } 
             }
-            else if (species && context !== 'explore') {
+            else if (species && STATE.mode !== 'explore') {
                 // get a number for the circle
                 const { count } = await STATE.db.getAsync(`SELECT COUNT(*) as count FROM records WHERE dateTime = ?
                                                     AND confidence >= ?`, r.timestamp, confidence);

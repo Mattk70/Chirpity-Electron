@@ -131,6 +131,18 @@
             </ul>
         </td>
     </tr>
+    <th>Model</th>
+    <td>Choose the model to use for prediction.
+        <ul>
+            <li>
+                <b>Chirpity</b> will use the native Chirpity model for predictions.
+            </li>
+            <li>
+                <b>BirdNet</b> will use the BirdNet model.
+            </li>
+        </ul>
+    </td>
+</tr>
     <tr>
         <th>Threads</th>
         <td>This setting allows you to select the number of threads to use for predictions.
@@ -142,8 +154,6 @@
         <th>Batch Size</th>
         <td>This setting determines the number of three-second audio chunks to process each time a prediction is requested.
             Larger values lead to faster processing, especially on long files.
-            However, setting it too high for your machine can cause the Chirpity model to crash due to memory limitations.
-            If this happens, set a lower value and restart Chirpity.
         </td>
     </tr>
 </table>

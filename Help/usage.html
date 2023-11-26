@@ -107,7 +107,7 @@
         </li>
     </ol>
     <h5 class="pt-2">Summary and Filtering Detections</h5>
-    <ol start="7">
+    <ol start="6">
         <li>
             A summary table appears to the left of the results once the model has completed its analysis. Importantly,
             this
@@ -118,7 +118,7 @@
         </li>
     </ol>
     <h5 class="pt-2">Custom "Deep Dive" Detections</h5>
-    <ol start="8">
+    <ol start="7">
         <li>Sometimes, a call is missed or a detection is erroneous due to the position of the analysis window in
             relation
             to the call. The window can be moved by dragging it, or you can create a new window by clicking and
@@ -132,7 +132,7 @@
     </ol>
 
     <h5 class="pt-2">Amending Results</h5>
-    <ol start="10">
+    <ol start="8">
         <li>It is possible to remove results from what will be saved by selecting <span
                 class='delete material-symbols-outlined'>delete_forever</span> <b>Delete Record</b> in the context menu.
             This can be selected on a per-detection basis in the results table, or a per-species basis in the summary.
@@ -141,32 +141,10 @@
     </ol>
 
     <h5 class="pt-2">Saving Results</h5>
-    <ol start="10">
-        <li>There are several ways to save results:
-            <ol>
-
+    <ol start="9">
                 <li>Once the analysis is complete, and after you have made any amendments, you can save the results to a
-                    database <b>Records > Save to Archive </b>
-                    After this, it will bring in the results from the database records. You can also explore and chart
-                    saved records.
-
-                <li>Save the detections as a label file in Audacity format. Press <b>Ctrl-A</b> or select <b>File > Save
-                        Audacity Labels</b> from the menu. By default, the label file will have the same name as the
-                    audio file,
-                    with a ".txt" extension.
+                    database by selecting <b>Records > <span class="material-symbols-outlined">archive</span> Save to Archive </b>
                 </li>
-                <li>
-                    Export an audio clip of a detection. To do this, select <span class="material-symbols-outlined">
-                        music_note
-                    </span><b>Export Audio Clip</b> on the context menu. By default, the filename will contain the
-                    species and
-                    timestamp of the detection identifying its position in the original audio file. The <b>Settings</b>
-                    menu allows you
-                    to control the format and quality of the exported files as well as apply padding and a fade effect
-                    to the beginning and end of the audio.
-                </li>
-            </ol>
-        </li>
     </ol>
 
     <h5 id="reload" class="pt-2">Restoring Results</h5>
@@ -181,6 +159,30 @@
         cue from this file's creation time, use the original one.</p>
     <p>From the records menu, you can also browse saved detections by species, and within a date range of your choosing.
         Furthermore, you can generate charts of the species detected over time.</p>
+
+    <h5 id="reload" class="pt-2">Exporting Results</h5>
+    There are a number of ways to export detections.
+    <ol>
+        <li>Save the detections as a label file in Audacity format. Press <b>Ctrl-A</b> or select <b>File > Save
+            Audacity Labels</b> from the menu. By default, the label file will have the same name as the
+            audio file,with a ".txt" extension.
+        </li>
+        <li>
+            Export an audio clip of a detection. To do this, select <span class="material-symbols-outlined">
+                music_note
+            </span><b>Export Audio Clip</b> on the context menu. By default, the filename will contain the
+            species and
+            timestamp of the detection identifying its position in the original audio file. The <b>Settings</b>
+            menu allows you
+            to control the format and quality of the exported files as well as apply padding and a fade effect
+            to the beginning and end of the audio.
+        </li>
+        <li>
+            Export a CSV file of detections. To do this, select <span class="material-symbols-outlined">
+                ios_share
+            </span><b>Export results to CSV</b> from the file menu. This will export the results to a CSV file in the folder you choose.
+        </li>
+    </ol>
 </body>
 
 </html>
