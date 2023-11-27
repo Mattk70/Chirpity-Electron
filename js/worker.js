@@ -20,7 +20,7 @@ let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on every change
 
-const DEBUG = false;
+const DEBUG = true;
 
 const DATASET = false;
 const adding_chirpity_additions = true;
@@ -725,12 +725,7 @@ const convertFileFormat = (file, destination, size, error) => {
         ffmpeg(file)
             .audioChannels(channels)
             .audioFrequency(sampleRate)
-            // .audioFilters(
-            //     {
-            //       filter: 'dynaudnorm',
-            //       options: 'f=500:p=0.95:g=3'
-            //     }
-            // )
+
             .on('error', (err) => {
                 console.log('An error occurred: ' + err.message);
                 if (err) {
@@ -756,6 +751,9 @@ const convertFileFormat = (file, destination, size, error) => {
                 UI.postMessage({
                     event: 'progress', text: 'Extracting file', progress: extractionProgress
                 })
+            })
+            .on('start', function (commandLine) {
+                DEBUG && console.log('FFmpeg command: ' + commandLine);
             })
             .on('end', () => {
                 UI.postMessage({ event: 'progress', text: 'File decompressed', progress: 1.0 })
