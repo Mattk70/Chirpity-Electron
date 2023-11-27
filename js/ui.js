@@ -96,12 +96,11 @@ let fileStart, bufferStartTime, fileEnd;
 
 let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
 // set up some DOM element caches
-const bodyElement = $('body');
-let spectrogramWrapper = $('#spectrogramWrapper'), specElement, waveElement, specCanvasElement, specWaveElement;
+const bodyElement = document.body;
+let spectrogramWrapper = document.getElementById('spectrogramWrapper'), specElement, waveElement, specCanvasElement, specWaveElement;
 let waveCanvasElement, waveWaveElement,
-    resultTableElement = $('#resultTableContainer');
-const contentWrapperElement = $('#contentWrapper');
-//const completeDiv = $('#complete');
+    resultTableElement = document.getElementById('resultTableContainer');
+const contentWrapperElement = document.getElementById('contentWrapper');
 const nocmigButton = document.getElementById('nocmigMode');
 const summaryTable = document.getElementById('summaryTable');
 const progressDiv = document.getElementById('progressDiv');
@@ -131,7 +130,7 @@ let predictions = {},
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
 // Set content container height
-contentWrapperElement.height(bodyElement.height() - 80);
+contentWrapperElement.style.height = (bodyElement.clientHeight - 80) + 'px';
 
 
 // Set default Options
@@ -284,10 +283,7 @@ const initWavesurfer = ({
     colourmap.value = config.colormap;
     // Set click event that removes all regions
 
-    waveElement.mousedown(function () {
-        resetRegions();
-        //clearActive();
-    });
+    waveElement.addEventListener('mousedown', resetRegions);
     // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
         region = e;
@@ -340,12 +336,12 @@ const initWavesurfer = ({
 function updateElementCache() {
     t0 = Date.now();
     // Update element caches
-    waveElement = $('#waveform');
-    specElement = $('spectrogram');
-    specCanvasElement = $('#spectrogram canvas');
-    waveCanvasElement = $('#waveform canvas');
-    waveWaveElement = $('#waveform wave');
-    specWaveElement = $('#spectrogram wave');
+    waveElement = document.getElementById('waveform')
+    specElement = document.getElementById('spectrogram');
+    specCanvasElement = document.querySelector('#spectrogram canvas');
+    waveCanvasElement = document.querySelector('#waveform canvas');
+    waveWaveElement = document.querySelector('#waveform wave');
+    specWaveElement = document.querySelector('#spectrogram wave');
 }
 
 function zoomSpec(direction) {
@@ -407,13 +403,13 @@ const openFileInList = async (e) => {
 const buildFileMenu = (e) => {
     //e.preventDefault();
     e.stopImmediatePropagation();
-    const menu = $('#context-menu');
-    menu.html(`
+    const menu = document.getElementById('context-menu');
+    menu.innerHTML = `
     <a class="dropdown-item" id="setLocation"><span
     class="material-symbols-outlined align-bottom pointer">edit_location_alt</span> Amend File Recording Location</a>
     <a class="dropdown-item" id="setFileStart"><span
     class="material-symbols-outlined align-bottom pointer">edit_calendar</span> Amend File Start Time
-    `);
+    `;
     positionMenu(menu, e);
     // Add the setLocation handler
     const setLocationLink = document.getElementById('setLocation');
@@ -900,13 +896,13 @@ function exitApplication() {
 
 function enableMenuItem(id_list) {
     id_list.forEach(id => {
-        $('#' + id).removeClass('disabled');
+        document.getElementById(id).classList.remove('disabled');
     })
 }
 
 function disableMenuItem(id_list) {
     id_list.forEach(id => {
-        $('#' + id).addClass('disabled');
+        document.getElementById(id).classList.add('disabled');
     })
 }
 
@@ -931,9 +927,9 @@ function showElement(id_list, makeFlex = true, empty = false) {
 
 function hideElement(id_list) {
     id_list.forEach(id => {
-        const thisElement = $('#' + id);
-        thisElement.removeClass('d-flex');
-        thisElement.addClass('d-none');
+        const thisElement = document.getElementById(id);
+        thisElement.classList.remove('d-flex');
+        thisElement.classList.add('d-none');
     })
 }
 
@@ -1107,16 +1103,15 @@ const loadResultRegion = ({ file = '', start = 0, end = 3, label = '' } = {}) =>
  */
 function adjustSpecDims(redraw, fftSamples) {
     //Contentwrapper starts below navbar (66px) and ends above footer (30px). Hence - 96
-    contentWrapperElement.height(bodyElement.height() - 86);
-    const contentHeight = contentWrapperElement.outerHeight(true);
+    contentWrapperElement.style.height = (bodyElement.clientHeight - 86) + 'px';
+    const contentHeight = contentWrapperElement.clientHeight;
     // + 2 for padding
-    const formOffset = $('#exploreWrapper').outerHeight(true);
-    const specWrapperElement = document.getElementById('spectrogramWrapper');
+    const formOffset = document.getElementById('exploreWrapper').clientHeight;
     let specOffset;
-    if (!spectrogramWrapper.hasClass('d-none')) {
+    if (!spectrogramWrapper.classList.contains('d-none')) {
         // Expand up to 512px unless fullscreen
-        const controlsHeight = $('#controlsWrapper').outerHeight(true);
-        const timelineHeight = $('#timeline').outerHeight(true);
+        const controlsHeight = document.getElementById('controlsWrapper').clientHeight;
+        const timelineHeight = document.getElementById('timeline').clientHeight;
         const specHeight = config.fullscreen ? contentHeight - timelineHeight - formOffset - controlsHeight : Math.min(contentHeight * 0.4, 512);
         if (currentFile) {
             // give the wrapper space for the transport controls and element padding/margins
@@ -1132,18 +1127,18 @@ function adjustSpecDims(redraw, fftSamples) {
                 wavesurfer.setHeight(specHeight);
             }
             initSpectrogram(specHeight, fftSamples);
-            specCanvasElement.width('100%');
-            specElement.css('z-index', 0);
-            $('.spec-labels').width('55px')
+            specCanvasElement.style.width = '100%';
+            specElement.style.zIndex = 0;
+            document.querySelector('.spec-labels').style.width = '55px';
         }
         if (wavesurfer && redraw) {
             //wavesurfer.setOptions({});
         }
-        specOffset = specWrapperElement.offsetHeight;
+        specOffset = spectrogramWrapper.offsetHeight;
     } else {
         specOffset = 0
     }
-    resultTableElement.height(contentHeight - specOffset - formOffset);
+    resultTableElement.style.height = (contentHeight - specOffset - formOffset) + 'px';
 }
 
 
@@ -1324,7 +1319,7 @@ function updatePrefs() {
 let appPath, tempPath;
 window.onload = async () => {
     window.electron.requestWorkerChannel();
-    contentWrapperElement.addClass('loaded');
+    contentWrapperElement.classList.add('loaded');
     // Set config defaults
     const defaultConfig = {
         seenTour: false,
@@ -1456,7 +1451,7 @@ window.onload = async () => {
     setUpWorkerMessaging()
 
     // Set footer year
-    $('#year').text(new Date().getFullYear());
+    document.getElementById('year').innerText = new Date().getFullYear();
 
 }
 
@@ -1860,20 +1855,21 @@ const waitForFinalEvent = (function () {
     };
 })();
 
-$(window).on('resize', function () {
+window.addEventListener('resize', function () {
     waitForFinalEvent(function () {
-
         WindowResize();
     }, 250, 'id1');
 });
 
 function WindowResize() {
-    //updateElementCache();
     adjustSpecDims(true);
 }
 
-$(document).on('click', '.play', function () {
-    (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
+const contextMenu = document.getElementById('context-menu')
+contextMenu.addEventListener('click', function (e) {
+    if (e.target.closest('.play')){
+        (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
+    }
 })
 
 
@@ -2626,7 +2622,7 @@ function onSummaryComplete({
     AUDACITY_LABELS = audacityLabels;
     if (! isEmptyObject(AUDACITY_LABELS)) {
         enableMenuItem(['saveLabels', 'saveCSV', 'save2db', 'export2audio']);
-        $('.download').removeClass('disabled');
+        document.querySelector('.download').classList.remove('disabled');
     } else {
         disableMenuItem(['saveLabels', 'saveCSV']);
     }
@@ -3198,7 +3194,7 @@ diagnosticMenu.addEventListener('click', async function () {
         diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
     }
     diagnosticTable += "</table>";
-    $('#diagnosticsModalBody').html(diagnosticTable);
+    document.getElementById('diagnosticsModalBody').innerHTML = diagnosticTable;
     const testModal = new bootstrap.Modal(document.getElementById('diagnosticsModal'));
     testModal.show();
 });
@@ -3295,31 +3291,37 @@ document.body.addEventListener('dragstart', e => {
 });
 
 // Make modals draggable
-$(".modal-header").on("mousedown", function (mousedownEvt) {
-    const $draggable = $(this);
-    const x = mousedownEvt.pageX - $draggable.offset().left,
-        y = mousedownEvt.pageY - $draggable.offset().top;
-    $("body").on("mousemove.draggable", function (mousemoveEvt) {
-        $draggable.closest(".modal-content").offset({
-            "left": mousemoveEvt.pageX - x,
-            "top": mousemoveEvt.pageY - y
-        });
-    });
-    $("body").one("mouseup", function () {
-        $("body").off("mousemove.draggable");
-    });
-    $draggable.closest(".modal").one("bs.modal.hide", function () {
-        $("body").off("mousemove.draggable");
+// Make modals draggable
+document.querySelectorAll('.modal-header').forEach(function (header) {
+    header.addEventListener('mousedown', function (mousedownEvt) {
+        const draggable = this;
+        const x = mousedownEvt.pageX - draggable.offsetLeft,
+            y = mousedownEvt.pageY - draggable.offsetTop;
+
+        function handleDrag(moveEvt) {
+            draggable.closest('.modal-content').style.left = moveEvt.pageX - x + 'px';
+            draggable.closest('.modal-content').style.top = moveEvt.pageY - y + 'px';
+        }
+
+        function stopDrag() {
+            document.body.removeEventListener('mousemove', handleDrag);
+            document.body.removeEventListener('mouseup', stopDrag);
+            draggable.closest('.modal').removeEventListener('hide.bs.modal', stopDrag);
+        }
+
+        document.body.addEventListener('mousemove', handleDrag);
+        document.body.addEventListener('mouseup', stopDrag);
+        draggable.closest('.modal').addEventListener('hide.bs.modal', stopDrag);
     });
 });
 
 ////////// Date Picker ///////////////
 
-$(function () {
+function initialiseDatePicker() {
     const start = moment();
     const end = start;
-    $('#chartRange, #exploreRange').each(function () {
-        $(this).daterangepicker({
+    document.querySelectorAll('#chartRange, #exploreRange').forEach(function(element) {
+        const picker = new daterangepicker(element, {
             autoUpdateInput: false,
             locale: {
                 cancelLabel: 'Clear'
@@ -3341,8 +3343,8 @@ $(function () {
                 'Last Year': [moment().subtract(1, 'year').startOf('year'), moment().subtract(1, 'year').endOf('year')]
             }
         });
-        $(this).on('apply.daterangepicker', function (ev, picker) {
-            $(this).children('span').html(picker.startDate.format('MMMM D, YYYY') + ' - ' + picker.endDate.format('MMMM D, YYYY'));
+        element.addEventListener('apply.daterangepicker', function (ev, picker) {
+            $(this).children('span:not(.material-symbols-outlined)').html(picker.startDate.format('MMMM D, YYYY') + ' - ' + picker.endDate.format('MMMM D, YYYY'));
             $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
             const dateRange = { start: picker.startDate._d.getTime(), end: picker.endDate._d.getTime() };
             if (worker) {
@@ -3370,7 +3372,7 @@ $(function () {
             }
         });
 
-        $(this).on('cancel.daterangepicker', function () {
+        element.addEventListener('cancel.daterangepicker', function () {
             $(this).children('span:not(.material-symbols-outlined)').html('Apply a date filter');
             if (worker) {
                 if (this.id === 'chartRange') {
@@ -3396,7 +3398,7 @@ $(function () {
             }
         });
     })
-});
+};
 
 
 function toggleKeyDownForFormInputs(){
@@ -3446,7 +3448,7 @@ document.addEventListener("DOMContentLoaded", function () {
             });
         })
     }
-    // end if innerWidth
+    initialiseDatePicker();
 });
 
 
@@ -3497,7 +3499,7 @@ const handleThresholdChange = (e) => {
         // Update the seen species list
         worker.postMessage({ action: 'get-detected-species-list' })
     }
-    if (!PREDICTING && !resultTableElement[0].hidden) {
+    if (!PREDICTING && !resultTableElement.classList.contains('d-none')) {
         worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
         resetResults({clearSummary: true, clearPagination: true, clearResults: false});
         worker.postMessage({
@@ -3676,16 +3678,14 @@ function getSnameFromCname(cname) {
     return null; // Substring not found in any item
 }
 
-$(document).on('click', function () {
-    $("#context-menu").removeClass("show").hide();
+document.addEventListener('click', function () {
+    contextMenu.classList.add("d-none");
     hideConfidenceSlider();
 })
 
 async function createContextMenu(e) {
     const target = e.target;
     if (target.classList.contains('circle') || target.closest('thead')) return;
-
-    const menu = $("#context-menu");
     let hideInSummary = '', hideInSelection = '',
         plural = '', contextDelete;
     const inSummary = target.closest('#speciesFilter')
@@ -3708,7 +3708,7 @@ async function createContextMenu(e) {
     if (region === undefined && ! inSummary) return;
     const createOrEdit = ((region?.attributes.label || target.closest('#summary'))) ? 'Edit' : 'Create';
 
-    menu.html(`
+    contextMenu.innerHTML = `
         <a class="dropdown-item play ${hideInSummary}"><span class='material-symbols-outlined'>play_circle</span> Play</a>
         <a class="dropdown-item ${hideInSummary} ${hideInSelection}" href="#" id="context-analyse-selection">
             <span class="material-symbols-outlined">search</span> Analyse
@@ -3727,7 +3727,7 @@ async function createContextMenu(e) {
         <a class="dropdown-item ${hideInSelection}" id="context-delete" href="#">
             <span class='delete material-symbols-outlined'>delete_forever</span> Delete Record${plural}
         </a>
-    `);
+    `;
     const modalTitle = document.getElementById('record-entry-modal-label');
     modalTitle.innerText = `${createOrEdit} Record`;
     if (!hideInSelection) {
@@ -3771,13 +3771,13 @@ async function createContextMenu(e) {
         xc.classList.add('d-none');
         contextDelete.classList.add('d-none');
     }
-    positionMenu(menu, e);
+    positionMenu(contextMenu, e);
 }
 
 function positionMenu(menu, event) {
     // Calculate menu positioning:
-    const menuWidth = menu.outerWidth();
-    const menuHeight = menu.outerHeight();
+    const menuWidth = menu.clientWidth;
+    const menuHeight = menu.clientHeight;
     let top = event.pageY - 50;
     let left = event.pageX;
     // Check if the menu would be displayed partially off-screen on the right
@@ -3790,14 +3790,16 @@ function positionMenu(menu, event) {
         top = window.innerHeight - menuHeight - 90;
     }
 
-    menu.css({
-        display: "block",
-        top: top,
-        left: left
-    }).addClass("show");
+    menu.style.display = 'block';
+    menu.style.top =  top + 'px';
+    menu.style.left =  left + 'px';
+    menu.classList.remove("d-none");
 }
 
-$('#spectrogramWrapper, #resultTableContainer, #selectionResultTableBody').on('contextmenu', createContextMenu)
+[spectrogramWrapper, resultTableElement, selectionTable].forEach(el =>{
+    el.addEventListener('contextmenu', createContextMenu)
+})
+
 
 const recordEntryModalDiv = document.getElementById('record-entry-modal')
 const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, { backdrop: 'static' });
@@ -3915,56 +3917,65 @@ async function waitForLocations() {
 }
 
 // TOUR functions
-
+const tourModal = document.getElementById('tourModal');
 // Initialize the Bootstrap modal
-$('#tourModal').modal({
-    backdrop: 'static', // Prevent closing by clicking outside the modal
-    keyboard: false      // Prevent closing by pressing Esc key
-});
 
 // Function to start the tour
 function startTour() {
-    $('#tourModal').modal('show');
+    var modal = new bootstrap.Modal(tourModal, {
+        backdrop: 'static', // Prevent closing by clicking outside the modal
+        keyboard: false      // Prevent closing by pressing Esc key
+    });
+    modal.show();
 }
 
 // Function to highlight an element on the page
 function highlightElement(selector) {
     // Remove any previous highlights
-    $('.highlighted').removeClass('highlighted');
+    var highlightedElements = document.querySelectorAll('.highlighted');
+    highlightedElements.forEach(function (element) {
+        element.classList.remove('highlighted');
+    });
     // Add a highlight class to the selected element
-    $(selector).addClass('highlighted');
+    var selectedElement = document.querySelector(selector);
+    if (selectedElement) {
+        selectedElement.classList.add('highlighted');
+    }
 }
 
 // Event handler for when the carousel slides
-$('#carouselExample').on('slid.bs.carousel', function () {
+document.getElementById('carouselExample').addEventListener('slid.bs.carousel', function () {
     // Get the active carousel item
-    const activeItem = $('#carouselExample .carousel-inner .carousel-item.active');
+    var activeItem = document.querySelector('#carouselExample .carousel-inner .carousel-item.active');
     // Get the element selector associated with the current step
-    const elementSelector = activeItem.data('element-selector');
+    var elementSelector = activeItem.dataset.elementSelector;
     // Highlight the corresponding element on the page
     highlightElement(elementSelector);
+
     if (elementSelector === "#fileContainer") {
         // Create and dispatch a new 'contextmenu' event
-        const element = document.getElementById('filename');
-        const contextMenuEvent = new MouseEvent('contextmenu', {
+        var element = document.getElementById('filename');
+        var contextMenuEvent = new MouseEvent('contextmenu', {
             bubbles: true,
             cancelable: true,
             clientY: element.offsetTop + (2 * element.offsetHeight),
             clientX: 20
         });
-        buildFileMenu(contextMenuEvent)
-        //element.dispatchEvent(contextMenuEvent);
+        buildFileMenu(contextMenuEvent);
     } else {
-        $("#context-menu").removeClass("show");
+        document.getElementById("context-menu").classList.remove("show");
     }
 });
 
 // Event handler for closing the modal
-$('#tourModal').on('hidden.bs.modal', function () {
+tourModal.addEventListener('hidden.bs.modal', function () {
     // Remove any highlights when the modal is closed
-    $('.highlighted').removeClass('highlighted');
+    var highlightedElements = document.querySelectorAll('.highlighted');
+    highlightedElements.forEach(function (element) {
+        element.classList.remove('highlighted');
+    });
     config.seenTour = true;
-    updatePrefs()
+    updatePrefs();
 });
 
 // Event handler for starting the tour
@@ -3975,9 +3986,10 @@ const prepTour = async () => {
         showElement(['spectrogramWrapper'], false);
         await loadAudioFile({ filePath: example_file });
     }
-    startTour()
+    startTour();
 }
-$('#startTour').on('click', prepTour);
+
+document.getElementById('startTour').addEventListener('click', prepTour);
 
 // Function to display update download progress
 const tracking = document.getElementById('update-progress');
