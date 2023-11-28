@@ -1604,24 +1604,25 @@ function getSpecies(target) {
 const getDetectionContext = (target) => target.closest('table').id;
 
 
-$(document).on('change', '#bird-list-seen', function (e) {
-
-    // Clear the results table
-    const resultTable = document.getElementById('resultTableBody');
-    resultTable.innerText = '';
-    const cname = e.target.value;
-    const context = e.target.parentNode.classList.contains('chart') ? 'chart' : 'explore';
-    let pickerEl = context + 'Range';
-    t0 = Date.now();
-    let action, explore;
-    if (context === 'chart') {
-        STATE.chart.species = cname;
-        action = 'chart';
-    } else {
-        action = 'filter';
+document.addEventListener('change', function (e) {
+    if (e.target.closest('#bird-list-seen')){
+        // Clear the results table
+        // const resultTable = document.getElementById('resultTableBody');
+        // resultTable.innerText = '';
+        const cname = e.target.value;
+        const context = e.target.parentNode.classList.contains('chart') ? 'chart' : 'explore';
+        let pickerEl = context + 'Range';
+        t0 = Date.now();
+        let action, explore;
+        if (context === 'chart') {
+            STATE.chart.species = cname;
+            action = 'chart';
+        } else {
+            action = 'filter';
+            resetResults({clearSummary: false, clearPagination: true, clearResults: false});
+        }
+        worker.postMessage({ action: action, species: cname, range: STATE[context].range, updateSummary: true });
     }
-    worker.postMessage({ action: action, species: cname, range: STATE[context].range, updateSummary: true }) // no re-prepare
-
 })
 
 
@@ -2622,7 +2623,6 @@ function onSummaryComplete({
     AUDACITY_LABELS = audacityLabels;
     if (! isEmptyObject(AUDACITY_LABELS)) {
         enableMenuItem(['saveLabels', 'saveCSV', 'save2db', 'export2audio']);
-        document.querySelector('.download').classList.remove('disabled');
     } else {
         disableMenuItem(['saveLabels', 'saveCSV']);
     }
@@ -3318,87 +3318,159 @@ document.querySelectorAll('.modal-header').forEach(function (header) {
 ////////// Date Picker ///////////////
 
 function initialiseDatePicker() {
-    const start = moment();
-    const end = start;
-    document.querySelectorAll('#chartRange, #exploreRange').forEach(function(element) {
-        const picker = new daterangepicker(element, {
-            autoUpdateInput: false,
-            locale: {
-                cancelLabel: 'Clear'
+    const currentDate = new Date();
+    const thisYear = () => {
+        const d1 = new Date(currentDate.getFullYear(), 0, 1);
+        return [d1, currentDate]
+    }
+    const lastYear = () => {
+        const d1 = new Date(currentDate.getFullYear() -1, 0, 1);
+        const d2 = new Date(currentDate.getFullYear() -1, 11, 31, 23, 59, 59, 999);
+        return [d1, d2]
+    }
+    const thisMonth = () => {
+        const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+        return [startOfMonth, currentDate];
+    };
+    
+    const lastMonth = () => {
+        const startOfLastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+        const endOfLastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0, 23, 59, 59, 999);
+    
+        return [startOfLastMonth, endOfLastMonth];
+    };
+    const thisWeek = () => {
+        const today = currentDate.getDay(); // 0 (Sunday) to 6 (Saturday)
+        const startOfWeek = new Date(currentDate);
+        startOfWeek.setDate(currentDate.getDate() - today); // Move to the beginning of the week (Sunday)
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6); // Move to the end of the week (Saturday)
+        return [startOfWeek, currentDate];
+    };
+    
+    const lastWeek = () => {
+        const today = currentDate.getDay(); // 0 (Sunday) to 6 (Saturday)
+        const startOfLastWeek = new Date(currentDate);
+        startOfLastWeek.setDate(currentDate.getDate() - today - 7); // Move to the beginning of the last week (Sunday)
+        const endOfLastWeek = new Date(startOfLastWeek);
+        endOfLastWeek.setDate(startOfLastWeek.getDate() + 6); // Move to the end of the last week (Saturday)
+        return [startOfLastWeek, endOfLastWeek];
+    };
+    const lastNight = () => {
+        const middayYesterday = new Date(currentDate);
+        middayYesterday.setDate(currentDate.getDate() -1);
+        middayYesterday.setHours(12, 0, 0, 0); // Set to midday yesterday
+        const middayToday = new Date(currentDate);
+        middayToday.setHours(12, 0, 0, 0); // Set to midday today
+        return [middayYesterday, middayToday];
+    };
+    ['chartRange', 'exploreRange'].forEach(function(element) {
+        element = document.getElementById(element);
+        const picker = new easepick.create({
+            element: element,
+            css: [
+              './node_modules/@easepick/bundle/dist/index.css',
+            ],
+            format: 'H:mm MMM D, YYYY',
+            zIndex: 10,
+            calendars: 1,
+            autoApply: false,
+            plugins: [
+                "RangePlugin",
+                "PresetPlugin",
+                "KbdPlugin",
+                "TimePlugin"
+            ],
+            PresetPlugin: {
+                customPreset: {
+                    'Last Night': lastNight(),
+                   'This Week': thisWeek(),
+                   'Last Week': lastWeek(),
+                   'This Month': thisMonth(),
+                   'Last Month': lastMonth(),
+                   'This Year': thisYear(),
+                   'Last Year': lastYear()
+                }
             },
-            timePicker: true,
-            timePicker24Hour: true,
-            timePickerIncrement: 5,
-            startDate: start,
-            endDate: end,
-            opens: "left",
-            ranges: {
-                'Last Night': [moment().startOf('day').add(12, 'hours').subtract(1, 'days'), moment().startOf('day').add(12, 'hours')],
-                'Previous Night': [moment().startOf('day').add(12, 'hours').subtract(2, 'days'), moment().subtract(1, 'days').startOf('day').add(12, 'hours')],
-                'Last 7 Nights': [moment().startOf('day').add(12, 'hours').subtract(6, 'days'), moment().startOf('day').add(12, 'hours')],
-                'Last 30 Nights': [moment().startOf('day').add(12, 'hours').subtract(29, 'days'), moment()],
-                'This Month': [moment().startOf('month'), moment().endOf('month')],
-                'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')],
-                'This Year': [moment().startOf('year'), moment().endOf('year')],
-                'Last Year': [moment().subtract(1, 'year').startOf('year'), moment().subtract(1, 'year').endOf('year')]
+            TimePlugin: {
+                format: 'HH:mm',
+              },
+          });
+        picker.on('select', (e) =>{
+            const {start, end} = e.detail;
+            console.log('Range Selected! ', JSON.stringify(e.detail))
+            const span = document.createElement('span');
+            span.classList.add('material-symbols-outlined', 'text-danger', 'ps-2')
+            element.appendChild(span);
+            span.innerText = 'cancel';
+            span.title = 'Clear date filter';
+            span.id = element.id + '-clear';
+            span.addEventListener('click', (e) =>{
+                e.stopImmediatePropagation();
+                picker.clear();
+                element.innerHTML = '<span class="material-symbols-outlined align-bottom">date_range</span><span>Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>';
+            })
+            if (element.id === 'chartRange') {
+                STATE.chart.range = {start: start.getTime(), end: end.getTime()};
+                worker.postMessage({ action: 'update-state', chart: STATE.chart })
+                t0 = Date.now();
+                worker.postMessage({
+                    action: 'chart',
+                    species: STATE.chart.species,
+                    range: STATE.chart.range
+                });
+            } else if (element.id === 'exploreRange') {
+                STATE.explore.range = {start: start.getTime(), end: end.getTime()};
+                resetResults({clearSummary: true, clearPagination: true, clearResults: false});
+                worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}, explore: STATE.explore}); 
+                worker.postMessage({
+                    action: 'filter',
+                    species: isSpeciesViewFiltered(true),
+                    range: STATE.explore.range,
+                    updateSummary: true
+                }); // re-prepare
             }
-        });
-        element.addEventListener('apply.daterangepicker', function (ev, picker) {
-            $(this).children('span:not(.material-symbols-outlined)').html(picker.startDate.format('MMMM D, YYYY') + ' - ' + picker.endDate.format('MMMM D, YYYY'));
-            $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
-            const dateRange = { start: picker.startDate._d.getTime(), end: picker.endDate._d.getTime() };
-            if (worker) {
-                if (this.id === 'chartRange') {
-                    STATE.chart.range = dateRange;
-                    worker.postMessage({ action: 'update-state', chart: STATE.chart })
-                    t0 = Date.now();
-                    worker.postMessage({
-                        action: 'chart',
-                        species: STATE.chart.species,
-                        range: STATE.chart.range
-                    });
-                } else if (this.id === 'exploreRange') {
-                    STATE.explore.range = dateRange;
-                    worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}, explore: STATE.explore}); 
-                    worker.postMessage({
-                        action: 'filter',
-                        species: STATE.explore.species,
-                        range: STATE.explore.range,
-                        updateSummary: true
-                    }); // re-prepare
-                }
-                // Update the seen species list
-                worker.postMessage({ action: 'get-detected-species-list' })
+            // Update the seen species list
+            worker.postMessage({ action: 'get-detected-species-list' })
+        })
+        picker.on('clear', (e) =>{
+            console.log('Range Cleared!', JSON.stringify(e.detail));
+            if (element.id === 'chartRange') {
+                STATE.chart.range = {start: undefined, end: undefined};
+                worker.postMessage({ action: 'update-state', chart: STATE.chart })
+                t0 = Date.now();
+                worker.postMessage({
+                    action: 'chart',
+                    species: STATE.chart.species,
+                    range: STATE.chart.range
+                });
+            } else if (element.id === 'exploreRange') {
+                STATE.explore.range = {start: undefined, end: undefined};
+                worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}, explore: STATE.explore}); 
+                resetResults({clearSummary: true, clearPagination: true, clearResults: false});
+                worker.postMessage({
+                    action: 'filter',
+                    species: STATE.explore.species,
+                    range: STATE.explore.range,
+                    updateSummary: true
+                }); // re-prepare
             }
-        });
-
-        element.addEventListener('cancel.daterangepicker', function () {
-            $(this).children('span:not(.material-symbols-outlined)').html('Apply a date filter');
-            if (worker) {
-                if (this.id === 'chartRange') {
-                    STATE.chart.range = { start: undefined, end: undefined };
-                    worker.postMessage({ action: 'update-state', chart: STATE.chart })
-                    t0 = Date.now();
-                    worker.postMessage({
-                        action: 'chart',
-                        species: STATE.chart.species,
-                        range: STATE.chart.range
-                    });
-                } else if (this.id === 'exploreRange') {
-                    STATE.explore.range = { start: undefined, end: undefined };
-                    worker.postMessage({ action: 'update-state', explore: STATE.explore })
-                    worker.postMessage({
-                        action: 'filter',
-                        species: isSpeciesViewFiltered(true),
-                        updateSummary: true
-                    }); // re-prepare
-                }
-                // Update the seen species list
-                worker.postMessage({ action: 'get-detected-species-list' })
+        })
+        picker.on('click', (e) =>{
+            if (e.target.classList.contains('cancel-button')){
+                console.log('cancelled')
+                element.innerHTML = '<span class="material-symbols-outlined align-bottom">date_range</span><span>Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>';
             }
-        });
+        })
+        picker.on('show', (e) =>{
+                picker.setStartTime('12:00')
+                picker.setEndTime('12:00')
+        
+        })
     })
-};
+
+}
+
 
 
 function toggleKeyDownForFormInputs(){
