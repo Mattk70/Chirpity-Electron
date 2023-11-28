@@ -443,7 +443,7 @@ const prepSummaryStatement = () => {
     const useRange = range?.start;
     let summaryStatement = `
     WITH ranked_records AS (
-        SELECT records.dateTime, records.confidence, files.name, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, COALESCE(isDaylight, 0) as isDaylight,
+        SELECT records.dateTime, records.confidence, files.name, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight as isDaylight,
           RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
         FROM records
         JOIN files ON files.id = records.fileID
@@ -457,7 +457,7 @@ const prepSummaryStatement = () => {
         extraClause += ' AND dateTime BETWEEN ? AND ? ';
     }
     if (STATE.detect.nocmig){
-        extraClause += ' AND isDaylight != 1 ';
+        extraClause += ' AND COALESCE(isDaylight, 0) != 1 ';
     }
     if (blocked.length) {
         const excluded = prepParams(blocked);
@@ -493,7 +493,7 @@ const getTotal = async ({species = undefined, offset = 0}) => {
         SQL += ' AND speciesID = (SELECT id from species WHERE cname = ?) '; 
         }// This will overcount as there may be a valid species ranked above it
     else if (STATE.blocked.length) SQL += ` AND speciesID not in (${STATE.blocked}) `;
-    if (useRange) SQL += ` AND dateTime BETWEEN ${range.start} AND ${range.start} `;
+    if (useRange) SQL += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
     if (STATE.detect.nocmig) SQL += ' AND COALESCE(isDaylight, 0) != 1 ';
     if (STATE.locationID) SQL += ` AND locationID =  ${STATE.locationID}`;
     // if (['analyse', 'archive'].includes(STATE.mode)) {
@@ -569,7 +569,7 @@ const prepResultsStatement = (species, noLimit) => {
         resultStatement += ` AND locationID = ${STATE.locationID} `;
     }
     if (STATE.detect.nocmig){
-        resultStatement += ' AND isDaylight != 1 ';
+        resultStatement += ' AND COALESCE(isDaylight, 0) != 1 ';
     }
     const limitClause = noLimit ? '' : 'LIMIT ?  OFFSET ?';
     resultStatement += ` ORDER BY ${STATE.sortOrder}, confidence DESC, callCount DESC ${limitClause} `;

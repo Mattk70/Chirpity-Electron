@@ -182,6 +182,7 @@
     "terser": "5.22.0"
   },
   "dependencies": {
+    "@easepick/bundle": "^1.2.1",
     "@fast-csv/format": "^4.3.5",
     "@popperjs/core": "^2.9.2",
     "@tensorflow/tfjs-node": "^4.12.0",
@@ -194,7 +195,6 @@
     "fast-png": "^6.1.0",
     "ffmpeg-static-electron": "^2.0.3",
     "fluent-ffmpeg": "^2.1.2",
-    "jquery": "3.6.3",
     "sqlite3": "^5.1.6",
     "suncalc": "^1.9.0",
     "utimes": "^5.1.1",
