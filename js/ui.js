@@ -1786,7 +1786,7 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
     for (const key in results) {
         hasResults = true;
         chartOptions.series.push({
-            name: `Total for ${aggregation} in ` + key,
+            name: `Total for ${aggregation.replace('Day', 'Night')} in ` + key,
             pointInterval: pointInterval[aggregation],
             pointStart: pointStart,
             type: 'column',
@@ -1815,13 +1815,20 @@ function setChartOptions(species, total, rate, results, dataPoints, aggregation,
                         point.y;
                 }, `<b>${aggregation} ${weekOfYear} (${getDateOfISOWeek(weekOfYear)} - ${getDateOfISOWeek(weekOfYear + 1)})</b>`);
             } else if (aggregation === 'Day') {
-                const period = moment(x).format('MMMM Do, YYYY');
+                const period = x.toLocaleDateString('en-GB', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric',
+                  });
                 return this.points.reduce(function (s, point) {
                     return s + '<br/><span style="font-weight: bold;color: ' + point.series.color + '">&#9679; </span>' + point.series.name + ': ' +
                         point.y;
                 }, `<b>${period}</b>`);
             } else {
-                const period = moment(x).format('MMM D, ha');
+                const period = x.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }) +
+                ', ' +
+                x.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
+              
                 return this.points.reduce(function (s, point) {
                     return s + '<br/><span style="font-weight: bold;color: ' + point.series.color + '">&#9679; </span> Count: ' +
                         point.y;
