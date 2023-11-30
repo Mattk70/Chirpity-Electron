@@ -598,7 +598,7 @@ const showLocation = async (fromSelect) => {
     const customPlaceEl = document.getElementById('customPlace');
     const locationSelect = document.getElementById('savedLocations');
     // CHeck if currentfile has a location id
-    const id = fromSelect ? parseInt(locationSelect.value) : FILE_LOCATION_MAP[currentFile];
+    const id = fromSelect ? locationSelect.valueAsNumber : FILE_LOCATION_MAP[currentFile];
 
     if (id) {
         newLocation = LOCATIONS.find(obj => obj.id === id);
@@ -682,7 +682,7 @@ async function setLocation() {
 
 
     const addLocation = () => {
-        locationID = parseInt(savedLocationSelect.value);
+        locationID = savedLocationSelect.valueAsNumber;
         const batch = document.getElementById('batchLocations').checked;
         const files = batch ? STATE.openFiles : [currentFile];
         worker.postMessage({ action: 'set-custom-file-location', lat: latEl.value, lon: lonEl.value, place: customPlaceEl.value, files: files })
@@ -986,7 +986,7 @@ chartsLink.addEventListener('click', async () => {
 });
 
 const handleLocationFilterChange = (e) => {
-    const location = parseInt(e.target.value) || undefined;
+    const location = e.target.valueAsNumber || undefined;
     worker.postMessage({ action: 'update-state', locationID: location });
     // Update the seen species list
     worker.postMessage({ action: 'get-detected-species-list' })
@@ -3557,7 +3557,7 @@ const hideConfidenceSlider = () => {
 
 
 function showThreshold(e) {
-    const threshold = e instanceof Event ? parseInt(e.target.value) : e;
+    const threshold = e instanceof Event ? e.target.valueAsNumber : e;
     filterPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
     settingsPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
     filterPanelRangeInput.value = threshold;
@@ -3567,7 +3567,7 @@ settingsPanelRangeInput.addEventListener('input', showThreshold);
 filterPanelRangeInput.addEventListener('input', showThreshold);
 
 const handleThresholdChange = (e) => {
-    const threshold = parseInt(e.target.value);
+    const threshold = e.target.valueAsNumber;
     config.detect.confidence = threshold;
     updatePrefs();
     worker.postMessage({
@@ -3635,7 +3635,7 @@ SNRSlider.addEventListener('input', () => {
 SNRSlider.addEventListener('change', handleSNRchange);
 
 const handleHPchange = () => {
-    config.filters.highPassFrequency = parseInt(HPSlider.value);
+    config.filters.highPassFrequency = HPSlider.valueAsNumber;
     updatePrefs();
     worker.postMessage({ action: 'update-state', filters: { highPassFrequency: config.filters.highPassFrequency } })
     showFilterEffect();
@@ -3651,7 +3651,7 @@ HPSlider.addEventListener('change', handleHPchange);
 
 // Low shelf threshold
 const handleLowShelfchange = () => {
-    config.filters.lowShelfFrequency = parseInt(LowShelfSlider.value);
+    config.filters.lowShelfFrequency = LowShelfSlider.valueAsNumber;
     updatePrefs();
     worker.postMessage({ action: 'update-state', filters: { lowShelfFrequency: config.filters.lowShelfFrequency } })
     showFilterEffect();
@@ -3667,7 +3667,7 @@ LowShelfSlider.addEventListener('change', handleLowShelfchange);
 
 // Low shelf gain
 const handleAttenuationchange = () => {
-    config.filters.lowShelfAttenuation = - parseInt(lowShelfAttenuation.value);
+    config.filters.lowShelfAttenuation = - lowShelfAttenuation.valueAsNumber;
     updatePrefs();
     worker.postMessage({ action: 'update-state', filters: { lowShelfAttenuation: config.filters.lowShelfAttenuation } })
     showFilterEffect();
@@ -3689,7 +3689,7 @@ ThreadSlider.addEventListener('input', () => {
     numberOfThreads.innerText = ThreadSlider.value;
 });
 ThreadSlider.addEventListener('change', () => {
-    config[config.backend].threads = parseInt(ThreadSlider.value);
+    config[config.backend].threads = ThreadSlider.valueAsNumber;
     loadModel();
     updatePrefs();
 });
