@@ -1841,8 +1841,7 @@ const parsePredictions = async (response) => {
         updateFilesBeingProcessed(response.file)
         console.log(`File ${file} processed after ${(new Date() - predictionStart) / 1000} seconds: ${filesBeingProcessed.length} files to go`);
     }
-    //!STATE.selection && (!DATASET || STATE.increment() === 0) &&
-    getSummary({ interim: true });
+    !STATE.selection && (!DATASET || STATE.increment() === 0) && getSummary({ interim: true });
     return response.worker
 }
 
