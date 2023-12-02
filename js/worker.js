@@ -2385,36 +2385,37 @@ const getMostCalls = (species) => {
 }
 
 const getChartTotals = ({
-    species = undefined, range = {}
+    species = undefined, range = {}, aggregation = 'Week'
 }) => {
     // Add Location filter
     const locationFilter = filterLocation();
     const dateRange = range;
-    // Work out sensible aggregations from hours difference in daterange
+
+    // Work out sensible aggregations from hours difference in date range
     const hours_diff = dateRange.start ? Math.round((dateRange.end - dateRange.start) / (1000 * 60 * 60)) : 745;
     console.log(hours_diff, "difference in hours")
+
     const dateFilter = dateRange.start ? ` AND dateTime BETWEEN ${dateRange.start} AND ${dateRange.end} ` : '';
-    // default to group by Week
-    let dataPoints = Math.max(52, Math.round(hours_diff / 24 / 7));
+
+    // Default values for grouping
     let groupBy = "Year, Week";
-    let orderBy = 'Year'
-    let aggregation = 'Week';
+    let orderBy = 'Year';
+    let dataPoints = Math.max(52, Math.round(hours_diff / 24 / 7));
     let startDay = 0;
-    if (hours_diff <= 744) {
-        //31 days or less: group by Day
+
+    // Update grouping based on aggregation parameter
+    if (aggregation === 'Day') {
         groupBy += ", Day";
         orderBy = 'Year, Week';
         dataPoints = Math.round(hours_diff / 24);
-        aggregation = 'Day';
         const date = dateRange.start ? new Date(dateRange.start) : Date.UTC(2020, 0, 0, 0, 0, 0);
         startDay = Math.floor((date - new Date(date.getFullYear(), 0, 0, 0, 0, 0)) / 1000 / 60 / 60 / 24);
-    }
-    if (hours_diff <= 72) {
-        // 3 days or less, group by Hour of Day
+    } else if (aggregation === 'Hour') {
         groupBy += ", Hour";
         orderBy = 'Day, Hour';
         dataPoints = hours_diff;
-        aggregation = 'Hour';
+        const date = dateRange.start ? new Date(dateRange.start) : Date.UTC(2020, 0, 0, 0, 0, 0);
+        startDay = Math.floor((date - new Date(date.getFullYear(), 0, 0, 0, 0, 0)) / 1000 / 60 / 60 / 24);
     }
 
     return new Promise(function (resolve, reject) {
@@ -2432,12 +2433,12 @@ const getChartTotals = ({
             if (err) {
                 reject(err)
             } else {
-
                 resolve([rows, dataPoints, aggregation, startDay])
             }
         })
     })
 }
+
 
 
 const getRate = (species) => {

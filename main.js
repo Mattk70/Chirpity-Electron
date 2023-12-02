@@ -3,9 +3,9 @@ const { autoUpdater } = require("electron-updater")
 const log = require('electron-log');
 //app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
 const fs = require("fs");
-const os = require('os');
 const path = require('path');
 const settings = require('electron-settings');
+
 //require('update-electron-app')();
 let files = [];
 let DEBUG = false;
