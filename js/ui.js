@@ -27,7 +27,6 @@ const p = window.module.p;
 const SunCalc = window.module.SunCalc;
 const uuidv4 = window.module.uuidv4;
 const os = window.module.os;
-
 /// Set up communication channel between UI and worker window
 
 let worker;
@@ -1563,7 +1562,8 @@ function generateBirdOptionList({ store, rows, selected }) {
     } else {
         listHTML += '<select id="bird-list-seen" class="form-select"><option value="">All</option>';
         for (const item in rows) {
-            listHTML += `<option value="${rows[item].cname}">${rows[item].cname}</option>`;
+            const isSelected = rows[item].cname === STATE.chart.species ? 'selected' : '';
+            listHTML += `<option value="${rows[item].cname}" ${isSelected}>${rows[item].cname}</option>`;
         }
         listHTML += '</select><label for="bird-list-seen">Species</label>';
     }
@@ -1640,10 +1640,9 @@ function getDateOfISOWeek(w) {
     return ISOweekStart.toLocaleDateString('en-GB', options);
 }
 
-
 function onChartData(args) {
     const genTime = Date.now() - t0;
-    const genTimeElement = document.getElementById('genTime')
+    const genTimeElement = document.getElementById('genTime');
     genTimeElement.innerText = (genTime / 1000).toFixed(1) + ' seconds';
     if (args.species) {
         showElement(['recordsTableBody'], false);
@@ -1652,10 +1651,15 @@ function onChartData(args) {
     } else {
         hideElement(['recordsTableBody']);
     }
-    const elements = document.getElementsByClassName('highcharts-data-table');
-    while (elements.length > 0) {
-        elements[0].parentNode.removeChild(elements[0]);
-    }
+    // Destroy the existing charts (if any)
+    const chartInstances = Object.values(Chart.instances);
+    chartInstances.forEach(chartInstance => {
+        chartInstance.destroy();
+    });
+
+    // Get the Chart.js canvas
+    const chartCanvas = document.getElementById('chart-week');
+
     const records = args.records;
     for (const [key, value] of Object.entries(records)) {
         const element = document.getElementById(key);
@@ -1663,7 +1667,7 @@ function onChartData(args) {
             if (isNaN(value[0])) element.innerText = 'N/A';
             else {
                 element.innerText = value[0].toString() + ' on ' +
-                    new Date(value[1]).toLocaleDateString(undefined, { dateStyle: "short" })
+                    new Date(value[1]).toLocaleDateString(undefined, { dateStyle: "short" });
             }
         } else {
             element.innerText = value ? new Date(value).toLocaleDateString(undefined, {
@@ -1672,181 +1676,236 @@ function onChartData(args) {
             }) : 'No Records';
         }
     }
+
     const results = args.results;
     const rate = args.rate;
     const total = args.total;
     const dataPoints = args.dataPoints;
     const aggregation = args.aggregation;
-    const pointStart = args.pointStart;
-    const chartOptions = setChartOptions(args.species, total, rate, results, dataPoints, aggregation, pointStart);
-    Highcharts.chart('chart-week', chartOptions);
+    const pointStart = args.pointStart; 
+    const dateLabels = generateDateLabels(aggregation, dataPoints, pointStart);
+
+    // Initialize Chart.js
+    const plugin = {
+        id: 'customCanvasBackgroundColor',
+        beforeDraw: (chart, args, options) => {
+          const {ctx} = chart;
+          ctx.save();
+          ctx.globalCompositeOperation = 'destination-over';
+          ctx.fillStyle = options.color || '#99ffff';
+          ctx.fillRect(0, 0, chart.width, chart.height);
+          ctx.restore();
+        }
+      };
+    const chartOptions = {
+        type: 'bar',
+        data: {
+          labels: dateLabels,
+          datasets: Object.entries(results).map(([year, data]) => ({
+              label: parseInt(year), // Convert year to number
+              data: data,
+              backgroundColor: 'rgba(255, 0, 64, 0.5)',
+              borderWidth: 1,
+              borderColor: 'rgba(255, 0, 64, 0.9)',
+              borderSkipped: 'bottom' // Lines will appear to rise from the bottom
+            }))
+        },
+        options: {
+          scales: {
+              y: {
+                  min:0,
+                  ticks: {
+                      // Force integers on the Y-axis
+                      precision: 0,
+
+                  }
+              }
+          },
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+                  title: {
+                      display: true,
+                      text: args.species ? `${args.species} Detections` : ""
+                  },
+                  customCanvasBackgroundColor: {
+                      color: "GhostWhite"
+                  }
+              }
+          },
+          plugins: [plugin],
+      }
+    if (total) {
+        chartOptions.data.datasets.push({
+            label: 'Hours Recorded', 
+            type: 'line', 
+            data: total,
+            fill: true,
+            backgroundColor: 'rgba(0, 0, 64, 0.2)',
+            borderWidth: 0,
+            pointRadius: 0,
+            yAxisID: 'y1',
+            cubicInterpolationMode: 'monotone', // Use monotone cubic interpolation for a spline effect
+            borderSkipped: 'bottom' // Lines will appear to rise from the bottom
+        })
+        chartOptions.options.scales['y1'] = {position: 'right', title: {display: true, text: 'Hours of Recordings'} }
+        chartOptions.options.scales.x = {max: 53, title: {display: true, text: 'Week in Year'}} 
+    }
+    new Chart(
+        chartCanvas,
+        chartOptions
+      );
 }
 
+
+function generateDateLabels(aggregation, datapoints, pointstart) {
+    const dateLabels = [];
+    const startDate = new Date(pointstart);
+
+    for (let i = 0; i < datapoints; i++) {
+      // Push the formatted date label to the array
+      dateLabels.push(formatDate(startDate, aggregation));
+  
+      // Increment the startDate based on the aggregation
+      if (aggregation === 'Hour') {
+        startDate.setTime(startDate.getTime() + 60 * 60 * 1000); // Add 1 hour
+      } else if (aggregation === 'Day') {
+        startDate.setDate(startDate.getDate() + 1); // Add 1 day
+      } else if (aggregation === 'Week') {
+        startDate.setDate(startDate.getDate() + 7); // Add 7 days (1 week)
+      }
+    }
+  
+    return dateLabels;
+  }
+
+  // Helper function to format the date as desired
+function formatDate(date, aggregation) {
+
+    const options = {};
+    let formattedDate = '';
+    if (aggregation === 'Week'){
+        // Add 1 day to the startDate
+        date.setHours(date.getDate() + 1);
+        const year = date.getFullYear();
+        const oneJan = new Date(year, 0, 1);
+        const weekNumber = Math.ceil(((date - oneJan) / (24 * 60 * 60 * 1000) + oneJan.getDay() + 1) / 7);
+        return weekNumber;
+    }
+    else if (aggregation === 'Day') {
+        options.day = 'numeric';
+        options.weekday = 'short';
+        options.month = 'short';
+    }
+    else if (aggregation === 'Hour') {
+        const hour = date.getHours();
+        const period = hour >= 12 ? 'PM' : 'AM';
+        const formattedHour = hour % 12 || 12; // Convert 0 to 12
+        return `${formattedHour}${period}`;
+    }
+  
+    return formattedDate + date.toLocaleDateString('en-GB', options);
+  }
 function setChartOptions(species, total, rate, results, dataPoints, aggregation, pointStart) {
     let chartOptions = {};
-    chartOptions.yAxis = [];
-    const pointInterval = { Week: 7 * 24 * 36e5, Day: 24 * 36e5, Hour: 36e5 };
-    chartOptions.colors = ["#003", "#2B9179", "#AB41E8", "#E88E2A", "#E86235"];
-    chartOptions.chart = {
-        zoomType: 'x',
-        backgroundColor: { linearGradient: [0, 0, 0, 500], stops: [[0, "#dbe2ed"], [1, "#dddddd"]] }
-    }
-    chartOptions.credits = { text: 'Chart generated by Chirpity Nocmig', href: '' }
-    chartOptions.title = species ? { text: `${species} Detections` } : { text: 'Hours Recorded' };
+    //chartOptions.plugins = [ChartDataLabels];
 
-    // Add location to title if filtered
-    const selected = document.getElementById('chart-locations');
-    if (selected.selectedIndex > 0) {
-        const nickname = selected.options[selected.selectedIndex].text.split(',')[0];
-        chartOptions.title.text += ' in ' + nickname;
-    }
-
-    chartOptions.lang = {
-        noData: "No Detections to Display"
-    }
-    chartOptions.noData = {
-        style: {
-            fontWeight: 'bold',
-            fontSize: '25px',
-            color: '#303030'
-        }
-    }
-    chartOptions.time = { useUTC: false }; // Use localtime for axes
-    Highcharts.dateFormats.W = function (timestamp) {
-        let date = new Date(timestamp), day = date.getUTCDay() === 0 ? 7 : date.getUTCDay(), dayNumber;
-        date.setDate(date.getUTCDate() + 4 - day);
-        dayNumber = Math.floor((date.getTime() - new Date(date.getUTCFullYear(), 0, 1, -6)) / 86400000);
-        return 1 + Math.floor(dayNumber / 7);
-    };
-    const format = { Week: '{value:Week %W}', Day: '{value:%a %e %b}', Hour: '{value:%l%P}' }
-    chartOptions.xAxis = {
-        type: 'datetime',
-        tickInterval: pointInterval[aggregation], // one week
-        labels: {
-            format: format[aggregation],
-        }
-    };
-
-    chartOptions.series = [];
-    if (aggregation === 'Week') {
-        chartOptions.series.push({
-            name: 'Hours of recordings',
-            marker: { enabled: false },
-            yAxis: 0,
-            type: 'areaspline',
-            data: total,
-            pointInterval: pointInterval[aggregation],
-            pointStart: pointStart,
-            lineWidth: 0,
-            fillColor: {
-                linearGradient: [0, 0, 0, 300],
-                stops: [
-                    [0, chartOptions.colors[0]],
-                    [1, Highcharts.color(chartOptions.colors[0]).setOpacity(0.2).get('rgba')]
-                ]
-            }
-        });
-        chartOptions.yAxis.push({
-            title: {
-                text: 'Hours recorded'
-            },
-            accessibility: {
-                description: 'Total recording time in hours'
-            },
-            opposite: true
-        });
-    }
-    if (rate && Math.max(...rate) > 0) {
-        if (aggregation === 'Week') {
-            chartOptions.yAxis.push({
-                title: { text: 'Hourly Detection Rate' },
-                accessibility: { description: 'Hourly rate of records' },
-                opposite: true
-            });
-            chartOptions.series.push({
-                name: 'Average hourly call rate',
-                marker: { enabled: false },
-                yAxis: 1,
-                type: 'areaspline',
-                data: rate,
-                lineWidth: 0,
-                pointInterval: pointInterval[aggregation],
-                pointStart: pointStart,
-                fillColor: {
-                    linearGradient: [0, 0, 0, 300],
-                    stops: [
-                        [0, chartOptions.colors[1]],
-                        [1, Highcharts.color(chartOptions.colors[1]).setOpacity(0.2).get('rgba')]
-                    ]
-                }
-            });
-        }
-    }
-    let hasResults = false;
-    for (const key in results) {
-        hasResults = true;
-        chartOptions.series.push({
-            name: `Total for ${aggregation.replace('Day', 'Night')} in ` + key,
-            pointInterval: pointInterval[aggregation],
-            pointStart: pointStart,
-            type: 'column',
-            yAxis: chartOptions.yAxis.length,
-            data: results[key]
-        });
-    }
-    if (hasResults) {
-        chartOptions.yAxis.push(
+    chartOptions.data = {
+        labels: dataPoints, // Assuming dataPoints is an array of labels
+        datasets: [
             {
-                title: { text: 'Detections' },
-                accessibility: { description: 'Count of records' }
-            }
-        );
-    }
+                label: 'Hours of recordings',
+                data: total,
+                borderColor: "#003",
+                backgroundColor: "rgba(0, 51, 0, 0.2)",
+                fill: true,
+                yAxisID: 'y-axis-0'
+            },
+            // Add other datasets as needed
+        ]
+    };
 
-    chartOptions.tooltip = {
-        crosshairs: true, shared: true, formatter: function () {
-            const x = new Date(this.x)
-            if (aggregation === "Week") {
-                const oneJan = new Date(x.getFullYear(), 0, 1);
-                const numberOfDays = Math.floor((x - oneJan) / (24 * 60 * 60 * 1000));
-                const weekOfYear = Math.ceil((x.getDay() + 1 + numberOfDays) / 7);
-                return this.points.reduce(function (s, point) {
-                    return s + '<br/><span style="font-weight: bold;color: ' + point.series.color + '">&#9679; </span>' + point.series.name + ': ' +
-                        point.y;
-                }, `<b>${aggregation} ${weekOfYear} (${getDateOfISOWeek(weekOfYear)} - ${getDateOfISOWeek(weekOfYear + 1)})</b>`);
-            } else if (aggregation === 'Day') {
-                const period = x.toLocaleDateString('en-GB', {
-                    month: 'long',
-                    day: 'numeric',
-                    year: 'numeric',
-                  });
-                return this.points.reduce(function (s, point) {
-                    return s + '<br/><span style="font-weight: bold;color: ' + point.series.color + '">&#9679; </span>' + point.series.name + ': ' +
-                        point.y;
-                }, `<b>${period}</b>`);
-            } else {
-                const period = x.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }) +
-                ', ' +
-                x.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
-              
-                return this.points.reduce(function (s, point) {
-                    return s + '<br/><span style="font-weight: bold;color: ' + point.series.color + '">&#9679; </span> Count: ' +
-                        point.y;
-                }, `<b>${period}</b>`);
+    chartOptions.options = {
+        scales: {
+            x: {
+                type: 'time',
+                time: {
+                    unit: aggregation.toLowerCase(), // Assuming aggregation is 'Week', 'Day', or 'Hour'
+                    displayFormats: {
+                        day: 'ddd D MMM',
+                        week: 'MMM D',
+                        hour: 'hA'
+                    }
+                }
+            },
+            y: [
+                {
+                    id: 'y-axis-0',
+                    type: 'linear',
+                    position: 'left',
+                    title: {
+                        text: 'Hours recorded'
+                    }
+                },
+                // Add other y-axes as needed
+            ]
+        },
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top'
+            },
+            tooltip: {
+                enabled: true,
+                mode: 'index',
+                intersect: false,
+                position: 'nearest',
+                callbacks: {
+                    title: function (tooltipItems) {
+                        const timestamp = tooltipItems[0].parsed.x;
+                        const date = new Date(timestamp);
+                        return getTooltipTitle(date, aggregation);
+                    },
+                    label: function (tooltipItem) {
+                        return `${tooltipItem.dataset.label}: ${tooltipItem.formattedValue}`;
+                    }
+                }
+            },
+            datalabels: {
+                display: true,
+                color: 'white',
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                borderRadius: 3,
+                padding: {
+                    top: 2
+                },
+                formatter: function (value, context) {
+                    return value; // Customize the displayed value as needed
+                }
             }
         }
     };
-    chartOptions.exporting = {};
-    chartOptions.exporting.csv = {
-        columnHeaderFormatter: function (item, key) {
-            if (!item || item instanceof Highcharts.Axis) {
-                return ''
-            } else {
-                return item.name;
-            }
-        }
-    };
+
     return chartOptions;
+}
+
+function getTooltipTitle(date, aggregation) {
+    if (aggregation === 'Week') {
+        // Customize for week view
+        return `Week ${getISOWeek(date)} (${getDateOfISOWeek(getISOWeek(date))} - ${getDateOfISOWeek(getISOWeek(date) + 1)})`;
+    } else if (aggregation === 'Day') {
+        // Customize for day view
+        return date.toLocaleDateString('en-GB', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric',
+        });
+    } else {
+        // Customize for hour view
+        return date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }) +
+            ', ' +
+            date.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
+    }
 }
 
 
@@ -3326,6 +3385,7 @@ document.querySelectorAll('.modal-header').forEach(function (header) {
 
 function initialiseDatePicker() {
     const currentDate = new Date();
+    
     const thisYear = () => {
         const d1 = new Date(currentDate.getFullYear(), 0, 1);
         return [d1, currentDate]
@@ -3406,17 +3466,6 @@ function initialiseDatePicker() {
         picker.on('select', (e) =>{
             const {start, end} = e.detail;
             console.log('Range Selected! ', JSON.stringify(e.detail))
-            const span = document.createElement('span');
-            span.classList.add('material-symbols-outlined', 'text-danger', 'ps-2')
-            element.appendChild(span);
-            span.innerText = 'cancel';
-            span.title = 'Clear date filter';
-            span.id = element.id + '-clear';
-            span.addEventListener('click', (e) =>{
-                e.stopImmediatePropagation();
-                picker.clear();
-                element.innerHTML = '<span class="material-symbols-outlined align-bottom">date_range</span><span>Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>';
-            })
             if (element.id === 'chartRange') {
                 STATE.chart.range = {start: start.getTime(), end: end.getTime()};
                 worker.postMessage({ action: 'update-state', chart: STATE.chart })
@@ -3424,7 +3473,8 @@ function initialiseDatePicker() {
                 worker.postMessage({
                     action: 'chart',
                     species: STATE.chart.species,
-                    range: STATE.chart.range
+                    range: STATE.chart.range,
+                    aggregation: 'Hour'
                 });
             } else if (element.id === 'exploreRange') {
                 STATE.explore.range = {start: start.getTime(), end: end.getTime()};
@@ -3437,6 +3487,7 @@ function initialiseDatePicker() {
                     updateSummary: true
                 }); // re-prepare
             }
+
             // Update the seen species list
             worker.postMessage({ action: 'get-detected-species-list' })
         })
@@ -3449,7 +3500,8 @@ function initialiseDatePicker() {
                 worker.postMessage({
                     action: 'chart',
                     species: STATE.chart.species,
-                    range: STATE.chart.range
+                    range: STATE.chart.range,
+                    aggregation: 'Week'
                 });
             } else if (element.id === 'exploreRange') {
                 STATE.explore.range = {start: undefined, end: undefined};
@@ -3466,7 +3518,7 @@ function initialiseDatePicker() {
         picker.on('click', (e) =>{
             if (e.target.classList.contains('cancel-button')){
                 console.log('cancelled')
-                element.innerHTML = '<span class="material-symbols-outlined align-bottom">date_range</span><span>Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>';
+                //element.innerHTML = savedContent;
             }
         })
         picker.on('show', (e) =>{
@@ -3474,10 +3526,33 @@ function initialiseDatePicker() {
                 picker.setEndTime('12:00')
         
         })
+        picker.on('hide', (e) =>{
+            const id = STATE.mode === 'chart' ? 'chartRange' : 'exploreRange';
+            const element = document.getElementById(id);
+            if (! element.innerText){
+                // It's blank
+                element.innerHTML = '<span class="material-symbols-outlined align-bottom">date_range</span><span>Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>';
+            } else if (element.innerText.indexOf('Apply') < 0){
+                createDateClearButton(element, picker);
+            }
+        })
     })
 
 }
 
+function createDateClearButton(element, picker){
+    const span = document.createElement('span');
+    span.classList.add('material-symbols-outlined', 'text-secondary', 'ps-2')
+    element.appendChild(span);
+    span.innerText = 'cancel';
+    span.title = 'Clear date filter';
+    span.id = element.id + '-clear';
+    span.addEventListener('click', (e) =>{
+        e.stopImmediatePropagation();
+        picker.clear();
+        element.innerHTML = '<span class="material-symbols-outlined align-bottom">date_range</span><span>Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>';
+    })
+}
 
 
 function toggleKeyDownForFormInputs(){
