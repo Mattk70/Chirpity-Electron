@@ -875,7 +875,7 @@
                             </div>
                         </div>
                         <!-- Explore Div -->
-                        <div id="exploreWrapper" class="p-1 row g-1 d-none justify-content-evenly">
+                        <div id="exploreWrapper" class="p-1 m-1 row g-1 d-none justify-content-evenly">
                             <div class="col align-middle">
                                 <div class="btn btn-light me-2 pt-3" id="exploreRange">
                                     <span class="material-symbols-outlined align-bottom">date_range</span>&nbsp;
@@ -919,10 +919,11 @@
                                 <!-- Spectrogram view -->
                                 <div class="w-100 d-none" id="spectrogramWrapper">
                                     <div>
+                                        <span title="Toggle Fullscreen mode (Ctrl+F)" id="fullscreen"
+                                            class="material-symbols-outlined btn btn-outline-secondary p-1 pointer d-none">fullscreen</span>
                                         <div class="bg-dark border border-secondary w-100" id="timeline"></div>
                                         <div class="w-100" id="spectrogram">
-                                            <span title="Toggle Fullscreen mode (Ctrl+F)" id="fullscreen"
-                                            class="material-symbols-outlined btn btn-outline-secondary p-1 pointer d-none">fullscreen</span>
+                                            
                                         </div>
                                         <div class="w-100" id="waveform"></div>
                                     </div>
@@ -1032,6 +1033,50 @@
                                                 id="chart-locations"></select>
                                                 <label for="explore-locations">Location</label>
                                             </div>
+                                        </div>
+                                        <div class="col">
+                                            <fieldset class="border border rounded bg-light p-2">
+                                                <legend class="h6">Sum Detections by:</legend>
+                                          
+                                                <div class="form-row">
+                                                    <div class="form-check-inline">
+                                                      <input class="form-check-input" type="radio" name="showTotals" id="hourTotal" value="Hour">
+                                                      <label class="form-check-label" for="hourTotal">Hour</label>
+                                                    </div>
+                                                    <div class="form-check-inline">
+                                                      <input class="form-check-input" type="radio" name="showTotals" id="dayTotal" value="Day">
+                                                      <label class="form-check-label" for="dayTotal">Day</label>
+                                                    </div>
+                                                    <div class="form-check-inline pb-3">
+                                                        <input class="form-check-input" type="radio" name="showTotals" id="weekTotal" value="Week">
+                                                        <label class="form-check-label" for="weekTotal">Week</label>
+                                                    </div>
+                                                </div>
+                                          
+                                              
+                                              <legend class="h6">Group Detections by:</legend>
+                                          
+                                              <div class="form-row">
+                                                  <div class="form-check-inline">
+                                                    <input class="form-check-input" type="radio" name="groupTotals" id="dayGroup" value="Day">
+                                                    <label class="form-check-label" for="dayGroup">Day</label>
+                                                  </div>
+                                                  <div class="form-check-inline">
+                                                    <input class="form-check-input" type="radio" name="groupTotals" id="weekGroup" value="Week">
+                                                    <label class="form-check-label" for="weekGroup">Week</label>
+                                                  </div>
+                                                  <div class="form-check-inline">
+                                                    <input class="form-check-input" type="radio" name="groupTotals" id="monthGroup" value="Month">
+                                                    <label class="form-check-label" for="monthGroup">Month</label>
+                                                  </div>
+                                              </div>
+                                              <div class="form-row pt-3">
+                                                <div class="form-check form-switch">
+                                                  <input class="form-check-input" type="checkbox" role="switch" name="stackYears" id="stackYears" checked>
+                                                  <label class="form-check-label" for="stackYears">Stack Years</label>
+                                                </div>
+                                            </div>
+                                            </fieldset>
                                         </div>
                                     </div>                            
                                     <div class="col-9">

@@ -1,12 +1,14 @@
 let seenTheDarkness = false, shownDaylightBanner = false, LOCATIONS, locationID = undefined;
+const startTime = performance.now();
 let labels = [], DELETE_HISTORY = [];
 
 const STATE = {
     mode: 'analyse',
     openFiles: [],
     chart: {
+        aggregation: 'Week',
         species: undefined,
-        range: { start: undefined, end: undefined }
+        range: { start: undefined, end: undefined },
     },
     explore: {
         species: undefined,
@@ -14,7 +16,7 @@ const STATE = {
     },
     sortOrder: 'dateTime',
     birdList: { lastSelectedSpecies: undefined }, // Used to put the last selected species at the top of the all-species list
-    selection: { start: undefined, end: undefined },
+    selection: { start: undefined, end: undefined }
 }
 
 // Batch size map for slider
@@ -1001,7 +1003,7 @@ exploreLink.addEventListener('click', async () => {
     const locationFilter = await generateLocationList('explore-locations');
     locationFilter.addEventListener('change', handleLocationFilterChange);
     hideAll();
-    showElement(['exploreWrapper', 'spectrogramWrapper'], false);
+    showElement(['exploreWrapper'], false);
     enableMenuItem(['saveCSV']);
     adjustSpecDims(true)
     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
@@ -1100,17 +1102,19 @@ const loadResultRegion = ({ file = '', start = 0, end = 3, label = '' } = {}) =>
  * @param redraw boolean, whether to re-render the spectrogram
  * @param fftSamples: Optional, the number of fftsamples to use for rendering. Must be a factor of 2
  */
+const footerHeight = document.getElementById('footer').offsetHeight;
+const navHeight = document.getElementById('navPadding').offsetHeight;
 function adjustSpecDims(redraw, fftSamples) {
     //Contentwrapper starts below navbar (66px) and ends above footer (30px). Hence - 96
-    contentWrapperElement.style.height = (bodyElement.clientHeight - 86) + 'px';
-    const contentHeight = contentWrapperElement.clientHeight;
+    contentWrapperElement.style.height = (bodyElement.clientHeight - footerHeight - navHeight) + 'px';
+    const contentHeight = contentWrapperElement.offsetHeight;
     // + 2 for padding
-    const formOffset = document.getElementById('exploreWrapper').clientHeight;
+    const formOffset = document.getElementById('exploreWrapper').offsetHeight;
     let specOffset;
     if (!spectrogramWrapper.classList.contains('d-none')) {
         // Expand up to 512px unless fullscreen
-        const controlsHeight = document.getElementById('controlsWrapper').clientHeight;
-        const timelineHeight = document.getElementById('timeline').clientHeight;
+        const controlsHeight = document.getElementById('controlsWrapper').offsetHeight;
+        const timelineHeight = document.getElementById('timeline').offsetHeight;
         const specHeight = config.fullscreen ? contentHeight - timelineHeight - formOffset - controlsHeight : Math.min(contentHeight * 0.4, 512);
         if (currentFile) {
             // give the wrapper space for the transport controls and element padding/margins
@@ -1317,6 +1321,8 @@ function updatePrefs() {
 /////////////////////////  Window Handlers ////////////////////////////
 let appPath, tempPath;
 window.onload = async () => {
+    const startOnload = performance.now();
+    console.log('To Page onload took: ', startOnload - startTime)
     window.electron.requestWorkerChannel();
     contentWrapperElement.classList.add('loaded');
     // Set config defaults
@@ -1451,7 +1457,8 @@ window.onload = async () => {
 
     // Set footer year
     document.getElementById('year').innerText = new Date().getFullYear();
-
+    const endOnload = performance.now();
+    console.log('Page onload took: ', endOnload -startOnload)
 }
 
 const setUpWorkerMessaging = () => {
@@ -1476,8 +1483,9 @@ const setUpWorkerMessaging = () => {
                     }
                     if (args.file) { // File is in disk database but not found
                         let message = args.message;
-                        message += '\nWould you like to remove the file from the Archive?';
-                        if (confirm(message)) deleteFile(args.file)
+                        alert(message);
+                        // message += '\nWould you like to remove the file from the Archive?';
+                        // if (confirm(message)) deleteFile(args.file)
                     } else { 
                         if (args.filter){
                             worker.postMessage({
@@ -1605,12 +1613,13 @@ const getDetectionContext = (target) => target.closest('table').id;
 
 
 document.addEventListener('change', function (e) {
-    if (e.target.closest('#bird-list-seen')){
+    const target = e.target;
+    const context = target.parentNode.classList.contains('chart') ? 'chart' : 'explore';
+    if (target.closest('#bird-list-seen')){
         // Clear the results table
         // const resultTable = document.getElementById('resultTableBody');
         // resultTable.innerText = '';
-        const cname = e.target.value;
-        const context = e.target.parentNode.classList.contains('chart') ? 'chart' : 'explore';
+        const cname = target.value;
         let pickerEl = context + 'Range';
         t0 = Date.now();
         let action, explore;
@@ -1622,6 +1631,15 @@ document.addEventListener('change', function (e) {
             resetResults({clearSummary: false, clearPagination: true, clearResults: false});
         }
         worker.postMessage({ action: action, species: cname, range: STATE[context].range, updateSummary: true });
+    }
+    else if (target.closest('#chart-aggregation')){
+        STATE.chart.aggregation = target.value;
+        worker.postMessage({ 
+            action: 'chart', 
+            aggregation: STATE.chart.aggregation, 
+            species: STATE.chart.species, 
+            range: STATE[context].range
+        });
     }
 })
 
@@ -1677,12 +1695,13 @@ function onChartData(args) {
         }
     }
 
+    const aggregation = args.aggregation;
     const results = args.results;
     const rate = args.rate;
     const total = args.total;
     const dataPoints = args.dataPoints;
-    const aggregation = args.aggregation;
-    const pointStart = args.pointStart; 
+    // start hourly charts at midday if no filter applied
+    const pointStart = STATE.chart.range.start || aggregation !== 'Hour' ? args.pointStart : args.pointStart + (12 * 60 * 60 * 1000); 
     const dateLabels = generateDateLabels(aggregation, dataPoints, pointStart);
 
     // Initialize Chart.js
@@ -1702,11 +1721,12 @@ function onChartData(args) {
         data: {
           labels: dateLabels,
           datasets: Object.entries(results).map(([year, data]) => ({
-              label: parseInt(year), // Convert year to number
-              data: data,
-              backgroundColor: 'rgba(255, 0, 64, 0.5)',
+              label: year,
+              //shift data to midday - midday rahter than nidnight to midnight if hourly chart and filter not set
+              data: aggregation !== 'Hour' ? data :  data.slice(12).concat(data.slice(0, 12)),
+              //backgroundColor: 'rgba(255, 0, 64, 0.5)',
               borderWidth: 1,
-              borderColor: 'rgba(255, 0, 64, 0.9)',
+              //borderColor: 'rgba(255, 0, 64, 0.9)',
               borderSkipped: 'bottom' // Lines will appear to rise from the bottom
             }))
         },
@@ -1736,12 +1756,12 @@ function onChartData(args) {
           plugins: [plugin],
       }
     if (total) {
-        chartOptions.data.datasets.push({
+        chartOptions.data.datasets.unshift({
             label: 'Hours Recorded', 
             type: 'line', 
             data: total,
             fill: true,
-            backgroundColor: 'rgba(0, 0, 64, 0.2)',
+            //backgroundColor: 'rgba(0, 0, 64, 0.2)',
             borderWidth: 0,
             pointRadius: 0,
             yAxisID: 'y1',
@@ -3327,6 +3347,7 @@ const setSortOrder = (order) => {
     STATE.sortOrder = order;
     showSortIcon()
     worker.postMessage({ action: 'update-state', sortOrder: order })
+    resetResults({clearSummary: false, clearPagination: false, clearResults: true});
     worker.postMessage({
         action: 'filter',
         species: isSpeciesViewFiltered(true)
@@ -3474,7 +3495,7 @@ function initialiseDatePicker() {
                     action: 'chart',
                     species: STATE.chart.species,
                     range: STATE.chart.range,
-                    aggregation: 'Hour'
+                    aggregation: STATE.chart.aggregation
                 });
             } else if (element.id === 'exploreRange') {
                 STATE.explore.range = {start: start.getTime(), end: end.getTime()};
@@ -3501,7 +3522,7 @@ function initialiseDatePicker() {
                     action: 'chart',
                     species: STATE.chart.species,
                     range: STATE.chart.range,
-                    aggregation: 'Week'
+                    aggregation: STATE.chart.aggregation
                 });
             } else if (element.id === 'exploreRange') {
                 STATE.explore.range = {start: undefined, end: undefined};
@@ -3832,7 +3853,7 @@ function getSnameFromCname(cname) {
     return null; // Substring not found in any item
 }
 
-document.addEventListener('click', function () {
+document.addEventListener('click', function (e) {
     contextMenu.classList.add("d-none");
     hideConfidenceSlider();
 })
@@ -3929,6 +3950,7 @@ async function createContextMenu(e) {
 }
 
 function positionMenu(menu, event) {
+    menu.classList.remove("d-none");
     // Calculate menu positioning:
     const menuWidth = menu.clientWidth;
     const menuHeight = menu.clientHeight;
@@ -3947,7 +3969,6 @@ function positionMenu(menu, event) {
     menu.style.display = 'block';
     menu.style.top =  top + 'px';
     menu.style.left =  left + 'px';
-    menu.classList.remove("d-none");
 }
 
 [spectrogramWrapper, resultTableElement, selectionTable].forEach(el =>{
