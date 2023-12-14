@@ -535,7 +535,7 @@ const prepResultsStatement = (species, noLimit) => {
           records.speciesID,
           species.sname, 
           species.cname, 
-          records.confidence, 
+          records.confidence as score, 
           records.label, 
           records.comment, 
           records.end,
@@ -584,7 +584,7 @@ const prepResultsStatement = (species, noLimit) => {
         speciesID,
         sname, 
         cname, 
-        confidence as score, 
+        score, 
         label, 
         comment,
         end,
@@ -2408,22 +2408,22 @@ const getChartTotals = ({
         groupBy += ", Day";
         orderBy = 'Year, Week';
         dataPoints = Math.round(hours_diff / 24);
-        const date = dateRange.start ? new Date(dateRange.start) : Date.UTC(2020, 0, 0, 0, 0, 0);
+        const date = dateRange.start !== undefined ? new Date(dateRange.start) : new Date(Date.UTC(2020, 0, 0, 0, 0, 0));
         startDay = Math.floor((date - new Date(date.getFullYear(), 0, 0, 0, 0, 0)) / 1000 / 60 / 60 / 24);
     } else if (aggregation === 'Hour') {
-        groupBy += ", Hour";
-        orderBy = 'Day, Hour';
-        dataPoints = hours_diff;
-        const date = dateRange.start ? new Date(dateRange.start) : Date.UTC(2020, 0, 0, 0, 0, 0);
+        groupBy = "Hour";
+        orderBy = 'CASE WHEN Hour >= 12 THEN Hour - 12 ELSE Hour + 12 END';
+        dataPoints = 24;
+        const date = dateRange.start !== undefined ? new Date(dateRange.start) : new Date(Date.UTC(2020, 0, 0, 0, 0, 0));
         startDay = Math.floor((date - new Date(date.getFullYear(), 0, 0, 0, 0, 0)) / 1000 / 60 / 60 / 24);
     }
 
     return new Promise(function (resolve, reject) {
-        diskDB.all(`SELECT STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS Year, 
-            STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Week,
-            STRFTIME('%j', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Day, 
-            STRFTIME('%H', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Hour,    
-            COUNT(*) as count
+        diskDB.all(`SELECT CAST(STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS INTEGER) AS Year, 
+        CAST(STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS Week,
+        CAST(STRFTIME('%j', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS Day, 
+        CAST(STRFTIME('%H', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS Hour,    
+        COUNT(*) as count
                     FROM records
                         JOIN species ON species.id = speciesID
                         JOIN files ON files.id = fileID
@@ -2645,10 +2645,10 @@ async function onChartRequest(args) {
                 } else if (aggregation === 'Day') {
                     results[year][parseInt(day) - startDay] = count;
                 } else {
-                    const d = new Date(dateRange.start);
-                    const hoursOffset = d.getHours();
-                    const index = ((parseInt(day) - startDay) * 24) + (parseInt(hour) - hoursOffset);
-                    results[year][index] = count;
+                    // const d = new Date(dateRange.start);
+                    // const hoursOffset = d.getHours();
+                    // const index = ((parseInt(day) - startDay) * 24) + (parseInt(hour) - hoursOffset);
+                    results[year][hour] = count;
                 }
             }
             return [dataPoints, aggregation]

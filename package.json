@@ -1,6 +1,6 @@
 {
   "name": "chirpity",
-  "version": "0.10.2",
+  "version": "0.10.3",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
@@ -41,7 +41,7 @@
       "!pyproject.toml",
       "!README.md",
       "!saved_model$(/*)",
-      "!**/*.js.map",
+      "!**/*.*js.map",
       "node_modules/ffmpeg-static-electron/bin/${os}/${arch}/ffmpeg",
       "node_modules/ffmpeg-static-electron/index.js",
       "node_modules/ffmpeg-static-electron/package.json",
