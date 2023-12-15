@@ -438,42 +438,41 @@ const getSummaryParams = () => {
 }
 
 const prepSummaryStatement = () => {
-    const blocked = STATE.blocked.length && !STATE.selection ? STATE.blocked : [];
     const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
     const useRange = range?.start;
     let summaryStatement = `
     WITH ranked_records AS (
-        SELECT records.dateTime, records.confidence, files.name, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight as isDaylight,
+        SELECT records.dateTime, records.confidence, files.name, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight,
           RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
         FROM records
         JOIN files ON files.id = records.fileID
         JOIN species ON species.id = records.speciesID
         WHERE confidence >=  ? `;
-    let extraClause = '';
     if (['analyse', 'archive'].includes(STATE.mode)) {
-        extraClause += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+        summaryStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
     }
     else if (useRange) {
-        extraClause += ' AND dateTime BETWEEN ? AND ? ';
+        summaryStatement += ' AND dateTime BETWEEN ? AND ? ';
+    }
+    
+    if (STATE.blocked.length && !STATE.selection) {
+        const excluded = prepParams(STATE.blocked);
+        summaryStatement += ` AND speciesID NOT IN (${excluded}) `;
     }
     if (STATE.detect.nocmig){
-        extraClause += ' AND COALESCE(isDaylight, 0) != 1 ';
-    }
-    if (blocked.length) {
-        const excluded = prepParams(blocked);
-        extraClause += ` AND speciesID NOT IN (${excluded}) `;
+        summaryStatement += ' AND COALESCE(isDaylight, 0) != 1 ';
     }
 
     if (STATE.locationID) {
-        extraClause += ' AND locationID = ? ';
+        summaryStatement += ' AND locationID = ? ';
     }
-    summaryStatement += extraClause;
     summaryStatement += `
     )
-    SELECT cname, sname, COUNT(*) as count, SUM(callcount) as calls, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
+    SELECT speciesID, cname, sname, COUNT(cname) as count, SUM(callcount) as calls, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
       FROM ranked_records
-      WHERE ranked_records.rank <= ${STATE.topRankin}
-      GROUP BY speciesID  ORDER BY cname`;
+      WHERE ranked_records.rank <= ${STATE.topRankin}`;
+
+    summaryStatement +=  ` GROUP BY speciesID  ORDER BY cname`;
     STATE.GET_SUMMARY_SQL = STATE.db.prepare(summaryStatement);
     //console.log('Summary SQL statement:\n' + summaryStatement)
 }
@@ -512,13 +511,13 @@ const getTotal = async ({species = undefined, offset = 0}) => {
 const getResultsParams = (species, confidence, offset, limit, topRankin) => {
     const params = [];
     params.push(confidence);
-    species && params.push(species);
-    const blocked = (! species && STATE.blocked.length && !STATE.selection) ?
-        STATE.blocked : [];
-    blocked.length && params.push(...blocked);
     ['analyse', 'archive'].includes(STATE.mode) && !STATE.selection && params.push(...STATE.filesToAnalyse);
-    limit !== Infinity && params.push(limit, offset);
+    const blocked = (STATE.blocked.length && !STATE.selection) ? STATE.blocked : [];
+    blocked.length && params.push(...blocked);
+    
     params.push(topRankin);
+    species && params.push(species);
+    limit !== Infinity && params.push(limit, offset);
     return params
 }
 
@@ -535,7 +534,7 @@ const prepResultsStatement = (species, noLimit) => {
           records.speciesID,
           species.sname, 
           species.cname, 
-          records.confidence, 
+          records.confidence as score, 
           records.label, 
           records.comment, 
           records.end,
@@ -548,10 +547,8 @@ const prepResultsStatement = (species, noLimit) => {
           WHERE confidence >= ?
     `;
 
-    if (species) resultStatement+=  ` AND speciesID = (SELECT id FROM species WHERE cname = ?) `;
-    
-    const blocked = STATE.selection || species ? [] : STATE.blocked;
-    if (blocked.length) resultStatement += ` AND speciesID NOT IN (${prepParams(blocked)}) `;
+    //if (species) resultStatement+=  ` AND speciesID = (SELECT id FROM species WHERE cname = ?) `;
+
     // might have two locations with same dates - so need to add files
     if (['analyse', 'archive'].includes(STATE.mode) && !STATE.selection) {
         resultStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
@@ -559,11 +556,12 @@ const prepResultsStatement = (species, noLimit) => {
     // Prioritise selection ranges
     const range = STATE.selection?.start ? STATE.selection :
         STATE.mode === 'explore' ? STATE.explore.range : false;
-
     const useRange = range?.start;  
     if (useRange) {
         resultStatement += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
-    }
+    }    
+    const blocked = STATE.selection ? [] : STATE.blocked;
+    if (blocked.length) resultStatement += ` AND speciesID NOT IN (${prepParams(blocked)}) `;
     if (STATE.selection) resultStatement += ` AND name = '${FILE_QUEUE[0]}' `;
     if (STATE.locationID) {
         resultStatement += ` AND locationID = ${STATE.locationID} `;
@@ -571,12 +569,11 @@ const prepResultsStatement = (species, noLimit) => {
     if (STATE.detect.nocmig){
         resultStatement += ' AND COALESCE(isDaylight, 0) != 1 ';
     }
-    const limitClause = noLimit ? '' : 'LIMIT ?  OFFSET ?';
-    resultStatement += ` ORDER BY ${STATE.sortOrder}, confidence DESC, callCount DESC ${limitClause} `;
 
     resultStatement += `)
       SELECT 
         dateTime as timestamp, 
+        score,
         duration, 
         filestart, 
         name as file, 
@@ -584,7 +581,7 @@ const prepResultsStatement = (species, noLimit) => {
         speciesID,
         sname, 
         cname, 
-        confidence as score, 
+        score, 
         label, 
         comment,
         end,
@@ -592,8 +589,11 @@ const prepResultsStatement = (species, noLimit) => {
         rankvb 
       FROM 
         ranked_records 
-        WHERE ranked_records.rank <= ? `;
-
+        WHERE confidence_rank <= ? `;
+    if (species) resultStatement+=  ` AND  cname = ? `;
+    
+    const limitClause = noLimit ? '' : 'LIMIT ?  OFFSET ?';
+    resultStatement += ` ORDER BY ${STATE.sortOrder}, callCount DESC ${limitClause} `;
     STATE.GET_RESULT_SQL = STATE.db.prepare(resultStatement);
 }
 
@@ -2408,22 +2408,22 @@ const getChartTotals = ({
         groupBy += ", Day";
         orderBy = 'Year, Week';
         dataPoints = Math.round(hours_diff / 24);
-        const date = dateRange.start ? new Date(dateRange.start) : Date.UTC(2020, 0, 0, 0, 0, 0);
+        const date = dateRange.start !== undefined ? new Date(dateRange.start) : new Date(Date.UTC(2020, 0, 0, 0, 0, 0));
         startDay = Math.floor((date - new Date(date.getFullYear(), 0, 0, 0, 0, 0)) / 1000 / 60 / 60 / 24);
     } else if (aggregation === 'Hour') {
-        groupBy += ", Hour";
-        orderBy = 'Day, Hour';
-        dataPoints = hours_diff;
-        const date = dateRange.start ? new Date(dateRange.start) : Date.UTC(2020, 0, 0, 0, 0, 0);
+        groupBy = "Hour";
+        orderBy = 'CASE WHEN Hour >= 12 THEN Hour - 12 ELSE Hour + 12 END';
+        dataPoints = 24;
+        const date = dateRange.start !== undefined ? new Date(dateRange.start) : new Date(Date.UTC(2020, 0, 0, 0, 0, 0));
         startDay = Math.floor((date - new Date(date.getFullYear(), 0, 0, 0, 0, 0)) / 1000 / 60 / 60 / 24);
     }
 
     return new Promise(function (resolve, reject) {
-        diskDB.all(`SELECT STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS Year, 
-            STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Week,
-            STRFTIME('%j', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Day, 
-            STRFTIME('%H', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS Hour,    
-            COUNT(*) as count
+        diskDB.all(`SELECT CAST(STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS INTEGER) AS Year, 
+        CAST(STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS Week,
+        CAST(STRFTIME('%j', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS Day, 
+        CAST(STRFTIME('%H', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS Hour,    
+        COUNT(*) as count
                     FROM records
                         JOIN species ON species.id = speciesID
                         JOIN files ON files.id = fileID
@@ -2645,10 +2645,10 @@ async function onChartRequest(args) {
                 } else if (aggregation === 'Day') {
                     results[year][parseInt(day) - startDay] = count;
                 } else {
-                    const d = new Date(dateRange.start);
-                    const hoursOffset = d.getHours();
-                    const index = ((parseInt(day) - startDay) * 24) + (parseInt(hour) - hoursOffset);
-                    results[year][index] = count;
+                    // const d = new Date(dateRange.start);
+                    // const hoursOffset = d.getHours();
+                    // const index = ((parseInt(day) - startDay) * 24) + (parseInt(hour) - hoursOffset);
+                    results[year][hour] = count;
                 }
             }
             return [dataPoints, aggregation]
