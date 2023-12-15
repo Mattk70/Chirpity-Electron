@@ -2094,6 +2094,7 @@ listToUse.addEventListener('change', function (e) {
     config.list = e.target.value;
     updateListIcon();
     updatePrefs();
+    resetResults({clearSummary: true, clearPagination: true, clearResults: true});
     worker.postMessage({ action: 'update-list', list: config.list })
 })
 

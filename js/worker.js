@@ -438,42 +438,41 @@ const getSummaryParams = () => {
 }
 
 const prepSummaryStatement = () => {
-    const blocked = STATE.blocked.length && !STATE.selection ? STATE.blocked : [];
     const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
     const useRange = range?.start;
     let summaryStatement = `
     WITH ranked_records AS (
-        SELECT records.dateTime, records.confidence, files.name, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight as isDaylight,
+        SELECT records.dateTime, records.confidence, files.name, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight,
           RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
         FROM records
         JOIN files ON files.id = records.fileID
         JOIN species ON species.id = records.speciesID
         WHERE confidence >=  ? `;
-    let extraClause = '';
     if (['analyse', 'archive'].includes(STATE.mode)) {
-        extraClause += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+        summaryStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
     }
     else if (useRange) {
-        extraClause += ' AND dateTime BETWEEN ? AND ? ';
+        summaryStatement += ' AND dateTime BETWEEN ? AND ? ';
+    }
+    
+    if (STATE.blocked.length && !STATE.selection) {
+        const excluded = prepParams(STATE.blocked);
+        summaryStatement += ` AND speciesID NOT IN (${excluded}) `;
     }
     if (STATE.detect.nocmig){
-        extraClause += ' AND COALESCE(isDaylight, 0) != 1 ';
-    }
-    if (blocked.length) {
-        const excluded = prepParams(blocked);
-        extraClause += ` AND speciesID NOT IN (${excluded}) `;
+        summaryStatement += ' AND COALESCE(isDaylight, 0) != 1 ';
     }
 
     if (STATE.locationID) {
-        extraClause += ' AND locationID = ? ';
+        summaryStatement += ' AND locationID = ? ';
     }
-    summaryStatement += extraClause;
     summaryStatement += `
     )
-    SELECT cname, sname, COUNT(*) as count, SUM(callcount) as calls, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
+    SELECT speciesID, cname, sname, COUNT(cname) as count, SUM(callcount) as calls, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
       FROM ranked_records
-      WHERE ranked_records.rank <= ${STATE.topRankin}
-      GROUP BY speciesID  ORDER BY cname`;
+      WHERE ranked_records.rank <= ${STATE.topRankin}`;
+
+    summaryStatement +=  ` GROUP BY speciesID  ORDER BY cname`;
     STATE.GET_SUMMARY_SQL = STATE.db.prepare(summaryStatement);
     //console.log('Summary SQL statement:\n' + summaryStatement)
 }
@@ -512,13 +511,12 @@ const getTotal = async ({species = undefined, offset = 0}) => {
 const getResultsParams = (species, confidence, offset, limit, topRankin) => {
     const params = [];
     params.push(confidence);
-    species && params.push(species);
-    const blocked = (! species && STATE.blocked.length && !STATE.selection) ?
-        STATE.blocked : [];
-    blocked.length && params.push(...blocked);
     ['analyse', 'archive'].includes(STATE.mode) && !STATE.selection && params.push(...STATE.filesToAnalyse);
+    const blocked = (STATE.blocked.length && !STATE.selection) ? STATE.blocked : [];
+    blocked.length && params.push(...blocked);
     limit !== Infinity && params.push(limit, offset);
     params.push(topRankin);
+    species && params.push(species);
     return params
 }
 
@@ -548,10 +546,8 @@ const prepResultsStatement = (species, noLimit) => {
           WHERE confidence >= ?
     `;
 
-    if (species) resultStatement+=  ` AND speciesID = (SELECT id FROM species WHERE cname = ?) `;
-    
-    const blocked = STATE.selection || species ? [] : STATE.blocked;
-    if (blocked.length) resultStatement += ` AND speciesID NOT IN (${prepParams(blocked)}) `;
+    //if (species) resultStatement+=  ` AND speciesID = (SELECT id FROM species WHERE cname = ?) `;
+
     // might have two locations with same dates - so need to add files
     if (['analyse', 'archive'].includes(STATE.mode) && !STATE.selection) {
         resultStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
@@ -559,11 +555,12 @@ const prepResultsStatement = (species, noLimit) => {
     // Prioritise selection ranges
     const range = STATE.selection?.start ? STATE.selection :
         STATE.mode === 'explore' ? STATE.explore.range : false;
-
     const useRange = range?.start;  
     if (useRange) {
         resultStatement += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
-    }
+    }    
+    const blocked = STATE.selection ? [] : STATE.blocked;
+    if (blocked.length) resultStatement += ` AND speciesID NOT IN (${prepParams(blocked)}) `;
     if (STATE.selection) resultStatement += ` AND name = '${FILE_QUEUE[0]}' `;
     if (STATE.locationID) {
         resultStatement += ` AND locationID = ${STATE.locationID} `;
@@ -593,7 +590,7 @@ const prepResultsStatement = (species, noLimit) => {
       FROM 
         ranked_records 
         WHERE confidence_rank <= ? `;
-
+    if (species) resultStatement+=  ` AND  cname = ? `;
     STATE.GET_RESULT_SQL = STATE.db.prepare(resultStatement);
 }
 
