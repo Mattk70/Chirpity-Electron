@@ -514,9 +514,10 @@ const getResultsParams = (species, confidence, offset, limit, topRankin) => {
     ['analyse', 'archive'].includes(STATE.mode) && !STATE.selection && params.push(...STATE.filesToAnalyse);
     const blocked = (STATE.blocked.length && !STATE.selection) ? STATE.blocked : [];
     blocked.length && params.push(...blocked);
-    limit !== Infinity && params.push(limit, offset);
+    
     params.push(topRankin);
     species && params.push(species);
+    limit !== Infinity && params.push(limit, offset);
     return params
 }
 
@@ -568,12 +569,11 @@ const prepResultsStatement = (species, noLimit) => {
     if (STATE.detect.nocmig){
         resultStatement += ' AND COALESCE(isDaylight, 0) != 1 ';
     }
-    const limitClause = noLimit ? '' : 'LIMIT ?  OFFSET ?';
-    resultStatement += ` ORDER BY ${STATE.sortOrder}, confidence DESC, callCount DESC ${limitClause} `;
 
     resultStatement += `)
       SELECT 
         dateTime as timestamp, 
+        score,
         duration, 
         filestart, 
         name as file, 
@@ -591,6 +591,9 @@ const prepResultsStatement = (species, noLimit) => {
         ranked_records 
         WHERE confidence_rank <= ? `;
     if (species) resultStatement+=  ` AND  cname = ? `;
+    
+    const limitClause = noLimit ? '' : 'LIMIT ?  OFFSET ?';
+    resultStatement += ` ORDER BY ${STATE.sortOrder}, callCount DESC ${limitClause} `;
     STATE.GET_RESULT_SQL = STATE.db.prepare(resultStatement);
 }
 
