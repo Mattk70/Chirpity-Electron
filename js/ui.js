@@ -2082,6 +2082,7 @@ listIcon.addEventListener('click', () => {
             listToUse.value = keys[replace];
             config.list = keys[replace];
             updatePrefs();
+            resetResults({clearSummary: true, clearPagination: true, clearResults: true});
             worker.postMessage({ action: 'update-list', list: config.list })
             break
         }
@@ -3319,7 +3320,7 @@ confidenceSort.addEventListener('click', () => {
 const timeSort = document.querySelectorAll('.time-sort');
 timeSort.forEach(el => {
     el.addEventListener('click', () => {
-        setSortOrder('dateTime')
+        setSortOrder('timestamp')
     });
 })
 
