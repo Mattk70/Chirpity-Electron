@@ -149,18 +149,6 @@ ul {
 }
 
 
-/* .bird-list-wrapper {
-    margin-top: -3px;
-    overflow: hidden;
-    max-height: 250px;
-    position: absolute;
-    z-index: 12;
-    box-shadow: -2px 6px 6px rgba(0, 0, 0, 0.4);
-    border-bottom-left-radius: 5px;
-    border-bottom-right-radius: 5px;
-    min-width: 320px;
-} */
-
 .bird-list {
     overflow: auto;
     margin-right: 0;
@@ -272,41 +260,6 @@ region.wavesurfer-region[data-region-highlight] {
     margin: 30px 1em 1em;
 }
 
-.highcharts-data-table table {
-    margin: 0 1em 1em;
-    display: block;
-    max-width: 280px;
-    overflow: auto;
-}
-
-
-.highcharts-data-table caption {
-    display: none;
-}
-
-.highcharts-data-table th {
-    font-weight: 600;
-    padding: 0.5em;
-}
-
-.highcharts-data-table td,
-.highcharts-data-table th,
-.highcharts-data-table caption {
-    padding: 0.5em;
-}
-
-.highcharts-data-table thead tr,
-.highcharts-data-table tr:nth-child(even) {
-    background: #f8f8f8;
-}
-
-.highcharts-data-table tr:hover {
-    background: #f1f7ff;
-}
-
-.highcharts-background {
-    opacity: 0.75;
-}
 
 
 /* Scrollbar */
@@ -345,7 +298,8 @@ footer {
 #fullscreen {
     margin: 5px;
     position: absolute;
-    z-index: 4;
+    z-index: 1;
+    top: 1em;
     right: 0em;
     max-width: 70px;
 }
@@ -609,6 +563,7 @@ input[type="range"].vertical {
     max-width: 400px;
 }
 
+
 /* Tour highlighting */
 
 .highlighted {
@@ -647,6 +602,3 @@ input[type="range"].vertical {
     background-color: #4CAF50; /* Set the color for WebKit browsers */
   }
 
-  .form-select {
-    font-size: 0.74rem;
-  }
