@@ -22,7 +22,7 @@ let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on ever
 
 const DEBUG = true;
 
-const DATASET = false;
+const DATASET = true;
 const adding_chirpity_additions = true;
 const dataset_database = DATASET;
 
@@ -541,7 +541,7 @@ const prepResultsStatement = (species, noLimit) => {
           records.end,
           records.callCount,
           records.isDaylight,
-          RANK() OVER (PARTITION BY records.dateTime, records.fileID ORDER BY records.confidence DESC) AS confidence_rank
+          RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
         FROM records 
           JOIN species ON records.speciesID = species.id 
           JOIN files ON records.fileID = files.id 
@@ -589,10 +589,10 @@ const prepResultsStatement = (species, noLimit) => {
         comment,
         end,
         callCount,
-        confidence_rank
+        rankvb 
       FROM 
         ranked_records 
-        WHERE confidence_rank <= ? `;
+        WHERE ranked_records.rank <= ? `;
 
     STATE.GET_RESULT_SQL = STATE.db.prepare(resultStatement);
 }
@@ -1348,7 +1348,7 @@ const convertSpecsFromExistingSpecs = async (path) => {
 }
 
 const saveResults2DataSet = ({species}) => {
-    const rootDirectory = 'C:/Users/simpo/PycharmProjects/Data/Test Dataset';
+    const rootDirectory = '/media/matt/36A5CC3B5FA245852/additions';
     const height = 256, width = 384;
     let t0 = Date.now()
     let promise = Promise.resolve();
