@@ -57,7 +57,7 @@ test.beforeAll(async () => {
     page = window
     // Wait for the model to be ready
     const warmup = page.locator('#warmup')
-    const slowExpect = expect.configure({ timeout: 15000 });
+    const slowExpect = expect.configure({ timeout: 15_000 });
     await slowExpect(warmup).toHaveClass('dropdown-item text-danger d-none') 
     // capture errors
     page.on('pageerror', (error) => {
@@ -91,7 +91,7 @@ test(`Analyse works`, async () => {
   await page.locator('#analyse').click()
   await  page.locator('#resultTableContainer').waitFor({state: 'visible'})
   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
-  expect(callID).not.toBe(null)
+  expect(callID).not.toBe(undefined)
 })
 
 //test.describe.configure({ mode: 'parallel' });

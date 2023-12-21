@@ -18,7 +18,7 @@ export class State {
             this.detect = { nocmig: false, contextAware: false, confidence: 450 },
             this.chart = { range: { start: undefined, end: undefined }, species: undefined },
             this.explore = { range: { start: undefined, end: undefined } },
-            this.model = null,
+            this.model = undefined,
             this.predictionCount = 0,
             this.topRankin = 1,
             this.GET_RESULT_SQL = undefined,

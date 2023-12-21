@@ -24,7 +24,7 @@ class PreprocessSpectrogramLayer extends tf.layers.Layer {
 
 
     build(inputShape) {
-        this.inputSpec = [{ shape: [null, inputShape[1], inputShape[2], inputShape[3]] }];
+        this.inputSpec = [{ shape: [undefined, inputShape[1], inputShape[2], inputShape[3]] }];
         return this;
     }
 
@@ -63,16 +63,16 @@ onmessage = async (e) => {
         audio = tf.tensor1d(audio);
 
         // check if we need to pad
-        const remainder = audio.shape % 72000;
+        const remainder = audio.shape % 72_000;
         let paddedBuffer;
         if (remainder !== 0) {
             // Pad to the nearest full sample
-            paddedBuffer = audio.pad([[0, 72000 - remainder]]);
+            paddedBuffer = audio.pad([[0, 72_000 - remainder]]);
             audio.dispose();
             if (DEBUG) console.log('Received final chunks')
         }
         const buffer = paddedBuffer || audio;
-        const numSamples = buffer.shape / 72000;
+        const numSamples = buffer.shape / 72_000;
         let bufferList = tf.split(buffer, numSamples);
         buffer.dispose();
         // Turn the audio into a spec tensor
@@ -84,7 +84,7 @@ onmessage = async (e) => {
 
         const specBatch = makeSpectrogramBatch(bufferList);
         //const specBatch = tf.stack(bufferList);
-        const batchKeys = [...Array(numSamples).keys()].map(i => start + 72000 * i);
+        const batchKeys = [...Array(numSamples).keys()].map(i => start + 72_000 * i);
         postMessage({
             message: 'specs',
             specBatch: specBatch.arraySync(),

@@ -1,34 +1,24 @@
 const terser = require('terser');
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const minifyOptions = {
-    parse: {
-        // parse options
-    },
-    compress: {
-        // compress options
-    },
+    parse: {},
+    compress: {},
     mangle: {
         // mangle options
         toplevel: true,
-        properties: {
-            // mangle property options
-        }
+        properties: {}
     },
-    format: {
-        // format options (can also use `output` for backwards compatibility)
-    },
-    sourceMap: {
-        // source map options
-    },
+    format: {},
+    sourceMap: {},
     ecma: 2016, // specify one of: 5, 2015, 2016, etc.
     enclose: false, // or specify true, or "args:values"
     keep_classnames: false,
     keep_fnames: false,
     ie8: false,
     module: false,
-    nameCache: null, // or specify a name cache object
+    nameCache: undefined, // or specify a name cache object
     safari10: false,
     toplevel: true
 }

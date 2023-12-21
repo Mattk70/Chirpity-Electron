@@ -14,7 +14,7 @@ const STATE = {
         species: undefined,
         range: { start: undefined, end: undefined }
     },
-    sortOrder: 'dateTime',
+    sortOrder: 'timestamp',
     birdList: { lastSelectedSpecies: undefined }, // Used to put the last selected species at the top of the all-species list
     selection: { start: undefined, end: undefined }
 }
@@ -52,15 +52,15 @@ const establishMessageChannel =
         }
     }).then((value) => {
         console.log(value);
-    }, reason => {
-        console.log(reason);
+    }, error => {
+        console.log(error);
     });
 
 
 async function getPaths() {
     const appPath = await window.electron.getPath();
     const tempPath = await window.electron.getTemp();
-    console.log('path is ', appPath, 'temp is ', tempPath);
+    console.log('path is', appPath, 'temp is', tempPath);
     return [appPath, tempPath];
 }
 
@@ -81,11 +81,11 @@ let DIAGNOSTICS = {};
 window.electron.getVersion()
     .then((appVersion) => {
         version = appVersion;
-        console.log('App version: ', appVersion);
+        console.log('App version:', appVersion);
         DIAGNOSTICS['Chirpity Version'] = version;
     })
-    .catch(e => {
-        console.log('Error getting app version:', e)
+    .catch(error => {
+        console.log('Error getting app version:', error)
     });
 
 let modelReady = false, fileLoaded = false, currentFile;
@@ -136,7 +136,7 @@ contentWrapperElement.style.height = (bodyElement.clientHeight - 80) + 'px';
 
 // Set default Options
 let config;
-let sampleRate = 24000;
+let sampleRate = 24_000;
 let audioCtx;
 
 /** Collect DIAGNOSTICS Information
@@ -159,12 +159,12 @@ DIAGNOSTICS['Cores'] = os.cpus().length;
 DIAGNOSTICS['System Memory'] = (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) + ' GB';
 
 function resetResults({clearSummary, clearPagination, clearResults}) {
-    if (clearSummary) summaryTable.innerText = '';
+    if (clearSummary) summaryTable.textContent = '';
 
     clearPagination && pagination.forEach(item => item.classList.add('d-none'));
     const resultTable = document.getElementById('resultTableBody');
     resultsBuffer = resultTable.cloneNode(false)
-    if (clearResults) resultTable.innerText = '';
+    if (clearResults) resultTable.textContent = '';
     predictions = {};
     seenTheDarkness = false;
     shownDaylightBanner = false;
@@ -180,7 +180,7 @@ function updateProgress(val) {
     if (val) {
         progressBar.value = val;
         val = val.toString();
-        progressBar.innerText = val + '%';
+        progressBar.textContent = val + '%';
     }
     else {
         progressBar.removeAttribute('value');
@@ -499,7 +499,7 @@ filename.addEventListener('click', openFileInList);
 filename.addEventListener('contextmenu', buildFileMenu);
 
 function extractFileNameAndFolder(path) {
-    const regex = /[\\\/]([^\\\/]+)[\\\/]([^\\\/]+)$/; // Regular expression to match the parent folder and file name
+    const regex = /[\\/]([^\\/]+)[\\/]([^\\/]+)$/; // Regular expression to match the parent folder and file name
   
     const match = path.match(regex);
   
@@ -535,7 +535,7 @@ function renderFilenamePanel() {
         <div class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton">`;
         files.forEach(item => {
             if (item !== openfile) {
-                const label = item.replace(/^.*[\\\/]/, "");
+                const label = item.replace(/^.*[\\/]/, "");
                 appendStr += `<a id="${item}" class="dropdown-item openFiles" href="#">
                 <span class="material-symbols-outlined align-bottom">audio_file</span>${label}</a>`;
             }
@@ -620,14 +620,14 @@ const showLocation = async (fromSelect) => {
 }
 
 const displayLocationAddress = async (where) => {
-    const custom = where.indexOf('custom') > -1;
+    const custom = where.includes('custom');
     let latEl, lonEl, placeEl, place;
     if (custom){
         latEl = document.getElementById('customLat');
         lonEl = document.getElementById('customLon');
         placeEl = document.getElementById('customPlace');
         address = await fetchLocationAddress(latEl.value, lonEl.value, false);
-        placeEl.value = address ? address : 'Location not available';
+        placeEl.value = address || 'Location not available';
     } else {
         latEl = document.getElementById('latitude');
         lonEl = document.getElementById('longitude');
@@ -662,11 +662,11 @@ async function setLocation() {
     })
     const addOrDelete = () => {
         if (customPlaceEl.value) {
-            locationAdd.innerText = 'Set Location'
+            locationAdd.textContent = 'Set Location'
             locationAdd.classList.remove('btn-danger');
             locationAdd.classList.add('button-primary');
         } else {
-            locationAdd.innerText = 'Delete Location'
+            locationAdd.textContent = 'Delete Location'
             locationAdd.classList.add('btn-danger');
             locationAdd.classList.remove('button-primary');
         }
@@ -760,7 +760,7 @@ function resetDiagnostics() {
 
 // Worker listeners
 function analyseReset() {
-    fileNumber.innerText = '';
+    fileNumber.textContent = '';
     PREDICTING = true;
     resetDiagnostics();
     AUDACITY_LABELS = {};
@@ -861,10 +861,10 @@ function postAnalyseMessage(args) {
 
 
 function fetchLocationAddress(lat, lon) {
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
         if (!LOCATIONS) {
             worker.postMessage({ action: 'get-locations', file: currentFile });
-            await waitForLocations();
+            waitForLocations();
         }
         const storedLocation = LOCATIONS.find(obj => obj.lat === lat && obj.lon === lon);
         if (storedLocation) return resolve(storedLocation.place);
@@ -1134,9 +1134,7 @@ function adjustSpecDims(redraw, fftSamples) {
             specElement.style.zIndex = 0;
             document.querySelector('.spec-labels').style.width = '55px';
         }
-        if (wavesurfer && redraw) {
-            //wavesurfer.setOptions({});
-        }
+        if (wavesurfer && redraw) {}
         specOffset = spectrogramWrapper.offsetHeight;
     } else {
         specOffset = 0
@@ -1312,8 +1310,8 @@ function secondaryLabelInterval(pxPerSec) {
 function updatePrefs() {
     try {
         fs.writeFileSync(p.join(appPath, 'config.json'), JSON.stringify(config))
-    } catch (e) {
-        console.log(e)
+    } catch (error) {
+        console.log(error)
     }
 }
 
@@ -1322,7 +1320,7 @@ function updatePrefs() {
 let appPath, tempPath;
 window.onload = async () => {
     const startOnload = performance.now();
-    console.log('To Page onload took: ', startOnload - startTime)
+    console.log('To Page onload took:', startOnload - startTime)
     window.electron.requestWorkerChannel();
     contentWrapperElement.classList.add('loaded');
     // Set config defaults
@@ -1379,7 +1377,7 @@ window.onload = async () => {
         // Map slider value to batch size
         batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
         batchSizeSlider.max = (BATCH_SIZE_LIST.length - 1).toString();
-        batchSizeValue.innerText = config[config.backend].batchSize;
+        batchSizeValue.textContent = config[config.backend].batchSize;
         const modelToUse = document.getElementById('model-to-use');
         modelToUse.value = config.model;
         const backend = document.getElementById(config.backend);
@@ -1410,22 +1408,22 @@ window.onload = async () => {
         debugMode.checked = config.debug;
         showThreshold(config.detect.confidence);
         SNRSlider.value = config.filters.SNR;
-        SNRThreshold.innerText = config.filters.SNR;
+        SNRThreshold.textContent = config.filters.SNR;
         if (config.backend === 'webgl') {
             SNRSlider.disabled = true;
         };
         // Filters
-        HPThreshold.innerText = config.filters.highPassFrequency + 'Hz';
+        HPThreshold.textContent = config.filters.highPassFrequency + 'Hz';
         HPSlider.value = config.filters.highPassFrequency;
         LowShelfSlider.value = config.filters.lowShelfFrequency;
-        LowShelfThreshold.innerText = config.filters.lowShelfFrequency + 'Hz';
+        LowShelfThreshold.textContent = config.filters.lowShelfFrequency + 'Hz';
         lowShelfAttenuation.value = -config.filters.lowShelfAttenuation;
-        lowShelfAttenuationThreshold.innerText = lowShelfAttenuation.value + 'dB';
+        lowShelfAttenuationThreshold.textContent = lowShelfAttenuation.value + 'dB';
         filterIconDisplay();
 
         ThreadSlider.max = DIAGNOSTICS['Cores'];
         ThreadSlider.value = config[config.backend].threads;
-        numberOfThreads.innerText = config[config.backend].threads;
+        numberOfThreads.textContent = config[config.backend].threads;
         defaultLat.value = config.latitude;
         defaultLon.value = config.longitude;
         place.innerHTML = '<span class="material-symbols-outlined">fmd_good</span>' + config.location;
@@ -1456,9 +1454,9 @@ window.onload = async () => {
     setUpWorkerMessaging()
 
     // Set footer year
-    document.getElementById('year').innerText = new Date().getFullYear();
+    document.getElementById('year').textContent = new Date().getFullYear();
     const endOnload = performance.now();
-    console.log('Page onload took: ', endOnload -startOnload)
+    console.log('Page onload took:', endOnload -startOnload)
 }
 
 const setUpWorkerMessaging = () => {
@@ -1467,72 +1465,102 @@ const setUpWorkerMessaging = () => {
             const args = e.data;
             const event = args.event;
             switch (event) {
-                case 'analysis-complete': onAnalysisComplete(); break;
-                case 'chart-data': onChartData(args); break;
-                case 'diskDB-has-records':
-                    chartsLink.classList.remove('disabled');
-                    exploreLink.classList.remove('disabled');
-                    break;
-                case 'file-location-id': onFileLocationID(args); break;
-                case 'files': onOpenFiles(args); break;
-                case 'generate-alert':
-                    if (args.updateFilenamePanel) {
-                        renderFilenamePanel();
-                        window.electron.unsavedRecords(false);
-                        document.getElementById('unsaved-icon').classList.add('d-none');
-                    }
-                    if (args.file) { // File is in disk database but not found
-                        let message = args.message;
-                        alert(message);
-                        // message += '\nWould you like to remove the file from the Archive?';
-                        // if (confirm(message)) deleteFile(args.file)
-                    } else { 
-                        if (args.filter){
-                            worker.postMessage({
-                                action: 'filter',
-                                species: isSpeciesViewFiltered(true),
-                                active: args.active,
-                                updateSummary: true
-                            }); // no re-prepare
-                            resetResults({clearSummary: true, clearPagination: true, clearResults: true});
-                        } else {
-                            alert(args.message) 
-                        }
-                    }
-                    break;
-                case 'results-complete':
-                    onResultsComplete(args);
-                    hideLoadingSpinner();
-                    break;
-                case 'location-list':
-                    LOCATIONS = args.locations;
-                    locationID = args.currentLocation;
-                    break;
-                case 'model-ready': onModelReady(args); break;
-                case 'mode-changed':
-                    STATE.mode = args.mode;
-                    // Update the current file name in the UI
-                    renderFilenamePanel();
-                    config.debug && console.log('Mode changed to: ' + args.mode);
-                    break;
-                case 'summary-complate': onSummaryComplete(args); break;
-                case 'new-result': renderResult(args); break;
-                case 'progress': onProgress(args); break;
-                case 'seen-species-list': generateBirdList('seenSpecies', args.list); break;
-                case 'show-spinner': showLoadingSpinner(500); break;
-                case 'spawning': displayWarmUpMessage(); break;
-                case 'total-records': updatePagination(args.total, args.offset); break;
-                case 'unsaved-records':
-                    window.electron.unsavedRecords(true);
-                    document.getElementById('unsaved-icon').classList.remove('d-none');
-                    break;
-                case 'update-audio-duration':
-                    DIAGNOSTICS['Audio Duration'] ??= 0;
-                    DIAGNOSTICS['Audio Duration'] += args.value;
-                    break;
-                case 'update-summary': updateSummary(args); break;
-                case 'worker-loaded-audio': onWorkerLoadedAudio(args); break;
-                default: alert(`Unrecognised message from worker:${args.event}`)
+                case "analysis-complete": {onAnalysisComplete();
+break;
+}
+                case "chart-data": {onChartData(args);
+break;
+}
+                case "diskDB-has-records": {chartsLink.classList.remove("disabled");
+exploreLink.classList.remove("disabled");
+break;
+}
+                case "file-location-id": {onFileLocationID(args);
+break;
+}
+                case "files": {onOpenFiles(args);
+break;
+}
+                case "generate-alert": {if (args.updateFilenamePanel) {
+    renderFilenamePanel();
+    window.electron.unsavedRecords(false);
+    document.getElementById("unsaved-icon").classList.add("d-none");
+}
+if (args.file) {
+    let message = args.message;
+    alert(message);
+}  else {
+    if (args.filter) {
+        worker.postMessage({
+            action: "filter",
+            species: isSpeciesViewFiltered(true),
+            active: args.active,
+            updateSummary: true
+        });
+        resetResults({
+            clearSummary: true,
+            clearPagination: true,
+            clearResults: true
+        });
+    }  else {
+        alert(args.message);
+    }
+}
+break;
+}
+                case "results-complete": {onResultsComplete(args);
+hideLoadingSpinner();
+break;
+}
+                case "location-list": {LOCATIONS = args.locations;
+locationID = args.currentLocation;
+break;
+}
+                case "model-ready": {onModelReady(args);
+break;
+}
+                case "mode-changed": {STATE.mode = args.mode;
+renderFilenamePanel();
+config.debug && console.log("Mode changed to: " + args.mode);
+break;
+}
+                case "summary-complate": {onSummaryComplete(args);
+break;
+}
+                case "new-result": {renderResult(args);
+break;
+}
+                case "progress": {onProgress(args);
+break;
+}
+                case "seen-species-list": {generateBirdList("seenSpecies", args.list);
+break;
+}
+                case "show-spinner": {showLoadingSpinner(500);
+break;
+}
+                case "spawning": {displayWarmUpMessage();
+break;
+}
+                case "total-records": {updatePagination(args.total, args.offset);
+break;
+}
+                case "unsaved-records": {window.electron.unsavedRecords(true);
+document.getElementById("unsaved-icon").classList.remove("d-none");
+break;
+}
+                case "update-audio-duration": {DIAGNOSTICS["Audio Duration"] ??= 0;
+DIAGNOSTICS["Audio Duration"] += args.value;
+break;
+}
+                case "update-summary": {updateSummary(args);
+break;
+}
+                case "worker-loaded-audio": {onWorkerLoadedAudio(args);
+break;
+}
+                default: {alert(`Unrecognised message from worker:${args.event}`);
+}
             }
         })
     })
@@ -1604,7 +1632,7 @@ function unpackNameAttr(el, cname) {
 function getSpecies(target) {
     const row = target.closest('tr');
     const speciesCell = row.querySelector('.cname .cname');
-    const species = speciesCell.innerText.split('\n')[0];
+    const species = speciesCell.textContent.split('\n')[0];
     return species;
 }
 
@@ -1618,7 +1646,7 @@ document.addEventListener('change', function (e) {
     if (target.closest('#bird-list-seen')){
         // Clear the results table
         // const resultTable = document.getElementById('resultTableBody');
-        // resultTable.innerText = '';
+        // resultTable.textContent = '';
         const cname = target.value;
         let pickerEl = context + 'Range';
         t0 = Date.now();
@@ -1661,11 +1689,11 @@ function getDateOfISOWeek(w) {
 function onChartData(args) {
     const genTime = Date.now() - t0;
     const genTimeElement = document.getElementById('genTime');
-    genTimeElement.innerText = (genTime / 1000).toFixed(1) + ' seconds';
+    genTimeElement.textContent = (genTime / 1000).toFixed(1) + ' seconds';
     if (args.species) {
         showElement(['recordsTableBody'], false);
         const title = document.getElementById('speciesName');
-        title.innerText = args.species;
+        title.textContent = args.species;
     } else {
         hideElement(['recordsTableBody']);
     }
@@ -1682,13 +1710,13 @@ function onChartData(args) {
     for (const [key, value] of Object.entries(records)) {
         const element = document.getElementById(key);
         if (value?.constructor === Array) {
-            if (isNaN(value[0])) element.innerText = 'N/A';
+            if (isNaN(value[0])) element.textContent = 'N/A';
             else {
-                element.innerText = value[0].toString() + ' on ' +
+                element.textContent = value[0].toString() + ' on ' +
                     new Date(value[1]).toLocaleDateString(undefined, { dateStyle: "short" });
             }
         } else {
-            element.innerText = value ? new Date(value).toLocaleDateString(undefined, {
+            element.textContent = value ? new Date(value).toLocaleDateString(undefined, {
                 month: "short",
                 day: "numeric"
             }) : 'No Records';
@@ -1723,7 +1751,7 @@ function onChartData(args) {
           datasets: Object.entries(results).map(([year, data]) => ({
               label: year,
               //shift data to midday - midday rahter than nidnight to midnight if hourly chart and filter not set
-              data: aggregation !== 'Hour' ? data :  data.slice(12).concat(data.slice(0, 12)),
+              data: aggregation !== 'Hour' ? data :  data.slice(12).join(data.slice(0, 12)),
               //backgroundColor: 'rgba(255, 0, 64, 0.5)',
               borderWidth: 1,
               //borderColor: 'rgba(255, 0, 64, 0.9)',
@@ -1970,9 +1998,7 @@ function handleKeyDownDeBounce(e) {
 function handleKeyDown(e) {
     let action = e.code;
     if (action in GLOBAL_ACTIONS) {
-        if (document === e.target || document.body === e.target || e.target.attributes["data-action"]) {
-
-        }
+        if (document === e.target || document.body === e.target || e.target.attributes["data-action"]) {}
         GLOBAL_ACTIONS[action](e);
     }
 
@@ -2028,7 +2054,7 @@ function initSpectrogram(height, fftSamples) {
         windowFunc: 'hamming',
         minPxPerSec: 1,
         frequencyMin: 0,
-        frequencyMax: 11750,
+        frequencyMax: 11_750,
         normalize: false,
         hideScrollbar: true,
         labels: true,
@@ -2075,7 +2101,7 @@ listIcon.addEventListener('click', () => {
     const keys = Object.keys(states);
     for (let key in Object.keys(states)) {
         key = parseInt(key);
-        if (img.src.indexOf(keys[key]) !== -1) {
+        if (img.src.includes(keys[key])) {
             const replace = (key === keys.length - 1) ? 0 : key + 1;
             img.src = img.src.replace(keys[key], keys[replace]);
             img.title = states[keys[replace]];
@@ -2145,9 +2171,9 @@ const handleBackendChange = (e) => {
     }
     // Update threads and batch Size in UI
     ThreadSlider.value = config[config.backend].threads;
-    numberOfThreads.innerText = config[config.backend].threads;
+    numberOfThreads.textContent = config[config.backend].threads;
     batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
-    batchSizeValue.innerText = BATCH_SIZE_LIST[batchSizeSlider.value].toString();
+    batchSizeValue.textContent = BATCH_SIZE_LIST[batchSizeSlider.value].toString();
     updatePrefs();
     // restart wavesurfer regions to set new maxLength
     initRegion();
@@ -2600,17 +2626,15 @@ function onProgress(args) {
         fileNumber.innerHTML = args.text;
     } else {
         const count = fileList.indexOf(args.file) + 1;
-        fileNumber.innerText = `File ${count} of ${fileList.length}`;
+        fileNumber.textContent = `File ${count} of ${fileList.length}`;
     }
     if (args.progress) {
         let progress = Math.round(args.progress * 1000) / 10;
         updateProgress(progress);
-        if (progress === 100.0) {
+        if (progress === 100) {
             progressDiv.classList.add('d-none');
         }
-    } else {
-        //updateProgress(0)
-    }
+    } else {}
 }
 
 function updatePagination(total, offset) {
@@ -2722,9 +2746,9 @@ const pagination = document.querySelectorAll('.pagination');
 pagination.forEach(item => {
     item.addEventListener('click', (e) => {
         if (e.target.tagName === 'A') { // Did we click a link in the list?
-            let clicked = e.target.innerText;
+            let clicked = e.target.textContent;
             let currentPage = pagination[0].querySelector('.active');
-            currentPage = parseInt(currentPage.innerText);
+            currentPage = parseInt(currentPage.textContent);
             if (clicked === 'Previous') {
                 clicked = currentPage - 1
             } else if (clicked === 'Next') {
@@ -2871,7 +2895,7 @@ async function renderResult({
             shownDaylightBanner = true;
         }
         const commentHTML = comment ?
-            `<span title="${comment.replaceAll('\"', '&quot;')}" class='material-symbols-outlined pointer'>comment</span>` : '';
+            `<span title="${comment.replaceAll('"', '&quot;')}" class='material-symbols-outlined pointer'>comment</span>` : '';
         const isUncertain = score < 65 ? '&#63;' : '';
         // result.filename  and result.date used for feedback
         result.date = timestamp;
@@ -2889,7 +2913,7 @@ async function renderResult({
         const labelHTML = label ? tags[label] : '';
         const hide = selection ? 'd-none' : '';
         const countIcon = count > 1 ? `<span class="circle pointer" title="Click to view the ${count} detections at this timecode">${count}</span>` : '';
-        const XC_type = cname.indexOf('(song)') !== -1 ? "song" : "nocturnal flight call";
+        const XC_type = cname.includes('(song)') ? "song" : "nocturnal flight call";
         tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${end || position + 3}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
             <td class='text-start text-nowrap timeOfDay ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-start timestamp ${showTimestamp}">${UI_position} </td>
@@ -2978,18 +3002,18 @@ const deleteRecord = (target) => {
     const [file, start, end,] = unpackNameAttr(target);
     const setting = target.closest('table');
     const row = target.closest('tr');
-    let cname = target.querySelector('.cname').innerText;
+    let cname = target.querySelector('.cname').textContent;
     let [species, confidence] = cname.split('\n');
     // confirmed records don't have a confidence bar
     if (!confidence) {
         species =  species.slice(0, -9); // remove ' verified'
         confidence = 2000;
     } else { confidence = parseInt(confidence.replace('%', '')) * 10 }
-    const comment = target.querySelector('.comment').innerText;
-    const label = target.querySelector('.label').innerText;
-    let callCount = target.querySelector('.call-count').innerText;
+    const comment = target.querySelector('.comment').textContent;
+    const label = target.querySelector('.label').textContent;
+    let callCount = target.querySelector('.call-count').textContent;
     callCount = callCount.replace('Present', '');
-    DELETE_HISTORY.push([species, start, end, comment, callCount, label, null, null, null, confidence])
+    DELETE_HISTORY.push([species, start, end, comment, callCount, label, undefined, undefined, undefined, confidence])
 
     worker.postMessage({
         action: 'delete',
@@ -3138,7 +3162,7 @@ document.getElementById('usage').addEventListener('click', async () => {
 });
 
 const populateHelpModal = async (file, label) => {
-    document.getElementById('helpModalLabel').innerText = label;
+    document.getElementById('helpModalLabel').textContent = label;
     const response = await fetch(file);
     document.getElementById('helpModalBody').innerHTML = await response.text();
     const help = new bootstrap.Modal(document.getElementById('helpModal'));
@@ -3152,11 +3176,11 @@ document.getElementById('settingsMenu').addEventListener('click', (e) => {
 
 function setNocmig(on) {
     if (on) {
-        nocmigButton.innerText = 'nights_stay';
+        nocmigButton.textContent = 'nights_stay';
         nocmigButton.title = 'Nocmig mode on';
         nocmigButton.classList.add('text-info');
     } else {
-        nocmigButton.innerText = 'bedtime_off';
+        nocmigButton.textContent = 'bedtime_off';
         nocmigButton.title = 'Nocmig mode off';
         nocmigButton.classList.remove('text-info');
     }
@@ -3240,10 +3264,10 @@ const fullscreen = document.getElementById('fullscreen');
 const toggleFullscreen = () => {
     if (config.fullscreen) {
         config.fullscreen = false;
-        fullscreen.innerText = 'fullscreen';
+        fullscreen.textContent = 'fullscreen';
     } else {
         config.fullscreen = true;
-        fullscreen.innerText = 'fullscreen_exit';
+        fullscreen.textContent = 'fullscreen_exit';
     }
     updatePrefs();
     adjustSpecDims(true, 1024);
@@ -3299,7 +3323,7 @@ document.getElementById('zoomOut').addEventListener('click', zoomSpec);
 const batchSizeSlider = document.getElementById('batch-size');
 
 batchSizeSlider.addEventListener('input', (e) => {
-    batchSizeValue.innerText = BATCH_SIZE_LIST[batchSizeSlider.value].toString();
+    batchSizeValue.textContent = BATCH_SIZE_LIST[batchSizeSlider.value].toString();
 })
 batchSizeSlider.addEventListener('change', (e) => {
     config[config.backend].batchSize = BATCH_SIZE_LIST[e.target.value];
@@ -3336,7 +3360,7 @@ function showSortIcon() {
 
     [...speciesHeadings].forEach(heading => {
         heading.classList.toggle('d-none', !sortOrderScore);
-        if (sortOrderScore && STATE.sortOrder.indexOf('ASC') !== -1){
+        if (sortOrderScore && STATE.sortOrder.includes('ASC')){
             // Flip the sort icon
             heading.classList.add('flipped')
         } else {
@@ -3488,7 +3512,7 @@ function initialiseDatePicker() {
           });
         picker.on('select', (e) =>{
             const {start, end} = e.detail;
-            console.log('Range Selected! ', JSON.stringify(e.detail))
+            console.log('Range Selected!', JSON.stringify(e.detail))
             if (element.id === 'chartRange') {
                 STATE.chart.range = {start: start.getTime(), end: end.getTime()};
                 worker.postMessage({ action: 'update-state', chart: STATE.chart })
@@ -3552,10 +3576,10 @@ function initialiseDatePicker() {
         picker.on('hide', (e) =>{
             const id = STATE.mode === 'chart' ? 'chartRange' : 'exploreRange';
             const element = document.getElementById(id);
-            if (! element.innerText){
+            if (! element.textContent){
                 // It's blank
                 element.innerHTML = '<span class="material-symbols-outlined align-bottom">date_range</span><span>Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>';
-            } else if (element.innerText.indexOf('Apply') < 0){
+            } else if (element.textContent.includes('Apply')){
                 createDateClearButton(element, picker);
             }
         })
@@ -3567,7 +3591,7 @@ function createDateClearButton(element, picker){
     const span = document.createElement('span');
     span.classList.add('material-symbols-outlined', 'text-secondary', 'ps-2')
     element.appendChild(span);
-    span.innerText = 'cancel';
+    span.textContent = 'cancel';
     span.title = 'Clear date filter';
     span.id = element.id + '-clear';
     span.addEventListener('click', (e) =>{
@@ -3728,7 +3752,7 @@ const handleSNRchange = () => {
 const SNRThreshold = document.getElementById('SNR-threshold');
 const SNRSlider = document.getElementById('snrValue');
 SNRSlider.addEventListener('input', () => {
-    SNRThreshold.innerText = SNRSlider.value;
+    SNRThreshold.textContent = SNRSlider.value;
 });
 SNRSlider.addEventListener('change', handleSNRchange);
 
@@ -3743,7 +3767,7 @@ const handleHPchange = () => {
 const HPThreshold = document.getElementById('HP-threshold');
 const HPSlider = document.getElementById('HighPassFrequency');
 HPSlider.addEventListener('input', () => {
-    HPThreshold.innerText = HPSlider.value + 'Hz';
+    HPThreshold.textContent = HPSlider.value + 'Hz';
 });
 HPSlider.addEventListener('change', handleHPchange);
 
@@ -3759,7 +3783,7 @@ const handleLowShelfchange = () => {
 const LowShelfThreshold = document.getElementById('LowShelf-threshold');
 const LowShelfSlider = document.getElementById('lowShelfFrequency');
 LowShelfSlider.addEventListener('input', () => {
-    LowShelfThreshold.innerText = LowShelfSlider.value + 'Hz';
+    LowShelfThreshold.textContent = LowShelfSlider.value + 'Hz';
 });
 LowShelfSlider.addEventListener('change', handleLowShelfchange);
 
@@ -3777,14 +3801,14 @@ const lowShelfAttenuationThreshold = document.getElementById('attenuation-thresh
 lowShelfAttenuation.addEventListener('change', handleAttenuationchange);
 
 lowShelfAttenuation.addEventListener('input', () => {
-    lowShelfAttenuationThreshold.innerText = lowShelfAttenuation.value + 'dB';
+    lowShelfAttenuationThreshold.textContent = lowShelfAttenuation.value + 'dB';
 });
 
 // number of threads
 const numberOfThreads = document.getElementById('threads-value');
 const ThreadSlider = document.getElementById('thread-slider');
 ThreadSlider.addEventListener('input', () => {
-    numberOfThreads.innerText = ThreadSlider.value;
+    numberOfThreads.textContent = ThreadSlider.value;
 });
 ThreadSlider.addEventListener('change', () => {
     config[config.backend].threads = ThreadSlider.valueAsNumber;
@@ -3852,7 +3876,7 @@ function getSnameFromCname(cname) {
             return labels[i].split('_')[0];
         }
     }
-    return null; // Substring not found in any item
+    return ; // Substring not found in any item
 }
 
 document.addEventListener('click', function (e) {
@@ -3906,7 +3930,7 @@ async function createContextMenu(e) {
         </a>
     `;
     const modalTitle = document.getElementById('record-entry-modal-label');
-    modalTitle.innerText = `${createOrEdit} Record`;
+    modalTitle.textContent = `${createOrEdit} Record`;
     if (!hideInSelection) {
         const contextAnalyseSelectionLink = document.getElementById('context-analyse-selection');
         contextAnalyseSelectionLink.addEventListener('click', getSelectionResults);
@@ -3922,7 +3946,7 @@ async function createContextMenu(e) {
         exporLink.addEventListener('click', exportAudio);
     if (!hideInSelection) {
         document.getElementById('create-manual-record').addEventListener('click', function (e) {
-            if (e.target.innerText.indexOf('Edit') !== -1) {
+            if (e.target.textContent.includes('Edit')) {
                 showRecordEntryForm('Update', !!hideInSummary);
             } else {
                 showRecordEntryForm('Add', !!hideInSummary);
@@ -3934,13 +3958,13 @@ async function createContextMenu(e) {
         let cname;
         if (hideInSummary) {
             const row = target.closest('tr');
-            cname = row.querySelector('.cname .cname').innerText;
+            cname = row.querySelector('.cname .cname').textContent;
         } else {
             cname = region.attributes.label.replace('?', '');
         }
         const sname = getSnameFromCname(cname);
-        const XC_type = cname.indexOf('(song)') !== -1 ? "song" :
-            cname.indexOf('call)') !== -1 ? "nocturnal flight call" : "";
+        const XC_type = cname.includes('(song)') ? "song" :
+            cname.includes('call)') ? "nocturnal flight call" : "";
         xc.href = `https://xeno-canto.org/explore?query=${sname}%20type:"${XC_type}`;
         xc.classList.remove('d-none');
     }
@@ -3986,13 +4010,13 @@ const recordEntryForm = document.getElementById('record-entry-form');
 let focusBirdList;
 
 async function showRecordEntryForm(mode, batch) {
-    const cname = batch ? document.querySelector('#speciesFilter .text-warning .cname .cname').innerText : region.attributes.label.replace('?', '');
+    const cname = batch ? document.querySelector('#speciesFilter .text-warning .cname .cname').textContent : region.attributes.label.replace('?', '');
     let callCount = '', typeIndex = '', commentText = '';
     if (cname && activeRow) {
         // Populate the form with existing values
         commentText = activeRow.querySelector('.comment > span')?.title || '';
-        callCount = activeRow.querySelector('.call-count').innerText.replace('Present', '');
-        typeIndex = ['Local', 'Nocmig', ''].indexOf(activeRow.querySelector('.label').innerText);
+        callCount = activeRow.querySelector('.call-count').textContent.replace('Present', '');
+        typeIndex = ['Local', 'Nocmig', ''].indexOf(activeRow.querySelector('.label').textContent);
     }
     const recordEntryBirdList = recordEntryForm.querySelector('#record-entry-birdlist');
     focusBirdList = () => {
@@ -4007,7 +4031,7 @@ async function showRecordEntryForm(mode, batch) {
     recordEntryForm.querySelector('#DBmode').value = mode;
     recordEntryForm.querySelector('#batch-mode').value = batch;
     recordEntryForm.querySelector('#original-id').value = cname;
-    recordEntryForm.querySelector('#record-add').innerText = mode;
+    recordEntryForm.querySelector('#record-add').textContent = mode;
     if (typeIndex) recordEntryForm.querySelectorAll('input[name="record-label"]')[typeIndex].checked = true;
     recordEntryModalDiv.addEventListener('shown.bs.modal', focusBirdList)
     toggleKeyDownForFormInputs()
@@ -4046,7 +4070,7 @@ const insertManualRecord = (cname, start, end, comment, count, label, action, ba
         start: start?.toFixed(3),
         end: end?.toFixed(3),
         comment: comment,
-        count: count || null,
+        count: count || undefined,
         file: files,
         label: label,
         DBaction: action,

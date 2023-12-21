@@ -1,6 +1,6 @@
 const tf = require('@tensorflow/tfjs-node');
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 let DEBUG = false;
 let BACKEND;
 
@@ -15,7 +15,7 @@ let BLOCKED_IDS = [];
 let SUPPRESSED_IDS = [];
 let ENHANCED_IDS = [];
 const CONFIG = {
-    sampleRate: 48000, specLength: 3, sigmoid: 1.0,
+    sampleRate: 48_000, specLength: 3, sigmoid: 1,
 };
 
 
@@ -24,128 +24,136 @@ onmessage = async (e) => {
     let response;
     try {
         switch (modelRequest) {
-            case 'load':
-                const version = e.data.model;
-                if (DEBUG) console.log('load request to worker');
-                const {
-                    height,
-                    width,
-                    labels,
-                    location
-                } = JSON.parse(fs.readFileSync(path.join(__dirname, `../${version}_model_config.json`), 'utf8'));
-                const appPath = '../' + location + '/';
-                const list = e.data.list;
-                const batch = e.data.batchSize;
-                const backend = e.data.backend;
-                labels.push(...MYSTERIES);
-                postMessage({ message: 'labels', labels: labels });
-                if (DEBUG) console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
-                tf.setBackend(backend).then(async () => {
-                    if (backend === 'webgl') {
-                        tf.env().set('WEBGL_FORCE_F16_TEXTURES', true);
-                        tf.env().set('WEBGL_PACK', true);
-                        tf.env().set('WEBGL_EXP_CONV', true);
-                        tf.env().set('TOPK_K_CPU_HANDOFF_THRESHOLD', 128)
-                        tf.env().set('TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD', 0);
-                    }
-                    tf.enableProdMode();
-                    if (DEBUG) {
-                        console.log(tf.env());
-                        console.log(tf.env().getFlags());
-                    }
-                    myModel = new Model(appPath, list, version);
-                    myModel.height = height;
-                    myModel.width = width;
-                    myModel.labels = labels;
-                    await myModel.loadModel();
-                    postMessage({ message: 'update-list', blocked: BLOCKED_IDS, updateResults: false });
-                    myModel.warmUp(batch);
-                    BACKEND = tf.getBackend();
-                    postMessage({
-                        message: 'model-ready',
-                        sampleRate: myModel.config.sampleRate,
-                        chunkLength: myModel.chunkLength,
-                        backend: tf.getBackend(),
-                        labels: labels
-                    })
-
-                });
-                break;
-            case 'predict':
-                //const t0 = performance.now();
-                if (myModel.model_loaded) { //test here, as after abort, model is null
-                    const { chunks, start, fileStart, file, snr, confidence, worker, context, resetResults } = e.data;
-                    myModel.useContext = context;
-                    myModel.selection = !resetResults;
-                    const [result, filename, startPosition]  = await myModel.predictChunk(chunks, start, fileStart, file, snr, confidence / 1000);
-                    response = {
-                        message: 'prediction',
-                        file: filename,
-                        result: result,
-                        fileStart: startPosition,
-                        worker: worker,
-                        selection: myModel.selection
-                    };
-                    postMessage(response);
-                    // reset the results
-                    myModel.result = [];
-                }
-                break;
-            case 'get-spectrogram':
-                const buffer = e.data.buffer;
-                // Only consider full specs
-                if (buffer.length < myModel.chunkLength) return;
-                const specFile = e.data.file;
-                const filepath = e.data.filepath;
-                const spec_height = e.data.height;
-                const spec_width = e.data.width;
-                let image;
-                const signal = tf.tensor1d(buffer, 'float32');
-                const bufferTensor = myModel.normalise_audio(signal);
-                signal.dispose();
-                // const mymax = tf.max(bufferTensor).dataSync()
-                // const mymin = tf.min(bufferTensor).dataSync()
-                const imageTensor = tf.tidy(() => {
-                    return myModel.makeSpectrogram(bufferTensor);
-                });
-                image = tf.tidy(() => {
-                    let spec = myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), spec_height, spec_width);
-                    const spec_max = tf.max(spec);
-                    return spec.mul(255).div(spec_max).dataSync();
-                });
-                bufferTensor.dispose();
-                imageTensor.dispose();
-                response = {
-                    message: 'spectrogram',
-                    width: myModel.inputShape[2],
-                    height: myModel.inputShape[1],
-                    channels: myModel.inputShape[3],
-                    image: image,
-                    file: specFile,
-                    filepath: filepath
-                };
-                postMessage(response);
-                break;
-            case 'list':
-                myModel.list = e.data.list;
-                if (DEBUG) console.log(`Setting list to ${myModel.list}`);
-                myModel.setList();
-                postMessage({ message: 'update-list', blocked: BLOCKED_IDS, updateResults: true });
-                break;
+            case "load": {const version = e.data.model;
+if (DEBUG) {
+    console.log("load request to worker");
+}
+const { height: height, width: width, labels: labels, location: location } = JSON.parse(fs.readFileSync(path.join(__dirname, `../${version}_model_config.json`), "utf8"));
+const appPath = "../" + location + "/";
+const list = e.data.list;
+const batch = e.data.batchSize;
+const backend = e.data.backend;
+labels.push(...MYSTERIES);
+postMessage({
+    message: "labels",
+    labels: labels
+});
+if (DEBUG) {
+    console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
+}
+tf.setBackend(backend).then(async () => {
+    if (backend === "webgl") {
+        tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
+        tf.env().set("WEBGL_PACK", true);
+        tf.env().set("WEBGL_EXP_CONV", true);
+        tf.env().set("TOPK_K_CPU_HANDOFF_THRESHOLD", 128);
+        tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 0);
+    }
+    tf.enableProdMode();
+    if (DEBUG) {
+        console.log(tf.env());
+        console.log(tf.env().getFlags());
+    }
+    myModel = new Model(appPath, list, version);
+    myModel.height = height;
+    myModel.width = width;
+    myModel.labels = labels;
+    await myModel.loadModel();
+    postMessage({
+        message: "update-list",
+        blocked: BLOCKED_IDS,
+        updateResults: false
+    });
+    myModel.warmUp(batch);
+    BACKEND = tf.getBackend();
+    postMessage({
+        message: "model-ready",
+        sampleRate: myModel.config.sampleRate,
+        chunkLength: myModel.chunkLength,
+        backend: tf.getBackend(),
+        labels: labels
+    });
+});
+break;
+}
+            case "predict": {if (myModel.model_loaded) {
+    const { chunks: chunks, start: start, fileStart: fileStart, file: file, snr: snr, confidence: confidence, worker: worker, context: context, resetResults: resetResults } = e.data;
+    myModel.useContext = context;
+    myModel.selection =  !resetResults;
+    const [result,filename,startPosition] = await myModel.predictChunk(chunks, start, fileStart, file, snr, confidence / 1000);
+    response = {
+        message: "prediction",
+        file: filename,
+        result: result,
+        fileStart: startPosition,
+        worker: worker,
+        selection: myModel.selection
+    };
+    postMessage(response);
+    myModel.result = [];
+}
+break;
+}
+            case "get-spectrogram": {const buffer = e.data.buffer;
+if (buffer.length < myModel.chunkLength) {
+    return;
+}
+const specFile = e.data.file;
+const filepath = e.data.filepath;
+const spec_height = e.data.height;
+const spec_width = e.data.width;
+let image;
+const signal = tf.tensor1d(buffer, "float32");
+const bufferTensor = myModel.normalise_audio(signal);
+signal.dispose();
+const imageTensor = tf.tidy(() => {
+    return myModel.makeSpectrogram(bufferTensor);
+});
+image = tf.tidy(() => {
+    let spec = myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), spec_height, spec_width);
+    const spec_max = tf.max(spec);
+    return spec.mul(255).div(spec_max).dataSync();
+});
+bufferTensor.dispose();
+imageTensor.dispose();
+response = {
+    message: "spectrogram",
+    width: myModel.inputShape[2],
+    height: myModel.inputShape[1],
+    channels: myModel.inputShape[3],
+    image: image,
+    file: specFile,
+    filepath: filepath
+};
+postMessage(response);
+break;
+}
+            case "list": {myModel.list = e.data.list;
+if (DEBUG) {
+    console.log(`Setting list to ${myModel.list}`);
+}
+myModel.setList();
+postMessage({
+    message: "update-list",
+    blocked: BLOCKED_IDS,
+    updateResults: true
+});
+break;
+}
         }
     }
     // If worker was respawned
-    catch (e) {
-        console.log(e)
+    catch (error) {
+        console.log(error)
     }
 };
 
 class Model {
     constructor(appPath, list, version) {
-        this.model = null;
-        this.labels = null;
-        this.height = null;
-        this.width = null;
+        this.model = undefined;
+        this.labels = undefined;
+        this.height = undefined;
+        this.width = undefined;
         this.config = CONFIG;
         this.chunkLength = this.config.sampleRate * this.config.specLength;
         this.model_loaded = false;
@@ -153,7 +161,7 @@ class Model {
         this.frame_step = 186;
         this.appPath = appPath;
         this.list = list;
-        this.useContext = null;
+        this.useContext = undefined;
         this.version = version;
         this.selection = false;
     }
@@ -162,7 +170,7 @@ class Model {
         if (DEBUG) console.log('loading model')
         if (this.model_loaded === false) {
             // Model files must be in a different folder than the js, assets files
-            if (DEBUG) console.log('loading model from ', this.appPath + 'model.json')
+            if (DEBUG) console.log('loading model from', this.appPath + 'model.json')
             this.model = await tf.loadLayersModel(this.appPath + 'model.json',
                 { weightPathPrefix: this.appPath });
             this.model_loaded = true;
@@ -177,7 +185,7 @@ class Model {
         if (tf.getBackend() === 'webgl') {
             tf.tidy(() => {
                 //const warmupResult = this.model.predict(tf.zeros(this.inputShape), { batchSize: this.batchSize });
-                const warmupResult = this.model.predict(tf.zeros([1,144000]), { batchSize: this.batchSize });
+                const warmupResult = this.model.predict(tf.zeros([1,144_000]), { batchSize: this.batchSize });
                 warmupResult.arraySync();
                 // see if we can get padding compiled at this point
                 //this.padBatch(tf.zeros([1, this.inputShape[1], this.inputShape[2], this.inputShape[3]]), { batchSize: this.batchSize })
@@ -312,7 +320,7 @@ class Model {
             const keysTensor = tf.stack(keys); // + 1 tensor
             const snr = this.getSNR(TensorBatch)
             const condition = tf.greaterEqual(snr, threshold); // + 1 tensor
-            if (DEBUG) console.log('SNR is: ', snr.dataSync())
+            if (DEBUG) console.log('SNR is:', snr.dataSync())
             snr.dispose();
             // Avoid mask cannot be scalar error at end of predictions
             let newCondition;
@@ -469,7 +477,7 @@ class SimpleSpecLayer extends tf.layers.Layer {
     }
 
     build(inputShape) {
-        this.mag_scale = this.addWeight('magnitude_scaling', [], 'float32', tf.initializers.constant({value: 1.0}));
+        this.mag_scale = this.addWeight('magnitude_scaling', [], 'float32', tf.initializers.constant({value: 1}));
       }
 
     computeOutputShape(inputShape) { return [inputShape[0], this.spec_shape[0], this.spec_shape[1], 1]; }
@@ -485,10 +493,10 @@ class SimpleSpecLayer extends tf.layers.Layer {
         spec = tf.cast(spec, 'float32');
 
         // Convert to power spectrogram
-        spec = tf.pow(spec, 2.0)
+        spec = tf.pow(spec, 2)
 
         // Convert magnitudes using nonlinearity
-        spec = tf.pow(spec, tf.div(1.0, tf.add(1.0, tf.exp(this.mag_scale.read()))))
+        spec = tf.pow(spec, tf.div(1, tf.add(1, tf.exp(this.mag_scale.read()))))
 
         // Normalize values between 0 and 1
         //spec = tf.div(tf.sub(spec, tf.min(spec)), tf.max(spec));
@@ -527,7 +535,7 @@ class GlobalLogExpPooling2D extends tf.layers.Layer {
     }
 
     build(inputShape) {
-        this.sharpness = this.addWeight('sharpness', [1], 'float32', tf.initializers.constant({value: 2.0}));
+        this.sharpness = this.addWeight('sharpness', [1], 'float32', tf.initializers.constant({value: 2}));
     }
 
     computeOutputShape(inputShape) { return [inputShape[0], inputShape[3]]; }
@@ -551,7 +559,7 @@ class SigmoidLayer extends tf.layers.Layer {
     }
 
     build(inputShape) {
-        this.kernel = this.addWeight('scale_factor', [1], 'float32', tf.initializers.constant({value: 1.0}));
+        this.kernel = this.addWeight('scale_factor', [1], 'float32', tf.initializers.constant({value: 1}));
     }
 
     computeOutputShape(inputShape) { return inputShape; }
