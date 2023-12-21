@@ -1,10 +1,10 @@
 const {contextBridge, ipcRenderer} = require("electron");
-const fs = require('fs');
+const fs = require('node:fs');
 const colormap = require("colormap");
-const p = require('path');
+const p = require('node:path');
 const SunCalc = require('suncalc');
 const {v4: uuidv4} = require("uuid");
-const os = require('os')
+const os = require('node:os')
 
 // We need to wait until the UI  is ready to receive the message before
 // sending the port. We create this promise in the preload, so it's guaranteed

@@ -1,15 +1,14 @@
 const { ipcRenderer } = require('electron');
-const fs = require('fs');
+const fs = require('node:fs');
 const wavefileReader = require('wavefile-reader');
-const p = require('path');
+const p = require('node:path');
 const SunCalc = require('suncalc');
 const ffmpeg = require('fluent-ffmpeg');
 const png = require('fast-png');
-const { writeFile, mkdir, readdir } = require('node:fs/promises');
+const { writeFile, mkdir, readdir, stat } = require('node:fs/promises');
 const { utimesSync } = require('utimes');
-const stream = require("stream");
+const stream = require("node:stream");
 const staticFfmpeg = require('ffmpeg-static-electron');
-const { stat } = require("fs/promises");
 const {writeToPath} = require('@fast-csv/format');
 import { State } from './state.js';
 import { sqlite3 } from './database.js';
@@ -94,8 +93,7 @@ const createDB = async (file) => {
         // If the db is not ready
         while (code === "SQLITE_BUSY") {
             console.log("Disk DB busy")
-            setTimeout(() => {
-            }, 10);
+            setTimeout(() => {}, 10);
             let response = await db.runAsync(`ATTACH '${filename}' as disk`);
             code = response.code;
         }
@@ -144,7 +142,7 @@ async function loadDB(path) {
 
 let metadata = {};
 let index = 0, AUDACITY = {}, predictionStart;
-let sampleRate = 48000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
+let sampleRate = 48_000;  // Value obtained from model.js CONFIG, however, need default here to permit file loading before model.js response
 let predictWorkers = [], aborted = false;
 let audioCtx;
 // Set up the audio context:
@@ -177,7 +175,11 @@ const dirInfo = async ({ folder = undefined, recursive = false }) => {
         }
         return 0;
     });
-    const size = (await Promise.all(paths)).flat(Infinity).reduce((i, size) => i + size, 0);
+    const pathResults = await Promise.all(paths);
+    const flattenedPaths = pathResults.flat(Infinity);
+    const size = flattenedPaths.reduce((i, size) => i + size, 0);
+
+    //const size = (await Promise.all(paths)).flat(Infinity).reduce((i, size) => i + size, 0);
     // Newest to oldest file, so we can pop the list (faster)
     ctimes.sort((a, b) => {
         return a[1] - b[1]
@@ -223,134 +225,139 @@ const clearCache = async (fileCache, sizeLimitInGB) => {
 async function handleMessage(e) {
     const args = e.data;
     const action = args.action;
-    console.log('message received ', action)
+    console.log('message received', action)
     switch (action) {
-        case 'abort':
-            onAbort(args);
-            break;
-        case 'analyse':
-            predictionsReceived = {};
-            predictionsRequested = {};
-            await onAnalyse(args);
-            break;
-        case 'change-mode':
-            onChangeMode(args.mode);
-            break;
-        case 'chart':
-            await onChartRequest(args);
-            break;
-        case 'clear-cache':
-            CACHE_LOCATION = p.join(TEMP, 'chirpity');
-            fs.existsSync(CACHE_LOCATION) || fs.mkdirSync(CACHE_LOCATION);
-            await clearCache(CACHE_LOCATION, 0);  // belt and braces - in dev mode, ctrl-c in console will prevent cache clear on exit
-            break;
-        case 'convert-dataset':
-            convertSpecsFromExistingSpecs();
-            break;
-        case 'create-dataset':
-            saveResults2DataSet(args);
-            break;
-        case 'delete':
-            await onDelete(args)
-            break;
-        case 'delete-species':
-            await onDeleteSpecies(args)
-            break;
-        case 'export-results':
-            await getResults(args);
-            break;
-        case 'file-load-request':
-            index = 0;
-            filesBeingProcessed.length && onAbort(args);
-            console.log('Worker received audio ' + args.file);
-            await loadAudioFile(args);
-            metadata[args.file].isSaved ? onChangeMode('archive') : onChangeMode('analyse');
-            break;
-        case 'filter':
-            if (STATE.db) {
-                t0 = Date.now()
-                UI.postMessage({event: 'show-spinner'});
-                await getResults(args);
-                const t1 = Date.now()
-                args.updateSummary && await getSummary(args);
-                const t2 = Date.now()
-                await getTotal(args);
-                //await Promise.all([getResults(args), getSummary(args)]);
-                console.log('Filter took ', (Date.now() - t0) / 1000, 'seconds', '\nGetTotal took ', (Date.now() - t2) / 1000, 'seconds', '\nGetSummary took ', (t2 - t1) / 1000, 'seconds')
-            }
-            break;
-        case 'get-detected-species-list':
-            getSpecies();
-            break;
-        case 'get-locations':
-            getLocations({ db: STATE.db, file: args.file });
-            break;
-        case 'get-valid-files-list':
-            await getFiles(args.files)
-            break;
-        case 'insert-manual-record':
-            const count = await onInsertManualRecord(args);
-            // if (STATE.mode !== 'explore' && !args.batch) {
-
-            // }
-            break;
-        case 'load-model':
-            SEEN_LABELS = false;
-            SEEN_MODEL_READY = false;
-            UI.postMessage({ event: 'spawning' });
-            if (args.model === 'v3') {
-                BATCH_SIZE = 1;
-                sampleRate = 48000;
-            } else {
-                BATCH_SIZE = parseInt(args.batchSize);
-                sampleRate = 24000;
-            }
-            setAudioContext(sampleRate);
-            memoryDB = null;
-            BACKEND = args.backend;
-            STATE.update({ model: args.model });
-            predictWorkers.length && terminateWorkers();
-            spawnWorkers(args.model, args.list, BATCH_SIZE, args.threads);
-            break;
-        case 'post':
-            await uploadOpus(args);
-            break;
-        case 'purge-file':
-            onFileDelete(args.fileName);
-            break;
-        case 'save':
-            console.log("file save requested")
-            await saveAudio(args.file, args.start, args.end, args.filename, args.metadata);
-            break;
-        case 'save2db':
-            await onSave2DiskDB(args);
-            break;
-        case 'set-custom-file-location':
-            onSetCustomLocation(args);
-            break;
-        case 'update-buffer':
-            await loadAudioFile(args);
-            break;
-        case 'update-file-start':
-            await onUpdateFileStart(args)
-            break;
-        case 'update-list':
-            UI.postMessage({event: 'show-spinner'});
-            SEEN_LIST_UPDATE = false;
-            predictWorkers.forEach(worker =>
-                worker.postMessage({ message: 'list', list: args.list }))
-            break;
-        case 'update-state':
-            // This pattern to only update variables that have values
-            // latitude = args.lat || latitude;
-            // longitude = args.lon || longitude;
-            TEMP = args.temp || TEMP;
-            appPath = args.path || appPath;
-            STATE.update(args);
-            // Need to recompile prepared sql if changeing sortOrder
-            break;
-        default:
-            UI.postMessage('Worker communication lines open')
+        case "abort": {onAbort(args);
+break;
+}
+        case "analyse": {predictionsReceived = {};
+predictionsRequested = {};
+await onAnalyse(args);
+break;
+}
+        case "change-mode": {onChangeMode(args.mode);
+break;
+}
+        case "chart": {await onChartRequest(args);
+break;
+}
+        case "clear-cache": {CACHE_LOCATION = p.join(TEMP, "chirpity");
+fs.existsSync(CACHE_LOCATION) || fs.mkdirSync(CACHE_LOCATION);
+await clearCache(CACHE_LOCATION, 0);
+break;
+}
+        case "convert-dataset": {convertSpecsFromExistingSpecs();
+break;
+}
+        case "create-dataset": {saveResults2DataSet(args);
+break;
+}
+        case "delete": {await onDelete(args);
+break;
+}
+        case "delete-species": {await onDeleteSpecies(args);
+break;
+}
+        case "export-results": {await getResults(args);
+break;
+}
+        case "file-load-request": {index = 0;
+filesBeingProcessed.length && onAbort(args);
+console.log("Worker received audio " + args.file);
+await loadAudioFile(args);
+metadata[args.file].isSaved ? onChangeMode("archive") : onChangeMode("analyse");
+break;
+}
+        case "filter": {if (STATE.db) {
+    t0 = Date.now();
+    UI.postMessage({
+        event: "show-spinner"
+    });
+    await getResults(args);
+    const t1 = Date.now();
+    args.updateSummary && await getSummary(args);
+    const t2 = Date.now();
+    await getTotal(args);
+    console.log("Filter took", (Date.now() - t0) / 1000, "seconds", "GetTotal took", (Date.now() - t2) / 1000, "seconds", "GetSummary took", (t2 - t1) / 1000, "seconds");
+}
+break;
+}
+        case "get-detected-species-list": {getSpecies();
+break;
+}
+        case "get-locations": {getLocations({
+    db: STATE.db,
+    file: args.file
+});
+break;
+}
+        case "get-valid-files-list": {await getFiles(args.files);
+break;
+}
+        case "insert-manual-record": {const count = await onInsertManualRecord(args);
+break;
+}
+        case "load-model": {SEEN_LABELS = false;
+SEEN_MODEL_READY = false;
+UI.postMessage({
+    event: "spawning"
+});
+if (args.model === "v3") {
+    BATCH_SIZE = 1;
+    sampleRate = 48_000;
+}  else {
+    BATCH_SIZE = parseInt(args.batchSize);
+    sampleRate = 24_000;
+}
+setAudioContext(sampleRate);
+memoryDB = undefined;
+BACKEND = args.backend;
+STATE.update({
+    model: args.model
+});
+predictWorkers.length && terminateWorkers();
+spawnWorkers(args.model, args.list, BATCH_SIZE, args.threads);
+break;
+}
+        case "post": {await uploadOpus(args);
+break;
+}
+        case "purge-file": {onFileDelete(args.fileName);
+break;
+}
+        case "save": {console.log("file save requested");
+await saveAudio(args.file, args.start, args.end, args.filename, args.metadata);
+break;
+}
+        case "save2db": {await onSave2DiskDB(args);
+break;
+}
+        case "set-custom-file-location": {onSetCustomLocation(args);
+break;
+}
+        case "update-buffer": {await loadAudioFile(args);
+break;
+}
+        case "update-file-start": {await onUpdateFileStart(args);
+break;
+}
+        case "update-list": {UI.postMessage({
+    event: "show-spinner"
+});
+SEEN_LIST_UPDATE = false;
+predictWorkers.forEach((worker) => worker.postMessage({
+    message: "list",
+    list: args.list
+}));
+break;
+}
+        case "update-state": {TEMP = args.temp || TEMP;
+appPath = args.path || appPath;
+STATE.update(args);
+break;
+}
+        default: {UI.postMessage("Worker communication lines open");
+}
     }
 }
 
@@ -381,7 +388,7 @@ const getFiles = async (files, image) => {
         const stats = fs.lstatSync(files[i])
         if (stats.isDirectory()) {
             const dirFiles = await getFilesInDirectory(files[i])
-            file_list = file_list.concat(dirFiles)
+            file_list = [...file_list,...dirFiles]
         } else {
             file_list.push(files[i])
         }
@@ -586,10 +593,10 @@ const prepResultsStatement = (species, noLimit) => {
         comment,
         end,
         callCount,
-        rankvb 
+        rank
       FROM 
         ranked_records 
-        WHERE confidence_rank <= ? `;
+        WHERE rank <= ? `;
     if (species) resultStatement+=  ` AND  cname = ? `;
     
     const limitClause = noLimit ? '' : 'LIMIT ?  OFFSET ?';
@@ -671,7 +678,7 @@ async function onAnalyse({
         }
 
     }
-    console.log("FILE_QUEUE has ", FILE_QUEUE.length, 'files', count, 'files ignored')
+    console.log("FILE_QUEUE has", FILE_QUEUE.length, 'files', count, 'files ignored')
     STATE.selection || onChangeMode('analyse');
 
     filesBeingProcessed = [...FILE_QUEUE];
@@ -707,7 +714,7 @@ const getDuration = async (src) => {
         audio.src = src;
         audio.addEventListener("loadedmetadata", function () {
             const duration = audio.duration;
-            audio = null;
+            audio = undefined;
             // Tidy up - cloning removes event listeners
             const old_element = document.getElementById("audio");
             const new_element = old_element.cloneNode(true);
@@ -720,7 +727,7 @@ const getDuration = async (src) => {
 
 const convertFileFormat = (file, destination, size, error) => {
     return new Promise(function (resolve) {
-        const sampleRate = 24000, channels = 1;
+        const sampleRate = 24_000, channels = 1;
         let totalTime;
         ffmpeg(file)
             .audioChannels(channels)
@@ -756,7 +763,7 @@ const convertFileFormat = (file, destination, size, error) => {
                 DEBUG && console.log('FFmpeg command: ' + commandLine);
             })
             .on('end', () => {
-                UI.postMessage({ event: 'progress', text: 'File decompressed', progress: 1.0 })
+                UI.postMessage({ event: 'progress', text: 'File decompressed', progress: 1 })
                 resolve(destination)
             })
             .save(destination)
@@ -798,7 +805,7 @@ async function getWorkingFile(file) {
             const statsObj = fs.statSync(source_file);
             const sourceMtime = statsObj.mtime;
             proxy = await convertFileFormat(source_file, destination, statsObj.size, function (errorMessage) {
-                console.log('An error occurred converting to wav: ', errorMessage);
+                console.log('An error occurred converting to wav:', errorMessage);
                 return true;
             });
             // assign the source file's save time to the proxy file
@@ -888,8 +895,8 @@ async function loadAudioFile({
                     goToRegion
                 }, [audioArray.buffer]);
             })
-            .catch(e => {
-                console.log(e);
+            .catch(error => {
+                console.log(error);
             })
     }
 }
@@ -1123,7 +1130,7 @@ async function setupCtx(chunk, header) {
 const getPredictBuffers = async ({
     file = '', start = 0, end = undefined, worker = undefined
 }) => {
-    let chunkLength = 72000;
+    let chunkLength = 72_000;
     // Ensure max and min are within range
     start = Math.max(0, start);
     end = Math.min(metadata[file].duration, end);
@@ -1175,11 +1182,11 @@ const getPredictBuffers = async ({
                 chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
                 // Now the async stuff is done ==>
                 readStream.resume();
-            }).catch((err) => {
-                console.error(`PredictBuffer rendering failed: ${err}, file ${file}`);
+            }).catch((error) => {
+                console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
                 const fileIndex = filesBeingProcessed.indexOf(file);
                 if (fileIndex !== -1) {
-                    canBeRemovedFromCache.concat(filesBeingProcessed.splice(fileIndex, 1))
+                    canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
                 }
                 // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
             });
@@ -1217,7 +1224,7 @@ const fetchAudioBuffer = async ({
     if (end - start < 0.1) return  // prevents dataset creation barfing with  v. short buffers
     const proxy = metadata[file].proxy;
     if (!proxy) return false
-    return new Promise(async (resolve) => {
+    return new Promise(resolve => {
         const byteStart = convertTimeToBytes(start, metadata[file]);
         const byteEnd = convertTimeToBytes(end, metadata[file]);
 
@@ -1240,8 +1247,8 @@ const fetchAudioBuffer = async ({
                 // use resampled.getChannelData(x) to get an Float32Array for channel x.
                 readStream.resume();
                 resolve(resampled);
-            }).catch((err) => {
-                console.error(`FetchAudio rendering failed: ${err}`);
+            }).catch((error) => {
+                console.error(`FetchAudio rendering failed: ${error}`);
                 // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
             });
         })
@@ -1348,7 +1355,7 @@ const convertSpecsFromExistingSpecs = async (path) => {
 }
 
 const saveResults2DataSet = ({species}) => {
-    const rootDirectory = '/media/matt/36A5CC3B5FA245852/additions';
+    const rootDirectory = '/media/matt/Data';
     const height = 256, width = 384;
     let t0 = Date.now()
     let promise = Promise.resolve();
@@ -1399,7 +1406,7 @@ const saveResults2DataSet = ({species}) => {
                 const folders = p.dirname(result.file).split(p.sep); //.match(/^.*\/(.*)$/)
                 species = result.cname.replaceAll(' ', '_');
                 const sname = result.sname.replaceAll(' ', '_');
-                const folder = `${sname}~${species}`;
+                const folder = adding_chirpity_additions ? 'No_call' : `${sname}~${species}`;
                 // get start and end from timestamp
                 const start = result.position;
                 let end = start + 3;
@@ -1481,7 +1488,7 @@ const bufferToAudio = ({
     let quality = parseInt(STATE.audio.quality);
     let downmix = STATE.audio.downmix;
     format ??= STATE.audio.format;
-    const bitrateMap = { 24000: '24k', 16000: '16k', 12000: '12k', 8000: '8k', 44100: '44k', 22050: '22k', 11025: '11k' };
+    const bitrateMap = { 24_000: '24k', 16_000: '16k', 12_000: '12k', 8000: '8k', 44_100: '44k', 22_050: '22k', 11_025: '11k' };
     if (format === 'mp3') {
         audioCodec = 'libmp3lame';
         soundFormat = 'mp3';
@@ -1655,7 +1662,7 @@ const insertRecord = async (timestamp, key, speciesID, confidence, file) => {
     let res = await db.getAsync('SELECT id FROM files WHERE name = ?', file);
     if (!res) {
         res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,? )',
-            null, file, metadata[file].duration, metadata[file].fileStart, null);
+            undefined, file, metadata[file].duration, metadata[file].fileStart, undefined);
         fileID = res.lastID;
         changes = 1;
     } else {
@@ -1669,7 +1676,7 @@ const insertRecord = async (timestamp, key, speciesID, confidence, file) => {
     }
     await db.runAsync('INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?)',
         metadata[file].fileStart + offset, key, fileID, speciesID, confidence,
-        null, null, key + 3, null, isDaylight);
+        undefined, undefined, key + 3, undefined, isDaylight);
 }
 
 async function batchInsertRecords(cname, label, files, originalCname) {
@@ -1732,7 +1739,7 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     // Manual records can be added off the bat, so there may be no record of the file in either db
         fileStart = metadata[file].fileStart;
         res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,? )',
-            fileID, file, metadata[file].duration, fileStart, null);
+            fileID, file, metadata[file].duration, fileStart, undefined);
         fileID = res.lastID;
         changes = 1;
         let durationSQL = Object.entries(metadata[file].dateDuration)
@@ -1783,8 +1790,7 @@ const parsePredictions = async (response) => {
             if (confidence < 0.05) break;
             let speciesID = speciesIDArray[j];
             confidence *= 1000;
-            updateUI = (confidence > STATE.detect.confidence &&
-                STATE.blocked.indexOf(speciesID) === -1);
+            updateUI = (confidence > STATE.detect.confidence && ! STATE.blocked.includes(speciesID));
             //save all results to  db, regardless of confidence
             STATE.selection || await insertRecord(timestamp, key, speciesID, confidence, file);
             if (STATE.selection || updateUI) {
@@ -1849,63 +1855,68 @@ let SEEN_LABELS = false, SEEN_MODEL_READY = false;
 async function parseMessage(e) {
     const response = e.data;
     switch (response['message']) {
-        case 'labels':
-            t0 = Date.now();
-            LABELS = response['labels'];
-            // Now we have what we need to populate a database...
-            // Load the archive db
-            if (!SEEN_LABELS) {
-                SEEN_LABELS = true;
-                await loadDB(appPath);
-                memoryDB || await createDB();
-            }
-            break;
-        case 'model-ready':
-            if (!SEEN_MODEL_READY) {
-                SEEN_MODEL_READY = true;
-                sampleRate = response['sampleRate'];
-                const backend = response['backend'];
-                console.log(backend);
-                UI.postMessage({ event: 'model-ready', message: 'ready', backend: backend, labels: LABELS, sampleRate: sampleRate })
-            }
-            break;
-        case 'prediction':
-            if (!aborted) {
-                predictWorkers[response.worker].isAvailable = true;
-                let worker = await parsePredictions(response);
-                //if (response['finished']) {
-
-                //process.stdout.write(`FILE QUEUE: ${FILE_QUEUE.length}, ${response.file},  Prediction requests ${predictionsRequested[response.file]}, predictions received ${predictionsReceived[response.file]}    \n`)
-                if (predictionsReceived[response.file] === predictionsRequested[response.file]) {
-                    const limit = 10;
-                    clearCache(CACHE_LOCATION, limit);
-                    if (filesBeingProcessed.length) {
-                        processNextFile({ worker: worker });
-                    } else if (!STATE.selection) {
-                        getSummary();
-                        UI.postMessage({event: 'analysis-complete'})
-                    }
-                }
-            }
-            break;
-        case 'spectrogram':
-            onSpectrogram(response['filepath'], response['file'], response['width'], response['height'], response['image'], response['channels'])
-            break;
-        case 'update-list':
-            if (!SEEN_LIST_UPDATE) {
-                SEEN_LIST_UPDATE = true;
-                STATE.update({ blocked: response.blocked, globalOffset: 0 });
-
-                if (response['updateResults'] && STATE.db) {
-                    // update-results called after setting migrants list, so DB may not be initialized
-                    await Promise.all([getResults(), getSummary()] );
-                    if (['explore', 'chart'].includes(STATE.mode)) {
-                        // Update the seen species list
-                        getSpecies();
-                    }
-                }
-            }
-            break;
+        case "labels": {t0 = Date.now();
+LABELS = response["labels"];
+if ( !SEEN_LABELS) {
+    SEEN_LABELS = true;
+    await loadDB(appPath);
+    memoryDB || await createDB();
+}
+break;
+}
+        case "model-ready": {if ( !SEEN_MODEL_READY) {
+    SEEN_MODEL_READY = true;
+    sampleRate = response["sampleRate"];
+    const backend = response["backend"];
+    console.log(backend);
+    UI.postMessage({
+        event: "model-ready",
+        message: "ready",
+        backend: backend,
+        labels: LABELS,
+        sampleRate: sampleRate
+    });
+}
+break;
+}
+        case "prediction": {if ( !aborted) {
+    predictWorkers[response.worker].isAvailable = true;
+    let worker = await parsePredictions(response);
+    if (predictionsReceived[response.file] === predictionsRequested[response.file]) {
+        const limit = 10;
+        clearCache(CACHE_LOCATION, limit);
+        if (filesBeingProcessed.length) {
+            processNextFile({
+                worker: worker
+            });
+        }  else if ( !STATE.selection) {
+            getSummary();
+            UI.postMessage({
+                event: "analysis-complete"
+            });
+        }
+    }
+}
+break;
+}
+        case "spectrogram": {onSpectrogram(response["filepath"], response["file"], response["width"], response["height"], response["image"], response["channels"]);
+break;
+}
+        case "update-list": {if ( !SEEN_LIST_UPDATE) {
+    SEEN_LIST_UPDATE = true;
+    STATE.update({
+        blocked: response.blocked,
+        globalOffset: 0
+    });
+    if (response["updateResults"] && STATE.db) {
+        await Promise.all([getResults(), getSummary()]);
+        if (["explore", "chart"].includes(STATE.mode)) {
+            getSpecies();
+        }
+    }
+}
+break;
+}
     }
 }
 
@@ -1917,8 +1928,8 @@ function updateFilesBeingProcessed(file) {
     // This method to determine batch complete
     const fileIndex = filesBeingProcessed.indexOf(file);
     if (fileIndex !== -1) {
-        canBeRemovedFromCache.concat(filesBeingProcessed.splice(fileIndex, 1))
-        UI.postMessage({ event: 'progress', progress: 1.0, file: file })
+        canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
+        UI.postMessage({ event: 'progress', progress: 1, file: file })
     }
     if (!filesBeingProcessed.length) {
         if (!STATE.selection) getSummary();
@@ -1938,9 +1949,7 @@ async function processNextFile({
         // }
         const found = await getWorkingFile(file);
         if (found) {
-            if (end) {
-                // If we have an end value already, we're analysing a selection
-            }
+            if (end) {}
             let boundaries = [];
             if (!start) boundaries = await setStartEnd(file);
             else boundaries.push({ start: start, end: end });
@@ -2081,7 +2090,7 @@ const getSummary = async ({
     const params = getSummaryParams(species);
     const summary = await STATE.GET_SUMMARY_SQL.allAsync(...params);
 
-    DEBUG && console.log("Get Summary took", (Date.now() - t0) / 1000, " seconds");
+    DEBUG && console.log("Get Summary took", (Date.now() - t0) / 1000, "seconds");
     const event = interim ? 'update-summary' : 'summary-complate';
     UI.postMessage({
         event: event,
@@ -2137,7 +2146,7 @@ const getResults = async ({
         // CSV export. Format the values
         const formattedValues = result.map(formatCSVValues);
         // Create a write stream for the CSV file
-        let filename = species ? species : 'All';
+        let filename = species || 'All';
         filename += '_detections.csv';
         const filePath = p.join(exportTo, filename);
         writeToPath(filePath, formattedValues, {headers: true})
@@ -2508,7 +2517,7 @@ const onUpdateFileStart = async (args) => {
     let result;
     if (!row) {
         console.log('File not found in database, adding.');
-        await db.runAsync('INSERT INTO files (id, name, duration, filestart) values (?, ?, ?, ?)', null, file, metadata[file].duration, args.start);
+        await db.runAsync('INSERT INTO files (id, name, duration, filestart) values (?, ?, ?, ?)', undefined, file, metadata[file].duration, args.start);
         // If no file, no records, so we're done.
     }
     else {
@@ -2603,16 +2612,16 @@ async function onChartRequest(args) {
             .then((result) => {
                 dataRecords.earliestSpring = result['minDate'];
                 dataRecords.latestSpring = result['maxDate'];
-            }).catch((message) => {
-                console.log(message)
+            }).catch((error) => {
+                console.log(error)
             })
 
         await getSeasonRecords(args.species, 'autumn')
             .then((result) => {
                 dataRecords.earliestAutumn = result['minDate'];
                 dataRecords.latestAutumn = result['maxDate'];
-            }).catch((message) => {
-                console.log(message)
+            }).catch((error) => {
+                console.log(error)
             })
 
         console.log(`Season chart generation took ${(Date.now() - t0) / 1000} seconds`)
@@ -2620,8 +2629,8 @@ async function onChartRequest(args) {
         await getMostCalls(args.species)
             .then((row) => {
                 row ? dataRecords.mostDetections = [row.count, row.date] : dataRecords.mostDetections = ['N/A', 'Not detected'];
-            }).catch((message) => {
-                console.log(message)
+            }).catch((error) => {
+                console.log(error)
             })
 
         console.log(`Most calls  chart generation took ${(Date.now() - t0) / 1000} seconds`)
@@ -2652,8 +2661,8 @@ async function onChartRequest(args) {
                 }
             }
             return [dataPoints, aggregation]
-        }).catch((message) => {
-            console.log(message)
+        }).catch((error) => {
+            console.log(error)
         })
 
     console.log(`Chart series generation took ${(Date.now() - t0) / 1000} seconds`)
@@ -2662,7 +2671,7 @@ async function onChartRequest(args) {
     let total, rate;
     if (dataPoints === 52) [total, rate] = await getRate(args.species)
     console.log(`Chart rate generation took ${(Date.now() - t0) / 1000} seconds`)
-    const pointStart = dateRange.start ? dateRange.start : Date.UTC(2020, 0, 0, 0, 0, 0);
+    const pointStart = dateRange.start ??= Date.UTC(2020, 0, 0, 0, 0, 0);
     UI.postMessage({
         event: 'chart-data', // Restore species name
         species: args.species ? args.species.replace("''", "'") : undefined,
@@ -2709,7 +2718,7 @@ async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
     } else {
         const result = await db.runAsync(`
         INSERT INTO locations VALUES (?, ?, ?, ?)
-            ON CONFLICT(lat,lon) DO UPDATE SET place = excluded.place`, null, lat, lon, place);
+            ON CONFLICT(lat,lon) DO UPDATE SET place = excluded.place`, undefined, lat, lon, place);
         const { id } = await db.getAsync(`SELECT ID FROM locations WHERE lat = ? AND lon = ?`, lat, lon);
         for (const file of files) {
             await db.runAsync('UPDATE files SET locationID = ? WHERE name = ?', id, file);

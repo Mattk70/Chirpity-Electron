@@ -2,8 +2,8 @@ const { app, dialog, ipcMain, MessageChannelMain, BrowserWindow, globalShortcut 
 const { autoUpdater } = require("electron-updater")
 const log = require('electron-log');
 
-const fs = require("fs");
-const path = require('path');
+const fs = require("node:fs");
+const path = require('node:path');
 const settings = require('electron-settings');
 
 //require('update-electron-app')();
@@ -168,14 +168,14 @@ async function exitHandler(options, exitCode) {
 }
 
 //do something when app is closing
-process.on('exit', exitHandler.bind(null, { cleanup: true }));
+process.on('exit', exitHandler.bind(undefined, { cleanup: true }));
 //catches ctrl+c event (but not in main process!)
-process.on('SIGINT', exitHandler.bind(null, { exit: true }));
+process.on('SIGINT', exitHandler.bind(undefined, { exit: true }));
 // catches "kill pid" (for example: nodemon restart)
-process.on('SIGUSR1', exitHandler.bind(null, { exit: true }));
-process.on('SIGUSR2', exitHandler.bind(null, { exit: true }));
+process.on('SIGUSR1', exitHandler.bind(undefined, { exit: true }));
+process.on('SIGUSR2', exitHandler.bind(undefined, { exit: true }));
 //catches uncaught exceptions
-process.on('uncaughtException', exitHandler.bind(null, { exit: true }));
+process.on('uncaughtException', exitHandler.bind(undefined, { exit: true }));
 
 let mainWindow;
 let workerWindow;
@@ -206,8 +206,7 @@ async function windowStateKeeper(windowName) {
         windowState.isMaximized = window.isMaximized();
         try {
             await settings.set(`windowState.${windowName}`, windowState);
-        } catch (error) {
-        }
+        } catch (error){}
     }
     
     function track(win) {
@@ -316,7 +315,7 @@ async function createWorker() {
     await workerWindow.loadFile('worker.html');
     
     workerWindow.on('closed', () => {
-        workerWindow = null;
+        workerWindow = undefined;
     });
     if (DEBUG) workerWindow.webContents.openDevTools();
     console.log("worker created");
@@ -335,7 +334,7 @@ app.whenReady().then(async () => {
         const filePath = path.join(app.getPath('userData'), 'config.json');
         
         // Read the contents of the file synchronously
-        const fileContent = fs.readFileSync(filePath, 'utf-8');
+        const fileContent = fs.readFileSync(filePath, 'utf8');
         const config = JSON.parse(fileContent);
         DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
         console.log('CI mode' , process.env.CI)
@@ -374,7 +373,7 @@ app.whenReady().then(async () => {
     
     app.on('open-file', (event, path) => {
         files.push(path);
-        console.log('file passed to open: ', path)
+        console.log('file passed to open:', path)
     });
     
     
@@ -413,7 +412,7 @@ app.on('activate', async () => {
         await createWindow();
     }
     
-    if (workerWindow == null) {
+    if (workerWindow == undefined) {
         await createWorker();
     }
 });
@@ -422,9 +421,9 @@ ipcMain.handle('request-worker-channel', async (_event) =>{
            // Create a new channel ...
            const { port1, port2 } = new MessageChannelMain()
            // ... send one end to the worker ...
-           workerWindow.webContents.postMessage('new-client', null, [port1])
+           workerWindow.webContents.postMessage('new-client', undefined, [port1])
            // ... and the other end to the UI window.
-           mainWindow.webContents.postMessage('provide-worker-channel', null, [port2])
+           mainWindow.webContents.postMessage('provide-worker-channel', undefined, [port2])
            // Now the main window and the worker can communicate with each other
            // without going through the main process!
 })
@@ -485,8 +484,8 @@ ipcMain.handle('saveFile', (event, arg) => {
                 console.log('Saved!');
             });
         }
-    }).catch(err => {
-        console.log(err)
+    }).catch(error => {
+        console.log(error)
     });
     mainWindow.webContents.send('saveFile', { message: 'file saved!' });
 });
