@@ -19,11 +19,12 @@ let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on every change
 
-const DEBUG = true;
+const DEBUG = false;
 
 const DATASET = true;
-const adding_chirpity_additions = true;
+const adding_chirpity_additions = false;
 const dataset_database = DATASET;
+const DATASET_SAVE_LOCATION = '/media/matt/36A5CC3B5FA24585/DATASETS/BEST_MODEL_pngs/';
 
 
 if (DEBUG) console.log(staticFfmpeg.path);
@@ -636,7 +637,7 @@ async function onAnalyse({
     }
 
     let count = 0;
-    if (DATASET  && !STATE.selection) {
+    if (DATASET  && !STATE.selection && !reanalyse) {
         for (let i = FILE_QUEUE.length - 1; i >= 0; i--) {
             let file = FILE_QUEUE[i];
             //STATE.db = diskDB;
@@ -1241,8 +1242,7 @@ const fetchAudioBuffer = async ({
             // Ensure data is processed in order
             readStream.pause();
             const offlineCtx = await setupCtx(chunk, metadata[file].header);
-
-            offlineCtx.startRendering().then(resampled => {
+            offlineCtx?.startRendering().then(resampled => {
                 // `resampled` contains an AudioBuffer resampled at 24000Hz.
                 // use resampled.getChannelData(x) to get an Float32Array for channel x.
                 readStream.resume();
@@ -1355,7 +1355,7 @@ const convertSpecsFromExistingSpecs = async (path) => {
 }
 
 const saveResults2DataSet = ({species}) => {
-    const rootDirectory = '/media/matt/Data';
+    const rootDirectory = DATASET_SAVE_LOCATION;
     const height = 256, width = 384;
     let t0 = Date.now()
     let promise = Promise.resolve();
@@ -1382,9 +1382,9 @@ const saveResults2DataSet = ({species}) => {
         db2ResultSQL += ` AND species.cname = ?`;
         params.push(species)
     }
-    memoryDB.each(db2ResultSQL, ...params, async (err, result) => {
+    diskDB.each(db2ResultSQL, ...params, async (err, result) => {
         // Check for level of ambient noise activation
-        let ambient, threshold, value = 50;
+        let ambient, threshold, value = STATE.detect.confidence;
         // adding_chirpity_additions is a flag for curated files, if true we assume every detection is correct
         if (!adding_chirpity_additions) {
             //     ambient = (result.sname2 === 'Ambient Noise' ? result.score2 : result.sname3 === 'Ambient Noise' ? result.score3 : false)
@@ -1396,7 +1396,7 @@ const saveResults2DataSet = ({species}) => {
             // Check whether top predicted species matches folder (i.e. the searched for species)
             // species not matching the top prediction sets threshold to 2, effectively doing nothing with results
             // that don't match the searched for species
-            threshold = speciesMatch(result.file, result.sname) ? value : 200;
+            threshold = speciesMatch(result.file, result.sname) ? value : 2000;
         } else {
             threshold = 0;
         }
@@ -1933,6 +1933,7 @@ function updateFilesBeingProcessed(file) {
     }
     if (!filesBeingProcessed.length) {
         if (!STATE.selection) getSummary();
+        UI.postMessage({event: 'processing-complete'})
     }
 }
 

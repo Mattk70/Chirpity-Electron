@@ -1533,6 +1533,10 @@ break;
                 case "progress": {onProgress(args);
 break;
 }
+                case "processing-complete": {        
+                    progressDiv.classList.add('d-none');
+break;
+}
                 case "seen-species-list": {generateBirdList("seenSpecies", args.list);
 break;
 }
@@ -2624,6 +2628,9 @@ function onProgress(args) {
     progressDiv.classList.remove('d-none');
     if (args.text) {
         fileNumber.innerHTML = args.text;
+        if (args.text.includes('decompressed')) {
+            progressDiv.classList.add('d-none');
+        }
     } else {
         const count = fileList.indexOf(args.file) + 1;
         fileNumber.textContent = `File ${count} of ${fileList.length}`;
@@ -2710,6 +2717,9 @@ function onResultsComplete({active = undefined} = {}){
         activeRow.focus();
         activeRow.click();
     }
+    // hide progress div
+    progressDiv.classList.add('d-none');
+    
 }
 
 function onAnalysisComplete(){
