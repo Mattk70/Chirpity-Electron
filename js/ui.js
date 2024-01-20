@@ -2632,6 +2632,7 @@ function onProgress(args) {
             progressDiv.classList.add('d-none');
         }
     } else {
+        progressDiv.classList.remove('d-none');
         const count = fileList.indexOf(args.file) + 1;
         fileNumber.textContent = `File ${count} of ${fileList.length}`;
     }
@@ -2639,9 +2640,11 @@ function onProgress(args) {
         let progress = Math.round(args.progress * 1000) / 10;
         updateProgress(progress);
         if (progress === 100) {
-            progressDiv.classList.add('d-none');
+            //progressDiv.classList.add('d-none');
         }
-    } else {}
+    } else {
+        progressDiv.classList.remove('d-none');
+    }
 }
 
 function updatePagination(total, offset) {
@@ -3012,16 +3015,16 @@ const deleteRecord = (target) => {
     const [file, start, end,] = unpackNameAttr(target);
     const setting = target.closest('table');
     const row = target.closest('tr');
-    let cname = target.querySelector('.cname').textContent;
+    let cname = target.querySelector('.cname').innerText;
     let [species, confidence] = cname.split('\n');
     // confirmed records don't have a confidence bar
     if (!confidence) {
         species =  species.slice(0, -9); // remove ' verified'
         confidence = 2000;
     } else { confidence = parseInt(confidence.replace('%', '')) * 10 }
-    const comment = target.querySelector('.comment').textContent;
-    const label = target.querySelector('.label').textContent;
-    let callCount = target.querySelector('.call-count').textContent;
+    const comment = target.querySelector('.comment').innerText;
+    const label = target.querySelector('.label').innerText;
+    let callCount = target.querySelector('.call-count').innerText;
     callCount = callCount.replace('Present', '');
     DELETE_HISTORY.push([species, start, end, comment, callCount, label, undefined, undefined, undefined, confidence])
 

@@ -22,9 +22,9 @@ let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on ever
 const DEBUG = false;
 
 const DATASET = true;
-const adding_chirpity_additions = false;
+const adding_chirpity_additions = true;
 const dataset_database = DATASET;
-const DATASET_SAVE_LOCATION = '/media/matt/36A5CC3B5FA24585/DATASETS/BEST_MODEL_pngs/';
+const DATASET_SAVE_LOCATION = "E:/DATASETS/BEST_MODEL_pngs";
 
 
 if (DEBUG) console.log(staticFfmpeg.path);
@@ -490,7 +490,9 @@ const getTotal = async ({species = undefined, offset = 0}) => {
     const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
     const useRange = range?.start;
     let SQL = ` WITH MaxConfidencePerDateTime AS (
-                    SELECT confidence FROM records `;
+                    SELECT confidence,
+                    RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
+                    FROM records `;
     // if (['analyse', 'archive'].includes(STATE.mode)) {
     //     SQL += ' JOIN files on files.id = records.fileid ';
     // }
@@ -508,7 +510,7 @@ const getTotal = async ({species = undefined, offset = 0}) => {
     //     params.push(...STATE.filesToAnalyse)
     // }
     SQL += ' ) '
-    SQL += `SELECT COUNT(confidence) AS total FROM MaxConfidencePerDateTime`;
+    SQL += `SELECT COUNT(confidence) AS total FROM MaxConfidencePerDateTime WHERE rank <= ${STATE.topRankin}`;
 
     const {total} = await STATE.db.getAsync(SQL, ...params)
     UI.postMessage({event: 'total-records', total: total, offset: offset, species: species})
@@ -1223,7 +1225,7 @@ const fetchAudioBuffer = async ({
     file = '', start = 0, end = metadata[file].duration
 }) => {
     if (end - start < 0.1) return  // prevents dataset creation barfing with  v. short buffers
-    const proxy = metadata[file].proxy;
+    const proxy = metadata[file]?.proxy || await getWorkingFile(file);
     if (!proxy) return false
     return new Promise(resolve => {
         const byteStart = convertTimeToBytes(start, metadata[file]);
@@ -1242,15 +1244,19 @@ const fetchAudioBuffer = async ({
             // Ensure data is processed in order
             readStream.pause();
             const offlineCtx = await setupCtx(chunk, metadata[file].header);
-            offlineCtx?.startRendering().then(resampled => {
-                // `resampled` contains an AudioBuffer resampled at 24000Hz.
-                // use resampled.getChannelData(x) to get an Float32Array for channel x.
-                readStream.resume();
-                resolve(resampled);
-            }).catch((error) => {
-                console.error(`FetchAudio rendering failed: ${error}`);
-                // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
-            });
+            if (offlineCtx){
+                offlineCtx.startRendering().then(resampled => {
+                    // `resampled` contains an AudioBuffer resampled at 24000Hz.
+                    // use resampled.getChannelData(x) to get an Float32Array for channel x.
+                    readStream.resume();
+                    resolve(resampled);
+                }).catch((error) => {
+                    console.error(`FetchAudio rendering failed: ${error}`);
+                    // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
+                });
+            }
+            // if the was a problem setting up the context remove the file from the files list
+            offlineCtx || updateFilesBeingProcessed(file)
         })
 
         readStream.on('end', function () {
@@ -1361,7 +1367,7 @@ const saveResults2DataSet = ({species}) => {
     let promise = Promise.resolve();
     let promises = [];
     let count = 0;
-    let db2ResultSQL = `SELECT DISTINCT dateTime AS timestamp, 
+    let db2ResultSQL = `SELECT dateTime AS timestamp, 
     files.duration, 
     files.filestart,
     files.name AS file, 
@@ -1382,7 +1388,7 @@ const saveResults2DataSet = ({species}) => {
         db2ResultSQL += ` AND species.cname = ?`;
         params.push(species)
     }
-    diskDB.each(db2ResultSQL, ...params, async (err, result) => {
+    STATE.db.each(db2ResultSQL, ...params, async (err, result) => {
         // Check for level of ambient noise activation
         let ambient, threshold, value = STATE.detect.confidence;
         // adding_chirpity_additions is a flag for curated files, if true we assume every detection is correct
@@ -1394,11 +1400,10 @@ const saveResults2DataSet = ({species}) => {
             //         value = 0.7
             //     }
             // Check whether top predicted species matches folder (i.e. the searched for species)
-            // species not matching the top prediction sets threshold to 2, effectively doing nothing with results
-            // that don't match the searched for species
+            // species not matching the top prediction sets threshold to 2000, effectively limiting treatment to manual records
             threshold = speciesMatch(result.file, result.sname) ? value : 2000;
         } else {
-            threshold = 0;
+            threshold = result.sname === "Ambient_Noise" ? 0 : 2000;
         }
         promise = promise.then(async function () {
             let score = result.score;
@@ -1406,7 +1411,8 @@ const saveResults2DataSet = ({species}) => {
                 const folders = p.dirname(result.file).split(p.sep); //.match(/^.*\/(.*)$/)
                 species = result.cname.replaceAll(' ', '_');
                 const sname = result.sname.replaceAll(' ', '_');
-                const folder = adding_chirpity_additions ? 'No_call' : `${sname}~${species}`;
+                // score 2000 when manual id. if manual ID when doing  additions put it in the species folder
+                const folder = adding_chirpity_additions && score !== 2000 ? 'No_call' : `${sname}~${species}`;
                 // get start and end from timestamp
                 const start = result.position;
                 let end = start + 3;
@@ -1653,31 +1659,31 @@ const terminateWorkers = () => {
     predictWorkers = [];
 }
 
-const insertRecord = async (timestamp, key, speciesID, confidence, file) => {
-    const isDaylight = isDuringDaylight(timestamp, STATE.lat, STATE.lon);
-    const offset = key * 1000;
-    let changes, fileID;
-    confidence = Math.round(confidence);
-    const db = memoryDB; //STATE.db;
-    let res = await db.getAsync('SELECT id FROM files WHERE name = ?', file);
-    if (!res) {
-        res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,? )',
-            undefined, file, metadata[file].duration, metadata[file].fileStart, undefined);
-        fileID = res.lastID;
-        changes = 1;
-    } else {
-        fileID = res.id;
-    }
-    if (changes) {
-        const durationSQL = Object.entries(metadata[file].dateDuration)
-            .map(entry => `(${entry.toString()},${fileID})`).join(',');
-        // No "OR IGNORE" in this statement because it should only run when the file is new
-        await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
-    }
-    await db.runAsync('INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?)',
-        metadata[file].fileStart + offset, key, fileID, speciesID, confidence,
-        undefined, undefined, key + 3, undefined, isDaylight);
-}
+// const insertRecord = async (timestamp, key, speciesID, confidence, file) => {
+//     const isDaylight = isDuringDaylight(timestamp, STATE.lat, STATE.lon);
+//     const offset = key * 1000;
+//     let changes, fileID;
+//     confidence = Math.round(confidence);
+//     const db = STATE.db;
+//     let res = await db.getAsync('SELECT id FROM files WHERE name = ?', file);
+//     if (!res) {
+//         res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,? )',
+//             undefined, file, metadata[file].duration, metadata[file].fileStart, undefined);
+//         fileID = res.lastID;
+//         changes = 1;
+//     } else {
+//         fileID = res.id;
+//     }
+//     if (changes) {
+//         const durationSQL = Object.entries(metadata[file].dateDuration)
+//             .map(entry => `(${entry.toString()},${fileID})`).join(',');
+//         // No "OR IGNORE" in this statement because it should only run when the file is new
+//         await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
+//     }
+//     await db.runAsync('INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?)',
+//         metadata[file].fileStart + offset, key, fileID, speciesID, confidence,
+//         undefined, undefined, key + 3, undefined, isDaylight);
+// }
 
 async function batchInsertRecords(cname, label, files, originalCname) {
     const db = STATE.db;
@@ -1772,12 +1778,51 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     })
 }
 
+const generateInsertQuery = async (latestResult, file) => {
+    const db = STATE.db;
+    let insertQuery = 'INSERT INTO records VALUES ';
+    let fileID, changes;
+    let res = await db.getAsync('SELECT id FROM files WHERE name = ?', file);
+    if (!res) {
+        res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,? )',
+            undefined, file, metadata[file].duration, metadata[file].fileStart, undefined);
+        fileID = res.lastID;
+        changes = 1;
+    } else {
+        fileID = res.id;
+    }
+    if (changes) {
+        const durationSQL = Object.entries(metadata[file].dateDuration)
+            .map(entry => `(${entry.toString()},${fileID})`).join(',');
+        // No "OR IGNORE" in this statement because it should only run when the file is new
+        await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
+    }
+    let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
+    for (let i = 0; i < keysArray.length; i++) {
+        const key = parseFloat(keysArray[i]);
+        const timestamp = metadata[file].fileStart + key * 1000;
+        const isDaylight = isDuringDaylight(timestamp, STATE.lat, STATE.lon);
+        const confidenceArray = confidenceBatch[i];
+        const speciesIDArray = speciesIDBatch[i];
+        for (let j = 0; j < confidenceArray.length; j++) {
+            const confidence = Math.round(confidenceArray[j] *= 1000);
+            if (confidence < 50) break;
+            const speciesID = speciesIDArray[j];
+            insertQuery += `(${timestamp}, ${key}, ${fileID}, ${speciesID}, ${confidence}, null, null, ${key + 3}, null, ${isDaylight}), `;
+        }
+    }
+    // Remove the trailing comma and space
+    insertQuery = insertQuery.slice(0, -2);
+    DEBUG && console.log(insertQuery);
+    await db.runAsync(insertQuery);
+    return fileID
+}
+
 const parsePredictions = async (response) => {
     let file = response.file;
     const latestResult = response.result, db = STATE.db;
     DEBUG && console.log('worker being used:', response.worker);
-
-
+    await generateInsertQuery(latestResult, file);
     let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
     for (let i = 0; i < keysArray.length; i++) {
         let updateUI = false;
@@ -1787,12 +1832,9 @@ const parsePredictions = async (response) => {
         const speciesIDArray = speciesIDBatch[i];
         for (let j = 0; j < confidenceArray.length; j++) {
             let confidence = confidenceArray[j];
-            if (confidence < 0.05) break;
+            if (confidence < 50) break;
             let speciesID = speciesIDArray[j];
-            confidence *= 1000;
             updateUI = (confidence > STATE.detect.confidence && ! STATE.blocked.includes(speciesID));
-            //save all results to  db, regardless of confidence
-            STATE.selection || await insertRecord(timestamp, key, speciesID, confidence, file);
             if (STATE.selection || updateUI) {
                 let end, confidenceRequired;
                 if (STATE.selection) {
@@ -1804,7 +1846,6 @@ const parsePredictions = async (response) => {
                     end = key + 3;
                     confidenceRequired = STATE.detect.confidence;
                 }
-
                 if (confidence >= confidenceRequired) {
                     const { cname } = await memoryDB.getAsync(`SELECT cname FROM species WHERE id = ${speciesID}`);
                     const result = {
@@ -1815,13 +1856,14 @@ const parsePredictions = async (response) => {
                         cname: cname,
                         score: confidence
                     }
-                    sendResult(++index, result, false)
+                    sendResult(++index, result, false);
+                    // Only show the highest confidence detection
+                    if (! STATE.selection) break;
                 };
             }
         }
     } 
 
-    //STATE.userSettingsInSelection = false;
     predictionsReceived[file]++;
     const received = sumObjectValues(predictionsReceived);
     const total = sumObjectValues(batchChunksToSend);
@@ -1883,7 +1925,7 @@ break;
     predictWorkers[response.worker].isAvailable = true;
     let worker = await parsePredictions(response);
     if (predictionsReceived[response.file] === predictionsRequested[response.file]) {
-        const limit = 10;
+        const limit = 100;
         clearCache(CACHE_LOCATION, limit);
         if (filesBeingProcessed.length) {
             processNextFile({
@@ -1989,10 +2031,7 @@ async function processNextFile({
 }
 
 function sumObjectValues(obj) {
-    return Object.values(obj).reduce((acc, value) => {
-        acc += value;
-        return acc;
-    }, 0);
+    return Object.values(obj).reduce((total, value) => total + value, 0);
 }
 
 function onSameDay(timestamp1, timestamp2) {
