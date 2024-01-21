@@ -1363,7 +1363,7 @@ window.onload = async () => {
             }
         });
         // Update model if old models in config
-        if (!['v2', 'v3', 'v4'].includes(config.model)) {
+        if (!['v2', 'v3', 'v4', 'v2.4'].includes(config.model)) {
             config.model = 'v2';
             updatePrefs()
         }

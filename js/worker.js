@@ -21,10 +21,19 @@ let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on ever
 
 const DEBUG = false;
 
-const DATASET = true;
+const DATASET = false;
 const adding_chirpity_additions = true;
 const dataset_database = DATASET;
 const DATASET_SAVE_LOCATION = "E:/DATASETS/BEST_MODEL_pngs";
+
+// Adapted from https://stackoverflow.com/questions/6117814/get-week-of-year-in-javascript-like-in-php
+Date.prototype.getWeekNumber = function(){
+    var d = new Date(Date.UTC(this.getFullYear(), this.getMonth(), this.getDate()));
+    var dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    var yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1)/7 * (48/52))
+  };
 
 
 if (DEBUG) console.log(staticFfmpeg.path);
@@ -1627,13 +1636,13 @@ async function saveAudio(file, start, end, filename, metadata, folder) {
 }
 
 
-/// Workers  From the MDN example
+/// Workers  From the MDN example5
 function spawnWorkers(model, list, batchSize, threads) {
     NUM_WORKERS = threads;
     // And be ready to receive the list:
     SEEN_LIST_UPDATE = false;
     for (let i = 0; i < threads; i++) {
-        const workerSrc = model === 'v3' ? 'BirdNet' : 'model';
+        const workerSrc = model === 'v3' ? 'BirdNet' : model === 'v2.4' ? 'BirdNet2.4' : 'model';
         const worker = new Worker(`./js/${workerSrc}.js`, { type: 'module' });
         worker.isAvailable = true;
         predictWorkers.push(worker)
@@ -1643,7 +1652,10 @@ function spawnWorkers(model, list, batchSize, threads) {
             model: model,
             list: list,
             batchSize: batchSize,
-            backend: BACKEND
+            backend: BACKEND,
+            lat: STATE.lat,
+            lon: STATE.lon,
+            week: -1 //new Date(1617229255088).getWeekNumber()
         })
         worker.onmessage = async (e) => {
             await parseMessage(e)
@@ -1780,7 +1792,7 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
 
 const generateInsertQuery = async (latestResult, file) => {
     const db = STATE.db;
-    let insertQuery = 'INSERT INTO records VALUES ';
+    let insertQuery = 'INSERT OR IGNORE INTO records VALUES ';
     let fileID, changes;
     let res = await db.getAsync('SELECT id FROM files WHERE name = ?', file);
     if (!res) {
@@ -1805,7 +1817,7 @@ const generateInsertQuery = async (latestResult, file) => {
         const confidenceArray = confidenceBatch[i];
         const speciesIDArray = speciesIDBatch[i];
         for (let j = 0; j < confidenceArray.length; j++) {
-            const confidence = Math.round(confidenceArray[j] *= 1000);
+            const confidence = Math.round(confidenceArray[j] * 1000);
             if (confidence < 50) break;
             const speciesID = speciesIDArray[j];
             insertQuery += `(${timestamp}, ${key}, ${fileID}, ${speciesID}, ${confidence}, null, null, ${key + 3}, null, ${isDaylight}), `;
@@ -1814,7 +1826,8 @@ const generateInsertQuery = async (latestResult, file) => {
     // Remove the trailing comma and space
     insertQuery = insertQuery.slice(0, -2);
     DEBUG && console.log(insertQuery);
-    await db.runAsync(insertQuery);
+    // Make sure we have some values to INSERT
+    insertQuery.endsWith(')') && await db.runAsync(insertQuery);
     return fileID
 }
 
@@ -1822,7 +1835,7 @@ const parsePredictions = async (response) => {
     let file = response.file;
     const latestResult = response.result, db = STATE.db;
     DEBUG && console.log('worker being used:', response.worker);
-    await generateInsertQuery(latestResult, file);
+    if (! STATE.selection) await generateInsertQuery(latestResult, file);
     let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
     for (let i = 0; i < keysArray.length; i++) {
         let updateUI = false;
@@ -1832,7 +1845,8 @@ const parsePredictions = async (response) => {
         const speciesIDArray = speciesIDBatch[i];
         for (let j = 0; j < confidenceArray.length; j++) {
             let confidence = confidenceArray[j];
-            if (confidence < 50) break;
+            if (confidence < 0.05) break;
+            confidence*=1000;
             let speciesID = speciesIDArray[j];
             updateUI = (confidence > STATE.detect.confidence && ! STATE.blocked.includes(speciesID));
             if (STATE.selection || updateUI) {
