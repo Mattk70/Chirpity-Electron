@@ -2089,6 +2089,7 @@ const updateListIcon = () => {
     const icon = listIcon.querySelector('img');
     icon.src = icon.src.replace(/\w+\.png$/, config.list + '.png');
     const states = {
+        location: 'Searching for birds in your region',
         migrants: 'Searching for migrants and owls',
         birds: 'Searching for all birds',
         everything: 'Searching for everything'
@@ -2098,6 +2099,7 @@ const updateListIcon = () => {
 listIcon.addEventListener('click', () => {
     let img = listIcon.querySelector('img')
     const states = {
+        location: 'Searching for birds in your region',
         migrants: 'Searching for migrants and owls',
         birds: 'Searching for all birds',
         everything: 'Searching for everything'
