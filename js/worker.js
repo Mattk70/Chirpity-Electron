@@ -24,7 +24,7 @@ const DEBUG = false;
 const DATASET = false;
 const adding_chirpity_additions = true;
 const dataset_database = DATASET;
-const DATASET_SAVE_LOCATION = "E:/DATASETS/BEST_MODEL_pngs";
+const DATASET_SAVE_LOCATION = "E:/DATASETS/BirdNET_pngs";
 
 // Adapted from https://stackoverflow.com/questions/6117814/get-week-of-year-in-javascript-like-in-php
 Date.prototype.getWeekNumber = function(){
