@@ -57,6 +57,9 @@ tf.setBackend(backend).then(async () => {
     myModel = new Model(appPath, list, version);
     myModel.height = height;
     myModel.width = width;
+    myModel.lat = parseFloat(e.data.lat);
+    myModel.lon = parseFloat(e.data.lon);
+    myModel.week = parseInt(e.data.week);
     myModel.labels = labels;
     await myModel.loadModel();
     postMessage({
@@ -128,11 +131,12 @@ response = {
 postMessage(response);
 break;
 }
-            case "list": {myModel.list = e.data.list;
+            case "list": {
+                myModel.list = e.data.list;
 if (DEBUG) {
     console.log(`Setting list to ${myModel.list}`);
 }
-myModel.setList();
+await myModel.setList();
 postMessage({
     message: "update-list",
     blocked: BLOCKED_IDS,
@@ -173,9 +177,14 @@ class Model {
             this.model = await tf.loadGraphModel(this.appPath + 'model.json',
                 { weightPathPrefix: this.appPath });
             this.model_loaded = true;
-            this.setList();
+            
             this.inputShape = [...this.model.inputs[0].shape];
-        }
+            this.metadata_model = await tf.loadGraphModel(path.join(
+                this.appPath, '..', 'BirdNET_GLOBAL_6K_V2.4_Model_TFJS', 'static', 'model', 'mdata', 'model.json'
+            ));
+            this.mdata_labels = JSON.parse(fs.readFileSync(path.join(__dirname, `..`, 'BirdNET_GLOBAL_6K_V2.4_Model_TFJS', 'static', 'model', 'labels.json'), "utf8")); 
+            await this.setList();
+            }
     }
 
     async warmUp(batchSize) {
@@ -191,9 +200,43 @@ class Model {
         return true;
     }
 
-    setList() {
+    async setList() {
         BLOCKED_IDS = [];
-        // get the indices of any items in the blacklist, GRAYLIST
+        if (this.list === "location") {
+            const lat = myModel.lat;
+            const lon = myModel.lon;
+            const week = myModel.week;
+            this.mdata_input = tf.tensor([lat, lon, week]).expandDims(0);
+            const mdata_prediction = this.metadata_model.predict(this.mdata_input);
+            const mdata_probs = await mdata_prediction.data();
+            //const mdata_probs_sorted = mdata_probs.slice().sort().reverse();
+            //console.log('<b>Most common species @ (' + lat + '/' + lon + ') in week ' + week + ':</b>');
+            let count = 0
+            for (let i = 0; i < mdata_probs.length; i++) {
+                const index = i; // mdata_probs.indexOf(mdata_probs_sorted[i]);
+                if (mdata_probs[index] > 0.004) {
+                    count++
+                    DEBUG && console.log('Including:', this.mdata_labels[index] + ': ' + mdata_probs[index]);
+                } else {
+                    const latin = this.mdata_labels[index].split('_')[0];
+                    // Use the reduce() method to accumulate the indices of species containing the latin name
+                    const foundIndices = this.labels.reduce((indices, element, index) => {
+                        if (element.includes(latin)) {
+                            indices.push(index);
+                        }
+                        return indices;
+                    }, []);
+                    foundIndices.forEach(index => {
+                        // If we want an override list...=>
+                        //if (! ['Dotterel', 'Stone-curlew', 'Spotted Crake'].some(this.labels[index])) BLOCKED_IDS.push(index)
+                        BLOCKED_IDS.push(index)
+                        DEBUG && console.log('Excluding: ', index, 'name', this.labels[index], 'probability', mdata_probs[i].toFixed(5) )
+                    })
+                }
+            }
+            NOT_BIRDS.forEach(notBird => {BLOCKED_IDS.push(this.labels.indexOf(notBird)); count++})
+            console.log('Total species considered at this location: ', count)
+        }
         if (this.list === 'birds') {
             // find the position of the blocked items in the label list
             NOT_BIRDS.forEach(notBird => BLOCKED_IDS.push(this.labels.indexOf(notBird)))

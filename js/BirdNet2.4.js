@@ -31,9 +31,6 @@ if (DEBUG) {
 const { height: height, width: width, labels: labels, location: location } = JSON.parse(fs.readFileSync(path.join(__dirname, `../${version}_model_config.json`), "utf8"));
 const appPath = "../" + location + "/";
 const list = e.data.list;
-const lat = e.data.lat;
-const lon = e.data.lon;
-const week = e.data.week;
 const batch = e.data.batchSize;
 const backend = e.data.backend;
 labels.push(...MYSTERIES);
@@ -61,9 +58,9 @@ tf.setBackend(backend).then(async () => {
     myModel.height = height;
     myModel.width = width;
     myModel.labels = labels;
-    myModel.lat = parseFloat(lat);
-    myModel.lon = parseFloat(lon);
-    myModel.week = parseInt(week)
+    myModel.lat = parseFloat(e.data.lat);
+    myModel.lon = parseFloat(e.data.lon);
+    myModel.week = parseInt(e.data.week);
     await myModel.loadModel();
     postMessage({
         message: "update-list",
@@ -209,6 +206,7 @@ class Model {
         const lat = myModel.lat;
         const lon = myModel.lon;
         const week = myModel.week;
+        console.log('lat', lat, 'lon', lon, 'week', week)
         this.mdata_input = tf.tensor([lat, lon, week]).expandDims(0);
         const mdata_prediction = this.metadata_model.predict(this.mdata_input);
         const mdata_probs = await mdata_prediction.data();
@@ -575,7 +573,6 @@ class MelSpecLayerSimple extends tf.layers.Layer {
 
                 return spec;
             })
-            inputList.map(x => x.dispose())
             return tf.stack(specBatch)
         });
     }

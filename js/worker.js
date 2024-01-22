@@ -1655,7 +1655,7 @@ function spawnWorkers(model, list, batchSize, threads) {
             backend: BACKEND,
             lat: STATE.lat,
             lon: STATE.lon,
-            week: -1 //new Date(1617229255088).getWeekNumber()
+            week: new Date(1617229255088).getWeekNumber()
         })
         worker.onmessage = async (e) => {
             await parseMessage(e)
