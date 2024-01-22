@@ -568,9 +568,6 @@ class MelSpecLayerSimple extends tf.layers.Layer {
                 // Adding the channel dimension
                 spec = spec.expandDims(-1);
 
-                // Adding batch dimension
-                //spec = spec.expandDims(0);
-
                 return spec;
             })
             return tf.stack(specBatch)
