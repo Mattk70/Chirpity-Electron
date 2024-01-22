@@ -179,10 +179,11 @@ class Model {
             this.model_loaded = true;
             
             this.inputShape = [...this.model.inputs[0].shape];
-            this.metadata_model = await tf.loadGraphModel(path.join(
-                this.appPath, '..', 'BirdNET_GLOBAL_6K_V2.4_Model_TFJS', 'static', 'model', 'mdata', 'model.json'
-            ));
-            this.mdata_labels = JSON.parse(fs.readFileSync(path.join(__dirname, `..`, 'BirdNET_GLOBAL_6K_V2.4_Model_TFJS', 'static', 'model', 'labels.json'), "utf8")); 
+            this.metadata_model = await tf.loadGraphModel(
+                this.appPath + '../BirdNET_GLOBAL_6K_V2.4_Model_TFJS/static/model/mdata/model.json'
+            );
+            const mdata_label_path = path.join(__dirname, '..','BirdNET_GLOBAL_6K_V2.4_Model_TFJS','static','model','labels.json')
+            this.mdata_labels = JSON.parse(fs.readFileSync(mdata_label_path, "utf8")); 
             await this.setList();
             }
     }

@@ -1,7 +1,7 @@
 const tf = require('@tensorflow/tfjs-node');
 const fs = require('node:fs');
 const path = require('node:path');
-let DEBUG = false;
+let DEBUG = true;
 let BACKEND;
 
 //GLOBALS
@@ -135,7 +135,7 @@ break;
 if (DEBUG) {
     console.log(`Setting list to ${myModel.list}`);
 }
-myModel.setList();
+await myModel.setList();
 postMessage({
     message: "update-list",
     blocked: BLOCKED_IDS,
@@ -178,7 +178,9 @@ class Model {
                 { weightPathPrefix: this.appPath });
             this.model_loaded = true;
             this.inputShape = [...this.model.inputs[0].shape];
-            this.metadata_model = await tf.loadGraphModel(path.join(this.appPath, 'mdata', 'model.json'));
+            const mdata_model_path = this.appPath + 'mdata/model.json'
+            this.metadata_model = await tf.loadGraphModel(mdata_model_path,  
+                );
             await this.setList();
         }
     }
@@ -211,16 +213,15 @@ class Model {
         const mdata_prediction = this.metadata_model.predict(this.mdata_input);
         const mdata_probs = await mdata_prediction.data();
         const mdata_probs_sorted = mdata_probs.slice().sort().reverse();
-        console.log('<b>Most common species @ (' + lat + '/' + lon + ') in week ' + week + ':</b>');
         let count = 0
-        for (let i = 0; i < mdata_probs_sorted.length; i++) {
-            const index = mdata_probs.indexOf(mdata_probs_sorted[i]);
-            if (mdata_probs_sorted[i] > 0.004) {
+        for (let i = 0; i < mdata_probs.length; i++) {
+            if (mdata_probs[i] > 0.004) {
                 count++;
-                console.log(this.labels[index] + ': ' + mdata_probs_sorted[i]);
+                DEBUG && console.log("including:", this.labels[i] + ': ' + mdata_probs[i]);
             } else {
-                // Hack to add Dotterel
-                if (! this.labels[index].includes('Dotterel')) BLOCKED_IDS.push(index)
+                DEBUG && console.log("Excluding:", this.labels[i] + ': ' + mdata_probs[i]);
+                // Hack to add Dotterel??
+                if (! this.labels[i].includes('Dotterel')) BLOCKED_IDS.push(i)
             }
         }
         console.log('Total species considered at this location: ', count)
