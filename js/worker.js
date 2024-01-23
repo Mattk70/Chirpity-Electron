@@ -22,7 +22,7 @@ let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on ever
 const DEBUG = false;
 
 const DATASET = false;
-const adding_chirpity_additions = true;
+const adding_chirpity_additions = false;
 const dataset_database = DATASET;
 const DATASET_SAVE_LOCATION = "E:/DATASETS/BirdNET_pngs";
 
@@ -1371,6 +1371,7 @@ const convertSpecsFromExistingSpecs = async (path) => {
 
 const saveResults2DataSet = ({species}) => {
     const rootDirectory = DATASET_SAVE_LOCATION;
+    sampleRate = 24_000;
     const height = 256, width = 384;
     let t0 = Date.now()
     let promise = Promise.resolve();
@@ -1463,6 +1464,7 @@ const saveResults2DataSet = ({species}) => {
         if (err) return console.log(err);
         Promise.all(promises).then(() => console.log(`Dataset created. ${count} files saved in ${(Date.now() - t0) / 1000} seconds`))
     })
+
 }
 
 const onSpectrogram = async (filepath, file, width, height, data, channels) => {
@@ -1493,7 +1495,7 @@ async function uploadOpus({ file, start, end, defaultName, metadata, mode }) {
     xhr.send(formData);
 }
 
-const bufferToAudio = ({
+const bufferToAudio = async ({
     file = '', start = 0, end = 3, meta = {}, format = undefined
 }) => {
     let audioCodec, mimeType, soundFormat;
@@ -1535,7 +1537,7 @@ const bufferToAudio = ({
         optionList.push('-metadata');
         optionList.push(`${k}=${v}`);
     }
-
+    metadata[file] || await getWorkingFile(file);
     if (padding) {
         start -= padding;
         end += padding;
@@ -2210,7 +2212,6 @@ const getResults = async ({
             });
     }
     else {
-
         for (let i = 0; i < result.length; i++) {
             const r = result[i];
             if (exportTo) {

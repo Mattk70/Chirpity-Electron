@@ -296,11 +296,6 @@ footer {
 }
 
 #fullscreen {
-    margin: 5px;
-    position: absolute;
-    z-index: 1;
-    top: 1em;
-    right: 0em;
     max-width: 70px;
 }
 

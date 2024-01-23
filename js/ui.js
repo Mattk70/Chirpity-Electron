@@ -211,6 +211,7 @@ async function loadAudioFile({ filePath = '', preserveResults = false }) {
 
 
 function updateSpec({ buffer, play = false, position = 0, resetSpec = false }) {
+    showElement(['spectrogramWrapper'], false);
     wavesurfer.loadDecodedBuffer(buffer);
     wavesurfer.seekTo(position);
     play ? wavesurfer.play() : wavesurfer.pause();
@@ -866,7 +867,7 @@ function fetchLocationAddress(lat, lon) {
             worker.postMessage({ action: 'get-locations', file: currentFile });
             waitForLocations();
         }
-        const storedLocation = LOCATIONS.find(obj => obj.lat === lat && obj.lon === lon);
+        const storedLocation = LOCATIONS?.find(obj => obj.lat === lat && obj.lon === lon);
         if (storedLocation) return resolve(storedLocation.place);
 
         fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`)
@@ -951,7 +952,7 @@ export2audio.addEventListener('click', batchExportAudio);
 
 async function batchExportAudio(e) {
     const species = isSpeciesViewFiltered(true); // || getSpecies(e.target);
-    species ? exportData(limit, species) : alert("Filter results by species to export audio files");
+    species ? exportData(species, 1000) : alert("Filter results by species to export audio files");
 }
 
 const export2CSV = ()  => exportData(isSpeciesViewFiltered(true), Infinity);
