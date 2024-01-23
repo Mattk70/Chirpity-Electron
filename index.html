@@ -260,7 +260,7 @@
                                                                 <div class="row pe-3">
                                                                     <label class="col-auto ps-0" for="list-to-use">Show:</label>
                                                                     <select class="form-select col" id="list-to-use">
-                                                                        <option value="location">Birds in your region</option>
+                                                                        <option value="location">Local Birds</option>
                                                                         <option value="migrants">Nocturnal Birds</option>
                                                                         <option value="birds">Birds</option>
                                                                         <option value="everything">Everything</option>
@@ -920,8 +920,6 @@
                                 <!-- Spectrogram view -->
                                 <div class="w-100 d-none" id="spectrogramWrapper">
                                     <div>
-                                        <span title="Toggle Fullscreen mode (Ctrl+F)" id="fullscreen"
-                                            class="material-symbols-outlined btn btn-outline-secondary p-1 pointer d-none">fullscreen</span>
                                         <div class="bg-dark border border-secondary w-100" id="timeline"></div>
                                         <div class="w-100" id="spectrogram">
                                             
@@ -965,6 +963,8 @@
                                         class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">blur_on</span>
                                         <span style="max-width: 70px" id="context-mode" title="Context Aware mode enabled"
                                         class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2 text-warning">swap_horiz</span>
+                                        <span title="Toggle Fullscreen mode (Ctrl+F)" id="fullscreen"
+                                            class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">fullscreen</span>
                                         <span style="max-width: 70px" id="list-icon" class="btn btn-outline-secondary p-1"><img
                                             class="icon" src="img/migrants.png" alt="migrants"></span>
                                             <span style="max-width: 70px" title="Prediction confidence threshold" id="threshold-value"
@@ -1016,7 +1016,7 @@
                             <div class="container-fluid">
                                 <div class="row p-1 g-1 justify-content-evenly">
                                     <div class="col-3 pt-4">
-                                        <div class="col">
+                                        <div class="col d-none">
                                             <div class="btn btn-light pt-3 mb-2" id="chartRange">
                                                 <span class="material-symbols-outlined align-bottom">date_range</span>&nbsp;
                                                 <span>Apply a date filter</span> <span
@@ -1028,14 +1028,14 @@
                                                 <div id="chart-list" class="chart bird-list-wrapper form-floating"></div>
                                             </div>
                                         </div>
-                                        <div class="col">
+                                        <div class="col d-none">
                                             <div id="chart-location-list" class="form-floating">
                                                 <select spellcheck="false" class="input form-select mb-3" aria-label=".form-select"
                                                 id="chart-locations"></select>
                                                 <label for="explore-locations">Location</label>
                                             </div>
                                         </div>
-                                        <div class="col">
+                                        <div class="col d-none">
                                             <fieldset class="border border rounded bg-light p-2">
                                                 <legend class="h6">Sum Detections by:</legend>
                                           

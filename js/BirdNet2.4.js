@@ -1,13 +1,13 @@
 const tf = require('@tensorflow/tfjs-node');
 const fs = require('node:fs');
 const path = require('node:path');
-let DEBUG = true;
+let DEBUG = false;
 let BACKEND;
 
 //GLOBALS
 let myModel;
-const MIGRANTS = new Set(["Pluvialis dominica_American Golden Plover", "Acanthis hornemanni_Arctic Redpoll", "Sterna paradisaea_Arctic Tern", "Recurvirostra avosetta_Avocet", "Porzana pusilla_Baillon's Crake", "Limosa lapponica_Bar-tailed Godwit", "Tyto alba_Barn Owl", "Branta leucopsis_Barnacle Goose", "Cygnus columbianus_Bewick's Swan", "Botaurus stellaris_Bittern", "Chroicocephalus ridibundus_Black-headed Gull", "Podiceps nigricollis_Black-necked Grebe", "Limosa limosa_Black-tailed Godwit", "Turdus merula_Blackbird", "Sylvia atricapilla_Blackcap", "Fringilla montifringilla_Brambling", "Branta bernicla_Brent Goose", "Branta canadensis_Canada Goose", "Larus cachinnans_Caspian Gull", "Phylloscopus collybita_Chiffchaff", "Loxia curvirostra_Common Crossbill", "Larus canus_Common Gull", "Acanthis flammea_Common Redpoll", "Actitis hypoleucos_Common Sandpiper", "Melanitta nigra_Common Scoter", "Sterna hirundo_Common Tern", "Fulica atra_Coot", "Crex crex_Corncrake", "Cuculus canorus_Cuckoo", "Calidris ferruginea_Curlew Sandpiper", "Numenius arquata_Curlew", "Charadrius morinellus_Dotterel", "Calidris alpina_Dunlin", "Prunella modularis_Dunnock", "Alopochen aegyptiaca_Egyptian Goose", "Turdus pilaris_Fieldfare", "Mareca strepera_Gadwall", "Sylvia borin_Garden Warbler", "Spatula querquedula_Garganey", "Regulus regulus_Goldcrest", "Pluvialis apricaria_Golden Plover", "Bucephala clangula_Goldeneye", "Mergus merganser_Goosander", "Locustella naevia_Grasshopper Warbler", "Larus marinus_Great Black-backed Gull", "Podiceps cristatus_Great Crested Grebe", "Tringa ochropus_Green Sandpiper", "Tringa nebularia_Greenshank", "Ardea cinerea_Grey Heron", "Perdix perdix_Grey Partridge", "Phalaropus fulicarius_Grey", "Pluvialis squatarola_Grey Plover", "Motacilla cinerea_Grey Wagtail ", "Anser anser_Greylag Goose", "Delichon urbicum_House Martin", "Coccothraustes coccothraustes_Hawfinch", "Larus argentatus_Herring Gull", "Lymnocryptes minimus_Jack Snipe", "Alcedo atthis_Kingfisher", "Calidris canutus_Knot", "Calcarius lapponicus_Lapland Bunting", "Larus fuscus_Lesser Black-backed Gull", "Acanthis cabaret_Lesser Redpoll ", "Sylvia curruca_Lesser Whitethroat", "Linaria cannabina_Linnet", "Egretta garzetta_Little Egret", "Tachybaptus ruficollis_Little Grebe", "Hydrocoloeus minutus_Little Gull", "Athene noctua_Little Owl", "Charadrius dubius_Little Ringed Plover", "Calidris minuta_Little Stint ", "Sternula albifrons_Little Tern", "Asio otus_Long-eared Owl", "Clangula hyemalis_Long-tailed Duck", "Anas platyrhynchos_Mallard", "Aix galericulata_Mandarin Duck", "Anthus pratensis_Meadow Pipit", "Ichthyaetus melanocephalus_Mediterranean Gull", "Turdus viscivorus_Mistle Thrush", "Gallinula chloropus_Moorhen", "Nycticorax nycticorax_Night Heron", "Luscinia megarhynchos_Nightingale", "Luscinia megarhynchos_Nightingale (song)", "Caprimulgus europaeus_Nightjar", "Anthus hodgsoni_Olive-backed Pipit", "Emberiza hortulana_Ortolan Bunting", "Emberiza pusilla_Little Bunting", "Haematopus ostralegus_Oystercatcher", "Ficedula hypoleuca_Pied Flycatcher", "Motacilla alba_Pied Wagtail", "Anser brachyrhynchus_Pink-footed Goose", "Anas acuta_Pintail", "Aythya ferina_Pochard", "Calidris maritima_Purple Sandpiper", "Coturnix coturnix_Quail", "Mergus serrator_Red-breasted Merganser", "Netta rufina_Red-crested Pochard", "Alectoris rufa_Red-legged Partridge", "Tringa totanus_Redshank", "Phoenicurus phoenicurus_Redstart", "Turdus iliacus_Redwing", "Emberiza schoeniclus_Reed Bunting", "Acrocephalus scirpaceus_Reed Warbler", "Turdus torquatus_Ring Ouzel", "Charadrius hiaticula_Ringed Plover", "Erithacus rubecula_Robin (flight call)", "Anthus petrosus_Rock Pipit", "Sterna dougallii_Roseate Tern", "Calidris pugnax_Ruff", "Riparia riparia_Sand Martin", "Calidris alba_Sanderling", "Thalasseus sandvicensis_Sandwich Tern", "Aythya marila_Scaup", "Loxia scotica_Scottish Crossbill", "Acrocephalus schoenobaenus_Sedge Warbler", "Tadorna tadorna_Shelduck", "Asio flammeus_Short-eared Owl", "Spatula clypeata_Shoveler", "Spinus spinus_Siskin", "Alauda arvensis_Skylark", "Gallinago gallinago_Snipe", "Plectrophenax nivalis_Snow Bunting", "Turdus philomelos_Song Thrush", "Porzana porzana_Spotted Crake", "Muscicapa striata_Spotted Flycatcher", "Tringa erythropus_Spotted Redshank", "Burhinus oedicnemus_Stone-curlew", "Saxicola rubicola_Stonechat", "Hirundo rustica_Swallow", "Apus apus_Swift", "Anser fabalis_Taiga Bean Goose", "Strix aluco_Tawny Owl", "Anas crecca_Teal", "Anthus trivialis_Tree Pipit", "Aythya fuligula_Tufted Duck", "Anser serrirostris_Tundra Bean Goose", "Arenaria interpres_Turnstone", "Anthus spinoletta_Water Pipit", "Rallus aquaticus_Water Rail", "Numenius phaeopus_Whimbrel", "Anser albifrons_White-fronted Goose", "Sylvia communis_Whitethroat", "Cygnus cygnus_Whooper Swan", "Mareca penelope_Wigeon", "Phylloscopus trochilus_Willow Warbler", "Tringa glareola_Wood Sandpiper", "Scolopax rusticola_Woodcock", "Lullula arborea_Woodlark", "Larus michahellis_Yellow-legged Gull", "Motacilla flava_Yellow Wagtail", "Emberiza citrinella_Yellowhammer"]);
-const NOT_BIRDS = ['Ambient Noise_Ambient Noise', 'Animal_Animal', 'Cat_Cat', 'Church Bells_Church Bells', 'Cough_Cough', 'Dog_Dog', 'Human_Human', 'Laugh_Laugh', 'Rain_Rain', 'Red Fox_Red Fox', 'Sneeze_Sneeze', 'Snoring_Snoring', 'Thunder_Thunder', 'Vehicle_Vehicle', 'Water Drops_Water Drops', 'Waves_Waves', 'Wind_Wind'];
+// const MIGRANTS = new Set(["Pluvialis dominica_American Golden Plover", "Acanthis hornemanni_Arctic Redpoll", "Sterna paradisaea_Arctic Tern", "Recurvirostra avosetta_Avocet", "Porzana pusilla_Baillon's Crake", "Limosa lapponica_Bar-tailed Godwit", "Tyto alba_Barn Owl", "Branta leucopsis_Barnacle Goose", "Cygnus columbianus_Bewick's Swan", "Botaurus stellaris_Bittern", "Chroicocephalus ridibundus_Black-headed Gull", "Podiceps nigricollis_Black-necked Grebe", "Limosa limosa_Black-tailed Godwit", "Turdus merula_Blackbird", "Sylvia atricapilla_Blackcap", "Fringilla montifringilla_Brambling", "Branta bernicla_Brent Goose", "Branta canadensis_Canada Goose", "Larus cachinnans_Caspian Gull", "Phylloscopus collybita_Chiffchaff", "Loxia curvirostra_Common Crossbill", "Larus canus_Common Gull", "Acanthis flammea_Common Redpoll", "Actitis hypoleucos_Common Sandpiper", "Melanitta nigra_Common Scoter", "Sterna hirundo_Common Tern", "Fulica atra_Coot", "Crex crex_Corncrake", "Cuculus canorus_Cuckoo", "Calidris ferruginea_Curlew Sandpiper", "Numenius arquata_Curlew", "Charadrius morinellus_Dotterel", "Calidris alpina_Dunlin", "Prunella modularis_Dunnock", "Alopochen aegyptiaca_Egyptian Goose", "Turdus pilaris_Fieldfare", "Mareca strepera_Gadwall", "Sylvia borin_Garden Warbler", "Spatula querquedula_Garganey", "Regulus regulus_Goldcrest", "Pluvialis apricaria_Golden Plover", "Bucephala clangula_Goldeneye", "Mergus merganser_Goosander", "Locustella naevia_Grasshopper Warbler", "Larus marinus_Great Black-backed Gull", "Podiceps cristatus_Great Crested Grebe", "Tringa ochropus_Green Sandpiper", "Tringa nebularia_Greenshank", "Ardea cinerea_Grey Heron", "Perdix perdix_Grey Partridge", "Phalaropus fulicarius_Grey", "Pluvialis squatarola_Grey Plover", "Motacilla cinerea_Grey Wagtail ", "Anser anser_Greylag Goose", "Delichon urbicum_House Martin", "Coccothraustes coccothraustes_Hawfinch", "Larus argentatus_Herring Gull", "Lymnocryptes minimus_Jack Snipe", "Alcedo atthis_Kingfisher", "Calidris canutus_Knot", "Calcarius lapponicus_Lapland Bunting", "Larus fuscus_Lesser Black-backed Gull", "Acanthis cabaret_Lesser Redpoll ", "Sylvia curruca_Lesser Whitethroat", "Linaria cannabina_Linnet", "Egretta garzetta_Little Egret", "Tachybaptus ruficollis_Little Grebe", "Hydrocoloeus minutus_Little Gull", "Athene noctua_Little Owl", "Charadrius dubius_Little Ringed Plover", "Calidris minuta_Little Stint ", "Sternula albifrons_Little Tern", "Asio otus_Long-eared Owl", "Clangula hyemalis_Long-tailed Duck", "Anas platyrhynchos_Mallard", "Aix galericulata_Mandarin Duck", "Anthus pratensis_Meadow Pipit", "Ichthyaetus melanocephalus_Mediterranean Gull", "Turdus viscivorus_Mistle Thrush", "Gallinula chloropus_Moorhen", "Nycticorax nycticorax_Night Heron", "Luscinia megarhynchos_Nightingale", "Luscinia megarhynchos_Nightingale (song)", "Caprimulgus europaeus_Nightjar", "Anthus hodgsoni_Olive-backed Pipit", "Emberiza hortulana_Ortolan Bunting", "Emberiza pusilla_Little Bunting", "Haematopus ostralegus_Oystercatcher", "Ficedula hypoleuca_Pied Flycatcher", "Motacilla alba_Pied Wagtail", "Anser brachyrhynchus_Pink-footed Goose", "Anas acuta_Pintail", "Aythya ferina_Pochard", "Calidris maritima_Purple Sandpiper", "Coturnix coturnix_Quail", "Mergus serrator_Red-breasted Merganser", "Netta rufina_Red-crested Pochard", "Alectoris rufa_Red-legged Partridge", "Tringa totanus_Redshank", "Phoenicurus phoenicurus_Redstart", "Turdus iliacus_Redwing", "Emberiza schoeniclus_Reed Bunting", "Acrocephalus scirpaceus_Reed Warbler", "Turdus torquatus_Ring Ouzel", "Charadrius hiaticula_Ringed Plover", "Erithacus rubecula_Robin (flight call)", "Anthus petrosus_Rock Pipit", "Sterna dougallii_Roseate Tern", "Calidris pugnax_Ruff", "Riparia riparia_Sand Martin", "Calidris alba_Sanderling", "Thalasseus sandvicensis_Sandwich Tern", "Aythya marila_Scaup", "Loxia scotica_Scottish Crossbill", "Acrocephalus schoenobaenus_Sedge Warbler", "Tadorna tadorna_Shelduck", "Asio flammeus_Short-eared Owl", "Spatula clypeata_Shoveler", "Spinus spinus_Siskin", "Alauda arvensis_Skylark", "Gallinago gallinago_Snipe", "Plectrophenax nivalis_Snow Bunting", "Turdus philomelos_Song Thrush", "Porzana porzana_Spotted Crake", "Muscicapa striata_Spotted Flycatcher", "Tringa erythropus_Spotted Redshank", "Burhinus oedicnemus_Stone-curlew", "Saxicola rubicola_Stonechat", "Hirundo rustica_Swallow", "Apus apus_Swift", "Anser fabalis_Taiga Bean Goose", "Strix aluco_Tawny Owl", "Anas crecca_Teal", "Anthus trivialis_Tree Pipit", "Aythya fuligula_Tufted Duck", "Anser serrirostris_Tundra Bean Goose", "Arenaria interpres_Turnstone", "Anthus spinoletta_Water Pipit", "Rallus aquaticus_Water Rail", "Numenius phaeopus_Whimbrel", "Anser albifrons_White-fronted Goose", "Sylvia communis_Whitethroat", "Cygnus cygnus_Whooper Swan", "Mareca penelope_Wigeon", "Phylloscopus trochilus_Willow Warbler", "Tringa glareola_Wood Sandpiper", "Scolopax rusticola_Woodcock", "Lullula arborea_Woodlark", "Larus michahellis_Yellow-legged Gull", "Motacilla flava_Yellow Wagtail", "Emberiza citrinella_Yellowhammer"]);
+// const NOT_BIRDS = ['Ambient Noise_Ambient Noise', 'Animal_Animal', 'Cat_Cat', 'Church Bells_Church Bells', 'Cough_Cough', 'Dog_Dog', 'Human_Human', 'Laugh_Laugh', 'Rain_Rain', 'Red Fox_Red Fox', 'Sneeze_Sneeze', 'Snoring_Snoring', 'Thunder_Thunder', 'Vehicle_Vehicle', 'Water Drops_Water Drops', 'Waves_Waves', 'Wind_Wind'];
 const MYSTERIES = ['Unknown Sp._Unknown Sp.'];
 const GRAYLIST = [];
 const GOLDEN_LIST = [] 
@@ -24,125 +24,125 @@ onmessage = async (e) => {
     let response;
     try {
         switch (modelRequest) {
-            case "load": {const version = e.data.model;
-if (DEBUG) {
-    console.log("load request to worker");
-}
-const { height: height, width: width, labels: labels, location: location } = JSON.parse(fs.readFileSync(path.join(__dirname, `../${version}_model_config.json`), "utf8"));
-const appPath = "../" + location + "/";
-const list = e.data.list;
-const batch = e.data.batchSize;
-const backend = e.data.backend;
-labels.push(...MYSTERIES);
-postMessage({
-    message: "labels",
-    labels: labels
-});
-if (DEBUG) {
-    console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
-}
-tf.setBackend(backend).then(async () => {
-    if (backend === "webgl") {
-        tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
-        tf.env().set("WEBGL_PACK", true);
-        tf.env().set("WEBGL_EXP_CONV", true);
-        tf.env().set("TOPK_K_CPU_HANDOFF_THRESHOLD", 128);
-        tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 0);
-    }
-    tf.enableProdMode();
-    if (DEBUG) {
-        console.log(tf.env());
-        console.log(tf.env().getFlags());
-    }
-    myModel = new Model(appPath, list, version);
-    myModel.height = height;
-    myModel.width = width;
-    myModel.labels = labels;
-    myModel.lat = parseFloat(e.data.lat);
-    myModel.lon = parseFloat(e.data.lon);
-    myModel.week = parseInt(e.data.week);
-    await myModel.loadModel();
-    postMessage({
-        message: "update-list",
-        blocked: BLOCKED_IDS,
-        updateResults: false
-    });
-    myModel.warmUp(batch);
-    BACKEND = tf.getBackend();
-    postMessage({
-        message: "model-ready",
-        sampleRate: myModel.config.sampleRate,
-        chunkLength: myModel.chunkLength,
-        backend: tf.getBackend(),
-        labels: labels
-    });
-});
-break;
-}
-            case "predict": {if (myModel.model_loaded) {
-    const { chunks: chunks, start: start, fileStart: fileStart, file: file, snr: snr, confidence: confidence, worker: worker, context: context, resetResults: resetResults } = e.data;
-    myModel.useContext = context;
-    myModel.selection =  !resetResults;
-    const [result,filename,startPosition] = await myModel.predictChunk(chunks, start, fileStart, file, snr, confidence / 1000);
-    response = {
-        message: "prediction",
-        file: filename,
-        result: result,
-        fileStart: startPosition,
-        worker: worker,
-        selection: myModel.selection
-    };
-    postMessage(response);
-    myModel.result = [];
-}
-break;
-}
-            case "get-spectrogram": {const buffer = e.data.buffer;
-if (buffer.length < myModel.chunkLength) {
-    return;
-}
-const specFile = e.data.file;
-const filepath = e.data.filepath;
-const spec_height = e.data.height;
-const spec_width = e.data.width;
-let image;
-const signal = tf.tensor1d(buffer, "float32");
-const bufferTensor = myModel.normalise_audio(signal);
-signal.dispose();
-const imageTensor = tf.tidy(() => {
-    return myModel.makeSpectrogram(bufferTensor);
-});
-image = tf.tidy(() => {
-    let spec = myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), spec_height, spec_width);
-    const spec_max = tf.max(spec);
-    return spec.mul(255).div(spec_max).dataSync();
-});
-bufferTensor.dispose();
-imageTensor.dispose();
-response = {
-    message: "spectrogram",
-    width: myModel.inputShape[2],
-    height: myModel.inputShape[1],
-    channels: myModel.inputShape[3],
-    image: image,
-    file: specFile,
-    filepath: filepath
-};
-postMessage(response);
-break;
-}
-            case "list": {myModel.list = e.data.list;
-if (DEBUG) {
-    console.log(`Setting list to ${myModel.list}`);
-}
-await myModel.setList();
-postMessage({
-    message: "update-list",
-    blocked: BLOCKED_IDS,
-    updateResults: true
-});
-break;
-}
+            case "load": {
+                const version = e.data.model;
+                DEBUG && console.log("load request to worker");
+                const { height: height, width: width, labels: labels, location: location } = JSON.parse(fs.readFileSync(path.join(__dirname, `../${version}_model_config.json`), "utf8"));
+                const appPath = "../" + location + "/";
+                const list = e.data.list;
+                const batch = e.data.batchSize;
+                const backend = e.data.backend;
+                labels.push(...MYSTERIES);
+                postMessage({
+                    message: "labels",
+                    labels: labels
+                });
+                DEBUG && console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
+                
+                tf.setBackend(backend).then(async () => {
+                    if (backend === "webgl") {
+                        tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
+                        tf.env().set("WEBGL_PACK", true);
+                        tf.env().set("WEBGL_EXP_CONV", true);
+                        tf.env().set("TOPK_K_CPU_HANDOFF_THRESHOLD", 128);
+                        tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 0);
+                    }
+                    tf.enableProdMode();
+                    if (DEBUG) {
+                        console.log(tf.env());
+                        console.log(tf.env().getFlags());
+                    }
+                    myModel = new Model(appPath, list, version);
+                    myModel.height = height;
+                    myModel.width = width;
+                    myModel.labels = labels;
+                    myModel.lat = parseFloat(e.data.lat);
+                    myModel.lon = parseFloat(e.data.lon);
+                    myModel.week = parseInt(e.data.week);
+                    await myModel.loadModel();
+                    postMessage({
+                        message: "update-list",
+                        blocked: BLOCKED_IDS,
+                        updateResults: false
+                    });
+                    myModel.warmUp(batch);
+                    BACKEND = tf.getBackend();
+                    postMessage({
+                        message: "model-ready",
+                        sampleRate: myModel.config.sampleRate,
+                        chunkLength: myModel.chunkLength,
+                        backend: tf.getBackend(),
+                        labels: labels
+                    });
+                });
+                break;
+            }
+            case "predict": {
+                if (myModel.model_loaded) {
+                    const { chunks: chunks, start: start, fileStart: fileStart, file: file, snr: snr, confidence: confidence, worker: worker, context: context, resetResults: resetResults } = e.data;
+                    myModel.useContext = context;
+                    myModel.selection =  !resetResults;
+                    const [result,filename,startPosition] = await myModel.predictChunk(chunks, start, fileStart, file, snr, confidence / 1000);
+                    response = {
+                        message: "prediction",
+                        file: filename,
+                        result: result,
+                        fileStart: startPosition,
+                        worker: worker,
+                        selection: myModel.selection
+                    };
+                    postMessage(response);
+                    myModel.result = [];
+                }
+                break;
+            }
+            case "get-spectrogram": {
+                const buffer = e.data.buffer;
+                const specFile = e.data.file;
+                const filepath = e.data.filepath;
+                const spec_height = e.data.height;
+                const spec_width = e.data.width;
+                let image;
+                if (buffer.length !== 72000) {
+                    console.log((`Skipping ${e.data.file} as buffer size is ${buffer.length}`))
+                    return;
+                }
+                const signal = tf.tensor1d(buffer, "float32");
+                const bufferTensor = myModel.normalise_audio(signal);
+                signal.dispose();
+                const imageTensor = tf.tidy(() => {
+                    return myModel.makeSpectrogram(bufferTensor);
+                });
+                image = tf.tidy(() => {
+                    let spec = myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), spec_height, spec_width);
+                    const spec_max = tf.max(spec);
+                    return spec.mul(255).div(spec_max).dataSync();
+                });
+                bufferTensor.dispose();
+                imageTensor.dispose();
+                response = {
+                    message: "spectrogram",
+                    width: 384,
+                    height: 256,
+                    channels: 1,
+                    image: image,
+                    file: specFile,
+                    filepath: filepath
+                };
+                postMessage(response);
+                break;
+            }
+            case "list": {
+                myModel.list = e.data.list;
+                DEBUG && console.log(`Setting list to ${myModel.list}`);
+                await myModel.setList();
+                postMessage({
+                    message: "update-list",
+                    blocked: BLOCKED_IDS,
+                    updateResults: true
+                });
+                break;
+            }
         }
     }
     // If worker was respawned
@@ -170,10 +170,10 @@ class Model {
     }
 
     async loadModel() {
-        if (DEBUG) console.log('loading model')
+        DEBUG && console.log('loading model')
         if (this.model_loaded === false) {
             // Model files must be in a different folder than the js, assets files
-            if (DEBUG) console.log('loading model from', this.appPath + 'model.json')
+            DEBUG && console.log('loading model from', this.appPath + 'model.json')
             this.model = await tf.loadLayersModel(this.appPath + 'model.json',
                 { weightPathPrefix: this.appPath });
             this.model_loaded = true;
@@ -197,7 +197,7 @@ class Model {
                 //this.padBatch(tf.zeros([1, this.inputShape[1], this.inputShape[2], this.inputShape[3]]), { batchSize: this.batchSize })
             })
         }
-        if (DEBUG) console.log('WarmUp end', tf.memory().numTensors)
+        DEBUG && console.log('WarmUp end', tf.memory().numTensors)
         return true;
     }
 
@@ -299,7 +299,7 @@ class Model {
 
     padBatch(tensor) {
         return tf.tidy(() => {
-            if (DEBUG) console.log(`Adding ${this.batchSize - tensor.shape[0]} tensors to the batch`)
+            DEBUG && console.log(`Adding ${this.batchSize - tensor.shape[0]} tensors to the batch`)
             const shape = [...tensor.shape];
             shape[0] = this.batchSize - shape[0];
             const padding = tf.zeros(shape);
@@ -348,7 +348,7 @@ class Model {
             const keysTensor = tf.stack(keys); // + 1 tensor
             const snr = this.getSNR(TensorBatch)
             const condition = tf.greaterEqual(snr, threshold); // + 1 tensor
-            if (DEBUG) console.log('SNR is:', snr.dataSync())
+            DEBUG && console.log('SNR is:', snr.dataSync())
             snr.dispose();
             // Avoid mask cannot be scalar error at end of predictions
             let newCondition;
@@ -368,12 +368,12 @@ class Model {
                 maskedTensorBatch.dispose(); // - 1 tensor
                 maskedKeysTensor.dispose(); // - 1 tensor
                 TensorBatch.dispose(); // - 1 tensor
-                if (DEBUG) console.log("No surviving tensors in batch", maskedTensorBatch.shape[0])
+                DEBUG && console.log("No surviving tensors in batch", maskedTensorBatch.shape[0])
                 return []
             } else {
                 keys = maskedKeysTensor.dataSync();
                 maskedKeysTensor.dispose(); // - 1 tensor
-                if (DEBUG) console.log("surviving tensors in batch", maskedTensorBatch.shape[0])
+                DEBUG && console.log("surviving tensors in batch", maskedTensorBatch.shape[0])
             }
         }
 
@@ -453,7 +453,7 @@ class Model {
     };
 
     async predictChunk(audioBuffer, start, fileStart, file, threshold, confidence) {
-        if (DEBUG) console.log('predictCunk begin', tf.memory().numTensors);
+        DEBUG && console.log('predictCunk begin', tf.memory().numTensors);
         audioBuffer = tf.tensor1d(audioBuffer);
 
         // check if we need to pad
@@ -463,7 +463,7 @@ class Model {
             // Pad to the nearest full sample
             paddedBuffer = audioBuffer.pad([[0, this.chunkLength - remainder]]);
             audioBuffer.dispose();
-            if (DEBUG) console.log('Received final chunks')
+            DEBUG && console.log('Received final chunks')
         }
         const buffer = paddedBuffer || audioBuffer;
         const numSamples = buffer.shape / this.chunkLength;
