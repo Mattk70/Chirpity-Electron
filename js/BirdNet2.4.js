@@ -134,6 +134,9 @@ onmessage = async (e) => {
             }
             case "list": {
                 myModel.list = e.data.list;
+                myModel.lat = parseFloat(e.data.lat);
+                myModel.lon = parseFloat(e.data.lon);
+                myModel.week = parseInt(e.data.week) || myModel.week;
                 DEBUG && console.log(`Setting list to ${myModel.list}`);
                 await myModel.setList();
                 postMessage({

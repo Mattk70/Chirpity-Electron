@@ -632,18 +632,21 @@
                                                     Help
                                                 </a>
                                                 <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
-                                                    <!-- <li><a class="dropdown-item" id="update" href="#">
-                                                        <span class="material-symbols-outlined text-info">browser_updated</span>Update Available!</a></li> -->
-                                                        <li><a class="dropdown-item" id="usage" href="#">
-                                                            <span class="material-symbols-outlined">help</span> Usage</a>
-                                                        </li>
-                                                        <li>
-                                                            <a class="dropdown-item" id="settings" href="#">
-                                                                <span class="material-symbols-outlined">help</span> Settings
-                                                            </a>
-                                                        </li>
-                                                        <li><a class="dropdown-item" id="keyboard" href="#">
-                                                            <span class="material-symbols-outlined">help</span> Keyboard Shortcuts
+                                                    <li>
+                                                        <a class="dropdown-item" id="species" href="#">
+                                                            <span class="material-symbols-outlined">help</span> What species are detected?
+                                                        </a>
+                                                    </li>
+                                                    <li><a class="dropdown-item" id="usage" href="#">
+                                                        <span class="material-symbols-outlined">help</span> Using Chirpity</a>
+                                                    </li>
+                                                    <li>
+                                                        <a class="dropdown-item" id="settings" href="#">
+                                                            <span class="material-symbols-outlined">help</span> Settings
+                                                        </a>
+                                                    </li>
+                                                    <li><a class="dropdown-item" id="keyboard" href="#">
+                                                        <span class="material-symbols-outlined">help</span> Keyboard Shortcuts
                                                         </a>
                                                     </li>
                                                     <li><a class="dropdown-item" id="diagnostics" href="#">
@@ -747,6 +750,21 @@
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
                                     <div id="helpModalBody" class="modal-body"></div>
+                                    <div class="modal-footer justify-content-center">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Species Modal -->
+                        <div class="modal fade" id="speciesModal" tabindex="-1" aria-labelledby="speciesModalLabel" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                                <div class="modal-content">
+                                    <div class="modal-header justify-content-center">
+                                        <h5 class="modal-title" id="speciesModalLabel">Detected Species</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div id="speciesModalBody" class="modal-body"></div>
                                     <div class="modal-footer justify-content-center">
                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                                     </div>

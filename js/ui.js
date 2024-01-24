@@ -622,7 +622,7 @@ const showLocation = async (fromSelect) => {
 
 const displayLocationAddress = async (where) => {
     const custom = where.includes('custom');
-    let latEl, lonEl, placeEl, place;
+    let latEl, lonEl, placeEl;
     if (custom){
         latEl = document.getElementById('customLat');
         lonEl = document.getElementById('customLon');
@@ -630,6 +630,7 @@ const displayLocationAddress = async (where) => {
         address = await fetchLocationAddress(latEl.value, lonEl.value, false);
         placeEl.value = address || 'Location not available';
     } else {
+
         latEl = document.getElementById('latitude');
         lonEl = document.getElementById('longitude');
         placeEl = document.getElementById('place');
@@ -645,6 +646,16 @@ const displayLocationAddress = async (where) => {
             lat: config.latitude,
             lon: config.longitude,
         });
+        // Initially, so changes to the default location are immediately reflected in subsequent analyses
+        // We will switch to location filtersing when the default location is changed.
+        config.list = 'location';
+        updateListIcon();
+        document.getElementById('list-to-use').value = config.list;
+        worker.postMessage({
+            action: 'update-list',
+            list: 'location'
+        });
+        
     }
 }
 
@@ -1547,6 +1558,9 @@ break;
                 case "seen-species-list": {generateBirdList("seenSpecies", args.list);
 break;
 }
+                case "valid-species-list": {populateSpeciesModal(args.rows);
+break;
+}
                 case "show-spinner": {showLoadingSpinner(500);
 break;
 }
@@ -1618,7 +1632,13 @@ function generateBirdOptionList({ store, rows, selected }) {
     return listHTML;
 }
 
-
+function generateBirdIDList(rows) {
+    let listHTML = '';
+    for (const item in rows) {
+        listHTML += `   <tr><td>${rows[item].cname}</td> <td><i>${rows[item].sname}</i></td></tr>\n`;
+    }
+    return listHTML;
+}
 
 const getActiveRowID = () => activeRow?.rowIndex - 1;
 
@@ -3189,6 +3209,11 @@ document.getElementById('keyboard').addEventListener('click', async () => {
 document.getElementById('settings').addEventListener('click', async () => {
     await populateHelpModal('Help/settings.html', 'Settings Help');
 });
+
+document.getElementById('species').addEventListener('click', async () => {
+    worker.postMessage({action: 'get-valid-species'})
+});
+
 document.getElementById('usage').addEventListener('click', async () => {
     await populateHelpModal('Help/usage.html', 'Usage Guide');
 });
@@ -3199,6 +3224,20 @@ const populateHelpModal = async (file, label) => {
     document.getElementById('helpModalBody').innerHTML = await response.text();
     const help = new bootstrap.Modal(document.getElementById('helpModal'));
     help.show();
+}
+
+const populateSpeciesModal = async (rows) => {
+    const model = config.model === 'v2.4' ? 'BirdNET' : 'Chirpity';
+    const location = config.list === 'location' ? ` centered on ${place.textContent.replace('fmd_good', '')}` : '';
+    let modalContent =  `
+    <h6>Using the <b>${model}</b> model and the <b>${config.list}</b> list${location}, the following species can be detected:</h6>
+    `
+    modalContent += '<table class="table table-striped"><thead class="bg-text-dark"><tr><th>Common Name</th><th>Scientific Name</th></tr></thead><tbody>\n';
+    modalContent += generateBirdIDList(rows);
+    modalContent += '</tbody></table>\n';
+    document.getElementById('speciesModalBody').innerHTML = modalContent;
+    const species = new bootstrap.Modal(document.getElementById('speciesModal'));
+    species.show();
 }
 
 // Prevent the settings menu disappearing on click
