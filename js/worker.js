@@ -292,7 +292,10 @@ break;
 }
 break;
 }
-        case "get-detected-species-list": {getSpecies();
+        case "get-detected-species-list": {getDetectedSpecies();
+break;
+}
+        case "get-valid-species": {getValidSpecies();
 break;
 }
         case "get-locations": {getLocations({
@@ -357,7 +360,10 @@ break;
 SEEN_LIST_UPDATE = false;
 predictWorkers.forEach((worker) => worker.postMessage({
     message: "list",
-    list: args.list
+    list: args.list,
+    lat: STATE.lat,
+    lon: STATE.lon,
+    week: -1
 }));
 break;
 }
@@ -1657,7 +1663,7 @@ function spawnWorkers(model, list, batchSize, threads) {
             backend: BACKEND,
             lat: STATE.lat,
             lon: STATE.lon,
-            week: new Date(1617229255088).getWeekNumber()
+            week: -1 // new Date(1617229255088).getWeekNumber()
         })
         worker.onmessage = async (e) => {
             await parseMessage(e)
@@ -1969,7 +1975,7 @@ break;
     if (response["updateResults"] && STATE.db) {
         await Promise.all([getResults(), getSummary()]);
         if (["explore", "chart"].includes(STATE.mode)) {
-            getSpecies();
+            getDetectedSpecies();
         }
     }
 }
@@ -2543,7 +2549,7 @@ const getRate = (species) => {
     })
 }
 
-const getSpecies = () => {
+const getDetectedSpecies = () => {
     const range = STATE.explore.range;
     const confidence = STATE.detect.confidence;
     let sql = `SELECT cname, locationID
@@ -2563,6 +2569,16 @@ const getSpecies = () => {
     })
 };
 
+const getValidSpecies = () => {
+    let sql = `SELECT cname, sname FROM species`;
+    if (STATE.blocked.length) {
+        sql += ` WHERE id NOT IN (${STATE.blocked.join(',')})`;
+    }
+    sql += ' GROUP BY cname ORDER BY cname';
+    diskDB.all(sql, (err, rows) => {
+        err ? console.log(err) : UI.postMessage({ event: 'valid-species-list', rows: rows })
+    })
+};
 
 const onUpdateFileStart = async (args) => {
     let file = args.file;
@@ -2622,7 +2638,7 @@ async function onDelete({
         }
         // Update the seen species list
         if (db === diskDB) {
-            getSpecies();
+            getDetectedSpecies();
         } else {
             UI.postMessage({event: 'unsaved-records'});
         }
@@ -2651,7 +2667,7 @@ async function onDeleteSpecies({
     if (changes) {
         if (db === diskDB) {
             // Update the seen species list
-            getSpecies();
+            getDetectedSpecies();
         } else {
             UI.postMessage({event: 'unsaved-records'});
         }
@@ -2746,7 +2762,7 @@ const onFileDelete = async (fileName) => {
     const result = await diskDB.runAsync('DELETE FROM files WHERE name = ?', fileName);
     if (result.changes) {
         onChangeMode('analyse');
-        getSpecies();
+        getDetectedSpecies();
         UI.postMessage({
             event: 'generate-alert',
             message: `${fileName} 
