@@ -952,25 +952,26 @@ export2audio.addEventListener('click', batchExportAudio);
 
 async function batchExportAudio(e) {
     const species = isSpeciesViewFiltered(true); // || getSpecies(e.target);
-    species ? exportData(species, 1000) : alert("Filter results by species to export audio files");
+    species ? exportData('audio', species, 1000) : alert("Filter results by species to export audio files");
 }
 
-const export2CSV = ()  => exportData(isSpeciesViewFiltered(true), Infinity);
+const export2CSV = ()  => exportData('text', isSpeciesViewFiltered(true), Infinity);
 
-async function exportData(species, limit){
+async function exportData(format, species, limit){
     const response = await window.electron.selectDirectory('selectDirectory');
     if (!response.canceled) {
         const directory = response.filePaths[0];
         worker.postMessage({
             action: 'export-results',
-            exportTo: directory,
+            directory: directory,
+            format: format,
             species: species,
             files: isExplore() ? [] : fileList,
             explore: isExplore(),
             limit: limit,
             range: isExplore() ? STATE.explore.range : undefined
         })
-    }
+    } 
 }
 
 const chartsLink = document.getElementById('charts');
@@ -1320,8 +1321,6 @@ function updatePrefs() {
 /////////////////////////  Window Handlers ////////////////////////////
 let appPath, tempPath;
 window.onload = async () => {
-    const startOnload = performance.now();
-    console.log('To Page onload took:', startOnload - startTime)
     window.electron.requestWorkerChannel();
     contentWrapperElement.classList.add('loaded');
     // Set config defaults
@@ -1404,7 +1403,16 @@ window.onload = async () => {
         audioFade.disabled = !audioPadding.checked;
         audioDownmix.checked = config.audio.downmix;
         setNocmig(config.detect.nocmig);
-        contextAware.checked = config.detect.contextAware;
+        if (config.model !== 'v2.4'){
+            contextAware.checked = config.detect.contextAware
+            SNRSlider.disabled = false;
+        } else {
+            contextAware.checked = false;
+            contextAware.disabed = true;
+            config.detect.contextAware = false;
+            SNRSlider.disabled = true;
+            config.filters.SNR = 0;
+        }
         contextAwareIconDisplay();
         debugMode.checked = config.debug;
         showThreshold(config.detect.confidence);
@@ -1451,13 +1459,11 @@ window.onload = async () => {
     }
     )
     // establish the message channel
-
     setUpWorkerMessaging()
 
     // Set footer year
     document.getElementById('year').textContent = new Date().getFullYear();
-    const endOnload = performance.now();
-    console.log('Page onload took:', endOnload -startOnload)
+
 }
 
 const setUpWorkerMessaging = () => {
@@ -2148,6 +2154,16 @@ const loadModel = () => {
 const modelToUse = document.getElementById('model-to-use');
 modelToUse.addEventListener('change', function (e) {
     config.model = e.target.value;
+    if (config.model === 'v2.4') { 
+        contextAware.checked = false;
+        contextAware.disabed = true;
+        config.detect.contextAware = false;
+        SNRSlider.disabled = true;
+        config.filters.SNR = 0;
+    } else {
+        contextAware.disabed = false;
+        SNRSlider.disabled = false;
+    }
     updatePrefs();
     loadModel();
 })
@@ -3245,13 +3261,13 @@ const toggleFilters = () => {
 audioFiltersIcon.addEventListener('click', toggleFilters);
 
 const toggleContextAwareMode = () => {
-    config.detect.contextAware = !config.detect.contextAware;
+    if (config.model !== 'v2.4') config.detect.contextAware = !config.detect.contextAware;
     contextAware.checked = config.detect.contextAware;
     contextAwareIconDisplay();
     if (config.detect.contextAware) {
         SNRSlider.disabled = true;
         config.filters.SNR = 0;
-    } else if (config.backend !== 'webgl') {
+    } else if (config.backend !== 'webgl'  && config.model !== 'v2.4') {
         SNRSlider.disabled = false;
         config.filters.SNR = parseFloat(SNRSlider.value);
     }
@@ -3754,7 +3770,6 @@ const handleSNRchange = () => {
     if (config.filters.SNR > 0) {
         config.detect.contextAware = false;
         contextAware.disabled = true;
-
     } else {
         config.detect.contextAware = contextAware.checked;
         contextAware.disabled = false;
