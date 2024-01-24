@@ -309,7 +309,7 @@ class Model {
 
     addContext(prediction, tensor, confidence) {
         // Create a set of images from the batch, offset by half the width of the original images
-        const [batchSize, height, width, channel] = tensor.shape;
+        const [_, height, width, channel] = tensor.shape;
         return tf.tidy(() => {
             const firstHalf = tensor.slice([0, 0, 0, 0], [-1, -1, width / 2, -1]);
             const secondHalf = tensor.slice([0, 0, width / 2, 0], [-1, -1, width / 2, -1]);

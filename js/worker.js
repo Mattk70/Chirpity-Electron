@@ -2167,7 +2167,8 @@ const getSummary = async ({
  * @param limit: the pagination limit per page
  * @param offset: is the SQL query offset to use
  * @param topRankin: return results >= to this rank for each datetime
- * @param exportTo: if set, will export audio of the returned results to this folder
+ * @param directory: if set, will export audio of the returned results to this folder
+ * @param format: whether to export audio or text
  *
  * @returns {Promise<integer> } A count of the records retrieved
  */
@@ -2176,7 +2177,8 @@ const getResults = async ({
     limit = STATE.limit,
     offset = undefined,
     topRankin = STATE.topRankin,
-    exportTo = undefined,
+    directory = undefined,
+    format = undefined,
     active = undefined
 } = {}) => {
     let confidence = STATE.detect.confidence;
@@ -2198,13 +2200,13 @@ const getResults = async ({
     prepResultsStatement(species, limit === Infinity);
 
     const result = await STATE.GET_RESULT_SQL.allAsync(...params);
-    if (exportTo && limit === Infinity){
+    if (format === 'text'){
         // CSV export. Format the values
         const formattedValues = result.map(formatCSVValues);
         // Create a write stream for the CSV file
         let filename = species || 'All';
         filename += '_detections.csv';
-        const filePath = p.join(exportTo, filename);
+        const filePath = p.join(directory, filename);
         writeToPath(filePath, formattedValues, {headers: true})
             .on('error', err => UI.postMessage({event: 'generate-alert', message: `Cannot save file ${filePath}\nbecause it is open in another application`}))
             .on('finish', () => {
@@ -2214,13 +2216,13 @@ const getResults = async ({
     else {
         for (let i = 0; i < result.length; i++) {
             const r = result[i];
-            if (exportTo) {
+            if (format === 'audio') {
                 if (limit){
                     // Audio export. Format date to YYYY-MM-DD-HH-MM-ss
                     const dateString = new Date(r.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
                     const filename = `${r.cname}-${dateString}.${STATE.audio.format}`
-                    console.log(`Exporting from ${r.file}, position ${r.position}, into folder ${exportTo}`)
-                    saveAudio(r.file, r.position, r.position + 3, filename, metadata, exportTo)
+                    console.log(`Exporting from ${r.file}, position ${r.position}, into folder ${directory}`)
+                    saveAudio(r.file, r.position, r.position + 3, filename, metadata, directory)
                     i === result.length - 1 && UI.postMessage({ event: 'generate-alert', message: `${result.length} files saved` })
                 } 
             }
