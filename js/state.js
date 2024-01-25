@@ -24,7 +24,8 @@ export class State {
             this.GET_RESULT_SQL = undefined,
             this.lat = undefined,
             this.lon = undefined,
-            this.locationID = undefined
+            this.locationID = undefined,
+            this.speciesThreshold = undefined
     }
 
 

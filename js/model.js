@@ -57,9 +57,11 @@ tf.setBackend(backend).then(async () => {
     myModel = new Model(appPath, list, version);
     myModel.height = height;
     myModel.width = width;
+    myModel.list = e.data.list;
     myModel.lat = parseFloat(e.data.lat);
     myModel.lon = parseFloat(e.data.lon);
-    myModel.week = parseInt(e.data.week);
+    myModel.week = parseInt(e.data.week) || myModel.week;
+    myModel.speciesThreshold = parseFloat(e.data.threshold);
     myModel.labels = labels;
     await myModel.loadModel();
     postMessage({
@@ -133,6 +135,10 @@ break;
 }
             case "list": {
                 myModel.list = e.data.list;
+                myModel.lat = parseFloat(e.data.lat);
+                myModel.lon = parseFloat(e.data.lon);
+                myModel.week = parseInt(e.data.week) || myModel.week;
+                myModel.speciesThreshold = parseFloat(e.data.threshold);
 if (DEBUG) {
     console.log(`Setting list to ${myModel.list}`);
 }
@@ -204,9 +210,9 @@ class Model {
     async setList() {
         BLOCKED_IDS = [];
         if (this.list === "location") {
-            const lat = myModel.lat;
-            const lon = myModel.lon;
-            const week = myModel.week;
+            const lat = this.lat;
+            const lon = this.lon;
+            const week = this.week;
             this.mdata_input = tf.tensor([lat, lon, week]).expandDims(0);
             const mdata_prediction = this.metadata_model.predict(this.mdata_input);
             const mdata_probs = await mdata_prediction.data();
@@ -215,7 +221,7 @@ class Model {
             let count = 0
             for (let i = 0; i < mdata_probs.length; i++) {
                 const index = i; // mdata_probs.indexOf(mdata_probs_sorted[i]);
-                if (mdata_probs[index] > 0.004) {
+                if (mdata_probs[index] > this.speciesThreshold) {
                     count++
                     DEBUG && console.log('Including:', this.mdata_labels[index] + ': ' + mdata_probs[index]);
                 } else {

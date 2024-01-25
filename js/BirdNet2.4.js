@@ -59,6 +59,7 @@ onmessage = async (e) => {
                     myModel.lat = parseFloat(e.data.lat);
                     myModel.lon = parseFloat(e.data.lon);
                     myModel.week = parseInt(e.data.week);
+                    myModel.speciesThreshold = parseFloat(e.data.threshold);
                     await myModel.loadModel();
                     postMessage({
                         message: "update-list",
@@ -137,6 +138,7 @@ onmessage = async (e) => {
                 myModel.lat = parseFloat(e.data.lat);
                 myModel.lon = parseFloat(e.data.lon);
                 myModel.week = parseInt(e.data.week) || myModel.week;
+                myModel.speciesThreshold = parseFloat(e.data.threshold);
                 DEBUG && console.log(`Setting list to ${myModel.list}`);
                 await myModel.setList();
                 postMessage({
@@ -208,9 +210,9 @@ class Model {
         BLOCKED_IDS = [];
         if (this.list === "everything") return
         // Dummy location and week
-        const lat = myModel.lat;
-        const lon = myModel.lon;
-        const week = myModel.week;
+        const lat = this.lat;
+        const lon = this.lon;
+        const week = this.week;
         console.log('lat', lat, 'lon', lon, 'week', week)
         this.mdata_input = tf.tensor([lat, lon, week]).expandDims(0);
         const mdata_prediction = this.metadata_model.predict(this.mdata_input);
@@ -218,16 +220,17 @@ class Model {
         const mdata_probs_sorted = mdata_probs.slice().sort().reverse();
         let count = 0
         for (let i = 0; i < mdata_probs.length; i++) {
-            if (mdata_probs[i] > 0.004) {
+            if (mdata_probs[i] > this.speciesThreshold) {
                 count++;
                 DEBUG && console.log("including:", this.labels[i] + ': ' + mdata_probs[i]);
             } else {
                 DEBUG && console.log("Excluding:", this.labels[i] + ': ' + mdata_probs[i]);
                 // Hack to add Dotterel??
-                if (! this.labels[i].includes('Dotterel')) BLOCKED_IDS.push(i)
+                //if (! this.labels[i].includes('Dotterel')) 
+                BLOCKED_IDS.push(i)
             }
         }
-        console.log('Total species considered at this location: ', count)
+        //console.log('Total species considered at this location: ', count)
         // get the indices of any items in the blacklist, GRAYLIST
         // if (this.list === 'birds') {
         //     // find the position of the blocked items in the label list

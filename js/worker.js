@@ -363,7 +363,8 @@ predictWorkers.forEach((worker) => worker.postMessage({
     list: args.list,
     lat: STATE.lat,
     lon: STATE.lon,
-    week: -1
+    week: -1,
+    threshold: STATE.speciesThreshold
 }));
 break;
 }
@@ -1663,7 +1664,8 @@ function spawnWorkers(model, list, batchSize, threads) {
             backend: BACKEND,
             lat: STATE.lat,
             lon: STATE.lon,
-            week: -1 // new Date(1617229255088).getWeekNumber()
+            week: -1, // new Date(1617229255088).getWeekNumber()
+            threshold: STATE.speciesThreshold
         })
         worker.onmessage = async (e) => {
             await parseMessage(e)
@@ -1967,11 +1969,11 @@ break;
 break;
 }
         case "update-list": {if ( !SEEN_LIST_UPDATE) {
-    SEEN_LIST_UPDATE = true;
     STATE.update({
         blocked: response.blocked,
         globalOffset: 0
     });
+    SEEN_LIST_UPDATE = true;
     if (response["updateResults"] && STATE.db) {
         await Promise.all([getResults(), getSummary()]);
         if (["explore", "chart"].includes(STATE.mode)) {
@@ -2569,15 +2571,27 @@ const getDetectedSpecies = () => {
     })
 };
 
-const getValidSpecies = () => {
+const getValidSpecies = async () => {
+    if (!SEEN_LIST_UPDATE){
+        UI.postMessage({
+            event: 'generate-alert',
+            message: 'Still preparing the detection list, try again in a few moments'
+        });
+        return
+    }
+    let excluded, included;
     let sql = `SELECT cname, sname FROM species`;
     if (STATE.blocked.length) {
         sql += ` WHERE id NOT IN (${STATE.blocked.join(',')})`;
     }
     sql += ' GROUP BY cname ORDER BY cname';
-    diskDB.all(sql, (err, rows) => {
-        err ? console.log(err) : UI.postMessage({ event: 'valid-species-list', rows: rows })
-    })
+    included = await diskDB.allAsync(sql)
+    
+    if (STATE.blocked.length){
+        sql = sql.replace('NOT IN', 'IN');
+        excluded = await diskDB.allAsync(sql);
+    }
+    UI.postMessage({ event: 'valid-species-list', included: included, excluded: excluded })
 };
 
 const onUpdateFileStart = async (args) => {
