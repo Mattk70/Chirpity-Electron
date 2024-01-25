@@ -299,6 +299,10 @@ footer {
     max-width: 70px;
 }
 
+#speciesModal {
+    max-height: 90%;
+}
+
 /* Flip comment icons */
 
 .flipped {

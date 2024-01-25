@@ -158,7 +158,7 @@ DIAGNOSTICS['CPU'] = os.cpus()[0].model;
 DIAGNOSTICS['Cores'] = os.cpus().length;
 DIAGNOSTICS['System Memory'] = (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) + ' GB';
 
-function resetResults({clearSummary, clearPagination, clearResults}) {
+function resetResults({clearSummary = true, clearPagination = true, clearResults = true} = {}) {
     if (clearSummary) summaryTable.textContent = '';
 
     clearPagination && pagination.forEach(item => item.classList.add('d-none'));
@@ -649,8 +649,11 @@ const displayLocationAddress = async (where) => {
         // Initially, so changes to the default location are immediately reflected in subsequent analyses
         // We will switch to location filtersing when the default location is changed.
         config.list = 'location';
+        speciesThresholdEl.classList.remove('d-none');
+        
         updateListIcon();
         document.getElementById('list-to-use').value = config.list;
+        resetResults();
         worker.postMessage({
             action: 'update-list',
             list: 'location'
@@ -889,7 +892,9 @@ function fetchLocationAddress(lat, lon) {
                 return response.json()
             })
             .then(data => {
-                const address = data.display_name;
+                // Just take the first two elements of the address
+                let address = data.display_name.split(',').slice(0,2).join(", ");
+
                 LOCATIONS.push({ id: LOCATIONS.length + 1, lat: lat, lon: lon, place: address })
                 resolve(address);
             })
@@ -1005,7 +1010,7 @@ const handleLocationFilterChange = (e) => {
     // Update the seen species list
     worker.postMessage({ action: 'get-detected-species-list' })
     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
-    if (STATE.mode === 'explore') worker.postMessage({ action: 'filter', species: isSpeciesViewFiltered(true), updateSummary: true });
+    if (STATE.mode === 'explore') filterResults() // worker.postMessage({ action: 'filter', species: isSpeciesViewFiltered(true), updateSummary: true });
 }
 
 const exploreLink = document.getElementById('explore');
@@ -1020,7 +1025,8 @@ exploreLink.addEventListener('click', async () => {
     enableMenuItem(['saveCSV']);
     adjustSpecDims(true)
     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
-    worker.postMessage({ action: 'filter', species: undefined, range: STATE.explore.range, updateSummary: true }); 
+    filterResults({species: undefined, range: STATE.explore.range})
+    //worker.postMessage({ action: 'filter', species: undefined, range: STATE.explore.range, updateSummary: true }); 
     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
 });
 
@@ -1341,6 +1347,7 @@ window.onload = async () => {
         colormap: 'inferno',
         timeOfDay: false,
         list: 'migrants',
+        speciesThreshold: 0.004,
         model: 'v2',
         latitude: 52.87,
         longitude: 0.89, // Great Snoring :)
@@ -1397,6 +1404,9 @@ window.onload = async () => {
         setTimelinePreferences();
         // Show the list in use
         document.getElementById('list-to-use').value = config.list;
+        config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
+            speciesThresholdEl.classList.add('d-none');
+        speciesThreshold.value = config.speciesThreshold;
         // And update the icon
         updateListIcon();
         timelineSetting.value = config.timeOfDay ? 'timeOfDay' : 'timecode';
@@ -1457,7 +1467,8 @@ window.onload = async () => {
             detect: config.detect,
             filters: config.filters,
             audio: config.audio,
-            limit: config.limit
+            limit: config.limit,
+            speciesThreshold: config.speciesThreshold
         });
         loadModel();
         worker.postMessage({ action: 'clear-cache' })
@@ -1558,7 +1569,7 @@ break;
                 case "seen-species-list": {generateBirdList("seenSpecies", args.list);
 break;
 }
-                case "valid-species-list": {populateSpeciesModal(args.rows);
+                case "valid-species-list": {populateSpeciesModal(args.included, args.excluded);
 break;
 }
                 case "show-spinner": {showLoadingSpinner(500);
@@ -2112,6 +2123,8 @@ colourmap.addEventListener('change', (e) => {
 
 // list mode icons
 const listIcon = document.getElementById('list-icon')
+const speciesThresholdEl = document.getElementById('species-threshold-el');
+const speciesThreshold = document.getElementById('species-frequency-threshold');
 const updateListIcon = () => {
     const icon = listIcon.querySelector('img');
     icon.src = icon.src.replace(/\w+\.png$/, config.list + '.png');
@@ -2142,6 +2155,8 @@ listIcon.addEventListener('click', () => {
             config.list = keys[replace];
             updatePrefs();
             resetResults({clearSummary: true, clearPagination: true, clearResults: true});
+            config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
+                speciesThresholdEl.classList.add('d-none');
             worker.postMessage({ action: 'update-list', list: config.list })
             break
         }
@@ -2152,9 +2167,18 @@ listIcon.addEventListener('click', () => {
 const listToUse = document.getElementById('list-to-use');
 listToUse.addEventListener('change', function (e) {
     config.list = e.target.value;
+    config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
+    speciesThresholdEl.classList.add('d-none');
     updateListIcon();
     updatePrefs();
     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
+    worker.postMessage({ action: 'update-list', list: config.list  })
+})
+
+speciesThreshold.addEventListener('change', () =>{
+    config.speciesThreshold = speciesThreshold.value;
+    updatePrefs();
+    worker.postMessage({ action: 'update-state', speciesThreshold: speciesThreshold.value });
     worker.postMessage({ action: 'update-list', list: config.list })
 })
 
@@ -2810,13 +2834,14 @@ pagination.forEach(item => {
             }
             const limit = config.limit;
             const offset = (clicked - 1) * limit;
-            const species = isSpeciesViewFiltered(true);
-            worker.postMessage({
-                action: 'filter',
-                species: species,
-                offset: offset,
-                limit: limit,
-            }); 
+            // const species = isSpeciesViewFiltered(true);
+            filterResults({offset: offset, limit:limit})
+            // worker.postMessage({
+            //     action: 'filter',
+            //     species: species,
+            //     offset: offset,
+            //     limit: limit,
+            // }); 
             resetResults({clearSummary: false, clearPagination: false, clearResults: false});
         }
     })
@@ -2873,10 +2898,11 @@ function speciesFilter(e) {
         const list = document.getElementById('bird-list-seen');
         list.value = species || '';
     }
-    worker.postMessage({
-        action: 'filter',
-        species: species
-    });
+    filterResults()
+    // worker.postMessage({
+    //     action: 'filter',
+    //     species: species
+    // });
     resetResults({clearSummary: false, clearPagination: false, clearResults: false});
 }
 
@@ -2904,8 +2930,6 @@ async function renderResult({
         }
         else {
             showElement(['resultTableContainer', 'resultsHead'], false);
-            // const resultTable = document.getElementById('resultTableBody');
-            // resultTable.innerHTML = '';
         }
     }  else if (!isFromDB && index % (config.limit + 1) === 0) {
         addPagination(index, 0)
@@ -3218,6 +3242,10 @@ document.getElementById('usage').addEventListener('click', async () => {
     await populateHelpModal('Help/usage.html', 'Usage Guide');
 });
 
+document.getElementById('bugs').addEventListener('click', async () => {
+    await populateHelpModal('Help/bugs.html', 'Issues, queries or bugs');
+});
+
 const populateHelpModal = async (file, label) => {
     document.getElementById('helpModalLabel').textContent = label;
     const response = await fetch(file);
@@ -3226,23 +3254,48 @@ const populateHelpModal = async (file, label) => {
     help.show();
 }
 
-const populateSpeciesModal = async (rows) => {
+const populateSpeciesModal = async (included, excluded) => {
+    const count = included.length;
     const model = config.model === 'v2.4' ? 'BirdNET' : 'Chirpity';
     const location = config.list === 'location' ? ` centered on ${place.textContent.replace('fmd_good', '')}` : '';
+    let includedContent = `<br/><p>The number of species detected depends on the model and list being used. As you are using the <b>${model}</b> model and the <b>${config.list}</b> list${location}, Chirpity will display detections of the following ${count} classes:</p>`;
+    includedContent += '<table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Common Name</th><th>Scientific Name</th></tr></thead><tbody>\n';
+    includedContent += generateBirdIDList(included);
+    includedContent += '</tbody></table>\n';
+    let excludedContent = '', disable = '';
+    if (excluded){
+        excludedContent += `<br/><p>Conversely, the application will not display detections among the following ${excluded.length} classes:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Common Name</th><th>Scientific Name</th></tr></thead><tbody>\n`;
+        excludedContent += generateBirdIDList(excluded);
+        excludedContent += '</tbody></table>\n';
+    } else {
+        disable = ' disabled'
+    }
     let modalContent =  `
-    <h6>Using the <b>${model}</b> model and the <b>${config.list}</b> list${location}, the following species can be detected:</h6>
-    `
-    modalContent += '<table class="table table-striped"><thead class="bg-text-dark"><tr><th>Common Name</th><th>Scientific Name</th></tr></thead><tbody>\n';
-    modalContent += generateBirdIDList(rows);
-    modalContent += '</tbody></table>\n';
+    <ul class="nav nav-tabs" id="myTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="included-tab" data-bs-toggle="tab" data-bs-target="#included-tab-pane" type="button" role="tab" aria-controls="included-tab-pane" aria-selected="true">Included</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="excluded-tab" data-bs-toggle="tab" data-bs-target="#excluded-tab-pane" type="button" role="tab" aria-controls="excluded-tab-pane" aria-selected="false" ${disable}>Excluded</button>
+        </li>
+        </ul>
+        <div class="tab-content" id="myTabContent">
+            <div class="tab-pane fade show active" id="included-tab-pane" role="tabpanel" aria-labelledby="included-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${includedContent}</div>
+            <div class="tab-pane fade" id="excluded-tab-pane" role="tabpanel" aria-labelledby="excluded-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${excludedContent}</div>
+        </div>
+    `;
     document.getElementById('speciesModalBody').innerHTML = modalContent;
     const species = new bootstrap.Modal(document.getElementById('speciesModal'));
     species.show();
 }
 
-// Prevent the settings menu disappearing on click
-document.getElementById('settingsMenu').addEventListener('click', (e) => {
+// Prevent the settings menu disappearing on click or mouseout
+const settingsMenu = document.getElementById('settingsMenu')
+settingsMenu.addEventListener('click', (e) => {
     e.stopImmediatePropagation();
+})
+settingsMenu.addEventListener('mouseout', (e) => {
+    e.stopImmediatePropagation()
 })
 
 function setNocmig(on) {
@@ -3269,10 +3322,22 @@ const changeNocmigMode = () => {
     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}}); 
 
     resetResults({clearSummary: true, clearPagination: true, clearResults: false});
+    filterResults()
+    // worker.postMessage({
+    //     action: 'filter',
+    //     species: isSpeciesViewFiltered(true),
+    //     updateSummary: true
+    // })
+}
+
+function filterResults({species = isSpeciesViewFiltered(true), updateSummary = true, offset = 0, limit = 500, range = undefined} = {}){
     worker.postMessage({
         action: 'filter',
-        species: isSpeciesViewFiltered(true),
-        updateSummary: true
+        species: species,
+        updateSummary: updateSummary,
+        offset: offset,
+        limit: limit,
+        range: range
     })
 }
 
@@ -3445,10 +3510,11 @@ const setSortOrder = (order) => {
     showSortIcon()
     worker.postMessage({ action: 'update-state', sortOrder: order })
     resetResults({clearSummary: false, clearPagination: false, clearResults: true});
-    worker.postMessage({
-        action: 'filter',
-        species: isSpeciesViewFiltered(true)
-    }) // re-prepare
+    filterResults()
+    // worker.postMessage({
+    //     action: 'filter',
+    //     species: isSpeciesViewFiltered(true)
+    // }) // re-prepare
 
 }
 // Drag file to app window to open
@@ -3598,12 +3664,13 @@ function initialiseDatePicker() {
                 STATE.explore.range = {start: start.getTime(), end: end.getTime()};
                 resetResults({clearSummary: true, clearPagination: true, clearResults: false});
                 worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}, explore: STATE.explore}); 
-                worker.postMessage({
-                    action: 'filter',
-                    species: isSpeciesViewFiltered(true),
-                    range: STATE.explore.range,
-                    updateSummary: true
-                }); // re-prepare
+                filterResults({range:STATE.explore.range})
+                // worker.postMessage({
+                //     action: 'filter',
+                //     species: isSpeciesViewFiltered(true),
+                //     range: STATE.explore.range,
+                //     updateSummary: true
+                // }); // re-prepare
             }
 
             // Update the seen species list
@@ -3625,12 +3692,13 @@ function initialiseDatePicker() {
                 STATE.explore.range = {start: undefined, end: undefined};
                 worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}, explore: STATE.explore}); 
                 resetResults({clearSummary: true, clearPagination: true, clearResults: false});
-                worker.postMessage({
-                    action: 'filter',
-                    species: STATE.explore.species,
-                    range: STATE.explore.range,
-                    updateSummary: true
-                }); // re-prepare
+                filterResults({species:STATE.explore.species, range:STATE.explore.range})
+                // worker.postMessage({
+                //     action: 'filter',
+                //     species: STATE.explore.species,
+                //     range: STATE.explore.range,
+                //     updateSummary: true
+                // }); // re-prepare
             }
         })
         picker.on('click', (e) =>{
@@ -3774,11 +3842,12 @@ const handleThresholdChange = (e) => {
     if (!PREDICTING && !resultTableElement.classList.contains('d-none')) {
         worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
         resetResults({clearSummary: true, clearPagination: true, clearResults: false});
-        worker.postMessage({
-            action: 'filter',
-            species: isSpeciesViewFiltered(true),
-            updateSummary: true
-        });
+        filterResults()
+        // worker.postMessage({
+        //     action: 'filter',
+        //     species: isSpeciesViewFiltered(true),
+        //     updateSummary: true
+        // });
     }
 }
 filterPanelRangeInput.addEventListener('change', handleThresholdChange);
