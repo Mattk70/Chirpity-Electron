@@ -38,35 +38,6 @@
         </td>
     </tr>
     <tr>
-        <td colspan="2" class="text-center text-bg-light"><h5>Experimental Features</h5></td>
-    </tr>
-    <tr>
-        <th>Context Mode</th>
-        <td> In this mode, Chirpity will use the surrounding context when making predictions. This helps mitigate
-            against false positive detections.
-        </td>
-    </tr>
-        <th>SNR filter</th>
-        <td>The SNR (Signal to Noise Ratio) filter can only be enabled when using the CPU backend. When enabled, Chirpity will disregard audio segments with no distinct sound event.
-            A stronger signal is required for a prediction to be attempted when higher signal-to-noise values are set.
-            The purpose is to deliver significant speed gains, however, the setting may cause Chirpity to miss quieter, more distant calls.
-        </td>
-    </tr>
-    <tr>
-        <th>High Pass filter</th>
-        <td> This applies a filter to the audio, removing the sound below the frequency selected. 
-            Intended primarily for recordings made in in urban settings, this is desirable to compensate for strong low-frequency noise which is not present in the training data.
-        </td>
-    </tr>
-    <tr>
-        <th>Low Shelf filter</th>
-        <td> This applies an audio filter similar to the High Pass filter, however, rather than simply remove noise, it reduces the volume of low frequency noise. 
-            You can set the threshold frequency, and the strength of the filter to apply (Attenuation).
-            Also intended for recordings made in in urban settings, this helps tune the audio to the noise profile of the training data.
-        </td>
-    </tr>
-    <tr>
-    <tr>
         <td colspan="2" class="text-center text-bg-light"><h5>Location</h5></td>
     </tr>
     <tr>
@@ -128,7 +99,7 @@
                 <b>Chirpity</b> will use the native Chirpity model for predictions.
             </li>
             <li>
-                <b>BirdNet</b> will use the BirdNet model.
+                <b>BirdNET</b> will use the <a href="https://github.com/kahst/BirdNET-Analyzer" target="_blank">BirdNET</a> model developed by Stefan Kahl et al. from the K. Lisa Yang Center for Conservation Bioacoustics
             </li>
         </ul>
     </td>
@@ -144,6 +115,34 @@
         <th>Batch Size</th>
         <td>This setting determines the number of three-second audio chunks to process each time a prediction is requested.
             Larger values lead to faster processing, especially on long files.
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center text-bg-warning"><h5>Experimental Features</h5></td>
+    </tr>
+    <tr>
+        <th>Context Mode</th>
+        <td> In this mode, Chirpity will use the surrounding context when making predictions. This helps mitigate
+            against false positive detections.
+        </td>
+    </tr>
+        <th>SNR filter</th>
+        <td>The SNR (Signal to Noise Ratio) filter can only be enabled when using the CPU backend. When enabled, Chirpity will disregard audio segments with no distinct sound event.
+            A stronger signal is required for a prediction to be attempted when higher signal-to-noise values are set.
+            The purpose is to deliver significant speed gains, however, the setting may cause Chirpity to miss quieter, more distant calls.
+        </td>
+    </tr>
+    <tr>
+        <th>High Pass filter</th>
+        <td> This applies a filter to the audio, removing the sound below the frequency selected. 
+            Intended primarily for recordings made in in urban settings, this is desirable to compensate for strong low-frequency noise which is not present in the training data.
+        </td>
+    </tr>
+    <tr>
+        <th>Low Shelf filter</th>
+        <td> This applies an audio filter similar to the High Pass filter, however, rather than simply remove noise, it reduces the volume of low frequency noise. 
+            You can set the threshold frequency, and the strength of the filter to apply (Attenuation).
+            Also intended for recordings made in in urban settings, this helps tune the audio to the noise profile of the training data.
         </td>
     </tr>
 </table>

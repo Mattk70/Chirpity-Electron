@@ -96,7 +96,7 @@
     ],
     "mac": {
       "target": {
-        "target": "pkg",
+        "target": "dmg",
         "arch": "arm64"
       },
       "files": [

@@ -368,6 +368,7 @@ class Model {
 
         const tb = paddedTensorBatch || maskedTensorBatch || TensorBatch;
         const prediction = this.model.predict(tb, { batchSize: this.batchSize })
+        
         let newPrediction;
         if (this.selection) {
             newPrediction = tf.max(prediction, 0, true);
