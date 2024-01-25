@@ -3257,8 +3257,8 @@ const populateHelpModal = async (file, label) => {
 const populateSpeciesModal = async (included, excluded) => {
     const count = included.length;
     const model = config.model === 'v2.4' ? 'BirdNET' : 'Chirpity';
-    const location = config.list === 'location' ? ` centered on ${place.textContent.replace('fmd_good', '')}` : '';
-    let includedContent = `<br/><p>The number of species detected depends on the model and list being used. As you are using the <b>${model}</b> model and the <b>${config.list}</b> list${location}, Chirpity will display detections of the following ${count} classes:</p>`;
+    const location = config.list === 'location' ? ` centered on <b>${place.textContent.replace('fmd_good', '')}</b> and with a location filter threshold of <b>${config.speciesThreshold}</b>` : '';
+    let includedContent = `<br/><p>The number of species detected depends on the model, the list being used and in the case of the location filter, the species filter threshold. As you are using the <b>${model}</b> model and the <b>${config.list}</b> list${location}, Chirpity will display detections of the following ${count} classes:</p>`;
     includedContent += '<table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Common Name</th><th>Scientific Name</th></tr></thead><tbody>\n';
     includedContent += generateBirdIDList(included);
     includedContent += '</tbody></table>\n';
