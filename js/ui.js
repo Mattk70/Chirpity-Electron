@@ -628,13 +628,14 @@ const displayLocationAddress = async (where) => {
         lonEl = document.getElementById('customLon');
         placeEl = document.getElementById('customPlace');
         address = await fetchLocationAddress(latEl.value, lonEl.value, false);
+        if (address === false) return
         placeEl.value = address || 'Location not available';
     } else {
-
         latEl = document.getElementById('latitude');
         lonEl = document.getElementById('longitude');
         placeEl = document.getElementById('place');
         address = await fetchLocationAddress(latEl.value, lonEl.value, false);
+        if (address === false) return
         const content = '<span class="material-symbols-outlined">fmd_good</span> ' + address;
         placeEl.innerHTML = content;
         config.latitude = parseFloat(latEl.value).toFixed(2);
@@ -876,6 +877,10 @@ function postAnalyseMessage(args) {
 
 
 function fetchLocationAddress(lat, lon) {
+    if (isNaN(lat) || isNaN(lon  || lat === '' || lon === '')){
+        alert('Both lat and lon values need to be numbers between 180 and -180')
+        return false
+    }
     return new Promise((resolve, reject) => {
         if (!LOCATIONS) {
             worker.postMessage({ action: 'get-locations', file: currentFile });
@@ -1347,7 +1352,7 @@ window.onload = async () => {
         colormap: 'inferno',
         timeOfDay: false,
         list: 'migrants',
-        speciesThreshold: 0.004,
+        speciesThreshold: 0.03,
         model: 'v2',
         latitude: 52.87,
         longitude: 0.89, // Great Snoring :)
@@ -2176,6 +2181,10 @@ listToUse.addEventListener('change', function (e) {
 })
 
 speciesThreshold.addEventListener('change', () =>{
+    if (isNaN(speciesThreshold.value) || speciesThreshold.value === '') {
+        alert('The threshold must be a number between 0.001 and 1');
+        return false
+    }
     config.speciesThreshold = speciesThreshold.value;
     updatePrefs();
     worker.postMessage({ action: 'update-state', speciesThreshold: speciesThreshold.value });
