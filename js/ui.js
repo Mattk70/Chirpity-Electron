@@ -1356,9 +1356,9 @@ window.onload = async () => {
         model: 'v2',
         latitude: 52.87,
         longitude: 0.89, // Great Snoring :)
-        location: 'Great Snoring, North Norfolk, Norfolk, England, United Kingdom',
+        location: 'Great Snoring, North Norfolk',
         detect: { nocmig: false, contextAware: false, confidence: 45 },
-        filters: { active: true, highPassFrequency: 250, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0 },
+        filters: { active: false, highPassFrequency: 250, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0 },
         warmup: true,
         backend: 'tensorflow',
         tensorflow: { threads: DIAGNOSTICS['Cores'], batchSize: 32 },
