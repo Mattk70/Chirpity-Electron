@@ -740,7 +740,7 @@ const getDuration = async (src) => {
 
 const convertFileFormat = (file, destination, size, error) => {
     return new Promise(function (resolve) {
-        const sampleRate = 24_000, channels = 1;
+        const sampleRate = STATE.model === 'v2.4' ? 48_000 :24_000, channels = 1;
         let totalTime;
         ffmpeg(file)
             .audioChannels(channels)
@@ -1143,7 +1143,7 @@ async function setupCtx(chunk, header) {
 const getPredictBuffers = async ({
     file = '', start = 0, end = undefined, worker = undefined
 }) => {
-    let chunkLength = 72_000;
+    let chunkLength = STATE.model === 'v2.4' ? 144_000 : 72_000;
     // Ensure max and min are within range
     start = Math.max(0, start);
     end = Math.min(metadata[file].duration, end);
@@ -1372,7 +1372,7 @@ const convertSpecsFromExistingSpecs = async (path) => {
 
 const saveResults2DataSet = ({species}) => {
     const rootDirectory = DATASET_SAVE_LOCATION;
-    sampleRate = 24_000;
+    sampleRate = STATE.model === 'v2.4' ? 48_000 : 24_000;
     const height = 256, width = 384;
     let t0 = Date.now()
     let promise = Promise.resolve();
