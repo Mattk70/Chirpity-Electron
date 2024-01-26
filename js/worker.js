@@ -1037,8 +1037,8 @@ const convertTimeToBytes = (time, metadata) => {
 }
 
 
-async function setupCtx(chunk, header, sampleRate) {
-    sampleRate ??= STATE.sampleRate;
+async function setupCtx(chunk, header, rate) {
+    rate ??= sampleRate;
     // Deal with detached arraybuffer issue
     let audioBufferChunk;
     try {
@@ -1052,7 +1052,7 @@ async function setupCtx(chunk, header, sampleRate) {
     audioCtxSource.buffer = audioBufferChunk;
     const duration = audioCtxSource.buffer.duration;
     const buffer = audioCtxSource.buffer;
-    const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
+    const offlineCtx = new OfflineAudioContext(1, rate * duration, rate);
     const offlineSource = offlineCtx.createBufferSource();
     offlineSource.buffer = buffer;
     let previousFilter = undefined;
