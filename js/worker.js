@@ -298,38 +298,32 @@ break;
         case "get-valid-species": {getValidSpecies();
 break;
 }
-        case "get-locations": {getLocations({
-    db: STATE.db,
-    file: args.file
-});
+        case "get-locations": { getLocations({ db: STATE.db, file: args.file });
 break;
 }
-        case "get-valid-files-list": {await getFiles(args.files);
+        case "get-valid-files-list": { await getFiles(args.files);
 break;
 }
-        case "insert-manual-record": {const count = await onInsertManualRecord(args);
+        case "insert-manual-record": { await onInsertManualRecord(args);
 break;
 }
-        case "load-model": {SEEN_LABELS = false;
-SEEN_MODEL_READY = false;
-UI.postMessage({
-    event: "spawning"
-});
-if (args.model === "v3") {
-    BATCH_SIZE = 1;
-    sampleRate = 48_000;
-}  else {
-    BATCH_SIZE = parseInt(args.batchSize);
-    sampleRate = 24_000;
-}
-setAudioContext(sampleRate);
-memoryDB = undefined;
-BACKEND = args.backend;
-STATE.update({
-    model: args.model
-});
-predictWorkers.length && terminateWorkers();
-spawnWorkers(args.model, args.list, BATCH_SIZE, args.threads);
+        case "load-model": {
+            SEEN_LABELS = false;
+            SEEN_MODEL_READY = false;
+            UI.postMessage({
+                event: "spawning"
+            });
+            sampleRate = args.model === "v2.4" ? 48_000 : 24_000;
+
+            BATCH_SIZE = parseInt(args.batchSize);
+            setAudioContext(sampleRate);
+            memoryDB = undefined;
+            BACKEND = args.backend;
+            STATE.update({
+                model: args.model
+            });
+            predictWorkers.length && terminateWorkers();
+            spawnWorkers(args.model, args.list, BATCH_SIZE, args.threads);
 break;
 }
         case "post": {await uploadOpus(args);
@@ -339,7 +333,7 @@ break;
 break;
 }
         case "save": {console.log("file save requested");
-await saveAudio(args.file, args.start, args.end, args.filename, args.metadata);
+            await saveAudio(args.file, args.start, args.end, args.filename, args.metadata);
 break;
 }
         case "save2db": {await onSave2DiskDB(args);
@@ -354,23 +348,23 @@ break;
         case "update-file-start": {await onUpdateFileStart(args);
 break;
 }
-        case "update-list": {UI.postMessage({
-    event: "show-spinner"
-});
-SEEN_LIST_UPDATE = false;
-predictWorkers.forEach((worker) => worker.postMessage({
-    message: "list",
-    list: args.list,
-    lat: STATE.lat,
-    lon: STATE.lon,
-    week: -1,
-    threshold: STATE.speciesThreshold
-}));
+        case "update-list": {
+            UI.postMessage({ event: "show-spinner" });
+                SEEN_LIST_UPDATE = false;
+                predictWorkers.forEach((worker) => worker.postMessage({
+                    message: "list",
+                    list: args.list,
+                    lat: STATE.lat,
+                    lon: STATE.lon,
+                    week: -1,
+                    threshold: STATE.speciesThreshold
+                }));
 break;
 }
-        case "update-state": {TEMP = args.temp || TEMP;
-appPath = args.path || appPath;
-STATE.update(args);
+        case "update-state": {
+            TEMP = args.temp || TEMP;
+            appPath = args.path || appPath;
+            STATE.update(args);
 break;
 }
         default: {UI.postMessage("Worker communication lines open");
@@ -1218,7 +1212,7 @@ const getPredictBuffers = async ({
                 worker = workerInstance;
             }
             // Create array with 0's (short segment of silence that will trigger the finalChunk flag
-            const myArray = new Float32Array(new Array(chunkLength).fill(0));
+            const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
             feedChunksToModel(myArray, chunkStart, file, end, worker);
             readStream.resume();
         }
@@ -2518,8 +2512,8 @@ const getChartTotals = ({
 const getRate = (species) => {
 
     return new Promise(function (resolve, reject) {
-        const calls = new Array(52).fill(0);
-        const total = new Array(52).fill(0);
+        const calls = Array.from({length: 52}).fill(0);
+        const total = Array.from({length: 52}).fill(0);
         // Add Location filter
         const locationFilter = filterLocation();
 
@@ -2734,7 +2728,7 @@ async function onChartRequest(args) {
                 const count = rows[i].count;
                 // stack years
                 if (!(year in results)) {
-                    results[year] = new Array(dataPoints).fill(0);
+                    results[year] = Array.from({length: dataPoints}).fill(0);
                 }
                 if (aggregation === 'Week') {
                     results[year][parseInt(week) - 1] = count;
