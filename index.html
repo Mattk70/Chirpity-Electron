@@ -42,7 +42,7 @@
     </div>
 </div>
     <!-- The modal for the tour -->
-    <div class="modal modal-fade" id="tourModal" tabindex="-1" aria-labelledby="tourModalLabel" aria-hidden="true">
+    <div class="modal modal-lg modal-fade" id="tourModal" tabindex="-1" aria-labelledby="tourModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-body">
@@ -63,16 +63,21 @@
                             <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chiprity Nocmig">
                             <div class="text-center pb-4">
                                 <h5>Welcome to Chirpity Nocmig</h5>
-                                <p>This tour will highlight a few of the key features of the application.</p>
+                                <p>This tour will highlight a few of the key features of the application. Click the right arrow for the next item</p>
                             </div>
                         </div>
                         <div class="carousel-item" data-element-selector="#navbarSettings">
                             <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chiprity Nocmig">
-                            <div class="text-center pb-4">
-                                <h5>Settings</h5>
-                                <p>When getting started, here is where you should set a number of default settings, especially your recording location.
-                                    You may also want to tune system parameters, audio preferences and spectrogram options.
-                                </p>
+                            <div class="text-start pb-4 ms-3">
+                                <h5 class="text-center">Getting Started</h5>
+                                <ol class="ps-5 ms-5">
+                                    <li>First off, set your location in the settings menu.</li>
+                                    <li>Next, consider which model best suits your needs:</li>
+                                        <ul>
+                                            <li><b>Chirpity</b> is tuned for nocturnal migration,<br> but only has birds on the British list</li>
+                                            <li><b>BirdNET</b> is trained on global bird species</li>
+                                        </ul>
+                                </ol>
                             </div>
                         </div>
                         <div class="carousel-item" data-element-selector="#filter-panel">
@@ -81,16 +86,17 @@
                                 <h5>Quick access settings panel</h5>
                                 <p>The icons here allow you to qucikly toggle some frequently used settings. 
                                     These include:
-                                    <ul> 
-                                        <li>Nocmig mode
-                                        <li>Audio filters
-                                        <li>Context-aware mode
-                                        <li>Which detection list to use
-                                        <li>Fullscreen mode for the spectrogram
-                                        <li>And the confidence threshold.
-                                    </ul>
-                                    Note, the confidence threshold can be adjusted at any time,
-                                    even after a file analysis has taken place.
+                                    <div class="w-75 ms-5">
+                                        <ol class="text-start ps-5"> 
+                                            <li>Nocmig mode
+                                            <li>Audio filters
+                                            <li>Context-aware mode
+                                            <li>Fullscreen mode for the spectrogram
+                                            <li>Which detection list to use
+                                            <li>And the confidence threshold.
+                                        </ol>
+                                    </div>
+                                    Explanations for each of these settings can be found under "Settings" in the Help menu.
                                 </p>
                             </div>
                         </div>

@@ -1037,7 +1037,8 @@ const convertTimeToBytes = (time, metadata) => {
 }
 
 
-async function setupCtx(chunk, header) {
+async function setupCtx(chunk, header, sampleRate) {
+    sampleRate ??= STATE.sampleRate;
     // Deal with detached arraybuffer issue
     let audioBufferChunk;
     try {
@@ -1253,7 +1254,7 @@ const fetchAudioBuffer = async ({
         readStream.on('data', async chunk => {
             // Ensure data is processed in order
             readStream.pause();
-            const offlineCtx = await setupCtx(chunk, metadata[file].header);
+            const offlineCtx = await setupCtx(chunk, metadata[file].header, sampleRate);
             if (offlineCtx){
                 offlineCtx.startRendering().then(resampled => {
                     // `resampled` contains an AudioBuffer resampled at 24000Hz.
