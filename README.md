@@ -13,6 +13,11 @@ First, clone the project and install all dependencies:
 ```
 git clone https://github.com/Mattk70/Chirpity-Electron
 cd Chirpity-Electron
+```
+
+Chirpity depends on  <i><a href="https://nodejs.org/en/download">Node.js</a></i>, follow the link for the download and installation instructions.
+Once installed, run:
+```
 npm install
 ```
 
@@ -24,21 +29,21 @@ npm start
 
 ## Development setup
 
-Setting up the project requires <i>Node.js</i>, which we need to install first.
 
-After that, we can initialize the source directory with:
+
+Initialize the source directory with:
 
 ```
 npm init
 ```
 
-Now, we need to install project dependencoies with:
+Now, install project dependencoies with:
 
 ```
 npm install --save-dev
 ```
 
-After that, we can build a windows msi installer with:
+After that,  build a windows msi installer with:
 
 ```
 npm run export
