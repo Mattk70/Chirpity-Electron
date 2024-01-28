@@ -489,3 +489,9 @@ ipcMain.handle('saveFile', (event, arg) => {
     });
     mainWindow.webContents.send('saveFile', { message: 'file saved!' });
 });
+
+ipcMain.handle('clear-cache', (event, filePath) => {
+    // console.log("cache location:", event, filePath);
+    // return
+    clearCache(filePath)
+})

@@ -1,6 +1,6 @@
 {
   "name": "chirpity",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
@@ -98,7 +98,7 @@
     ],
     "mac": {
       "target": {
-        "target": "dmg",
+        "target": "pkg",
         "arch": "arm64"
       },
       "files": [
@@ -186,6 +186,7 @@
     "@easepick/bundle": "^1.2.1",
     "@fast-csv/format": "^4.3.5",
     "@popperjs/core": "^2.9.2",
+    "@tensorflow/tfjs-core": "^4.14.0",
     "@tensorflow/tfjs-node": "^4.14.0",
     "bootstrap": "5.2.2",
     "browser-id3-writer": "^4.4.0",
