@@ -1349,6 +1349,7 @@ window.onload = async () => {
     const defaultConfig = {
         seenTour: false,
         UUID: uuidv4(),
+        locale: 'en',
         colormap: 'inferno',
         timeOfDay: false,
         list: 'migrants',
@@ -1409,6 +1410,8 @@ window.onload = async () => {
         setTimelinePreferences();
         // Show the list in use
         document.getElementById('list-to-use').value = config.list;
+        // Show Locale
+        document.getElementById('locale').value = config.locale;
         config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
             speciesThresholdEl.classList.add('d-none');
         speciesThreshold.value = config.speciesThreshold;
@@ -2125,6 +2128,21 @@ colourmap.addEventListener('change', (e) => {
     }
 })
 
+const locale = document.getElementById('locale')
+locale.addEventListener('change', async ()=> {
+    config.locale = locale.value;
+    updatePrefs();
+    const labelFile = 'labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_XX.txt'.replace('XX', locale.value);
+    fetch(labelFile).then(response => {
+        if (! response.ok) throw new Error('Network response was not ok');
+        return response.text();
+    }).then(filecontents => {
+        const labels = filecontents.trim().split('\n');
+        worker.postMessage({action: 'update-locale', locale: labels})
+    }).catch(error =>{
+        console.error('There was a problem fetching the label file:', error);
+    })
+})
 
 // list mode icons
 const listIcon = document.getElementById('list-icon')

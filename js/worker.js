@@ -366,6 +366,10 @@ break;
                 }));
 break;
 }
+        case 'update-locale': {
+            await onUpdateLocale(args.locale)
+            break;
+        }
         case "update-state": {
             TEMP = args.temp || TEMP;
             appPath = args.path || appPath;
@@ -2789,6 +2793,18 @@ and its associated records were deleted successfully`,
         UI.postMessage({
             event: 'generate-alert', message: `${fileName} 
 was not found in the Archve databasse.`});
+    }
+}
+
+async function onUpdateLocale(labels){
+    if (STATE.model === 'v2.4'){
+        await diskDB.runAsync('BEGIN');
+        for (let i = 0; i < labels.length; i++){
+            const [sname, cname] = labels[i].split('_');
+            diskDB.runAsync('UPDATE species SET cname = ? WHERE sname = ?', cname, sname);
+        }
+        await diskDB.runAsync('END');
+        await createDB();
     }
 }
 
