@@ -2294,7 +2294,7 @@ document.getElementById('timelineSetting').addEventListener('change', timelineTo
 
 const GLOBAL_ACTIONS = { // eslint-disable-line
     KeyA: async function (e) {
-        if (e.ctrlKey) {
+        if ( e.ctrlKey || e.metaKey) {
             if (currentFile) {
                 if (e.shiftKey) analyseAllLink.click();
                 else analyseLink.click()
@@ -2303,7 +2303,7 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
     },
     KeyC: function (e) {
         // Center window on playhead
-        if (e.ctrlKey && currentBuffer) {
+        if (( e.ctrlKey || e.metaKey) && currentBuffer) {
             const saveBufferBegin = bufferBegin;
             const middle = bufferBegin + wavesurfer.getCurrentTime();
             bufferBegin = middle - windowLength / 2;
@@ -2321,33 +2321,33 @@ const GLOBAL_ACTIONS = { // eslint-disable-line
         }
     },
     KeyD: function (e) {
-        if (e.ctrlKey && e.shiftKey) worker.postMessage({ action: 'convert-dataset' });
+        if (( e.ctrlKey || e.metaKey) && e.shiftKey) worker.postMessage({ action: 'convert-dataset' });
     },
     KeyE: function (e) {
-        if (e.ctrlKey && region) exportAudio();
+        if (( e.ctrlKey || e.metaKey) && region) exportAudio();
     },
     KeyF: function (e) {
-        if (e.ctrlKey) toggleFullscreen();
+        if ( e.ctrlKey || e.metaKey) toggleFullscreen();
     },
     KeyG: function (e) {
-        if (e.ctrlKey) showGoToPosition();
+        if ( e.ctrlKey || e.metaKey) showGoToPosition();
     },
     KeyO: async function (e) {
-        if (e.ctrlKey) await showOpenDialog();
+        if ( e.ctrlKey || e.metaKey) await showOpenDialog();
     },
     KeyP: function () {
         (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
     },
     KeyS: function (e) {
-        if (e.ctrlKey) {
+        if ( e.ctrlKey || e.metaKey) {
             worker.postMessage({ action: 'save2db', file: currentFile});
         }
     },
     KeyT: function (e) {
-        if (e.ctrlKey) timelineToggle(true);
+        if ( e.ctrlKey || e.metaKey) timelineToggle(true);
     },
     KeyZ: function (e) {
-        if (e.ctrlKey && DELETE_HISTORY.length) insertManualRecord(...DELETE_HISTORY.pop());
+        if (( e.ctrlKey || e.metaKey) && DELETE_HISTORY.length) insertManualRecord(...DELETE_HISTORY.pop());
     },
     Escape: function () {
         if (PREDICTING) {

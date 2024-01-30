@@ -352,7 +352,7 @@ app.whenReady().then(async () => {
         app.dock.bounce();
         // Close app on Command+Q on OSX
         globalShortcut.register('Command+Q', () => {
-            app.quit();
+            if (mainWindow.isFocused())app.quit();
         })
     } else {
         // Quit when all windows are closed.
