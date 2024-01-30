@@ -2803,14 +2803,16 @@ async function onUpdateLocale(labels){
     if (STATE.model === 'v2.4'){
         await diskDB.runAsync('BEGIN');
         for (let i = 0; i < labels.length; i++){
+            const id = i+1;
             const [sname, cname] = labels[i].split('_');
-            await diskDB.runAsync('UPDATE species SET cname = ? WHERE sname = ?', cname, sname);
+            await diskDB.runAsync('UPDATE species SET cname = ? WHERE id = ?', cname, id);
         }
         await diskDB.runAsync('END');
         await memoryDB.runAsync('BEGIN');
         for (let i = 0; i < labels.length; i++){
+            const id = i+1;
             const [sname, cname] = labels[i].split('_');
-            await memoryDB.runAsync('UPDATE species SET cname = ? WHERE sname = ?', cname, sname);
+            await memoryDB.runAsync('UPDATE species SET cname = ? WHERE id = ?', cname, id);
         }
         await memoryDB.runAsync('END');
         // //reset index to flush results table
