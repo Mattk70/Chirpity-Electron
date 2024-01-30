@@ -2132,7 +2132,8 @@ const locale = document.getElementById('locale')
 locale.addEventListener('change', async ()=> {
     config.locale = locale.value;
     updatePrefs();
-    const labelFile = 'labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_XX.txt'.replace('XX', locale.value);
+    const chirpity = config.locale === 'en' && config.model !== 'v2.4' ? 'chirpity' : '';
+    const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${config.locale}.txt`; 
     fetch(labelFile).then(response => {
         if (! response.ok) throw new Error('Network response was not ok');
         return response.text();
@@ -3282,6 +3283,40 @@ const populateHelpModal = async (file, label) => {
     document.getElementById('helpModalBody').innerHTML = await response.text();
     const help = new bootstrap.Modal(document.getElementById('helpModal'));
     help.show();
+    function replaceTextInTitleAttributes() {
+        // Select all elements with title attribute in the body of the web page
+        const elementsWithTitle = document.querySelectorAll('[title]');
+        
+        // Iterate over each element with title attribute
+        elementsWithTitle.forEach(element => {
+            // Replace 'Ctrl' with ⌘ in the title attribute value
+            element.title = element.title.replace(/Ctrl/g, '⌘');
+        });
+    }
+    
+    function replaceTextInTextNode(node) {
+        node.nodeValue = node.nodeValue.replace(/Ctrl/g, '⌘');
+    }
+    
+    function replaceCtrlWithCommand() {
+        console.log('running replacetext')
+        // Select all text nodes in the body of the web page
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+        const nodes = [];
+        let node;
+    
+        // Iterate over each text node
+        while (node = walker.nextNode()) {
+            nodes.push(node);
+        }
+    
+        // Replace 'Ctrl' with ⌘ in each text node
+        nodes.forEach(node => replaceTextInTextNode(node));
+        
+        // Replace 'Ctrl' with ⌘ in title attributes of elements
+        replaceTextInTitleAttributes();
+    }
+    document.addEventListener('shown.bs.modal', replaceCtrlWithCommand)
 }
 
 const populateSpeciesModal = async (included, excluded) => {

@@ -119,6 +119,7 @@ const createDB = async (file) => {
 }
 
 async function loadDB(path) {
+    // let labels;
     const file = dataset_database ? p.join(path, `archive_dataset${LABELS.length}.sqlite`) : p.join(path, `archive${LABELS.length}.sqlite`)
     if (!fs.existsSync(file)) {
         await createDB(file);
@@ -128,11 +129,11 @@ async function loadDB(path) {
         await diskDB.runAsync('VACUUM');
         await diskDB.runAsync('PRAGMA foreign_keys = ON');
         const { count } = await diskDB.getAsync('SELECT COUNT(*) as count FROM records')
-        const labelList = await diskDB.allAsync('SELECT sname, cname FROM species');
-        LABELS = labelList.map(obj => `${obj.sname}_${obj.cname}`);
-        if (count) {
-            UI.postMessage({ event: 'diskDB-has-records' })
-        }
+        // const labelList = await diskDB.allAsync('SELECT * FROM species order by id');
+        // labels = labelList.map(obj => `${obj.sname}_${obj.cname}`);
+        // if (count) {
+        //     UI.postMessage({ event: 'diskDB-has-records' })
+        // }
         const sql = 'PRAGMA table_info(records)';
         const result = await  diskDB.allAsync(sql);
         // Update legacy tables
@@ -148,7 +149,7 @@ async function loadDB(path) {
         // await Promise.all([species, files]);
         console.log("Opened and cleaned disk db " + file)
     }
-    return LABELS
+    return true;
 }
 
 
@@ -1932,7 +1933,7 @@ async function parseMessage(e) {
             if ( !SEEN_LABELS) {
                 LABELS = response["labels"];
                 SEEN_LABELS = true;
-                LABELS = await loadDB(appPath);
+                await loadDB(appPath);
                 memoryDB || await createDB();
             }
 break;
@@ -2800,27 +2801,41 @@ was not found in the Archve databasse.`});
 }
 
 async function onUpdateLocale(labels){
+    let t0 = performance.now();
+    await diskDB.runAsync('BEGIN');
+    await memoryDB.runAsync('BEGIN');
     if (STATE.model === 'v2.4'){
-        await diskDB.runAsync('BEGIN');
         for (let i = 0; i < labels.length; i++){
-            const id = i+1;
+            const id = i;
             const [sname, cname] = labels[i].split('_');
             await diskDB.runAsync('UPDATE species SET cname = ? WHERE id = ?', cname, id);
-        }
-        await diskDB.runAsync('END');
-        await memoryDB.runAsync('BEGIN');
-        for (let i = 0; i < labels.length; i++){
-            const id = i+1;
-            const [sname, cname] = labels[i].split('_');
             await memoryDB.runAsync('UPDATE species SET cname = ? WHERE id = ?', cname, id);
         }
-        await memoryDB.runAsync('END');
-        // //reset index to flush results table
-        // index = 0;
-        await getResults()
-        await getSummary();
-
+    } else {
+        for (let i = 0; i < labels.length; i++) {
+            const [sname, common] = labels[i].split('_');
+            // Check if the existing cname ends with a word or words in brackets
+            const existingCnameResult = await memoryDB.allAsync('SELECT id, cname FROM species WHERE sname = ?', sname);
+            if (existingCnameResult.length) {
+                for (let i = 0; i < existingCnameResult.length; i++){
+                    const {id, cname} = existingCnameResult[i];
+                    const match = cname.match(/\(([^)]+)\)$/); // Regex to match word(s) within brackets at the end of the string
+                    let appendedCname = common;
+                    if (match) {
+                        const bracketedWord = match[1];
+                        appendedCname += ` (${bracketedWord})`; // Append the bracketed word to the new cname
+                    }
+                    await diskDB.runAsync('UPDATE species SET cname = ? WHERE id = ?', appendedCname, id);
+                    await memoryDB.runAsync('UPDATE species SET cname = ? WHERE id = ?', appendedCname, id);
+                }
+            }
+        }
     }
+    await diskDB.runAsync('END');
+    await memoryDB.runAsync('END');
+    await getResults()
+    await getSummary();
+    console.error('updating labels took:',  performance.now() -t0, 'ms');
 }
 
 async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
