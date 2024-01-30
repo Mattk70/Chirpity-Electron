@@ -1476,7 +1476,7 @@ window.onload = async () => {
             speciesThreshold: config.speciesThreshold
         });
         loadModel();
-        worker.postMessage({ action: 'clear-cache' })
+        //worker.postMessage({ action: 'clear-cache' })
         // New users - show the tour
         if (!config.seenTour) {
             setTimeout(prepTour, 2000)
@@ -2191,7 +2191,7 @@ speciesThreshold.addEventListener('change', () =>{
     worker.postMessage({ action: 'update-list', list: config.list })
 })
 
-const loadModel = () => {
+const loadModel = ({clearCache = true} = {})  => {
     t0_warmup = Date.now();
     worker.postMessage({
         action: 'load-model',
@@ -2200,7 +2200,8 @@ const loadModel = () => {
         batchSize: config[config.backend].batchSize,
         warmup: config.warmup,
         threads: config[config.backend].threads,
-        backend: config.backend
+        backend: config.backend,
+        clearCache: clearCache
     });
 }
 
@@ -2253,7 +2254,7 @@ const handleBackendChange = (e) => {
     updatePrefs();
     // restart wavesurfer regions to set new maxLength
     initRegion();
-    loadModel();
+    loadModel({clearCache: false});
 }
 
 const backend = document.getElementsByName('backend');
@@ -3472,7 +3473,7 @@ batchSizeSlider.addEventListener('input', (e) => {
 })
 batchSizeSlider.addEventListener('change', (e) => {
     config[config.backend].batchSize = BATCH_SIZE_LIST[e.target.value];
-    loadModel();
+    loadModel({clearCache: false});
     updatePrefs();
     // Reset region maxLength
     initRegion();
@@ -3960,7 +3961,7 @@ ThreadSlider.addEventListener('input', () => {
 });
 ThreadSlider.addEventListener('change', () => {
     config[config.backend].threads = ThreadSlider.valueAsNumber;
-    loadModel();
+    loadModel({clearCache: false});
     updatePrefs();
 });
 

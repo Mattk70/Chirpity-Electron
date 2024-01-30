@@ -204,7 +204,6 @@ const clearCache = async (fileCache, sizeLimitInGB) => {
     const requiredSpace = sizeLimitInGB * 1024 ** 3;
     // If Full, clear at least 25% of cache, so we're not doing this too frequently
     if (size > requiredSpace) {
-        // while (size > requiredSpace && canBeRemovedFromCache.length) {
         while (canBeRemovedFromCache.length > 1) {
             const file = canBeRemovedFromCache.shift();
             const proxy = metadata[file].proxy;
@@ -251,9 +250,10 @@ break;
         case "chart": {await onChartRequest(args);
 break;
 }
-        case "clear-cache": {CACHE_LOCATION = p.join(TEMP, "chirpity");
-fs.existsSync(CACHE_LOCATION) || fs.mkdirSync(CACHE_LOCATION);
-await clearCache(CACHE_LOCATION, 0);
+        case "clear-cache": {
+            CACHE_LOCATION = p.join(TEMP, "chirpity");
+            fs.existsSync(CACHE_LOCATION) || fs.mkdirSync(CACHE_LOCATION);
+            await clearCache(CACHE_LOCATION, 0);
 break;
 }
         case "convert-dataset": {convertSpecsFromExistingSpecs();
@@ -314,7 +314,12 @@ break;
                 event: "spawning"
             });
             sampleRate = args.model === "v2.4" ? 48_000 : 24_000;
-
+            // Since models have different sample rates, we need to clear the cache of 
+            // files that have been resampled for a different model, and reset metadata
+            CACHE_LOCATION = p.join(TEMP, "chirpity");
+            DEBUG && console.log('clear cache', args.clearCache, 'location', CACHE_LOCATION)
+            args.clearCache && ipcRenderer.invoke('clear-cache', CACHE_LOCATION)
+            metadata = {}
             BATCH_SIZE = parseInt(args.batchSize);
             setAudioContext(sampleRate);
             memoryDB = undefined;
