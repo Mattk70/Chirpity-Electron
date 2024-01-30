@@ -288,7 +288,7 @@ class Model {
             this.mdata_input = tf.tensor([lat, lon, week]).expandDims(0);
             const mdata_prediction = this.metadata_model.predict(this.mdata_input);
             const mdata_probs = await mdata_prediction.data();
-            const mdata_probs_sorted = mdata_probs.slice().sort().reverse();
+            //const mdata_probs_sorted = mdata_probs.slice().sort().reverse();
             let count = 0
             for (let i = 0; i < mdata_probs.length; i++) {
                 if (mdata_probs[i] > this.speciesThreshold) {
