@@ -2835,7 +2835,6 @@ async function onUpdateLocale(labels){
     await memoryDB.runAsync('END');
     await getResults()
     await getSummary();
-    console.error('updating labels took:',  performance.now() -t0, 'ms');
 }
 
 async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {

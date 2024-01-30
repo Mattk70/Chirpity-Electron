@@ -1344,6 +1344,7 @@ function updatePrefs() {
 let appPath, tempPath;
 window.onload = async () => {
     window.electron.requestWorkerChannel();
+    replaceCtrlWithCommand()
     contentWrapperElement.classList.add('loaded');
     // Set config defaults
     const defaultConfig = {
@@ -3283,23 +3284,26 @@ const populateHelpModal = async (file, label) => {
     document.getElementById('helpModalBody').innerHTML = await response.text();
     const help = new bootstrap.Modal(document.getElementById('helpModal'));
     help.show();
-    function replaceTextInTitleAttributes() {
-        // Select all elements with title attribute in the body of the web page
-        const elementsWithTitle = document.querySelectorAll('[title]');
-        
-        // Iterate over each element with title attribute
-        elementsWithTitle.forEach(element => {
-            // Replace 'Ctrl' with ⌘ in the title attribute value
-            element.title = element.title.replace(/Ctrl/g, '⌘');
-        });
-    }
+    document.addEventListener('shown.bs.modal', replaceCtrlWithCommand)
+}
+function replaceTextInTitleAttributes() {
+    // Select all elements with title attribute in the body of the web page
+    const elementsWithTitle = document.querySelectorAll('[title]');
     
-    function replaceTextInTextNode(node) {
-        node.nodeValue = node.nodeValue.replace(/Ctrl/g, '⌘');
-    }
-    
-    function replaceCtrlWithCommand() {
-        console.log('running replacetext')
+    // Iterate over each element with title attribute
+    elementsWithTitle.forEach(element => {
+        // Replace 'Ctrl' with ⌘ in the title attribute value
+        element.title = element.title.replaceAll('Ctrl', '⌘');
+    });
+}
+
+function replaceTextInTextNode(node) {
+    node.nodeValue = node.nodeValue.replaceAll('Ctrl', '⌘');
+}
+
+function replaceCtrlWithCommand() {
+    const isMac = /mac/i.test(navigator.userAgentData ? navigator.userAgentData.platform : navigator.platform);
+    if (!isMac){
         // Select all text nodes in the body of the web page
         const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
         const nodes = [];
@@ -3316,7 +3320,6 @@ const populateHelpModal = async (file, label) => {
         // Replace 'Ctrl' with ⌘ in title attributes of elements
         replaceTextInTitleAttributes();
     }
-    document.addEventListener('shown.bs.modal', replaceCtrlWithCommand)
 }
 
 const populateSpeciesModal = async (included, excluded) => {
