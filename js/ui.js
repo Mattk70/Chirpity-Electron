@@ -1,6 +1,6 @@
 let seenTheDarkness = false, shownDaylightBanner = false, LOCATIONS, locationID = undefined;
 const startTime = performance.now();
-let labels = [], DELETE_HISTORY = [];
+let LABELS = [], DELETE_HISTORY = [];
 
 const STATE = {
     mode: 'analyse',
@@ -1623,7 +1623,7 @@ function generateBirdList(store, rows) {
 function generateBirdOptionList({ store, rows, selected }) {
     let listHTML = '';
     if (store === 'allSpecies') {
-        let sortedList = labels.map(label => label.split('_')[1]);
+        let sortedList = LABELS.map(label => label.split('_')[1]);
         sortedList.sort((a, b) => a.localeCompare(b));
         // Check if we have prepared this before
         const all = document.getElementById('allSpecies');
@@ -2137,8 +2137,8 @@ locale.addEventListener('change', async ()=> {
         if (! response.ok) throw new Error('Network response was not ok');
         return response.text();
     }).then(filecontents => {
-        const labels = filecontents.trim().split('\n');
-        worker.postMessage({action: 'update-locale', locale: labels})
+        LABELS = filecontents.trim().split('\n');
+        worker.postMessage({action: 'update-locale', locale: LABELS})
     }).catch(error =>{
         console.error('There was a problem fetching the label file:', error);
     })
@@ -2621,7 +2621,7 @@ function displayWarmUpMessage() {
 
 function onModelReady(args) {
     modelReady = true;
-    labels = args.labels;
+    LABELS = args.labels;
     sampleRate = args.sampleRate;
     warmupText.classList.add('d-none');
     if (fileLoaded) {
@@ -2954,10 +2954,12 @@ async function renderResult({
     if (index <= 1) {
         if (selection) {
             const selectionTable = document.getElementById('selectionResultTableBody');
-            selectionTable.innerHTML = '';
+            selectionTable.textContent = '';
         }
         else {
             showElement(['resultTableContainer', 'resultsHead'], false);
+            const resultTable = document.getElementById('resultTableBody');
+            resultTable.textContent = ''
         }
     }  else if (!isFromDB && index % (config.limit + 1) === 0) {
         addPagination(index, 0)
@@ -4038,9 +4040,9 @@ audioDownmix.addEventListener('change', (e) => {
 });
 
 function getSnameFromCname(cname) {
-    for (let i = 0; i < labels.length; i++) {
-        if (labels[i].includes(cname)) {
-            return labels[i].split('_')[0];
+    for (let i = 0; i < LABELS.length; i++) {
+        if (LABELS[i].includes(cname)) {
+            return LABELS[i].split('_')[0];
         }
     }
     return ; // Substring not found in any item

@@ -128,6 +128,8 @@ async function loadDB(path) {
         await diskDB.runAsync('VACUUM');
         await diskDB.runAsync('PRAGMA foreign_keys = ON');
         const { count } = await diskDB.getAsync('SELECT COUNT(*) as count FROM records')
+        const labelList = await diskDB.allAsync('SELECT sname, cname FROM species');
+        LABELS = labelList.map(obj => `${obj.sname}_${obj.cname}`);
         if (count) {
             UI.postMessage({ event: 'diskDB-has-records' })
         }
@@ -146,7 +148,7 @@ async function loadDB(path) {
         // await Promise.all([species, files]);
         console.log("Opened and cleaned disk db " + file)
     }
-    return true
+    return LABELS
 }
 
 
@@ -1925,13 +1927,14 @@ let SEEN_LABELS = false, SEEN_MODEL_READY = false;
 async function parseMessage(e) {
     const response = e.data;
     switch (response['message']) {
-        case "labels": {t0 = Date.now();
-LABELS = response["labels"];
-if ( !SEEN_LABELS) {
-    SEEN_LABELS = true;
-    await loadDB(appPath);
-    memoryDB || await createDB();
-}
+        case "labels": {
+            t0 = Date.now();
+            if ( !SEEN_LABELS) {
+                LABELS = response["labels"];
+                SEEN_LABELS = true;
+                LABELS = await loadDB(appPath);
+                memoryDB || await createDB();
+            }
 break;
 }
         case "model-ready": {if ( !SEEN_MODEL_READY) {
@@ -2801,10 +2804,20 @@ async function onUpdateLocale(labels){
         await diskDB.runAsync('BEGIN');
         for (let i = 0; i < labels.length; i++){
             const [sname, cname] = labels[i].split('_');
-            diskDB.runAsync('UPDATE species SET cname = ? WHERE sname = ?', cname, sname);
+            await diskDB.runAsync('UPDATE species SET cname = ? WHERE sname = ?', cname, sname);
         }
         await diskDB.runAsync('END');
-        await createDB();
+        await memoryDB.runAsync('BEGIN');
+        for (let i = 0; i < labels.length; i++){
+            const [sname, cname] = labels[i].split('_');
+            await memoryDB.runAsync('UPDATE species SET cname = ? WHERE sname = ?', cname, sname);
+        }
+        await memoryDB.runAsync('END');
+        // //reset index to flush results table
+        // index = 0;
+        await getResults()
+        await getSummary();
+
     }
 }
 
