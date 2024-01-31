@@ -1349,7 +1349,7 @@ window.onload = async () => {
     const defaultConfig = {
         seenTour: false,
         UUID: uuidv4(),
-        locale: 'en',
+        locale: 'en_uk',
         colormap: 'inferno',
         timeOfDay: false,
         list: 'migrants',
