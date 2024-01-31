@@ -284,7 +284,7 @@
                                                                 <span class="circle"
                                                                 title="Use your preferred language for birds' common names">?</span>
                                                                 <div class="row pe-3">
-                                                                    <label class="col-auto ps-0" for="list-to-use">Language:</label>
+                                                                    <label class="col-auto ps-0 pe-1 fs-6" for="list-to-use">Locale:</label>
                                                                     <select  class="form-select col" id="locale">
                                                                         <option value="en_uk">English (UK)</option>
                                                                         <option value="en">English (US)</option>
@@ -327,6 +327,7 @@
                                                                         aria-label="species frequency threshold" aria-describedby="species-frequency-threshold">
                                                                         <span class="circle"
                                                                         title="Set the minimum eBird checklist frequency for a bird to be included">?</span>
+                                                                        
                                                                     </div>
                                                                 </div>                                                                
                                                             </div>
@@ -368,11 +369,11 @@
                                                         </div>
                                                         <div class="col-6 ps-0">
                                                             <fieldset class="border rounded m-2 p-1 bg-warning">
-                                                                <legend style="font-size: large"><span
+                                                                <legend class="bg-warning pb-2" style="font-size: large"><span
                                                                     class="material-symbols-outlined align-middle"
                                                                     title="Experimental">science</span> Experimental features
                                                                 </legend>
-                                                                <div class="form-group rounded p-2 mb-2 bg-light">
+                                                                <div class="chirpity-only form-group rounded p-2 mb-2 bg-light">
                                                                     <div class="form-check form-switch">
                                                                         
                                                                         <input class="form-check-input" type="checkbox"
@@ -381,13 +382,15 @@
                                                                             Context mode
                                                                         </label>
                                                                         <span class="circle"
-                                                                        title="When enabled, context mode adapts predictions by analyzing the surrounding context.">?</span>
+                                                                        title="When enabled, context mode adapts predictions by analyzing the surrounding context.
+Not available in the BirdNET model">?</span>
                                                                     </div>
                                                                 </div>
-                                                                <div class="col me-auto">
+                                                                <div class="chirpity-only me-auto">
                                                                     <div class="form-group rounded p-2 mb-2 bg-light">
                                                                         <span class="circle"
-                                                                        title="Ignore samples with just background noise. Value is the minimum signal strength to look at.">?</span>
+                                                                        title="Ignore samples with just background noise. Value is the minimum signal strength to look at.
+Not available in the BirdNET model">?</span>
                                                                         <label for="snrValue" class="form-label">
                                                                             SNR filter:
                                                                         </label>
@@ -400,9 +403,8 @@
                                                                             </div>
                                                                         </div>
                                                                     </div>
-                                                                    
                                                                 </div>
-                                                                <div class="col me-auto">
+                                                                <div class="me-auto">
                                                                     <div class="form-group rounded p-2 mb-2 bg-light">
                                                                         <span class="circle"
                                                                         title="When enabled, removes low frequency noise below the threshold.">?</span>
@@ -617,7 +619,7 @@
                                                                                 </div>
                                                                             </div>
                                                                             <div class="col"><span class="circle" title="'Pad' adds 2 seconds before and after a selection to the exported audio. 
-                                                                                'Fade' adds a 1 second fade effect to the start and end of the audio">?</span></div>
+'Fade' adds a 1 second fade effect to the start and end of the audio">?</span></div>
                                                                             </div>
                                                                         </div>
                                                                     </div>
