@@ -2807,13 +2807,13 @@ async function onUpdateLocale(labels){
     if (STATE.model === 'v2.4'){
         for (let i = 0; i < labels.length; i++){
             const id = i;
-            const [sname, cname] = labels[i].split('_');
+            const [sname, cname] = labels[i].trim().split('_');
             await diskDB.runAsync('UPDATE species SET cname = ? WHERE id = ?', cname, id);
             await memoryDB.runAsync('UPDATE species SET cname = ? WHERE id = ?', cname, id);
         }
     } else {
         for (let i = 0; i < labels.length; i++) {
-            const [sname, common] = labels[i].split('_');
+            const [sname, common] = labels[i].trim().split('_');
             // Check if the existing cname ends with a word or words in brackets
             const existingCnameResult = await memoryDB.allAsync('SELECT id, cname FROM species WHERE sname = ?', sname);
             if (existingCnameResult.length) {
@@ -2835,7 +2835,6 @@ async function onUpdateLocale(labels){
     await memoryDB.runAsync('END');
     await getResults()
     await getSummary();
-    console.error('updating labels took:',  performance.now() -t0, 'ms');
 }
 
 async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
