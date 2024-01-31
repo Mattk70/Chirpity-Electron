@@ -1493,7 +1493,7 @@ window.onload = async () => {
         }
         // check for new version on mac platform. pkg containers are not an auto-updatable target
         // https://www.electron.build/auto-update#auto-updatable-targets
-        (config.debug || isMac) && checkForMacUpdates()
+        isMac && checkForMacUpdates();
     }
     )
     // establish the message channel
@@ -4417,9 +4417,9 @@ window.electron.onDownloadProgress((_event, progressObj) => {
 });
    
 // CI functions
-function getFileLoaded() {return fileLoaded};
-function donePredicting() {return !PREDICTING};
-function  getAudacityLabels() {return AUDACITY_LABELS[currentFile]};
+const getFileLoaded = () => fileLoaded;
+const donePredicting = () => !PREDICTING;
+const getAudacityLabels = () => AUDACITY_LABELS[currentFile];
 
 
 // Update checking for Mac 
@@ -4428,26 +4428,30 @@ function checkForMacUpdates() {
     // Do this at most daily
     const latestCheck = Date.now()
     const checkDue = (latestCheck - config.lastUpdateCheck) > 86_400_000;
-    if (config.debug || checkDue){
+    if (checkDue){
         fetch('https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest')
             .then(response => response.json())
             .then(data => {
                 const latestVersion = data.tag_name;
-                const releaseNotes = data.body;
-                const downloadUrl = data.assets.find(asset => asset.name.endsWith('.pkg')).browser_download_url;
-
                 const latest = parseSemVer(latestVersion);
                 const current = parseSemVer(VERSION);
 
                 if (config.debug || isNewVersion(latest, current)) {
-                    const notification = new Notification({
-                        title: `Chirpity ${latestVersion} Available!`,
-                        body: `Release notes:\n${releaseNotes}`,
-                    });
-                    notification.on('click', () => {
-                        require('electron').shell.openExternal(downloadUrl);
-                    });
-                    notification.show();
+                    const alertPlaceholder = document.getElementById('liveAlertPlaceholder')
+                    const alert = (message, type) => {
+                        const wrapper = document.createElement('div')
+                        wrapper.innerHTML = [
+                            `<div class="alert alert-${type} alert-dismissible" role="alert">`,
+                            `   <div>${message}</div>`,
+                            '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
+                            '</div>'
+                        ].join('')
+                        alertPlaceholder.append(wrapper)
+                    }
+                    alert(`
+                    <svg class="bi flex-shrink-0 me-2" width="20" height="20" role="img" aria-label="Info:"><use xlink:href="#info-fill"/></svg>
+                    There's a new version of Chirpity available! <a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blacnk">Check the website</a> for more information`,
+                    'info')
                 }
                 config.lastUpdateCheck = latestCheck;
                 updatePrefs()
