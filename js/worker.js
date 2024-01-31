@@ -237,7 +237,7 @@ const clearCache = async (fileCache, sizeLimitInGB) => {
 async function handleMessage(e) {
     const args = e.data;
     const action = args.action;
-    console.log('message received', action)
+    DEBUG && console.log('message received', action)
     switch (action) {
         case "abort": {onAbort(args);
 break;

@@ -2089,7 +2089,7 @@ function initRegion() {
 }
 
 function initSpectrogram(height, fftSamples) {
-    console.log("initializing spectrogram")
+    config.debug && console.log("initializing spectrogram")
     if (!fftSamples) {
         if (windowLength < 5) {
             fftSamples = 256;
