@@ -67,14 +67,14 @@ export class State {
 
 
     setFiles(files) {
-        console.log("Setting STATE, filesToAnalyse " + files);
+        //console.log("Setting STATE, filesToAnalyse " + files);
         this.update({ filesToAnalyse: files });
     }
 
     // Used to decrease calls to get summary when prepping a dataset
     // because it's an expensive op when the memory db is v. large
     increment() {
-        if (++this.predictionCount === 2000) {
+        if (++this.predictionCount === 200) {
             this.predictionCount = 0
         }
         return this.predictionCount;

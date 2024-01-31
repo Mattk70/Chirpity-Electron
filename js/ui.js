@@ -1,6 +1,11 @@
 let seenTheDarkness = false, shownDaylightBanner = false, LOCATIONS, locationID = undefined;
 const startTime = performance.now();
-let labels = [], DELETE_HISTORY = [];
+let LABELS = [], DELETE_HISTORY = [];
+
+
+// Mac Test: m2 macbook is reported as "MacIntel", I'd expect this to change at some point, hence regexp.
+const isMac = /mac/i.test(navigator.userAgentData.platform);
+
 
 const STATE = {
     mode: 'analyse',
@@ -75,14 +80,14 @@ function hideLoadingSpinner() {
     clearTimeout(window.loadingTimer);
     document.getElementById('loadingOverlay').classList.add('d-none');
 }
-let version;
+let VERSION;
 let DIAGNOSTICS = {};
 
 window.electron.getVersion()
     .then((appVersion) => {
-        version = appVersion;
+        VERSION = appVersion;
         console.log('App version:', appVersion);
-        DIAGNOSTICS['Chirpity Version'] = version;
+        DIAGNOSTICS['Chirpity Version'] = VERSION;
     })
     .catch(error => {
         console.log('Error getting app version:', error)
@@ -1344,11 +1349,14 @@ function updatePrefs() {
 let appPath, tempPath;
 window.onload = async () => {
     window.electron.requestWorkerChannel();
+    replaceCtrlWithCommand()
     contentWrapperElement.classList.add('loaded');
     // Set config defaults
     const defaultConfig = {
         seenTour: false,
+        lastUpdateCheck: 0,
         UUID: uuidv4(),
+        locale: 'en_uk',
         colormap: 'inferno',
         timeOfDay: false,
         list: 'migrants',
@@ -1409,6 +1417,8 @@ window.onload = async () => {
         setTimelinePreferences();
         // Show the list in use
         document.getElementById('list-to-use').value = config.list;
+        // Show Locale
+        document.getElementById('locale').value = config.locale;
         config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
             speciesThresholdEl.classList.add('d-none');
         speciesThreshold.value = config.speciesThreshold;
@@ -1481,8 +1491,9 @@ window.onload = async () => {
         if (!config.seenTour) {
             setTimeout(prepTour, 2000)
         }
-        // check for new version
-        //fetchAndCheckVersion()
+        // check for new version on mac platform. pkg containers are not an auto-updatable target
+        // https://www.electron.build/auto-update#auto-updatable-targets
+        isMac && checkForMacUpdates();
     }
     )
     // establish the message channel
@@ -1620,7 +1631,7 @@ function generateBirdList(store, rows) {
 function generateBirdOptionList({ store, rows, selected }) {
     let listHTML = '';
     if (store === 'allSpecies') {
-        let sortedList = labels.map(label => label.split('_')[1]);
+        let sortedList = LABELS.map(label => label.split('_')[1]);
         sortedList.sort((a, b) => a.localeCompare(b));
         // Check if we have prepared this before
         const all = document.getElementById('allSpecies');
@@ -2078,7 +2089,7 @@ function initRegion() {
 }
 
 function initSpectrogram(height, fftSamples) {
-    console.log("initializing spectrogram")
+    config.debug && console.log("initializing spectrogram")
     if (!fftSamples) {
         if (windowLength < 5) {
             fftSamples = 256;
@@ -2125,6 +2136,22 @@ colourmap.addEventListener('change', (e) => {
     }
 })
 
+const locale = document.getElementById('locale')
+locale.addEventListener('change', async ()=> {
+    config.locale = locale.value;
+    updatePrefs();
+    const chirpity = config.locale === 'en' && config.model !== 'v2.4' ? 'chirpity' : '';
+    const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${config.locale}.txt`; 
+    fetch(labelFile).then(response => {
+        if (! response.ok) throw new Error('Network response was not ok');
+        return response.text();
+    }).then(filecontents => {
+        LABELS = filecontents.trim().split('\n');
+        worker.postMessage({action: 'update-locale', locale: LABELS})
+    }).catch(error =>{
+        console.error('There was a problem fetching the label file:', error);
+    })
+})
 
 // list mode icons
 const listIcon = document.getElementById('list-icon')
@@ -2603,7 +2630,7 @@ function displayWarmUpMessage() {
 
 function onModelReady(args) {
     modelReady = true;
-    labels = args.labels;
+    LABELS = args.labels;
     sampleRate = args.sampleRate;
     warmupText.classList.add('d-none');
     if (fileLoaded) {
@@ -2936,10 +2963,12 @@ async function renderResult({
     if (index <= 1) {
         if (selection) {
             const selectionTable = document.getElementById('selectionResultTableBody');
-            selectionTable.innerHTML = '';
+            selectionTable.textContent = '';
         }
         else {
             showElement(['resultTableContainer', 'resultsHead'], false);
+            const resultTable = document.getElementById('resultTableBody');
+            resultTable.textContent = ''
         }
     }  else if (!isFromDB && index % (config.limit + 1) === 0) {
         addPagination(index, 0)
@@ -3163,7 +3192,7 @@ function sendFile(mode, result) {
         lon: config.longitude,
         Artist: 'Chirpity',
         date: new Date().getFullYear(),
-        version: version
+        version: VERSION
     };
     if (result) {
         metadata = {
@@ -3262,6 +3291,41 @@ const populateHelpModal = async (file, label) => {
     document.getElementById('helpModalBody').innerHTML = await response.text();
     const help = new bootstrap.Modal(document.getElementById('helpModal'));
     help.show();
+    document.addEventListener('shown.bs.modal', replaceCtrlWithCommand)
+}
+function replaceTextInTitleAttributes() {
+    // Select all elements with title attribute in the body of the web page
+    const elementsWithTitle = document.querySelectorAll('[title]');
+    
+    // Iterate over each element with title attribute
+    elementsWithTitle.forEach(element => {
+        // Replace 'Ctrl' with ⌘ in the title attribute value
+        element.title = element.title.replaceAll('Ctrl', '⌘');
+    });
+}
+
+function replaceTextInTextNode(node) {
+    node.nodeValue = node.nodeValue.replaceAll('Ctrl', '⌘');
+}
+
+function replaceCtrlWithCommand() {
+    if (isMac){
+        // Select all text nodes in the body of the web page
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+        const nodes = [];
+        let node;
+    
+        // Iterate over each text node
+        while ((node = walker.nextNode())) {
+            nodes.push(node);
+        }
+    
+        // Replace 'Ctrl' with ⌘ in each text node
+        nodes.forEach(node => replaceTextInTextNode(node));
+        
+        // Replace 'Ctrl' with ⌘ in title attributes of elements
+        replaceTextInTitleAttributes();
+    }
 }
 
 const populateSpeciesModal = async (included, excluded) => {
@@ -3293,6 +3357,7 @@ const populateSpeciesModal = async (included, excluded) => {
             <div class="tab-pane fade show active" id="included-tab-pane" role="tabpanel" aria-labelledby="included-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${includedContent}</div>
             <div class="tab-pane fade" id="excluded-tab-pane" role="tabpanel" aria-labelledby="excluded-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${excludedContent}</div>
         </div>
+    </ul>
     `;
     document.getElementById('speciesModalBody').innerHTML = modalContent;
     const species = new bootstrap.Modal(document.getElementById('speciesModal'));
@@ -4020,9 +4085,9 @@ audioDownmix.addEventListener('change', (e) => {
 });
 
 function getSnameFromCname(cname) {
-    for (let i = 0; i < labels.length; i++) {
-        if (labels[i].includes(cname)) {
-            return labels[i].split('_')[0];
+    for (let i = 0; i < LABELS.length; i++) {
+        if (LABELS[i].includes(cname)) {
+            return LABELS[i].split('_')[0];
         }
     }
     return ; // Substring not found in any item
@@ -4352,6 +4417,80 @@ window.electron.onDownloadProgress((_event, progressObj) => {
 });
    
 // CI functions
-function getFileLoaded() {return fileLoaded};
-function donePredicting() {return !PREDICTING};
-function  getAudacityLabels() {return AUDACITY_LABELS[currentFile]};
+const getFileLoaded = () => fileLoaded;
+const donePredicting = () => !PREDICTING;
+const getAudacityLabels = () => AUDACITY_LABELS[currentFile];
+
+
+// Update checking for Mac 
+
+function checkForMacUpdates() {
+    // Do this at most daily
+    const latestCheck = Date.now()
+    const checkDue = (latestCheck - config.lastUpdateCheck) > 86_400_000;
+    if (checkDue){
+        fetch('https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest')
+            .then(response => response.json())
+            .then(data => {
+                const latestVersion = data.tag_name;
+                const latest = parseSemVer(latestVersion);
+                const current = parseSemVer(VERSION);
+
+                if (config.debug || isNewVersion(latest, current)) {
+                    const alertPlaceholder = document.getElementById('liveAlertPlaceholder')
+                    const alert = (message, type) => {
+                        const wrapper = document.createElement('div')
+                        wrapper.innerHTML = [
+                            `<div class="alert alert-${type} alert-dismissible" role="alert">`,
+                            `   <div>${message}</div>`,
+                            '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
+                            '</div>'
+                        ].join('')
+                        alertPlaceholder.append(wrapper)
+                    }
+                    alert(`
+                    <svg class="bi flex-shrink-0 me-2" width="20" height="20" role="img" aria-label="Info:"><use xlink:href="#info-fill"/></svg>
+                    There's a new version of Chirpity available! <a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blacnk">Check the website</a> for more information`,
+                    'info')
+                }
+                config.lastUpdateCheck = latestCheck;
+                updatePrefs()
+            })
+            .catch(error => {
+                console.warn('Error checking for updates:', error);
+            });
+    }
+}
+
+function parseSemVer(versionString) {
+    const semVerRegex = /^[vV]?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-.]+))?(?:\+([0-9A-Za-z-.]+))?$/;
+    const matches = versionString.match(semVerRegex);
+    if (!matches) {
+        throw new Error('Invalid SemVer version string');
+    }
+
+    const [, major, minor, patch, preRelease, buildMetadata] = matches;
+    
+    return {
+        major: parseInt(major),
+        minor: parseInt(minor),
+        patch: parseInt(patch),
+        preRelease: preRelease || null,
+        buildMetadata: buildMetadata || null
+    };
+}
+
+function isNewVersion(latest, current) {
+    if (latest.major > current.major) {
+        return true;
+    } else if (latest.major === current.major) {
+        if (latest.minor > current.minor) {
+            return true;
+        } else if (latest.minor === current.minor) {
+            if (latest.patch > current.patch) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
