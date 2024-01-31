@@ -2,6 +2,11 @@ let seenTheDarkness = false, shownDaylightBanner = false, LOCATIONS, locationID 
 const startTime = performance.now();
 let LABELS = [], DELETE_HISTORY = [];
 
+
+// Mac Test: m2 macbook is reported as "MacIntel", I'd expect this to change at some point, hence regexp.
+const isMac = /mac/i.test(navigator.userAgentData.platform);
+
+
 const STATE = {
     mode: 'analyse',
     openFiles: [],
@@ -75,14 +80,14 @@ function hideLoadingSpinner() {
     clearTimeout(window.loadingTimer);
     document.getElementById('loadingOverlay').classList.add('d-none');
 }
-let version;
+let VERSION;
 let DIAGNOSTICS = {};
 
 window.electron.getVersion()
     .then((appVersion) => {
-        version = appVersion;
+        VERSION = appVersion;
         console.log('App version:', appVersion);
-        DIAGNOSTICS['Chirpity Version'] = version;
+        DIAGNOSTICS['Chirpity Version'] = VERSION;
     })
     .catch(error => {
         console.log('Error getting app version:', error)
@@ -1349,6 +1354,7 @@ window.onload = async () => {
     // Set config defaults
     const defaultConfig = {
         seenTour: false,
+        lastUpdateCheck: 0,
         UUID: uuidv4(),
         locale: 'en_uk',
         colormap: 'inferno',
@@ -1485,8 +1491,9 @@ window.onload = async () => {
         if (!config.seenTour) {
             setTimeout(prepTour, 2000)
         }
-        // check for new version
-        //fetchAndCheckVersion()
+        // check for new version on mac platform. pkg containers are not an auto-updatable target
+        // https://www.electron.build/auto-update#auto-updatable-targets
+        (config.debug || isMac) && checkForMacUpdates()
     }
     )
     // establish the message channel
@@ -3185,7 +3192,7 @@ function sendFile(mode, result) {
         lon: config.longitude,
         Artist: 'Chirpity',
         date: new Date().getFullYear(),
-        version: version
+        version: VERSION
     };
     if (result) {
         metadata = {
@@ -3302,15 +3309,14 @@ function replaceTextInTextNode(node) {
 }
 
 function replaceCtrlWithCommand() {
-    const isMac = /mac/i.test(navigator.userAgentData ? navigator.userAgentData.platform : navigator.platform);
-    if (!isMac){
+    if (isMac){
         // Select all text nodes in the body of the web page
         const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
         const nodes = [];
         let node;
     
         // Iterate over each text node
-        while (node = walker.nextNode()) {
+        while ((node = walker.nextNode())) {
             nodes.push(node);
         }
     
@@ -3351,6 +3357,7 @@ const populateSpeciesModal = async (included, excluded) => {
             <div class="tab-pane fade show active" id="included-tab-pane" role="tabpanel" aria-labelledby="included-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${includedContent}</div>
             <div class="tab-pane fade" id="excluded-tab-pane" role="tabpanel" aria-labelledby="excluded-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${excludedContent}</div>
         </div>
+    </ul>
     `;
     document.getElementById('speciesModalBody').innerHTML = modalContent;
     const species = new bootstrap.Modal(document.getElementById('speciesModal'));
@@ -4413,3 +4420,73 @@ window.electron.onDownloadProgress((_event, progressObj) => {
 function getFileLoaded() {return fileLoaded};
 function donePredicting() {return !PREDICTING};
 function  getAudacityLabels() {return AUDACITY_LABELS[currentFile]};
+
+
+// Update checking for Mac 
+
+function checkForMacUpdates() {
+    // Do this at most daily
+    const latestCheck = Date.now()
+    const checkDue = (latestCheck - config.lastUpdateCheck) > 86_400_000;
+    if (config.debug || checkDue){
+        fetch('https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest')
+            .then(response => response.json())
+            .then(data => {
+                const latestVersion = data.tag_name;
+                const releaseNotes = data.body;
+                const downloadUrl = data.assets.find(asset => asset.name.endsWith('.pkg')).browser_download_url;
+
+                const latest = parseSemVer(latestVersion);
+                const current = parseSemVer(VERSION);
+
+                if (config.debug || isNewVersion(latest, current)) {
+                    const notification = new Notification({
+                        title: `Chirpity ${latestVersion} Available!`,
+                        body: `Release notes:\n${releaseNotes}`,
+                    });
+                    notification.on('click', () => {
+                        require('electron').shell.openExternal(downloadUrl);
+                    });
+                    notification.show();
+                }
+                config.lastUpdateCheck = latestCheck;
+                updatePrefs()
+            })
+            .catch(error => {
+                console.warn('Error checking for updates:', error);
+            });
+    }
+}
+
+function parseSemVer(versionString) {
+    const semVerRegex = /^[vV]?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-.]+))?(?:\+([0-9A-Za-z-.]+))?$/;
+    const matches = versionString.match(semVerRegex);
+    if (!matches) {
+        throw new Error('Invalid SemVer version string');
+    }
+
+    const [, major, minor, patch, preRelease, buildMetadata] = matches;
+    
+    return {
+        major: parseInt(major),
+        minor: parseInt(minor),
+        patch: parseInt(patch),
+        preRelease: preRelease || null,
+        buildMetadata: buildMetadata || null
+    };
+}
+
+function isNewVersion(latest, current) {
+    if (latest.major > current.major) {
+        return true;
+    } else if (latest.major === current.major) {
+        if (latest.minor > current.minor) {
+            return true;
+        } else if (latest.minor === current.minor) {
+            if (latest.patch > current.patch) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
