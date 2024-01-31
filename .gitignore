@@ -121,3 +121,5 @@ dist/
 
 poetry.lock
 pyproject.toml
+
+scratchpad.txt

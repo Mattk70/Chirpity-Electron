@@ -36,11 +36,11 @@
 
 <body>
     <!-- Loading Spinner Overlay -->
-<div id="loadingOverlay" class="overlay d-none">
-    <div class="spinner-border" role="status">
-        <span class="visually-hidden">Loading...</span>
+    <div id="loadingOverlay" class="overlay d-none">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
     </div>
-</div>
     <!-- The modal for the tour -->
     <div class="modal modal-lg modal-fade" id="tourModal" tabindex="-1" aria-labelledby="tourModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -278,6 +278,44 @@
                                                                         <option value="birds">Birds</option>
                                                                         <option value="everything">Everything</option>
                                                                     </select>
+                                                                </div>
+                                                            </div>
+                                                            <div class="form-group rounded p-2 mb-2 bg-light">
+                                                                <span class="circle"
+                                                                title="Use your preferred language for birds' common names">?</span>
+                                                                <div class="row pe-3">
+                                                                    <label class="col-auto ps-0" for="list-to-use">Language:</label>
+                                                                    <select  class="form-select col" id="locale">
+                                                                        <option value="en_uk">English (UK)</option>
+                                                                        <option value="en">English (US)</option>
+                                                                        <option value="af">Afrikaans</option>
+                                                                        <option value="ar">العربية</option>
+                                                                        <option value="cs">Čeština</option>
+                                                                        <option value="ca">Català</option>
+                                                                        <option value="da">Dansk</option>
+                                                                        <option value="de">Deutsch</option>
+                                                                        <option value="es">Español</option>
+                                                                        <option value="fi">Suomi</option>
+                                                                        <option value="fr">Français</option>
+                                                                        <option value="hu">Magyar</option>
+                                                                        <option value="it">Italiano</option>
+                                                                        <option value="ja">日本語</option>
+                                                                        <option value="ko">한국어</option>
+                                                                        <option value="nl">Nederlands</option>
+                                                                        <option value="no">Norsk</option>
+                                                                        <option value="pl">Polski</option>
+                                                                        <option value="pt">Português</option>
+                                                                        <option value="ro">Română</option>
+                                                                        <option value="ru">Русский</option>
+                                                                        <option value="sk">Slovenčina</option>
+                                                                        <option value="sl">Slovenščina</option>
+                                                                        <option value="sv">Svenska</option>
+                                                                        <option value="th">ไทย</option>
+                                                                        <option value="tr">Türkçe</option>
+                                                                        <option value="uk">Українська</option>
+                                                                        <option value="zh">中文</option>
+                                                                      </select>
+                                                                      
                                                                 </div>
                                                             </div>
                                                             <div class="form-group rounded p-2 mb-2 bg-light" id="species-threshold-el">
@@ -1170,7 +1208,19 @@
                         </div>
 
                     </div>
-                        
+                    <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+                        <symbol id="check-circle-fill" viewBox="0 0 16 16">
+                          <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                        </symbol>
+                        <symbol id="info-fill" viewBox="0 0 16 16">
+                          <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                        </symbol>
+                        <symbol id="exclamation-triangle-fill" viewBox="0 0 16 16">
+                          <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+                        </symbol>
+                    </svg>
+                        <!-- Update alert placeholder -->
+                        <div id="liveAlertPlaceholder" style="position:absolute; bottom: 10px;"></div>
                         <!-- Footer -->
                         <footer class="p-1 text-bg-primary" id="footer">
                             <div class="d-none text-sm-start" id="update-progress">Downloading update: 

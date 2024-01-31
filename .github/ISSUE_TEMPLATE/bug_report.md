@@ -21,8 +21,8 @@ Steps to reproduce the behavior:
 A clear and concise description of what you expected to happen.
 
 **Screenshots**
-If applicable, add screenshots to help explain your problem.
+If applicable, add screenshots to help explain your problem. The Help > Diagnostics window will often be useful - as it captures important system and settings information.
 
 
 **Additional context**
-Add any other context about the problem here.
+Add any other context about the problem here. If it's an analysis issue, mention the file type and audio duration...

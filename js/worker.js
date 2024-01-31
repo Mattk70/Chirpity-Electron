@@ -119,6 +119,7 @@ const createDB = async (file) => {
 }
 
 async function loadDB(path) {
+    // let labels;
     const file = dataset_database ? p.join(path, `archive_dataset${LABELS.length}.sqlite`) : p.join(path, `archive${LABELS.length}.sqlite`)
     if (!fs.existsSync(file)) {
         await createDB(file);
@@ -128,9 +129,11 @@ async function loadDB(path) {
         await diskDB.runAsync('VACUUM');
         await diskDB.runAsync('PRAGMA foreign_keys = ON');
         const { count } = await diskDB.getAsync('SELECT COUNT(*) as count FROM records')
-        if (count) {
-            UI.postMessage({ event: 'diskDB-has-records' })
-        }
+        // const labelList = await diskDB.allAsync('SELECT * FROM species order by id');
+        // labels = labelList.map(obj => `${obj.sname}_${obj.cname}`);
+        // if (count) {
+        //     UI.postMessage({ event: 'diskDB-has-records' })
+        // }
         const sql = 'PRAGMA table_info(records)';
         const result = await  diskDB.allAsync(sql);
         // Update legacy tables
@@ -146,7 +149,7 @@ async function loadDB(path) {
         // await Promise.all([species, files]);
         console.log("Opened and cleaned disk db " + file)
     }
-    return true
+    return true;
 }
 
 
@@ -234,7 +237,7 @@ const clearCache = async (fileCache, sizeLimitInGB) => {
 async function handleMessage(e) {
     const args = e.data;
     const action = args.action;
-    console.log('message received', action)
+    DEBUG && console.log('message received', action)
     switch (action) {
         case "abort": {onAbort(args);
 break;
@@ -366,6 +369,10 @@ break;
                 }));
 break;
 }
+        case 'update-locale': {
+            await onUpdateLocale(args.locale)
+            break;
+        }
         case "update-state": {
             TEMP = args.temp || TEMP;
             appPath = args.path || appPath;
@@ -1921,13 +1928,14 @@ let SEEN_LABELS = false, SEEN_MODEL_READY = false;
 async function parseMessage(e) {
     const response = e.data;
     switch (response['message']) {
-        case "labels": {t0 = Date.now();
-LABELS = response["labels"];
-if ( !SEEN_LABELS) {
-    SEEN_LABELS = true;
-    await loadDB(appPath);
-    memoryDB || await createDB();
-}
+        case "labels": {
+            t0 = Date.now();
+            if ( !SEEN_LABELS) {
+                LABELS = response["labels"];
+                SEEN_LABELS = true;
+                await loadDB(appPath);
+                memoryDB || await createDB();
+            }
 break;
 }
         case "model-ready": {if ( !SEEN_MODEL_READY) {
@@ -2790,6 +2798,43 @@ and its associated records were deleted successfully`,
             event: 'generate-alert', message: `${fileName} 
 was not found in the Archve databasse.`});
     }
+}
+
+async function onUpdateLocale(labels){
+    let t0 = performance.now();
+    await diskDB.runAsync('BEGIN');
+    await memoryDB.runAsync('BEGIN');
+    if (STATE.model === 'v2.4'){
+        for (let i = 0; i < labels.length; i++){
+            const id = i;
+            const [sname, cname] = labels[i].trim().split('_');
+            await diskDB.runAsync('UPDATE species SET cname = ? WHERE id = ?', cname, id);
+            await memoryDB.runAsync('UPDATE species SET cname = ? WHERE id = ?', cname, id);
+        }
+    } else {
+        for (let i = 0; i < labels.length; i++) {
+            const [sname, common] = labels[i].trim().split('_');
+            // Check if the existing cname ends with a word or words in brackets
+            const existingCnameResult = await memoryDB.allAsync('SELECT id, cname FROM species WHERE sname = ?', sname);
+            if (existingCnameResult.length) {
+                for (let i = 0; i < existingCnameResult.length; i++){
+                    const {id, cname} = existingCnameResult[i];
+                    const match = cname.match(/\(([^)]+)\)$/); // Regex to match word(s) within brackets at the end of the string
+                    let appendedCname = common;
+                    if (match) {
+                        const bracketedWord = match[1];
+                        appendedCname += ` (${bracketedWord})`; // Append the bracketed word to the new cname
+                    }
+                    await diskDB.runAsync('UPDATE species SET cname = ? WHERE id = ?', appendedCname, id);
+                    await memoryDB.runAsync('UPDATE species SET cname = ? WHERE id = ?', appendedCname, id);
+                }
+            }
+        }
+    }
+    await diskDB.runAsync('END');
+    await memoryDB.runAsync('END');
+    await getResults()
+    await getSummary();
 }
 
 async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
