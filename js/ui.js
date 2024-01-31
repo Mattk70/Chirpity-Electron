@@ -1439,10 +1439,15 @@ window.onload = async () => {
         audioFade.disabled = !audioPadding.checked;
         audioDownmix.checked = config.audio.downmix;
         setNocmig(config.detect.nocmig);
+        //const chirpityOnly = document.querySelectorAll('.chirpity-only');
         if (config.model !== 'v2.4'){
+            // show chirpity-only features
+            //chirpityOnly.forEach(element => element.classList.remove('d-none'));
             contextAware.checked = config.detect.contextAware
             SNRSlider.disabled = false;
         } else {
+            // hide chirpity-only features
+            //chirpityOnly.forEach(element => element.classList.add('d-none'));
             contextAware.checked = false;
             contextAware.disabed = true;
             config.detect.contextAware = false;
@@ -1457,6 +1462,8 @@ window.onload = async () => {
         if (config.backend === 'webgl') {
             SNRSlider.disabled = true;
         };
+
+
         // Filters
         HPThreshold.textContent = config.filters.highPassFrequency + 'Hz';
         HPSlider.value = config.filters.highPassFrequency;
@@ -2235,13 +2242,18 @@ const loadModel = ({clearCache = true} = {})  => {
 const modelToUse = document.getElementById('model-to-use');
 modelToUse.addEventListener('change', function (e) {
     config.model = e.target.value;
+    const chirpityOnly = document.querySelectorAll('.chirpity-only');
     if (config.model === 'v2.4') { 
         contextAware.checked = false;
+        // hide chirpity-only features
+        //chirpityOnly.forEach(element => element.classList.add('d-none'));
         contextAware.disabed = true;
         config.detect.contextAware = false;
         SNRSlider.disabled = true;
         config.filters.SNR = 0;
     } else {
+        // show chirpity-only features
+        //chirpityOnly.forEach(element => element.classList.remove('d-none'));
         contextAware.disabed = false;
         SNRSlider.disabled = false;
     }
@@ -3972,6 +3984,7 @@ SNRSlider.addEventListener('change', handleSNRchange);
 
 const handleHPchange = () => {
     config.filters.highPassFrequency = HPSlider.valueAsNumber;
+    config.filters.active || toggleFilters();
     updatePrefs();
     worker.postMessage({ action: 'update-state', filters: { highPassFrequency: config.filters.highPassFrequency } })
     showFilterEffect();
@@ -3988,6 +4001,7 @@ HPSlider.addEventListener('change', handleHPchange);
 // Low shelf threshold
 const handleLowShelfchange = () => {
     config.filters.lowShelfFrequency = LowShelfSlider.valueAsNumber;
+    config.filters.active || toggleFilters();
     updatePrefs();
     worker.postMessage({ action: 'update-state', filters: { lowShelfFrequency: config.filters.lowShelfFrequency } })
     showFilterEffect();
@@ -4004,6 +4018,7 @@ LowShelfSlider.addEventListener('change', handleLowShelfchange);
 // Low shelf gain
 const handleAttenuationchange = () => {
     config.filters.lowShelfAttenuation = - lowShelfAttenuation.valueAsNumber;
+    config.filters.active = true;
     updatePrefs();
     worker.postMessage({ action: 'update-state', filters: { lowShelfAttenuation: config.filters.lowShelfAttenuation } })
     showFilterEffect();
