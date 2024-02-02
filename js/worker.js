@@ -322,7 +322,6 @@ case "insert-manual-record": { await onInsertManualRecord(args);
 case "load-model": {
     // Load model called when switching model *after* app launch
     SEEN_MODEL_READY = false;
-    //UI.postMessage({ event: "spawning" });
 
     // Since models have different sample rates, we need to clear the cache of 
     // files that have been resampled for a different model, and reset metadata
