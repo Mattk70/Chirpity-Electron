@@ -742,7 +742,6 @@ const prepSummaryStatement = () => {
                 console.log("abort received")
                 if (filesBeingProcessed.length) {
                     //restart the worker
-                    UI.postMessage({ event: 'spawning' });
                     terminateWorkers();
                     spawnWorkers(model, list, BATCH_SIZE, NUM_WORKERS)
                 }
