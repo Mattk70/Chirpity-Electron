@@ -1361,7 +1361,9 @@ window.onload = async () => {
         timeOfDay: false,
         list: 'migrants',
         speciesThreshold: 0.03,
-        model: 'v2',
+        model: 'chirpity',
+        chirpity: {locale: 'en_uk'},
+        birdnet: {locale: 'en_uk'},
         latitude: 52.87,
         longitude: 0.89, // Great Snoring :)
         location: 'Great Snoring, North Norfolk',
@@ -1394,8 +1396,8 @@ window.onload = async () => {
             }
         });
         // Update model if old models in config
-        if (!['v2', 'v3', 'v4', 'v2.4'].includes(config.model)) {
-            config.model = 'v2';
+        if (!['chirpity', 'v3', 'v4', 'birdnet'].includes(config.model)) {
+            config.model = config.model === 'v2.4' ? 'birdnet' : 'chirpity';
             updatePrefs()
         }
         // switch off fullscreen mode - we don't want to persist that setting
@@ -1411,14 +1413,14 @@ window.onload = async () => {
         batchSizeValue.textContent = config[config.backend].batchSize;
         const modelToUse = document.getElementById('model-to-use');
         modelToUse.value = config.model;
-        const backend = document.getElementById(config.backend);
-        backend.checked = true;
+        const backendEL = document.getElementById(config.backend);
+        backendEL.checked = true;
         // Show time of day in results?
         setTimelinePreferences();
         // Show the list in use
         document.getElementById('list-to-use').value = config.list;
         // Show Locale
-        document.getElementById('locale').value = config.locale;
+        document.getElementById('locale').value = config[config.model].locale;
         config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
             speciesThresholdEl.classList.add('d-none');
         speciesThreshold.value = config.speciesThreshold;
@@ -1440,7 +1442,7 @@ window.onload = async () => {
         audioDownmix.checked = config.audio.downmix;
         setNocmig(config.detect.nocmig);
         //const chirpityOnly = document.querySelectorAll('.chirpity-only');
-        if (config.model !== 'v2.4'){
+        if (config.model !== 'birdnet'){
             // show chirpity-only features
             //chirpityOnly.forEach(element => element.classList.remove('d-none'));
             contextAware.checked = config.detect.contextAware
@@ -1490,9 +1492,12 @@ window.onload = async () => {
             filters: config.filters,
             audio: config.audio,
             limit: config.limit,
+            locale: config[config.model].locale,
             speciesThreshold: config.speciesThreshold
         });
-        loadModel();
+        const {model, backend, list} = config;
+        t0_warmup = Date.now();
+        worker.postMessage({action: '_init_', model: model, batchSize: config[backend].batchSize, threads: config[backend].threads, backend: backend, list: list})
         //worker.postMessage({ action: 'clear-cache' })
         // New users - show the tour
         if (!config.seenTour) {
@@ -1564,6 +1569,9 @@ break;
 hideLoadingSpinner();
 break;
 }
+                case "labels": { 
+                    LABELS = args.labels; 
+                    break }
                 case "location-list": {LOCATIONS = args.locations;
 locationID = args.currentLocation;
 break;
@@ -1598,9 +1606,9 @@ break;
                 case "show-spinner": {showLoadingSpinner(500);
 break;
 }
-                case "spawning": {displayWarmUpMessage();
-break;
-}
+//                 case "spawning": {displayWarmUpMessage();
+// break;
+// }
                 case "total-records": {updatePagination(args.total, args.offset);
 break;
 }
@@ -1639,7 +1647,9 @@ function generateBirdOptionList({ store, rows, selected }) {
     let listHTML = '';
     if (store === 'allSpecies') {
         let sortedList = LABELS.map(label => label.split('_')[1]);
-        sortedList.sort((a, b) => a.localeCompare(b));
+
+        // International language sorting, recommended for large arrays - 'en_uk' not valid, but same as 'en'
+        sortedList.sort(new Intl.Collator(config[config.model].locale.replace('_uk', '')).compare);
         // Check if we have prepared this before
         const all = document.getElementById('allSpecies');
         const lastSelectedSpecies = selected || STATE.birdList.lastSelectedSpecies;
@@ -2145,16 +2155,18 @@ colourmap.addEventListener('change', (e) => {
 
 const locale = document.getElementById('locale')
 locale.addEventListener('change', async ()=> {
-    config.locale = locale.value;
+    config[config.model].locale = locale.value;
     updatePrefs();
-    const chirpity = config.locale === 'en' && config.model !== 'v2.4' ? 'chirpity' : '';
-    const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${config.locale}.txt`; 
+    const chirpity = config[config.model].locale === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
+    const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${config[config.model].locale}.txt`; 
     fetch(labelFile).then(response => {
         if (! response.ok) throw new Error('Network response was not ok');
         return response.text();
     }).then(filecontents => {
-        LABELS = filecontents.trim().split('\n');
-        worker.postMessage({action: 'update-locale', locale: LABELS})
+        LABELS = filecontents.trim().split(/\r?\n/);
+        // Add unknown species
+        LABELS.push('Unknown Sp._Unknown Sp.');
+        worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS})
     }).catch(error =>{
         console.error('There was a problem fetching the label file:', error);
     })
@@ -2242,8 +2254,8 @@ const loadModel = ({clearCache = true} = {})  => {
 const modelToUse = document.getElementById('model-to-use');
 modelToUse.addEventListener('change', function (e) {
     config.model = e.target.value;
-    const chirpityOnly = document.querySelectorAll('.chirpity-only');
-    if (config.model === 'v2.4') { 
+    //const chirpityOnly = document.querySelectorAll('.chirpity-only');
+    if (config.model === 'birdnet') { 
         contextAware.checked = false;
         // hide chirpity-only features
         //chirpityOnly.forEach(element => element.classList.add('d-none'));
@@ -2257,6 +2269,7 @@ modelToUse.addEventListener('change', function (e) {
         contextAware.disabed = false;
         SNRSlider.disabled = false;
     }
+    document.getElementById('locale').value = config[config.model].locale;
     updatePrefs();
     loadModel();
 })
@@ -2633,18 +2646,16 @@ const gotoForm = document.getElementById('gotoForm')
 gotoForm.addEventListener('submit', gotoTime)
 
 // Electron Message handling
-const warmupText = document.getElementById('warmup');
+//const warmupText = document.getElementById('warmup');
 
-function displayWarmUpMessage() {
-    disableMenuItem(['analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'analyseSelection', 'export2audio', 'save2db']);
-    warmupText.classList.remove('d-none');
-}
+// function displayWarmUpMessage() {
+//     disableMenuItem(['analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'analyseSelection', 'export2audio', 'save2db']);
+//     warmupText.classList.remove('d-none');
+// }
 
 function onModelReady(args) {
     modelReady = true;
-    LABELS = args.labels;
     sampleRate = args.sampleRate;
-    warmupText.classList.add('d-none');
     if (fileLoaded) {
         enableMenuItem(['analyse'])
         if (fileList.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
@@ -3342,7 +3353,7 @@ function replaceCtrlWithCommand() {
 
 const populateSpeciesModal = async (included, excluded) => {
     const count = included.length;
-    const model = config.model === 'v2.4' ? 'BirdNET' : 'Chirpity';
+    const model = config.model === 'birdnet' ? 'BirdNET' : 'Chirpity';
     const location = config.list === 'location' ? ` centered on <b>${place.textContent.replace('fmd_good', '')}</b> and with a location filter threshold of <b>${config.speciesThreshold}</b>` : '';
     let includedContent = `<br/><p>The number of species detected depends on the model, the list being used and in the case of the location filter, the species filter threshold. As you are using the <b>${model}</b> model and the <b>${config.list}</b> list${location}, Chirpity will display detections of the following ${count} classes:</p>`;
     includedContent += '<table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Common Name</th><th>Scientific Name</th></tr></thead><tbody>\n';
@@ -3452,13 +3463,13 @@ const toggleFilters = () => {
 audioFiltersIcon.addEventListener('click', toggleFilters);
 
 const toggleContextAwareMode = () => {
-    if (config.model !== 'v2.4') config.detect.contextAware = !config.detect.contextAware;
+    if (config.model !== 'birdnet') config.detect.contextAware = !config.detect.contextAware;
     contextAware.checked = config.detect.contextAware;
     contextAwareIconDisplay();
     if (config.detect.contextAware) {
         SNRSlider.disabled = true;
         config.filters.SNR = 0;
-    } else if (config.backend !== 'webgl'  && config.model !== 'v2.4') {
+    } else if (config.backend !== 'webgl'  && config.model !== 'birdnet') {
         SNRSlider.disabled = false;
         config.filters.SNR = parseFloat(SNRSlider.value);
     }

@@ -103,11 +103,11 @@ onmessage = async (e) => {
                 const list = e.data.list;
                 const batch = e.data.batchSize;
                 const backend = e.data.backend;
-                labels.push(...MYSTERIES);
-                postMessage({
-                    message: "labels",
-                    labels: labels
-                });
+                // labels.push(...MYSTERIES);
+                // postMessage({
+                //     message: "labels",
+                //     labels: labels
+                // });
                 DEBUG && console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
                 
                 tf.setBackend(backend).then(async () => {
@@ -301,6 +301,7 @@ class Model {
                     BLOCKED_IDS.push(i)
                 }
             }
+            DEBUG && console.log('Total species considered at this location: ', count)
         }
         else {
             // find the position of the blocked items in the label list
