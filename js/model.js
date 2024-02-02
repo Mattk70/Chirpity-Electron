@@ -33,11 +33,11 @@ const appPath = "../" + location + "/";
 const list = e.data.list;
 const batch = e.data.batchSize;
 const backend = e.data.backend;
-labels.push(...MYSTERIES);
-postMessage({
-    message: "labels",
-    labels: labels
-});
+// labels.push(...MYSTERIES);
+// postMessage({
+//     message: "labels",
+//     labels: labels
+// });
 if (DEBUG) {
     console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
 }
@@ -242,7 +242,7 @@ class Model {
                 }
             }
             NOT_BIRDS.forEach(notBird => {BLOCKED_IDS.push(this.labels.indexOf(notBird)); count++})
-            console.log('Total species considered at this location: ', count)
+            DEBUG && console.log('Total species considered at this location: ', count)
         }
         if (this.list === 'birds') {
             // find the position of the blocked items in the label list
