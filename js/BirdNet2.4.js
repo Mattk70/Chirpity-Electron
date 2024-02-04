@@ -135,6 +135,9 @@ onmessage = async (e) => {
                     postMessage({
                         message: "update-list",
                         blocked: BLOCKED_IDS,
+                        lat: myModel.lat,
+                        lon: myModel.lon,
+                        week: myModel.week,
                         updateResults: false
                     });
                     myModel.warmUp(batch);
@@ -215,7 +218,10 @@ onmessage = async (e) => {
                 postMessage({
                     message: "update-list",
                     blocked: BLOCKED_IDS,
-                    updateResults: true
+                    lat: myModel.lat,
+                    lon: myModel.lon,
+                    week: myModel.week,
+                    updateResults: false
                 });
                 break;
             }

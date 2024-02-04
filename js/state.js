@@ -13,8 +13,8 @@ export class State {
             this.filteredOffset = {}, // Current species start number for filtered results
             this.selection = false,
             this.blocked = [],
-            this.audio = { format: 'mp3', bitrate: 128, padding: false, fade: false, downmix: false, quality: 5, },
-            this.filters = { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: -6, SNR: 0 },
+            this.audio = { format: 'mp3', bitrate: 128, padding: false, fade: false, downmix: false, quality: 5 },
+            this.filters = { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0 },
             this.detect = { nocmig: false, contextAware: false, confidence: 450 },
             this.chart = { range: { start: undefined, end: undefined }, species: undefined },
             this.explore = { range: { start: undefined, end: undefined } },
@@ -26,7 +26,10 @@ export class State {
             this.lon = undefined,
             this.locationID = undefined,
             this.locale = 'en_uk',
-            this.speciesThreshold = undefined
+            this.speciesThreshold = undefined,
+            this.useWeek = false,
+            this.week = -1,
+            this.list = 'everything'
     }
 
 

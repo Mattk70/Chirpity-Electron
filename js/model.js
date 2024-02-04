@@ -60,13 +60,16 @@ tf.setBackend(backend).then(async () => {
     myModel.list = e.data.list;
     myModel.lat = parseFloat(e.data.lat);
     myModel.lon = parseFloat(e.data.lon);
-    myModel.week = parseInt(e.data.week) || myModel.week;
+    myModel.week = parseInt(e.data.week);
     myModel.speciesThreshold = parseFloat(e.data.threshold);
     myModel.labels = labels;
     await myModel.loadModel();
     postMessage({
         message: "update-list",
         blocked: BLOCKED_IDS,
+        lat: myModel.lat,
+        lon: myModel.lon,
+        week: myModel.week,
         updateResults: false
     });
     myModel.warmUp(batch);
@@ -146,6 +149,9 @@ await myModel.setList();
 postMessage({
     message: "update-list",
     blocked: BLOCKED_IDS,
+    lat: myModel.lat,
+    lon: myModel.lon,
+    week: myModel.week,
     updateResults: true
 });
 break;
