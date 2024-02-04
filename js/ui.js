@@ -664,7 +664,6 @@ const displayLocationAddress = async (where) => {
             action: 'update-list',
             list: 'location'
         });
-        
     }
 }
 
@@ -1361,14 +1360,15 @@ window.onload = async () => {
         timeOfDay: false,
         list: 'migrants',
         speciesThreshold: 0.03,
+        useWeek: false,
         model: 'chirpity',
         chirpity: {locale: 'en_uk'},
         birdnet: {locale: 'en_uk'},
         latitude: 52.87,
-        longitude: 0.89, // Great Snoring :)
+        longitude: 0.89, 
         location: 'Great Snoring, North Norfolk',
         detect: { nocmig: false, contextAware: false, confidence: 45 },
-        filters: { active: false, highPassFrequency: 250, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0 },
+        filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0 },
         warmup: true,
         backend: 'tensorflow',
         tensorflow: { threads: DIAGNOSTICS['Cores'], batchSize: 32 },
@@ -1421,9 +1421,13 @@ window.onload = async () => {
         document.getElementById('list-to-use').value = config.list;
         // Show Locale
         document.getElementById('locale').value = config[config.model].locale;
+
+        
         config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
             speciesThresholdEl.classList.add('d-none');
         speciesThreshold.value = config.speciesThreshold;
+        document.getElementById('species-week').checked = config.useWeek;
+
         // And update the icon
         updateListIcon();
         timelineSetting.value = config.timeOfDay ? 'timeOfDay' : 'timecode';
@@ -1493,7 +1497,9 @@ window.onload = async () => {
             audio: config.audio,
             limit: config.limit,
             locale: config[config.model].locale,
-            speciesThreshold: config.speciesThreshold
+            speciesThreshold: config.speciesThreshold,
+            list: config.list,
+            useWeek: config.useWeek
         });
         const {model, backend, list} = config;
         t0_warmup = Date.now();
@@ -1528,6 +1534,7 @@ break;
                 case "chart-data": {onChartData(args);
 break;
 }
+                case "current-file-week": { STATE.week = args.week}
                 case "diskDB-has-records": {chartsLink.classList.remove("disabled");
 exploreLink.classList.remove("disabled");
 break;
@@ -2153,24 +2160,24 @@ colourmap.addEventListener('change', (e) => {
     }
 })
 
-const locale = document.getElementById('locale')
-locale.addEventListener('change', async ()=> {
-    config[config.model].locale = locale.value;
-    updatePrefs();
-    const chirpity = config[config.model].locale === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
-    const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${config[config.model].locale}.txt`; 
-    fetch(labelFile).then(response => {
-        if (! response.ok) throw new Error('Network response was not ok');
-        return response.text();
-    }).then(filecontents => {
-        LABELS = filecontents.trim().split(/\r?\n/);
-        // Add unknown species
-        LABELS.push('Unknown Sp._Unknown Sp.');
-        worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS})
-    }).catch(error =>{
-        console.error('There was a problem fetching the label file:', error);
-    })
-})
+// const locale = document.getElementById('locale')
+// locale.addEventListener('change', async ()=> {
+//     config[config.model].locale = locale.value;
+//     updatePrefs();
+//     const chirpity = config[config.model].locale === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
+//     const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${config[config.model].locale}.txt`; 
+//     fetch(labelFile).then(response => {
+//         if (! response.ok) throw new Error('Network response was not ok');
+//         return response.text();
+//     }).then(filecontents => {
+//         LABELS = filecontents.trim().split(/\r?\n/);
+//         // Add unknown species
+//         LABELS.push('Unknown Sp._Unknown Sp.');
+//         worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS})
+//     }).catch(error =>{
+//         console.error('There was a problem fetching the label file:', error);
+//     })
+// })
 
 // list mode icons
 const listIcon = document.getElementById('list-icon')
@@ -2989,7 +2996,7 @@ async function renderResult({
             selectionTable.textContent = '';
         }
         else {
-            showElement(['resultTableContainer', 'resultsHead'], false);
+            if (fileLoaded) showElement(['resultTableContainer', 'resultsHead'], false);
             const resultTable = document.getElementById('resultTableBody');
             resultTable.textContent = ''
         }
@@ -3297,7 +3304,7 @@ document.getElementById('settings').addEventListener('click', async () => {
 });
 
 document.getElementById('species').addEventListener('click', async () => {
-    worker.postMessage({action: 'get-valid-species'})
+    worker.postMessage({action: 'get-valid-species', file: currentFile})
 });
 
 document.getElementById('usage').addEventListener('click', async () => {
@@ -3353,9 +3360,13 @@ function replaceCtrlWithCommand() {
 
 const populateSpeciesModal = async (included, excluded) => {
     const count = included.length;
+    const current_file_text =  STATE.week !== -1 && STATE.week ? `. The current file was saved in week <b>${STATE.week}</b>` : '';
     const model = config.model === 'birdnet' ? 'BirdNET' : 'Chirpity';
-    const location = config.list === 'location' ? ` centered on <b>${place.textContent.replace('fmd_good', '')}</b> and with a location filter threshold of <b>${config.speciesThreshold}</b>` : '';
-    let includedContent = `<br/><p>The number of species detected depends on the model, the list being used and in the case of the location filter, the species filter threshold. As you are using the <b>${model}</b> model and the <b>${config.list}</b> list${location}, Chirpity will display detections of the following ${count} classes:</p>`;
+    const species_filter_text = config.useWeek && config.list === 'location' ? `week-specific species filter threshold of <b>${config.speciesThreshold}</b>` : config.list === 'location' ? `species filter threshold of <b>${config.speciesThreshold}</b>` : '';  
+    const location_filter_text = config.list === 'location' ? ` focused on <b>${place.textContent.replace('fmd_good', '')}</b>, with a ${species_filter_text}${current_file_text}` : '';
+    let includedContent = `<br/><p>The number of species detected depends on the model, the list being used and in the case of the location filter, the species filter threshold and possibly the week in which the recording was made.<p>
+                            You are using the <b>${model}</b> model and the <b>${config.list}</b> list${location_filter_text}. With these settings, Chirpity will display detections for ${config.useWeek && config.list === 'location' && (STATE.week === -1 || !STATE.week ) ? 'up to' : ''} 
+                             <b>${count}</b> classes${config.useWeek && config.list === 'location' && (STATE.week === -1 || !STATE.week ) ? ', depending on the date of the file you analyse' : ''}:</p>`;
     includedContent += '<table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Common Name</th><th>Scientific Name</th></tr></thead><tbody>\n';
     includedContent += generateBirdIDList(included);
     includedContent += '</tbody></table>\n';
@@ -4119,10 +4130,52 @@ function getSnameFromCname(cname) {
     return ; // Substring not found in any item
 }
 
+
 document.addEventListener('click', function (e) {
     contextMenu.classList.add("d-none");
     hideConfidenceSlider();
 })
+
+
+
+// Beginnings of the all-powerful document 'change' listener
+// One listener to rule them all!
+document.addEventListener('change', function (e) {
+    const element = e.target.closest('[id]');
+    if (element){
+        const target = element.id;
+        config.debug && console.log('Change target:', target)
+        switch (target) {
+            case 'species-week': {
+                config.useWeek = element.checked;
+                updatePrefs();
+                if (! config.useWeek) STATE.week = -1;
+                worker.postMessage({action:'update-state', useWeek: config.useWeek})
+                break;
+            }
+            case 'locale': {
+                config[config.model].locale = element.value;
+                updatePrefs();
+                const chirpity = config[config.model].locale === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
+                const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${config[config.model].locale}.txt`; 
+                fetch(labelFile).then(response => {
+                    if (! response.ok) throw new Error('Network response was not ok');
+                    return response.text();
+                }).then(filecontents => {
+                    LABELS = filecontents.trim().split(/\r?\n/);
+                    // Add unknown species
+                    LABELS.push('Unknown Sp._Unknown Sp.');
+                    worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS})
+                }).catch(error =>{
+                    console.error('There was a problem fetching the label file:', error);
+                })
+                break;
+            }
+        }
+    }
+})
+
+
 
 async function createContextMenu(e) {
     const target = e.target;

@@ -307,7 +307,7 @@ async function handleMessage(e) {
     case "get-detected-species-list": {getDetectedSpecies();
         break;
     }
-    case "get-valid-species": {getValidSpecies();
+    case "get-valid-species": {getValidSpecies(args.file);
         break;
     }
     case "get-locations": { getLocations({ db: STATE.db, file: args.file });
@@ -320,15 +320,20 @@ case "insert-manual-record": { await onInsertManualRecord(args);
     break;
 }
 case "load-model": {
-    // Load model called when switching model *after* app launch
+    /* Load model called with cleaCache=true when switching model *after* app launch
+     Load model called with clear cache = false when: changing backend, bactchsize or threads
+     */
     SEEN_MODEL_READY = false;
-
-    // Since models have different sample rates, we need to clear the cache of 
-    // files that have been resampled for a different model, and reset metadata
     DEBUG && console.log('clear cache', args.clearCache, 'location', CACHE_LOCATION)
-    args.clearCache && ipcRenderer.invoke('clear-cache', CACHE_LOCATION)
-    metadata = {}
+    if (args.clearCache) {
+    //  Since models have different sample rates, we need to clear the cache of 
+    //  files that have been resampled for a different model, and clear the proxy
+        Object.keys(metadata).forEach(key => metadata[key].proxy = undefined);
 
+       // metadata = {};
+        ipcRenderer.invoke('clear-cache', CACHE_LOCATION)
+        STATE.blocked = [];
+    }
     predictWorkers.length && terminateWorkers();
     await onLaunch(args);
     break;
@@ -358,14 +363,16 @@ case "update-file-start": {await onUpdateFileStart(args);
 case "update-list": {
     UI.postMessage({ event: "show-spinner" });
     SEEN_LIST_UPDATE = false;
-    predictWorkers.forEach((worker) => worker.postMessage({
+    STATE.list = args.list;
+    const readyWorker = predictWorkers.find(obj => obj.isAvailable);
+    readyWorker.postMessage({
         message: "list",
         list: args.list,
         lat: STATE.lat,
         lon: STATE.lon,
         week: -1,
         threshold: STATE.speciesThreshold
-    }));
+    });
     break;
 }
 case 'update-locale': {
@@ -376,6 +383,8 @@ case 'update-locale': {
 case "update-state": {
     TEMP = args.temp || TEMP;
     appPath = args.path || appPath;
+    // If we change the speciesThreshold, we need to invalidate the blocked id cache
+    if (args.speciesThreshold) STATE.blocked = {};
     STATE.update(args);
     break;
 }
@@ -469,8 +478,13 @@ const getFilesInDirectory = async (dir) => {
 
 const prepParams = (list) => list.map(item => '?').join(',');
 
-const getSummaryParams = () => {
-    const blocked = STATE.blocked.length && !STATE.selection ? STATE.blocked : [];
+/**
+ * What do do with week numbers? We can't use file
+ * @returns a string, like (?,?,?)
+ */
+
+const getSummaryParams = (blocked) => {
+    
     const range = STATE.mode === 'explore' ? STATE.explore.range : STATE.selection?.range;
     const useRange = range?.start;
     const params = [STATE.detect.confidence];
@@ -485,7 +499,7 @@ const getSummaryParams = () => {
     return params
 }
 
-const prepSummaryStatement = () => {
+const prepSummaryStatement = (blocked) => {
     const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
     const useRange = range?.start;
     let summaryStatement = `
@@ -503,8 +517,8 @@ const prepSummaryStatement = () => {
             summaryStatement += ' AND dateTime BETWEEN ? AND ? ';
         }
         
-        if (STATE.blocked.length && !STATE.selection) {
-            const excluded = prepParams(STATE.blocked);
+        if (blocked.length) {
+            const excluded = prepParams(blocked);
             summaryStatement += ` AND speciesID NOT IN (${excluded}) `;
         }
         if (STATE.detect.nocmig){
@@ -558,11 +572,10 @@ const prepSummaryStatement = () => {
         
         
         
-        const getResultsParams = (species, confidence, offset, limit, topRankin) => {
+        const getResultsParams = (species, confidence, offset, limit, topRankin, blocked) => {
             const params = [];
             params.push(confidence);
             ['analyse', 'archive'].includes(STATE.mode) && !STATE.selection && params.push(...STATE.filesToAnalyse);
-            const blocked = (STATE.blocked.length && !STATE.selection) ? STATE.blocked : [];
             blocked.length && params.push(...blocked);
             
             params.push(topRankin);
@@ -571,7 +584,7 @@ const prepSummaryStatement = () => {
             return params
         }
         
-        const prepResultsStatement = (species, noLimit) => {
+        const prepResultsStatement = (species, noLimit, blocked) => {
             let resultStatement = `
             WITH ranked_records AS (
                 SELECT 
@@ -610,7 +623,6 @@ const prepSummaryStatement = () => {
                 if (useRange) {
                     resultStatement += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
                 }    
-                const blocked = STATE.selection ? [] : STATE.blocked;
                 if (blocked.length) resultStatement += ` AND speciesID NOT IN (${prepParams(blocked)}) `;
                 if (STATE.selection) resultStatement += ` AND name = '${FILE_QUEUE[0]}' `;
                 if (STATE.locationID) {
@@ -857,6 +869,20 @@ const prepSummaryStatement = () => {
                 }
                 if (!metadata.file?.isComplete) {
                     await setMetadata({ file: file, proxy: proxy, source_file: source_file });
+                        /*This is where we add week checking...
+                        GENERATING A WEEK SPECIFIC LIST FOR A LOCATION IS A *REALLY* EXPENSIVE TASK.
+                        LET'S CACHE BLOCKED IDS FOR WEEK AND LOCATION. NEED TO ADAPT STATE.BLOCKED_IDS
+                        SO IT CAN BE USED THIS WAY. DEFAULT KEY -1. 
+                        STRUCTURE: BLOCKED_IDS.week.location = []; 
+                        */ 
+                        if (STATE.list === 'location'){
+                            const meta = metadata[file];
+                            const week = STATE.useWeek ? new Date(meta.fileStart).getWeekNumber() : "-1";
+                            const location = STATE.lat + STATE.lon;
+                            if (! (STATE.blocked[week] && STATE.blocked[week][location])) {
+                                setBlockedIDs(STATE.lat,STATE.lon,week)
+                            }
+                        }
                 }
                 return proxy;
             }
@@ -916,6 +942,7 @@ const prepSummaryStatement = () => {
                 queued = false,
                 goToRegion = true
             }) {
+                
                 const found = await getWorkingFile(file);
                 if (found) {
                     await fetchAudioBuffer({ file, start, end })
@@ -940,6 +967,12 @@ const prepSummaryStatement = () => {
                     .catch(error => {
                         console.log(error);
                     })
+                    let week;
+                    if (STATE.list === 'location'){
+                        week = STATE.useWeek ? new Date(metadata[file].fileStart).getWeekNumber() : -1
+                        // Send the week number of the surrent file
+                        UI.postMessage({event: 'current-file-week', week: week})
+                    } else { UI.postMessage({event: 'current-file-week', week: undefined}) }
                 }
             }
             
@@ -1681,7 +1714,7 @@ const prepSummaryStatement = () => {
                             backend: BACKEND,
                             lat: STATE.lat,
                             lon: STATE.lon,
-                            week: -1, // new Date(1617229255088).getWeekNumber()
+                            week: STATE.week,
                             threshold: STATE.speciesThreshold
                         })
                         worker.onmessage = async (e) => {
@@ -1860,6 +1893,7 @@ const prepSummaryStatement = () => {
                         
                         const parsePredictions = async (response) => {
                             let file = response.file;
+                            const blocked = getBlockedIDs(file);
                             const latestResult = response.result, db = STATE.db;
                             DEBUG && console.log('worker being used:', response.worker);
                             if (! STATE.selection) await generateInsertQuery(latestResult, file);
@@ -1875,7 +1909,7 @@ const prepSummaryStatement = () => {
                                     if (confidence < 0.05) break;
                                     confidence*=1000;
                                     let speciesID = speciesIDArray[j];
-                                    updateUI = (confidence > STATE.detect.confidence && ! STATE.blocked.includes(speciesID));
+                                    updateUI = (confidence > STATE.detect.confidence && ! blocked.includes(speciesID));
                                     if (STATE.selection || updateUI) {
                                         let end, confidenceRequired;
                                         if (STATE.selection) {
@@ -1898,7 +1932,7 @@ const prepSummaryStatement = () => {
                                                 score: confidence
                                             }
                                             sendResult(++index, result, false);
-                                            // Only show the highest confidence detection
+                                            // Only show the highest confidence detection, unless it's a slection analysis
                                             if (! STATE.selection) break;
                                         };
                                     }
@@ -1952,42 +1986,55 @@ const prepSummaryStatement = () => {
                                 }
                                 break;
                             }
-                            case "prediction": {if ( !aborted) {
-                                predictWorkers[response.worker].isAvailable = true;
-                                let worker = await parsePredictions(response);
-                                if (predictionsReceived[response.file] === predictionsRequested[response.file]) {
-                                    const limit = 100;
-                                    clearCache(CACHE_LOCATION, limit);
-                                    if (filesBeingProcessed.length) {
-                                        processNextFile({
-                                            worker: worker
-                                        });
-                                    }  else if ( !STATE.selection) {
-                                        getSummary();
-                                        UI.postMessage({
-                                            event: "analysis-complete"
-                                        });
+                            case "prediction": {
+                                if ( !aborted) {
+                                    predictWorkers[response.worker].isAvailable = true;
+                                    let worker = await parsePredictions(response);
+                                    if (predictionsReceived[response.file] === predictionsRequested[response.file]) {
+                                        const limit = 100;
+                                        clearCache(CACHE_LOCATION, limit);
+                                        if (filesBeingProcessed.length) {
+                                            processNextFile({
+                                                worker: worker
+                                            });
+                                        }  else if ( !STATE.selection) {
+                                            getSummary();
+                                            UI.postMessage({
+                                                event: "analysis-complete"
+                                            });
+                                        }
                                     }
                                 }
-                            }
                             break;
                         }
                         case "spectrogram": {onSpectrogram(response["filepath"], response["file"], response["width"], response["height"], response["image"], response["channels"]);
                         break;
                     }
-                    case "update-list": {if ( !SEEN_LIST_UPDATE) {
-                        STATE.update({
-                            blocked: response.blocked,
-                            globalOffset: 0
-                        });
-                        SEEN_LIST_UPDATE = true;
-                        if (response["updateResults"] && STATE.db) {
-                            await Promise.all([getResults(), getSummary()]);
-                            if (["explore", "chart"].includes(STATE.mode)) {
-                                getDetectedSpecies();
+                    case "update-list": {
+                        if ( !SEEN_LIST_UPDATE) {
+                            if (STATE.list === 'location'){
+                                // Let's create our list cache
+                                const {week, lat, lon, blocked} = response;
+                                const location = lat.toFixed(2) + lon.toFixed(2);
+                                if (! (STATE.blocked[week] && STATE.blocked[week][location])) {
+                                    STATE.blocked[week] = {};
+                                    STATE.blocked[week][location] = blocked;
+                                } else {
+                                    DEBUG && console.log("Unnecesary call to generate location list")
+                                }
+                            } else {
+                                STATE.blocked = response.blocked;
+                            }
+                            STATE.globalOffset = 0
+
+                            SEEN_LIST_UPDATE = true;
+                            if (response["updateResults"] && STATE.db) {
+                                await Promise.all([getResults(), getSummary()]);
+                                if (["explore", "chart"].includes(STATE.mode)) {
+                                    getDetectedSpecies();
+                                }
                             }
                         }
-                    }
                     break;
                 }
             }
@@ -2148,7 +2195,9 @@ const prepSummaryStatement = () => {
             action = undefined,
         } = {}) => {
             const db = STATE.db;
-            prepSummaryStatement(species);
+
+            const blocked = STATE.selection ? [] : getBlockedIDs();
+            prepSummaryStatement(blocked);
             const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
             let range, files = [];
             if (['explore', 'chart'].includes(STATE.mode)) {
@@ -2158,7 +2207,7 @@ const prepSummaryStatement = () => {
             }
             
             t0 = Date.now();
-            const params = getSummaryParams(species);
+            const params = getSummaryParams(blocked);
             const summary = await STATE.GET_SUMMARY_SQL.allAsync(...params);
             
             DEBUG && console.log("Get Summary took", (Date.now() - t0) / 1000, "seconds");
@@ -2211,8 +2260,9 @@ const prepSummaryStatement = () => {
             
             let index = offset;
             AUDACITY = {};
-            const params = getResultsParams(species, confidence, offset, limit, topRankin);
-            prepResultsStatement(species, limit === Infinity);
+            const blocked = STATE.selection ? [] : getBlockedIDs();
+            const params = getResultsParams(species, confidence, offset, limit, topRankin, blocked);
+            prepResultsStatement(species, limit === Infinity, blocked);
             
             const result = await STATE.GET_RESULT_SQL.allAsync(...params);
             if (format === 'text'){
@@ -2380,6 +2430,7 @@ const prepSummaryStatement = () => {
                 })
                 return // nothing to do. Also will crash if trying to update disk from disk.
             }
+            const blocked = getBlockedIDs(args.file);
             await memoryDB.runAsync('BEGIN');
             await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.files SELECT * FROM files`);
             // Set the saved flag on files' metadata
@@ -2393,7 +2444,7 @@ const prepSummaryStatement = () => {
             response = await memoryDB.runAsync(`
             INSERT OR IGNORE INTO disk.records 
             SELECT * FROM records
-            WHERE confidence >= ${STATE.detect.confidence} AND speciesID NOT IN (${STATE.blocked})`);
+            WHERE confidence >= ${STATE.detect.confidence} AND speciesID NOT IN (${blocked})`);
             console.log(response?.changes + ' records added to disk database');
             await memoryDB.runAsync('END');
             console.log("transaction ended");
@@ -2558,6 +2609,11 @@ const prepSummaryStatement = () => {
             })
         }
         
+        /**
+         * getDetectedSpecies generates a list of species to use in dropdowns for chart and explore mode filters
+         * It doesn't really make sense to use location specific filtering here, as there is a location filter in the 
+         * page. For now, I'm just going skip the blocked IDs filter if location mode is selected
+         */
         const getDetectedSpecies = () => {
             const range = STATE.explore.range;
             const confidence = STATE.detect.confidence;
@@ -2567,7 +2623,7 @@ const prepSummaryStatement = () => {
             JOIN files on records.fileID = files.id`;
             
             if (STATE.mode === 'explore') sql += ` WHERE confidence >= ${confidence}`;
-            if (STATE.blocked.length) {
+            if (STATE.list !== 'location' && STATE.blocked.length) {
                 sql += ` AND speciesID NOT IN (${STATE.blocked.join(',')})`;
             }
             if (range?.start) sql += ` AND datetime BETWEEN ${range.start} AND ${range.end}`;
@@ -2578,7 +2634,13 @@ const prepSummaryStatement = () => {
             })
         };
         
-        const getValidSpecies = async () => {
+        /**
+         *  getValidSpecies generates a list of species included/excluded based on settings
+         *  For week specific lists, we need the file
+         * @returns Promise <void>
+         */
+        const getValidSpecies = async (file) => {
+            const blocked = getBlockedIDs(file);
             if (!SEEN_LIST_UPDATE){
                 UI.postMessage({
                     event: 'generate-alert',
@@ -2588,13 +2650,13 @@ const prepSummaryStatement = () => {
             }
             let excluded, included;
             let sql = `SELECT cname, sname FROM species`;
-            if (STATE.blocked.length) {
-                sql += ` WHERE id NOT IN (${STATE.blocked.join(',')})`;
+            if (blocked.length) {
+                sql += ` WHERE id NOT IN (${blocked.join(',')})`;
             }
             sql += ' GROUP BY cname ORDER BY cname';
             included = await diskDB.allAsync(sql)
             
-            if (STATE.blocked.length){
+            if (blocked.length){
                 sql = sql.replace('NOT IN', 'IN');
                 excluded = await diskDB.allAsync(sql);
             }
@@ -2881,3 +2943,44 @@ const prepSummaryStatement = () => {
                 UI.postMessage({ event: 'location-list', locations: locations, currentLocation: metadata[file]?.locationID })
             }
             
+            function getBlockedIDs(file){
+                let blocked, lat, lon, week;
+                if (STATE.list === 'location'){
+                    if (file){
+                        file = metadata[file];
+                        week = STATE.useWeek ? new Date(file.fileStart).getWeekNumber() : "-1";
+                        lat = file.lat || STATE.lat;
+                        lon = file.lon || STATE.lon;
+                        STATE.week = week;
+                    } else {
+                        // summary context: use the week, lat & lon from the first file??
+                        lat = STATE.lat, lon = STATE.lon;
+                        week = STATE.useWeek ? STATE.week : "-1";
+                    }
+                    const location = lat.toString() + lon.toString();
+                    try {
+                        blocked = STATE.blocked[week][location];
+                    } catch (error) {
+                        blocked = STATE.blocked["-1"][location];
+                        //setBlockedIDs(lat,lon,week)
+
+                    }
+                    
+                } else {
+                    blocked = STATE.blocked;
+                }
+                return blocked;
+            }
+
+            function setBlockedIDs(lat,lon,week){
+                SEEN_LIST_UPDATE = false;
+                const readyWorker = predictWorkers.find(obj => obj.isAvailable);
+                readyWorker.postMessage({
+                    message: "list",
+                    list: STATE.list,
+                    lat: lat,
+                    lon: lon,
+                    week: week,
+                    threshold: STATE.speciesThreshold
+                });
+            }

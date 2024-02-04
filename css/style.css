@@ -538,12 +538,15 @@ input[type="range"].vertical {
 
 #settingsForm {
     height: 75vh;
-    min-width: 550px;
+    width: 65vw;
     max-height: 925px;
     overflow-y: auto;
     overflow-x: hidden;
 }
 
+#settingsMap {
+    height: 300px;
+}
 
 #context-menu {
     /* One more than modal */
