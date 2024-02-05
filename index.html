@@ -1,13 +1,10 @@
 <!doctype html>
 <html lang="en">
-
 <head>
     <!-- Required meta tags -->
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <!--meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'unsafe-inline'; worker-src  'self' 'unsafe-inline' 'unsafe-eval' "-->
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' https:">
-    
     <!-- Bootstrap & CSS-->
     <link rel="stylesheet" href="./node_modules/bootstrap/dist/css/bootstrap.min.css" />
     <script defer src="./node_modules/@popperjs/core/dist/umd/popper.min.js"></script>
@@ -31,9 +28,7 @@
     </script>
     <!-- App title -->
     <title>Chirpity Bird Call Detection</title>
-    
 </head>
-
 <body>
     <!-- Loading Spinner Overlay -->
     <div id="loadingOverlay" class="overlay d-none">
@@ -141,8 +136,6 @@
             </div>
         </div>
     </div>
-    
-    
     <!-- Navigation bar -->
     <div id="navPadding" class="position-absolute top-0 w-100">
         <nav class="navbar navbar-expand-md navbar-dark bg-dark" id="primary_nav_wrap">
@@ -277,7 +270,6 @@
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                            
                                                             <div class="form-group rounded p-2 mb-2 bg-light">
                                                                 <span class="circle" title="Filters the detections returned in results.">?</span>
                                                                 <div class="row pe-3">
@@ -297,8 +289,7 @@
                                                                     <input id="species-frequency-threshold" type="number" class="form-control" style="width: 30%;" value="0.005" step="0.001" min="0.001" max="1" aria-label="species frequency threshold" aria-describedby="species-frequency-threshold">
                                                                     <span class="text-nowrap"><label class="col-auto m-2 mt-0" for="species-week">Use Week</label><input id="species-week" type="checkbox" class="form-check-input form-check-inline"></span>
                                                                 </div>                                                                
-                                                            </div>                                                           
-                                                            
+                                                            </div>
                                                             <div class="form-group rounded p-2 mb-2 bg-light">
                                                                 <div class="form-check form-switch">
                                                                     <input class="form-check-input" type="checkbox"
@@ -352,10 +343,8 @@
                                                                                     <option value="uk">Українська</option>
                                                                                     <option value="zh">中文</option>
                                                                                 </select>
-                                                                                
                                                                             </div>
-                                                                        </div>                                                                            
-                                                                        
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                                 <div class="row">
@@ -397,7 +386,6 @@
                                                                         </div>
                                                                     </div>
                                                                 </div>
-                                                                
                                                                 <div class="row">
                                                                     <div class="col p-0">
                                                                         <div class="form-group rounded p-2 mb-2 bg-light">
@@ -551,23 +539,23 @@
                                                                     <option value="viridis">Viridis</option>
                                                                     <option value="cdom">CDom</option>
                                                                     <option value="temperature">Temperature</option>
-                                                                    <!--                                                        <option value="density">Density</option>-->
-                                                                    <!--                                                        <option value="oxygen">Oxygen</option>-->
-                                                                    <!--                                                        <option value="copper">Copper</option>-->
-                                                                    <!--                                                        <option value="earth">Earth</option>-->
+                                                                    <!-- <option value="density">Density</option>-->
+                                                                    <!-- <option value="oxygen">Oxygen</option>-->
+                                                                    <!-- <option value="copper">Copper</option>-->
+                                                                    <!-- <option value="earth">Earth</option>-->
                                                                     <option value="inferno">Inferno</option>
                                                                     <option value="magma">Magma</option>
                                                                     <option value="plasma">Plasma</option>
                                                                     <option value="hot">Hot</option>
-                                                                    <!--                                                        <option value="cubehelix">CubeHelix</option>-->
-                                                                    <!--                                                        <option value="phase">Phase</option>-->
-                                                                    <!--                                                        <option value="YlOrRd">Yellow/red</option>-->
-                                                                    <!--                                                        <option value="picnic">Picnic</option>-->
-                                                                    <!--                                                        <option value="electric">Electric</option>-->
-                                                                    <!--                                                        <option value="bluered">BlueRed</option>-->
-                                                                    <!--                                                        <option value="blackbody">Blackbody</option>-->
-                                                                    <!--                                                        <option value="rainbow">Rainbow</option>-->
-                                                                    <!--                                                        <option value="rainbow-soft">Rainbow</option>-->
+                                                                    <!-- <option value="cubehelix">CubeHelix</option>-->
+                                                                    <!-- <option value="phase">Phase</option>-->
+                                                                    <!-- <option value="YlOrRd">Yellow/red</option>-->
+                                                                    <!-- <option value="picnic">Picnic</option>-->
+                                                                    <!-- <option value="electric">Electric</option>-->
+                                                                    <!-- <option value="bluered">BlueRed</option>-->
+                                                                    <option value="blackbody">Blackbody</option>
+                                                                    <!-- <option value="rainbow">Rainbow</option>-->
+                                                                    <!-- <option value="rainbow-soft">Rainbow</option>-->
                                                                 </select>
                                                             </div>
                                                         </div>
@@ -590,7 +578,6 @@
                                                             <div class="col">
                                                                 <div class="chirpity-only form-group rounded p-2 mb-2 bg-light">
                                                                     <div class="form-check form-switch">
-                                                                        
                                                                         <input class="form-check-input" type="checkbox"
                                                                         role="switch" id="context">
                                                                         <label class="form-check-label" for="context">
@@ -1034,7 +1021,6 @@
             <div id="progressDiv" class="col-2 d-none"><span id="fileNumber"></span><br>
                 <progress id="progress-bar" max="100" style="width:90%"></progress>
             </div>
-            
             <div id="complete" class="col-2 pe-2" style="display:none">
             </div>
             <div class="col pe-1">
@@ -1120,7 +1106,6 @@
                     <div class="col d-none">
                         <fieldset class="border border rounded bg-light p-2">
                             <legend class="h6">Sum Detections by:</legend>
-                            
                             <div class="form-row">
                                 <div class="form-check-inline">
                                     <input class="form-check-input" type="radio" name="showTotals" id="hourTotal" value="Hour">
@@ -1135,10 +1120,7 @@
                                     <label class="form-check-label" for="weekTotal">Week</label>
                                 </div>
                             </div>
-                            
-                            
                             <legend class="h6">Group Detections by:</legend>
-                            
                             <div class="form-row">
                                 <div class="form-check-inline">
                                     <input class="form-check-input" type="radio" name="groupTotals" id="dayGroup" value="Day">

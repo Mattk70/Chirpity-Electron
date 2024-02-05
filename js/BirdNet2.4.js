@@ -98,11 +98,23 @@ onmessage = async (e) => {
             case "load": {
                 const version = e.data.model;
                 DEBUG && console.log("load request to worker");
-                const { height: height, width: width, labels: labels, location: location } = JSON.parse(fs.readFileSync(path.join(__dirname, `../${version}_model_config.json`), "utf8"));
+                const { height: height, width: width, location: location } = JSON.parse(fs.readFileSync(path.join(__dirname, `../${version}_model_config.json`), "utf8"));
                 const appPath = "../" + location + "/";
                 const list = e.data.list;
                 const batch = e.data.batchSize;
                 const backend = e.data.backend;
+                let labels;
+                const labelFile = `../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`; 
+                await fetch(labelFile).then(response => {
+                    if (! response.ok) throw new Error('Network response was not ok');
+                    return response.text();
+                }).then(filecontents => {
+                    labels = filecontents.trim().split(/\r?\n/);
+                }).catch(error =>{
+                    console.error('There was a problem fetching the label file:', error);
+                })
+
+
                 // labels.push(...MYSTERIES);
                 // postMessage({
                 //     message: "labels",

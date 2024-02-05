@@ -2028,6 +2028,7 @@ const prepSummaryStatement = (blocked) => {
                             STATE.globalOffset = 0
 
                             SEEN_LIST_UPDATE = true;
+                            UI.postMessage({ event: "results-complete" });
                             if (response["updateResults"] && STATE.db) {
                                 await Promise.all([getResults(), getSummary()]);
                                 if (["explore", "chart"].includes(STATE.mode)) {
