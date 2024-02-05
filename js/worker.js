@@ -67,6 +67,7 @@ const createDB = async (file) => {
     await db.runAsync('CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL)');
     await db.runAsync(`CREATE TABLE files(id INTEGER PRIMARY KEY, name TEXT,duration  REAL,filestart INTEGER, locationID INTEGER, UNIQUE (name))`);
     await db.runAsync(`CREATE TABLE locations( id INTEGER PRIMARY KEY, lat REAL NOT NULL, lon  REAL NOT NULL, place TEXT NOT NULL, UNIQUE (lat, lon))`);
+
     // Ensure place names are unique too
     await db.runAsync('CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)');
     await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT,  comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, UNIQUE (dateTime, fileID, speciesID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,  FOREIGN KEY (speciesID) REFERENCES species(id))`);
@@ -128,6 +129,15 @@ async function loadDB(path) {
         await createDB(file);
     } else if (diskDB?.filename !== file) {
         diskDB = new sqlite3.Database(file);
+        // Add the blocked_species table if it is not present
+        const {changes} = await diskDB.runAsync(`CREATE TABLE IF NOT EXISTS blocked_species (
+            fileID INTEGER,
+            speciesID INTEGER,
+            PRIMARY KEY (fileID, speciesID),
+            FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,
+            FOREIGN KEY (speciesID) REFERENCES species(id) ON DELETE CASCADE
+        )`)
+        changes && console.log('Created a new blocked_species table');
         STATE.update({ db: diskDB });
         await diskDB.runAsync('VACUUM');
         await diskDB.runAsync('PRAGMA foreign_keys = ON');
@@ -323,7 +333,7 @@ case "load-model": {
     /* Load model called with cleaCache=true when switching model *after* app launch
      Load model called with clear cache = false when: changing backend, bactchsize or threads
      */
-    SEEN_MODEL_READY = false;
+    
     DEBUG && console.log('clear cache', args.clearCache, 'location', CACHE_LOCATION)
     if (args.clearCache) {
     //  Since models have different sample rates, we need to clear the cache of 
@@ -364,15 +374,7 @@ case "update-list": {
     UI.postMessage({ event: "show-spinner" });
     SEEN_LIST_UPDATE = false;
     STATE.list = args.list;
-    const readyWorker = predictWorkers.find(obj => obj.isAvailable);
-    readyWorker.postMessage({
-        message: "list",
-        list: args.list,
-        lat: STATE.lat,
-        lon: STATE.lon,
-        week: -1,
-        threshold: STATE.speciesThreshold
-    });
+    setBlockedIDs(STATE.lat, STATE.lon, STATE.week)
     break;
 }
 case 'update-locale': {
@@ -414,7 +416,7 @@ async function onChangeMode(mode) {
 */
 
 async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backend = 'tensorflow', list = 'everything'}){
-
+    SEEN_MODEL_READY = false;
     sampleRate = model === "birdnet" ? 48_000 : 24_000;
     setAudioContext(sampleRate);
     // intentional nullish assignment
@@ -518,8 +520,14 @@ const prepSummaryStatement = (blocked) => {
         }
         
         if (blocked.length) {
-            const excluded = prepParams(blocked);
-            summaryStatement += ` AND speciesID NOT IN (${excluded}) `;
+            // const excluded = prepParams(blocked);
+            // summaryStatement += ` AND speciesID NOT IN (${excluded}) `;
+            ` AND NOT EXISTS (
+                SELECT 1
+                FROM blocked_species
+                WHERE blocked_species.fileID = files.id
+                AND blocked_species.speciesID = records.speciesID
+            ) `
         }
         if (STATE.detect.nocmig){
             summaryStatement += ' AND COALESCE(isDaylight, 0) != 1 ';
@@ -1703,7 +1711,7 @@ const prepSummaryStatement = (blocked) => {
                     for (let i = 0; i < threads; i++) {
                         const workerSrc = model === 'v3' ? 'BirdNet' : model === 'birdnet' ? 'BirdNet2.4' : 'model';
                         const worker = new Worker(`./js/${workerSrc}.js`, { type: 'module' });
-                        worker.isAvailable = true;
+                        worker.isAvailable = false;
                         predictWorkers.push(worker)
                         console.log('loading a worker')
                         worker.postMessage({
@@ -1977,6 +1985,7 @@ const prepSummaryStatement = (blocked) => {
                                     sampleRate = response["sampleRate"];
                                     const backend = response["backend"];
                                     console.log(backend);
+                                    setBlockedIDs(STATE.lat,STATE.lon,STATE.week)
                                     UI.postMessage({
                                         event: "model-ready",
                                         message: "ready",
@@ -2025,8 +2034,20 @@ const prepSummaryStatement = (blocked) => {
                             } else {
                                 STATE.blocked = response.blocked;
                             }
-                            STATE.globalOffset = 0
-
+                            STATE.globalOffset = 0;
+                            try {
+                                const fileID = await STATE.db.getAsync('SELECT id AS fileID FROM files WHERE name = ?', response.file);
+                                await STATE.db.runAsync('BEGIN');
+                                let stmt = STATE.db.prepare("INSERT INTO blocked_species (fileID, speciesID) VALUES (?, ?);");
+                                response.blocked.forEach(speciesID => {
+                                    stmt.run(fileID, speciesID);
+                                })
+                                await STATE.db.runAsync('END');
+                            } catch (error) {
+                                console.log('setting blocked list didn\'t work', error)
+                            }
+                            
+                            
                             SEEN_LIST_UPDATE = true;
                             UI.postMessage({ event: "results-complete" });
                             if (response["updateResults"] && STATE.db) {
@@ -2962,9 +2983,9 @@ const prepSummaryStatement = (blocked) => {
                     try {
                         blocked = STATE.blocked[week][location];
                     } catch (error) {
-                        blocked = STATE.blocked["-1"][location];
-                        //setBlockedIDs(lat,lon,week)
-
+                        DEBUG && console.log('error creating blocked species list:', error)
+                        //blocked = STATE.blocked["-1"][location];
+                        setBlockedIDs(lat,lon,week)
                     }
                     
                 } else {
@@ -2975,7 +2996,8 @@ const prepSummaryStatement = (blocked) => {
 
             function setBlockedIDs(lat,lon,week){
                 SEEN_LIST_UPDATE = false;
-                const readyWorker = predictWorkers.find(obj => obj.isAvailable);
+                // Look for an idle worker, or push to the first worker queue
+                const readyWorker = predictWorkers.find(obj => obj.isAvailable) || predictWorkers[0];
                 readyWorker.postMessage({
                     message: "list",
                     list: STATE.list,

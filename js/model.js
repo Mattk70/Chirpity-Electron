@@ -64,14 +64,14 @@ tf.setBackend(backend).then(async () => {
     myModel.speciesThreshold = parseFloat(e.data.threshold);
     myModel.labels = labels;
     await myModel.loadModel();
-    postMessage({
-        message: "update-list",
-        blocked: BLOCKED_IDS,
-        lat: myModel.lat,
-        lon: myModel.lon,
-        week: myModel.week,
-        updateResults: false
-    });
+    // postMessage({
+    //     message: "update-list",
+    //     blocked: BLOCKED_IDS,
+    //     lat: myModel.lat,
+    //     lon: myModel.lon,
+    //     week: myModel.week,
+    //     updateResults: false
+    // });
     myModel.warmUp(batch);
     BACKEND = tf.getBackend();
     postMessage({
@@ -196,7 +196,7 @@ class Model {
             );
             const mdata_label_path = path.join(__dirname, '..','BirdNET_GLOBAL_6K_V2.4_Model_TFJS','static','model','labels.json')
             this.mdata_labels = JSON.parse(fs.readFileSync(mdata_label_path, "utf8")); 
-            await this.setList();
+            //await this.setList();
             }
     }
 

@@ -113,13 +113,6 @@ onmessage = async (e) => {
                 }).catch(error =>{
                     console.error('There was a problem fetching the label file:', error);
                 })
-
-
-                // labels.push(...MYSTERIES);
-                // postMessage({
-                //     message: "labels",
-                //     labels: labels
-                // });
                 DEBUG && console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
                 
                 tf.setBackend(backend).then(async () => {
@@ -144,14 +137,6 @@ onmessage = async (e) => {
                     myModel.week = parseInt(e.data.week);
                     myModel.speciesThreshold = parseFloat(e.data.threshold);
                     await myModel.loadModel();
-                    postMessage({
-                        message: "update-list",
-                        blocked: BLOCKED_IDS,
-                        lat: myModel.lat,
-                        lon: myModel.lon,
-                        week: myModel.week,
-                        updateResults: false
-                    });
                     myModel.warmUp(batch);
                     BACKEND = tf.getBackend();
                     postMessage({
@@ -273,9 +258,7 @@ class Model {
             this.model_loaded = true;
             this.inputShape = [...this.model.inputs[0].shape];
             const mdata_model_path = this.appPath + 'mdata/model.json'
-            this.metadata_model = await tf.loadGraphModel(mdata_model_path,  
-                );
-            await this.setList();
+            this.metadata_model = await tf.loadGraphModel(mdata_model_path);
         }
     }
 
