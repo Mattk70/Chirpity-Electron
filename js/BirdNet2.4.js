@@ -81,9 +81,7 @@ const NOT_BIRDS = [
     "Tamiasciurus hudsonicus_Red Squirrel"];
 
 const MYSTERIES = ['Unknown Sp._Unknown Sp.'];
-const GRAYLIST = [];
-const GOLDEN_LIST = [] 
-let BLOCKED_IDS = [];
+let INCLUDED_IDS = [];
 let SUPPRESSED_IDS = [];
 let ENHANCED_IDS = [];
 const CONFIG = {
@@ -219,11 +217,11 @@ onmessage = async (e) => {
                 await myModel.setList();
                 postMessage({
                     message: "update-list",
-                    blocked: BLOCKED_IDS,
+                    included: INCLUDED_IDS,
                     lat: myModel.lat,
                     lon: myModel.lon,
                     week: myModel.week,
-                    updateResults: false,
+                    updateResults: true,
                     worker: worker
                 });
                 break;
@@ -285,8 +283,9 @@ class Model {
     }
 
     async setList() {
-        BLOCKED_IDS = [];
-        if (this.list === "everything") return
+        if (this.list === "everything") {
+            INCLUDED_IDS = this.labels.map((_, index) => index);
+        }
         else if (this.list === 'location'){
             const lat = this.lat;
             const lon = this.lon;
@@ -300,19 +299,28 @@ class Model {
             for (let i = 0; i < mdata_probs.length; i++) {
                 if (mdata_probs[i] > this.speciesThreshold) {
                     count++;
+                    INCLUDED_IDS.push(i);
                     DEBUG && console.log("including:", this.labels[i] + ': ' + mdata_probs[i]);
+
                 } else {
                     DEBUG && console.log("Excluding:", this.labels[i] + ': ' + mdata_probs[i]);
-                    // Hack to add Dotterel??
-                    //if (! this.labels[i].includes('Dotterel')) 
-                    BLOCKED_IDS.push(i)
                 }
             }
             DEBUG && console.log('Total species considered at this location: ', count)
         }
         else {
-            // find the position of the blocked items in the label list
-            NOT_BIRDS.forEach(notBird => BLOCKED_IDS.push(this.labels.indexOf(notBird)))
+            // Function to extract the first element after splitting on '_'
+            const getFirstElement = label => label.split('_')[0];
+
+            // Create a list of included labels' indices
+            const t0 = Date.now()
+            INCLUDED_IDS = this.labels
+                .map((label, index) => {
+                    const firstPart = getFirstElement(label);
+                    return NOT_BIRDS.some(excludedLabel => getFirstElement(excludedLabel) === firstPart) ? null : index;
+                })
+                .filter(index => index !== null);
+            console.log('filtering took', Date.now() - t0, 'ms')
         }
     }
 
