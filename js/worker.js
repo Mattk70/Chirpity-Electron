@@ -17,7 +17,7 @@ let WINDOW_SIZE = 3;
 let NUM_WORKERS;
 let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
-
+let LIST_WORKER;
 const DEBUG = false;
 
 const DATASET = false;
@@ -253,6 +253,9 @@ async function handleMessage(e) {
     switch (action) {
         case "_init_": {
             const {model, batchSize, threads, backend, list} = args;
+            const t0 = Date.now();
+            LIST_WORKER = await spawnListWorker();
+            console.log('List worker took', Date.now() - t0, 'ms to load');
             await onLaunch({model: model, batchSize: batchSize, threads: threads, backend: backend, list: list});
             break;
         }
@@ -344,7 +347,7 @@ case "load-model": {
 
        // metadata = {};
         ipcRenderer.invoke('clear-cache', CACHE_LOCATION)
-        STATE.blocked = [];
+        STATE.included = [];
     }
     predictWorkers.length && terminateWorkers();
     await onLaunch(args);
@@ -375,7 +378,7 @@ case "update-file-start": {await onUpdateFileStart(args);
 case "update-list": {
     UI.postMessage({ event: "show-spinner" });
     STATE.list = args.list;
-    setBlockedIDs(STATE.lat, STATE.lon, STATE.week)
+    await setIncludedIDs(STATE.lat, STATE.lon, STATE.week)
     break;
 }
 case 'update-locale': {
@@ -386,8 +389,8 @@ case 'update-locale': {
 case "update-state": {
     TEMP = args.temp || TEMP;
     appPath = args.path || appPath;
-    // If we change the speciesThreshold, we need to invalidate the blocked id cache
-    if (args.speciesThreshold) STATE.blocked = {};
+    // If we change the speciesThreshold, we need to invalidate the included id cache
+    if (args.speciesThreshold) STATE.included = {};
     STATE.update(args);
     break;
 }
@@ -411,6 +414,7 @@ async function onChangeMode(mode) {
     });
 }
 
+const filtersApplied = () => STATE.included.length < LABELS.length -1;
 
 /**
 * onLaunch called when Application is first opened or when model changed
@@ -427,8 +431,63 @@ async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backen
     STATE.update({ model: model });
     await loadDB(appPath); // load the diskdb
     await createDB(); // now make the memoryDB
-    spawnWorkers(model, list, batchSize, threads);
+    spawnPredictWorkers(model, list, batchSize, threads);
 }
+
+
+// function spawnListWorker() {
+//     const worker = new Worker('./js/listWorker.js', { type: 'module' });
+  
+//     return function listWorker(message) {
+//       return new Promise((resolve, reject) => {
+//         worker.onmessage = function(event) {
+//           resolve(event.data);
+//         };
+  
+//         worker.onerror = function(error) {
+//           reject(error);
+//         };
+  
+//         console.log('posting message')
+//         worker.postMessage(message);
+//       });
+//     };
+//   }
+
+async function spawnListWorker() {
+    const worker_1 = await new Promise((resolve, reject) => {
+        const worker = new Worker('./js/listWorker.js', { type: 'module' });
+
+        worker.onmessage = function (event) {
+            // Resolve the promise once the worker sends a message indicating it's ready
+            if (event.data.message === 'list-model-ready') {
+                resolve(worker);
+            }
+        };
+
+        worker.onerror = function (error) {
+            reject(error);
+        };
+
+        // Start the worker
+        worker.postMessage('start');
+    });
+    return function listWorker(message_1) {
+        return new Promise((resolve_1, reject_1) => {
+            worker_1.onmessage = function (event_1) {
+                resolve_1(event_1.data);
+            };
+
+            worker_1.onerror = function (error_1) {
+                reject_1(error_1);
+            };
+
+            console.log('posting message');
+            worker_1.postMessage(message_1);
+        });
+    };
+}
+
 
 /**
 * Generates a list of supported audio files, recursively searching directories.
@@ -486,7 +545,7 @@ const prepParams = (list) => list.map(item => '?').join(',');
  * @returns a string, like (?,?,?)
  */
 
-const getSummaryParams = (blocked) => {
+const getSummaryParams = (included) => {
     
     const range = STATE.mode === 'explore' ? STATE.explore.range : STATE.selection?.range;
     const useRange = range?.start;
@@ -496,13 +555,13 @@ const getSummaryParams = (blocked) => {
         extraParams.push(...STATE.filesToAnalyse);
     }
     else if (useRange) params.push(range.start, range.end);
-    extraParams.push(...blocked);
+    filtersApplied() && extraParams.push(...included);
     STATE.locationID && extraParams.push(STATE.locationID);
     params.push(...extraParams);
     return params
 }
 
-const prepSummaryStatement = (blocked) => {
+const prepSummaryStatement = (included) => {
     const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
     const useRange = range?.start;
     let summaryStatement = `
@@ -520,9 +579,9 @@ const prepSummaryStatement = (blocked) => {
             summaryStatement += ' AND dateTime BETWEEN ? AND ? ';
         }
         
-        if (blocked.length) {
-            const excluded = prepParams(blocked);
-            summaryStatement += ` AND speciesID NOT IN (${excluded}) `;
+        if (filtersApplied()) {
+            const includedParams = prepParams(included);
+            summaryStatement += ` AND speciesID IN (${includedParams}) `;
             // ` AND NOT EXISTS (
             //     SELECT 1
             //     FROM blocked_species
@@ -564,7 +623,7 @@ const prepSummaryStatement = (blocked) => {
                 params.push(species);
                 SQL += ' AND speciesID = (SELECT id from species WHERE cname = ?) '; 
             }// This will overcount as there may be a valid species ranked above it
-            else if (STATE.blocked.length) SQL += ` AND speciesID not in (${STATE.blocked}) `;
+            else if (filtersApplied()) SQL += ` AND speciesID IN (${STATE.included}) `;
             if (useRange) SQL += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
             if (STATE.detect.nocmig) SQL += ' AND COALESCE(isDaylight, 0) != 1 ';
             if (STATE.locationID) SQL += ` AND locationID =  ${STATE.locationID}`;
@@ -581,11 +640,11 @@ const prepSummaryStatement = (blocked) => {
         
         
         
-        const getResultsParams = (species, confidence, offset, limit, topRankin, blocked) => {
+        const getResultsParams = (species, confidence, offset, limit, topRankin, included) => {
             const params = [];
             params.push(confidence);
             ['analyse', 'archive'].includes(STATE.mode) && !STATE.selection && params.push(...STATE.filesToAnalyse);
-            blocked.length && params.push(...blocked);
+            filtersApplied() && params.push(...included);
             
             params.push(topRankin);
             species && params.push(species);
@@ -593,7 +652,7 @@ const prepSummaryStatement = (blocked) => {
             return params
         }
         
-        const prepResultsStatement = (species, noLimit, blocked) => {
+        const prepResultsStatement = (species, noLimit, included) => {
             let resultStatement = `
             WITH ranked_records AS (
                 SELECT 
@@ -632,7 +691,7 @@ const prepSummaryStatement = (blocked) => {
                 if (useRange) {
                     resultStatement += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
                 }    
-                if (blocked.length) resultStatement += ` AND speciesID NOT IN (${prepParams(blocked)}) `;
+                if (filtersApplied()) resultStatement += ` AND speciesID IN (${prepParams(included)}) `;
                 if (STATE.selection) resultStatement += ` AND name = '${FILE_QUEUE[0]}' `;
                 if (STATE.locationID) {
                     resultStatement += ` AND locationID = ${STATE.locationID} `;
@@ -763,7 +822,7 @@ const prepSummaryStatement = (blocked) => {
                 if (filesBeingProcessed.length) {
                     //restart the worker
                     terminateWorkers();
-                    spawnWorkers(model, list, BATCH_SIZE, NUM_WORKERS)
+                    spawnPredictWorkers(model, list, BATCH_SIZE, NUM_WORKERS)
                 }
                 filesBeingProcessed = [];
                 predictionsReceived = {};
@@ -880,7 +939,7 @@ const prepSummaryStatement = (blocked) => {
                     await setMetadata({ file: file, proxy: proxy, source_file: source_file });
                         /*This is where we add week checking...
                         GENERATING A WEEK SPECIFIC LIST FOR A LOCATION IS A *REALLY* EXPENSIVE TASK.
-                        LET'S CACHE BLOCKED IDS FOR WEEK AND LOCATION. NEED TO ADAPT STATE.BLOCKED_IDS
+                        LET'S CACHE included IDS FOR WEEK AND LOCATION. NEED TO ADAPT STATE.BLOCKED_IDS
                         SO IT CAN BE USED THIS WAY. DEFAULT KEY -1. 
                         STRUCTURE: BLOCKED_IDS.week.location = []; 
                         */ 
@@ -888,8 +947,8 @@ const prepSummaryStatement = (blocked) => {
                             const meta = metadata[file];
                             const week = STATE.useWeek ? new Date(meta.fileStart).getWeekNumber() : "-1";
                             const location = STATE.lat + STATE.lon;
-                            if (! (STATE.blocked[week] && STATE.blocked[week][location])) {
-                                setBlockedIDs(STATE.lat,STATE.lon,week)
+                            if (! (STATE.included[week] && STATE.included[week][location])) {
+                                await setIncludedIDs(STATE.lat,STATE.lon,week)
                             }
                         }
                 }
@@ -1457,9 +1516,9 @@ const prepSummaryStatement = (blocked) => {
                 JOIN species
                 ON species.id = records.speciesID
                 JOIN files ON records.fileID = files.id
-                WHERE speciesID NOT IN (${prepParams(STATE.blocked)}) 
+                ${filtersApplied() ? `WHERE speciesID IN (${prepParams(STATE.included)}` : ''}) 
                 AND confidence >= ${STATE.detect.confidence}`;
-                let params = STATE.blocked;
+                let params = filtersApplied() ? STATE.included : [];
                 if (species) {
                     db2ResultSQL += ` AND species.cname = ?`;
                     params.push(species)
@@ -1706,7 +1765,7 @@ const prepSummaryStatement = (blocked) => {
                 
                 
                 /// Workers  From the MDN example5
-                function spawnWorkers(model, list, batchSize, threads) {
+                function spawnPredictWorkers(model, list, batchSize, threads) {
                     NUM_WORKERS = threads;
                     // And be ready to receive the list:
                     for (let i = 0; i < threads; i++) {
@@ -1904,7 +1963,7 @@ const prepSummaryStatement = (blocked) => {
                         
                         const parsePredictions = async (response) => {
                             let file = response.file;
-                            const blocked = getBlockedIDs(file);
+                            const included = await getIncludedIDs(file);
                             const latestResult = response.result, db = STATE.db;
                             DEBUG && console.log('worker being used:', response.worker);
                             if (! STATE.selection) await generateInsertQuery(latestResult, file);
@@ -1920,7 +1979,7 @@ const prepSummaryStatement = (blocked) => {
                                     if (confidence < 0.05) break;
                                     confidence*=1000;
                                     let speciesID = speciesIDArray[j];
-                                    updateUI = (confidence > STATE.detect.confidence && ! blocked.includes(speciesID));
+                                    updateUI = (confidence > STATE.detect.confidence && included.includes(speciesID));
                                     if (STATE.selection || updateUI) {
                                         let end, confidenceRequired;
                                         if (STATE.selection) {
@@ -1993,7 +2052,6 @@ const prepSummaryStatement = (blocked) => {
                                         sampleRate = response["sampleRate"];
                                         const backend = response["backend"];
                                         console.log(backend);
-                                        setBlockedIDs(STATE.lat,STATE.lon,STATE.week)
                                         UI.postMessage({
                                             event: "model-ready",
                                             message: "ready",
@@ -2028,19 +2086,19 @@ const prepSummaryStatement = (blocked) => {
                         break;
                     }
                     case "update-list": {
-                        const {week, lat, lon, blocked} = response;
+                        const {week, lat, lon, included} = response;
                         if (STATE.list === 'location'){
                             // Let's create our list cache
                             
                             const location = lat.toFixed(2) + lon.toFixed(2);
-                            if (! (STATE.blocked[week] && STATE.blocked[week][location])) {
-                                STATE.blocked[week] = {};
-                                STATE.blocked[week][location] = blocked;
+                            if (! (STATE.included[week] && STATE.included[week][location])) {
+                                STATE.included[week] = {};
+                                STATE.included[week][location] = included;
                             } else {
                                 DEBUG && console.log("Unnecesary call to generate location list")
                             }
                         } else {
-                            STATE.blocked = blocked;
+                            STATE.included = included;
                         }
                         STATE.globalOffset = 0;
                         // try {
@@ -2051,12 +2109,12 @@ const prepSummaryStatement = (blocked) => {
                         //     }
                         //     await STATE.db.runAsync('BEGIN');
                         //     let stmt = STATE.db.prepare("INSERT OR IGNORE INTO blocked_species (lat, lon, week, list, model, speciesID) VALUES (?, ?, ?, ?, ?)");
-                        //     response.blocked.forEach(speciesID => {
+                        //     response.included.forEach(speciesID => {
                         //         stmt.run(SQLlat, SQLlon, SQLweek, list, speciesID);
                         //     })
                         //     await STATE.db.runAsync('END');
                         // } catch (error) {
-                        //     console.log('setting blocked list didn\'t work', error)
+                        //     console.log('setting included list didn\'t work', error)
                         // }
                         
                         UI.postMessage({ event: "results-complete" });
@@ -2227,8 +2285,8 @@ const prepSummaryStatement = (blocked) => {
         } = {}) => {
             const db = STATE.db;
 
-            const blocked = STATE.selection ? [] : getBlockedIDs();
-            prepSummaryStatement(blocked);
+            const included = STATE.selection ? [] : await getIncludedIDs();
+            prepSummaryStatement(included);
             const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
             let range, files = [];
             if (['explore', 'chart'].includes(STATE.mode)) {
@@ -2238,7 +2296,7 @@ const prepSummaryStatement = (blocked) => {
             }
             
             t0 = Date.now();
-            const params = getSummaryParams(blocked);
+            const params = getSummaryParams(included);
             const summary = await STATE.GET_SUMMARY_SQL.allAsync(...params);
             
             DEBUG && console.log("Get Summary took", (Date.now() - t0) / 1000, "seconds");
@@ -2291,9 +2349,9 @@ const prepSummaryStatement = (blocked) => {
             
             let index = offset;
             AUDACITY = {};
-            const blocked = STATE.selection ? [] : getBlockedIDs();
-            const params = getResultsParams(species, confidence, offset, limit, topRankin, blocked);
-            prepResultsStatement(species, limit === Infinity, blocked);
+            const included = STATE.selection ? [] : await getIncludedIDs();
+            const params = getResultsParams(species, confidence, offset, limit, topRankin, included);
+            prepResultsStatement(species, limit === Infinity, included);
             
             const result = await STATE.GET_RESULT_SQL.allAsync(...params);
             if (format === 'text'){
@@ -2461,7 +2519,8 @@ const prepSummaryStatement = (blocked) => {
                 })
                 return // nothing to do. Also will crash if trying to update disk from disk.
             }
-            const blocked = getBlockedIDs(args.file);
+            const included = await getIncludedIDs(args.file);
+            const filterClause = filtersApplied() ? `AND speciesID IN (${included} )` : ''
             await memoryDB.runAsync('BEGIN');
             await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.files SELECT * FROM files`);
             // Set the saved flag on files' metadata
@@ -2475,7 +2534,7 @@ const prepSummaryStatement = (blocked) => {
             response = await memoryDB.runAsync(`
             INSERT OR IGNORE INTO disk.records 
             SELECT * FROM records
-            WHERE confidence >= ${STATE.detect.confidence} AND speciesID NOT IN (${blocked})`);
+            WHERE confidence >= ${STATE.detect.confidence} ${filterClause} `);
             console.log(response?.changes + ' records added to disk database');
             await memoryDB.runAsync('END');
             console.log("transaction ended");
@@ -2643,7 +2702,7 @@ const prepSummaryStatement = (blocked) => {
         /**
          * getDetectedSpecies generates a list of species to use in dropdowns for chart and explore mode filters
          * It doesn't really make sense to use location specific filtering here, as there is a location filter in the 
-         * page. For now, I'm just going skip the blocked IDs filter if location mode is selected
+         * page. For now, I'm just going skip the included IDs filter if location mode is selected
          */
         const getDetectedSpecies = () => {
             const range = STATE.explore.range;
@@ -2654,8 +2713,8 @@ const prepSummaryStatement = (blocked) => {
             JOIN files on records.fileID = files.id`;
             
             if (STATE.mode === 'explore') sql += ` WHERE confidence >= ${confidence}`;
-            if (STATE.list !== 'location' && STATE.blocked.length) {
-                sql += ` AND speciesID NOT IN (${STATE.blocked.join(',')})`;
+            if (STATE.list !== 'location' && filtersApplied()) {
+                sql += ` AND speciesID IN (${STATE.included.join(',')})`;
             }
             if (range?.start) sql += ` AND datetime BETWEEN ${range.start} AND ${range.end}`;
             sql += filterLocation();
@@ -2671,20 +2730,22 @@ const prepSummaryStatement = (blocked) => {
          * @returns Promise <void>
          */
         const getValidSpecies = async (file) => {
-            const blocked = getBlockedIDs(file);
-            let excluded, included;
+            const included = await getIncludedIDs(file);
+            let excludedSpecies, includedSpecies;
             let sql = `SELECT cname, sname FROM species`;
-            if (blocked.length) {
-                sql += ` WHERE id NOT IN (${blocked.join(',')})`;
+            // We'll ignore Unknown Sp. here, hence length < (LABELS.length *-1*)
+
+            if (filtersApplied()) {
+                sql += ` WHERE id IN (${included.join(',')})`;
             }
             sql += ' GROUP BY cname ORDER BY cname';
-            included = await diskDB.allAsync(sql)
+            includedSpecies = await diskDB.allAsync(sql)
             
-            if (blocked.length){
-                sql = sql.replace('NOT IN', 'IN');
-                excluded = await diskDB.allAsync(sql);
+            if (filtersApplied()){
+                sql = sql.replace('IN', 'NOT IN');
+                excludedSpecies = await diskDB.allAsync(sql);
             }
-            UI.postMessage({ event: 'valid-species-list', included: included, excluded: excluded })
+            UI.postMessage({ event: 'valid-species-list', included: includedSpecies, excluded: excludedSpecies })
         };
         
         const onUpdateFileStart = async (args) => {
@@ -2967,8 +3028,13 @@ const prepSummaryStatement = (blocked) => {
                 UI.postMessage({ event: 'location-list', locations: locations, currentLocation: metadata[file]?.locationID })
             }
             
-            function getBlockedIDs(file){
-                let blocked, lat, lon, week;
+            /**
+             * Helper function to provide a list of valid species for the filter. Will look in the cache, or call setIncludedIDs to generate a new list
+             * @param {*} file 
+             * @returns a list of IDs included in filtered results
+             */
+            async function getIncludedIDs(file){
+                let included, lat, lon, week;
                 if (STATE.list === 'location'){
                     if (file){
                         file = metadata[file];
@@ -2982,45 +3048,32 @@ const prepSummaryStatement = (blocked) => {
                         week = STATE.useWeek ? STATE.week : "-1";
                     }
                     const location = lat.toString() + lon.toString();
-                    try {
-                        blocked = STATE.blocked[week][location];
-                    } catch (error) {
-                        DEBUG && console.log('error creating blocked species list:', error)
-                        //blocked = STATE.blocked["-1"][location];
-                        setBlockedIDs(lat,lon,week)
+                    if (Array.isArray(STATE.included) || STATE.included[week]?.[location] === undefined ) {
+                        included =  await setIncludedIDs(lat,lon,week)
+                    } else {
+                        included = STATE.included.week.location;
                     }
-                    
                 } else {
-                    blocked = STATE.blocked;
+                    included = STATE.included;
                 }
-                return blocked;
+                return included;
             }
 
-            async function setBlockedIDs(lat,lon,week){
-                // Look for an idle worker, or push to the first worker queue
-                const readyWorker = await waitForWorker(predictWorkers);
-                predictWorkers[readyWorker].postMessage({
-                    message: "list",
-                    list: STATE.list,
-                    lat: lat,
-                    lon: lon,
-                    week: week,
-                    threshold: STATE.speciesThreshold,
-                    worker: readyWorker
-                });
-            }
-
-            function waitForWorker(predictWorkers) {
-                let count = 0
-                return new Promise(resolve => {
-                    const checkAvailability = () => {
-                        const readyWorker = predictWorkers.findIndex(obj => obj.isAvailable && obj.isReady) ;
-                        if (readyWorker > -1) {
-                            resolve(readyWorker);
-                        } else {
-                            setTimeout(checkAvailability, 100); // Check again in 100 milliseconds
-                        }
-                    };
-                    checkAvailability();
-                });
+            async function setIncludedIDs(lat,lon,week){
+                // Use the list worker
+                t0 = Date.now();
+                const message = await LIST_WORKER({
+                    message: 'get-list', 
+                    model: STATE.model, 
+                    listType: STATE.list, 
+                    lat: lat, 
+                    lon: lon, 
+                    week: week, 
+                    useWeek: STATE.useWeek,
+                    threshold: STATE.speciesThreshold
+                })
+                console.log(`setting the ${STATE.list} list took ${Date.now() -t0}ms`)
+                STATE.included = message.included;
+                UI.postMessage({ event: "results-complete" });
+                return STATE.included
             }

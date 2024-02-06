@@ -25,7 +25,7 @@ sqlite3.Statement.prototype.allAsync = function (...params) {
     if (DEBUG) console.log('SQL\n', this.sql, '\nParams\n', params)
     return new Promise((resolve, reject) => {
         this.all(params, (err, rows) => {
-            if (err) return reject(console.log(err, sql));
+            if (err) return reject(console.log(err, this.sql));
             if (DEBUG) console.log('\nRows:', rows)
             resolve(rows);
         });
