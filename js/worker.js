@@ -17,7 +17,6 @@ let WINDOW_SIZE = 3;
 let NUM_WORKERS;
 let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
-let SEEN_LIST_UPDATE = false // Prevents  list updates from every worker on every change
 
 const DEBUG = false;
 
@@ -67,7 +66,8 @@ const createDB = async (file) => {
     await db.runAsync('CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL)');
     await db.runAsync(`CREATE TABLE files(id INTEGER PRIMARY KEY, name TEXT,duration  REAL,filestart INTEGER, locationID INTEGER, UNIQUE (name))`);
     await db.runAsync(`CREATE TABLE locations( id INTEGER PRIMARY KEY, lat REAL NOT NULL, lon  REAL NOT NULL, place TEXT NOT NULL, UNIQUE (lat, lon))`);
-
+    // await db.runAsync('CREATE TABLE blocked_species (lat REAL, lon REAL, week INTEGER, list TEXT NOT NULL, speciesID INTEGER NOT NULL, PRIMARY KEY (lat,lon,week,list,speciesID))');
+    //await db.runAsync('CREATE INDEX blocked_species_idx on blocked_species(lat,lon,week)');
     // Ensure place names are unique too
     await db.runAsync('CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)');
     await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT,  comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, UNIQUE (dateTime, fileID, speciesID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,  FOREIGN KEY (speciesID) REFERENCES species(id))`);
@@ -129,15 +129,17 @@ async function loadDB(path) {
         await createDB(file);
     } else if (diskDB?.filename !== file) {
         diskDB = new sqlite3.Database(file);
-        // Add the blocked_species table if it is not present
-        const {changes} = await diskDB.runAsync(`CREATE TABLE IF NOT EXISTS blocked_species (
-            fileID INTEGER,
-            speciesID INTEGER,
-            PRIMARY KEY (fileID, speciesID),
-            FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,
-            FOREIGN KEY (speciesID) REFERENCES species(id) ON DELETE CASCADE
-        )`)
-        changes && console.log('Created a new blocked_species table');
+        // // Add the blocked_species table if it is not present
+        // const {changes} = await diskDB.runAsync(`
+        //     CREATE TABLE IF NOT EXISTS blocked_species (
+        //         lat REAL NOT NULL,
+        //         lon REAL NOT NULL,
+        //         week INTEGER  NOT NULL,
+        //         list TEXT NOT NULL,
+        //         speciesID INTEGER  NOT NULL,
+        //         PRIMARY KEY (lat,lon,week,speciesID))`);
+        // await diskDB.runAsync('CREATE INDEX IF NOT EXISTS blocked_species_idx on blocked_species(lat,lon,week)')
+        // changes && console.log('Created a new blocked_species table and index');
         STATE.update({ db: diskDB });
         await diskDB.runAsync('VACUUM');
         await diskDB.runAsync('PRAGMA foreign_keys = ON');
@@ -372,7 +374,6 @@ case "update-file-start": {await onUpdateFileStart(args);
 }
 case "update-list": {
     UI.postMessage({ event: "show-spinner" });
-    SEEN_LIST_UPDATE = false;
     STATE.list = args.list;
     setBlockedIDs(STATE.lat, STATE.lon, STATE.week)
     break;
@@ -520,14 +521,14 @@ const prepSummaryStatement = (blocked) => {
         }
         
         if (blocked.length) {
-            // const excluded = prepParams(blocked);
-            // summaryStatement += ` AND speciesID NOT IN (${excluded}) `;
-            ` AND NOT EXISTS (
-                SELECT 1
-                FROM blocked_species
-                WHERE blocked_species.fileID = files.id
-                AND blocked_species.speciesID = records.speciesID
-            ) `
+            const excluded = prepParams(blocked);
+            summaryStatement += ` AND speciesID NOT IN (${excluded}) `;
+            // ` AND NOT EXISTS (
+            //     SELECT 1
+            //     FROM blocked_species
+            //     WHERE blocked_species.fileID = files.id
+            //     AND blocked_species.speciesID = records.speciesID
+            // ) `
         }
         if (STATE.detect.nocmig){
             summaryStatement += ' AND COALESCE(isDaylight, 0) != 1 ';
@@ -637,7 +638,7 @@ const prepSummaryStatement = (blocked) => {
                     resultStatement += ` AND locationID = ${STATE.locationID} `;
                 }
                 if (STATE.detect.nocmig){
-                    resultStatement += ' AND COALESCE(isDaylight, 0) != 1 ';
+                    resultStatement += ' AND COALESCE(isDaylight, 0) != 1 '; // Backward compatibility for < v0.9.
                 }
                 
                 resultStatement += `)
@@ -1212,7 +1213,7 @@ const prepSummaryStatement = (blocked) => {
             */
             
             const getPredictBuffers = async ({
-                file = '', start = 0, end = undefined, worker = undefined
+                file = '', start = 0, end = undefined
             }) => {
                 let chunkLength = STATE.model === 'birdnet' ? 144_000 : 72_000;
                 // Ensure max and min are within range
@@ -1261,7 +1262,7 @@ const prepSummaryStatement = (blocked) => {
                             if (++workerInstance >= NUM_WORKERS) {
                                 workerInstance = 0;
                             }
-                            worker = workerInstance;
+                            let worker = workerInstance;
                             feedChunksToModel(myArray, chunkStart, file, end, worker);
                             chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
                             // Now the async stuff is done ==>
@@ -1284,7 +1285,7 @@ const prepSummaryStatement = (blocked) => {
                         }
                         // Create array with 0's (short segment of silence that will trigger the finalChunk flag
                         const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
-                        feedChunksToModel(myArray, chunkStart, file, end, worker);
+                        feedChunksToModel(myArray, chunkStart, file, end);
                         readStream.resume();
                     }
                 })
@@ -1385,9 +1386,8 @@ const prepSummaryStatement = (blocked) => {
                 file = '',
                 start = 0,
                 end = metadata[file].duration,
-                worker = undefined
             }) {
-                await getPredictBuffers({ file: file, start: start, end: end, worker: undefined });
+                await getPredictBuffers({ file: file, start: start, end: end });
                 UI.postMessage({ event: 'update-audio-duration', value: metadata[file].duration });
             }
             
@@ -1427,7 +1427,8 @@ const prepSummaryStatement = (blocked) => {
                                 file: parts.base,
                                 buffer: buffer,
                                 height: 256,
-                                width: 384
+                                width: 384,
+                                worker: workerInstance
                             }, [buffer.buffer]);
                         }
                     }
@@ -1514,7 +1515,8 @@ const prepSummaryStatement = (blocked) => {
                                         file: file,
                                         buffer: buffer,
                                         height: height,
-                                        width: width
+                                        width: width,
+                                        worker: workerInstance
                                     }, [buffer.buffer]);
                                     count++;
                                 }
@@ -1707,11 +1709,11 @@ const prepSummaryStatement = (blocked) => {
                 function spawnWorkers(model, list, batchSize, threads) {
                     NUM_WORKERS = threads;
                     // And be ready to receive the list:
-                    SEEN_LIST_UPDATE = false;
                     for (let i = 0; i < threads; i++) {
                         const workerSrc = model === 'v3' ? 'BirdNet' : model === 'birdnet' ? 'BirdNet2.4' : 'model';
                         const worker = new Worker(`./js/${workerSrc}.js`, { type: 'module' });
-                        worker.isAvailable = false;
+                        worker.isAvailable = true;
+                        worker.isReady = false;
                         predictWorkers.push(worker)
                         console.log('loading a worker')
                         worker.postMessage({
@@ -1723,7 +1725,8 @@ const prepSummaryStatement = (blocked) => {
                             lat: STATE.lat,
                             lon: STATE.lon,
                             week: STATE.week,
-                            threshold: STATE.speciesThreshold
+                            threshold: STATE.speciesThreshold,
+                            worker: i
                         })
                         worker.onmessage = async (e) => {
                             await parseMessage(e)
@@ -1979,19 +1982,24 @@ const prepSummaryStatement = (blocked) => {
                         let SEEN_MODEL_READY = false;
                         async function parseMessage(e) {
                             const response = e.data;
+                            // Update this worker's avaialability
+                            predictWorkers[response.worker].isAvailable = true;
+                            response.worker
                             switch (response['message']) {
-                                case "model-ready": {if ( !SEEN_MODEL_READY) {
-                                    SEEN_MODEL_READY = true;
-                                    sampleRate = response["sampleRate"];
-                                    const backend = response["backend"];
-                                    console.log(backend);
-                                    setBlockedIDs(STATE.lat,STATE.lon,STATE.week)
-                                    UI.postMessage({
-                                        event: "model-ready",
-                                        message: "ready",
-                                        backend: backend,
-                                        sampleRate: sampleRate
-                                    });
+                                case "model-ready": {
+                                    predictWorkers[response.worker].isReady = true;
+                                    if ( !SEEN_MODEL_READY) {
+                                        SEEN_MODEL_READY = true;
+                                        sampleRate = response["sampleRate"];
+                                        const backend = response["backend"];
+                                        console.log(backend);
+                                        setBlockedIDs(STATE.lat,STATE.lon,STATE.week)
+                                        UI.postMessage({
+                                            event: "model-ready",
+                                            message: "ready",
+                                            backend: backend,
+                                            sampleRate: sampleRate
+                                        });
                                 }
                                 break;
                             }
@@ -2000,7 +2008,7 @@ const prepSummaryStatement = (blocked) => {
                                     predictWorkers[response.worker].isAvailable = true;
                                     let worker = await parsePredictions(response);
                                     if (predictionsReceived[response.file] === predictionsRequested[response.file]) {
-                                        const limit = 100;
+                                        const limit = 10;
                                         clearCache(CACHE_LOCATION, limit);
                                         if (filesBeingProcessed.length) {
                                             processNextFile({
@@ -2020,41 +2028,42 @@ const prepSummaryStatement = (blocked) => {
                         break;
                     }
                     case "update-list": {
-                        if ( !SEEN_LIST_UPDATE) {
-                            if (STATE.list === 'location'){
-                                // Let's create our list cache
-                                const {week, lat, lon, blocked} = response;
-                                const location = lat.toFixed(2) + lon.toFixed(2);
-                                if (! (STATE.blocked[week] && STATE.blocked[week][location])) {
-                                    STATE.blocked[week] = {};
-                                    STATE.blocked[week][location] = blocked;
-                                } else {
-                                    DEBUG && console.log("Unnecesary call to generate location list")
-                                }
+                        const {week, lat, lon, blocked} = response;
+                        if (STATE.list === 'location'){
+                            // Let's create our list cache
+                            
+                            const location = lat.toFixed(2) + lon.toFixed(2);
+                            if (! (STATE.blocked[week] && STATE.blocked[week][location])) {
+                                STATE.blocked[week] = {};
+                                STATE.blocked[week][location] = blocked;
                             } else {
-                                STATE.blocked = response.blocked;
+                                DEBUG && console.log("Unnecesary call to generate location list")
                             }
-                            STATE.globalOffset = 0;
-                            try {
-                                const fileID = await STATE.db.getAsync('SELECT id AS fileID FROM files WHERE name = ?', response.file);
-                                await STATE.db.runAsync('BEGIN');
-                                let stmt = STATE.db.prepare("INSERT INTO blocked_species (fileID, speciesID) VALUES (?, ?);");
-                                response.blocked.forEach(speciesID => {
-                                    stmt.run(fileID, speciesID);
-                                })
-                                await STATE.db.runAsync('END');
-                            } catch (error) {
-                                console.log('setting blocked list didn\'t work', error)
-                            }
-                            
-                            
-                            SEEN_LIST_UPDATE = true;
-                            UI.postMessage({ event: "results-complete" });
-                            if (response["updateResults"] && STATE.db) {
-                                await Promise.all([getResults(), getSummary()]);
-                                if (["explore", "chart"].includes(STATE.mode)) {
-                                    getDetectedSpecies();
-                                }
+                        } else {
+                            STATE.blocked = blocked;
+                        }
+                        STATE.globalOffset = 0;
+                        // try {
+                        //     const list = STATE.list;
+                        //     let SQLweek = week, SQLlat = lat, SQLlon = lon;
+                        //     if (list  !== 'location') {
+                        //         SQLlat = SQLlon = SQLweek = null;
+                        //     }
+                        //     await STATE.db.runAsync('BEGIN');
+                        //     let stmt = STATE.db.prepare("INSERT OR IGNORE INTO blocked_species (lat, lon, week, list, model, speciesID) VALUES (?, ?, ?, ?, ?)");
+                        //     response.blocked.forEach(speciesID => {
+                        //         stmt.run(SQLlat, SQLlon, SQLweek, list, speciesID);
+                        //     })
+                        //     await STATE.db.runAsync('END');
+                        // } catch (error) {
+                        //     console.log('setting blocked list didn\'t work', error)
+                        // }
+                        
+                        UI.postMessage({ event: "results-complete" });
+                        if (response["updateResults"] && STATE.db) {
+                            await Promise.all([getResults(), getSummary()]);
+                            if (["explore", "chart"].includes(STATE.mode)) {
+                                getDetectedSpecies();
                             }
                         }
                     break;
@@ -2663,13 +2672,6 @@ const prepSummaryStatement = (blocked) => {
          */
         const getValidSpecies = async (file) => {
             const blocked = getBlockedIDs(file);
-            if (!SEEN_LIST_UPDATE){
-                UI.postMessage({
-                    event: 'generate-alert',
-                    message: 'Still preparing the detection list, try again in a few moments'
-                });
-                return
-            }
             let excluded, included;
             let sql = `SELECT cname, sname FROM species`;
             if (blocked.length) {
@@ -2994,16 +2996,31 @@ const prepSummaryStatement = (blocked) => {
                 return blocked;
             }
 
-            function setBlockedIDs(lat,lon,week){
-                SEEN_LIST_UPDATE = false;
+            async function setBlockedIDs(lat,lon,week){
                 // Look for an idle worker, or push to the first worker queue
-                const readyWorker = predictWorkers.find(obj => obj.isAvailable) || predictWorkers[0];
-                readyWorker.postMessage({
+                const readyWorker = await waitForWorker(predictWorkers);
+                predictWorkers[readyWorker].postMessage({
                     message: "list",
                     list: STATE.list,
                     lat: lat,
                     lon: lon,
                     week: week,
-                    threshold: STATE.speciesThreshold
+                    threshold: STATE.speciesThreshold,
+                    worker: readyWorker
+                });
+            }
+
+            function waitForWorker(predictWorkers) {
+                let count = 0
+                return new Promise(resolve => {
+                    const checkAvailability = () => {
+                        const readyWorker = predictWorkers.findIndex(obj => obj.isAvailable && obj.isReady) ;
+                        if (readyWorker > -1) {
+                            resolve(readyWorker);
+                        } else {
+                            setTimeout(checkAvailability, 100); // Check again in 100 milliseconds
+                        }
+                    };
+                    checkAvailability();
                 });
             }

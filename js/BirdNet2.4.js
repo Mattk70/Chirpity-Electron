@@ -79,6 +79,7 @@ const NOT_BIRDS = [
     "Alouatta pigra_Mexican Black Howler Monkey",
     "Tamias striatus_Eastern Chipmunk",
     "Tamiasciurus hudsonicus_Red Squirrel"];
+
 const MYSTERIES = ['Unknown Sp._Unknown Sp.'];
 const GRAYLIST = [];
 const GOLDEN_LIST = [] 
@@ -92,9 +93,11 @@ const CONFIG = {
 
 onmessage = async (e) => {
     const modelRequest = e.data.message;
+    const worker = e.data.worker;
     let response;
     try {
         switch (modelRequest) {
+
             case "load": {
                 const version = e.data.model;
                 DEBUG && console.log("load request to worker");
@@ -144,7 +147,8 @@ onmessage = async (e) => {
                         sampleRate: myModel.config.sampleRate,
                         chunkLength: myModel.chunkLength,
                         backend: tf.getBackend(),
-                        labels: labels
+                        labels: labels,
+                        worker: worker
                     });
                 });
                 break;
@@ -199,7 +203,8 @@ onmessage = async (e) => {
                     channels: 1,
                     image: image,
                     file: specFile,
-                    filepath: filepath
+                    filepath: filepath,
+                    worker: worker
                 };
                 postMessage(response);
                 break;
@@ -218,7 +223,8 @@ onmessage = async (e) => {
                     lat: myModel.lat,
                     lon: myModel.lon,
                     week: myModel.week,
-                    updateResults: false
+                    updateResults: false,
+                    worker: worker
                 });
                 break;
             }
@@ -456,6 +462,7 @@ class Model {
         const finalPrediction = newPrediction || prediction;
         //new
         const { indices, values } = tf.topk(finalPrediction, 5, true)
+        // const [topIndices, topValues] = await Promise.all([indices.arraySync(), values.arraySync()]).catch((err => console.log(err)));
         const topIndices = indices.arraySync();
         const topValues = values.arraySync();
         indices.dispose();
@@ -513,7 +520,7 @@ class Model {
     };
 
     async predictChunk(audioBuffer, start, fileStart, file, threshold, confidence) {
-        DEBUG && console.log('predictCunk begin', tf.memory().numTensors);
+        DEBUG && console.log('predictCunk begin', tf.memory());
         audioBuffer = tf.tensor1d(audioBuffer);
 
         // check if we need to pad
