@@ -534,7 +534,26 @@ input[type="range"].vertical {
     text-align: center;
     line-height: 20px;
     float: right;
+    text-decoration: none; /* Remove underline from <a> tags */
+    display: inline-block;
+    transition: transform 0.2s; /* Add transition for smooth scaling */
 }
+
+.circle a {
+    text-decoration: none; /* Remove underline */
+    color: inherit; /* Inherit parent's color */
+    display: block;
+}
+
+.circle:hover {
+    transform: scale(1.1); /* Grow on mouseover */
+    color: white;
+}
+
+.circle:active {
+    transform: scale(0.9); /* Shrink on click */
+}
+
 
 #settingsForm {
     height: 75vh;

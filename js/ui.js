@@ -1504,7 +1504,10 @@ window.onload = async () => {
         const {model, backend, list} = config;
         t0_warmup = Date.now();
         worker.postMessage({action: '_init_', model: model, batchSize: config[backend].batchSize, threads: config[backend].threads, backend: backend, list: list})
-        //worker.postMessage({ action: 'clear-cache' })
+        // Enable popovers
+        const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]')
+        const popoverList = [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl))
+
         // New users - show the tour
         if (!config.seenTour) {
             setTimeout(prepTour, 2000)
