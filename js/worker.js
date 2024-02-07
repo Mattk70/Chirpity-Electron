@@ -317,6 +317,7 @@ async function handleMessage(e) {
             const t1 = Date.now();
             args.updateSummary && await getSummary(args);
             const t2 = Date.now();
+            args.included = await getIncludedIDs(args.file);
             await getTotal(args);
             console.log("Filter took", (Date.now() - t0) / 1000, "seconds", "GetTotal took", (Date.now() - t2) / 1000, "seconds", "GetSummary took", (t2 - t1) / 1000, "seconds");
         }
@@ -381,6 +382,7 @@ case "update-list": {
     UI.postMessage({ event: "show-spinner" });
     STATE.list = args.list;
     await setIncludedIDs(STATE.lat, STATE.lon, STATE.week)
+    await Promise.all([getResults(), getSummary()]);
     break;
 }
 case 'update-locale': {
@@ -612,7 +614,7 @@ const prepSummaryStatement = (included) => {
         //console.log('Summary SQL statement:\n' + summaryStatement)
     }
     
-    const getTotal = async ({species = undefined, offset = 0}) => {
+    const getTotal = async ({species = undefined, offset = 0, included = []}) => {
         let params = [];
         const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
         const useRange = range?.start;
@@ -628,7 +630,7 @@ const prepSummaryStatement = (included) => {
                 params.push(species);
                 SQL += ' AND speciesID = (SELECT id from species WHERE cname = ?) '; 
             }// This will overcount as there may be a valid species ranked above it
-            else if (filtersApplied(included)) SQL += ` AND speciesID IN (${included}) `;
+            else if (included.length && filtersApplied(included)) SQL += ` AND speciesID IN (${included}) `;
             if (useRange) SQL += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
             if (STATE.detect.nocmig) SQL += ' AND COALESCE(isDaylight, 0) != 1 ';
             if (STATE.locationID) SQL += ` AND locationID =  ${STATE.locationID}`;
@@ -3084,7 +3086,6 @@ const prepSummaryStatement = (included) => {
                 // Merge the new object with the existing STATE.included object
                 if (STATE.included === undefined) STATE.included = {}
                 STATE.included = merge(STATE.included,includedObject);
-
                 UI.postMessage({ event: "results-complete" });
                 return STATE.included
             }
