@@ -19,7 +19,7 @@ let NUM_WORKERS;
 let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let LIST_WORKER;
-const DEBUG = false;
+const DEBUG = true;
 
 const DATASET = false;
 const adding_chirpity_additions = false;
@@ -952,7 +952,7 @@ const prepSummaryStatement = (included) => {
                             const meta = metadata[file];
                             const week = STATE.useWeek ? new Date(meta.fileStart).getWeekNumber() : "-1";
                             const location = STATE.lat + STATE.lon;
-                            if (! (STATE.included[week] && STATE.included[week][location])) {
+                            if (! (STATE.included?.[week] && STATE.included[week][location])) {
                                 await setIncludedIDs(STATE.lat,STATE.lon,week)
                             }
                         }
@@ -2251,7 +2251,7 @@ const prepSummaryStatement = (included) => {
             const db = STATE.db;
 
             const included = STATE.selection ? [] : await getIncludedIDs();
-            prepSummaryStatement(included);
+            prepSummaryStatement(included); console.log("included in summary:",included.length)
             const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
             let range, files = [];
             if (['explore', 'chart'].includes(STATE.mode)) {

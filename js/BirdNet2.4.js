@@ -6,84 +6,7 @@ let BACKEND;
 
 //GLOBALS
 let myModel;
-// const MIGRANTS = new Set(["Pluvialis dominica_American Golden Plover", "Acanthis hornemanni_Arctic Redpoll", "Sterna paradisaea_Arctic Tern", "Recurvirostra avosetta_Avocet", "Porzana pusilla_Baillon's Crake", "Limosa lapponica_Bar-tailed Godwit", "Tyto alba_Barn Owl", "Branta leucopsis_Barnacle Goose", "Cygnus columbianus_Bewick's Swan", "Botaurus stellaris_Bittern", "Chroicocephalus ridibundus_Black-headed Gull", "Podiceps nigricollis_Black-necked Grebe", "Limosa limosa_Black-tailed Godwit", "Turdus merula_Blackbird", "Sylvia atricapilla_Blackcap", "Fringilla montifringilla_Brambling", "Branta bernicla_Brent Goose", "Branta canadensis_Canada Goose", "Larus cachinnans_Caspian Gull", "Phylloscopus collybita_Chiffchaff", "Loxia curvirostra_Common Crossbill", "Larus canus_Common Gull", "Acanthis flammea_Common Redpoll", "Actitis hypoleucos_Common Sandpiper", "Melanitta nigra_Common Scoter", "Sterna hirundo_Common Tern", "Fulica atra_Coot", "Crex crex_Corncrake", "Cuculus canorus_Cuckoo", "Calidris ferruginea_Curlew Sandpiper", "Numenius arquata_Curlew", "Charadrius morinellus_Dotterel", "Calidris alpina_Dunlin", "Prunella modularis_Dunnock", "Alopochen aegyptiaca_Egyptian Goose", "Turdus pilaris_Fieldfare", "Mareca strepera_Gadwall", "Sylvia borin_Garden Warbler", "Spatula querquedula_Garganey", "Regulus regulus_Goldcrest", "Pluvialis apricaria_Golden Plover", "Bucephala clangula_Goldeneye", "Mergus merganser_Goosander", "Locustella naevia_Grasshopper Warbler", "Larus marinus_Great Black-backed Gull", "Podiceps cristatus_Great Crested Grebe", "Tringa ochropus_Green Sandpiper", "Tringa nebularia_Greenshank", "Ardea cinerea_Grey Heron", "Perdix perdix_Grey Partridge", "Phalaropus fulicarius_Grey", "Pluvialis squatarola_Grey Plover", "Motacilla cinerea_Grey Wagtail ", "Anser anser_Greylag Goose", "Delichon urbicum_House Martin", "Coccothraustes coccothraustes_Hawfinch", "Larus argentatus_Herring Gull", "Lymnocryptes minimus_Jack Snipe", "Alcedo atthis_Kingfisher", "Calidris canutus_Knot", "Calcarius lapponicus_Lapland Bunting", "Larus fuscus_Lesser Black-backed Gull", "Acanthis cabaret_Lesser Redpoll ", "Sylvia curruca_Lesser Whitethroat", "Linaria cannabina_Linnet", "Egretta garzetta_Little Egret", "Tachybaptus ruficollis_Little Grebe", "Hydrocoloeus minutus_Little Gull", "Athene noctua_Little Owl", "Charadrius dubius_Little Ringed Plover", "Calidris minuta_Little Stint ", "Sternula albifrons_Little Tern", "Asio otus_Long-eared Owl", "Clangula hyemalis_Long-tailed Duck", "Anas platyrhynchos_Mallard", "Aix galericulata_Mandarin Duck", "Anthus pratensis_Meadow Pipit", "Ichthyaetus melanocephalus_Mediterranean Gull", "Turdus viscivorus_Mistle Thrush", "Gallinula chloropus_Moorhen", "Nycticorax nycticorax_Night Heron", "Luscinia megarhynchos_Nightingale", "Luscinia megarhynchos_Nightingale (song)", "Caprimulgus europaeus_Nightjar", "Anthus hodgsoni_Olive-backed Pipit", "Emberiza hortulana_Ortolan Bunting", "Emberiza pusilla_Little Bunting", "Haematopus ostralegus_Oystercatcher", "Ficedula hypoleuca_Pied Flycatcher", "Motacilla alba_Pied Wagtail", "Anser brachyrhynchus_Pink-footed Goose", "Anas acuta_Pintail", "Aythya ferina_Pochard", "Calidris maritima_Purple Sandpiper", "Coturnix coturnix_Quail", "Mergus serrator_Red-breasted Merganser", "Netta rufina_Red-crested Pochard", "Alectoris rufa_Red-legged Partridge", "Tringa totanus_Redshank", "Phoenicurus phoenicurus_Redstart", "Turdus iliacus_Redwing", "Emberiza schoeniclus_Reed Bunting", "Acrocephalus scirpaceus_Reed Warbler", "Turdus torquatus_Ring Ouzel", "Charadrius hiaticula_Ringed Plover", "Erithacus rubecula_Robin (flight call)", "Anthus petrosus_Rock Pipit", "Sterna dougallii_Roseate Tern", "Calidris pugnax_Ruff", "Riparia riparia_Sand Martin", "Calidris alba_Sanderling", "Thalasseus sandvicensis_Sandwich Tern", "Aythya marila_Scaup", "Loxia scotica_Scottish Crossbill", "Acrocephalus schoenobaenus_Sedge Warbler", "Tadorna tadorna_Shelduck", "Asio flammeus_Short-eared Owl", "Spatula clypeata_Shoveler", "Spinus spinus_Siskin", "Alauda arvensis_Skylark", "Gallinago gallinago_Snipe", "Plectrophenax nivalis_Snow Bunting", "Turdus philomelos_Song Thrush", "Porzana porzana_Spotted Crake", "Muscicapa striata_Spotted Flycatcher", "Tringa erythropus_Spotted Redshank", "Burhinus oedicnemus_Stone-curlew", "Saxicola rubicola_Stonechat", "Hirundo rustica_Swallow", "Apus apus_Swift", "Anser fabalis_Taiga Bean Goose", "Strix aluco_Tawny Owl", "Anas crecca_Teal", "Anthus trivialis_Tree Pipit", "Aythya fuligula_Tufted Duck", "Anser serrirostris_Tundra Bean Goose", "Arenaria interpres_Turnstone", "Anthus spinoletta_Water Pipit", "Rallus aquaticus_Water Rail", "Numenius phaeopus_Whimbrel", "Anser albifrons_White-fronted Goose", "Sylvia communis_Whitethroat", "Cygnus cygnus_Whooper Swan", "Mareca penelope_Wigeon", "Phylloscopus trochilus_Willow Warbler", "Tringa glareola_Wood Sandpiper", "Scolopax rusticola_Woodcock", "Lullula arborea_Woodlark", "Larus michahellis_Yellow-legged Gull", "Motacilla flava_Yellow Wagtail", "Emberiza citrinella_Yellowhammer"]);
-const NOT_BIRDS = [
-    'Dog_Dog', 
-    'Environmental_Environmental', 
-    'Engine_Engine', 
-    'Fireworks_Fireworks', 
-    'Gun_Gun', 
-    'Human non-vocal_Human non-vocal', 
-    'Human vocal_Human vocal', 
-    'Human whistle_Human whistle', 
-    'Miogryllus saussurei_Miogryllus saussurei', 
-    'Noise_Noise', 
-    'Power tools_Power tools', 
-    'Siren_Siren',
-    "Canis latrans_Coyote",
-    "Canis lupus_Gray Wolf",
-    "Gastrophryne carolinensis_Eastern Narrow-mouthed Toad",
-    "Gastrophryne olivacea_Great Plains Narrow-mouthed Toad",
-    "Incilius valliceps_Gulf Coast Toad",
-    "Anaxyrus americanus_American Toad",
-    "Anaxyrus canorus_Yosemite Toad",
-    "Anaxyrus cognatus_Great Plains Toad",
-    "Anaxyrus fowleri_Fowler's Toad",
-    "Anaxyrus houstonensis_Houston Toad",
-    "Anaxyrus microscaphus_Arizona Toad",
-    "Anaxyrus quercicus_Oak Toad",
-    "Anaxyrus speciosus_Texas Toad",
-    "Anaxyrus terrestris_Southern Toad",
-    "Anaxyrus woodhousii_Woodhouse's Toad",
-    "Dryophytes andersonii_Pine Barrens Treefrog",
-    "Dryophytes arenicolor_Canyon Treefrog",
-    "Dryophytes avivoca_Bird-voiced Treefrog",
-    "Dryophytes chrysoscelis_Cope's Gray Treefrog",
-    "Dryophytes cinereus_Green Treefrog",
-    "Dryophytes femoralis_Pine Woods Treefrog",
-    "Dryophytes gratiosus_Barking Treefrog",
-    "Dryophytes squirellus_Squirrel Treefrog",
-    "Dryophytes versicolor_Gray Treefrog",
-    "Eleutherodactylus planirostris_Greenhouse Frog",
-    "Hyliola regilla_Pacific Chorus Frog",
-    "Lithobates catesbeianus_American Bullfrog",
-    "Lithobates clamitans_Green Frog",
-    "Lithobates palustris_Pickerel Frog",
-    "Lithobates sylvaticus_Wood Frog",
-    "Pseudacris brimleyi_Brimley's Chorus Frog",
-    "Pseudacris clarkii_Spotted Chorus Frog",
-    "Pseudacris crucifer_Spring Peeper",
-    "Pseudacris feriarum_Upland Chorus Frog",
-    "Pseudacris nigrita_Southern Chorus Frog",
-    "Pseudacris ocularis_Little Grass Frog",
-    "Pseudacris ornata_Ornate Chorus Frog",
-    "Pseudacris streckeri_Strecker's Chorus Frog",
-    "Pseudacris triseriata_Striped Chorus Frog",
-    "Acris crepitans_Northern Cricket Frog",
-    "Acris gryllus_Southern Cricket Frog",
-    "Eunemobius carolinus_Carolina Ground Cricket",
-    "Eunemobius confusus_Confused Ground Cricket",
-    "Gryllus assimilis_Gryllus assimilis",
-    "Gryllus fultoni_Southern Wood Cricket",
-    "Gryllus pennsylvanicus_Fall Field Cricket",
-    "Gryllus rubens_Southeastern Field Cricket",
-    "Neonemobius cubensis_Cuban Ground Cricket",
-    "Oecanthus celerinictus_Fast-calling Tree Cricket",
-    "Oecanthus exclamationis_Davis's Tree Cricket",
-    "Oecanthus fultoni_Snowy Tree Cricket",
-    "Oecanthus nigricornis_Blackhorned Tree Cricket",
-    "Oecanthus niveus_Narrow-winged Tree Cricket",
-    "Oecanthus pini_Pine Tree Cricket",
-    "Oecanthus quadripunctatus_Four-spotted Tree Cricket",
-    "Orocharis saltator_Jumping Bush Cricket",
-    "Alouatta pigra_Mexican Black Howler Monkey",
-    "Tamias striatus_Eastern Chipmunk",
-    "Tamiasciurus hudsonicus_Red Squirrel"];
 
-const MYSTERIES = ['Unknown Sp._Unknown Sp.'];
-let INCLUDED_IDS = [];
-let SUPPRESSED_IDS = [];
-let ENHANCED_IDS = [];
 const CONFIG = {
     sampleRate: 48_000, specLength: 3, sigmoid: 1,
 };
@@ -207,25 +130,6 @@ onmessage = async (e) => {
                 postMessage(response);
                 break;
             }
-            case "list": {
-                myModel.list = e.data.list;
-                myModel.lat = parseFloat(e.data.lat);
-                myModel.lon = parseFloat(e.data.lon);
-                myModel.week = parseInt(e.data.week) || myModel.week;
-                myModel.speciesThreshold = parseFloat(e.data.threshold);
-                DEBUG && console.log(`Setting list to ${myModel.list}`);
-                await myModel.setList();
-                postMessage({
-                    message: "update-list",
-                    included: INCLUDED_IDS,
-                    lat: myModel.lat,
-                    lon: myModel.lon,
-                    week: myModel.week,
-                    updateResults: true,
-                    worker: worker
-                });
-                break;
-            }
         }
     }
     // If worker was respawned
@@ -243,10 +147,7 @@ class Model {
         this.config = CONFIG;
         this.chunkLength = this.config.sampleRate * this.config.specLength;
         this.model_loaded = false;
-        this.frame_length = 512;
-        this.frame_step = 186;
         this.appPath = appPath;
-        this.list = list;
         this.useContext = undefined;
         this.version = version;
         this.selection = false;
@@ -261,8 +162,6 @@ class Model {
                 { weightPathPrefix: this.appPath });
             this.model_loaded = true;
             this.inputShape = [...this.model.inputs[0].shape];
-            const mdata_model_path = this.appPath + 'mdata/model.json'
-            this.metadata_model = await tf.loadGraphModel(mdata_model_path);
         }
     }
 
@@ -280,48 +179,6 @@ class Model {
         }
         DEBUG && console.log('WarmUp end', tf.memory().numTensors)
         return true;
-    }
-
-    async setList() {
-        if (this.list === "everything") {
-            INCLUDED_IDS = this.labels.map((_, index) => index);
-        }
-        else if (this.list === 'location'){
-            const lat = this.lat;
-            const lon = this.lon;
-            const week = this.week;
-            DEBUG && console.log('lat', lat, 'lon', lon, 'week', week)
-            this.mdata_input = tf.tensor([lat, lon, week]).expandDims(0);
-            const mdata_prediction = this.metadata_model.predict(this.mdata_input);
-            const mdata_probs = await mdata_prediction.data();
-            //const mdata_probs_sorted = mdata_probs.slice().sort().reverse();
-            let count = 0
-            for (let i = 0; i < mdata_probs.length; i++) {
-                if (mdata_probs[i] > this.speciesThreshold) {
-                    count++;
-                    INCLUDED_IDS.push(i);
-                    DEBUG && console.log("including:", this.labels[i] + ': ' + mdata_probs[i]);
-
-                } else {
-                    DEBUG && console.log("Excluding:", this.labels[i] + ': ' + mdata_probs[i]);
-                }
-            }
-            DEBUG && console.log('Total species considered at this location: ', count)
-        }
-        else {
-            // Function to extract the first element after splitting on '_'
-            const getFirstElement = label => label.split('_')[0];
-
-            // Create a list of included labels' indices
-            const t0 = Date.now()
-            INCLUDED_IDS = this.labels
-                .map((label, index) => {
-                    const firstPart = getFirstElement(label);
-                    return NOT_BIRDS.some(excludedLabel => getFirstElement(excludedLabel) === firstPart) ? null : index;
-                })
-                .filter(index => index !== null);
-            console.log('filtering took', Date.now() - t0, 'ms')
-        }
     }
 
     normalize(spec) {
@@ -470,9 +327,9 @@ class Model {
         const finalPrediction = newPrediction || prediction;
         //new
         const { indices, values } = tf.topk(finalPrediction, 5, true)
-        // const [topIndices, topValues] = await Promise.all([indices.arraySync(), values.arraySync()]).catch((err => console.log(err)));
-        const topIndices = indices.arraySync();
-        const topValues = values.arraySync();
+        const [topIndices, topValues] = await Promise.all([indices.array(), values.array()]).catch((err => console.log(err)));
+        // const topIndices = indices.arraySync();
+        // const topValues = values.arraySync();
         indices.dispose();
         values.dispose();
         // end new
@@ -481,12 +338,7 @@ class Model {
         if (newPrediction) newPrediction.dispose();
         keys = keys.map(key => (key / CONFIG.sampleRate).toFixed(3));
         return [keys, topIndices, topValues];
-        // return keys.reduce((acc, key, index) => {
-        //     // convert key (samples) to milliseconds
-        //     const position = (key / CONFIG.sampleRate).toFixed(3);
-        //     acc[position] = array_of_predictions[index];
-        //     return acc;
-        // }, {});
+
     }
 
     makeSpectrogram(signal) {
@@ -496,25 +348,6 @@ class Model {
             return spec;
         })
     }
-
-    /*    normalizeTensor(audio) {
-            return tf.tidy(() => {
-                const tensor = tf.tensor1d(audio);
-                const {mean, variance} = tf.moments(tensor);
-                const stdDev = variance.sqrt();
-                const normalizedTensor = tensor.sub(mean).div(stdDev.mul(tf.scalar(2)));
-                return normalizedTensor;
-            })
-        }*/
-
-    /*    normalise_audio = (signal) => {
-            return tf.tidy(() => {
-                //signal = tf.tensor1d(signal);
-                const sigMax = tf.max(signal);
-                const sigMin = tf.min(signal);
-                return signal.sub(sigMin).div(sigMax.sub(sigMin)).mul(255).sub(127.5);
-            })
-        };*/
 
     normalise_audio = (signal) => {
         return tf.tidy(() => {
@@ -544,14 +377,6 @@ class Model {
         const numSamples = buffer.shape / this.chunkLength;
         let bufferList = tf.split(buffer, numSamples);
         buffer.dispose();
-        // Turn the audio into a spec tensor
-        // bufferList = tf.tidy(() => {
-        //     return bufferList.map(x => {
-        //         let normal = this.normalise_audio(x);
-        //         x.dispose();
-        //         return normal ; // this.makeSpectrogram(normal);
-        //     })
-        // });
         const specBatch = tf.stack(bufferList);
         const batchKeys = [...Array(numSamples).keys()].map(i => start + this.chunkLength * i);
         const result = await this.predictBatch(specBatch, batchKeys, threshold, confidence);

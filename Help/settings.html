@@ -10,24 +10,39 @@
     <tr>
         <td colspan="2" class="text-center text-bg-light"><h5>Predictions</h5></td>
     </tr>
+    <th>Model</th>
+        <td>Choose the model to use for prediction.
+            <ul>
+                <li>
+                    <b>Chirpity</b> will use the native Chirpity model for predictions.
+                </li>
+                <li>
+                    <b>BirdNET</b> will use the <a href="https://github.com/kahst/BirdNET-Analyzer" target="_blank">BirdNET</a> model developed by Stefan Kahl et al. from the K. Lisa Yang Center for Conservation Bioacoustics
+                </li>
+            </ul>
+        </td>
+    </tr>
     <tr>
-        <th>Set Threshold</th>
+        <th>Confidence Threshold</th>
         <td>This setting determines the minimum confidence level required for the model to report a detection.
             Increasing the value reduces false positives but increases the risk of missing genuine calls.
             A value around 50% provides a good balance between detecting genuine calls and minimizing false positives.
         </td>
     </tr>
     <tr>
-        <th>Search for</th>
+        <th>List</th>
         <td><p><b>Local Birds</b>. Exclude birds unlikely to be found in your location.</p>
+            <p style="padding-left: 2em">With this option selected, an additional panel appears. The <b>Threshold</b> value represents the eBird checklist frequency. 
+                    So, a value of 0.03 means birds that are predicted to occur in less than 3% of eBird checlists in the area are excluded. 
+                    If you also check "Use Week", it excludes birds not expected at the time of year the recording was made - which is read from the files' timestamp.
+                </p>
             <p><b>Nocturnal Birds</b>. Just report detections relating to these species' calls (song detections are
             excluded).</p>
             <p><b>All birds</b>. Include birdsong as well as calls, also includes species not known to call at night.
             </p>
             <p><b>Everything</b>. In addition to birds, show non-bird detections including segments that were considered noise.
             </ul>
-            <p>If you wish to see the full list of the 320 species Chirpity <i>Nocmig</i> was trained on, just explore the list
-                offered when correcting a prediction.</p>
+            <p>If you wish to see the full list of species used for predictions each model was trained on, check the Help menu > <i>What species are detected?</i>.</p>
         </td>
     </tr>
     <tr>
@@ -38,10 +53,47 @@
         </td>
     </tr>
     <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>System</h5></td>
+    </tr>
+    <tr>
+        <th>Language</th>
+        <td>Choose the language for the "common name" labels, where translations exist. The translated labels have been obtained from <a href="https://ebird.org/home" target="_blank">eBird</a>. 
+        </td>
+    </tr>
+    <tr>
+        <th>Backend</th>
+        <td>Choose how predictions are calculated on you computer.
+            <ul>
+                <li>
+                    <b>CPU</b> will use the CPU for predictions, this is generally faster if you have an integrated
+                    graphics card.
+                </li>
+                <li>
+                    <b>GPU</b> will use the graphics card. If you have a dedicated graphics card, this will typically be
+                    significantly faster.
+                </li>
+            </ul>
+        </td>
+    </tr>
+
+    <tr>
+        <th>Threads</th>
+        <td>This setting allows you to select the number of threads to use for predictions.
+            When using the CPU backend, the number of threads is automatically set to match the number of CPU cores available on the computer.
+            By default, the GPU backend uses one thread. Adjusting this setting, along with the batch size, can optimize the speed of predictions.
+        </td>
+    </tr>
+    <tr>
+        <th>Batch Size</th>
+        <td>This setting determines the number of three-second audio chunks to process each time a prediction is requested.
+            Larger values lead to faster processing, especially on long files.
+        </td>
+    </tr>
+    <tr>
         <td colspan="2" class="text-center text-bg-light"><h5>Location</h5></td>
     </tr>
     <tr>
-        <th>Location</th>
+        <th>Default Location</th>
         <td>
             <figure class="figure float-end m-3">
                 <img src="Help/amend file.png"
@@ -53,7 +105,27 @@
         </td>
     </tr>
     <tr>
-        <td colspan="2" class="text-center text-bg-light"><h5>Spectrogram</h5></td>
+        <td colspan="2" class="text-center text-bg-light"><h5>Audio Export Preferences</h5></td>
+    </tr>
+    <tr>
+        <td><b>Format and Bitrate</b></td>
+        <td>Choose from lossless or lossy formats for the audio clips you export from Chirpity.</td>
+    </tr>
+    <tr>
+        <th>Decorators</th>
+        <td>These two options can be used to:
+            <ul>
+                <li>
+                    <b>Pad:</b> Add two seconds to the beginning and end of the audio selected for export
+                </li>
+                <li>
+                    <b>Fade:</b> Apply a fade effect to the beginning and end of your exported files.
+                </li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Spectrogram Preferences</h5></td>
     </tr>
     <tr>
         <td><b>Colourmap</b></td>
@@ -74,49 +146,7 @@
             </ul>
         </td>
     </tr>
-    <tr>
-        <td colspan="2" class="text-center text-bg-light"><h5>System</h5></td>
-    </tr>
-    <tr>
-        <th>Backend</th>
-        <td>Choose how predictions are calculated on you computer.
-            <ul>
-                <li>
-                    <b>CPU</b> will use the CPU for predictions, this is generally faster if you have an integrated
-                    graphics card.
-                </li>
-                <li>
-                    <b>GPU</b> will use the graphics card. If you have a dedicated graphics card, this will typically be
-                    significantly faster.
-                </li>
-            </ul>
-        </td>
-    </tr>
-    <th>Model</th>
-    <td>Choose the model to use for prediction.
-        <ul>
-            <li>
-                <b>Chirpity</b> will use the native Chirpity model for predictions.
-            </li>
-            <li>
-                <b>BirdNET</b> will use the <a href="https://github.com/kahst/BirdNET-Analyzer" target="_blank">BirdNET</a> model developed by Stefan Kahl et al. from the K. Lisa Yang Center for Conservation Bioacoustics
-            </li>
-        </ul>
-    </td>
-</tr>
-    <tr>
-        <th>Threads</th>
-        <td>This setting allows you to select the number of threads to use for predictions.
-            When using the CPU backend, the number of threads is automatically set to match the number of CPU cores available on the computer.
-            By default, the GPU backend uses one thread. Adjusting this setting, along with the batch size, can optimize the speed of predictions.
-        </td>
-    </tr>
-    <tr>
-        <th>Batch Size</th>
-        <td>This setting determines the number of three-second audio chunks to process each time a prediction is requested.
-            Larger values lead to faster processing, especially on long files.
-        </td>
-    </tr>
+ 
     <tr>
         <td colspan="2" class="text-center text-bg-warning"><h5>Experimental Features</h5></td>
     </tr>
