@@ -246,8 +246,7 @@
                                                         <fieldset class="border rounded m-2 p-1">
                                                             <legend style="font-size: large">Predictions</legend>
                                                             <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                <span class="circle"
-                                                                title="The GPU backend may speed up processing if you have a dedicated graphics card.">?</span>
+                                                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Model" data-bs-content="Select whether to use Chirpity, optimised for Nocturnal Migration Calls in Europe, or BirdNET, which can detect over 6000 species across the globe.">?</a>
                                                                 <div class="row pe-3">
                                                                     <label class="col-auto ps-0" for="model-to-use">Model:</label>
                                                                     <select class="form-select col" id="model-to-use">
@@ -257,9 +256,8 @@
                                                                     </select>
                                                                 </div>
                                                             </div>                                                            
-                                                            <div class="form-group rounded p-2 mb-2 bg-light"><span
-                                                                class="circle"
-                                                                title="Determines the minimum confidence required for results to be returned">?</span>
+                                                            <div class="form-group rounded p-2 mb-2 bg-light">
+                                                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Confidence Threshold" data-bs-content="Determines the minimum confidence required for results to be returned">?</a>
                                                                 <label for="confidence">Confidence threshold:</label>
                                                                 <div class="input-group">
                                                                     <input type="range" class="form-control-range w-75"
@@ -271,7 +269,9 @@
                                                                 </div>
                                                             </div>
                                                             <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                <span class="circle" title="Filters the detections returned in results.">?</span>
+                                                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="List" data-bs-content="Filters the detections returned in results. Local Birds: excludes birds 
+                                                                unlikely to be found in your region. Nocturnal Birds: excludes species' songs and species not known to call at night">?</a>
+                                                                
                                                                 <div class="row pe-3">
                                                                     <label class="col-auto ps-0" for="list-to-use">List:</label>
                                                                     <select class="form-select col" id="list-to-use">
@@ -283,7 +283,8 @@
                                                                 </div>
                                                             </div>
                                                             <div class="form-group rounded p-2 mb-2 bg-light" id="species-threshold-el">
-                                                                <span class="circle" title="Set the minimum eBird checklist frequency for a bird to be included&#10;If 'Use Week' is checked, the filter will be refined to include only the species likely in that week of the year">?</span>
+                                                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Species Threshold" data-bs-content="Set the minimum eBird checklist frequency for a bird to be included
+                                                                    If 'Use Week' is checked, the filter will be refined to include only the species likely in the week the recording was made.">?</a>
                                                                 <div class="input-group w-100">
                                                                     <span class="input-group-text col-auto">Threshold:</span>
                                                                     <input id="species-frequency-threshold" type="number" class="form-control" style="width: 30%;" value="0.005" step="0.001" min="0.001" max="1" aria-label="species frequency threshold" aria-describedby="species-frequency-threshold">
@@ -295,9 +296,7 @@
                                                                     <input class="form-check-input" type="checkbox"
                                                                     role="switch" id="nocmig">
                                                                     <label class="form-check-label" for="nocmig">Nocmig mode</label>
-                                                                    <span class="circle"
-                                                                    title="When enabled, Nocmig mode only searches for detections at night">?</span>
-                                                                    <!-- </div>  -->
+                                                                    <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Nocmig Mode" data-bs-content="When enabled, Nocmig mode only searches for and only displays detections found during the night">?</a>
                                                                 </div>
                                                             </div>
                                                         </fieldset>
@@ -309,8 +308,8 @@
                                                                 <div class="row">
                                                                     <div class="col p-0">
                                                                         <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                            <span class="circle"
-                                                                            title="Use your preferred language for birds' common names">?</span>
+                                                                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Language" data-bs-content="Select your preferred language for birds' common names">?</a>
+                                                                            
                                                                             <div class="row pe-3">
                                                                                 <label class="col-auto ps-0 pe-3 fs-6" for="list-to-use">Language:</label>
                                                                                 <select  class="form-select col" id="locale">
@@ -350,7 +349,7 @@
                                                                 <div class="row">
                                                                     <div class="col p-0">
                                                                         <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                            <span class="circle" title="The GPU backend may speed up processing if you have a dedicated graphics card.">?</span>
+                                                                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Backend" data-bs-content="The GPU backend can improve performance if you have a dedicated graphics card.">?</a>
                                                                             <div class="row">
                                                                                 <div class="col-auto">
                                                                                     <label class="ps-0 pe-1 fs-6 text-start">Backend:</label>
@@ -372,8 +371,8 @@
                                                                 <div class="row">
                                                                     <div class="col p-0">
                                                                         <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                            <span class="circle"
-                                                                            title="The number of parallel predictions to run">?</span>
+                                                                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Threads" data-bs-content="The number of parallel predictions to run. By default, 
+                                                                            this is set to the number of CPU cores on the machine for fastest performance. With the GPU backend, a lower number works better e.g. 1-3">?</a>
                                                                             <label for="thread-slider">Threads:</label>
                                                                             <div class="input-group">
                                                                                 <input type="range" class="form-control-range w-75"
@@ -389,8 +388,7 @@
                                                                 <div class="row">
                                                                     <div class="col p-0">
                                                                         <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                            <span class="circle"
-                                                                            title="Optimising the batch size can increase processing speed on longer files.">?</span>
+                                                                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Batch Size" data-bs-content="Optimising the batch size can increase processing speed on longer files.">?</a>
                                                                             <label for="batch-size">Batch Size:</label>
                                                                             <div class="input-group">
                                                                                 <input type="range" class="form-control-range w-75"
@@ -411,10 +409,8 @@
                                                 <div class="row">
                                                     <div class="col-12">
                                                         <fieldset class="border rounded m-2 p-1">
-                                                            <legend style="font-size: large">Default Location <span
-                                                                class="circle me-2"
-                                                                title="Location is used to determine dawn and dusk times for recordings">?</span>
-                                                            </legend>
+                                                            <legend style="font-size: large">Default Location </legend>
+                                                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Default Location" data-bs-content="Chirpity uses location information to determine the dawn and dusk times for recordings">?</a>
                                                             <div class="form-group rounded p-2 mb-2 bg-light">
                                                                 <div class="row">
                                                                     <div class="input-group col">
@@ -474,7 +470,10 @@
                                                                                 </label>
                                                                             </div>
                                                                         </div>
-                                                                        <div class="col"><span class="circle" title="'Pad' adds 2 seconds before and after a selection to the exported audio.&#10;'Fade' adds a 1 second fade effect to the start and end of the audio">?</span></div>
+                                                                        <div class="col">
+                                                                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Decorators" data-bs-content="'Pad' adds 2 seconds before and after a selection to the exported audio.
+                                                                            'Fade' adds a 1 second fade effect to the start and end of the audio">?</a>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -513,8 +512,8 @@
                                                                 </div>
                                                                 <div class="col pe-0">
                                                                     <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                        <span class="circle me-2"
-                                                                        title="When enabled, stereo audio will be downmixed to mono">?</span>
+                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Downmix" data-bs-content="When enabled, exported audio will be downmixed to mono">?</a>
+                                                                        
                                                                         <div class="form-check form-switch">
                                                                             <input class="form-check-input" type="checkbox"
                                                                             role="switch" id="downmix">
@@ -571,8 +570,7 @@
                                                     </fieldset>                                                                
                                                     <fieldset class="border rounded m-2 p-1 bg-warning">
                                                         <legend class="pb-2" style="font-size: large"><span
-                                                            class="material-symbols-outlined align-middle"
-                                                            title="Experimental">science</span> Advanced features
+                                                            class="material-symbols-outlined align-middle">science</span> Advanced features <a class="circle" style="background-color:darkgoldenrod" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Species Threshold" data-bs-content="The settings in this section can impact prediction quailty - for better or worse. Use them with caution!">?</a>
                                                         </legend>
                                                         <div class="row">
                                                             <div class="col">
@@ -583,16 +581,14 @@
                                                                         <label class="form-check-label" for="context">
                                                                             Context mode
                                                                         </label>
-                                                                        <span class="circle"
-                                                                        title="When enabled, context mode adapts predictions by analyzing the surrounding context.
-                                                                        Not available in the BirdNET model">?</span>
+                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Context Mode" data-bs-content="When enabled, context mode adapts predictions by analyzing the surrounding context.
+                                                                        Not available in the BirdNET model">?</a>
                                                                     </div>
                                                                 </div>
                                                                 <div class="chirpity-only me-auto">
                                                                     <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                        <span class="circle"
-                                                                        title="Ignore samples with just background noise. Value is the minimum signal strength to look at.
-                                                                        Not available in the BirdNET model">?</span>
+                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Signal to Noise Ration" data-bs-content="Skip over portions of audio with just background noise. Higher values skip increasingly noisy segments.
+                                                                        Not available in the BirdNET model">?</a>
                                                                         <label for="snrValue" class="form-label">
                                                                             SNR filter:
                                                                         </label>
@@ -608,8 +604,8 @@
                                                                 </div>
                                                                 <div class="me-auto">
                                                                     <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                        <span class="circle"
-                                                                        title="When enabled, removes low frequency noise below the threshold.">?</span>
+                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="High Pass Filter" data-bs-content="When set, removes low frequency noise below the threshold. If enabled before analysis, the modified audio is sent to the model. If only enabled after analysis, this just affects audio playback">?</a>
+                                                                    
                                                                         <label for="HighPassFrequency" class="form-label">
                                                                             High Pass filter:
                                                                         </label>
@@ -626,8 +622,7 @@
                                                             </div>
                                                             <div class="col">
                                                                 <div class="form-group rounded p-2 me-2 bg-light">
-                                                                    <span class="circle"
-                                                                    title="When used, attenuates low frequency noise below the frequency thresshold.">?</span>
+                                                                    <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Low Shelf Filter" data-bs-content="When used, attenuates low frequency noise below the frequency thresshold. If enabled before analysis, the modified audio is sent to the model. If only enabled after analysis, this just affects audio playback">?</a>
                                                                     <label for="lowShelfFrequency" class="form-label">
                                                                         Low Shelf filter:
                                                                     </label>
@@ -654,9 +649,7 @@
                                                     <div class="row p-2 pe-2">
                                                         <div class="col me-0">
                                                             <div class="form-group rounded p-2 mb-2 text-bg-danger">
-                                                                <span class="circle me-2"
-                                                                title="Enter debug mode (requires Chirpity relaunch to take effect)">?
-                                                            </span>
+                                                                <a class="circle" style="background-color:darkred" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Species Threshold" data-bs-content="Enter debug mode (changes to this setting require a Chirpity relaunch to take effect)">?</a>
                                                             <div class="form-check form-switch">
                                                                 <input class="form-check-input" type="checkbox"
                                                                 role="switch" id="debug-mode">
