@@ -142,6 +142,9 @@
         "!node_modules/ffprobe-static-electron/bin/mac${/*}"
       ]
     },
+    "nsis":{
+      "deleteAppDataOnUninstall": true
+    },
     "win": {
       "publish": [
         "github"
