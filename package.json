@@ -1,12 +1,12 @@
 {
   "name": "chirpity",
-  "version": "0.12.1",
+  "version": "1.0.0",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "minify": "node minify.js",
-    "export": "electron-builder build -m",
+    "export": "electron-builder build --win --x64",
     "publish": "electron-builder --win --x64 -p always"
   },
   "repository": {
