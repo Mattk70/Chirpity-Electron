@@ -124,10 +124,7 @@ onmessage = async (e) => {
                 const includedIDs = await listModel.setList({lat, lon, week, listType, useWeek, threshold});
                 postMessage({
                     message: "your-list-sir",
-                    included: includedIDs,
-                    lat: listModel.lat,
-                    lon: listModel.lon,
-                    week: listModel.week
+                    result: includedIDs,
                 });
                 break;
                 }
@@ -157,7 +154,7 @@ class Model {
     }
 
     async setList({lat, lon, week, listType, useWeek, threshold}) {
-        let includedIDs = [];         
+        let includedIDs = [];
         week = useWeek ? week : -1;
         if (listType === "everything") {
             includedIDs = this.labels.map((_, index) => index);
@@ -180,6 +177,8 @@ class Model {
                 }
             }
             DEBUG && console.log('Total species considered at this location: ', count)
+            // return an object
+            includedIDs = {week: week, lat: lat, lon:lon, included: includedIDs}
         }
         else {
             // Function to extract the first element after splitting on '_'

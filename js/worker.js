@@ -10,6 +10,7 @@ const { utimesSync } = require('utimes');
 const stream = require("node:stream");
 const staticFfmpeg = require('ffmpeg-static-electron');
 const {writeToPath} = require('@fast-csv/format');
+const merge = require('lodash.merge');
 import { State } from './state.js';
 import { sqlite3 } from './database.js';
 
@@ -286,7 +287,9 @@ async function handleMessage(e) {
         case "convert-dataset": {convertSpecsFromExistingSpecs();
             break;
         }
-        case "create-dataset": {saveResults2DataSet(args);
+        case "create-dataset": {
+            args.included = getIncludedIDs()
+            saveResults2DataSet(args);
             break;
         }
         case "delete": {await onDelete(args);
@@ -347,7 +350,6 @@ case "load-model": {
 
        // metadata = {};
         ipcRenderer.invoke('clear-cache', CACHE_LOCATION)
-        STATE.included = [];
     }
     predictWorkers.length && terminateWorkers();
     await onLaunch(args);
@@ -389,8 +391,11 @@ case 'update-locale': {
 case "update-state": {
     TEMP = args.temp || TEMP;
     appPath = args.path || appPath;
-    // If we change the speciesThreshold, we need to invalidate the included id cache
-    if (args.speciesThreshold) STATE.included = {};
+    // If we change the speciesThreshold, we need to invalidate any location caches
+    if (args.speciesThreshold) {
+        if (STATE.included?.['birdnet']?.['location'])  STATE.included.birdnet.location = {};
+        if (STATE.included?.['chirpity']?.['location'])  STATE.included.chirpity.location = {};
+    }
     STATE.update(args);
     break;
 }
@@ -414,7 +419,7 @@ async function onChangeMode(mode) {
     });
 }
 
-const filtersApplied = () => STATE.included.length < LABELS.length -1;
+const filtersApplied = (list) => list.length < LABELS.length -1;
 
 /**
 * onLaunch called when Application is first opened or when model changed
@@ -555,7 +560,7 @@ const getSummaryParams = (included) => {
         extraParams.push(...STATE.filesToAnalyse);
     }
     else if (useRange) params.push(range.start, range.end);
-    filtersApplied() && extraParams.push(...included);
+    filtersApplied(included) && extraParams.push(...included);
     STATE.locationID && extraParams.push(STATE.locationID);
     params.push(...extraParams);
     return params
@@ -579,7 +584,7 @@ const prepSummaryStatement = (included) => {
             summaryStatement += ' AND dateTime BETWEEN ? AND ? ';
         }
         
-        if (filtersApplied()) {
+        if (filtersApplied(included)) {
             const includedParams = prepParams(included);
             summaryStatement += ` AND speciesID IN (${includedParams}) `;
             // ` AND NOT EXISTS (
@@ -623,7 +628,7 @@ const prepSummaryStatement = (included) => {
                 params.push(species);
                 SQL += ' AND speciesID = (SELECT id from species WHERE cname = ?) '; 
             }// This will overcount as there may be a valid species ranked above it
-            else if (filtersApplied()) SQL += ` AND speciesID IN (${STATE.included}) `;
+            else if (filtersApplied(included)) SQL += ` AND speciesID IN (${included}) `;
             if (useRange) SQL += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
             if (STATE.detect.nocmig) SQL += ' AND COALESCE(isDaylight, 0) != 1 ';
             if (STATE.locationID) SQL += ` AND locationID =  ${STATE.locationID}`;
@@ -644,7 +649,7 @@ const prepSummaryStatement = (included) => {
             const params = [];
             params.push(confidence);
             ['analyse', 'archive'].includes(STATE.mode) && !STATE.selection && params.push(...STATE.filesToAnalyse);
-            filtersApplied() && params.push(...included);
+            filtersApplied(included) && params.push(...included);
             
             params.push(topRankin);
             species && params.push(species);
@@ -691,7 +696,7 @@ const prepSummaryStatement = (included) => {
                 if (useRange) {
                     resultStatement += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
                 }    
-                if (filtersApplied()) resultStatement += ` AND speciesID IN (${prepParams(included)}) `;
+                if (filtersApplied(included)) resultStatement += ` AND speciesID IN (${prepParams(included)}) `;
                 if (STATE.selection) resultStatement += ` AND name = '${FILE_QUEUE[0]}' `;
                 if (STATE.locationID) {
                     resultStatement += ` AND locationID = ${STATE.locationID} `;
@@ -1494,7 +1499,7 @@ const prepSummaryStatement = (included) => {
                 }
             }
             
-            const saveResults2DataSet = ({species}) => {
+            const saveResults2DataSet = ({species, included}) => {
                 const rootDirectory = DATASET_SAVE_LOCATION;
                 sampleRate = STATE.model === 'birdnet' ? 48_000 : 24_000;
                 const height = 256, width = 384;
@@ -1516,9 +1521,9 @@ const prepSummaryStatement = (included) => {
                 JOIN species
                 ON species.id = records.speciesID
                 JOIN files ON records.fileID = files.id
-                ${filtersApplied() ? `WHERE speciesID IN (${prepParams(STATE.included)}` : ''}) 
+                ${filtersApplied(included) ? `WHERE speciesID IN (${prepParams(STATE.included)}` : ''}) 
                 AND confidence >= ${STATE.detect.confidence}`;
-                let params = filtersApplied() ? STATE.included : [];
+                let params = filtersApplied(included) ? STATE.included : [];
                 if (species) {
                     db2ResultSQL += ` AND species.cname = ?`;
                     params.push(species)
@@ -2085,47 +2090,7 @@ const prepSummaryStatement = (included) => {
                         case "spectrogram": {onSpectrogram(response["filepath"], response["file"], response["width"], response["height"], response["image"], response["channels"]);
                         break;
                     }
-                    case "update-list": {
-                        const {week, lat, lon, included} = response;
-                        if (STATE.list === 'location'){
-                            // Let's create our list cache
-                            
-                            const location = lat.toFixed(2) + lon.toFixed(2);
-                            if (! (STATE.included[week] && STATE.included[week][location])) {
-                                STATE.included[week] = {};
-                                STATE.included[week][location] = included;
-                            } else {
-                                DEBUG && console.log("Unnecesary call to generate location list")
-                            }
-                        } else {
-                            STATE.included = included;
-                        }
-                        STATE.globalOffset = 0;
-                        // try {
-                        //     const list = STATE.list;
-                        //     let SQLweek = week, SQLlat = lat, SQLlon = lon;
-                        //     if (list  !== 'location') {
-                        //         SQLlat = SQLlon = SQLweek = null;
-                        //     }
-                        //     await STATE.db.runAsync('BEGIN');
-                        //     let stmt = STATE.db.prepare("INSERT OR IGNORE INTO blocked_species (lat, lon, week, list, model, speciesID) VALUES (?, ?, ?, ?, ?)");
-                        //     response.included.forEach(speciesID => {
-                        //         stmt.run(SQLlat, SQLlon, SQLweek, list, speciesID);
-                        //     })
-                        //     await STATE.db.runAsync('END');
-                        // } catch (error) {
-                        //     console.log('setting included list didn\'t work', error)
-                        // }
-                        
-                        UI.postMessage({ event: "results-complete" });
-                        if (response["updateResults"] && STATE.db) {
-                            await Promise.all([getResults(), getSummary()]);
-                            if (["explore", "chart"].includes(STATE.mode)) {
-                                getDetectedSpecies();
-                            }
-                        }
-                    break;
-                }
+
             }
         }
         
@@ -2510,7 +2475,7 @@ const prepSummaryStatement = (included) => {
         *  Transfers data in memoryDB to diskDB
         * @returns {Promise<unknown>}
         */
-        const onSave2DiskDB = async (args) => {
+        const onSave2DiskDB = async ({file}) => {
             t0 = Date.now();
             if (STATE.db === diskDB) {
                 UI.postMessage({
@@ -2519,8 +2484,8 @@ const prepSummaryStatement = (included) => {
                 })
                 return // nothing to do. Also will crash if trying to update disk from disk.
             }
-            const included = await getIncludedIDs(args.file);
-            const filterClause = filtersApplied() ? `AND speciesID IN (${included} )` : ''
+            const included = await getIncludedIDs(file);
+            const filterClause = filtersApplied(included) ? `AND speciesID IN (${included} )` : ''
             await memoryDB.runAsync('BEGIN');
             await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.files SELECT * FROM files`);
             // Set the saved flag on files' metadata
@@ -2544,7 +2509,7 @@ const prepSummaryStatement = (included) => {
                     
                     // Now we have saved the records, set state to DiskDB
                     onChangeMode('archive');
-                    getLocations({ db: STATE.db, file: args.file });
+                    getLocations({ db: STATE.db, file: file });
                     UI.postMessage({
                         event: 'generate-alert',
                         message: `Database update complete, ${response.changes} records added to the archive in ${((Date.now() - t0) / 1000)} seconds`,
@@ -2713,7 +2678,7 @@ const prepSummaryStatement = (included) => {
             JOIN files on records.fileID = files.id`;
             
             if (STATE.mode === 'explore') sql += ` WHERE confidence >= ${confidence}`;
-            if (STATE.list !== 'location' && filtersApplied()) {
+            if (STATE.list !== 'location' && filtersApplied(included)) {
                 sql += ` AND speciesID IN (${STATE.included.join(',')})`;
             }
             if (range?.start) sql += ` AND datetime BETWEEN ${range.start} AND ${range.end}`;
@@ -2735,13 +2700,13 @@ const prepSummaryStatement = (included) => {
             let sql = `SELECT cname, sname FROM species`;
             // We'll ignore Unknown Sp. here, hence length < (LABELS.length *-1*)
 
-            if (filtersApplied()) {
+            if (filtersApplied(included)) {
                 sql += ` WHERE id IN (${included.join(',')})`;
             }
             sql += ' GROUP BY cname ORDER BY cname';
             includedSpecies = await diskDB.allAsync(sql)
             
-            if (filtersApplied()){
+            if (filtersApplied(included)){
                 sql = sql.replace('IN', 'NOT IN');
                 excludedSpecies = await diskDB.allAsync(sql);
             }
@@ -3029,12 +2994,16 @@ const prepSummaryStatement = (included) => {
             }
             
             /**
-             * Helper function to provide a list of valid species for the filter. Will look in the cache, or call setIncludedIDs to generate a new list
+             * getIncludedIDs
+             * Helper function to provide a list of valid species for the filter. 
+             * Will look for a list in the STATE.included cache, and if not present, 
+             * will call setIncludedIDs to generate a new list
              * @param {*} file 
              * @returns a list of IDs included in filtered results
              */
             async function getIncludedIDs(file){
-                let included, lat, lon, week;
+                t0 = Date.now();
+                let lat, lon, week, hitOrMiss = 'hit';
                 if (STATE.list === 'location'){
                     if (file){
                         file = metadata[file];
@@ -3048,21 +3017,36 @@ const prepSummaryStatement = (included) => {
                         week = STATE.useWeek ? STATE.week : "-1";
                     }
                     const location = lat.toString() + lon.toString();
-                    if (Array.isArray(STATE.included) || STATE.included[week]?.[location] === undefined ) {
-                        included =  await setIncludedIDs(lat,lon,week)
-                    } else {
-                        included = STATE.included.week.location;
-                    }
+                    if (STATE.included?.[STATE.model]?.[STATE.list]?.[week]?.[location] === undefined ) {
+                        // Cache miss
+                        await setIncludedIDs(lat,lon,week)
+                        hitOrMiss = 'miss';
+                    } 
+                    DEBUG && console.log(`Cache ${hitOrMiss}: setting the ${STATE.list} list took ${Date.now() -t0}ms`)
+                    return STATE.included[STATE.model][STATE.list][week][location];
+                    
                 } else {
-                    included = STATE.included;
+                    if (STATE.included?.[STATE.model]?.[STATE.list] === undefined ) {
+                        // The object lacks the week / location
+                        await setIncludedIDs(lat,lon,week);
+                        hitOrMiss = 'miss';
+                    }
+                    DEBUG && console.log(`Cache ${hitOrMiss}: setting the ${STATE.list} list took ${Date.now() -t0}ms`)
+                    return STATE.included[STATE.model][STATE.list];
                 }
-                return included;
             }
 
+            /**
+             * setIncludedIDs
+             * Calls list_worker for a new list
+             * @param {*} lat 
+             * @param {*} lon 
+             * @param {*} week 
+             * @returns 
+             */
             async function setIncludedIDs(lat,lon,week){
                 // Use the list worker
-                t0 = Date.now();
-                const message = await LIST_WORKER({
+                const {result} = await LIST_WORKER({
                     message: 'get-list', 
                     model: STATE.model, 
                     listType: STATE.list, 
@@ -3072,8 +3056,35 @@ const prepSummaryStatement = (included) => {
                     useWeek: STATE.useWeek,
                     threshold: STATE.speciesThreshold
                 })
-                console.log(`setting the ${STATE.list} list took ${Date.now() -t0}ms`)
-                STATE.included = message.included;
+
+
+
+                // Create the new object based on the returned message and the location key
+                let includedObject = {};
+                if (STATE.list === 'location') {
+                    // Create the location key based on lat and lon values
+                    const location = lat.toString() + lon.toString();
+                    includedObject = {
+                        [STATE.model]: {
+                            [STATE.list]: {
+                                [week]: {
+                                    [location]: result.included
+                                }
+                            }
+                        }
+                    };
+                } else {
+                    includedObject = {
+                        [STATE.model]: {
+                            [STATE.list]: result
+                        }
+                    };
+                }
+
+                // Merge the new object with the existing STATE.included object
+                if (STATE.included === undefined) STATE.included = {}
+                STATE.included = merge(STATE.included,includedObject);
+
                 UI.postMessage({ event: "results-complete" });
                 return STATE.included
             }
