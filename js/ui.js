@@ -4518,7 +4518,7 @@ function checkForMacUpdates() {
                 const latest = parseSemVer(latestVersion);
                 const current = parseSemVer(VERSION);
 
-                if (config.debug || isNewVersion(latest, current)) {
+                if (isNewVersion(latest, current)) {
                     const alertPlaceholder = document.getElementById('liveAlertPlaceholder')
                     const alert = (message, type) => {
                         const wrapper = document.createElement('div')

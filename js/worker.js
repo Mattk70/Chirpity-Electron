@@ -2251,7 +2251,7 @@ const prepSummaryStatement = (included) => {
             const db = STATE.db;
 
             const included = STATE.selection ? [] : await getIncludedIDs();
-            prepSummaryStatement(included); console.log("included in summary:",included.length)
+            prepSummaryStatement(included);
             const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
             let range, files = [];
             if (['explore', 'chart'].includes(STATE.mode)) {
