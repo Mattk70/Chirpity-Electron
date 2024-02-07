@@ -114,6 +114,7 @@ onmessage = async (e) => {
 
             case "get-list": {
                 const {model, listType, useWeek}  = e.data;
+                listModel.model = model;
                 NOT_BIRDS = model === 'birdnet' ? BIRDNET_NOT_BIRDS : CHIRPITY_NOT_BIRDS;
                 listModel.labels = model === 'birdnet' ? BIRDNET_LABELS : CHIRPITY_LABELS;
                 let lat = parseFloat(e.data.lat);
@@ -166,31 +167,63 @@ class Model {
             const mdata_prediction = this.metadata_model.predict(this.mdata_input);
             const mdata_probs = await mdata_prediction.data();
             let count = 0;
-            for (let i = 0; i < mdata_probs.length; i++) {
-                if (mdata_probs[i] > threshold) {
-                    count++;
-                    includedIDs.push(i);
-                    DEBUG && console.log("including:", this.labels[i] + ': ' + mdata_probs[i]);
+            if (this.model === 'birdnet'){
+                for (let i = 0; i < mdata_probs.length; i++) {
+                    if (mdata_probs[i] > threshold) {
+                        count++;
+                        includedIDs.push(i);
+                        DEBUG && console.log("including:", this.labels[i] + ': ' + mdata_probs[i]);
 
-                } else {
-                    DEBUG && console.log("Excluding:", this.labels[i] + ': ' + mdata_probs[i]);
+                    } else {
+                        DEBUG && console.log("Excluding:", this.labels[i] + ': ' + mdata_probs[i]);
+                    }
+                }
+            } else {
+                for (let i = 0; i < mdata_probs.length; i++) {
+                    const index = i; // mdata_probs.indexOf(mdata_probs_sorted[i]);
+                    if (mdata_probs[index] < threshold) {
+                        DEBUG && console.log('Excluding:', this.mdata_labels[index] + ': ' + mdata_probs[index]);
+                    } else {
+                        count++
+                        const latin = this.mdata_labels[index].split('_')[0];
+                        // Use the reduce() method to accumulate the indices of species containing the latin name
+                        const foundIndices = this.labels.reduce((indices, element, index) => {
+                            element.includes(latin) && indices.push(index);
+                            return indices;
+                        }, []);
+                        foundIndices.forEach(index => {
+                            // If we want an override list...=>
+                            //if (! ['Dotterel', 'Stone-curlew', 'Spotted Crake'].some(this.labels[index])) BLOCKED_IDS.push(index)
+                            includedIDs.push(index)
+                            DEBUG && console.log('Including: ', index, 'name', this.labels[index], 'probability', mdata_probs[i].toFixed(5) )
+                        })
+                    }
                 }
             }
             DEBUG && console.log('Total species considered at this location: ', count)
             // return an object
-            includedIDs = {week: week, lat: lat, lon:lon, included: includedIDs}
-        }
-        else {
-            // Function to extract the first element after splitting on '_'
-            const getFirstElement = label => label.split('_')[0];
+            includedIDs = {week: week, lat: lat, lon:lon, included: includedIDs}            
+        } else {
+            if (this.model === 'chirpity' && listType === 'migrants') {
+                for (let i = 0; i < this.labels.length; i++) {
+                    const item = this.labels[i];
+                    if (MIGRANTS.has(item) || MYSTERIES.includes(item)) includedIDs.push(i);
+                }
+            } else {
+                // looking for birds (chirpity) or (birds or migrants) in the case of birdnet
+                // Function to extract the first element after splitting on '_'
+                const getFirstElement = label => label.split('_')[0];
 
-            // Create a list of included labels' indices
-            const t0 = Date.now()
-            includedIDs = this.labels.map((label, index) => {
+                // Create a list of included labels' indices
+                const t0 = Date.now()
+                const notBirdsFirstParts = NOT_BIRDS.map(getFirstElement);
+            
+                includedIDs = this.labels.map((label, index) => {
                     const firstPart = getFirstElement(label);
-                    return NOT_BIRDS.some(excludedLabel => getFirstElement(excludedLabel) === firstPart) ? null : index;
+                    return notBirdsFirstParts.includes(firstPart) ? null : index;
                 }).filter(index => index !== null);
-            console.log('filtering took', Date.now() - t0, 'ms')
+                DEBUG && console.log('filtering took', Date.now() - t0, 'ms')
+            }
         }
         return includedIDs;
     }

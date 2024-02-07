@@ -6,14 +6,7 @@ let BACKEND;
 
 //GLOBALS
 let myModel;
-const MIGRANTS = new Set(["Pluvialis dominica_American Golden Plover", "Acanthis hornemanni_Arctic Redpoll", "Sterna paradisaea_Arctic Tern", "Recurvirostra avosetta_Avocet", "Porzana pusilla_Baillon's Crake", "Limosa lapponica_Bar-tailed Godwit", "Tyto alba_Barn Owl", "Branta leucopsis_Barnacle Goose", "Cygnus columbianus_Bewick's Swan", "Botaurus stellaris_Bittern (call)", "Chroicocephalus ridibundus_Black-headed Gull", "Podiceps nigricollis_Black-necked Grebe", "Limosa limosa_Black-tailed Godwit", "Turdus merula_Blackbird (flight call)", "Sylvia atricapilla_Blackcap (call)", "Fringilla montifringilla_Brambling", "Branta bernicla_Brent Goose", "Branta canadensis_Canada Goose", "Larus cachinnans_Caspian Gull", "Phylloscopus collybita_Chiffchaff (call)", "Loxia curvirostra_Common Crossbill", "Larus canus_Common Gull", "Acanthis flammea_Common Redpoll", "Actitis hypoleucos_Common Sandpiper", "Melanitta nigra_Common Scoter", "Sterna hirundo_Common Tern", "Fulica atra_Coot", "Emberize calandre_Corn Bunting (call)", "Crex crex_Corncrake", "Cuculus canorus_Cuckoo (call)", "Calidris ferruginea_Curlew Sandpiper", "Numenius arquata_Curlew", "Charadrius morinellus_Dotterel", "Calidris alpina_Dunlin", "Prunella modularis_Dunnock (call)", "Alopochen aegyptiaca_Egyptian Goose", "Turdus pilaris_Fieldfare (call)", "Mareca strepera_Gadwall", "Sylvia borin_Garden Warbler (call)", "Spatula querquedula_Garganey", "Regulus regulus_Goldcrest (call)", "Regulus ignicapilla_Firecrest (call)", "Pluvialis apricaria_Golden Plover", "Bucephala clangula_Goldeneye", "Mergus merganser_Goosander", "Locustella naevia_Grasshopper Warbler (call)", "Larus marinus_Great Black-backed Gull", "Podiceps cristatus_Great Crested Grebe", "Tringa ochropus_Green Sandpiper", "Tringa nebularia_Greenshank", "Ardea cinerea_Grey Heron", "Perdix perdix_Grey Partridge", "Phalaropus fulicarius_Grey", "Pluvialis squatarola_Grey Plover", "Motacilla cinerea_Grey Wagtail ", "Anser anser_Greylag Goose", "Delichon urbicum_House Martin", "Coccothraustes coccothraustes_Hawfinch (call)", "Larus argentatus_Herring Gull", "Lymnocryptes minimus_Jack Snipe", "Alcedo atthis_Kingfisher", "Calidris canutus_Knot", "Calcarius lapponicus_Lapland Bunting (call)", "Larus fuscus_Lesser Black-backed Gull", "Acanthis cabaret_Lesser Redpoll ", "Curraca curruca_Lesser Whitethroat (call)", "Linaria cannabina_Linnet", "Ixobrychus minutus_Little Bittern (call)", "Egretta garzetta_Little Egret", "Tachybaptus ruficollis_Little Grebe", "Hydrocoloeus minutus_Little Gull", "Athene noctua_Little Owl", "Charadrius dubius_Little Ringed Plover", "Calidris minuta_Little Stint ", "Sternula albifrons_Little Tern", "Asio otus_Long-eared Owl", "Clangula hyemalis_Long-tailed Duck", "Anas platyrhynchos_Mallard", "Aix galericulata_Mandarin Duck", "Anthus pratensis_Meadow Pipit (call)", "Ichthyaetus melanocephalus_Mediterranean Gull", "Turdus viscivorus_Mistle Thrush (call)", "Gallinula chloropus_Moorhen", "Nycticorax nycticorax_Night Heron", "Luscinia megarhynchos_Nightingale (call)", "Luscinia megarhynchos_Nightingale (song)", "Caprimulgus europaeus_Nightjar (call)", "Anthus hodgsoni_Olive-backed Pipit (call)", "Emberiza hortulana_Ortolan Bunting (call)", "Emberiza pusilla_Little Bunting (call)", "Haematopus ostralegus_Oystercatcher", "Ficedula hypoleuca_Pied Flycatcher (call)", "Motacilla alba_Pied Wagtail", "Anser brachyrhynchus_Pink-footed Goose", "Anas acuta_Pintail", "Aythya ferina_Pochard", "Calidris maritima_Purple Sandpiper", "Coturnix coturnix_Quail (call)", "Coturnix coturnix_Quail (song)", "Mergus serrator_Red-breasted Merganser", "Netta rufina_Red-crested Pochard", "Alectoris rufa_Red-legged Partridge", "Tringa totanus_Redshank", "Phoenicurus phoenicurus_Redstart (call)", "Turdus iliacus_Redwing (call)", "Emberiza schoeniclus_Reed Bunting (call)", "Acrocephalus scirpaceus_Reed Warbler (call)", "Anthus richardi_Richard's Pipit (call)", "Turdus torquatus_Ring Ouzel (call)", "Charadrius hiaticula_Ringed Plover", "Erithacus rubecula_Robin (flight call)", "Anthus petrosus_Rock Pipit", "Sterna dougallii_Roseate Tern", "Calidris pugnax_Ruff", "Riparia riparia_Sand Martin", "Calidris alba_Sanderling", "Thalasseus sandvicensis_Sandwich Tern", "Aythya marila_Scaup", "Loxia scotica_Scottish Crossbill", "Acrocephalus schoenobaenus_Sedge Warbler", "Tadorna tadorna_Shelduck", "Asio flammeus_Short-eared Owl", "Spatula clypeata_Shoveler", "Spinus spinus_Siskin", "Alauda arvensis_Skylark (call)", "Gallinago gallinago_Snipe", "Plectrophenax nivalis_Snow Bunting", "Turdus philomelos_Song Thrush (call)", "Porzana porzana_Spotted Crake", "Muscicapa striata_Spotted Flycatcher", "Tringa erythropus_Spotted Redshank (call)", "Burhinus oedicnemus_Stone-curlew", "Saxicola rubicola_Stonechat", "Hirundo rustica_Swallow", "Apus apus_Swift", "Anser fabalis_Taiga Bean Goose", "Strix aluco_Tawny Owl", "Anas crecca_Teal", "Anthus trivialis_Tree Pipit (call)", "Aythya fuligula_Tufted Duck", "Anser serrirostris_Tundra Bean Goose", "Arenaria interpres_Turnstone", "Anthus spinoletta_Water Pipit", "Rallus aquaticus_Water Rail", "Numenius phaeopus_Whimbrel", "Anser albifrons_White-fronted Goose", "Sylvia communis_Whitethroat (call)", "Cygnus cygnus_Whooper Swan", "Mareca penelope_Wigeon", "Phylloscopus trochilus_Willow Warbler (call)", "Tringa glareola_Wood Sandpiper", "Scolopax rusticola_Woodcock", "Lullula arborea_Woodlark (call)", "Larus michahellis_Yellow-legged Gull", "Motacilla flava_Yellow Wagtail", "Emberiza citrinella_Yellowhammer (call)"]);
-const NOT_BIRDS = ['Ambient Noise_Ambient Noise', 'Animal_Animal', 'Cat_Cat', 'Church Bells_Church Bells', 'Cough_Cough', 'Dog_Dog', 'Human_Human', 'Laugh_Laugh', 'No call_No call', 'Rain_Rain', 'Red Fox_Red Fox', 'Sneeze_Sneeze', 'Snoring_Snoring', 'Thunder_Thunder', 'Vehicle_Vehicle', 'Water Drops_Water Drops', 'Waves_Waves', 'Wind_Wind'];
-const MYSTERIES = ['Unknown Sp._Unknown Sp.'];
-const GRAYLIST = [];
-const GOLDEN_LIST = [];
-let BLOCKED_IDS = [];
-let SUPPRESSED_IDS = [];
-let ENHANCED_IDS = [];
+
 const CONFIG = {
     sampleRate: 24_000, specLength: 3, sigmoid: 1,
 };
@@ -129,27 +122,6 @@ onmessage = async (e) => {
                 postMessage(response);
                 break;
                 }
-            case "list": {
-                myModel.list = e.data.list;
-                myModel.lat = parseFloat(e.data.lat);
-                myModel.lon = parseFloat(e.data.lon);
-                myModel.week = parseInt(e.data.week) || myModel.week;
-                myModel.speciesThreshold = parseFloat(e.data.threshold);
-                if (DEBUG) {
-                    console.log(`Setting list to ${myModel.list}`);
-                }
-                await myModel.setList();
-                postMessage({
-                    message: "update-list",
-                    blocked: BLOCKED_IDS,
-                    lat: myModel.lat,
-                    lon: myModel.lon,
-                    week: myModel.week,
-                    updateResults: true,
-                    worker: worker
-                });
-                break;
-                }
         }
     }
     // If worker was respawned
@@ -170,7 +142,6 @@ class Model {
         this.frame_length = 512;
         this.frame_step = 186;
         this.appPath = appPath;
-        this.list = list;
         this.useContext = undefined;
         this.version = version;
         this.selection = false;
@@ -183,14 +154,7 @@ class Model {
             this.model = await tf.loadGraphModel(this.appPath + 'model.json',
                 { weightPathPrefix: this.appPath });
             this.model_loaded = true;
-            
             this.inputShape = [...this.model.inputs[0].shape];
-            this.metadata_model = await tf.loadGraphModel(
-                this.appPath + '../BirdNET_GLOBAL_6K_V2.4_Model_TFJS/static/model/mdata/model.json'
-            );
-            const mdata_label_path = path.join(__dirname, '..','BirdNET_GLOBAL_6K_V2.4_Model_TFJS','static','model','labels.json')
-            this.mdata_labels = JSON.parse(fs.readFileSync(mdata_label_path, "utf8")); 
-            //await this.setList();
             }
     }
 
@@ -205,57 +169,6 @@ class Model {
         }
         if (DEBUG) console.log('WarmUp end', tf.memory().numTensors)
         return true;
-    }
-
-    async setList() {
-        BLOCKED_IDS = [];
-        if (this.list === "location") {
-            const lat = this.lat;
-            const lon = this.lon;
-            const week = this.week;
-            this.mdata_input = tf.tensor([lat, lon, week]).expandDims(0);
-            const mdata_prediction = this.metadata_model.predict(this.mdata_input);
-            const mdata_probs = await mdata_prediction.data();
-            //const mdata_probs_sorted = mdata_probs.slice().sort().reverse();
-            //console.log('<b>Most common species @ (' + lat + '/' + lon + ') in week ' + week + ':</b>');
-            let count = 0
-            for (let i = 0; i < mdata_probs.length; i++) {
-                const index = i; // mdata_probs.indexOf(mdata_probs_sorted[i]);
-                if (mdata_probs[index] > this.speciesThreshold) {
-                    count++
-                    DEBUG && console.log('Including:', this.mdata_labels[index] + ': ' + mdata_probs[index]);
-                } else {
-                    const latin = this.mdata_labels[index].split('_')[0];
-                    // Use the reduce() method to accumulate the indices of species containing the latin name
-                    const foundIndices = this.labels.reduce((indices, element, index) => {
-                        if (element.includes(latin)) {
-                            indices.push(index);
-                        }
-                        return indices;
-                    }, []);
-                    foundIndices.forEach(index => {
-                        // If we want an override list...=>
-                        //if (! ['Dotterel', 'Stone-curlew', 'Spotted Crake'].some(this.labels[index])) BLOCKED_IDS.push(index)
-                        BLOCKED_IDS.push(index)
-                        DEBUG && console.log('Excluding: ', index, 'name', this.labels[index], 'probability', mdata_probs[i].toFixed(5) )
-                    })
-                }
-            }
-            NOT_BIRDS.forEach(notBird => {BLOCKED_IDS.push(this.labels.indexOf(notBird)); count++})
-            DEBUG && console.log('Total species considered at this location: ', count)
-        }
-        if (this.list === 'birds') {
-            // find the position of the blocked items in the label list
-            NOT_BIRDS.forEach(notBird => BLOCKED_IDS.push(this.labels.indexOf(notBird)))
-        } else if (this.list === 'migrants') {
-            const listToCheck = MIGRANTS;
-            for (let i = 0; i < this.labels.length; i++) {
-                const item = this.labels[i];
-                if (!listToCheck.has(item) && !MYSTERIES.includes(item)) BLOCKED_IDS.push(i);
-            }
-        }
-        GRAYLIST.forEach(species => SUPPRESSED_IDS.push(this.labels.indexOf(species)))
-        GOLDEN_LIST.forEach(species => ENHANCED_IDS.push(this.labels.indexOf(species)))
     }
 
     normalise(spec) {
