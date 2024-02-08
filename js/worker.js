@@ -1797,6 +1797,11 @@ const prepSummaryStatement = (included) => {
                         worker.onmessage = async (e) => {
                             await parseMessage(e)
                         }
+                        worker.onerror = (e) => {
+                            console.warn(`Worker ${i} is suffering, shutting it down. THe error was:`, e)
+                            predictWorkers.splice(i, 1);
+                            worker.terminate();
+                        }
                     }
                 }
                 

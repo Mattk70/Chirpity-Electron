@@ -68,22 +68,21 @@ onmessage = async (e) => {
                 break;
                 }
             case "predict": {
-                if (myModel.model_loaded) {
-                    const { chunks: chunks, start: start, fileStart: fileStart, file: file, snr: snr, confidence: confidence, context: context, resetResults: resetResults } = e.data;
-                    myModel.useContext = context;
-                    myModel.selection =  !resetResults;
-                    const [result,filename,startPosition] = await myModel.predictChunk(chunks, start, fileStart, file, snr, confidence / 1000);
-                    response = {
-                        message: "prediction",
-                        file: filename,
-                        result: result,
-                        fileStart: startPosition,
-                        worker: worker,
-                        selection: myModel.selection
-                    };
-                    postMessage(response);
-                    myModel.result = [];
-                }
+                if (! myModel.model_loaded) { console.log("worker", worker, "received a prediction request before it was ready") }
+                const { chunks: chunks, start: start, fileStart: fileStart, file: file, snr: snr, confidence: confidence, context: context, resetResults: resetResults } = e.data;
+                myModel.useContext = context;
+                myModel.selection =  !resetResults;
+                const [result,filename,startPosition] = await myModel.predictChunk(chunks, start, fileStart, file, snr, confidence / 1000);
+                response = {
+                    message: "prediction",
+                    file: filename,
+                    result: result,
+                    fileStart: startPosition,
+                    worker: worker,
+                    selection: myModel.selection
+                };
+                postMessage(response);
+                myModel.result = [];
             break;
             }
             case "get-spectrogram": {
@@ -292,11 +291,11 @@ class Model {
 
         const finalPrediction = newPrediction || prediction;
         const { indices, values } = tf.topk(finalPrediction, 5, true)
-        //const adjusted_values  = tf.div(1, tf.add(1, tf.exp(tf.mul(tf.neg(10), values.sub(0.6)))));
-        const [topIndices, topValues] = await Promise.all([indices.array(), values.array()]).catch((err => console.log(err)));
-        // const topIndices = indices.arraySync();
-        // const topValues = await values.arraySync();
+        // For reasons I don't understand, the Promise.all approach is flakey: on occasion, not all predictions are returned
+        // const [topIndices, topValues] = await Promise.all([indices.array(), values.array()]).catch(err => console.log('Data transfer error:',err));
+        const topIndices = await indices.array();
         indices.dispose();
+        const topValues = await values.array();
         values.dispose();
 
         finalPrediction.dispose();
