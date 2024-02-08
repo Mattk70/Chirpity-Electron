@@ -1400,6 +1400,8 @@ window.onload = async () => {
             config.model = config.model === 'v2.4' ? 'birdnet' : 'chirpity';
             updatePrefs()
         }
+        // force backend to 'tensorflow' for Birdnet
+        if (config.model === 'birdnet') config.backend = 'tensorflow';
         // switch off fullscreen mode - we don't want to persist that setting
         config.fullscreen = false;
         // switch off debug mode we don't want this to be remembered
@@ -1445,15 +1447,15 @@ window.onload = async () => {
         audioFade.disabled = !audioPadding.checked;
         audioDownmix.checked = config.audio.downmix;
         setNocmig(config.detect.nocmig);
-        //const chirpityOnly = document.querySelectorAll('.chirpity-only');
+        const chirpityOnly = document.querySelectorAll('.chirpity-only');
         if (config.model !== 'birdnet'){
             // show chirpity-only features
-            //chirpityOnly.forEach(element => element.classList.remove('d-none'));
+            chirpityOnly.forEach(element => element.classList.remove('d-none'));
             contextAware.checked = config.detect.contextAware
             SNRSlider.disabled = false;
         } else {
             // hide chirpity-only features
-            //chirpityOnly.forEach(element => element.classList.add('d-none'));
+            chirpityOnly.forEach(element => element.classList.add('d-none'));
             contextAware.checked = false;
             contextAware.disabed = true;
             config.detect.contextAware = false;
@@ -2264,18 +2266,18 @@ const loadModel = ({clearCache = true} = {})  => {
 const modelToUse = document.getElementById('model-to-use');
 modelToUse.addEventListener('change', function (e) {
     config.model = e.target.value;
-    //const chirpityOnly = document.querySelectorAll('.chirpity-only');
+    const chirpityOnly = document.querySelectorAll('.chirpity-only');
     if (config.model === 'birdnet') { 
         contextAware.checked = false;
         // hide chirpity-only features
-        //chirpityOnly.forEach(element => element.classList.add('d-none'));
+        chirpityOnly.forEach(element => element.classList.add('d-none'));
         contextAware.disabed = true;
         config.detect.contextAware = false;
         SNRSlider.disabled = true;
         config.filters.SNR = 0;
     } else {
         // show chirpity-only features
-        //chirpityOnly.forEach(element => element.classList.remove('d-none'));
+        chirpityOnly.forEach(element => element.classList.remove('d-none'));
         contextAware.disabed = false;
         SNRSlider.disabled = false;
     }
