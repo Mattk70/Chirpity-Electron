@@ -421,7 +421,7 @@ async function onChangeMode(mode) {
     });
 }
 
-const filtersApplied = (list) => list.length < LABELS.length -1;
+const filtersApplied = (list) => list?.length && list.length < LABELS.length -1;
 
 /**
 * onLaunch called when Application is first opened or when model changed
