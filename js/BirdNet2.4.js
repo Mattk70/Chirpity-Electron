@@ -325,12 +325,11 @@ class Model {
         if (maskedTensorBatch) maskedTensorBatch.dispose();
 
         const finalPrediction = newPrediction || prediction;
-        //new
-        const { indices, values } = tf.topk(finalPrediction, 5, true)
-        const [topIndices, topValues] = await Promise.all([indices.array(), values.array()]).catch((err => console.log(err)));
-        // const topIndices = indices.arraySync();
-        // const topValues = values.arraySync();
+        
+        const { indices, values } = tf.topk(finalPrediction, 5, true);
+        const topIndices = await indices.array();
         indices.dispose();
+        const topValues = await values.array();
         values.dispose();
         // end new
         // const array_of_predictions = finalPrediction.arraySync()
