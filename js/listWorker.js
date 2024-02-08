@@ -94,7 +94,7 @@ const BIRDNET_LABELS = await fetch(birdnetlabelFile).then(response => {
     }).catch(error =>{
         console.error('There was a problem fetching the label file:', error);
     })
-
+const ACTIVITY_INDEX = JSON.parse(fs.readFileSync(path.join(__dirname, '../nocturnal_activity_index.json'), "utf8"));
 let config = JSON.parse(fs.readFileSync(path.join(__dirname, '../chirpity_model_config.json'), "utf8"));
 const CHIRPITY_LABELS = config.labels;
 config = undefined;
@@ -203,27 +203,34 @@ class Model {
             DEBUG && console.log('Total species considered at this location: ', count)
             // return an object
             includedIDs = {week: week, lat: lat, lon:lon, included: includedIDs}            
-        } else {
-            if (this.model === 'chirpity' && listType === 'migrants') {
+        } else if (listType === 'migrants') {
+            if (this.model === 'chirpity') {
                 for (let i = 0; i < this.labels.length; i++) {
                     const item = this.labels[i];
                     if (MIGRANTS.has(item) || MYSTERIES.includes(item)) includedIDs.push(i);
                 }
             } else {
-                // looking for birds (chirpity) or (birds or migrants) in the case of birdnet
-                // Function to extract the first element after splitting on '_'
-                const getFirstElement = label => label.split('_')[0];
+                // BirdNET nocturnal bird filter
+                for (let i = 0; i < this.labels.length; i++) {
+                    const item = this.labels[i];
+                    if (ACTIVITY_INDEX[item]  !== 1 && BIRDNET_NOT_BIRDS.indexOf(item) !== -1) includedIDs.push(i);     
+                }
+            } 
+        } else {
 
-                // Create a list of included labels' indices
-                const t0 = Date.now()
-                const notBirdsFirstParts = NOT_BIRDS.map(getFirstElement);
-            
-                includedIDs = this.labels.map((label, index) => {
-                    const firstPart = getFirstElement(label);
-                    return notBirdsFirstParts.includes(firstPart) ? null : index;
-                }).filter(index => index !== null);
-                DEBUG && console.log('filtering took', Date.now() - t0, 'ms')
-            }
+            // looking for birds (chirpity) or (birds or migrants) in the case of birdnet
+            // Function to extract the first element after splitting on '_'
+            const getFirstElement = label => label.split('_')[0];
+
+            // Create a list of included labels' indices
+            const t0 = Date.now()
+            const notBirdsFirstParts = NOT_BIRDS.map(getFirstElement);
+        
+            includedIDs = this.labels.map((label, index) => {
+                const firstPart = getFirstElement(label);
+                return notBirdsFirstParts.includes(firstPart) ? null : index;
+            }).filter(index => index !== null);
+            DEBUG && console.log('filtering took', Date.now() - t0, 'ms')
         }
         return includedIDs;
     }

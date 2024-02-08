@@ -1712,7 +1712,7 @@ const prepSummaryStatement = (included) => {
                                 )
                             }
                         }
-                        // This code doesn't weork: error opening filters
+                        // This code doesn't work: error opening filters
                         // if (STATE.filters.active){
                         //     ffmpgCommand = ffmpgCommand.audioFilters(
                         //          {
