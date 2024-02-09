@@ -39,27 +39,27 @@ const os = window.module.os;
 let worker;
 
 const establishMessageChannel =
-    new Promise((resolve) => {
-        window.onmessage = (event) => {
-            // event.source === window means the message is coming from the preload
-            // script, as opposed to from an <iframe> or other source.
-            if (event.source === window) {
-                if (event.data === 'provide-worker-channel') {
-                    [worker] = event.ports;
-                    worker.postMessage({ action: 'create message port' });
-                    // Once we have the port, we can communicate directly with the worker
-                    // process.
-                    worker.onmessage = e => {
-                        resolve(e.data);
-                    }
+new Promise((resolve) => {
+    window.onmessage = (event) => {
+        // event.source === window means the message is coming from the preload
+        // script, as opposed to from an <iframe> or other source.
+        if (event.source === window) {
+            if (event.data === 'provide-worker-channel') {
+                [worker] = event.ports;
+                worker.postMessage({ action: 'create message port' });
+                // Once we have the port, we can communicate directly with the worker
+                // process.
+                worker.onmessage = e => {
+                    resolve(e.data);
                 }
             }
         }
-    }).then((value) => {
-        console.log(value);
-    }, error => {
-        console.log(error);
-    });
+    }
+}).then((value) => {
+    console.log(value);
+}, error => {
+    console.log(error);
+});
 
 
 async function getPaths() {
@@ -84,14 +84,14 @@ let VERSION;
 let DIAGNOSTICS = {};
 
 window.electron.getVersion()
-    .then((appVersion) => {
-        VERSION = appVersion;
-        console.log('App version:', appVersion);
-        DIAGNOSTICS['Chirpity Version'] = VERSION;
-    })
-    .catch(error => {
-        console.log('Error getting app version:', error)
-    });
+.then((appVersion) => {
+    VERSION = appVersion;
+    console.log('App version:', appVersion);
+    DIAGNOSTICS['Chirpity Version'] = VERSION;
+})
+.catch(error => {
+    console.log('Error getting app version:', error)
+});
 
 let modelReady = false, fileLoaded = false, currentFile;
 let PREDICTING = false, t0;
@@ -105,7 +105,7 @@ let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
 const bodyElement = document.body;
 let spectrogramWrapper = document.getElementById('spectrogramWrapper'), specElement, waveElement, specCanvasElement, specWaveElement;
 let waveCanvasElement, waveWaveElement,
-    resultTableElement = document.getElementById('resultTableContainer');
+resultTableElement = document.getElementById('resultTableContainer');
 const contentWrapperElement = document.getElementById('contentWrapper');
 const nocmigButton = document.getElementById('nocmigMode');
 const summaryTable = document.getElementById('summaryTable');
@@ -132,7 +132,7 @@ const defaultLat = document.getElementById('latitude');
 const defaultLon = document.getElementById('longitude');
 let activeRow;
 let predictions = {},
-    clickedIndex, currentFileDuration;
+clickedIndex, currentFileDuration;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
 // Set content container height
@@ -145,17 +145,17 @@ let sampleRate = 24_000;
 let audioCtx;
 
 /** Collect DIAGNOSTICS Information
- DIAGNOSTICS keys:
- GPUx - name of GPU(s)
- backend: tensorflow backend in use
- warmup: time to warm up model (seconds)
- "Analysis Duration": time on detections (seconds)
- "Audio Duration": length of audio (seconds)
- "Chirpity Version": app version
- "Model": model in use
- "Tensorflow Backend"
- Analysis Rate: x real time performance
- */
+DIAGNOSTICS keys:
+GPUx - name of GPU(s)
+backend: tensorflow backend in use
+warmup: time to warm up model (seconds)
+"Analysis Duration": time on detections (seconds)
+"Audio Duration": length of audio (seconds)
+"Chirpity Version": app version
+"Model": model in use
+"Tensorflow Backend"
+Analysis Rate: x real time performance
+*/
 // Timers
 let t0_warmup, t1_warmup, t0_analysis, t1_analysis;
 
@@ -165,7 +165,7 @@ DIAGNOSTICS['System Memory'] = (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) +
 
 function resetResults({clearSummary = true, clearPagination = true, clearResults = true} = {}) {
     if (clearSummary) summaryTable.textContent = '';
-
+    
     clearPagination && pagination.forEach(item => item.classList.add('d-none'));
     const resultTable = document.getElementById('resultTableBody');
     resultsBuffer = resultTable.cloneNode(false)
@@ -178,9 +178,9 @@ function resetResults({clearSummary = true, clearPagination = true, clearResults
 }
 
 /***
- *
- * @param val: float between 0 and 100
- */
+*
+* @param val: float between 0 and 100
+*/
 function updateProgress(val) {
     if (val) {
         progressBar.value = val;
@@ -190,17 +190,17 @@ function updateProgress(val) {
     else {
         progressBar.removeAttribute('value');
     }
-
+    
 }
 
 /**
- * LoadAudiofile: Called when user opens a file (just opens first file in multiple files)
- * and when clicking on filename in list of open files.
- * 
- * @param {*} filePath: full path to file
- * @param {*} preserveResults: whether to clear results when opening file (i.e. don't clear results when clicking file in list of open files)
- *  
- */
+* LoadAudiofile: Called when user opens a file (just opens first file in multiple files)
+* and when clicking on filename in list of open files.
+* 
+* @param {*} filePath: full path to file
+* @param {*} preserveResults: whether to clear results when opening file (i.e. don't clear results when clicking file in list of open files)
+*  
+*/
 async function loadAudioFile({ filePath = '', preserveResults = false }) {
     fileLoaded = false; locationID = undefined;
     //if (!preserveResults) worker.postMessage({ action: 'change-mode', mode: 'analyse' })
@@ -258,7 +258,7 @@ const initWavesurfer = ({
     audio = undefined,
     height = 0
 }) => {
-
+    
     if (wavesurfer) {
         wavesurfer.pause();
     }
@@ -289,7 +289,7 @@ const initWavesurfer = ({
     if (audio) wavesurfer.loadDecodedBuffer(audio);
     colourmap.value = config.colormap;
     // Set click event that removes all regions
-
+    
     waveElement.addEventListener('mousedown', resetRegions);
     // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
@@ -304,16 +304,16 @@ const initWavesurfer = ({
         region = e;
         region.attributes.label = '';
     });
-
+    
     // Queue up next audio window while playing
     wavesurfer.on('audioprocess', function () {
-
+        
         const currentTime = wavesurfer.getCurrentTime();
         const duration = wavesurfer.getDuration();
         const playedPart = currentTime / duration;
-
+        
         if (playedPart > 0.5) {
-
+            
             if (!wavesurfer.bufferRequested && currentFileDuration > bufferBegin + windowLength) {
                 const begin = bufferBegin + windowLength;
                 postBufferUpdate({ begin: begin, play: false, queued: true })
@@ -332,7 +332,7 @@ const initWavesurfer = ({
             bufferBegin += windowLength;
         }
     });
-
+    
     // Show controls
     showElement(['controlsWrapper']);
     updateElementCache();
@@ -368,12 +368,12 @@ function zoomSpec(direction) {
             if (windowLength > 100 || windowLength === currentFileDuration) return;
             bufferBegin -= windowLength * position;
             windowLength = Math.min(currentFileDuration, windowLength * 2);
-
+            
             if (bufferBegin < 0) {
                 bufferBegin = 0;
             } else if (bufferBegin + windowLength > currentFileDuration) {
                 bufferBegin = currentFileDuration - windowLength
-
+                
             }
         }
         // Keep playhead at same time in file
@@ -386,7 +386,7 @@ function zoomSpec(direction) {
             region.end = region.start + duration;
             const {start, end} = region;
             if (start < 0 || start > windowLength || end > windowLength) region = undefined;
-
+            
         }
         postBufferUpdate({ begin: bufferBegin, position: position, region: region, goToRegion: false })
     }
@@ -450,7 +450,7 @@ function showDatePicker() {
     label.innerHTML = "Select New Date and Time:";
     label.classList.add("form-label");
     form.appendChild(label);
-
+    
     // Create the datetime-local input
     const datetimeInput = document.createElement("input");
     datetimeInput.setAttribute("type", "datetime-local");
@@ -459,31 +459,31 @@ function showDatePicker() {
     datetimeInput.setAttribute("max", getDatetimeLocalFromEpoch(new Date()));
     datetimeInput.classList.add("form-control");
     form.appendChild(datetimeInput);
-
+    
     // Create a submit button
     const submitButton = document.createElement("button");
     submitButton.innerHTML = "Submit";
     submitButton.classList.add("btn", "btn-primary", "mt-2");
     form.appendChild(submitButton);
-
+    
     // Create a cancel button
     var cancelButton = document.createElement("button");
     cancelButton.innerHTML = "Cancel";
     cancelButton.classList.add("btn", "btn-secondary", "mt-2", "ms-2");
     form.appendChild(cancelButton);
-
+    
     // Append the form to the filename element
     const domElement = document.getElementById("filename");
     domElement.appendChild(form);
     // Add submit event listener to the form
     form.addEventListener("submit", function (event) {
         event.preventDefault();
-
+        
         // Get the datetime-local value
         const newStart = document.getElementById("fileStart").value;
         // Convert the datetime-local value to milliseconds
         const timestamp = new Date(newStart).getTime();
-
+        
         // Send the data to the worker
         worker.postMessage({ action: 'update-file-start', file: currentFile, start: timestamp });
         fileStart = timestamp;
@@ -506,18 +506,18 @@ filename.addEventListener('contextmenu', buildFileMenu);
 
 function extractFileNameAndFolder(path) {
     const regex = /[\\/]([^\\/]+)[\\/]([^\\/]+)$/; // Regular expression to match the parent folder and file name
-  
+    
     const match = path.match(regex);
-  
+    
     if (match) {
-      const parentFolder = match[1];
-      const fileName = match[2];
-      return { parentFolder, fileName };
+        const parentFolder = match[1];
+        const fileName = match[2];
+        return { parentFolder, fileName };
     } else {
-      // Return a default value or handle the case where the path doesn't match the pattern
-      return { parentFolder: '', fileName: '' };
+        // Return a default value or handle the case where the path doesn't match the pattern
+        return { parentFolder: '', fileName: '' };
     }
-  }
+}
 
 function renderFilenamePanel() {
     if (!currentFile) return;
@@ -532,11 +532,11 @@ function renderFilenamePanel() {
     const isSaved = ['archive', 'explore'].includes(STATE.mode) ? 'text-info' : 'text-warning';
     if (files.length > 1) {
         appendStr = `<div id="fileContainer" class="btn-group dropup">
-            <span class="filename ${isSaved}">${label}</span>
+        <span class="filename ${isSaved}">${label}</span>
         </button>
         <button class="btn btn-dark dropdown-toggle dropdown-toggle-split" type="button" 
-                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-            <span class="visually-hidden">Toggle Dropdown</span>
+        data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        <span class="visually-hidden">Toggle Dropdown</span>
         </button>
         <div class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton">`;
         files.forEach(item => {
@@ -550,10 +550,10 @@ function renderFilenamePanel() {
     } else {
         appendStr = `<div id="fileContainer">
         <button class="btn btn-dark" type="button" id="dropdownMenuButton">
-         <span class="filename ${isSaved}">${label}</span>
+        <span class="filename ${isSaved}">${label}</span>
         </button></div>`;
     }
-
+    
     filenameElement.innerHTML = appendStr;
     // Adapt menu
     customiseAnalysisMenu(isSaved === 'text-info');
@@ -606,7 +606,7 @@ const showLocation = async (fromSelect) => {
     const locationSelect = document.getElementById('savedLocations');
     // CHeck if currentfile has a location id
     const id = fromSelect ? locationSelect.valueAsNumber : FILE_LOCATION_MAP[currentFile];
-
+    
     if (id) {
         newLocation = LOCATIONS.find(obj => obj.id === id);
         //locationSelect.value = id;
@@ -697,11 +697,11 @@ async function setLocation() {
     const locationModal = new bootstrap.Modal(locationModalDiv);
     locationModal.show();
     
-
+    
     // Submit action
     const locationForm = document.getElementById('locationForm');
-
-
+    
+    
     const addLocation = () => {
         locationID = savedLocationSelect.valueAsNumber;
         const batch = document.getElementById('batchLocations').checked;
@@ -720,10 +720,10 @@ async function setLocation() {
 }
 
 /**
- * We post the list to the worker as it has node and that allows it easier access to the
- * required filesystem routines, returns valid audio file list
- * @param filePaths
- */
+* We post the list to the worker as it has node and that allows it easier access to the
+* required filesystem routines, returns valid audio file list
+* @param filePaths
+*/
 const filterValidFiles = ({ filePaths }) => {
     worker.postMessage({ action: 'get-valid-files-list', files: filePaths })
 }
@@ -744,12 +744,12 @@ async function onOpenFiles(args) {
             name: fileName,
             time: fs.statSync(fileName).mtime.getTime(),
         }))
-            .sort((a, b) => a.time - b.time)
-            .map(file => file.name);
+        .sort((a, b) => a.time - b.time)
+        .map(file => file.name);
     } else {
         disableMenuItem(['analyseAll', 'reanalyseAll'])
     }
-
+    
     await loadAudioFile({ filePath: fileList[0] });
     disableMenuItem(['analyseSelection', 'analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'export2audio', 'save2db'])
     // Clear unsaved records warning
@@ -762,10 +762,10 @@ async function onOpenFiles(args) {
 
 
 /**
- *
- *
- * @returns {Promise<void>}
- */
+*
+*
+* @returns {Promise<void>}
+*/
 async function showSaveDialog() {
     await window.electron.saveFile({ currentFile: currentFile, labels: AUDACITY_LABELS[currentFile] });
 }
@@ -795,7 +795,7 @@ function isEmptyObject(obj) {
 }
 
 function refreshResultsView() {
-
+    
     if (fileLoaded) {
         hideAll();
         showElement(['spectrogramWrapper', 'fullscreen'], false);
@@ -818,7 +818,7 @@ const getSelectionResults = (fromDB) => {
     STATE.selection = {};
     STATE['selection']['start'] = start.toFixed(3);
     STATE['selection']['end'] = end.toFixed(3);
-
+    
     postAnalyseMessage({
         filesInScope: [currentFile],
         start: STATE['selection']['start'],
@@ -892,25 +892,25 @@ function fetchLocationAddress(lat, lon) {
         }
         const storedLocation = LOCATIONS?.find(obj => obj.lat === lat && obj.lon === lon);
         if (storedLocation) return resolve(storedLocation.place);
-
+        
         fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network error: ' + JSON.stringify(response));
-                }
-                return response.json()
-            })
-            .then(data => {
-                // Just take the first two elements of the address
-                let address = data.display_name.split(',').slice(0,2).join(", ");
-
-                LOCATIONS.push({ id: LOCATIONS.length + 1, lat: lat, lon: lon, place: address })
-                resolve(address);
-            })
-            .catch(error => {
-                console.log("There was a problem connecting to OpenStreetMap")
-                reject(error);
-            })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network error: ' + JSON.stringify(response));
+            }
+            return response.json()
+        })
+        .then(data => {
+            // Just take the first two elements of the address
+            let address = data.display_name.split(',').slice(0,2).join(", ");
+            
+            LOCATIONS.push({ id: LOCATIONS.length + 1, lat: lat, lon: lon, place: address })
+            resolve(address);
+        })
+        .catch(error => {
+            console.log("There was a problem connecting to OpenStreetMap")
+            reject(error);
+        })
     })
 }
 
@@ -963,7 +963,7 @@ function hideElement(id_list) {
 function hideAll() {
     // File hint div,  Waveform, timeline and spec, controls and result table
     hideElement(['exploreWrapper',
-        'spectrogramWrapper', 'resultTableContainer', 'recordsContainer', 'fullscreen', 'resultsHead']);
+    'spectrogramWrapper', 'resultTableContainer', 'recordsContainer', 'fullscreen', 'resultsHead']);
 }
 
 const save2dbLink = document.getElementById('save2db');
@@ -1051,10 +1051,10 @@ const checkWidth = (text) => {
     tempElement.style.visibility = 'hidden';
     tempElement.textContent = text;
     document.body.appendChild(tempElement);
-
+    
     // Get the width of the text
     const textWidth = tempElement.clientWidth;
-
+    
     // Remove the temporary element from the document
     document.body.removeChild(tempElement);
     return textWidth + 5
@@ -1070,7 +1070,7 @@ function createRegion(start, end, label, goToRegion) {
         color: "rgba(255, 255, 255, 0.1)",
         attributes: {
             label: label || '',
-
+            
         },
     });
     const region = document.getElementsByTagName('region')[0];
@@ -1098,7 +1098,7 @@ async function resultClick(e) {
     }
     // Search for results rows
     while (!(row.classList.contains('nighttime') ||
-        row.classList.contains('daytime'))) {
+    row.classList.contains('daytime'))) {
         row = row.previousElementSibling
         if (!row) return;
     }
@@ -1126,10 +1126,10 @@ const loadResultRegion = ({ file = '', start = 0, end = 3, label = '' } = {}) =>
 }
 
 /**
- *
- * @param redraw boolean, whether to re-render the spectrogram
- * @param fftSamples: Optional, the number of fftsamples to use for rendering. Must be a factor of 2
- */
+*
+* @param redraw boolean, whether to re-render the spectrogram
+* @param fftSamples: Optional, the number of fftsamples to use for rendering. Must be a factor of 2
+*/
 const footerHeight = document.getElementById('footer').offsetHeight;
 const navHeight = document.getElementById('navPadding').offsetHeight;
 function adjustSpecDims(redraw, fftSamples) {
@@ -1174,19 +1174,19 @@ function adjustSpecDims(redraw, fftSamples) {
 ///////////////////////// Timeline Callbacks /////////////////////////
 
 /**
- * Use formatTimeCallback to style the notch labels as you wish, such
- * as with more detail as the number of pixels per second increases.
- *
- * Here we format as M:SS.frac, with M suppressed for times < 1 minute,
- * and frac having 0, 1, or 2 digits as the zoom increases.
- *
- * Note that if you override the default function, you'll almost
- * certainly want to override timeInterval, primaryLabelInterval and/or
- * secondaryLabelInterval so they all work together.
- *
- * @param: seconds
- * @param: pxPerSec
- */
+* Use formatTimeCallback to style the notch labels as you wish, such
+* as with more detail as the number of pixels per second increases.
+*
+* Here we format as M:SS.frac, with M suppressed for times < 1 minute,
+* and frac having 0, 1, or 2 digits as the zoom increases.
+*
+* Note that if you override the default function, you'll almost
+* certainly want to override timeInterval, primaryLabelInterval and/or
+* secondaryLabelInterval so they all work together.
+*
+* @param: seconds
+* @param: pxPerSec
+*/
 
 
 function formatRegionTooltip(start, end) {
@@ -1206,7 +1206,7 @@ function formatTimeCallback(secs) {
     let seconds = now.getSeconds();
     const minutes = now.getMinutes();
     const hours = now.getHours();
-
+    
     // fill up seconds with zeroes
     let secondsStr;
     if (windowLength >= 5) {
@@ -1243,15 +1243,15 @@ function formatTimeCallback(secs) {
 }
 
 /**
- * Use timeInterval to set the period between notches, in seconds,
- * adding notches as the number of pixels per second increases.
- *
- * Note that if you override the default function, you'll almost
- * certainly want to override formatTimeCallback, primaryLabelInterval
- * and/or secondaryLabelInterval so they all work together.
- *
- * @param: pxPerSec
- */
+* Use timeInterval to set the period between notches, in seconds,
+* adding notches as the number of pixels per second increases.
+*
+* Note that if you override the default function, you'll almost
+* certainly want to override formatTimeCallback, primaryLabelInterval
+* and/or secondaryLabelInterval so they all work together.
+*
+* @param: pxPerSec
+*/
 function timeInterval(pxPerSec) {
     let retval;
     const mulFactor = window.devicePixelRatio || 1;
@@ -1277,16 +1277,16 @@ function timeInterval(pxPerSec) {
 }
 
 /**
- * Return the cadence of notches that get labels in the primary color.
- * EG, return 2 if every 2nd notch should be labeled,
- * return 10 if every 10th notch should be labeled, etc.
- *
- * Note that if you override the default function, you'll almost
- * certainly want to override formatTimeCallback, primaryLabelInterval
- * and/or secondaryLabelInterval so they all work together.
- *
- * @param pxPerSec
- */
+* Return the cadence of notches that get labels in the primary color.
+* EG, return 2 if every 2nd notch should be labeled,
+* return 10 if every 10th notch should be labeled, etc.
+*
+* Note that if you override the default function, you'll almost
+* certainly want to override formatTimeCallback, primaryLabelInterval
+* and/or secondaryLabelInterval so they all work together.
+*
+* @param pxPerSec
+*/
 function primaryLabelInterval(pxPerSec) {
     let retval;
     const mulFactor = window.devicePixelRatio || 1;
@@ -1312,20 +1312,20 @@ function primaryLabelInterval(pxPerSec) {
 }
 
 /**
- * Return the cadence of notches to get labels in the secondary color.
- * EG, return 2 if every 2nd notch should be labeled,
- * return 10 if every 10th notch should be labeled, etc.
- *
- * Secondary labels are drawn after primary labels, so if
- * you want to have labels every 10 seconds and another color labels
- * every 60 seconds, the 60 second labels should be the secondaries.
- *
- * Note that if you override the default function, you'll almost
- * certainly want to override formatTimeCallback, primaryLabelInterval
- * and/or secondaryLabelInterval so they all work together.
- *
- * @param pxPerSec
- */
+* Return the cadence of notches to get labels in the secondary color.
+* EG, return 2 if every 2nd notch should be labeled,
+* return 10 if every 10th notch should be labeled, etc.
+*
+* Secondary labels are drawn after primary labels, so if
+* you want to have labels every 10 seconds and another color labels
+* every 60 seconds, the 60 second labels should be the secondaries.
+*
+* Note that if you override the default function, you'll almost
+* certainly want to override formatTimeCallback, primaryLabelInterval
+* and/or secondaryLabelInterval so they all work together.
+*
+* @param pxPerSec
+*/
 function secondaryLabelInterval(pxPerSec) {
     const mulFactor = window.devicePixelRatio || 1;
     const threshold = pxPerSec / mulFactor;
@@ -1388,7 +1388,7 @@ window.onload = async () => {
         } else {
             config = JSON.parse(data);
         }
-
+        
         //fill in defaults - after updates add new items
         Object.keys(defaultConfig).forEach(key => {
             if (!(key in config)) {
@@ -1423,13 +1423,13 @@ window.onload = async () => {
         document.getElementById('list-to-use').value = config.list;
         // Show Locale
         document.getElementById('locale').value = config[config.model].locale;
-
+        
         
         config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
-            speciesThresholdEl.classList.add('d-none');
+        speciesThresholdEl.classList.add('d-none');
         speciesThreshold.value = config.speciesThreshold;
         document.getElementById('species-week').checked = config.useWeek;
-
+        
         // And update the icon
         updateListIcon();
         timelineSetting.value = config.timeOfDay ? 'timeOfDay' : 'timecode';
@@ -1470,8 +1470,8 @@ window.onload = async () => {
         if (config.backend === 'webgl') {
             SNRSlider.disabled = true;
         };
-
-
+        
+        
         // Filters
         HPThreshold.textContent = config.filters.highPassFrequency + 'Hz';
         HPSlider.value = config.filters.highPassFrequency;
@@ -1480,14 +1480,14 @@ window.onload = async () => {
         lowShelfAttenuation.value = -config.filters.lowShelfAttenuation;
         lowShelfAttenuationThreshold.textContent = lowShelfAttenuation.value + 'dB';
         filterIconDisplay();
-
+        
         ThreadSlider.max = DIAGNOSTICS['Cores'];
         ThreadSlider.value = config[config.backend].threads;
         numberOfThreads.textContent = config[config.backend].threads;
         defaultLat.value = config.latitude;
         defaultLon.value = config.longitude;
         place.innerHTML = '<span class="material-symbols-outlined">fmd_good</span>' + config.location;
-
+        
         worker.postMessage({
             action: 'update-state',
             path: appPath,
@@ -1509,7 +1509,7 @@ window.onload = async () => {
         // Enable popovers
         const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]')
         const popoverList = [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl))
-
+        
         // New users - show the tour
         if (!config.seenTour) {
             setTimeout(prepTour, 2000)
@@ -1517,15 +1517,33 @@ window.onload = async () => {
         // check for new version on mac platform. pkg containers are not an auto-updatable target
         // https://www.electron.build/auto-update#auto-updatable-targets
         isMac && checkForMacUpdates();
+
+        fetch(`https://analytics.mattkirkland.co.uk/matomo.php?&idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
+        &dimension1=${config.model}
+        &dimension2=${config.list}
+        &dimension9=${JSON.stringify(config.detect)}
+        &dimension3=${config.useWeek}
+        &dimension4=${config.locale}
+        &dimension5=${config.speciesThreshold}
+        &dimension6=${JSON.stringify(config.filters)}
+        &dimension7=${JSON.stringify(config.audio)}
+        &dimension8=${JSON.stringify(config[config.backend])}`)
+            .then(response => {
+                if (! response.ok) throw new Error('Network response was not ok', response);
+            })
+            .catch(error => console.log('Error posting tracking:', error))   
     }
     )
     // establish the message channel
     setUpWorkerMessaging()
-
+    
     // Set footer year
     document.getElementById('year').textContent = new Date().getFullYear();
-
+    
+    
 }
+
+
 
 const setUpWorkerMessaging = () => {
     establishMessageChannel.then(() => {
@@ -1534,115 +1552,115 @@ const setUpWorkerMessaging = () => {
             const event = args.event;
             switch (event) {
                 case "analysis-complete": {onAnalysisComplete();
-break;
-}
+                    break;
+                }
                 case "chart-data": {onChartData(args);
-break;
-}
+                    break;
+                }
                 case "current-file-week": { STATE.week = args.week}
                 case "diskDB-has-records": {chartsLink.classList.remove("disabled");
-exploreLink.classList.remove("disabled");
-break;
-}
-                case "file-location-id": {onFileLocationID(args);
-break;
-}
-                case "files": {onOpenFiles(args);
-break;
-}
-                case "generate-alert": {if (args.updateFilenamePanel) {
-    renderFilenamePanel();
-    window.electron.unsavedRecords(false);
-    document.getElementById("unsaved-icon").classList.add("d-none");
-}
-if (args.file) {
-    let message = args.message;
-    alert(message);
-}  else {
-    if (args.filter) {
-        worker.postMessage({
-            action: "filter",
-            species: isSpeciesViewFiltered(true),
-            active: args.active,
-            updateSummary: true
-        });
-        resetResults({
-            clearSummary: true,
-            clearPagination: true,
-            clearResults: true
-        });
-    }  else {
-        alert(args.message);
-    }
-}
-break;
-}
-                case "results-complete": {onResultsComplete(args);
-hideLoadingSpinner();
-break;
-}
-                case "labels": { 
-                    LABELS = args.labels; 
-                    break }
-                case "location-list": {LOCATIONS = args.locations;
-locationID = args.currentLocation;
-break;
-}
-                case "model-ready": {onModelReady(args);
-break;
-}
-                case "mode-changed": {STATE.mode = args.mode;
-renderFilenamePanel();
-config.debug && console.log("Mode changed to: " + args.mode);
-break;
-}
-                case "summary-complate": {onSummaryComplete(args);
-break;
-}
-                case "new-result": {renderResult(args);
-break;
-}
-                case "progress": {onProgress(args);
-break;
-}
-                case "processing-complete": {        
-                    progressDiv.classList.add('d-none');
-break;
-}
-                case "seen-species-list": {generateBirdList("seenSpecies", args.list);
-break;
-}
-                case "valid-species-list": {populateSpeciesModal(args.included, args.excluded);
-break;
-}
-                case "show-spinner": {showLoadingSpinner(500);
-break;
-}
-//                 case "spawning": {displayWarmUpMessage();
-// break;
-// }
-                case "total-records": {updatePagination(args.total, args.offset);
-break;
-}
-                case "unsaved-records": {window.electron.unsavedRecords(true);
-document.getElementById("unsaved-icon").classList.remove("d-none");
-break;
-}
-                case "update-audio-duration": {DIAGNOSTICS["Audio Duration"] ??= 0;
-DIAGNOSTICS["Audio Duration"] += args.value;
-break;
-}
-                case "update-summary": {updateSummary(args);
-break;
-}
-                case "worker-loaded-audio": {onWorkerLoadedAudio(args);
-break;
-}
-                default: {alert(`Unrecognised message from worker:${args.event}`);
-}
+                exploreLink.classList.remove("disabled");
+                break;
             }
-        })
-    })
+            case "file-location-id": {onFileLocationID(args);
+                break;
+            }
+            case "files": {onOpenFiles(args);
+                break;
+            }
+            case "generate-alert": {if (args.updateFilenamePanel) {
+                renderFilenamePanel();
+                window.electron.unsavedRecords(false);
+                document.getElementById("unsaved-icon").classList.add("d-none");
+            }
+            if (args.file) {
+                let message = args.message;
+                alert(message);
+            }  else {
+                if (args.filter) {
+                    worker.postMessage({
+                        action: "filter",
+                        species: isSpeciesViewFiltered(true),
+                        active: args.active,
+                        updateSummary: true
+                    });
+                    resetResults({
+                        clearSummary: true,
+                        clearPagination: true,
+                        clearResults: true
+                    });
+                }  else {
+                    alert(args.message);
+                }
+            }
+            break;
+        }
+        case "results-complete": {onResultsComplete(args);
+            hideLoadingSpinner();
+            break;
+        }
+        case "labels": { 
+            LABELS = args.labels; 
+            break }
+            case "location-list": {LOCATIONS = args.locations;
+                locationID = args.currentLocation;
+                break;
+            }
+            case "model-ready": {onModelReady(args);
+                break;
+            }
+            case "mode-changed": {STATE.mode = args.mode;
+                renderFilenamePanel();
+                config.debug && console.log("Mode changed to: " + args.mode);
+                break;
+            }
+            case "summary-complate": {onSummaryComplete(args);
+                break;
+            }
+            case "new-result": {renderResult(args);
+                break;
+            }
+            case "progress": {onProgress(args);
+                break;
+            }
+            case "processing-complete": {        
+                progressDiv.classList.add('d-none');
+                break;
+            }
+            case "seen-species-list": {generateBirdList("seenSpecies", args.list);
+            break;
+        }
+        case "valid-species-list": {populateSpeciesModal(args.included, args.excluded);
+            break;
+        }
+        case "show-spinner": {showLoadingSpinner(500);
+            break;
+        }
+        //                 case "spawning": {displayWarmUpMessage();
+        // break;
+        // }
+        case "total-records": {updatePagination(args.total, args.offset);
+            break;
+        }
+        case "unsaved-records": {window.electron.unsavedRecords(true);
+            document.getElementById("unsaved-icon").classList.remove("d-none");
+            break;
+        }
+        case "update-audio-duration": {DIAGNOSTICS["Audio Duration"] ??= 0;
+        DIAGNOSTICS["Audio Duration"] += args.value;
+        break;
+    }
+    case "update-summary": {updateSummary(args);
+        break;
+    }
+    case "worker-loaded-audio": {onWorkerLoadedAudio(args);
+        break;
+    }
+    default: {alert(`Unrecognised message from worker:${args.event}`);
+}
+}
+})
+})
 }
 
 function generateBirdList(store, rows) {
@@ -1659,7 +1677,7 @@ function generateBirdOptionList({ store, rows, selected }) {
     let listHTML = '';
     if (store === 'allSpecies') {
         let sortedList = LABELS.map(label => label.split('_')[1]);
-
+        
         // International language sorting, recommended for large arrays - 'en_uk' not valid, but same as 'en'
         sortedList.sort(new Intl.Collator(config[config.model].locale.replace('_uk', '')).compare);
         // Check if we have prepared this before
@@ -1684,7 +1702,7 @@ function generateBirdOptionList({ store, rows, selected }) {
         }
         listHTML += '</select><label for="bird-list-seen">Species</label>';
     }
-
+    
     return listHTML;
 }
 
@@ -1767,9 +1785,9 @@ function getDateOfISOWeek(w) {
     const dow = simple.getDay();
     const ISOweekStart = simple;
     if (dow <= 4)
-        ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+    ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
     else
-        ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+    ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
     return ISOweekStart.toLocaleDateString('en-GB', options);
 }
 
@@ -1789,10 +1807,10 @@ function onChartData(args) {
     chartInstances.forEach(chartInstance => {
         chartInstance.destroy();
     });
-
+    
     // Get the Chart.js canvas
     const chartCanvas = document.getElementById('chart-week');
-
+    
     const records = args.records;
     for (const [key, value] of Object.entries(records)) {
         const element = document.getElementById(key);
@@ -1800,7 +1818,7 @@ function onChartData(args) {
             if (isNaN(value[0])) element.textContent = 'N/A';
             else {
                 element.textContent = value[0].toString() + ' on ' +
-                    new Date(value[1]).toLocaleDateString(undefined, { dateStyle: "short" });
+                new Date(value[1]).toLocaleDateString(undefined, { dateStyle: "short" });
             }
         } else {
             element.textContent = value ? new Date(value).toLocaleDateString(undefined, {
@@ -1809,7 +1827,7 @@ function onChartData(args) {
             }) : 'No Records';
         }
     }
-
+    
     const aggregation = args.aggregation;
     const results = args.results;
     const rate = args.rate;
@@ -1818,58 +1836,58 @@ function onChartData(args) {
     // start hourly charts at midday if no filter applied
     const pointStart = STATE.chart.range.start || aggregation !== 'Hour' ? args.pointStart : args.pointStart + (12 * 60 * 60 * 1000); 
     const dateLabels = generateDateLabels(aggregation, dataPoints, pointStart);
-
+    
     // Initialize Chart.js
     const plugin = {
         id: 'customCanvasBackgroundColor',
         beforeDraw: (chart, args, options) => {
-          const {ctx} = chart;
-          ctx.save();
-          ctx.globalCompositeOperation = 'destination-over';
-          ctx.fillStyle = options.color || '#99ffff';
-          ctx.fillRect(0, 0, chart.width, chart.height);
-          ctx.restore();
+            const {ctx} = chart;
+            ctx.save();
+            ctx.globalCompositeOperation = 'destination-over';
+            ctx.fillStyle = options.color || '#99ffff';
+            ctx.fillRect(0, 0, chart.width, chart.height);
+            ctx.restore();
         }
-      };
+    };
     const chartOptions = {
         type: 'bar',
         data: {
-          labels: dateLabels,
-          datasets: Object.entries(results).map(([year, data]) => ({
-              label: year,
-              //shift data to midday - midday rahter than nidnight to midnight if hourly chart and filter not set
-              data: aggregation !== 'Hour' ? data :  data.slice(12).join(data.slice(0, 12)),
-              //backgroundColor: 'rgba(255, 0, 64, 0.5)',
-              borderWidth: 1,
-              //borderColor: 'rgba(255, 0, 64, 0.9)',
-              borderSkipped: 'bottom' // Lines will appear to rise from the bottom
+            labels: dateLabels,
+            datasets: Object.entries(results).map(([year, data]) => ({
+                label: year,
+                //shift data to midday - midday rahter than nidnight to midnight if hourly chart and filter not set
+                data: aggregation !== 'Hour' ? data :  data.slice(12).join(data.slice(0, 12)),
+                //backgroundColor: 'rgba(255, 0, 64, 0.5)',
+                borderWidth: 1,
+                //borderColor: 'rgba(255, 0, 64, 0.9)',
+                borderSkipped: 'bottom' // Lines will appear to rise from the bottom
             }))
         },
         options: {
-          scales: {
-              y: {
-                  min:0,
-                  ticks: {
-                      // Force integers on the Y-axis
-                      precision: 0,
-
-                  }
-              }
-          },
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-                  title: {
-                      display: true,
-                      text: args.species ? `${args.species} Detections` : ""
-                  },
-                  customCanvasBackgroundColor: {
-                      color: "GhostWhite"
-                  }
-              }
-          },
-          plugins: [plugin],
-      }
+            scales: {
+                y: {
+                    min:0,
+                    ticks: {
+                        // Force integers on the Y-axis
+                        precision: 0,
+                        
+                    }
+                }
+            },
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: args.species ? `${args.species} Detections` : ""
+                },
+                customCanvasBackgroundColor: {
+                    color: "GhostWhite"
+                }
+            }
+        },
+        plugins: [plugin],
+    }
     if (total) {
         chartOptions.data.datasets.unshift({
             label: 'Hours Recorded', 
@@ -1889,2637 +1907,2637 @@ function onChartData(args) {
     new Chart(
         chartCanvas,
         chartOptions
-      );
-}
-
-
-function generateDateLabels(aggregation, datapoints, pointstart) {
-    const dateLabels = [];
-    const startDate = new Date(pointstart);
-
-    for (let i = 0; i < datapoints; i++) {
-      // Push the formatted date label to the array
-      dateLabels.push(formatDate(startDate, aggregation));
-  
-      // Increment the startDate based on the aggregation
-      if (aggregation === 'Hour') {
-        startDate.setTime(startDate.getTime() + 60 * 60 * 1000); // Add 1 hour
-      } else if (aggregation === 'Day') {
-        startDate.setDate(startDate.getDate() + 1); // Add 1 day
-      } else if (aggregation === 'Week') {
-        startDate.setDate(startDate.getDate() + 7); // Add 7 days (1 week)
-      }
+        );
     }
-  
-    return dateLabels;
-  }
-
-  // Helper function to format the date as desired
-function formatDate(date, aggregation) {
-
-    const options = {};
-    let formattedDate = '';
-    if (aggregation === 'Week'){
-        // Add 1 day to the startDate
-        date.setHours(date.getDate() + 1);
-        const year = date.getFullYear();
-        const oneJan = new Date(year, 0, 1);
-        const weekNumber = Math.ceil(((date - oneJan) / (24 * 60 * 60 * 1000) + oneJan.getDay() + 1) / 7);
-        return weekNumber;
-    }
-    else if (aggregation === 'Day') {
-        options.day = 'numeric';
-        options.weekday = 'short';
-        options.month = 'short';
-    }
-    else if (aggregation === 'Hour') {
-        const hour = date.getHours();
-        const period = hour >= 12 ? 'PM' : 'AM';
-        const formattedHour = hour % 12 || 12; // Convert 0 to 12
-        return `${formattedHour}${period}`;
-    }
-  
-    return formattedDate + date.toLocaleDateString('en-GB', options);
-  }
-function setChartOptions(species, total, rate, results, dataPoints, aggregation, pointStart) {
-    let chartOptions = {};
-    //chartOptions.plugins = [ChartDataLabels];
-
-    chartOptions.data = {
-        labels: dataPoints, // Assuming dataPoints is an array of labels
-        datasets: [
-            {
-                label: 'Hours of recordings',
-                data: total,
-                borderColor: "#003",
-                backgroundColor: "rgba(0, 51, 0, 0.2)",
-                fill: true,
-                yAxisID: 'y-axis-0'
-            },
-            // Add other datasets as needed
-        ]
-    };
-
-    chartOptions.options = {
-        scales: {
-            x: {
-                type: 'time',
-                time: {
-                    unit: aggregation.toLowerCase(), // Assuming aggregation is 'Week', 'Day', or 'Hour'
-                    displayFormats: {
-                        day: 'ddd D MMM',
-                        week: 'MMM D',
-                        hour: 'hA'
-                    }
-                }
-            },
-            y: [
-                {
-                    id: 'y-axis-0',
-                    type: 'linear',
-                    position: 'left',
-                    title: {
-                        text: 'Hours recorded'
-                    }
-                },
-                // Add other y-axes as needed
-            ]
-        },
-        plugins: {
-            legend: {
-                display: true,
-                position: 'top'
-            },
-            tooltip: {
-                enabled: true,
-                mode: 'index',
-                intersect: false,
-                position: 'nearest',
-                callbacks: {
-                    title: function (tooltipItems) {
-                        const timestamp = tooltipItems[0].parsed.x;
-                        const date = new Date(timestamp);
-                        return getTooltipTitle(date, aggregation);
-                    },
-                    label: function (tooltipItem) {
-                        return `${tooltipItem.dataset.label}: ${tooltipItem.formattedValue}`;
-                    }
-                }
-            },
-            datalabels: {
-                display: true,
-                color: 'white',
-                backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                borderRadius: 3,
-                padding: {
-                    top: 2
-                },
-                formatter: function (value, context) {
-                    return value; // Customize the displayed value as needed
-                }
+    
+    
+    function generateDateLabels(aggregation, datapoints, pointstart) {
+        const dateLabels = [];
+        const startDate = new Date(pointstart);
+        
+        for (let i = 0; i < datapoints; i++) {
+            // Push the formatted date label to the array
+            dateLabels.push(formatDate(startDate, aggregation));
+            
+            // Increment the startDate based on the aggregation
+            if (aggregation === 'Hour') {
+                startDate.setTime(startDate.getTime() + 60 * 60 * 1000); // Add 1 hour
+            } else if (aggregation === 'Day') {
+                startDate.setDate(startDate.getDate() + 1); // Add 1 day
+            } else if (aggregation === 'Week') {
+                startDate.setDate(startDate.getDate() + 7); // Add 7 days (1 week)
             }
         }
-    };
-
-    return chartOptions;
-}
-
-function getTooltipTitle(date, aggregation) {
-    if (aggregation === 'Week') {
-        // Customize for week view
-        return `Week ${getISOWeek(date)} (${getDateOfISOWeek(getISOWeek(date))} - ${getDateOfISOWeek(getISOWeek(date) + 1)})`;
-    } else if (aggregation === 'Day') {
-        // Customize for day view
-        return date.toLocaleDateString('en-GB', {
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric',
-        });
-    } else {
-        // Customize for hour view
-        return date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }) +
+        
+        return dateLabels;
+    }
+    
+    // Helper function to format the date as desired
+    function formatDate(date, aggregation) {
+        
+        const options = {};
+        let formattedDate = '';
+        if (aggregation === 'Week'){
+            // Add 1 day to the startDate
+            date.setHours(date.getDate() + 1);
+            const year = date.getFullYear();
+            const oneJan = new Date(year, 0, 1);
+            const weekNumber = Math.ceil(((date - oneJan) / (24 * 60 * 60 * 1000) + oneJan.getDay() + 1) / 7);
+            return weekNumber;
+        }
+        else if (aggregation === 'Day') {
+            options.day = 'numeric';
+            options.weekday = 'short';
+            options.month = 'short';
+        }
+        else if (aggregation === 'Hour') {
+            const hour = date.getHours();
+            const period = hour >= 12 ? 'PM' : 'AM';
+            const formattedHour = hour % 12 || 12; // Convert 0 to 12
+            return `${formattedHour}${period}`;
+        }
+        
+        return formattedDate + date.toLocaleDateString('en-GB', options);
+    }
+    function setChartOptions(species, total, rate, results, dataPoints, aggregation, pointStart) {
+        let chartOptions = {};
+        //chartOptions.plugins = [ChartDataLabels];
+        
+        chartOptions.data = {
+            labels: dataPoints, // Assuming dataPoints is an array of labels
+            datasets: [
+                {
+                    label: 'Hours of recordings',
+                    data: total,
+                    borderColor: "#003",
+                    backgroundColor: "rgba(0, 51, 0, 0.2)",
+                    fill: true,
+                    yAxisID: 'y-axis-0'
+                },
+                // Add other datasets as needed
+            ]
+        };
+        
+        chartOptions.options = {
+            scales: {
+                x: {
+                    type: 'time',
+                    time: {
+                        unit: aggregation.toLowerCase(), // Assuming aggregation is 'Week', 'Day', or 'Hour'
+                        displayFormats: {
+                            day: 'ddd D MMM',
+                            week: 'MMM D',
+                            hour: 'hA'
+                        }
+                    }
+                },
+                y: [
+                    {
+                        id: 'y-axis-0',
+                        type: 'linear',
+                        position: 'left',
+                        title: {
+                            text: 'Hours recorded'
+                        }
+                    },
+                    // Add other y-axes as needed
+                ]
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                tooltip: {
+                    enabled: true,
+                    mode: 'index',
+                    intersect: false,
+                    position: 'nearest',
+                    callbacks: {
+                        title: function (tooltipItems) {
+                            const timestamp = tooltipItems[0].parsed.x;
+                            const date = new Date(timestamp);
+                            return getTooltipTitle(date, aggregation);
+                        },
+                        label: function (tooltipItem) {
+                            return `${tooltipItem.dataset.label}: ${tooltipItem.formattedValue}`;
+                        }
+                    }
+                },
+                datalabels: {
+                    display: true,
+                    color: 'white',
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                    borderRadius: 3,
+                    padding: {
+                        top: 2
+                    },
+                    formatter: function (value, context) {
+                        return value; // Customize the displayed value as needed
+                    }
+                }
+            }
+        };
+        
+        return chartOptions;
+    }
+    
+    function getTooltipTitle(date, aggregation) {
+        if (aggregation === 'Week') {
+            // Customize for week view
+            return `Week ${getISOWeek(date)} (${getDateOfISOWeek(getISOWeek(date))} - ${getDateOfISOWeek(getISOWeek(date) + 1)})`;
+        } else if (aggregation === 'Day') {
+            // Customize for day view
+            return date.toLocaleDateString('en-GB', {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+            });
+        } else {
+            // Customize for hour view
+            return date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }) +
             ', ' +
             date.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
-    }
-}
-
-
-const waitForFinalEvent = (function () {
-    let timers = {};
-    return function (callback, ms, uniqueId) {
-        if (!uniqueId) {
-            uniqueId = "Don't call this twice without a uniqueId";
         }
-        if (timers[uniqueId]) {
-            clearTimeout(timers[uniqueId]);
-        }
-        timers[uniqueId] = setTimeout(callback, ms);
-    };
-})();
-
-window.addEventListener('resize', function () {
-    waitForFinalEvent(function () {
-        WindowResize();
-    }, 250, 'id1');
-});
-
-function WindowResize() {
-    adjustSpecDims(true);
-}
-
-const contextMenu = document.getElementById('context-menu')
-contextMenu.addEventListener('click', function (e) {
-    if (e.target.closest('.play')){
-        (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
     }
-})
-
-
-function handleKeyDownDeBounce(e) {
-    e.preventDefault();
-    waitForFinalEvent(function () {
-        handleKeyDown(e);
-    }, 100, 'keyhandler');
-}
-
-function handleKeyDown(e) {
-    let action = e.code;
-    if (action in GLOBAL_ACTIONS) {
-        if (document === e.target || document.body === e.target || e.target.attributes["data-action"]) {}
-        GLOBAL_ACTIONS[action](e);
-    }
-
-    [].forEach.call(document.querySelectorAll('[data-action]'), function (el) {
-        el.addEventListener('click', function (e) {
-            let action = e.currentTarget.dataset.action;
-            if (action in GLOBAL_ACTIONS) {
-                e.preventDefault();
-                GLOBAL_ACTIONS[action](e);
+    
+    
+    const waitForFinalEvent = (function () {
+        let timers = {};
+        return function (callback, ms, uniqueId) {
+            if (!uniqueId) {
+                uniqueId = "Don't call this twice without a uniqueId";
             }
-        });
+            if (timers[uniqueId]) {
+                clearTimeout(timers[uniqueId]);
+            }
+            timers[uniqueId] = setTimeout(callback, ms);
+        };
+    })();
+    
+    window.addEventListener('resize', function () {
+        waitForFinalEvent(function () {
+            WindowResize();
+        }, 250, 'id1');
     });
-}
-
-
-
-///////////// Nav bar Option handlers //////////////
-
-function initRegion() {
-    if (wavesurfer.regions) wavesurfer.destroyPlugin('regions');
-    wavesurfer.addPlugin(WaveSurfer.regions.create({
-        formatTimeCallback: formatRegionTooltip,
-        dragSelection: true,
-        // Region length bug (likely mine) means I don't trust leangths > 60 seconds
-        maxLength: config[config.backend].batchSize * 3,
-        slop: 5,
-        color: "rgba(255, 255, 255, 0.2)"
+    
+    function WindowResize() {
+        adjustSpecDims(true);
+    }
+    
+    const contextMenu = document.getElementById('context-menu')
+    contextMenu.addEventListener('click', function (e) {
+        if (e.target.closest('.play')){
+            (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
+        }
     })
-    ).initPlugin('regions')
-}
-
-function initSpectrogram(height, fftSamples) {
-    config.debug && console.log("initializing spectrogram")
-    if (!fftSamples) {
-        if (windowLength < 5) {
-            fftSamples = 256;
-        } else if (windowLength <= 15) {
-            fftSamples = 512;
-        } else {
-            fftSamples = 1024;
+    
+    
+    function handleKeyDownDeBounce(e) {
+        e.preventDefault();
+        waitForFinalEvent(function () {
+            handleKeyDown(e);
+        }, 100, 'keyhandler');
+    }
+    
+    function handleKeyDown(e) {
+        let action = e.code;
+        if (action in GLOBAL_ACTIONS) {
+            if (document === e.target || document.body === e.target || e.target.attributes["data-action"]) {}
+            GLOBAL_ACTIONS[action](e);
         }
+        
+        [].forEach.call(document.querySelectorAll('[data-action]'), function (el) {
+            el.addEventListener('click', function (e) {
+                let action = e.currentTarget.dataset.action;
+                if (action in GLOBAL_ACTIONS) {
+                    e.preventDefault();
+                    GLOBAL_ACTIONS[action](e);
+                }
+            });
+        });
     }
-    if (!height) {
-        height = fftSamples / 2
+    
+    
+    
+    ///////////// Nav bar Option handlers //////////////
+    
+    function initRegion() {
+        if (wavesurfer.regions) wavesurfer.destroyPlugin('regions');
+        wavesurfer.addPlugin(WaveSurfer.regions.create({
+            formatTimeCallback: formatRegionTooltip,
+            dragSelection: true,
+            // Region length bug (likely mine) means I don't trust leangths > 60 seconds
+            maxLength: config[config.backend].batchSize * 3,
+            slop: 5,
+            color: "rgba(255, 255, 255, 0.2)"
+        })
+        ).initPlugin('regions')
     }
-    if (wavesurfer.spectrogram) wavesurfer.destroyPlugin('spectrogram');
-    wavesurfer.addPlugin(WaveSurfer.spectrogram.create({
-        //deferInit: false,
-        wavesurfer: wavesurfer,
-        container: "#spectrogram",
-        scrollParent: false,
-        fillParent: true,
-        windowFunc: 'hamming',
-        minPxPerSec: 1,
-        frequencyMin: 0,
-        frequencyMax: 11_750,
-        normalize: false,
-        hideScrollbar: true,
-        labels: true,
-        height: height,
-        fftSamples: fftSamples,
-        colorMap: colormap({
-            colormap: config.colormap, nshades: 256, format: 'float'
-        }),
-    })).initPlugin('spectrogram')
-    updateElementCache();
-}
-
-colourmap.addEventListener('change', (e) => {
-    config.colormap = e.target.value;
-    updatePrefs();
-    if (wavesurfer) {
-        initSpectrogram();
-        // refresh caches
-        updateElementCache()
-        adjustSpecDims(true)
+    
+    function initSpectrogram(height, fftSamples) {
+        config.debug && console.log("initializing spectrogram")
+        if (!fftSamples) {
+            if (windowLength < 5) {
+                fftSamples = 256;
+            } else if (windowLength <= 15) {
+                fftSamples = 512;
+            } else {
+                fftSamples = 1024;
+            }
+        }
+        if (!height) {
+            height = fftSamples / 2
+        }
+        if (wavesurfer.spectrogram) wavesurfer.destroyPlugin('spectrogram');
+        wavesurfer.addPlugin(WaveSurfer.spectrogram.create({
+            //deferInit: false,
+            wavesurfer: wavesurfer,
+            container: "#spectrogram",
+            scrollParent: false,
+            fillParent: true,
+            windowFunc: 'hamming',
+            minPxPerSec: 1,
+            frequencyMin: 0,
+            frequencyMax: 11_750,
+            normalize: false,
+            hideScrollbar: true,
+            labels: true,
+            height: height,
+            fftSamples: fftSamples,
+            colorMap: colormap({
+                colormap: config.colormap, nshades: 256, format: 'float'
+            }),
+        })).initPlugin('spectrogram')
+        updateElementCache();
     }
-})
-
-// const locale = document.getElementById('locale')
-// locale.addEventListener('change', async ()=> {
-//     config[config.model].locale = locale.value;
-//     updatePrefs();
-//     const chirpity = config[config.model].locale === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
-//     const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${config[config.model].locale}.txt`; 
-//     fetch(labelFile).then(response => {
-//         if (! response.ok) throw new Error('Network response was not ok');
-//         return response.text();
-//     }).then(filecontents => {
-//         LABELS = filecontents.trim().split(/\r?\n/);
-//         // Add unknown species
-//         LABELS.push('Unknown Sp._Unknown Sp.');
-//         worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS})
-//     }).catch(error =>{
-//         console.error('There was a problem fetching the label file:', error);
-//     })
-// })
-
-// list mode icons
-const listIcon = document.getElementById('list-icon')
-const speciesThresholdEl = document.getElementById('species-threshold-el');
-const speciesThreshold = document.getElementById('species-frequency-threshold');
-const updateListIcon = () => {
-    const icon = listIcon.querySelector('img');
-    icon.src = icon.src.replace(/\w+\.png$/, config.list + '.png');
-    const states = {
-        location: 'Searching for birds in your region',
-        migrants: 'Searching for migrants and owls',
-        birds: 'Searching for all birds',
-        everything: 'Searching for everything'
-    };
-    icon.title = states[config.list];
-}
-listIcon.addEventListener('click', () => {
-    let img = listIcon.querySelector('img')
-    const states = {
-        location: 'Searching for birds in your region',
-        migrants: 'Searching for migrants and owls',
-        birds: 'Searching for all birds',
-        everything: 'Searching for everything'
-    };
-    const keys = Object.keys(states);
-    for (let key in Object.keys(states)) {
-        key = parseInt(key);
-        if (img.src.includes(keys[key])) {
-            const replace = (key === keys.length - 1) ? 0 : key + 1;
-            img.src = img.src.replace(keys[key], keys[replace]);
-            img.title = states[keys[replace]];
-            listToUse.value = keys[replace];
-            config.list = keys[replace];
-            updatePrefs();
-            resetResults({clearSummary: true, clearPagination: true, clearResults: true});
-            config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
+    
+    colourmap.addEventListener('change', (e) => {
+        config.colormap = e.target.value;
+        updatePrefs();
+        if (wavesurfer) {
+            initSpectrogram();
+            // refresh caches
+            updateElementCache()
+            adjustSpecDims(true)
+        }
+    })
+    
+    // const locale = document.getElementById('locale')
+    // locale.addEventListener('change', async ()=> {
+    //     config[config.model].locale = locale.value;
+    //     updatePrefs();
+    //     const chirpity = config[config.model].locale === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
+    //     const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${config[config.model].locale}.txt`; 
+    //     fetch(labelFile).then(response => {
+    //         if (! response.ok) throw new Error('Network response was not ok');
+    //         return response.text();
+    //     }).then(filecontents => {
+    //         LABELS = filecontents.trim().split(/\r?\n/);
+    //         // Add unknown species
+    //         LABELS.push('Unknown Sp._Unknown Sp.');
+    //         worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS})
+    //     }).catch(error =>{
+    //         console.error('There was a problem fetching the label file:', error);
+    //     })
+    // })
+    
+    // list mode icons
+    const listIcon = document.getElementById('list-icon')
+    const speciesThresholdEl = document.getElementById('species-threshold-el');
+    const speciesThreshold = document.getElementById('species-frequency-threshold');
+    const updateListIcon = () => {
+        const icon = listIcon.querySelector('img');
+        icon.src = icon.src.replace(/\w+\.png$/, config.list + '.png');
+        const states = {
+            location: 'Searching for birds in your region',
+            migrants: 'Searching for migrants and owls',
+            birds: 'Searching for all birds',
+            everything: 'Searching for everything'
+        };
+        icon.title = states[config.list];
+    }
+    listIcon.addEventListener('click', () => {
+        let img = listIcon.querySelector('img')
+        const states = {
+            location: 'Searching for birds in your region',
+            migrants: 'Searching for migrants and owls',
+            birds: 'Searching for all birds',
+            everything: 'Searching for everything'
+        };
+        const keys = Object.keys(states);
+        for (let key in Object.keys(states)) {
+            key = parseInt(key);
+            if (img.src.includes(keys[key])) {
+                const replace = (key === keys.length - 1) ? 0 : key + 1;
+                img.src = img.src.replace(keys[key], keys[replace]);
+                img.title = states[keys[replace]];
+                listToUse.value = keys[replace];
+                config.list = keys[replace];
+                updatePrefs();
+                resetResults({clearSummary: true, clearPagination: true, clearResults: true});
+                config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
                 speciesThresholdEl.classList.add('d-none');
-            worker.postMessage({ action: 'update-list', list: config.list })
-            break
+                worker.postMessage({ action: 'update-list', list: config.list })
+                break
+            }
         }
+    })
+    
+    
+    const listToUse = document.getElementById('list-to-use');
+    listToUse.addEventListener('change', function (e) {
+        config.list = e.target.value;
+        config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
+        speciesThresholdEl.classList.add('d-none');
+        updateListIcon();
+        updatePrefs();
+        resetResults({clearSummary: true, clearPagination: true, clearResults: true});
+        worker.postMessage({ action: 'update-list', list: config.list  })
+    })
+    
+    speciesThreshold.addEventListener('change', () =>{
+        if (isNaN(speciesThreshold.value) || speciesThreshold.value === '') {
+            alert('The threshold must be a number between 0.001 and 1');
+            return false
+        }
+        config.speciesThreshold = speciesThreshold.value;
+        updatePrefs();
+        worker.postMessage({ action: 'update-state', speciesThreshold: speciesThreshold.value });
+        worker.postMessage({ action: 'update-list', list: config.list })
+    })
+    
+    const loadModel = ({clearCache = true} = {})  => {
+        t0_warmup = Date.now();
+        worker.postMessage({
+            action: 'load-model',
+            model: config.model,
+            list: config.list,
+            batchSize: config[config.backend].batchSize,
+            warmup: config.warmup,
+            threads: config[config.backend].threads,
+            backend: config.backend,
+            clearCache: clearCache
+        });
     }
-})
-
-
-const listToUse = document.getElementById('list-to-use');
-listToUse.addEventListener('change', function (e) {
-    config.list = e.target.value;
-    config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
-    speciesThresholdEl.classList.add('d-none');
-    updateListIcon();
-    updatePrefs();
-    resetResults({clearSummary: true, clearPagination: true, clearResults: true});
-    worker.postMessage({ action: 'update-list', list: config.list  })
-})
-
-speciesThreshold.addEventListener('change', () =>{
-    if (isNaN(speciesThreshold.value) || speciesThreshold.value === '') {
-        alert('The threshold must be a number between 0.001 and 1');
-        return false
-    }
-    config.speciesThreshold = speciesThreshold.value;
-    updatePrefs();
-    worker.postMessage({ action: 'update-state', speciesThreshold: speciesThreshold.value });
-    worker.postMessage({ action: 'update-list', list: config.list })
-})
-
-const loadModel = ({clearCache = true} = {})  => {
-    t0_warmup = Date.now();
-    worker.postMessage({
-        action: 'load-model',
-        model: config.model,
-        list: config.list,
-        batchSize: config[config.backend].batchSize,
-        warmup: config.warmup,
-        threads: config[config.backend].threads,
-        backend: config.backend,
-        clearCache: clearCache
-    });
-}
-
-const modelToUse = document.getElementById('model-to-use');
-modelToUse.addEventListener('change', function (e) {
-    config.model = e.target.value;
-    const chirpityOnly = document.querySelectorAll('.chirpity-only');
-    if (config.model === 'birdnet') { 
-        contextAware.checked = false;
-        // hide chirpity-only features
-        chirpityOnly.forEach(element => element.classList.add('d-none'));
-        contextAware.disabed = true;
-        config.detect.contextAware = false;
-        SNRSlider.disabled = true;
-        config.filters.SNR = 0;
-    } else {
-        // show chirpity-only features
-        chirpityOnly.forEach(element => element.classList.remove('d-none'));
-        contextAware.disabed = false;
-        SNRSlider.disabled = false;
-    }
-    document.getElementById('locale').value = config[config.model].locale;
-    updatePrefs();
-    loadModel();
-})
-
-const handleBackendChange = (e) => {
-    config.backend = e.target.value;
-    if (config.backend === 'webgl') {
-        //powerSave(true)
-        SNRSlider.disabled = true;
-        config.filters.SNR = 0;
-    } else {
-       // powerSave(false)
-        contextAware.disabled = false;
-        if (contextAware.checked) {
-            config.detect.contextAware = true;
+    
+    const modelToUse = document.getElementById('model-to-use');
+    modelToUse.addEventListener('change', function (e) {
+        config.model = e.target.value;
+        const chirpityOnly = document.querySelectorAll('.chirpity-only');
+        if (config.model === 'birdnet') { 
+            contextAware.checked = false;
+            // hide chirpity-only features
+            chirpityOnly.forEach(element => element.classList.add('d-none'));
+            contextAware.disabed = true;
+            config.detect.contextAware = false;
             SNRSlider.disabled = true;
             config.filters.SNR = 0;
         } else {
+            // show chirpity-only features
+            chirpityOnly.forEach(element => element.classList.remove('d-none'));
+            contextAware.disabed = false;
             SNRSlider.disabled = false;
-            config.filters.SNR = parseFloat(SNRSlider.value);
-            if (config.filters.SNR) {
-                contextAware.disabed = true;
-                config.detect.contextAware = false;
-                contextAwareIconDisplay();
-            }
         }
-
+        document.getElementById('locale').value = config[config.model].locale;
+        updatePrefs();
+        loadModel();
+    })
+    
+    const handleBackendChange = (e) => {
+        config.backend = e.target.value;
+        if (config.backend === 'webgl') {
+            //powerSave(true)
+            SNRSlider.disabled = true;
+            config.filters.SNR = 0;
+        } else {
+            // powerSave(false)
+            contextAware.disabled = false;
+            if (contextAware.checked) {
+                config.detect.contextAware = true;
+                SNRSlider.disabled = true;
+                config.filters.SNR = 0;
+            } else {
+                SNRSlider.disabled = false;
+                config.filters.SNR = parseFloat(SNRSlider.value);
+                if (config.filters.SNR) {
+                    contextAware.disabed = true;
+                    config.detect.contextAware = false;
+                    contextAwareIconDisplay();
+                }
+            }
+            
+        }
+        // Update threads and batch Size in UI
+        ThreadSlider.value = config[config.backend].threads;
+        numberOfThreads.textContent = config[config.backend].threads;
+        batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
+        batchSizeValue.textContent = BATCH_SIZE_LIST[batchSizeSlider.value].toString();
+        updatePrefs();
+        // restart wavesurfer regions to set new maxLength
+        initRegion();
+        loadModel({clearCache: false});
     }
-    // Update threads and batch Size in UI
-    ThreadSlider.value = config[config.backend].threads;
-    numberOfThreads.textContent = config[config.backend].threads;
-    batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
-    batchSizeValue.textContent = BATCH_SIZE_LIST[batchSizeSlider.value].toString();
-    updatePrefs();
-    // restart wavesurfer regions to set new maxLength
-    initRegion();
-    loadModel({clearCache: false});
-}
-
-const backend = document.getElementsByName('backend');
-for (let i = 0; i < backend.length; i++) {
-    backend[i].addEventListener('click', handleBackendChange)
-}
-
-
-const setTimelinePreferences = () => {
-    const timestampFields = document.querySelectorAll('.timestamp');
-    const timeOfDayFields = document.querySelectorAll('.timeOfDay');
-    timestampFields.forEach(time => {
-        config.timeOfDay ? time.classList.add('d-none') :
+    
+    const backend = document.getElementsByName('backend');
+    for (let i = 0; i < backend.length; i++) {
+        backend[i].addEventListener('click', handleBackendChange)
+    }
+    
+    
+    const setTimelinePreferences = () => {
+        const timestampFields = document.querySelectorAll('.timestamp');
+        const timeOfDayFields = document.querySelectorAll('.timeOfDay');
+        timestampFields.forEach(time => {
+            config.timeOfDay ? time.classList.add('d-none') :
             time.classList.remove('d-none');
-    });
-    timeOfDayFields.forEach(time => {
-        config.timeOfDay ? time.classList.remove('d-none') :
+        });
+        timeOfDayFields.forEach(time => {
+            config.timeOfDay ? time.classList.remove('d-none') :
             time.classList.add('d-none');
-    });
-}
-
-const timelineToggle = (fromKeys) => {
-    if (fromKeys === true) {
-        timelineSetting.value === 'timeOfDay' ? timelineSetting.value = 'timecode' : timelineSetting.value = 'timeOfDay'
+        });
     }
-    config.timeOfDay = timelineSetting.value === 'timeOfDay'; //toggle setting
-    setTimelinePreferences();
-    if (fileLoaded) {
-        // Reload wavesurfer with the new timeline
-        const position = wavesurfer.getCurrentTime() / windowLength;
-        postBufferUpdate({ begin: bufferBegin, position: position })
-    }
-    updatePrefs();
-};
-document.getElementById('timelineSetting').addEventListener('change', timelineToggle);
-
-/////////// Keyboard Shortcuts  ////////////
-
-const GLOBAL_ACTIONS = { // eslint-disable-line
-    KeyA: async function (e) {
-        if ( e.ctrlKey || e.metaKey) {
-            if (currentFile) {
-                if (e.shiftKey) analyseAllLink.click();
-                else analyseLink.click()
-            }
+    
+    const timelineToggle = (fromKeys) => {
+        if (fromKeys === true) {
+            timelineSetting.value === 'timeOfDay' ? timelineSetting.value = 'timecode' : timelineSetting.value = 'timeOfDay'
         }
-    },
-    KeyC: function (e) {
-        // Center window on playhead
-        if (( e.ctrlKey || e.metaKey) && currentBuffer) {
-            const saveBufferBegin = bufferBegin;
-            const middle = bufferBegin + wavesurfer.getCurrentTime();
-            bufferBegin = middle - windowLength / 2;
-            bufferBegin = Math.max(0, bufferBegin);
-            bufferBegin = Math.min(bufferBegin, currentFileDuration - windowLength)
-            // Move the region if needed
-            let region = getRegion();
-            if (region){
-                const shift = saveBufferBegin - bufferBegin;
-                region.start += shift;
-                region.end += shift;
-                if (region.start < 0 || region.end > windowLength) region = undefined;
-            }
-            postBufferUpdate({ begin: bufferBegin, position: 0.5, region: region, goToRegion: false})
-        }
-    },
-    KeyD: function (e) {
-        if (( e.ctrlKey || e.metaKey) && e.shiftKey) worker.postMessage({ action: 'convert-dataset' });
-    },
-    KeyE: function (e) {
-        if (( e.ctrlKey || e.metaKey) && region) exportAudio();
-    },
-    KeyF: function (e) {
-        if ( e.ctrlKey || e.metaKey) toggleFullscreen();
-    },
-    KeyG: function (e) {
-        if ( e.ctrlKey || e.metaKey) showGoToPosition();
-    },
-    KeyO: async function (e) {
-        if ( e.ctrlKey || e.metaKey) await showOpenDialog();
-    },
-    KeyP: function () {
-        (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
-    },
-    KeyS: function (e) {
-        if ( e.ctrlKey || e.metaKey) {
-            worker.postMessage({ action: 'save2db', file: currentFile});
-        }
-    },
-    KeyT: function (e) {
-        if ( e.ctrlKey || e.metaKey) timelineToggle(true);
-    },
-    KeyZ: function (e) {
-        if (( e.ctrlKey || e.metaKey) && DELETE_HISTORY.length) insertManualRecord(...DELETE_HISTORY.pop());
-    },
-    Escape: function () {
-        if (PREDICTING) {
-            console.log('Operation aborted');
-            PREDICTING = false;
-            worker.postMessage({
-                action: 'abort',
-                model: config.model,
-                threads: config[config.backend].threads,
-                list: config.list
-            });
-            alert('Operation cancelled');
-            progressDiv.classList.add('d-none');
-        }
-    },
-    Home: function () {
-        if (currentBuffer) {
-            bufferBegin = 0;
-            postBufferUpdate({})
-        }
-    },
-    End: function () {
-        if (currentBuffer) {
-            bufferBegin = currentFileDuration - windowLength;
-            postBufferUpdate({ begin: bufferBegin, position: 1 })
-        }
-    },
-    PageUp: function () {
-        if (currentBuffer) {
+        config.timeOfDay = timelineSetting.value === 'timeOfDay'; //toggle setting
+        setTimelinePreferences();
+        if (fileLoaded) {
+            // Reload wavesurfer with the new timeline
             const position = wavesurfer.getCurrentTime() / windowLength;
-            bufferBegin = Math.max(0, bufferBegin - windowLength);
             postBufferUpdate({ begin: bufferBegin, position: position })
         }
-    },
-    ArrowUp: function () {
-        if (activeRow) {
-            activeRow.classList.remove('table-active')
-            activeRow = activeRow.previousSibling || activeRow;
-            activeRow.classList.add('table-active')
-            activeRow.focus();
-            if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
-        }
-    },
-    PageDown: function () {
-        if (currentBuffer) {
-            const position = wavesurfer.getCurrentTime() / windowLength;
-            bufferBegin = Math.min(bufferBegin + windowLength, currentFileDuration - windowLength);
-            postBufferUpdate({ begin: bufferBegin, position: position })
-        }
-    },
-    ArrowDown: function () {
-        if (activeRow) {
-            activeRow.classList.remove('table-active')
-            activeRow = activeRow.nextSibling || activeRow;
-            activeRow.classList.add('table-active')
-            activeRow.focus();
-            if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
-        }
-    },
-    ArrowLeft: function () {
-        const skip = windowLength / 100;
-        if (currentBuffer) {
-            wavesurfer.skipBackward(skip);
-            const position = wavesurfer.getCurrentTime() / windowLength;
-            if (wavesurfer.getCurrentTime() < skip && bufferBegin > 0) {
-                bufferBegin -= skip;
+        updatePrefs();
+    };
+    document.getElementById('timelineSetting').addEventListener('change', timelineToggle);
+    
+    /////////// Keyboard Shortcuts  ////////////
+    
+    const GLOBAL_ACTIONS = { // eslint-disable-line
+        KeyA: async function (e) {
+            if ( e.ctrlKey || e.metaKey) {
+                if (currentFile) {
+                    if (e.shiftKey) analyseAllLink.click();
+                    else analyseLink.click()
+                }
+            }
+        },
+        KeyC: function (e) {
+            // Center window on playhead
+            if (( e.ctrlKey || e.metaKey) && currentBuffer) {
+                const saveBufferBegin = bufferBegin;
+                const middle = bufferBegin + wavesurfer.getCurrentTime();
+                bufferBegin = middle - windowLength / 2;
+                bufferBegin = Math.max(0, bufferBegin);
+                bufferBegin = Math.min(bufferBegin, currentFileDuration - windowLength)
+                // Move the region if needed
+                let region = getRegion();
+                if (region){
+                    const shift = saveBufferBegin - bufferBegin;
+                    region.start += shift;
+                    region.end += shift;
+                    if (region.start < 0 || region.end > windowLength) region = undefined;
+                }
+                postBufferUpdate({ begin: bufferBegin, position: 0.5, region: region, goToRegion: false})
+            }
+        },
+        KeyD: function (e) {
+            if (( e.ctrlKey || e.metaKey) && e.shiftKey) worker.postMessage({ action: 'convert-dataset' });
+        },
+        KeyE: function (e) {
+            if (( e.ctrlKey || e.metaKey) && region) exportAudio();
+        },
+        KeyF: function (e) {
+            if ( e.ctrlKey || e.metaKey) toggleFullscreen();
+        },
+        KeyG: function (e) {
+            if ( e.ctrlKey || e.metaKey) showGoToPosition();
+        },
+        KeyO: async function (e) {
+            if ( e.ctrlKey || e.metaKey) await showOpenDialog();
+        },
+        KeyP: function () {
+            (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
+        },
+        KeyS: function (e) {
+            if ( e.ctrlKey || e.metaKey) {
+                worker.postMessage({ action: 'save2db', file: currentFile});
+            }
+        },
+        KeyT: function (e) {
+            if ( e.ctrlKey || e.metaKey) timelineToggle(true);
+        },
+        KeyZ: function (e) {
+            if (( e.ctrlKey || e.metaKey) && DELETE_HISTORY.length) insertManualRecord(...DELETE_HISTORY.pop());
+        },
+        Escape: function () {
+            if (PREDICTING) {
+                console.log('Operation aborted');
+                PREDICTING = false;
+                worker.postMessage({
+                    action: 'abort',
+                    model: config.model,
+                    threads: config[config.backend].threads,
+                    list: config.list
+                });
+                alert('Operation cancelled');
+                progressDiv.classList.add('d-none');
+            }
+        },
+        Home: function () {
+            if (currentBuffer) {
+                bufferBegin = 0;
+                postBufferUpdate({})
+            }
+        },
+        End: function () {
+            if (currentBuffer) {
+                bufferBegin = currentFileDuration - windowLength;
+                postBufferUpdate({ begin: bufferBegin, position: 1 })
+            }
+        },
+        PageUp: function () {
+            if (currentBuffer) {
+                const position = wavesurfer.getCurrentTime() / windowLength;
+                bufferBegin = Math.max(0, bufferBegin - windowLength);
                 postBufferUpdate({ begin: bufferBegin, position: position })
             }
-        }
-    },
-    ArrowRight: function () {
-        const skip = windowLength / 100;
-        if (wavesurfer) {
-            wavesurfer.skipForward(skip);
-            const position = Math.max(wavesurfer.getCurrentTime() / windowLength, 1);
-            if (wavesurfer.getCurrentTime() > windowLength - skip) {
-                bufferBegin = Math.min(currentFileDuration - windowLength, bufferBegin += skip)
-                postBufferUpdate({ begin: bufferBegin, position: position })
-            }
-        }
-    },
-    Equal: function (e) {
-        if (e.shiftKey) {
-            if (wavesurfer.spectrogram.fftSamples > 64) {
-                wavesurfer.spectrogram.fftSamples /= 2;
-                const position = wavesurfer.getCurrentTime() / windowLength;
-                postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
-                console.log(wavesurfer.spectrogram.fftSamples);
-            }
-        } else {
-            zoomSpec('zoomIn')
-        }
-    },
-    NumpadAdd: function (e) {
-        if (e.shiftKey) {
-            if (wavesurfer.spectrogram.fftSamples > 64) {
-                wavesurfer.spectrogram.fftSamples /= 2;
-                const position = wavesurfer.getCurrentTime() / windowLength;
-                postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
-                console.log(wavesurfer.spectrogram.fftSamples);
-            }
-        } else {
-            zoomSpec('zoomIn')
-        }
-    },
-    Minus: function (e) {
-        if (e.shiftKey) {
-            if (wavesurfer.spectrogram.fftSamples <= 2048) {
-                wavesurfer.spectrogram.fftSamples *= 2;
-                const position = wavesurfer.getCurrentTime() / windowLength;
-                postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
-                console.log(wavesurfer.spectrogram.fftSamples);
-            }
-        } else {
-            zoomSpec('zoomOut')
-        }
-    },
-    NumpadSubtract: function (e) {
-        if (e.shiftKey) {
-            if (wavesurfer.spectrogram.fftSamples <= 2048) {
-                wavesurfer.spectrogram.fftSamples *= 2;
-                const position = wavesurfer.getCurrentTime() / windowLength;
-                postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
-                console.log(wavesurfer.spectrogram.fftSamples);
-            }
-        } else {
-            zoomSpec('zoomOut')
-        }
-    },
-    Space: function () {
-        if (wavesurfer) wavesurfer.playPause();
-    },
-    Tab: function (e) {
-        if (activeRow) {
-            if (e.shiftKey) {
+        },
+        ArrowUp: function () {
+            if (activeRow) {
                 activeRow.classList.remove('table-active')
                 activeRow = activeRow.previousSibling || activeRow;
                 activeRow.classList.add('table-active')
-            } else {
+                activeRow.focus();
+                if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
+            }
+        },
+        PageDown: function () {
+            if (currentBuffer) {
+                const position = wavesurfer.getCurrentTime() / windowLength;
+                bufferBegin = Math.min(bufferBegin + windowLength, currentFileDuration - windowLength);
+                postBufferUpdate({ begin: bufferBegin, position: position })
+            }
+        },
+        ArrowDown: function () {
+            if (activeRow) {
                 activeRow.classList.remove('table-active')
                 activeRow = activeRow.nextSibling || activeRow;
                 activeRow.classList.add('table-active')
+                activeRow.focus();
+                if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
             }
-            activeRow.focus();
-            if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
-        }
-    },
-    Delete: function () {
-        if (activeRow) deleteRecord(activeRow);
-    },
-    Backspace: function () {
-        if (activeRow) deleteRecord(activeRow);
-    },
-};
-
-//returns a region object with the start and end of the region supplied
-function getRegion(){
-    return region ? {
-        start: region.start,
-        end: region.end,
-        label: region.attributes?.label
-    } : undefined;
-}
-
-const postBufferUpdate = ({
-    file = currentFile,
-    begin = 0,
-    position = 0,
-    play = false,
-    resetSpec = false,
-    region = undefined,
-    goToRegion = true,
-    queued = false
-}) => {
-    fileLoaded = false
-    worker.postMessage({
-        action: 'update-buffer',
-        file: file,
-        position: position,
-        start: begin,
-        end: begin + windowLength,
-        play: play,
-        resetSpec: resetSpec,
-        region: region,
-        goToRegion: goToRegion,
-        queued: queued
-    });
-}
-
-// Go to position
-const goto = new bootstrap.Modal(document.getElementById('gotoModal'));
-const showGoToPosition = () => {
-    if (currentFile) {
-        goto.show();
+        },
+        ArrowLeft: function () {
+            const skip = windowLength / 100;
+            if (currentBuffer) {
+                wavesurfer.skipBackward(skip);
+                const position = wavesurfer.getCurrentTime() / windowLength;
+                if (wavesurfer.getCurrentTime() < skip && bufferBegin > 0) {
+                    bufferBegin -= skip;
+                    postBufferUpdate({ begin: bufferBegin, position: position })
+                }
+            }
+        },
+        ArrowRight: function () {
+            const skip = windowLength / 100;
+            if (wavesurfer) {
+                wavesurfer.skipForward(skip);
+                const position = Math.max(wavesurfer.getCurrentTime() / windowLength, 1);
+                if (wavesurfer.getCurrentTime() > windowLength - skip) {
+                    bufferBegin = Math.min(currentFileDuration - windowLength, bufferBegin += skip)
+                    postBufferUpdate({ begin: bufferBegin, position: position })
+                }
+            }
+        },
+        Equal: function (e) {
+            if (e.shiftKey) {
+                if (wavesurfer.spectrogram.fftSamples > 64) {
+                    wavesurfer.spectrogram.fftSamples /= 2;
+                    const position = wavesurfer.getCurrentTime() / windowLength;
+                    postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
+                    console.log(wavesurfer.spectrogram.fftSamples);
+                }
+            } else {
+                zoomSpec('zoomIn')
+            }
+        },
+        NumpadAdd: function (e) {
+            if (e.shiftKey) {
+                if (wavesurfer.spectrogram.fftSamples > 64) {
+                    wavesurfer.spectrogram.fftSamples /= 2;
+                    const position = wavesurfer.getCurrentTime() / windowLength;
+                    postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
+                    console.log(wavesurfer.spectrogram.fftSamples);
+                }
+            } else {
+                zoomSpec('zoomIn')
+            }
+        },
+        Minus: function (e) {
+            if (e.shiftKey) {
+                if (wavesurfer.spectrogram.fftSamples <= 2048) {
+                    wavesurfer.spectrogram.fftSamples *= 2;
+                    const position = wavesurfer.getCurrentTime() / windowLength;
+                    postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
+                    console.log(wavesurfer.spectrogram.fftSamples);
+                }
+            } else {
+                zoomSpec('zoomOut')
+            }
+        },
+        NumpadSubtract: function (e) {
+            if (e.shiftKey) {
+                if (wavesurfer.spectrogram.fftSamples <= 2048) {
+                    wavesurfer.spectrogram.fftSamples *= 2;
+                    const position = wavesurfer.getCurrentTime() / windowLength;
+                    postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
+                    console.log(wavesurfer.spectrogram.fftSamples);
+                }
+            } else {
+                zoomSpec('zoomOut')
+            }
+        },
+        Space: function () {
+            if (wavesurfer) wavesurfer.playPause();
+        },
+        Tab: function (e) {
+            if (activeRow) {
+                if (e.shiftKey) {
+                    activeRow.classList.remove('table-active')
+                    activeRow = activeRow.previousSibling || activeRow;
+                    activeRow.classList.add('table-active')
+                } else {
+                    activeRow.classList.remove('table-active')
+                    activeRow = activeRow.nextSibling || activeRow;
+                    activeRow.classList.add('table-active')
+                }
+                activeRow.focus();
+                if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
+            }
+        },
+        Delete: function () {
+            if (activeRow) deleteRecord(activeRow);
+        },
+        Backspace: function () {
+            if (activeRow) deleteRecord(activeRow);
+        },
+    };
+    
+    //returns a region object with the start and end of the region supplied
+    function getRegion(){
+        return region ? {
+            start: region.start,
+            end: region.end,
+            label: region.attributes?.label
+        } : undefined;
     }
-}
-
-const gotoModal = document.getElementById('gotoModal')
-//gotoModal.addEventListener('hidden.bs.modal', enableKeyDownEvent)
-
-gotoModal.addEventListener('shown.bs.modal', () => {
-    const timeInput = document.getElementById('timeInput')
-    timeInput.value  = '';
-    timeInput.focus()
-})
-
-
-const gotoTime = (e) => {
-    if (currentFile) {
-        e.preventDefault();
-        let hours = 0, minutes = 0, seconds = 0;
-        const time = document.getElementById('timeInput').value;
-        let timeArray = time.split(':');
-        if (timeArray.length === 1 && !isNaN(parseFloat(timeArray[0]))) {
-            seconds = parseFloat(timeArray[0]);
-        } else if (timeArray.length === 2 && !isNaN(parseInt(timeArray[0])) && !isNaN(parseInt(timeArray[1]))) {
-            // Case 2: Input is two numbers separated by a colon, take as minutes and seconds
-            minutes = Math.min(parseInt(timeArray[0]), 59);
-            seconds = Math.min(parseFloat(timeArray[1]), 59.999);
-        } else if (timeArray.length === 3 && !isNaN(parseInt(timeArray[0])) && !isNaN(parseInt(timeArray[1])) && !isNaN(parseInt(timeArray[2]))) {
-            // Case 3: Input is three numbers separated by colons, take as hours, minutes, and seconds
-            hours = Math.min(parseInt(timeArray[0]), 23);
-            minutes = Math.min(parseInt(timeArray[1]), 59);
-            seconds = Math.min(parseFloat(timeArray[2]), 59.999);
+    
+    const postBufferUpdate = ({
+        file = currentFile,
+        begin = 0,
+        position = 0,
+        play = false,
+        resetSpec = false,
+        region = undefined,
+        goToRegion = true,
+        queued = false
+    }) => {
+        fileLoaded = false
+        worker.postMessage({
+            action: 'update-buffer',
+            file: file,
+            position: position,
+            start: begin,
+            end: begin + windowLength,
+            play: play,
+            resetSpec: resetSpec,
+            region: region,
+            goToRegion: goToRegion,
+            queued: queued
+        });
+    }
+    
+    // Go to position
+    const goto = new bootstrap.Modal(document.getElementById('gotoModal'));
+    const showGoToPosition = () => {
+        if (currentFile) {
+            goto.show();
+        }
+    }
+    
+    const gotoModal = document.getElementById('gotoModal')
+    //gotoModal.addEventListener('hidden.bs.modal', enableKeyDownEvent)
+    
+    gotoModal.addEventListener('shown.bs.modal', () => {
+        const timeInput = document.getElementById('timeInput')
+        timeInput.value  = '';
+        timeInput.focus()
+    })
+    
+    
+    const gotoTime = (e) => {
+        if (currentFile) {
+            e.preventDefault();
+            let hours = 0, minutes = 0, seconds = 0;
+            const time = document.getElementById('timeInput').value;
+            let timeArray = time.split(':');
+            if (timeArray.length === 1 && !isNaN(parseFloat(timeArray[0]))) {
+                seconds = parseFloat(timeArray[0]);
+            } else if (timeArray.length === 2 && !isNaN(parseInt(timeArray[0])) && !isNaN(parseInt(timeArray[1]))) {
+                // Case 2: Input is two numbers separated by a colon, take as minutes and seconds
+                minutes = Math.min(parseInt(timeArray[0]), 59);
+                seconds = Math.min(parseFloat(timeArray[1]), 59.999);
+            } else if (timeArray.length === 3 && !isNaN(parseInt(timeArray[0])) && !isNaN(parseInt(timeArray[1])) && !isNaN(parseInt(timeArray[2]))) {
+                // Case 3: Input is three numbers separated by colons, take as hours, minutes, and seconds
+                hours = Math.min(parseInt(timeArray[0]), 23);
+                minutes = Math.min(parseInt(timeArray[1]), 59);
+                seconds = Math.min(parseFloat(timeArray[2]), 59.999);
+            } else {
+                // Invalid input
+                alert('Invalid time format. Please enter time in one of the following formats: \n1. Float (for seconds) \n2. Two numbers separated by a colon (for minutes and seconds) \n3. Three numbers separated by colons (for hours, minutes, and seconds)');
+                return;
+            }
+            let start = hours * 3600 + minutes * 60 + seconds;
+            windowLength = 20;
+            bufferBegin = Math.max(start - windowLength / 2, 0);
+            const position = bufferBegin === 0 ? start / windowLength : 0.5;
+            postBufferUpdate({ begin: bufferBegin, position: position })
+            // Close the modal
+            goto.hide()
+        }
+    }
+    
+    const go = document.getElementById('go')
+    go.addEventListener('click', gotoTime)
+    const gotoForm = document.getElementById('gotoForm')
+    gotoForm.addEventListener('submit', gotoTime)
+    
+    // Electron Message handling
+    //const warmupText = document.getElementById('warmup');
+    
+    // function displayWarmUpMessage() {
+    //     disableMenuItem(['analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'analyseSelection', 'export2audio', 'save2db']);
+    //     warmupText.classList.remove('d-none');
+    // }
+    
+    function onModelReady(args) {
+        modelReady = true;
+        sampleRate = args.sampleRate;
+        if (fileLoaded) {
+            enableMenuItem(['analyse'])
+            if (fileList.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
+        }
+        if (region) enableMenuItem(['analyseSelection'])
+        t1_warmup = Date.now();
+        DIAGNOSTICS['Warm Up'] = ((t1_warmup - t0_warmup) / 1000).toFixed(2) + ' seconds';
+        
+    }
+    
+    
+    /***
+    *  Called when a new file or buffer is loaded by the worker
+    * @param fileStart  Unix epoch in ms for the start of the file
+    * @param sourceDuration a float: number of seconds audio in the file
+    * @param bufferBegin a float: the start position of the file in seconds
+    * @param file full path to the audio file
+    * @param position the position to place the play head: between  0-1
+    * @param contents the audio buffer
+    * @param fileRegion an object {start, end} with the positions in seconds from the beginning of the buffer
+    * @param preserveResults boolean determines whether to clear the result table
+    * @param play whether to auto-play the audio
+    * @returns {Promise<void>}
+    */
+    let NEXT_BUFFER;
+    async function onWorkerLoadedAudio({
+        location,
+        start = 0,
+        sourceDuration = 0,
+        bufferBegin = 0,
+        file = '',
+        position = 0,
+        buffer = undefined,
+        contents = undefined,
+        fileRegion = undefined,
+        play = false,
+        queued = false,
+        goToRegion = true
+    }) {
+        fileLoaded = true, locationID = location;
+        const resetSpec = !currentFile;
+        currentFileDuration = sourceDuration;
+        //if (preserveResults) completeDiv.hide();
+        console.log(`UI received worker-loaded-audio: ${file}, buffered: ${contents === undefined}`);
+        if (contents) {
+            currentBuffer = new AudioBuffer({ length: contents.length, numberOfChannels: 1, sampleRate: sampleRate });
+            currentBuffer.copyToChannel(contents, 0);
         } else {
-            // Invalid input
-            alert('Invalid time format. Please enter time in one of the following formats: \n1. Float (for seconds) \n2. Two numbers separated by a colon (for minutes and seconds) \n3. Three numbers separated by colons (for hours, minutes, and seconds)');
-            return;
+            currentBuffer = buffer;
         }
-        let start = hours * 3600 + minutes * 60 + seconds;
-        windowLength = 20;
-        bufferBegin = Math.max(start - windowLength / 2, 0);
-        const position = bufferBegin === 0 ? start / windowLength : 0.5;
-        postBufferUpdate({ begin: bufferBegin, position: position })
-        // Close the modal
-        goto.hide()
-    }
-}
-
-const go = document.getElementById('go')
-go.addEventListener('click', gotoTime)
-const gotoForm = document.getElementById('gotoForm')
-gotoForm.addEventListener('submit', gotoTime)
-
-// Electron Message handling
-//const warmupText = document.getElementById('warmup');
-
-// function displayWarmUpMessage() {
-//     disableMenuItem(['analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'analyseSelection', 'export2audio', 'save2db']);
-//     warmupText.classList.remove('d-none');
-// }
-
-function onModelReady(args) {
-    modelReady = true;
-    sampleRate = args.sampleRate;
-    if (fileLoaded) {
-        enableMenuItem(['analyse'])
-        if (fileList.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
-    }
-    if (region) enableMenuItem(['analyseSelection'])
-    t1_warmup = Date.now();
-    DIAGNOSTICS['Warm Up'] = ((t1_warmup - t0_warmup) / 1000).toFixed(2) + ' seconds';
-
-}
-
-
-/***
- *  Called when a new file or buffer is loaded by the worker
- * @param fileStart  Unix epoch in ms for the start of the file
- * @param sourceDuration a float: number of seconds audio in the file
- * @param bufferBegin a float: the start position of the file in seconds
- * @param file full path to the audio file
- * @param position the position to place the play head: between  0-1
- * @param contents the audio buffer
- * @param fileRegion an object {start, end} with the positions in seconds from the beginning of the buffer
- * @param preserveResults boolean determines whether to clear the result table
- * @param play whether to auto-play the audio
- * @returns {Promise<void>}
- */
-let NEXT_BUFFER;
-async function onWorkerLoadedAudio({
-    location,
-    start = 0,
-    sourceDuration = 0,
-    bufferBegin = 0,
-    file = '',
-    position = 0,
-    buffer = undefined,
-    contents = undefined,
-    fileRegion = undefined,
-    play = false,
-    queued = false,
-    goToRegion = true
-}) {
-    fileLoaded = true, locationID = location;
-    const resetSpec = !currentFile;
-    currentFileDuration = sourceDuration;
-    //if (preserveResults) completeDiv.hide();
-    console.log(`UI received worker-loaded-audio: ${file}, buffered: ${contents === undefined}`);
-    if (contents) {
-        currentBuffer = new AudioBuffer({ length: contents.length, numberOfChannels: 1, sampleRate: sampleRate });
-        currentBuffer.copyToChannel(contents, 0);
-    } else {
-        currentBuffer = buffer;
-    }
-    if (queued) {
-        // Prepare arguments to call this function with
-        NEXT_BUFFER = {
-            start: start, sourceDuration: sourceDuration, bufferBegin: bufferBegin, file: file,
-            buffer: currentBuffer, play: true, resetSpec: false, queued: false
-        }
-    } else {
-        NEXT_BUFFER = undefined;
-        if (currentFile !== file) {
-            currentFile = file;
-            renderFilenamePanel();
-            fileStart = start;
-            fileEnd = new Date(fileStart + (currentFileDuration * 1000));
-        }
-        if (config.timeOfDay) {
-            bufferStartTime = new Date(fileStart + (bufferBegin * 1000))
-        } else {
-            bufferStartTime = new Date(zero.getTime() + (bufferBegin * 1000))
-        }
-        if (windowLength > currentFileDuration) windowLength = currentFileDuration;
-
-
-        updateSpec({ buffer: currentBuffer, position: position, play: play, resetSpec: resetSpec });
-        wavesurfer.bufferRequested = false;
-        if (modelReady) {
-            enableMenuItem(['analyse']);
-            if (fileList.length > 1) enableMenuItem(['analyseAll'])
-        }
-        if (fileRegion) {
-            createRegion(fileRegion.start, fileRegion.end, fileRegion.label, goToRegion);
-            if (fileRegion.play) {
-                region.play()
+        if (queued) {
+            // Prepare arguments to call this function with
+            NEXT_BUFFER = {
+                start: start, sourceDuration: sourceDuration, bufferBegin: bufferBegin, file: file,
+                buffer: currentBuffer, play: true, resetSpec: false, queued: false
             }
         } else {
-            clearActive();
+            NEXT_BUFFER = undefined;
+            if (currentFile !== file) {
+                currentFile = file;
+                renderFilenamePanel();
+                fileStart = start;
+                fileEnd = new Date(fileStart + (currentFileDuration * 1000));
+            }
+            if (config.timeOfDay) {
+                bufferStartTime = new Date(fileStart + (bufferBegin * 1000))
+            } else {
+                bufferStartTime = new Date(zero.getTime() + (bufferBegin * 1000))
+            }
+            if (windowLength > currentFileDuration) windowLength = currentFileDuration;
+            
+            
+            updateSpec({ buffer: currentBuffer, position: position, play: play, resetSpec: resetSpec });
+            wavesurfer.bufferRequested = false;
+            if (modelReady) {
+                enableMenuItem(['analyse']);
+                if (fileList.length > 1) enableMenuItem(['analyseAll'])
+            }
+            if (fileRegion) {
+                createRegion(fileRegion.start, fileRegion.end, fileRegion.label, goToRegion);
+                if (fileRegion.play) {
+                    region.play()
+                }
+            } else {
+                clearActive();
+            }
+            fileLoaded = true;
+            //if (activeRow) activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
-        fileLoaded = true;
-        //if (activeRow) activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-}
-
-function onProgress(args) {
-    progressDiv.classList.remove('d-none');
-    if (args.text) {
-        fileNumber.innerHTML = args.text;
-        if (args.text.includes('decompressed')) {
-            progressDiv.classList.add('d-none');
-        }
-    } else {
+    
+    function onProgress(args) {
         progressDiv.classList.remove('d-none');
-        const count = fileList.indexOf(args.file) + 1;
-        fileNumber.textContent = `File ${count} of ${fileList.length}`;
-    }
-    if (args.progress) {
-        let progress = Math.round(args.progress * 1000) / 10;
-        updateProgress(progress);
-        if (progress === 100) {
-            //progressDiv.classList.add('d-none');
+        if (args.text) {
+            fileNumber.innerHTML = args.text;
+            if (args.text.includes('decompressed')) {
+                progressDiv.classList.add('d-none');
+            }
+        } else {
+            progressDiv.classList.remove('d-none');
+            const count = fileList.indexOf(args.file) + 1;
+            fileNumber.textContent = `File ${count} of ${fileList.length}`;
         }
-    } else {
-        progressDiv.classList.remove('d-none');
+        if (args.progress) {
+            let progress = Math.round(args.progress * 1000) / 10;
+            updateProgress(progress);
+            if (progress === 100) {
+                //progressDiv.classList.add('d-none');
+            }
+        } else {
+            progressDiv.classList.remove('d-none');
+        }
     }
-}
-
-function updatePagination(total, offset) {
+    
+    function updatePagination(total, offset) {
         //Pagination
         total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
-}
-
-const updateSummary = ({ summary = [], filterSpecies = '' }) => {
-    let total, summaryHTML = `<table id="resultSummary" class="table table-dark p-1"><thead>
-            <tr>
-                <th class="col-3" scope="col">Max</th>
-                <th class="col-5" scope="col">Species</th>
-                <th class="col-1 text-end" scope="col">Detections</th>
-                <th class="col-1 text-end" scope="col">Calls</th>
-            </tr>
-            </thead><tbody id="speciesFilter">`;
-
-    for (let i = 0; i < summary.length; i++) {
-        const item = summary[i];
-        const selected = item.cname === filterSpecies ? ' text-warning' : '';
-        summaryHTML += `<tr tabindex="-1" class="${selected}">
-                            <td class="max">${iconizeScore(item.max)}</td>
-                            <td class="cname">
-                                <span class="pointer"><span class="cname">${item.cname}</span> <br><i>${item.sname}</i></span>
-                            </td>
-                            <td class="text-end">${item.count}</td>
-                            <td class="text-end">${item.calls}</td>
-                        </tr>`;
-
     }
-    summaryHTML += '</tbody></table>';
-    // Get rid of flicker...
-    const old_summary = document.getElementById('summaryTable');
-    const buffer = old_summary.cloneNode();
-    buffer.innerHTML = summaryHTML;
-    old_summary.replaceWith(buffer);
-    const currentFilter = document.querySelector('#speciesFilter tr.text-warning');
-    if (currentFilter) currentFilter.focus();
-}
-
-/*
-onResultsComplete is called when the last result is sent
-*/
-function onResultsComplete({active = undefined} = {}){
-    let table = document.getElementById('resultTableBody');
-    table.replaceWith(resultsBuffer);
-    table = document.getElementById('resultTableBody');
-    PREDICTING = false;
-    // Set active Row
-    if (active) {
-        // Refresh node and scroll to active row:
-        activeRow = table.rows[active];
-        if (! activeRow) { // because: after an edit the active row may not exist
-            const rows = table.querySelectorAll('tr.daytime, tr.nighttime')
-            if (rows.length) {
-                activeRow = rows[rows.length - 1];
-            }
-        } else {
-            activeRow.classList.add('table-active');
-        }
-    }
-    else { // if (STATE.mode === 'analyse') {
-        activeRow = table.querySelector('.table-active');
-        if (!activeRow) {
-            // Select the first row
-            activeRow = table.querySelector('tr:first-child');
-            activeRow?.classList.add('table-active');
-            document.getElementById('resultsDiv').scrollTo({ top: 0, left: 0, behavior: "smooth" });
-        }
-    }
-
-    if (activeRow) {
-        activeRow.focus();
-        activeRow.click();
-    }
-    // hide progress div
-    progressDiv.classList.add('d-none');
     
-}
-
-function onAnalysisComplete(){
-    PREDICTING = false;
-    // DIAGNOSTICS:
-    t1_analysis = Date.now();
-    const analysisTime = ((t1_analysis - t0_analysis) / 1000).toFixed(2);
-    DIAGNOSTICS['Analysis Duration'] = analysisTime + ' seconds';
-    DIAGNOSTICS['Analysis Rate'] = (DIAGNOSTICS['Audio Duration'] / analysisTime).toFixed(0) + 'x faster than real time performance.';
-}
-
-/* 
-onSummaryComplete is called when getSummary finishes.
-*/
-function onSummaryComplete({
-    filterSpecies = undefined,
-    audacityLabels = {},
-    summary = [],
-    active = undefined,
-}) {
-    updateSummary({ summary: summary, filterSpecies: filterSpecies });
-    // Why do we do audacity labels here?
-    AUDACITY_LABELS = audacityLabels;
-    if (! isEmptyObject(AUDACITY_LABELS)) {
-        enableMenuItem(['saveLabels', 'saveCSV', 'save2db', 'export2audio']);
-    } else {
-        disableMenuItem(['saveLabels', 'saveCSV']);
+    const updateSummary = ({ summary = [], filterSpecies = '' }) => {
+        let total, summaryHTML = `<table id="resultSummary" class="table table-dark p-1"><thead>
+        <tr>
+        <th class="col-3" scope="col">Max</th>
+        <th class="col-5" scope="col">Species</th>
+        <th class="col-1 text-end" scope="col">Detections</th>
+        <th class="col-1 text-end" scope="col">Calls</th>
+        </tr>
+        </thead><tbody id="speciesFilter">`;
+        
+        for (let i = 0; i < summary.length; i++) {
+            const item = summary[i];
+            const selected = item.cname === filterSpecies ? ' text-warning' : '';
+            summaryHTML += `<tr tabindex="-1" class="${selected}">
+            <td class="max">${iconizeScore(item.max)}</td>
+            <td class="cname">
+            <span class="pointer"><span class="cname">${item.cname}</span> <br><i>${item.sname}</i></span>
+            </td>
+            <td class="text-end">${item.count}</td>
+            <td class="text-end">${item.calls}</td>
+            </tr>`;
+            
+        }
+        summaryHTML += '</tbody></table>';
+        // Get rid of flicker...
+        const old_summary = document.getElementById('summaryTable');
+        const buffer = old_summary.cloneNode();
+        buffer.innerHTML = summaryHTML;
+        old_summary.replaceWith(buffer);
+        const currentFilter = document.querySelector('#speciesFilter tr.text-warning');
+        if (currentFilter) currentFilter.focus();
     }
-    if (currentFile) enableMenuItem(['analyse'])
-}
-
-
-const pagination = document.querySelectorAll('.pagination');
-pagination.forEach(item => {
-    item.addEventListener('click', (e) => {
-        if (e.target.tagName === 'A') { // Did we click a link in the list?
-            let clicked = e.target.textContent;
-            let currentPage = pagination[0].querySelector('.active');
-            currentPage = parseInt(currentPage.textContent);
-            if (clicked === 'Previous') {
-                clicked = currentPage - 1
-            } else if (clicked === 'Next') {
-                clicked = currentPage + 1
+    
+    /*
+    onResultsComplete is called when the last result is sent
+    */
+    function onResultsComplete({active = undefined} = {}){
+        let table = document.getElementById('resultTableBody');
+        table.replaceWith(resultsBuffer);
+        table = document.getElementById('resultTableBody');
+        PREDICTING = false;
+        // Set active Row
+        if (active) {
+            // Refresh node and scroll to active row:
+            activeRow = table.rows[active];
+            if (! activeRow) { // because: after an edit the active row may not exist
+                const rows = table.querySelectorAll('tr.daytime, tr.nighttime')
+                if (rows.length) {
+                    activeRow = rows[rows.length - 1];
+                }
             } else {
-                clicked = parseInt(clicked)
+                activeRow.classList.add('table-active');
             }
-            const limit = config.limit;
-            const offset = (clicked - 1) * limit;
-            // const species = isSpeciesViewFiltered(true);
-            filterResults({offset: offset, limit:limit})
-            // worker.postMessage({
-            //     action: 'filter',
-            //     species: species,
-            //     offset: offset,
-            //     limit: limit,
-            // }); 
-            resetResults({clearSummary: false, clearPagination: false, clearResults: false});
         }
-    })
-})
-
-const addPagination = (total, offset) => {
-    const limit = config.limit;
-    const pages = Math.ceil(total / limit);
-    const currentPage = (offset / limit) + 1;
-    let list = '';
-    for (let i = 1; i <= pages; i++) {
-        if (i === 1) {
-            list += i === currentPage ? '<li class="page-item disabled"><span class="page-link" href="#">Previous</span></li>'
-                : '<li class="page-item"><a class="page-link" href="#">Previous</a></li>';
+        else { // if (STATE.mode === 'analyse') {
+            activeRow = table.querySelector('.table-active');
+            if (!activeRow) {
+                // Select the first row
+                activeRow = table.querySelector('tr:first-child');
+                activeRow?.classList.add('table-active');
+                document.getElementById('resultsDiv').scrollTo({ top: 0, left: 0, behavior: "smooth" });
+            }
         }
-        if (i <= 2 || i > pages - 2 || (i >= currentPage - 2 && i <= currentPage + 2)) {
-            list += i === currentPage ? '<li class="page-item active" aria-current="page"><span class="page-link" href="#">' + i + '</span></li>' :
-                '<li class="page-item"><a class="page-link" href="#">' + i + '</a></li>';
-        } else if (i === 3 || i === pages - 3) {
-            list += '<li class="page-item disabled"><span class="page-link" href="#">...</span></li>';
+        
+        if (activeRow) {
+            activeRow.focus();
+            activeRow.click();
         }
-        if (i === pages) {
-            list += i === currentPage ? '<li class="page-item disabled"><span class="page-link" href="#">Next</span></li>'
-                : '<li class="page-item"><a class="page-link" href="#">Next</a></li>';
-        }
+        // hide progress div
+        progressDiv.classList.add('d-none');
+        
     }
+    
+    function onAnalysisComplete(){
+        PREDICTING = false;
+        // DIAGNOSTICS:
+        t1_analysis = Date.now();
+        const analysisTime = ((t1_analysis - t0_analysis) / 1000).toFixed(2);
+        DIAGNOSTICS['Analysis Duration'] = analysisTime + ' seconds';
+        DIAGNOSTICS['Analysis Rate'] = (DIAGNOSTICS['Audio Duration'] / analysisTime).toFixed(0) + 'x faster than real time performance.';
+    }
+    
+    /* 
+    onSummaryComplete is called when getSummary finishes.
+    */
+    function onSummaryComplete({
+        filterSpecies = undefined,
+        audacityLabels = {},
+        summary = [],
+        active = undefined,
+    }) {
+        updateSummary({ summary: summary, filterSpecies: filterSpecies });
+        // Why do we do audacity labels here?
+        AUDACITY_LABELS = audacityLabels;
+        if (! isEmptyObject(AUDACITY_LABELS)) {
+            enableMenuItem(['saveLabels', 'saveCSV', 'save2db', 'export2audio']);
+        } else {
+            disableMenuItem(['saveLabels', 'saveCSV']);
+        }
+        if (currentFile) enableMenuItem(['analyse'])
+    }
+    
+    
+    const pagination = document.querySelectorAll('.pagination');
     pagination.forEach(item => {
-        item.classList.remove('d-none');
-        item.innerHTML = list;
-    })
-}
-
-const summary = document.getElementById('summary');
-summary.addEventListener('click', speciesFilter);
-
-function speciesFilter(e) {
-    if (['TBODY', 'TH', 'DIV'].includes(e.target.tagName)) return; // on Drag or clicked header
-    clearActive();
-    let species, range;
-    // Am I trying to unfilter?
-    if (e.target.closest('tr').classList.contains('text-warning')) {
-        e.target.closest('tr').classList.remove('text-warning');
-    } else {
-        //Clear any highlighted rows
-        const tableRows = summary.querySelectorAll('tr');
-        tableRows.forEach(row => {row.classList.remove('text-warning');})
-        // Add a highlight to the current row
-        e.target.closest('tr').classList.add('text-warning');
-        // Clicked on unfiltered species
-        species = getSpecies(e.target)
-    }
-    if (isExplore()) {
-        range = STATE.explore.range;
-        const list = document.getElementById('bird-list-seen');
-        list.value = species || '';
-    }
-    filterResults()
-    // worker.postMessage({
-    //     action: 'filter',
-    //     species: species
-    // });
-    resetResults({clearSummary: false, clearPagination: false, clearResults: false});
-}
-
-
-const checkDayNight = (timestamp) => {
-    let astro = SunCalc.getTimes(timestamp, config.latitude, config.longitude);
-    return (astro.dawn.setMilliseconds(0) < timestamp && astro.dusk.setMilliseconds(0) > timestamp) ? 'daytime' : 'nighttime';
-}
-
-// TODO: show every detection in the spec window as a region on the spectrogram
-
-async function renderResult({
-    index = 1,
-    result = {},
-    file = undefined,
-    isFromDB = false,
-    selection = false
-}) {
-
-    let tr = '';
-    if (index <= 1) {
-        if (selection) {
-            const selectionTable = document.getElementById('selectionResultTableBody');
-            selectionTable.textContent = '';
-        }
-        else {
-            if (fileLoaded) showElement(['resultTableContainer', 'resultsHead'], false);
-            const resultTable = document.getElementById('resultTableBody');
-            resultTable.textContent = ''
-        }
-    }  else if (!isFromDB && index % (config.limit + 1) === 0) {
-        addPagination(index, 0)
-    }
-    if (!isFromDB && index > config.limit) {
-        return
-    }
-    if (typeof (result) === 'string') {
-        const nocturnal = config.detect.nocmig ? '<b>during the night</b>' : '';
-        tr += `<tr><td colspan="8">${result} (Showing ${config.list} detected ${nocturnal} with at least ${config.detect.confidence}% confidence in the prediction)</td></tr>`;
-    } else {
-        const {
-            timestamp,
-            position,
-            active,
-            sname,
-            cname,
-            score,
-            label,
-            comment,
-            end,
-            count,
-            callCount
-        } = result;
-        const dayNight = checkDayNight(timestamp);
-        if (dayNight === 'nighttime') seenTheDarkness = true;
-        // Todo: move this logic so pre dark sections of file are not even analysed
-        if (config.detect.nocmig && !selection && dayNight === 'daytime') return
-
-        // Show twilight indicator when  nocmig mode off (except when analysing a selection)
-        if (shownDaylightBanner === false && dayNight === 'daytime') {
-            // Only do this if change starts midway through a file
-            if ((index - 1) % config.limit !== 0) {
-                // Show the twilight start bar
-                tr += `<tr class="text-bg-dark"><td colspan="20" class="text-center text-white">
-                Start of civil twilight <span class="material-symbols-outlined text-warning align-bottom">wb_twilight</span>
-                </td></tr>`;
+        item.addEventListener('click', (e) => {
+            if (e.target.tagName === 'A') { // Did we click a link in the list?
+                let clicked = e.target.textContent;
+                let currentPage = pagination[0].querySelector('.active');
+                currentPage = parseInt(currentPage.textContent);
+                if (clicked === 'Previous') {
+                    clicked = currentPage - 1
+                } else if (clicked === 'Next') {
+                    clicked = currentPage + 1
+                } else {
+                    clicked = parseInt(clicked)
+                }
+                const limit = config.limit;
+                const offset = (clicked - 1) * limit;
+                // const species = isSpeciesViewFiltered(true);
+                filterResults({offset: offset, limit:limit})
+                // worker.postMessage({
+                //     action: 'filter',
+                //     species: species,
+                //     offset: offset,
+                //     limit: limit,
+                // }); 
+                resetResults({clearSummary: false, clearPagination: false, clearResults: false});
             }
-            shownDaylightBanner = true;
+        })
+    })
+    
+    const addPagination = (total, offset) => {
+        const limit = config.limit;
+        const pages = Math.ceil(total / limit);
+        const currentPage = (offset / limit) + 1;
+        let list = '';
+        for (let i = 1; i <= pages; i++) {
+            if (i === 1) {
+                list += i === currentPage ? '<li class="page-item disabled"><span class="page-link" href="#">Previous</span></li>'
+                : '<li class="page-item"><a class="page-link" href="#">Previous</a></li>';
+            }
+            if (i <= 2 || i > pages - 2 || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                list += i === currentPage ? '<li class="page-item active" aria-current="page"><span class="page-link" href="#">' + i + '</span></li>' :
+                '<li class="page-item"><a class="page-link" href="#">' + i + '</a></li>';
+            } else if (i === 3 || i === pages - 3) {
+                list += '<li class="page-item disabled"><span class="page-link" href="#">...</span></li>';
+            }
+            if (i === pages) {
+                list += i === currentPage ? '<li class="page-item disabled"><span class="page-link" href="#">Next</span></li>'
+                : '<li class="page-item"><a class="page-link" href="#">Next</a></li>';
+            }
         }
-        const commentHTML = comment ?
+        pagination.forEach(item => {
+            item.classList.remove('d-none');
+            item.innerHTML = list;
+        })
+    }
+    
+    const summary = document.getElementById('summary');
+    summary.addEventListener('click', speciesFilter);
+    
+    function speciesFilter(e) {
+        if (['TBODY', 'TH', 'DIV'].includes(e.target.tagName)) return; // on Drag or clicked header
+        clearActive();
+        let species, range;
+        // Am I trying to unfilter?
+        if (e.target.closest('tr').classList.contains('text-warning')) {
+            e.target.closest('tr').classList.remove('text-warning');
+        } else {
+            //Clear any highlighted rows
+            const tableRows = summary.querySelectorAll('tr');
+            tableRows.forEach(row => {row.classList.remove('text-warning');})
+            // Add a highlight to the current row
+            e.target.closest('tr').classList.add('text-warning');
+            // Clicked on unfiltered species
+            species = getSpecies(e.target)
+        }
+        if (isExplore()) {
+            range = STATE.explore.range;
+            const list = document.getElementById('bird-list-seen');
+            list.value = species || '';
+        }
+        filterResults()
+        // worker.postMessage({
+        //     action: 'filter',
+        //     species: species
+        // });
+        resetResults({clearSummary: false, clearPagination: false, clearResults: false});
+    }
+    
+    
+    const checkDayNight = (timestamp) => {
+        let astro = SunCalc.getTimes(timestamp, config.latitude, config.longitude);
+        return (astro.dawn.setMilliseconds(0) < timestamp && astro.dusk.setMilliseconds(0) > timestamp) ? 'daytime' : 'nighttime';
+    }
+    
+    // TODO: show every detection in the spec window as a region on the spectrogram
+    
+    async function renderResult({
+        index = 1,
+        result = {},
+        file = undefined,
+        isFromDB = false,
+        selection = false
+    }) {
+        
+        let tr = '';
+        if (index <= 1) {
+            if (selection) {
+                const selectionTable = document.getElementById('selectionResultTableBody');
+                selectionTable.textContent = '';
+            }
+            else {
+                if (fileLoaded) showElement(['resultTableContainer', 'resultsHead'], false);
+                const resultTable = document.getElementById('resultTableBody');
+                resultTable.textContent = ''
+            }
+        }  else if (!isFromDB && index % (config.limit + 1) === 0) {
+            addPagination(index, 0)
+        }
+        if (!isFromDB && index > config.limit) {
+            return
+        }
+        if (typeof (result) === 'string') {
+            const nocturnal = config.detect.nocmig ? '<b>during the night</b>' : '';
+            tr += `<tr><td colspan="8">${result} (Showing ${config.list} detected ${nocturnal} with at least ${config.detect.confidence}% confidence in the prediction)</td></tr>`;
+        } else {
+            const {
+                timestamp,
+                position,
+                active,
+                sname,
+                cname,
+                score,
+                label,
+                comment,
+                end,
+                count,
+                callCount
+            } = result;
+            const dayNight = checkDayNight(timestamp);
+            if (dayNight === 'nighttime') seenTheDarkness = true;
+            // Todo: move this logic so pre dark sections of file are not even analysed
+            if (config.detect.nocmig && !selection && dayNight === 'daytime') return
+            
+            // Show twilight indicator when  nocmig mode off (except when analysing a selection)
+            if (shownDaylightBanner === false && dayNight === 'daytime') {
+                // Only do this if change starts midway through a file
+                if ((index - 1) % config.limit !== 0) {
+                    // Show the twilight start bar
+                    tr += `<tr class="text-bg-dark"><td colspan="20" class="text-center text-white">
+                    Start of civil twilight <span class="material-symbols-outlined text-warning align-bottom">wb_twilight</span>
+                    </td></tr>`;
+                }
+                shownDaylightBanner = true;
+            }
+            const commentHTML = comment ?
             `<span title="${comment.replaceAll('"', '&quot;')}" class='material-symbols-outlined pointer'>comment</span>` : '';
-        const isUncertain = score < 65 ? '&#63;' : '';
-        // result.filename  and result.date used for feedback
-        result.date = timestamp;
-        result.filename = cname.replace(/'/g, "\\'") + `_${timestamp}`;
-        // store result for feedback function to use
-        predictions[index] = result;
-        // Format date and position for  UI
-        const tsArray = new Date(timestamp).toString().split(' ');
-        const UI_timestamp = `${tsArray[2]} ${tsArray[1]} ${tsArray[3].substring(2)}<br/>${tsArray[4]}`;
-        const spliceStart = position < 3600 ? 14 : 11;
-        const UI_position = new Date(position * 1000).toISOString().substring(spliceStart, 19);
-        const showTimeOfDay = config.timeOfDay ? '' : 'd-none';
-        const showTimestamp = config.timeOfDay ? 'd-none' : '';
-        const activeTable = active ? 'table-active' : '';
-        const labelHTML = label ? tags[label] : '';
-        const hide = selection ? 'd-none' : '';
-        const countIcon = count > 1 ? `<span class="circle pointer" title="Click to view the ${count} detections at this timecode">${count}</span>` : '';
-        const XC_type = cname.includes('(song)') ? "song" : "nocturnal flight call";
-        tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${end || position + 3}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
+            const isUncertain = score < 65 ? '&#63;' : '';
+            // result.filename  and result.date used for feedback
+            result.date = timestamp;
+            result.filename = cname.replace(/'/g, "\\'") + `_${timestamp}`;
+            // store result for feedback function to use
+            predictions[index] = result;
+            // Format date and position for  UI
+            const tsArray = new Date(timestamp).toString().split(' ');
+            const UI_timestamp = `${tsArray[2]} ${tsArray[1]} ${tsArray[3].substring(2)}<br/>${tsArray[4]}`;
+            const spliceStart = position < 3600 ? 14 : 11;
+            const UI_position = new Date(position * 1000).toISOString().substring(spliceStart, 19);
+            const showTimeOfDay = config.timeOfDay ? '' : 'd-none';
+            const showTimestamp = config.timeOfDay ? 'd-none' : '';
+            const activeTable = active ? 'table-active' : '';
+            const labelHTML = label ? tags[label] : '';
+            const hide = selection ? 'd-none' : '';
+            const countIcon = count > 1 ? `<span class="circle pointer" title="Click to view the ${count} detections at this timecode">${count}</span>` : '';
+            const XC_type = cname.includes('(song)') ? "song" : "nocturnal flight call";
+            tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${end || position + 3}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
             <td class='text-start text-nowrap timeOfDay ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-start timestamp ${showTimestamp}">${UI_position} </td>
             <td name="${cname}" class='text-start cname'>
             <span class="cname">${cname}</span> ${countIcon} ${iconizeScore(score)}
-             </td>
-             <td class="text-end call-count ${hide}">${callCount || 'Present'} </td>
+            </td>
+            <td class="text-end call-count ${hide}">${callCount || 'Present'} </td>
             
             <td class="label ${hide}">${labelHTML}</td>
             <td class="comment text-end ${hide}">${commentHTML}</td>
             
-        </tr>`;
+            </tr>`;
+        }
+        updateResultTable(tr, isFromDB, selection);
     }
-    updateResultTable(tr, isFromDB, selection);
-}
-
-
-let resultsBuffer = document.getElementById('resultTableBody').cloneNode(false), detectionsModal;
-const detectionsModalDiv = document.getElementById('detectionsModal')
-
-detectionsModalDiv.addEventListener('hide.bs.modal', (e) => {
-    worker.postMessage({ action: 'update-state', selection: undefined });
-});
-
-
-const updateResultTable = (row, isFromDB, isSelection) => {
-    const table = isSelection ? document.getElementById('selectionResultTableBody')
+    
+    
+    let resultsBuffer = document.getElementById('resultTableBody').cloneNode(false), detectionsModal;
+    const detectionsModalDiv = document.getElementById('detectionsModal')
+    
+    detectionsModalDiv.addEventListener('hide.bs.modal', (e) => {
+        worker.postMessage({ action: 'update-state', selection: undefined });
+    });
+    
+    
+    const updateResultTable = (row, isFromDB, isSelection) => {
+        const table = isSelection ? document.getElementById('selectionResultTableBody')
         : document.getElementById('resultTableBody');
-    if (isFromDB && !isSelection) {
-        //if (!resultsBuffer) resultsBuffer = table.cloneNode();
-        resultsBuffer.lastElementChild ?
+        if (isFromDB && !isSelection) {
+            //if (!resultsBuffer) resultsBuffer = table.cloneNode();
+            resultsBuffer.lastElementChild ?
             resultsBuffer.lastElementChild.insertAdjacentHTML('afterend', row) :
             resultsBuffer.innerHTML = row;
-        
-    } else {
-        if (isSelection) {
-            if (!detectionsModal || !detectionsModal._isShown) {
-                detectionsModal = new bootstrap.Modal('#detectionsModal', { backdrop: 'static' });
-                detectionsModal.show();
-            }
-        }
-        table.lastElementChild ? table.lastElementChild.insertAdjacentHTML('afterend', row) :
-            table.innerHTML = row;
-    }
-};
-
-const isExplore = () => {
-    return STATE.mode === 'explore';
-};
-
-
-
-const tags = {
-    Local: '<span class="badge bg-success rounded-pill">Local</span>',
-    Nocmig: '<span class="badge bg-dark rounded-pill">Nocmig</span>',
-}
-
-// Results event handlers
-
-function setClickedIndex(target) {
-    const clickedNode = target.closest('tr');
-    clickedIndex = clickedNode.rowIndex;
-}
-
-const deleteRecord = (target) => {
-    if (target === activeRow) {}
-    else if (target instanceof PointerEvent) target = activeRow;
-    else {
-        //I'm not sure what triggers this
-        target.forEach(position => {
-            const [start, end] = position;
-            worker.postMessage({
-                action: 'delete',
-                file: currentFile,
-                start: start,
-                end: end,
-                active: getActiveRowID(),
-            })
-        })
-        activeRow = undefined;
-        return
-    }
-    if (target.childElementCount === 2) return; // No detections found in selection
-
-    setClickedIndex(target);
-    const [file, start, end,] = unpackNameAttr(target);
-    const setting = target.closest('table');
-    const row = target.closest('tr');
-    let cname = target.querySelector('.cname').innerText;
-    let [species, confidence] = cname.split('\n');
-    // confirmed records don't have a confidence bar
-    if (!confidence) {
-        species =  species.slice(0, -9); // remove ' verified'
-        confidence = 2000;
-    } else { confidence = parseInt(confidence.replace('%', '')) * 10 }
-    const comment = target.querySelector('.comment').innerText;
-    const label = target.querySelector('.label').innerText;
-    let callCount = target.querySelector('.call-count').innerText;
-    callCount = callCount.replace('Present', '');
-    DELETE_HISTORY.push([species, start, end, comment, callCount, label, undefined, undefined, undefined, confidence])
-
-    worker.postMessage({
-        action: 'delete',
-        file: file,
-        start: start,
-        end: end,
-        species: getSpecies(target),
-        speciesFiltered: isSpeciesViewFiltered()
-    })
-    // Clear the record in the UI
-    const index = row.rowIndex
-    setting.deleteRow(index);
-    setting.rows[index]?.click()
-
-}
-
-const deleteSpecies = (target) => {
-    worker.postMessage({
-        action: 'delete-species',
-        species: getSpecies(target),
-        speciesFiltered: isSpeciesViewFiltered()
-    })
-    // Clear the record in the UI
-    const row = target.closest('tr');
-    const table = document.getElementById('resultSummary')
-    const rowClicked = row.rowIndex;
-    table.deleteRow(rowClicked);
-    const resultTable = document.getElementById('resultTableBody');
-    resultTable.innerHTML = '';
-    // Highlight the next row
-    const newRow = table.rows[rowClicked]
-    newRow?.click();
-}
-
-const getSelectionRange = () => {
-    return STATE.selection ?
-        { start: (STATE.selection.start * 1000) + fileStart, end: (STATE.selection.end * 1000) + fileStart } :
-        undefined
-}
-
-function sendFile(mode, result) {
-    let start, end, filename;
-    if (result) {
-        start = result.position;
-        end = result.end || start + 3;
-        filename = result.filename + `.${config.audio.format}`;
-    } else if (start === undefined) {
-        if (region.start) {
-            start = region.start + bufferBegin;
-            end = region.end + bufferBegin;
+            
         } else {
-            start = 0;
-            end = currentBuffer.duration;
+            if (isSelection) {
+                if (!detectionsModal || !detectionsModal._isShown) {
+                    detectionsModal = new bootstrap.Modal('#detectionsModal', { backdrop: 'static' });
+                    detectionsModal.show();
+                }
+            }
+            table.lastElementChild ? table.lastElementChild.insertAdjacentHTML('afterend', row) :
+            table.innerHTML = row;
         }
-        const dateString = new Date(fileStart + (start * 1000)).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
-        filename = dateString + '_export.' + config.audio.format;
-    }
-
-    let metadata = {
-        lat: config.latitude,
-        lon: config.longitude,
-        Artist: 'Chirpity',
-        date: new Date().getFullYear(),
-        version: VERSION
     };
-    if (result) {
-        metadata = {
-            ...metadata,
-            UUID: config.UUID,
+    
+    const isExplore = () => {
+        return STATE.mode === 'explore';
+    };
+    
+    
+    
+    const tags = {
+        Local: '<span class="badge bg-success rounded-pill">Local</span>',
+        Nocmig: '<span class="badge bg-dark rounded-pill">Nocmig</span>',
+    }
+    
+    // Results event handlers
+    
+    function setClickedIndex(target) {
+        const clickedNode = target.closest('tr');
+        clickedIndex = clickedNode.rowIndex;
+    }
+    
+    const deleteRecord = (target) => {
+        if (target === activeRow) {}
+        else if (target instanceof PointerEvent) target = activeRow;
+        else {
+            //I'm not sure what triggers this
+            target.forEach(position => {
+                const [start, end] = position;
+                worker.postMessage({
+                    action: 'delete',
+                    file: currentFile,
+                    start: start,
+                    end: end,
+                    active: getActiveRowID(),
+                })
+            })
+            activeRow = undefined;
+            return
+        }
+        if (target.childElementCount === 2) return; // No detections found in selection
+        
+        setClickedIndex(target);
+        const [file, start, end,] = unpackNameAttr(target);
+        const setting = target.closest('table');
+        const row = target.closest('tr');
+        let cname = target.querySelector('.cname').innerText;
+        let [species, confidence] = cname.split('\n');
+        // confirmed records don't have a confidence bar
+        if (!confidence) {
+            species =  species.slice(0, -9); // remove ' verified'
+            confidence = 2000;
+        } else { confidence = parseInt(confidence.replace('%', '')) * 10 }
+        const comment = target.querySelector('.comment').innerText;
+        const label = target.querySelector('.label').innerText;
+        let callCount = target.querySelector('.call-count').innerText;
+        callCount = callCount.replace('Present', '');
+        DELETE_HISTORY.push([species, start, end, comment, callCount, label, undefined, undefined, undefined, confidence])
+        
+        worker.postMessage({
+            action: 'delete',
+            file: file,
             start: start,
             end: end,
-            filename: result.filename,
-            cname: result.cname,
-            sname: result.sname,
-            score: result.score,
-            date: result.date
-        };
-    }
-
-    if (mode === 'save') {
-        worker.postMessage({
-            action: 'save',
-            start: start, file: currentFile, end: end, filename: filename, metadata: metadata
+            species: getSpecies(target),
+            speciesFiltered: isSpeciesViewFiltered()
         })
-    } else {
-        if (!config.seenThanks) {
-            alert('Thank you, your feedback helps improve Chirpity predictions');
-            config.seenThanks = true;
-            updatePrefs()
-        }
-        worker.postMessage({
-            action: 'post',
-            start: start, file: currentFile, end: end, defaultName: filename, metadata: metadata, mode: mode
-        })
-    }
-}
-
-const iconDict = {
-    guess: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: grey">--%</span></span>',
-    low: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: rgba(255,0,0,0.5)">--%</span></span>',
-    medium: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #fd7e14">--%</span></span>',
-    high: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #198754">--%</span></span>',
-    confirmed: '<span class="material-symbols-outlined" title="Confirmed Record">verified</span>',
-}
-
-
-const iconizeScore = (score) => {
-    const tooltip = score.toString();
-    if (score < 50) return iconDict['guess'].replaceAll('--', tooltip);
-    else if (score < 65) return iconDict['low'].replaceAll('--', tooltip);
-    else if (score < 85) return iconDict['medium'].replaceAll('--', tooltip);
-    else if (score <= 100) return iconDict['high'].replaceAll('--', tooltip);
-    else return iconDict['confirmed']
-}
-
-// File menu handling
-
-const exportAudio = () => {
-    let result;
-    if (region.attributes.label) {
-        setClickedIndex(activeRow);
-        result = predictions[clickedIndex]
-    }
-    sendFile('save', result)
-}
-
-document.getElementById('open').addEventListener('click', showOpenDialog);
-document.getElementById('saveLabels').addEventListener('click', showSaveDialog);
-document.getElementById('saveCSV').addEventListener('click', export2CSV);
-document.getElementById('export-audio').addEventListener('click', exportAudio);
-
-
-
-
-document.getElementById('exit').addEventListener('click', exitApplication);
-
-// Help menu handling
-document.getElementById('keyboard').addEventListener('click', async () => {
-    await populateHelpModal('Help/keyboard.html', 'Keyboard shortcuts');
-});
-document.getElementById('settings').addEventListener('click', async () => {
-    await populateHelpModal('Help/settings.html', 'Settings Help');
-});
-
-document.getElementById('species').addEventListener('click', async () => {
-    worker.postMessage({action: 'get-valid-species', file: currentFile})
-});
-
-document.getElementById('usage').addEventListener('click', async () => {
-    await populateHelpModal('Help/usage.html', 'Usage Guide');
-});
-
-document.getElementById('bugs').addEventListener('click', async () => {
-    await populateHelpModal('Help/bugs.html', 'Issues, queries or bugs');
-});
-
-const populateHelpModal = async (file, label) => {
-    document.getElementById('helpModalLabel').textContent = label;
-    const response = await fetch(file);
-    document.getElementById('helpModalBody').innerHTML = await response.text();
-    const help = new bootstrap.Modal(document.getElementById('helpModal'));
-    help.show();
-    document.addEventListener('shown.bs.modal', replaceCtrlWithCommand)
-}
-function replaceTextInTitleAttributes() {
-    // Select all elements with title attribute in the body of the web page
-    const elementsWithTitle = document.querySelectorAll('[title]');
-    
-    // Iterate over each element with title attribute
-    elementsWithTitle.forEach(element => {
-        // Replace 'Ctrl' with ⌘ in the title attribute value
-        element.title = element.title.replaceAll('Ctrl', '⌘');
-    });
-}
-
-function replaceTextInTextNode(node) {
-    node.nodeValue = node.nodeValue.replaceAll('Ctrl', '⌘');
-}
-
-function replaceCtrlWithCommand() {
-    if (isMac){
-        // Select all text nodes in the body of the web page
-        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
-        const nodes = [];
-        let node;
-    
-        // Iterate over each text node
-        while ((node = walker.nextNode())) {
-            nodes.push(node);
-        }
-    
-        // Replace 'Ctrl' with ⌘ in each text node
-        nodes.forEach(node => replaceTextInTextNode(node));
+        // Clear the record in the UI
+        const index = row.rowIndex
+        setting.deleteRow(index);
+        setting.rows[index]?.click()
         
-        // Replace 'Ctrl' with ⌘ in title attributes of elements
-        replaceTextInTitleAttributes();
     }
-}
-
-const populateSpeciesModal = async (included, excluded) => {
-    const count = included.length;
-    const current_file_text =  STATE.week !== -1 && STATE.week ? `. The current file was saved in week <b>${STATE.week}</b>` : '';
-    const model = config.model === 'birdnet' ? 'BirdNET' : 'Chirpity';
-    const species_filter_text = config.useWeek && config.list === 'location' ? `week-specific species filter threshold of <b>${config.speciesThreshold}</b>` : config.list === 'location' ? `species filter threshold of <b>${config.speciesThreshold}</b>` : '';  
-    const location_filter_text = config.list === 'location' ? ` focused on <b>${place.textContent.replace('fmd_good', '')}</b>, with a ${species_filter_text}${current_file_text}` : '';
-    let includedContent = `<br/><p>The number of species detected depends on the model, the list being used and in the case of the location filter, the species filter threshold and possibly the week in which the recording was made.<p>
-                            You are using the <b>${model}</b> model and the <b>${config.list}</b> list${location_filter_text}. With these settings, Chirpity will display detections for ${config.useWeek && config.list === 'location' && (STATE.week === -1 || !STATE.week ) ? 'up to' : ''} 
-                             <b>${count}</b> classes${config.useWeek && config.list === 'location' && (STATE.week === -1 || !STATE.week ) ? ', depending on the date of the file you analyse' : ''}:</p>`;
-    includedContent += '<table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Common Name</th><th>Scientific Name</th></tr></thead><tbody>\n';
-    includedContent += generateBirdIDList(included);
-    includedContent += '</tbody></table>\n';
-    let excludedContent = '', disable = '';
-    if (excluded){
-        excludedContent += `<br/><p>Conversely, the application will not display detections among the following ${excluded.length} classes:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Common Name</th><th>Scientific Name</th></tr></thead><tbody>\n`;
-        excludedContent += generateBirdIDList(excluded);
-        excludedContent += '</tbody></table>\n';
-    } else {
-        disable = ' disabled'
+    
+    const deleteSpecies = (target) => {
+        worker.postMessage({
+            action: 'delete-species',
+            species: getSpecies(target),
+            speciesFiltered: isSpeciesViewFiltered()
+        })
+        // Clear the record in the UI
+        const row = target.closest('tr');
+        const table = document.getElementById('resultSummary')
+        const rowClicked = row.rowIndex;
+        table.deleteRow(rowClicked);
+        const resultTable = document.getElementById('resultTableBody');
+        resultTable.innerHTML = '';
+        // Highlight the next row
+        const newRow = table.rows[rowClicked]
+        newRow?.click();
     }
-    let modalContent =  `
-    <ul class="nav nav-tabs" id="myTab" role="tablist">
+    
+    const getSelectionRange = () => {
+        return STATE.selection ?
+        { start: (STATE.selection.start * 1000) + fileStart, end: (STATE.selection.end * 1000) + fileStart } :
+        undefined
+    }
+    
+    function sendFile(mode, result) {
+        let start, end, filename;
+        if (result) {
+            start = result.position;
+            end = result.end || start + 3;
+            filename = result.filename + `.${config.audio.format}`;
+        } else if (start === undefined) {
+            if (region.start) {
+                start = region.start + bufferBegin;
+                end = region.end + bufferBegin;
+            } else {
+                start = 0;
+                end = currentBuffer.duration;
+            }
+            const dateString = new Date(fileStart + (start * 1000)).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
+            filename = dateString + '_export.' + config.audio.format;
+        }
+        
+        let metadata = {
+            lat: config.latitude,
+            lon: config.longitude,
+            Artist: 'Chirpity',
+            date: new Date().getFullYear(),
+            version: VERSION
+        };
+        if (result) {
+            metadata = {
+                ...metadata,
+                UUID: config.UUID,
+                start: start,
+                end: end,
+                filename: result.filename,
+                cname: result.cname,
+                sname: result.sname,
+                score: result.score,
+                date: result.date
+            };
+        }
+        
+        if (mode === 'save') {
+            worker.postMessage({
+                action: 'save',
+                start: start, file: currentFile, end: end, filename: filename, metadata: metadata
+            })
+        } else {
+            if (!config.seenThanks) {
+                alert('Thank you, your feedback helps improve Chirpity predictions');
+                config.seenThanks = true;
+                updatePrefs()
+            }
+            worker.postMessage({
+                action: 'post',
+                start: start, file: currentFile, end: end, defaultName: filename, metadata: metadata, mode: mode
+            })
+        }
+    }
+    
+    const iconDict = {
+        guess: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: grey">--%</span></span>',
+        low: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: rgba(255,0,0,0.5)">--%</span></span>',
+        medium: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #fd7e14">--%</span></span>',
+        high: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #198754">--%</span></span>',
+        confirmed: '<span class="material-symbols-outlined" title="Confirmed Record">verified</span>',
+    }
+    
+    
+    const iconizeScore = (score) => {
+        const tooltip = score.toString();
+        if (score < 50) return iconDict['guess'].replaceAll('--', tooltip);
+        else if (score < 65) return iconDict['low'].replaceAll('--', tooltip);
+        else if (score < 85) return iconDict['medium'].replaceAll('--', tooltip);
+        else if (score <= 100) return iconDict['high'].replaceAll('--', tooltip);
+        else return iconDict['confirmed']
+    }
+    
+    // File menu handling
+    
+    const exportAudio = () => {
+        let result;
+        if (region.attributes.label) {
+            setClickedIndex(activeRow);
+            result = predictions[clickedIndex]
+        }
+        sendFile('save', result)
+    }
+    
+    document.getElementById('open').addEventListener('click', showOpenDialog);
+    document.getElementById('saveLabels').addEventListener('click', showSaveDialog);
+    document.getElementById('saveCSV').addEventListener('click', export2CSV);
+    document.getElementById('export-audio').addEventListener('click', exportAudio);
+    
+    
+    
+    
+    document.getElementById('exit').addEventListener('click', exitApplication);
+    
+    // Help menu handling
+    document.getElementById('keyboard').addEventListener('click', async () => {
+        await populateHelpModal('Help/keyboard.html', 'Keyboard shortcuts');
+    });
+    document.getElementById('settings').addEventListener('click', async () => {
+        await populateHelpModal('Help/settings.html', 'Settings Help');
+    });
+    
+    document.getElementById('species').addEventListener('click', async () => {
+        worker.postMessage({action: 'get-valid-species', file: currentFile})
+    });
+    
+    document.getElementById('usage').addEventListener('click', async () => {
+        await populateHelpModal('Help/usage.html', 'Usage Guide');
+    });
+    
+    document.getElementById('bugs').addEventListener('click', async () => {
+        await populateHelpModal('Help/bugs.html', 'Issues, queries or bugs');
+    });
+    
+    const populateHelpModal = async (file, label) => {
+        document.getElementById('helpModalLabel').textContent = label;
+        const response = await fetch(file);
+        document.getElementById('helpModalBody').innerHTML = await response.text();
+        const help = new bootstrap.Modal(document.getElementById('helpModal'));
+        help.show();
+        document.addEventListener('shown.bs.modal', replaceCtrlWithCommand)
+    }
+    function replaceTextInTitleAttributes() {
+        // Select all elements with title attribute in the body of the web page
+        const elementsWithTitle = document.querySelectorAll('[title]');
+        
+        // Iterate over each element with title attribute
+        elementsWithTitle.forEach(element => {
+            // Replace 'Ctrl' with ⌘ in the title attribute value
+            element.title = element.title.replaceAll('Ctrl', '⌘');
+        });
+    }
+    
+    function replaceTextInTextNode(node) {
+        node.nodeValue = node.nodeValue.replaceAll('Ctrl', '⌘');
+    }
+    
+    function replaceCtrlWithCommand() {
+        if (isMac){
+            // Select all text nodes in the body of the web page
+            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+            const nodes = [];
+            let node;
+            
+            // Iterate over each text node
+            while ((node = walker.nextNode())) {
+                nodes.push(node);
+            }
+            
+            // Replace 'Ctrl' with ⌘ in each text node
+            nodes.forEach(node => replaceTextInTextNode(node));
+            
+            // Replace 'Ctrl' with ⌘ in title attributes of elements
+            replaceTextInTitleAttributes();
+        }
+    }
+    
+    const populateSpeciesModal = async (included, excluded) => {
+        const count = included.length;
+        const current_file_text =  STATE.week !== -1 && STATE.week ? `. The current file was saved in week <b>${STATE.week}</b>` : '';
+        const model = config.model === 'birdnet' ? 'BirdNET' : 'Chirpity';
+        const species_filter_text = config.useWeek && config.list === 'location' ? `week-specific species filter threshold of <b>${config.speciesThreshold}</b>` : config.list === 'location' ? `species filter threshold of <b>${config.speciesThreshold}</b>` : '';  
+        const location_filter_text = config.list === 'location' ? ` focused on <b>${place.textContent.replace('fmd_good', '')}</b>, with a ${species_filter_text}${current_file_text}` : '';
+        let includedContent = `<br/><p>The number of species detected depends on the model, the list being used and in the case of the location filter, the species filter threshold and possibly the week in which the recording was made.<p>
+        You are using the <b>${model}</b> model and the <b>${config.list}</b> list${location_filter_text}. With these settings, Chirpity will display detections for ${config.useWeek && config.list === 'location' && (STATE.week === -1 || !STATE.week ) ? 'up to' : ''} 
+        <b>${count}</b> classes${config.useWeek && config.list === 'location' && (STATE.week === -1 || !STATE.week ) ? ', depending on the date of the file you analyse' : ''}:</p>`;
+        includedContent += '<table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Common Name</th><th>Scientific Name</th></tr></thead><tbody>\n';
+        includedContent += generateBirdIDList(included);
+        includedContent += '</tbody></table>\n';
+        let excludedContent = '', disable = '';
+        if (excluded){
+            excludedContent += `<br/><p>Conversely, the application will not display detections among the following ${excluded.length} classes:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Common Name</th><th>Scientific Name</th></tr></thead><tbody>\n`;
+            excludedContent += generateBirdIDList(excluded);
+            excludedContent += '</tbody></table>\n';
+        } else {
+            disable = ' disabled'
+        }
+        let modalContent =  `
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
         <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="included-tab" data-bs-toggle="tab" data-bs-target="#included-tab-pane" type="button" role="tab" aria-controls="included-tab-pane" aria-selected="true">Included</button>
+        <button class="nav-link active" id="included-tab" data-bs-toggle="tab" data-bs-target="#included-tab-pane" type="button" role="tab" aria-controls="included-tab-pane" aria-selected="true">Included</button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="excluded-tab" data-bs-toggle="tab" data-bs-target="#excluded-tab-pane" type="button" role="tab" aria-controls="excluded-tab-pane" aria-selected="false" ${disable}>Excluded</button>
+        <button class="nav-link" id="excluded-tab" data-bs-toggle="tab" data-bs-target="#excluded-tab-pane" type="button" role="tab" aria-controls="excluded-tab-pane" aria-selected="false" ${disable}>Excluded</button>
         </li>
         </ul>
         <div class="tab-content" id="myTabContent">
-            <div class="tab-pane fade show active" id="included-tab-pane" role="tabpanel" aria-labelledby="included-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${includedContent}</div>
-            <div class="tab-pane fade" id="excluded-tab-pane" role="tabpanel" aria-labelledby="excluded-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${excludedContent}</div>
+        <div class="tab-pane fade show active" id="included-tab-pane" role="tabpanel" aria-labelledby="included-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${includedContent}</div>
+        <div class="tab-pane fade" id="excluded-tab-pane" role="tabpanel" aria-labelledby="excluded-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${excludedContent}</div>
         </div>
-    </ul>
-    `;
-    document.getElementById('speciesModalBody').innerHTML = modalContent;
-    const species = new bootstrap.Modal(document.getElementById('speciesModal'));
-    species.show();
-}
-
-// Prevent the settings menu disappearing on click or mouseout
-const settingsMenu = document.getElementById('settingsMenu')
-settingsMenu.addEventListener('click', (e) => {
-    e.stopImmediatePropagation();
-})
-settingsMenu.addEventListener('mouseout', (e) => {
-    e.stopImmediatePropagation()
-})
-
-function setNocmig(on) {
-    if (on) {
-        nocmigButton.textContent = 'nights_stay';
-        nocmigButton.title = 'Nocmig mode on';
-        nocmigButton.classList.add('text-info');
-    } else {
-        nocmigButton.textContent = 'bedtime_off';
-        nocmigButton.title = 'Nocmig mode off';
-        nocmigButton.classList.remove('text-info');
+        </ul>
+        `;
+        document.getElementById('speciesModalBody').innerHTML = modalContent;
+        const species = new bootstrap.Modal(document.getElementById('speciesModal'));
+        species.show();
     }
-    nocmig.checked = config.detect.nocmig;
-}
-
-const changeNocmigMode = () => {
-    config.detect.nocmig = !config.detect.nocmig;
-    setNocmig(config.detect.nocmig);
-    worker.postMessage({
-        action: 'update-state',
-        detect: { nocmig: config.detect.nocmig },
-    });
-    updatePrefs();
-    worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}}); 
-
-    resetResults({clearSummary: true, clearPagination: true, clearResults: false});
-    filterResults()
-    // worker.postMessage({
-    //     action: 'filter',
-    //     species: isSpeciesViewFiltered(true),
-    //     updateSummary: true
-    // })
-}
-
-function filterResults({species = isSpeciesViewFiltered(true), updateSummary = true, offset = 0, limit = 500, range = undefined} = {}){
-    worker.postMessage({
-        action: 'filter',
-        species: species,
-        updateSummary: updateSummary,
-        offset: offset,
-        limit: limit,
-        range: range
-    })
-}
-
-const contextAwareIconDisplay = () => {
-    if (config.detect.contextAware) {
-        contextAwareIcon.classList.add('text-warning');
-        contextAwareIcon.title = "Context aware mode enabled";
-    } else {
-        contextAwareIcon.classList.remove('text-warning');
-        contextAwareIcon.title = "Context aware mode disabled";
-    }
-};
-
-const toggleFilters = () => {
-    config.filters.active = !config.filters.active;
-    worker.postMessage({
-        action: 'update-state',
-        filters: { active: config.filters.active },
-    });
-    updatePrefs();
-    showFilterEffect();
-    filterIconDisplay();
-}
-
-audioFiltersIcon.addEventListener('click', toggleFilters);
-
-const toggleContextAwareMode = () => {
-    if (config.model !== 'birdnet') config.detect.contextAware = !config.detect.contextAware;
-    contextAware.checked = config.detect.contextAware;
-    contextAwareIconDisplay();
-    if (config.detect.contextAware) {
-        SNRSlider.disabled = true;
-        config.filters.SNR = 0;
-    } else if (config.backend !== 'webgl'  && config.model !== 'birdnet') {
-        SNRSlider.disabled = false;
-        config.filters.SNR = parseFloat(SNRSlider.value);
-    }
-    worker.postMessage({
-        action: 'update-state',
-        detect: { contextAware: config.detect.contextAware },
-        filters: { SNR: config.filters.SNR },
-    });
-    updatePrefs()
-}
-contextAwareIcon.addEventListener('click', toggleContextAwareMode)
-
-debugMode.addEventListener('click', () =>{
-    config.debug = !config.debug;
-    debugMode.checked = config.debug;
-    updatePrefs()
-})
-
-nocmigButton.addEventListener('click', changeNocmigMode);
-nocmig.addEventListener('change', changeNocmigMode)
-
-contextAware.addEventListener('change', toggleContextAwareMode)
-
-const fullscreen = document.getElementById('fullscreen');
-
-const toggleFullscreen = () => {
-    if (config.fullscreen) {
-        config.fullscreen = false;
-        fullscreen.textContent = 'fullscreen';
-    } else {
-        config.fullscreen = true;
-        fullscreen.textContent = 'fullscreen_exit';
-    }
-    updatePrefs();
-    adjustSpecDims(true, 1024);
-}
-
-fullscreen.addEventListener('click', toggleFullscreen);
-
-
-const diagnosticMenu = document.getElementById('diagnostics');
-diagnosticMenu.addEventListener('click', async function () {
-    const modelToUse = document.getElementById('model-to-use');
-    DIAGNOSTICS['Model'] = modelToUse.options[modelToUse.selectedIndex].text;
-    DIAGNOSTICS['Backend'] = config.backend;
-    DIAGNOSTICS['Batch size'] = config[config.backend].batchSize;
-    DIAGNOSTICS['Threads'] = config[config.backend].threads;
-    DIAGNOSTICS['Context'] = config.detect.contextAware;
-    DIAGNOSTICS['SNR'] = config.filters.SNR;
-    DIAGNOSTICS['List'] = config.list;
-    let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
-    for (let [key, value] of Object.entries(DIAGNOSTICS)) {
-        if (key === 'Audio Duration') { // Format duration as days, hours,minutes, etc.
-            if (value < 3600) {
-                value = new Date(value * 1000).toISOString().substring(14, 19);
-                value = value.replace(':', ' minutes ').concat(' seconds');
-            } else if (value < 86400) {
-                value = new Date(value * 1000).toISOString().substring(11, 19)
-                value = value.replace(':', ' hours ').replace(':', ' minutes ').concat(' seconds')
-            } else {
-                value = new Date(value * 1000).toISOString().substring(8, 19);
-                const day = parseInt(value.slice(0, 2)) - 1;
-                const daysString = day === 1 ? '1 day ' : day.toString() + ' days ';
-                const dateString = daysString + value.slice(3);
-                value = dateString.replace(':', ' hours ').replace(':', ' minutes ').concat(' seconds');
-            }
-        }
-        diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
-    }
-    diagnosticTable += "</table>";
-    document.getElementById('diagnosticsModalBody').innerHTML = diagnosticTable;
-    const testModal = new bootstrap.Modal(document.getElementById('diagnosticsModal'));
-    testModal.show();
-});
-
-// Transport controls handling
-document.getElementById('playToggle').addEventListener('mousedown', async () => {
-    await wavesurfer.playPause();
-});
-
-document.getElementById('zoomIn').addEventListener('click', zoomSpec);
-document.getElementById('zoomOut').addEventListener('click', zoomSpec);
-
-// Listeners to set and display batch size
-const batchSizeSlider = document.getElementById('batch-size');
-
-batchSizeSlider.addEventListener('input', (e) => {
-    batchSizeValue.textContent = BATCH_SIZE_LIST[batchSizeSlider.value].toString();
-})
-batchSizeSlider.addEventListener('change', (e) => {
-    config[config.backend].batchSize = BATCH_SIZE_LIST[e.target.value];
-    loadModel({clearCache: false});
-    updatePrefs();
-    // Reset region maxLength
-    initRegion();
-})
-
-
-// Listeners to sort results table
-const confidenceSort = document.getElementById('confidence-sort');
-confidenceSort.addEventListener('click', () => {
-    const sortBy = STATE.sortOrder === 'score DESC ' ? 'score ASC ' : 'score DESC ';
-    setSortOrder(sortBy)
-});
-
-const timeSort = document.querySelectorAll('.time-sort');
-timeSort.forEach(el => {
-    el.addEventListener('click', () => {
-        setSortOrder('timestamp')
-    });
-})
-
-function showSortIcon() {
-    const timeHeadings = document.getElementsByClassName('time-sort-icon');
-    const speciesHeadings = document.getElementsByClassName('species-sort-icon');
-
-    const sortOrderScore = STATE.sortOrder.includes('score');
-
-    [...timeHeadings].forEach(heading => {
-        heading.classList.toggle('d-none', sortOrderScore);
-    });
-
-    [...speciesHeadings].forEach(heading => {
-        heading.classList.toggle('d-none', !sortOrderScore);
-        if (sortOrderScore && STATE.sortOrder.includes('ASC')){
-            // Flip the sort icon
-            heading.classList.add('flipped')
-        } else {
-            heading.classList.remove('flipped')
-        }
-    });
-}
-
-const setSortOrder = (order) => {
-    STATE.sortOrder = order;
-    showSortIcon()
-    worker.postMessage({ action: 'update-state', sortOrder: order })
-    resetResults({clearSummary: false, clearPagination: false, clearResults: true});
-    filterResults()
-    // worker.postMessage({
-    //     action: 'filter',
-    //     species: isSpeciesViewFiltered(true)
-    // }) // re-prepare
-
-}
-// Drag file to app window to open
-document.addEventListener('dragover', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-});
-
-document.addEventListener('drop', async (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    let filelist = [];
-    for (const f of event.dataTransfer.files) {
-        // Using the path attribute to get absolute file path
-        filelist.push(f.path);
-    }
-    if (filelist.length) filterValidFiles({ filePaths: filelist })
-});
-
-
-// Prevent drag for UI elements
-document.body.addEventListener('dragstart', e => {
-    e.preventDefault()
-});
-
-// Make modals draggable
-// Make modals draggable
-document.querySelectorAll('.modal-header').forEach(function (header) {
-    header.addEventListener('mousedown', function (mousedownEvt) {
-        const draggable = this;
-        const x = mousedownEvt.pageX - draggable.offsetLeft,
-            y = mousedownEvt.pageY - draggable.offsetTop;
-
-        function handleDrag(moveEvt) {
-            draggable.closest('.modal-content').style.left = moveEvt.pageX - x + 'px';
-            draggable.closest('.modal-content').style.top = moveEvt.pageY - y + 'px';
-        }
-
-        function stopDrag() {
-            document.body.removeEventListener('mousemove', handleDrag);
-            document.body.removeEventListener('mouseup', stopDrag);
-            draggable.closest('.modal').removeEventListener('hide.bs.modal', stopDrag);
-        }
-
-        document.body.addEventListener('mousemove', handleDrag);
-        document.body.addEventListener('mouseup', stopDrag);
-        draggable.closest('.modal').addEventListener('hide.bs.modal', stopDrag);
-    });
-});
-
-////////// Date Picker ///////////////
-
-function initialiseDatePicker() {
-    const currentDate = new Date();
     
-    const thisYear = () => {
-        const d1 = new Date(currentDate.getFullYear(), 0, 1);
-        return [d1, currentDate]
-    }
-    const lastYear = () => {
-        const d1 = new Date(currentDate.getFullYear() -1, 0, 1);
-        const d2 = new Date(currentDate.getFullYear() -1, 11, 31, 23, 59, 59, 999);
-        return [d1, d2]
-    }
-    const thisMonth = () => {
-        const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-        return [startOfMonth, currentDate];
-    };
-    
-    const lastMonth = () => {
-        const startOfLastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-        const endOfLastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0, 23, 59, 59, 999);
-    
-        return [startOfLastMonth, endOfLastMonth];
-    };
-    const thisWeek = () => {
-        const today = currentDate.getDay(); // 0 (Sunday) to 6 (Saturday)
-        const startOfWeek = new Date(currentDate);
-        startOfWeek.setDate(currentDate.getDate() - today); // Move to the beginning of the week (Sunday)
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6); // Move to the end of the week (Saturday)
-        return [startOfWeek, currentDate];
-    };
-    
-    const lastWeek = () => {
-        const today = currentDate.getDay(); // 0 (Sunday) to 6 (Saturday)
-        const startOfLastWeek = new Date(currentDate);
-        startOfLastWeek.setDate(currentDate.getDate() - today - 7); // Move to the beginning of the last week (Sunday)
-        const endOfLastWeek = new Date(startOfLastWeek);
-        endOfLastWeek.setDate(startOfLastWeek.getDate() + 6); // Move to the end of the last week (Saturday)
-        return [startOfLastWeek, endOfLastWeek];
-    };
-    const lastNight = () => {
-        const middayYesterday = new Date(currentDate);
-        middayYesterday.setDate(currentDate.getDate() -1);
-        middayYesterday.setHours(12, 0, 0, 0); // Set to midday yesterday
-        const middayToday = new Date(currentDate);
-        middayToday.setHours(12, 0, 0, 0); // Set to midday today
-        return [middayYesterday, middayToday];
-    };
-    ['chartRange', 'exploreRange'].forEach(function(element) {
-        element = document.getElementById(element);
-        const picker = new easepick.create({
-            element: element,
-            css: [
-              './node_modules/@easepick/bundle/dist/index.css',
-            ],
-            format: 'H:mm MMM D, YYYY',
-            zIndex: 10,
-            calendars: 1,
-            autoApply: false,
-            plugins: [
-                "RangePlugin",
-                "PresetPlugin",
-                "KbdPlugin",
-                "TimePlugin"
-            ],
-            PresetPlugin: {
-                customPreset: {
-                    'Last Night': lastNight(),
-                   'This Week': thisWeek(),
-                   'Last Week': lastWeek(),
-                   'This Month': thisMonth(),
-                   'Last Month': lastMonth(),
-                   'This Year': thisYear(),
-                   'Last Year': lastYear()
-                }
-            },
-            TimePlugin: {
-                format: 'HH:mm',
-              },
-          });
-        picker.on('select', (e) =>{
-            const {start, end} = e.detail;
-            console.log('Range Selected!', JSON.stringify(e.detail))
-            if (element.id === 'chartRange') {
-                STATE.chart.range = {start: start.getTime(), end: end.getTime()};
-                worker.postMessage({ action: 'update-state', chart: STATE.chart })
-                t0 = Date.now();
-                worker.postMessage({
-                    action: 'chart',
-                    species: STATE.chart.species,
-                    range: STATE.chart.range,
-                    aggregation: STATE.chart.aggregation
-                });
-            } else if (element.id === 'exploreRange') {
-                STATE.explore.range = {start: start.getTime(), end: end.getTime()};
-                resetResults({clearSummary: true, clearPagination: true, clearResults: false});
-                worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}, explore: STATE.explore}); 
-                filterResults({range:STATE.explore.range})
-                // worker.postMessage({
-                //     action: 'filter',
-                //     species: isSpeciesViewFiltered(true),
-                //     range: STATE.explore.range,
-                //     updateSummary: true
-                // }); // re-prepare
-            }
-
-            // Update the seen species list
-            worker.postMessage({ action: 'get-detected-species-list' })
-        })
-        picker.on('clear', (e) =>{
-            console.log('Range Cleared!', JSON.stringify(e.detail));
-            if (element.id === 'chartRange') {
-                STATE.chart.range = {start: undefined, end: undefined};
-                worker.postMessage({ action: 'update-state', chart: STATE.chart })
-                t0 = Date.now();
-                worker.postMessage({
-                    action: 'chart',
-                    species: STATE.chart.species,
-                    range: STATE.chart.range,
-                    aggregation: STATE.chart.aggregation
-                });
-            } else if (element.id === 'exploreRange') {
-                STATE.explore.range = {start: undefined, end: undefined};
-                worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}, explore: STATE.explore}); 
-                resetResults({clearSummary: true, clearPagination: true, clearResults: false});
-                filterResults({species:STATE.explore.species, range:STATE.explore.range})
-                // worker.postMessage({
-                //     action: 'filter',
-                //     species: STATE.explore.species,
-                //     range: STATE.explore.range,
-                //     updateSummary: true
-                // }); // re-prepare
-            }
-        })
-        picker.on('click', (e) =>{
-            if (e.target.classList.contains('cancel-button')){
-                console.log('cancelled')
-                //element.innerHTML = savedContent;
-            }
-        })
-        picker.on('show', (e) =>{
-                picker.setStartTime('12:00')
-                picker.setEndTime('12:00')
-        
-        })
-        picker.on('hide', (e) =>{
-            const id = STATE.mode === 'chart' ? 'chartRange' : 'exploreRange';
-            const element = document.getElementById(id);
-            if (! element.textContent){
-                // It's blank
-                element.innerHTML = '<span class="material-symbols-outlined align-bottom">date_range</span><span>Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>';
-            } else if (element.textContent.includes('Apply')){
-                createDateClearButton(element, picker);
-            }
-        })
-    })
-
-}
-
-function createDateClearButton(element, picker){
-    const span = document.createElement('span');
-    span.classList.add('material-symbols-outlined', 'text-secondary', 'ps-2')
-    element.appendChild(span);
-    span.textContent = 'cancel';
-    span.title = 'Clear date filter';
-    span.id = element.id + '-clear';
-    span.addEventListener('click', (e) =>{
+    // Prevent the settings menu disappearing on click or mouseout
+    const settingsMenu = document.getElementById('settingsMenu')
+    settingsMenu.addEventListener('click', (e) => {
         e.stopImmediatePropagation();
-        picker.clear();
-        element.innerHTML = '<span class="material-symbols-outlined align-bottom">date_range</span><span>Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>';
     })
-}
-
-
-function toggleKeyDownForFormInputs(){
-    const formFields = document.querySelectorAll("input, textarea, select");
-    // Disable keyboard shortcuts when any form field gets focus
-    formFields.forEach((formField) => {
-        formField.addEventListener("focus", () => {
-            document.removeEventListener("keydown", handleKeyDownDeBounce, true);
-        });
+    settingsMenu.addEventListener('mouseout', (e) => {
+        e.stopImmediatePropagation()
+    })
     
-        formField.addEventListener("blur", () => {
-            document.addEventListener("keydown", handleKeyDownDeBounce, true);
-        });
-    });
-}
-
-document.addEventListener("DOMContentLoaded", function () {
-    document.addEventListener("keydown", handleKeyDownDeBounce, true);
-    toggleKeyDownForFormInputs();
-    // make menu an accordion for smaller screens
-    if (window.innerWidth < 768) {
-
-        // close all inner dropdowns when parent is closed
-        document.querySelectorAll('.navbar .dropdown').forEach(function (everydropdown) {
-            everydropdown.addEventListener('hidden.bs.dropdown', function () {
-                // after dropdown is hidden, then find all submenus
-                this.querySelectorAll('.submenu').forEach(function (everysubmenu) {
-                    // hide every submenu as well
-                    everysubmenu.style.display = 'none';
-                });
-            })
-        });
-
-        document.querySelectorAll('.dropdown-menu a').forEach(function (element) {
-            element.addEventListener('click', function (e) {
-                let nextEl = this.nextElementSibling;
-                if (nextEl?.classList.contains('submenu')) {
-                    // prevent opening link if link needs to open dropdown
-                    e.preventDefault();
-                    if (nextEl.style.display === 'block') {
-                        nextEl.style.display = 'none';
-                    } else {
-                        nextEl.style.display = 'block';
-                    }
-
-                }
-            });
-        })
+    function setNocmig(on) {
+        if (on) {
+            nocmigButton.textContent = 'nights_stay';
+            nocmigButton.title = 'Nocmig mode on';
+            nocmigButton.classList.add('text-info');
+        } else {
+            nocmigButton.textContent = 'bedtime_off';
+            nocmigButton.title = 'Nocmig mode off';
+            nocmigButton.classList.remove('text-info');
+        }
+        nocmig.checked = config.detect.nocmig;
     }
-    initialiseDatePicker();
-});
-
-
-// Confidence thresholds
-const filterPanelThresholdDisplay = document.getElementById('threshold-value'); // confidence % display in panel
-const settingsPanelThresholdDisplay = document.getElementById('confidence-value');  // confidence % display in settings
-const confidenceSliderDisplay = document.getElementById('confidenceSliderContainer'); // confidence span for slider in panel - show-hide
-const filterPanelRangeInput = document.getElementById('confidenceValue'); // panel range input 
-const settingsPanelRangeInput = document.getElementById('confidence'); // confidence range input in settings
-
-const setConfidence = (e) => {
-    //settingsPanelRangeInput.value = e.target.value;
-    handleThresholdChange(e);
-}
-
-filterPanelThresholdDisplay.addEventListener('click', (e) => {
-    e.stopPropagation();
-    confidenceSliderDisplay.classList.toggle('d-none');
-})
-filterPanelRangeInput.addEventListener('click', (e) => {
-    e.stopPropagation();
-})
-
-const hideConfidenceSlider = () => {
-    confidenceSliderDisplay.classList.add('d-none');
-}
-
-
-function showThreshold(e) {
-    const threshold = e instanceof Event ? e.target.valueAsNumber : e;
-    filterPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
-    settingsPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
-    filterPanelRangeInput.value = threshold;
-    settingsPanelRangeInput.value = threshold;
-}
-settingsPanelRangeInput.addEventListener('input', showThreshold);
-filterPanelRangeInput.addEventListener('input', showThreshold);
-
-const handleThresholdChange = (e) => {
-    const threshold = e.target.valueAsNumber;
-    config.detect.confidence = threshold;
-    updatePrefs();
-    worker.postMessage({
-        action: 'update-state',
-        detect: { confidence: config.detect.confidence }
-    });
-    if (STATE.mode == 'explore') {
-        // Update the seen species list
-        worker.postMessage({ action: 'get-detected-species-list' })
-    }
-    if (!PREDICTING && !resultTableElement.classList.contains('d-none')) {
-        worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
+    
+    const changeNocmigMode = () => {
+        config.detect.nocmig = !config.detect.nocmig;
+        setNocmig(config.detect.nocmig);
+        worker.postMessage({
+            action: 'update-state',
+            detect: { nocmig: config.detect.nocmig },
+        });
+        updatePrefs();
+        worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}}); 
+        
         resetResults({clearSummary: true, clearPagination: true, clearResults: false});
         filterResults()
         // worker.postMessage({
         //     action: 'filter',
         //     species: isSpeciesViewFiltered(true),
         //     updateSummary: true
-        // });
+        // })
     }
-}
-filterPanelRangeInput.addEventListener('change', handleThresholdChange);
-settingsPanelRangeInput.addEventListener('change', handleThresholdChange);
-
-
-// Filter handling
-const filterIconDisplay = () => {
-    if (config.filters.active && (config.filters.highPassFrequency || (config.filters.lowShelfAttenuation && config.filters.lowShelfFrequency) || config.filters.SNR)) {
-        audioFiltersIcon.classList.add('text-warning');
-        audioFiltersIcon.title = 'Experimental audio filters applied';
-    } else {
-        audioFiltersIcon.classList.remove('text-warning')
-        audioFiltersIcon.title = 'No audio filters applied';
+    
+    function filterResults({species = isSpeciesViewFiltered(true), updateSummary = true, offset = 0, limit = 500, range = undefined} = {}){
+        worker.postMessage({
+            action: 'filter',
+            species: species,
+            updateSummary: updateSummary,
+            offset: offset,
+            limit: limit,
+            range: range
+        })
     }
-}
-// High pass threshold
-const showFilterEffect = () => {
-    if (fileLoaded) {
-        const position = wavesurfer.getCurrentTime() / windowLength;
-        postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion() })
-    }
-}
-
-// SNR
-const handleSNRchange = () => {
-    config.filters.SNR = parseFloat(SNRSlider.value);
-    if (config.filters.SNR > 0) {
-        config.detect.contextAware = false;
-        contextAware.disabled = true;
-    } else {
-        config.detect.contextAware = contextAware.checked;
-        contextAware.disabled = false;
-    }
-    updatePrefs();
-    worker.postMessage({ action: 'update-state', filters: { SNR: config.filters.SNR } })
-    filterIconDisplay();
-}
-
-
-const SNRThreshold = document.getElementById('SNR-threshold');
-const SNRSlider = document.getElementById('snrValue');
-SNRSlider.addEventListener('input', () => {
-    SNRThreshold.textContent = SNRSlider.value;
-});
-SNRSlider.addEventListener('change', handleSNRchange);
-
-const handleHPchange = () => {
-    config.filters.highPassFrequency = HPSlider.valueAsNumber;
-    config.filters.active || toggleFilters();
-    updatePrefs();
-    worker.postMessage({ action: 'update-state', filters: { highPassFrequency: config.filters.highPassFrequency } })
-    showFilterEffect();
-    filterIconDisplay();
-}
-
-const HPThreshold = document.getElementById('HP-threshold');
-const HPSlider = document.getElementById('HighPassFrequency');
-HPSlider.addEventListener('input', () => {
-    HPThreshold.textContent = HPSlider.value + 'Hz';
-});
-HPSlider.addEventListener('change', handleHPchange);
-
-// Low shelf threshold
-const handleLowShelfchange = () => {
-    config.filters.lowShelfFrequency = LowShelfSlider.valueAsNumber;
-    config.filters.active || toggleFilters();
-    updatePrefs();
-    worker.postMessage({ action: 'update-state', filters: { lowShelfFrequency: config.filters.lowShelfFrequency } })
-    showFilterEffect();
-    filterIconDisplay();
-}
-
-const LowShelfThreshold = document.getElementById('LowShelf-threshold');
-const LowShelfSlider = document.getElementById('lowShelfFrequency');
-LowShelfSlider.addEventListener('input', () => {
-    LowShelfThreshold.textContent = LowShelfSlider.value + 'Hz';
-});
-LowShelfSlider.addEventListener('change', handleLowShelfchange);
-
-// Low shelf gain
-const handleAttenuationchange = () => {
-    config.filters.lowShelfAttenuation = - lowShelfAttenuation.valueAsNumber;
-    config.filters.active = true;
-    updatePrefs();
-    worker.postMessage({ action: 'update-state', filters: { lowShelfAttenuation: config.filters.lowShelfAttenuation } })
-    showFilterEffect();
-    filterIconDisplay();
-}
-
-const lowShelfAttenuation = document.getElementById('attenuation');
-const lowShelfAttenuationThreshold = document.getElementById('attenuation-threshold');
-lowShelfAttenuation.addEventListener('change', handleAttenuationchange);
-
-lowShelfAttenuation.addEventListener('input', () => {
-    lowShelfAttenuationThreshold.textContent = lowShelfAttenuation.value + 'dB';
-});
-
-// number of threads
-const numberOfThreads = document.getElementById('threads-value');
-const ThreadSlider = document.getElementById('thread-slider');
-ThreadSlider.addEventListener('input', () => {
-    numberOfThreads.textContent = ThreadSlider.value;
-});
-ThreadSlider.addEventListener('change', () => {
-    config[config.backend].threads = ThreadSlider.valueAsNumber;
-    loadModel({clearCache: false});
-    updatePrefs();
-});
-
-
-// Audio preferences:
-
-const showRelevantAudioQuality = () => {
-    if (['mp3', 'opus'].includes(config.audio.format)) {
-        audioBitrateContainer.classList.remove('d-none');
-        audioQualityContainer.classList.add('d-none');
-    } else if (config.audio.format === 'flac') {
-        audioQualityContainer.classList.remove('d-none');
-        audioBitrateContainer.classList.add('d-none');
-    } else {
-        audioQualityContainer.classList.add('d-none');
-        audioBitrateContainer.classList.add('d-none');
-    }
-}
-
-audioFormat.addEventListener('change', (e) => {
-    config.audio.format = e.target.value;
-    showRelevantAudioQuality();
-    updatePrefs();
-    worker.postMessage({ action: 'update-state', audio: config.audio })
-});
-
-audioBitrate.addEventListener('change', (e) => {
-    config.audio.bitrate = e.target.value;
-    updatePrefs();
-    worker.postMessage({ action: 'update-state', audio: config.audio })
-});
-
-audioQuality.addEventListener('change', (e) => {
-    config.audio.quality = e.target.value;
-    updatePrefs();
-    worker.postMessage({ action: 'update-state', audio: config.audio })
-});
-
-audioFade.addEventListener('change', (e) => {
-    config.audio.fade = e.target.checked;
-    updatePrefs();
-    worker.postMessage({ action: 'update-state', audio: config.audio })
-});
-
-audioPadding.addEventListener('change', (e) => {
-    config.audio.padding = e.target.checked;
-    audioFade.disabled = !audioPadding.checked;
-    updatePrefs();
-    worker.postMessage({ action: 'update-state', audio: config.audio })
-});
-
-audioDownmix.addEventListener('change', (e) => {
-    config.audio.downmix = e.target.checked;
-    updatePrefs();
-    worker.postMessage({ action: 'update-state', audio: config.audio })
-});
-
-function getSnameFromCname(cname) {
-    for (let i = 0; i < LABELS.length; i++) {
-        if (LABELS[i].includes(cname)) {
-            return LABELS[i].split('_')[0];
+    
+    const contextAwareIconDisplay = () => {
+        if (config.detect.contextAware) {
+            contextAwareIcon.classList.add('text-warning');
+            contextAwareIcon.title = "Context aware mode enabled";
+        } else {
+            contextAwareIcon.classList.remove('text-warning');
+            contextAwareIcon.title = "Context aware mode disabled";
         }
+    };
+    
+    const toggleFilters = () => {
+        config.filters.active = !config.filters.active;
+        worker.postMessage({
+            action: 'update-state',
+            filters: { active: config.filters.active },
+        });
+        updatePrefs();
+        showFilterEffect();
+        filterIconDisplay();
     }
-    return ; // Substring not found in any item
-}
-
-
-document.addEventListener('click', function (e) {
-    contextMenu.classList.add("d-none");
-    hideConfidenceSlider();
-})
-
-
-
-// Beginnings of the all-powerful document 'change' listener
-// One listener to rule them all!
-document.addEventListener('change', function (e) {
-    const element = e.target.closest('[id]');
-    if (element){
-        const target = element.id;
-        config.debug && console.log('Change target:', target)
-        switch (target) {
-            case 'species-week': {
-                config.useWeek = element.checked;
-                updatePrefs();
-                if (! config.useWeek) STATE.week = -1;
-                worker.postMessage({action:'update-state', useWeek: config.useWeek})
-                break;
+    
+    audioFiltersIcon.addEventListener('click', toggleFilters);
+    
+    const toggleContextAwareMode = () => {
+        if (config.model !== 'birdnet') config.detect.contextAware = !config.detect.contextAware;
+        contextAware.checked = config.detect.contextAware;
+        contextAwareIconDisplay();
+        if (config.detect.contextAware) {
+            SNRSlider.disabled = true;
+            config.filters.SNR = 0;
+        } else if (config.backend !== 'webgl'  && config.model !== 'birdnet') {
+            SNRSlider.disabled = false;
+            config.filters.SNR = parseFloat(SNRSlider.value);
+        }
+        worker.postMessage({
+            action: 'update-state',
+            detect: { contextAware: config.detect.contextAware },
+            filters: { SNR: config.filters.SNR },
+        });
+        updatePrefs()
+    }
+    contextAwareIcon.addEventListener('click', toggleContextAwareMode)
+    
+    debugMode.addEventListener('click', () =>{
+        config.debug = !config.debug;
+        debugMode.checked = config.debug;
+        updatePrefs()
+    })
+    
+    nocmigButton.addEventListener('click', changeNocmigMode);
+    nocmig.addEventListener('change', changeNocmigMode)
+    
+    contextAware.addEventListener('change', toggleContextAwareMode)
+    
+    const fullscreen = document.getElementById('fullscreen');
+    
+    const toggleFullscreen = () => {
+        if (config.fullscreen) {
+            config.fullscreen = false;
+            fullscreen.textContent = 'fullscreen';
+        } else {
+            config.fullscreen = true;
+            fullscreen.textContent = 'fullscreen_exit';
+        }
+        updatePrefs();
+        adjustSpecDims(true, 1024);
+    }
+    
+    fullscreen.addEventListener('click', toggleFullscreen);
+    
+    
+    const diagnosticMenu = document.getElementById('diagnostics');
+    diagnosticMenu.addEventListener('click', async function () {
+        const modelToUse = document.getElementById('model-to-use');
+        DIAGNOSTICS['Model'] = modelToUse.options[modelToUse.selectedIndex].text;
+        DIAGNOSTICS['Backend'] = config.backend;
+        DIAGNOSTICS['Batch size'] = config[config.backend].batchSize;
+        DIAGNOSTICS['Threads'] = config[config.backend].threads;
+        DIAGNOSTICS['Context'] = config.detect.contextAware;
+        DIAGNOSTICS['SNR'] = config.filters.SNR;
+        DIAGNOSTICS['List'] = config.list;
+        let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
+        for (let [key, value] of Object.entries(DIAGNOSTICS)) {
+            if (key === 'Audio Duration') { // Format duration as days, hours,minutes, etc.
+                if (value < 3600) {
+                    value = new Date(value * 1000).toISOString().substring(14, 19);
+                    value = value.replace(':', ' minutes ').concat(' seconds');
+                } else if (value < 86400) {
+                    value = new Date(value * 1000).toISOString().substring(11, 19)
+                    value = value.replace(':', ' hours ').replace(':', ' minutes ').concat(' seconds')
+                } else {
+                    value = new Date(value * 1000).toISOString().substring(8, 19);
+                    const day = parseInt(value.slice(0, 2)) - 1;
+                    const daysString = day === 1 ? '1 day ' : day.toString() + ' days ';
+                    const dateString = daysString + value.slice(3);
+                    value = dateString.replace(':', ' hours ').replace(':', ' minutes ').concat(' seconds');
+                }
             }
-            case 'locale': {
-                config[config.model].locale = element.value;
-                updatePrefs();
-                const chirpity = config[config.model].locale === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
-                const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${config[config.model].locale}.txt`; 
-                fetch(labelFile).then(response => {
-                    if (! response.ok) throw new Error('Network response was not ok');
-                    return response.text();
-                }).then(filecontents => {
-                    LABELS = filecontents.trim().split(/\r?\n/);
-                    // Add unknown species
-                    LABELS.push('Unknown Sp._Unknown Sp.');
-                    worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS})
-                }).catch(error =>{
-                    console.error('There was a problem fetching the label file:', error);
+            diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
+        }
+        diagnosticTable += "</table>";
+        document.getElementById('diagnosticsModalBody').innerHTML = diagnosticTable;
+        const testModal = new bootstrap.Modal(document.getElementById('diagnosticsModal'));
+        testModal.show();
+    });
+    
+    // Transport controls handling
+    document.getElementById('playToggle').addEventListener('mousedown', async () => {
+        await wavesurfer.playPause();
+    });
+    
+    document.getElementById('zoomIn').addEventListener('click', zoomSpec);
+    document.getElementById('zoomOut').addEventListener('click', zoomSpec);
+    
+    // Listeners to set and display batch size
+    const batchSizeSlider = document.getElementById('batch-size');
+    
+    batchSizeSlider.addEventListener('input', (e) => {
+        batchSizeValue.textContent = BATCH_SIZE_LIST[batchSizeSlider.value].toString();
+    })
+    batchSizeSlider.addEventListener('change', (e) => {
+        config[config.backend].batchSize = BATCH_SIZE_LIST[e.target.value];
+        loadModel({clearCache: false});
+        updatePrefs();
+        // Reset region maxLength
+        initRegion();
+    })
+    
+    
+    // Listeners to sort results table
+    const confidenceSort = document.getElementById('confidence-sort');
+    confidenceSort.addEventListener('click', () => {
+        const sortBy = STATE.sortOrder === 'score DESC ' ? 'score ASC ' : 'score DESC ';
+        setSortOrder(sortBy)
+    });
+    
+    const timeSort = document.querySelectorAll('.time-sort');
+    timeSort.forEach(el => {
+        el.addEventListener('click', () => {
+            setSortOrder('timestamp')
+        });
+    })
+    
+    function showSortIcon() {
+        const timeHeadings = document.getElementsByClassName('time-sort-icon');
+        const speciesHeadings = document.getElementsByClassName('species-sort-icon');
+        
+        const sortOrderScore = STATE.sortOrder.includes('score');
+        
+        [...timeHeadings].forEach(heading => {
+            heading.classList.toggle('d-none', sortOrderScore);
+        });
+        
+        [...speciesHeadings].forEach(heading => {
+            heading.classList.toggle('d-none', !sortOrderScore);
+            if (sortOrderScore && STATE.sortOrder.includes('ASC')){
+                // Flip the sort icon
+                heading.classList.add('flipped')
+            } else {
+                heading.classList.remove('flipped')
+            }
+        });
+    }
+    
+    const setSortOrder = (order) => {
+        STATE.sortOrder = order;
+        showSortIcon()
+        worker.postMessage({ action: 'update-state', sortOrder: order })
+        resetResults({clearSummary: false, clearPagination: false, clearResults: true});
+        filterResults()
+        // worker.postMessage({
+        //     action: 'filter',
+        //     species: isSpeciesViewFiltered(true)
+        // }) // re-prepare
+        
+    }
+    // Drag file to app window to open
+    document.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+    });
+    
+    document.addEventListener('drop', async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        let filelist = [];
+        for (const f of event.dataTransfer.files) {
+            // Using the path attribute to get absolute file path
+            filelist.push(f.path);
+        }
+        if (filelist.length) filterValidFiles({ filePaths: filelist })
+    });
+    
+    
+    // Prevent drag for UI elements
+    document.body.addEventListener('dragstart', e => {
+        e.preventDefault()
+    });
+    
+    // Make modals draggable
+    // Make modals draggable
+    document.querySelectorAll('.modal-header').forEach(function (header) {
+        header.addEventListener('mousedown', function (mousedownEvt) {
+            const draggable = this;
+            const x = mousedownEvt.pageX - draggable.offsetLeft,
+            y = mousedownEvt.pageY - draggable.offsetTop;
+            
+            function handleDrag(moveEvt) {
+                draggable.closest('.modal-content').style.left = moveEvt.pageX - x + 'px';
+                draggable.closest('.modal-content').style.top = moveEvt.pageY - y + 'px';
+            }
+            
+            function stopDrag() {
+                document.body.removeEventListener('mousemove', handleDrag);
+                document.body.removeEventListener('mouseup', stopDrag);
+                draggable.closest('.modal').removeEventListener('hide.bs.modal', stopDrag);
+            }
+            
+            document.body.addEventListener('mousemove', handleDrag);
+            document.body.addEventListener('mouseup', stopDrag);
+            draggable.closest('.modal').addEventListener('hide.bs.modal', stopDrag);
+        });
+    });
+    
+    ////////// Date Picker ///////////////
+    
+    function initialiseDatePicker() {
+        const currentDate = new Date();
+        
+        const thisYear = () => {
+            const d1 = new Date(currentDate.getFullYear(), 0, 1);
+            return [d1, currentDate]
+        }
+        const lastYear = () => {
+            const d1 = new Date(currentDate.getFullYear() -1, 0, 1);
+            const d2 = new Date(currentDate.getFullYear() -1, 11, 31, 23, 59, 59, 999);
+            return [d1, d2]
+        }
+        const thisMonth = () => {
+            const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+            return [startOfMonth, currentDate];
+        };
+        
+        const lastMonth = () => {
+            const startOfLastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+            const endOfLastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0, 23, 59, 59, 999);
+            
+            return [startOfLastMonth, endOfLastMonth];
+        };
+        const thisWeek = () => {
+            const today = currentDate.getDay(); // 0 (Sunday) to 6 (Saturday)
+            const startOfWeek = new Date(currentDate);
+            startOfWeek.setDate(currentDate.getDate() - today); // Move to the beginning of the week (Sunday)
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6); // Move to the end of the week (Saturday)
+            return [startOfWeek, currentDate];
+        };
+        
+        const lastWeek = () => {
+            const today = currentDate.getDay(); // 0 (Sunday) to 6 (Saturday)
+            const startOfLastWeek = new Date(currentDate);
+            startOfLastWeek.setDate(currentDate.getDate() - today - 7); // Move to the beginning of the last week (Sunday)
+            const endOfLastWeek = new Date(startOfLastWeek);
+            endOfLastWeek.setDate(startOfLastWeek.getDate() + 6); // Move to the end of the last week (Saturday)
+            return [startOfLastWeek, endOfLastWeek];
+        };
+        const lastNight = () => {
+            const middayYesterday = new Date(currentDate);
+            middayYesterday.setDate(currentDate.getDate() -1);
+            middayYesterday.setHours(12, 0, 0, 0); // Set to midday yesterday
+            const middayToday = new Date(currentDate);
+            middayToday.setHours(12, 0, 0, 0); // Set to midday today
+            return [middayYesterday, middayToday];
+        };
+        ['chartRange', 'exploreRange'].forEach(function(element) {
+            element = document.getElementById(element);
+            const picker = new easepick.create({
+                element: element,
+                css: [
+                    './node_modules/@easepick/bundle/dist/index.css',
+                ],
+                format: 'H:mm MMM D, YYYY',
+                zIndex: 10,
+                calendars: 1,
+                autoApply: false,
+                plugins: [
+                    "RangePlugin",
+                    "PresetPlugin",
+                    "KbdPlugin",
+                    "TimePlugin"
+                ],
+                PresetPlugin: {
+                    customPreset: {
+                        'Last Night': lastNight(),
+                        'This Week': thisWeek(),
+                        'Last Week': lastWeek(),
+                        'This Month': thisMonth(),
+                        'Last Month': lastMonth(),
+                        'This Year': thisYear(),
+                        'Last Year': lastYear()
+                    }
+                },
+                TimePlugin: {
+                    format: 'HH:mm',
+                },
+            });
+            picker.on('select', (e) =>{
+                const {start, end} = e.detail;
+                console.log('Range Selected!', JSON.stringify(e.detail))
+                if (element.id === 'chartRange') {
+                    STATE.chart.range = {start: start.getTime(), end: end.getTime()};
+                    worker.postMessage({ action: 'update-state', chart: STATE.chart })
+                    t0 = Date.now();
+                    worker.postMessage({
+                        action: 'chart',
+                        species: STATE.chart.species,
+                        range: STATE.chart.range,
+                        aggregation: STATE.chart.aggregation
+                    });
+                } else if (element.id === 'exploreRange') {
+                    STATE.explore.range = {start: start.getTime(), end: end.getTime()};
+                    resetResults({clearSummary: true, clearPagination: true, clearResults: false});
+                    worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}, explore: STATE.explore}); 
+                    filterResults({range:STATE.explore.range})
+                    // worker.postMessage({
+                    //     action: 'filter',
+                    //     species: isSpeciesViewFiltered(true),
+                    //     range: STATE.explore.range,
+                    //     updateSummary: true
+                    // }); // re-prepare
+                }
+                
+                // Update the seen species list
+                worker.postMessage({ action: 'get-detected-species-list' })
+            })
+            picker.on('clear', (e) =>{
+                console.log('Range Cleared!', JSON.stringify(e.detail));
+                if (element.id === 'chartRange') {
+                    STATE.chart.range = {start: undefined, end: undefined};
+                    worker.postMessage({ action: 'update-state', chart: STATE.chart })
+                    t0 = Date.now();
+                    worker.postMessage({
+                        action: 'chart',
+                        species: STATE.chart.species,
+                        range: STATE.chart.range,
+                        aggregation: STATE.chart.aggregation
+                    });
+                } else if (element.id === 'exploreRange') {
+                    STATE.explore.range = {start: undefined, end: undefined};
+                    worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}, explore: STATE.explore}); 
+                    resetResults({clearSummary: true, clearPagination: true, clearResults: false});
+                    filterResults({species:STATE.explore.species, range:STATE.explore.range})
+                    // worker.postMessage({
+                    //     action: 'filter',
+                    //     species: STATE.explore.species,
+                    //     range: STATE.explore.range,
+                    //     updateSummary: true
+                    // }); // re-prepare
+                }
+            })
+            picker.on('click', (e) =>{
+                if (e.target.classList.contains('cancel-button')){
+                    console.log('cancelled')
+                    //element.innerHTML = savedContent;
+                }
+            })
+            picker.on('show', (e) =>{
+                picker.setStartTime('12:00')
+                picker.setEndTime('12:00')
+                
+            })
+            picker.on('hide', (e) =>{
+                const id = STATE.mode === 'chart' ? 'chartRange' : 'exploreRange';
+                const element = document.getElementById(id);
+                if (! element.textContent){
+                    // It's blank
+                    element.innerHTML = '<span class="material-symbols-outlined align-bottom">date_range</span><span>Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>';
+                } else if (element.textContent.includes('Apply')){
+                    createDateClearButton(element, picker);
+                }
+            })
+        })
+        
+    }
+    
+    function createDateClearButton(element, picker){
+        const span = document.createElement('span');
+        span.classList.add('material-symbols-outlined', 'text-secondary', 'ps-2')
+        element.appendChild(span);
+        span.textContent = 'cancel';
+        span.title = 'Clear date filter';
+        span.id = element.id + '-clear';
+        span.addEventListener('click', (e) =>{
+            e.stopImmediatePropagation();
+            picker.clear();
+            element.innerHTML = '<span class="material-symbols-outlined align-bottom">date_range</span><span>Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>';
+        })
+    }
+    
+    
+    function toggleKeyDownForFormInputs(){
+        const formFields = document.querySelectorAll("input, textarea, select");
+        // Disable keyboard shortcuts when any form field gets focus
+        formFields.forEach((formField) => {
+            formField.addEventListener("focus", () => {
+                document.removeEventListener("keydown", handleKeyDownDeBounce, true);
+            });
+            
+            formField.addEventListener("blur", () => {
+                document.addEventListener("keydown", handleKeyDownDeBounce, true);
+            });
+        });
+    }
+    
+    document.addEventListener("DOMContentLoaded", function () {
+        document.addEventListener("keydown", handleKeyDownDeBounce, true);
+        toggleKeyDownForFormInputs();
+        // make menu an accordion for smaller screens
+        if (window.innerWidth < 768) {
+            
+            // close all inner dropdowns when parent is closed
+            document.querySelectorAll('.navbar .dropdown').forEach(function (everydropdown) {
+                everydropdown.addEventListener('hidden.bs.dropdown', function () {
+                    // after dropdown is hidden, then find all submenus
+                    this.querySelectorAll('.submenu').forEach(function (everysubmenu) {
+                        // hide every submenu as well
+                        everysubmenu.style.display = 'none';
+                    });
                 })
-                break;
+            });
+            
+            document.querySelectorAll('.dropdown-menu a').forEach(function (element) {
+                element.addEventListener('click', function (e) {
+                    let nextEl = this.nextElementSibling;
+                    if (nextEl?.classList.contains('submenu')) {
+                        // prevent opening link if link needs to open dropdown
+                        e.preventDefault();
+                        if (nextEl.style.display === 'block') {
+                            nextEl.style.display = 'none';
+                        } else {
+                            nextEl.style.display = 'block';
+                        }
+                        
+                    }
+                });
+            })
+        }
+        initialiseDatePicker();
+    });
+    
+    
+    // Confidence thresholds
+    const filterPanelThresholdDisplay = document.getElementById('threshold-value'); // confidence % display in panel
+    const settingsPanelThresholdDisplay = document.getElementById('confidence-value');  // confidence % display in settings
+    const confidenceSliderDisplay = document.getElementById('confidenceSliderContainer'); // confidence span for slider in panel - show-hide
+    const filterPanelRangeInput = document.getElementById('confidenceValue'); // panel range input 
+    const settingsPanelRangeInput = document.getElementById('confidence'); // confidence range input in settings
+    
+    const setConfidence = (e) => {
+        //settingsPanelRangeInput.value = e.target.value;
+        handleThresholdChange(e);
+    }
+    
+    filterPanelThresholdDisplay.addEventListener('click', (e) => {
+        e.stopPropagation();
+        confidenceSliderDisplay.classList.toggle('d-none');
+    })
+    filterPanelRangeInput.addEventListener('click', (e) => {
+        e.stopPropagation();
+    })
+    
+    const hideConfidenceSlider = () => {
+        confidenceSliderDisplay.classList.add('d-none');
+    }
+    
+    
+    function showThreshold(e) {
+        const threshold = e instanceof Event ? e.target.valueAsNumber : e;
+        filterPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
+        settingsPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
+        filterPanelRangeInput.value = threshold;
+        settingsPanelRangeInput.value = threshold;
+    }
+    settingsPanelRangeInput.addEventListener('input', showThreshold);
+    filterPanelRangeInput.addEventListener('input', showThreshold);
+    
+    const handleThresholdChange = (e) => {
+        const threshold = e.target.valueAsNumber;
+        config.detect.confidence = threshold;
+        updatePrefs();
+        worker.postMessage({
+            action: 'update-state',
+            detect: { confidence: config.detect.confidence }
+        });
+        if (STATE.mode == 'explore') {
+            // Update the seen species list
+            worker.postMessage({ action: 'get-detected-species-list' })
+        }
+        if (!PREDICTING && !resultTableElement.classList.contains('d-none')) {
+            worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
+            resetResults({clearSummary: true, clearPagination: true, clearResults: false});
+            filterResults()
+            // worker.postMessage({
+            //     action: 'filter',
+            //     species: isSpeciesViewFiltered(true),
+            //     updateSummary: true
+            // });
+        }
+    }
+    filterPanelRangeInput.addEventListener('change', handleThresholdChange);
+    settingsPanelRangeInput.addEventListener('change', handleThresholdChange);
+    
+    
+    // Filter handling
+    const filterIconDisplay = () => {
+        if (config.filters.active && (config.filters.highPassFrequency || (config.filters.lowShelfAttenuation && config.filters.lowShelfFrequency) || config.filters.SNR)) {
+            audioFiltersIcon.classList.add('text-warning');
+            audioFiltersIcon.title = 'Experimental audio filters applied';
+        } else {
+            audioFiltersIcon.classList.remove('text-warning')
+            audioFiltersIcon.title = 'No audio filters applied';
+        }
+    }
+    // High pass threshold
+    const showFilterEffect = () => {
+        if (fileLoaded) {
+            const position = wavesurfer.getCurrentTime() / windowLength;
+            postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion() })
+        }
+    }
+    
+    // SNR
+    const handleSNRchange = () => {
+        config.filters.SNR = parseFloat(SNRSlider.value);
+        if (config.filters.SNR > 0) {
+            config.detect.contextAware = false;
+            contextAware.disabled = true;
+        } else {
+            config.detect.contextAware = contextAware.checked;
+            contextAware.disabled = false;
+        }
+        updatePrefs();
+        worker.postMessage({ action: 'update-state', filters: { SNR: config.filters.SNR } })
+        filterIconDisplay();
+    }
+    
+    
+    const SNRThreshold = document.getElementById('SNR-threshold');
+    const SNRSlider = document.getElementById('snrValue');
+    SNRSlider.addEventListener('input', () => {
+        SNRThreshold.textContent = SNRSlider.value;
+    });
+    SNRSlider.addEventListener('change', handleSNRchange);
+    
+    const handleHPchange = () => {
+        config.filters.highPassFrequency = HPSlider.valueAsNumber;
+        config.filters.active || toggleFilters();
+        updatePrefs();
+        worker.postMessage({ action: 'update-state', filters: { highPassFrequency: config.filters.highPassFrequency } })
+        showFilterEffect();
+        filterIconDisplay();
+    }
+    
+    const HPThreshold = document.getElementById('HP-threshold');
+    const HPSlider = document.getElementById('HighPassFrequency');
+    HPSlider.addEventListener('input', () => {
+        HPThreshold.textContent = HPSlider.value + 'Hz';
+    });
+    HPSlider.addEventListener('change', handleHPchange);
+    
+    // Low shelf threshold
+    const handleLowShelfchange = () => {
+        config.filters.lowShelfFrequency = LowShelfSlider.valueAsNumber;
+        config.filters.active || toggleFilters();
+        updatePrefs();
+        worker.postMessage({ action: 'update-state', filters: { lowShelfFrequency: config.filters.lowShelfFrequency } })
+        showFilterEffect();
+        filterIconDisplay();
+    }
+    
+    const LowShelfThreshold = document.getElementById('LowShelf-threshold');
+    const LowShelfSlider = document.getElementById('lowShelfFrequency');
+    LowShelfSlider.addEventListener('input', () => {
+        LowShelfThreshold.textContent = LowShelfSlider.value + 'Hz';
+    });
+    LowShelfSlider.addEventListener('change', handleLowShelfchange);
+    
+    // Low shelf gain
+    const handleAttenuationchange = () => {
+        config.filters.lowShelfAttenuation = - lowShelfAttenuation.valueAsNumber;
+        config.filters.active = true;
+        updatePrefs();
+        worker.postMessage({ action: 'update-state', filters: { lowShelfAttenuation: config.filters.lowShelfAttenuation } })
+        showFilterEffect();
+        filterIconDisplay();
+    }
+    
+    const lowShelfAttenuation = document.getElementById('attenuation');
+    const lowShelfAttenuationThreshold = document.getElementById('attenuation-threshold');
+    lowShelfAttenuation.addEventListener('change', handleAttenuationchange);
+    
+    lowShelfAttenuation.addEventListener('input', () => {
+        lowShelfAttenuationThreshold.textContent = lowShelfAttenuation.value + 'dB';
+    });
+    
+    // number of threads
+    const numberOfThreads = document.getElementById('threads-value');
+    const ThreadSlider = document.getElementById('thread-slider');
+    ThreadSlider.addEventListener('input', () => {
+        numberOfThreads.textContent = ThreadSlider.value;
+    });
+    ThreadSlider.addEventListener('change', () => {
+        config[config.backend].threads = ThreadSlider.valueAsNumber;
+        loadModel({clearCache: false});
+        updatePrefs();
+    });
+    
+    
+    // Audio preferences:
+    
+    const showRelevantAudioQuality = () => {
+        if (['mp3', 'opus'].includes(config.audio.format)) {
+            audioBitrateContainer.classList.remove('d-none');
+            audioQualityContainer.classList.add('d-none');
+        } else if (config.audio.format === 'flac') {
+            audioQualityContainer.classList.remove('d-none');
+            audioBitrateContainer.classList.add('d-none');
+        } else {
+            audioQualityContainer.classList.add('d-none');
+            audioBitrateContainer.classList.add('d-none');
+        }
+    }
+    
+    audioFormat.addEventListener('change', (e) => {
+        config.audio.format = e.target.value;
+        showRelevantAudioQuality();
+        updatePrefs();
+        worker.postMessage({ action: 'update-state', audio: config.audio })
+    });
+    
+    audioBitrate.addEventListener('change', (e) => {
+        config.audio.bitrate = e.target.value;
+        updatePrefs();
+        worker.postMessage({ action: 'update-state', audio: config.audio })
+    });
+    
+    audioQuality.addEventListener('change', (e) => {
+        config.audio.quality = e.target.value;
+        updatePrefs();
+        worker.postMessage({ action: 'update-state', audio: config.audio })
+    });
+    
+    audioFade.addEventListener('change', (e) => {
+        config.audio.fade = e.target.checked;
+        updatePrefs();
+        worker.postMessage({ action: 'update-state', audio: config.audio })
+    });
+    
+    audioPadding.addEventListener('change', (e) => {
+        config.audio.padding = e.target.checked;
+        audioFade.disabled = !audioPadding.checked;
+        updatePrefs();
+        worker.postMessage({ action: 'update-state', audio: config.audio })
+    });
+    
+    audioDownmix.addEventListener('change', (e) => {
+        config.audio.downmix = e.target.checked;
+        updatePrefs();
+        worker.postMessage({ action: 'update-state', audio: config.audio })
+    });
+    
+    function getSnameFromCname(cname) {
+        for (let i = 0; i < LABELS.length; i++) {
+            if (LABELS[i].includes(cname)) {
+                return LABELS[i].split('_')[0];
             }
         }
+        return ; // Substring not found in any item
     }
-})
-
-
-
-async function createContextMenu(e) {
-    const target = e.target;
-    if (target.classList.contains('circle') || target.closest('thead')) return;
-    let hideInSummary = '', hideInSelection = '',
-        plural = '', contextDelete;
-    const inSummary = target.closest('#speciesFilter')
-    const resultContext = !target.closest('#summaryTable');
-    if (inSummary) {
-        hideInSummary = 'd-none';
-        plural = 's';
-    } else if (target.closest('#selectionResultTableBody')) {
-        hideInSelection = 'd-none';
-    }
-
-    // If we haven't clicked the active row or we cleared the region, load the row we clicked
-    if (resultContext || hideInSelection || hideInSummary) {
-        // Lets check if the summary needs to be filtered
-        if (!(inSummary && target.closest('tr').classList.contains('text-warning'))) {
-            target.click(); // Wait for file to load
-            await waitForFileLoad();
+    
+    
+    document.addEventListener('click', function (e) {
+        contextMenu.classList.add("d-none");
+        hideConfidenceSlider();
+    })
+    
+    
+    
+    // Beginnings of the all-powerful document 'change' listener
+    // One listener to rule them all!
+    document.addEventListener('change', function (e) {
+        const element = e.target.closest('[id]');
+        if (element){
+            const target = element.id;
+            config.debug && console.log('Change target:', target)
+            switch (target) {
+                case 'species-week': {
+                    config.useWeek = element.checked;
+                    updatePrefs();
+                    if (! config.useWeek) STATE.week = -1;
+                    worker.postMessage({action:'update-state', useWeek: config.useWeek})
+                    break;
+                }
+                case 'locale': {
+                    config[config.model].locale = element.value;
+                    updatePrefs();
+                    const chirpity = config[config.model].locale === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
+                    const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${config[config.model].locale}.txt`; 
+                    fetch(labelFile).then(response => {
+                        if (! response.ok) throw new Error('Network response was not ok');
+                        return response.text();
+                    }).then(filecontents => {
+                        LABELS = filecontents.trim().split(/\r?\n/);
+                        // Add unknown species
+                        LABELS.push('Unknown Sp._Unknown Sp.');
+                        worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS})
+                    }).catch(error =>{
+                        console.error('There was a problem fetching the label file:', error);
+                    })
+                    break;
+                }
+            }
         }
-    }
-    if (region === undefined && ! inSummary) return;
-    const createOrEdit = ((region?.attributes.label || target.closest('#summary'))) ? 'Edit' : 'Create';
-
-    contextMenu.innerHTML = `
+    })
+    
+    
+    
+    async function createContextMenu(e) {
+        const target = e.target;
+        if (target.classList.contains('circle') || target.closest('thead')) return;
+        let hideInSummary = '', hideInSelection = '',
+        plural = '', contextDelete;
+        const inSummary = target.closest('#speciesFilter')
+        const resultContext = !target.closest('#summaryTable');
+        if (inSummary) {
+            hideInSummary = 'd-none';
+            plural = 's';
+        } else if (target.closest('#selectionResultTableBody')) {
+            hideInSelection = 'd-none';
+        }
+        
+        // If we haven't clicked the active row or we cleared the region, load the row we clicked
+        if (resultContext || hideInSelection || hideInSummary) {
+            // Lets check if the summary needs to be filtered
+            if (!(inSummary && target.closest('tr').classList.contains('text-warning'))) {
+                target.click(); // Wait for file to load
+                await waitForFileLoad();
+            }
+        }
+        if (region === undefined && ! inSummary) return;
+        const createOrEdit = ((region?.attributes.label || target.closest('#summary'))) ? 'Edit' : 'Create';
+        
+        contextMenu.innerHTML = `
         <a class="dropdown-item play ${hideInSummary}"><span class='material-symbols-outlined'>play_circle</span> Play</a>
         <a class="dropdown-item ${hideInSummary} ${hideInSelection}" href="#" id="context-analyse-selection">
-            <span class="material-symbols-outlined">search</span> Analyse
+        <span class="material-symbols-outlined">search</span> Analyse
         </a>
         <div class="dropdown-divider ${hideInSummary}"></div>
         <a class="dropdown-item" id="create-manual-record" href="#">
-            <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} Record${plural}
+        <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} Record${plural}
         </a>
         <a class="dropdown-item" id="context-create-clip" href="#">
-            <span class="material-symbols-outlined">music_note</span> Export Audio Clip${plural}
+        <span class="material-symbols-outlined">music_note</span> Export Audio Clip${plural}
         </a>
         <a class="dropdown-item" id="context-xc" href='#' target="xc">
-            <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> View Species on Xeno-Canto
+        <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> View Species on Xeno-Canto
         </a>
         <div class="dropdown-divider ${hideInSelection}"></div>
         <a class="dropdown-item ${hideInSelection}" id="context-delete" href="#">
-            <span class='delete material-symbols-outlined'>delete_forever</span> Delete Record${plural}
+        <span class='delete material-symbols-outlined'>delete_forever</span> Delete Record${plural}
         </a>
-    `;
-    const modalTitle = document.getElementById('record-entry-modal-label');
-    modalTitle.textContent = `${createOrEdit} Record`;
-    if (!hideInSelection) {
-        const contextAnalyseSelectionLink = document.getElementById('context-analyse-selection');
-        contextAnalyseSelectionLink.addEventListener('click', getSelectionResults);
-        contextDelete = document.getElementById('context-delete');
-        resultContext ? contextDelete.addEventListener('click', deleteRecord) :
+        `;
+        const modalTitle = document.getElementById('record-entry-modal-label');
+        modalTitle.textContent = `${createOrEdit} Record`;
+        if (!hideInSelection) {
+            const contextAnalyseSelectionLink = document.getElementById('context-analyse-selection');
+            contextAnalyseSelectionLink.addEventListener('click', getSelectionResults);
+            contextDelete = document.getElementById('context-delete');
+            resultContext ? contextDelete.addEventListener('click', deleteRecord) :
             contextDelete.addEventListener('click', function () {
                 deleteSpecies(target);
             });
-    }
-    // Add event Handlers
-    const exporLink = document.getElementById('context-create-clip');
-    hideInSummary ? exporLink.addEventListener('click', batchExportAudio) :
-        exporLink.addEventListener('click', exportAudio);
-    if (!hideInSelection) {
-        document.getElementById('create-manual-record').addEventListener('click', function (e) {
-            if (e.target.textContent.includes('Edit')) {
-                showRecordEntryForm('Update', !!hideInSummary);
-            } else {
-                showRecordEntryForm('Add', !!hideInSummary);
-            }
-        })
-    }
-    const xc = document.getElementById('context-xc');
-    if (region?.attributes.label || hideInSummary) {
-        let cname;
-        if (hideInSummary) {
-            const row = target.closest('tr');
-            cname = row.querySelector('.cname .cname').textContent;
-        } else {
-            cname = region.attributes.label.replace('?', '');
         }
-        const sname = getSnameFromCname(cname);
-        const XC_type = cname.includes('(song)') ? "song" :
-            cname.includes('call)') ? "nocturnal flight call" : "";
-        xc.href = `https://xeno-canto.org/explore?query=${sname}%20type:"${XC_type}`;
-        xc.classList.remove('d-none');
-    }
-    else {
-        xc.classList.add('d-none');
-        contextDelete.classList.add('d-none');
-    }
-    positionMenu(contextMenu, e);
-}
-
-function positionMenu(menu, event) {
-    menu.classList.remove("d-none");
-    // Calculate menu positioning:
-    const menuWidth = menu.clientWidth;
-    const menuHeight = menu.clientHeight;
-    let top = event.pageY - 50;
-    let left = event.pageX;
-    // Check if the menu would be displayed partially off-screen on the right
-    if (left + menuWidth > window.innerWidth) {
-        left = window.innerWidth - menuWidth - 15;
-    }
-
-    // Check if the menu would be displayed partially off-screen on the bottom
-    if (top + menuHeight > window.innerHeight - 90) {
-        top = window.innerHeight - menuHeight - 90;
-    }
-
-    menu.style.display = 'block';
-    menu.style.top =  top + 'px';
-    menu.style.left =  left + 'px';
-}
-
-[spectrogramWrapper, resultTableElement, selectionTable].forEach(el =>{
-    el.addEventListener('contextmenu', createContextMenu)
-})
-
-
-const recordEntryModalDiv = document.getElementById('record-entry-modal')
-const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, { backdrop: 'static' });
-
-
-const recordEntryForm = document.getElementById('record-entry-form');
-let focusBirdList;
-
-async function showRecordEntryForm(mode, batch) {
-    const cname = batch ? document.querySelector('#speciesFilter .text-warning .cname .cname').textContent : region.attributes.label.replace('?', '');
-    let callCount = '', typeIndex = '', commentText = '';
-    if (cname && activeRow) {
-        // Populate the form with existing values
-        commentText = activeRow.querySelector('.comment > span')?.title || '';
-        callCount = activeRow.querySelector('.call-count').textContent.replace('Present', '');
-        typeIndex = ['Local', 'Nocmig', ''].indexOf(activeRow.querySelector('.label').textContent);
-    }
-    const recordEntryBirdList = recordEntryForm.querySelector('#record-entry-birdlist');
-    focusBirdList = () => {
-        const allBirdList = document.getElementById('bird-list-all')
-        allBirdList.focus()
-    }
-    recordEntryBirdList.innerHTML = generateBirdOptionList({ store: 'allSpecies', rows: undefined, selected: cname });
-    const batchHide = recordEntryForm.querySelectorAll('.hide-in-batch');
-    batchHide.forEach(el => batch ? el.classList.add('d-none') : el.classList.remove('d-none'));
-    recordEntryForm.querySelector('#call-count').value = callCount;
-    recordEntryForm.querySelector('#record-comment').value = commentText;
-    recordEntryForm.querySelector('#DBmode').value = mode;
-    recordEntryForm.querySelector('#batch-mode').value = batch;
-    recordEntryForm.querySelector('#original-id').value = cname;
-    recordEntryForm.querySelector('#record-add').textContent = mode;
-    if (typeIndex) recordEntryForm.querySelectorAll('input[name="record-label"]')[typeIndex].checked = true;
-    recordEntryModalDiv.addEventListener('shown.bs.modal', focusBirdList)
-    toggleKeyDownForFormInputs()
-    recordEntryModal.show();
-}
-
-recordEntryForm.addEventListener('submit', function (e) {
-    e.preventDefault();
-    const action = document.getElementById('DBmode').value;
-    // cast boolstring to boolean
-    const batch = document.getElementById('batch-mode').value === 'true';
-    const cname = document.getElementById('bird-list-all').value;
-    let start, end;
-    if (region) {
-        start = bufferBegin + region.start;
-        end = bufferBegin + region.end;
-        region.attributes.label = cname;
-    }
-    const originalCname = document.getElementById('original-id').value;
-    // Update the region label
-    const count = document.getElementById('call-count')?.value;
-    const comment = document.getElementById('record-comment')?.value;
-    const label = document.querySelector('input[name="record-label"]:checked')?.value || '';
-
-    recordEntryModal.hide();
-    insertManualRecord(cname, start, end, comment, count, label, action, batch, originalCname)
-})
-
-
-const insertManualRecord = (cname, start, end, comment, count, label, action, batch, originalCname, confidence) => {
-    const files = batch ? fileList : currentFile;
-    worker.postMessage({
-        action: 'insert-manual-record',
-        cname: cname,
-        originalCname: originalCname,
-        start: start?.toFixed(3),
-        end: end?.toFixed(3),
-        comment: comment,
-        count: count || undefined,
-        file: files,
-        label: label,
-        DBaction: action,
-        batch: batch,
-        confidence: confidence,
-        active: activeRow.rowIndex - 1 //  have to account for the header row
-    })
-}
-
-
-const purgeFile = document.getElementById('purge-file');
-purgeFile.addEventListener('click', deleteFile)
-
-function deleteFile(file) {
-    // EventHandler caller 
-    if (typeof file === 'object' && file instanceof Event) {
-        file = currentFile;
-    }
-    if (file) {
-        if (confirm(`This will remove ${file} and all the associated detections from the database archive. Proceed?`)) {
-            worker.postMessage({
-                action: 'purge-file',
-                fileName: file
+        // Add event Handlers
+        const exporLink = document.getElementById('context-create-clip');
+        hideInSummary ? exporLink.addEventListener('click', batchExportAudio) :
+        exporLink.addEventListener('click', exportAudio);
+        if (!hideInSelection) {
+            document.getElementById('create-manual-record').addEventListener('click', function (e) {
+                if (e.target.textContent.includes('Edit')) {
+                    showRecordEntryForm('Update', !!hideInSummary);
+                } else {
+                    showRecordEntryForm('Add', !!hideInSummary);
+                }
             })
         }
-        renderFilenamePanel()
+        const xc = document.getElementById('context-xc');
+        if (region?.attributes.label || hideInSummary) {
+            let cname;
+            if (hideInSummary) {
+                const row = target.closest('tr');
+                cname = row.querySelector('.cname .cname').textContent;
+            } else {
+                cname = region.attributes.label.replace('?', '');
+            }
+            const sname = getSnameFromCname(cname);
+            const XC_type = cname.includes('(song)') ? "song" :
+            cname.includes('call)') ? "nocturnal flight call" : "";
+            xc.href = `https://xeno-canto.org/explore?query=${sname}%20type:"${XC_type}`;
+            xc.classList.remove('d-none');
+        }
+        else {
+            xc.classList.add('d-none');
+            contextDelete.classList.add('d-none');
+        }
+        positionMenu(contextMenu, e);
     }
-}
-// Utility functions to wait for file to load
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function waitForFileLoad() {
-    while (!fileLoaded) {
-        await delay(100); // Wait for 100 milliseconds before checking again
+    
+    function positionMenu(menu, event) {
+        menu.classList.remove("d-none");
+        // Calculate menu positioning:
+        const menuWidth = menu.clientWidth;
+        const menuHeight = menu.clientHeight;
+        let top = event.pageY - 50;
+        let left = event.pageX;
+        // Check if the menu would be displayed partially off-screen on the right
+        if (left + menuWidth > window.innerWidth) {
+            left = window.innerWidth - menuWidth - 15;
+        }
+        
+        // Check if the menu would be displayed partially off-screen on the bottom
+        if (top + menuHeight > window.innerHeight - 90) {
+            top = window.innerHeight - menuHeight - 90;
+        }
+        
+        menu.style.display = 'block';
+        menu.style.top =  top + 'px';
+        menu.style.left =  left + 'px';
     }
-}
-
-async function waitForLocations() {
-    while (!LOCATIONS) {
-        await delay(100); // Wait for 100 milliseconds before checking again
+    
+    [spectrogramWrapper, resultTableElement, selectionTable].forEach(el =>{
+        el.addEventListener('contextmenu', createContextMenu)
+    })
+    
+    
+    const recordEntryModalDiv = document.getElementById('record-entry-modal')
+    const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, { backdrop: 'static' });
+    
+    
+    const recordEntryForm = document.getElementById('record-entry-form');
+    let focusBirdList;
+    
+    async function showRecordEntryForm(mode, batch) {
+        const cname = batch ? document.querySelector('#speciesFilter .text-warning .cname .cname').textContent : region.attributes.label.replace('?', '');
+        let callCount = '', typeIndex = '', commentText = '';
+        if (cname && activeRow) {
+            // Populate the form with existing values
+            commentText = activeRow.querySelector('.comment > span')?.title || '';
+            callCount = activeRow.querySelector('.call-count').textContent.replace('Present', '');
+            typeIndex = ['Local', 'Nocmig', ''].indexOf(activeRow.querySelector('.label').textContent);
+        }
+        const recordEntryBirdList = recordEntryForm.querySelector('#record-entry-birdlist');
+        focusBirdList = () => {
+            const allBirdList = document.getElementById('bird-list-all')
+            allBirdList.focus()
+        }
+        recordEntryBirdList.innerHTML = generateBirdOptionList({ store: 'allSpecies', rows: undefined, selected: cname });
+        const batchHide = recordEntryForm.querySelectorAll('.hide-in-batch');
+        batchHide.forEach(el => batch ? el.classList.add('d-none') : el.classList.remove('d-none'));
+        recordEntryForm.querySelector('#call-count').value = callCount;
+        recordEntryForm.querySelector('#record-comment').value = commentText;
+        recordEntryForm.querySelector('#DBmode').value = mode;
+        recordEntryForm.querySelector('#batch-mode').value = batch;
+        recordEntryForm.querySelector('#original-id').value = cname;
+        recordEntryForm.querySelector('#record-add').textContent = mode;
+        if (typeIndex) recordEntryForm.querySelectorAll('input[name="record-label"]')[typeIndex].checked = true;
+        recordEntryModalDiv.addEventListener('shown.bs.modal', focusBirdList)
+        toggleKeyDownForFormInputs()
+        recordEntryModal.show();
     }
-    return;
-}
-
-// TOUR functions
-const tourModal = document.getElementById('tourModal');
-// Initialize the Bootstrap modal
-
-// Function to start the tour
-function startTour() {
-    var modal = new bootstrap.Modal(tourModal, {
-        backdrop: 'static', // Prevent closing by clicking outside the modal
-        keyboard: false      // Prevent closing by pressing Esc key
-    });
-    modal.show();
-}
-
-// Function to highlight an element on the page
-function highlightElement(selector) {
-    // Remove any previous highlights
-    var highlightedElements = document.querySelectorAll('.highlighted');
-    highlightedElements.forEach(function (element) {
-        element.classList.remove('highlighted');
-    });
-    // Add a highlight class to the selected element
-    var selectedElement = document.querySelector(selector);
-    if (selectedElement) {
-        selectedElement.classList.add('highlighted');
+    
+    recordEntryForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const action = document.getElementById('DBmode').value;
+        // cast boolstring to boolean
+        const batch = document.getElementById('batch-mode').value === 'true';
+        const cname = document.getElementById('bird-list-all').value;
+        let start, end;
+        if (region) {
+            start = bufferBegin + region.start;
+            end = bufferBegin + region.end;
+            region.attributes.label = cname;
+        }
+        const originalCname = document.getElementById('original-id').value;
+        // Update the region label
+        const count = document.getElementById('call-count')?.value;
+        const comment = document.getElementById('record-comment')?.value;
+        const label = document.querySelector('input[name="record-label"]:checked')?.value || '';
+        
+        recordEntryModal.hide();
+        insertManualRecord(cname, start, end, comment, count, label, action, batch, originalCname)
+    })
+    
+    
+    const insertManualRecord = (cname, start, end, comment, count, label, action, batch, originalCname, confidence) => {
+        const files = batch ? fileList : currentFile;
+        worker.postMessage({
+            action: 'insert-manual-record',
+            cname: cname,
+            originalCname: originalCname,
+            start: start?.toFixed(3),
+            end: end?.toFixed(3),
+            comment: comment,
+            count: count || undefined,
+            file: files,
+            label: label,
+            DBaction: action,
+            batch: batch,
+            confidence: confidence,
+            active: activeRow.rowIndex - 1 //  have to account for the header row
+        })
     }
-}
-
-// Event handler for when the carousel slides
-document.getElementById('carouselExample').addEventListener('slid.bs.carousel', function () {
-    // Get the active carousel item
-    var activeItem = document.querySelector('#carouselExample .carousel-inner .carousel-item.active');
-    // Get the element selector associated with the current step
-    var elementSelector = activeItem.dataset.elementSelector;
-    // Highlight the corresponding element on the page
-    highlightElement(elementSelector);
-
-    if (elementSelector === "#fileContainer") {
-        // Create and dispatch a new 'contextmenu' event
-        var element = document.getElementById('filename');
-        var contextMenuEvent = new MouseEvent('contextmenu', {
-            bubbles: true,
-            cancelable: true,
-            clientY: element.offsetTop + (2 * element.offsetHeight),
-            clientX: 20
+    
+    
+    const purgeFile = document.getElementById('purge-file');
+    purgeFile.addEventListener('click', deleteFile)
+    
+    function deleteFile(file) {
+        // EventHandler caller 
+        if (typeof file === 'object' && file instanceof Event) {
+            file = currentFile;
+        }
+        if (file) {
+            if (confirm(`This will remove ${file} and all the associated detections from the database archive. Proceed?`)) {
+                worker.postMessage({
+                    action: 'purge-file',
+                    fileName: file
+                })
+            }
+            renderFilenamePanel()
+        }
+    }
+    // Utility functions to wait for file to load
+    function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+    
+    async function waitForFileLoad() {
+        while (!fileLoaded) {
+            await delay(100); // Wait for 100 milliseconds before checking again
+        }
+    }
+    
+    async function waitForLocations() {
+        while (!LOCATIONS) {
+            await delay(100); // Wait for 100 milliseconds before checking again
+        }
+        return;
+    }
+    
+    // TOUR functions
+    const tourModal = document.getElementById('tourModal');
+    // Initialize the Bootstrap modal
+    
+    // Function to start the tour
+    function startTour() {
+        var modal = new bootstrap.Modal(tourModal, {
+            backdrop: 'static', // Prevent closing by clicking outside the modal
+            keyboard: false      // Prevent closing by pressing Esc key
         });
-        buildFileMenu(contextMenuEvent);
-    } else {
-        document.getElementById("context-menu").classList.remove("show");
+        modal.show();
     }
-});
-
-// Event handler for closing the modal
-tourModal.addEventListener('hidden.bs.modal', function () {
-    // Remove any highlights when the modal is closed
-    var highlightedElements = document.querySelectorAll('.highlighted');
-    highlightedElements.forEach(function (element) {
-        element.classList.remove('highlighted');
+    
+    // Function to highlight an element on the page
+    function highlightElement(selector) {
+        // Remove any previous highlights
+        var highlightedElements = document.querySelectorAll('.highlighted');
+        highlightedElements.forEach(function (element) {
+            element.classList.remove('highlighted');
+        });
+        // Add a highlight class to the selected element
+        var selectedElement = document.querySelector(selector);
+        if (selectedElement) {
+            selectedElement.classList.add('highlighted');
+        }
+    }
+    
+    // Event handler for when the carousel slides
+    document.getElementById('carouselExample').addEventListener('slid.bs.carousel', function () {
+        // Get the active carousel item
+        var activeItem = document.querySelector('#carouselExample .carousel-inner .carousel-item.active');
+        // Get the element selector associated with the current step
+        var elementSelector = activeItem.dataset.elementSelector;
+        // Highlight the corresponding element on the page
+        highlightElement(elementSelector);
+        
+        if (elementSelector === "#fileContainer") {
+            // Create and dispatch a new 'contextmenu' event
+            var element = document.getElementById('filename');
+            var contextMenuEvent = new MouseEvent('contextmenu', {
+                bubbles: true,
+                cancelable: true,
+                clientY: element.offsetTop + (2 * element.offsetHeight),
+                clientX: 20
+            });
+            buildFileMenu(contextMenuEvent);
+        } else {
+            document.getElementById("context-menu").classList.remove("show");
+        }
     });
-    config.seenTour = true;
-    updatePrefs();
-});
-
-// Event handler for starting the tour
-const prepTour = async () => {
-    if (!fileLoaded) {
-        const example_file = await window.electron.getAudio();
-        // create a canvas for the audio spec
-        showElement(['spectrogramWrapper'], false);
-        await loadAudioFile({ filePath: example_file });
+    
+    // Event handler for closing the modal
+    tourModal.addEventListener('hidden.bs.modal', function () {
+        // Remove any highlights when the modal is closed
+        var highlightedElements = document.querySelectorAll('.highlighted');
+        highlightedElements.forEach(function (element) {
+            element.classList.remove('highlighted');
+        });
+        config.seenTour = true;
+        updatePrefs();
+    });
+    
+    // Event handler for starting the tour
+    const prepTour = async () => {
+        if (!fileLoaded) {
+            const example_file = await window.electron.getAudio();
+            // create a canvas for the audio spec
+            showElement(['spectrogramWrapper'], false);
+            await loadAudioFile({ filePath: example_file });
+        }
+        startTour();
     }
-    startTour();
-}
-
-document.getElementById('startTour').addEventListener('click', prepTour);
-
-// Function to display update download progress
-const tracking = document.getElementById('update-progress');
-const updateProgressBar = document.getElementById('update-progress-bar');
-window.electron.onDownloadProgress((_event, progressObj) => {
-    tracking.classList.remove('d-none')
-    // Update your UI with the progress information
-    updateProgressBar.value = progressObj.percent;
-    if (progressObj.percent > 99) tracking.classList.add('d-none')
-});
-   
-// CI functions
-const getFileLoaded = () => fileLoaded;
-const donePredicting = () => !PREDICTING;
-const getAudacityLabels = () => AUDACITY_LABELS[currentFile];
-
-
-// Update checking for Mac 
-
-function checkForMacUpdates() {
-    // Do this at most daily
-    const latestCheck = Date.now()
-    const checkDue = (latestCheck - config.lastUpdateCheck) > 86_400_000;
-    if (checkDue){
-        fetch('https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest')
+    
+    document.getElementById('startTour').addEventListener('click', prepTour);
+    
+    // Function to display update download progress
+    const tracking = document.getElementById('update-progress');
+    const updateProgressBar = document.getElementById('update-progress-bar');
+    window.electron.onDownloadProgress((_event, progressObj) => {
+        tracking.classList.remove('d-none')
+        // Update your UI with the progress information
+        updateProgressBar.value = progressObj.percent;
+        if (progressObj.percent > 99) tracking.classList.add('d-none')
+    });
+    
+    // CI functions
+    const getFileLoaded = () => fileLoaded;
+    const donePredicting = () => !PREDICTING;
+    const getAudacityLabels = () => AUDACITY_LABELS[currentFile];
+    
+    
+    // Update checking for Mac 
+    
+    function checkForMacUpdates() {
+        // Do this at most daily
+        const latestCheck = Date.now()
+        const checkDue = (latestCheck - config.lastUpdateCheck) > 86_400_000;
+        if (checkDue){
+            fetch('https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest')
             .then(response => response.json())
             .then(data => {
                 const latestVersion = data.tag_name;
                 const latest = parseSemVer(latestVersion);
                 const current = parseSemVer(VERSION);
-
+                
                 if (isNewVersion(latest, current)) {
                     const alertPlaceholder = document.getElementById('liveAlertPlaceholder')
                     const alert = (message, type) => {
@@ -4543,38 +4561,38 @@ function checkForMacUpdates() {
             .catch(error => {
                 console.warn('Error checking for updates:', error);
             });
-    }
-}
-
-function parseSemVer(versionString) {
-    const semVerRegex = /^[vV]?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-.]+))?(?:\+([0-9A-Za-z-.]+))?$/;
-    const matches = versionString.match(semVerRegex);
-    if (!matches) {
-        throw new Error('Invalid SemVer version string');
-    }
-
-    const [, major, minor, patch, preRelease, buildMetadata] = matches;
-    
-    return {
-        major: parseInt(major),
-        minor: parseInt(minor),
-        patch: parseInt(patch),
-        preRelease: preRelease || null,
-        buildMetadata: buildMetadata || null
-    };
-}
-
-function isNewVersion(latest, current) {
-    if (latest.major > current.major) {
-        return true;
-    } else if (latest.major === current.major) {
-        if (latest.minor > current.minor) {
-            return true;
-        } else if (latest.minor === current.minor) {
-            if (latest.patch > current.patch) {
-                return true;
-            }
         }
     }
-    return false;
-}
+    
+    function parseSemVer(versionString) {
+        const semVerRegex = /^[vV]?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-.]+))?(?:\+([0-9A-Za-z-.]+))?$/;
+        const matches = versionString.match(semVerRegex);
+        if (!matches) {
+            throw new Error('Invalid SemVer version string');
+        }
+        
+        const [, major, minor, patch, preRelease, buildMetadata] = matches;
+        
+        return {
+            major: parseInt(major),
+            minor: parseInt(minor),
+            patch: parseInt(patch),
+            preRelease: preRelease || null,
+            buildMetadata: buildMetadata || null
+        };
+    }
+    
+    function isNewVersion(latest, current) {
+        if (latest.major > current.major) {
+            return true;
+        } else if (latest.major === current.major) {
+            if (latest.minor > current.minor) {
+                return true;
+            } else if (latest.minor === current.minor) {
+                if (latest.patch > current.patch) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }

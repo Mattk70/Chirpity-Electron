@@ -213,7 +213,7 @@ class Model {
                 // BirdNET nocturnal bird filter
                 for (let i = 0; i < this.labels.length; i++) {
                     const item = this.labels[i];
-                    if (ACTIVITY_INDEX[item]  !== 1 && BIRDNET_NOT_BIRDS.indexOf(item) !== -1) includedIDs.push(i);     
+                    if (ACTIVITY_INDEX[item]  !== 1 && BIRDNET_NOT_BIRDS.indexOf(item) < 0) includedIDs.push(i);     
                 }
             } 
         } else {
