@@ -177,7 +177,7 @@
   "bugs": {
     "url": "https://github.com/mattk70/Chirpity-Electron/issues"
   },
-  "homepage": "https://github.com/mattk70/Chirpity-Electron#readme",
+  "homepage": "https://chirpity.mattkirkland.co.uk",
   "devDependencies": {
     "@playwright/test": "^1.39.0",
     "electron": "^27.1.3",
