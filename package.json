@@ -18,8 +18,7 @@
       {
         "provider": "github",
         "owner": "Mattk70",
-        "repo": "https://github.com/Mattk70/Chirpity-Electron",
-        "branch": "nocturnal-filter"
+        "repo": "https://github.com/Mattk70/Chirpity-Electron"
       }
     ],
     "files": [
