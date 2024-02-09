@@ -3057,9 +3057,9 @@ const prepSummaryStatement = (included) => {
                     message: 'get-list', 
                     model: STATE.model, 
                     listType: STATE.list, 
-                    lat: lat, 
-                    lon: lon, 
-                    week: week, 
+                    lat: lat || STATE.lat, 
+                    lon: lon || STATE.lon, 
+                    week: week || STATE.week, 
                     useWeek: STATE.useWeek,
                     threshold: STATE.speciesThreshold
                 })

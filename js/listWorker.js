@@ -211,10 +211,35 @@ class Model {
                 }
             } else {
                 // BirdNET nocturnal bird filter
+                const additionalIDs = [];
                 for (let i = 0; i < this.labels.length; i++) {
                     const item = this.labels[i];
                     if (ACTIVITY_INDEX[item]  !== 1 && BIRDNET_NOT_BIRDS.indexOf(item) < 0) includedIDs.push(i);     
                 }
+                this.mdata_input = tf.tensor([lat, lon, week]).expandDims(0);
+                const mdata_prediction = this.metadata_model.predict(this.mdata_input);
+                const mdata_probs = await mdata_prediction.data();
+                for (let i = 0; i < mdata_probs.length; i++) {
+                    const index = i; // mdata_probs.indexOf(mdata_probs_sorted[i]);
+                    if (mdata_probs[index] < threshold) {
+                        DEBUG && console.log('Excluding:', this.mdata_labels[index] + ': ' + mdata_probs[index]);
+                    } else {
+                        const latin = this.mdata_labels[index].split('_')[0];
+                        // Use the reduce() method to accumulate the indices of species containing the latin name
+                        const foundIndices = this.labels.reduce((indices, element, index) => {
+                            element.includes(latin) && indices.push(index);
+                            return indices;
+                        }, []);
+                        foundIndices.forEach(index => {
+                            // If we want an override list...=>
+                            //if (! ['Dotterel', 'Stone-curlew', 'Spotted Crake'].some(this.labels[index])) BLOCKED_IDS.push(index)
+                            additionalIDs.push(index)
+                            DEBUG && console.log('Including: ', index, 'name', this.labels[index], 'probability', mdata_probs[i].toFixed(3) )
+                        })
+                    }
+                }
+                includedIDs = includedIDs.filter(id => additionalIDs.includes(id));
+
             } 
         } else {
 
