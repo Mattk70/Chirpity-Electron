@@ -19,6 +19,7 @@ let NUM_WORKERS;
 let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let LIST_WORKER;
+let normalizerNode;
 const DEBUG = false;
 
 const DATASET = false;
@@ -379,10 +380,11 @@ case "update-file-start": {await onUpdateFileStart(args);
     break;
 }
 case "update-list": {
-    UI.postMessage({ event: "show-spinner" });
+    //UI.postMessage({ event: "show-spinner" });
     STATE.list = args.list;
-    await setIncludedIDs(STATE.lat, STATE.lon, STATE.week)
-    await Promise.all([getResults(), getSummary()]);
+    const {lat, lon, week} = STATE;
+    await setIncludedIDs(lat, lon, week )
+    args.refreshResults && await Promise.all([getResults(), getSummary()]);
     break;
 }
 case 'update-locale': {
@@ -862,10 +864,9 @@ const prepSummaryStatement = (included) => {
                 return new Promise(function (resolve) {
                     const sampleRate = STATE.model === 'birdnet' ? 48_000 :24_000, channels = 1;
                     let totalTime;
-                    ffmpeg(file)
+                    let command = ffmpeg(file)
                     .audioChannels(channels)
                     .audioFrequency(sampleRate)
-                    
                     .on('error', (err) => {
                         console.log('An error occurred: ' + err.message);
                         if (err) {
@@ -899,7 +900,8 @@ const prepSummaryStatement = (included) => {
                         UI.postMessage({ event: 'progress', text: 'File decompressed', progress: 1 })
                         resolve(destination)
                     })
-                    .save(destination)
+                    STATE.audio.normalise && command.audioFilter("loudnorm=I=-16:LRA=11:TP=-1.5")
+                    command.save(destination)
                 });
             }
             
@@ -921,7 +923,7 @@ const prepSummaryStatement = (included) => {
                 if (!source_file) return false;
                 let proxy = source_file;
                 
-                if (!source_file.endsWith('.wav')) {
+                if (STATE.audio.normalise || ! source_file.endsWith('.wav')) {
                     const pc = p.parse(source_file);
                     const filename = pc.base + '.wav';
                     const prefix = pc.dir.replace(pc.root, '');
@@ -1194,6 +1196,7 @@ const prepSummaryStatement = (included) => {
                 audioCtxSource.buffer = audioBufferChunk;
                 const duration = audioCtxSource.buffer.duration;
                 const buffer = audioCtxSource.buffer;
+                // IF we want to use worklets, we'll need to reuse the context across the whole file
                 const offlineCtx = new OfflineAudioContext(1, rate * duration, rate);
                 const offlineSource = offlineCtx.createBufferSource();
                 offlineSource.buffer = buffer;
@@ -1240,14 +1243,14 @@ const prepSummaryStatement = (included) => {
                 
                 
                 // Add audio normalizer as an Audio Worklet
-                /*
-                await offlineCtx.audioWorklet.addModule('js/audio_normalizer_processor.js');
-                const normalizerNode = new AudioWorkletNode(offlineCtx, 'audio-normalizer-processor');
+                // if (!normalizerNode){
+                //     await offlineCtx.audioWorklet.addModule('js/audio_normalizer_processor.js');
+                //     normalizerNode = new AudioWorkletNode(offlineCtx, 'audio-normalizer-processor');
+                // }
+                // // Connect the nodes
+                // previousFilter ? previousFilter.connect(normalizerNode) : offlineSource.connect(normalizerNode);
+                // previousFilter = normalizerNode;
                 
-                // Connect the nodes
-                previousFilter ? previousFilter.connect(normalizerNode) : offlineSource.connect(normalizerNode);
-                previousFilter = normalizerNode;
-                */
                 // // Create a gain node to adjust the audio level
                 if (STATE.audio.gain){
                     var gainNode = offlineCtx.createGain();
