@@ -114,10 +114,17 @@ const progressBar = document.getElementById('progress-bar');
 const fileNumber = document.getElementById('fileNumber');
 const timelineSetting = document.getElementById('timelineSetting');
 const colourmap = document.getElementById('colourmap');
+const batchSizeSlider = document.getElementById('batch-size');
 const batchSizeValue = document.getElementById('batch-size-value');
 const nocmig = document.getElementById('nocmig');
 const contextAware = document.getElementById('context');
+const modelToUse = document.getElementById('model-to-use');
 const debugMode = document.getElementById('debug-mode');
+const listToUse = document.getElementById('list-to-use');
+const localSwitch = document.getElementById('local');
+const localSwitchContainer = document.getElementById('use-location-container');
+const gain = document.getElementById('gain');
+const gainAdjustment = document.getElementById('gain-adjustment');
 const audioFade = document.getElementById('fade');
 const audioBitrate = document.getElementById('bitrate');
 const audioQuality = document.getElementById('quality');
@@ -130,6 +137,8 @@ const audioFiltersIcon = document.getElementById('audioFiltersIcon')
 const contextAwareIcon = document.getElementById('context-mode');
 const defaultLat = document.getElementById('latitude');
 const defaultLon = document.getElementById('longitude');
+const ThreadSlider = document.getElementById('thread-slider');
+const numberOfThreads = document.getElementById('threads-value');
 let activeRow;
 let predictions = {},
 clickedIndex, currentFileDuration;
@@ -658,7 +667,7 @@ const displayLocationAddress = async (where) => {
         speciesThresholdEl.classList.remove('d-none');
         
         updateListIcon();
-        document.getElementById('list-to-use').value = config.list;
+        listToUse.value = config.list;
         resetResults();
         worker.postMessage({
             action: 'update-list',
@@ -1358,7 +1367,8 @@ window.onload = async () => {
         locale: 'en_uk',
         colormap: 'inferno',
         timeOfDay: false,
-        list: 'migrants',
+        list: 'nocturnal',
+        local: true,
         speciesThreshold: 0.03,
         useWeek: false,
         model: 'chirpity',
@@ -1374,7 +1384,7 @@ window.onload = async () => {
         tensorflow: { threads: DIAGNOSTICS['Cores'], batchSize: 32 },
         webgpu: { threads: 2, batchSize: 32 },
         webgl: { threads: 2, batchSize: 32 },
-        audio: { format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false },
+        audio: { gain: 0, format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false },
         limit: 500,
         debug: false
     };
@@ -1408,19 +1418,20 @@ window.onload = async () => {
         // Initialize Spectrogram
         initWavesurfer({});
         // Set UI option state
-        const batchSizeSlider = document.getElementById('batch-size');
+        
         // Map slider value to batch size
         batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
         batchSizeSlider.max = (BATCH_SIZE_LIST.length - 1).toString();
         batchSizeValue.textContent = config[config.backend].batchSize;
-        const modelToUse = document.getElementById('model-to-use');
         modelToUse.value = config.model;
         const backendEL = document.getElementById(config.backend);
         backendEL.checked = true;
         // Show time of day in results?
         setTimelinePreferences();
         // Show the list in use
-        document.getElementById('list-to-use').value = config.list;
+        listToUse.value = config.list;
+        localSwitch.checked = config.local;
+
         // Show Locale
         document.getElementById('locale').value = config[config.model].locale;
         
@@ -1438,6 +1449,8 @@ window.onload = async () => {
         // Nocmig mode state
         console.log('nocmig mode is ' + config.detect.nocmig);
         // Audio preferences:
+        gain.value = config.audio.gain;
+        gainAdjustment.textContent = config.audio.gain + 'dB';
         audioFormat.value = config.audio.format;
         audioBitrate.value = config.audio.bitrate;
         audioQuality.value = config.audio.quality;
@@ -1448,19 +1461,22 @@ window.onload = async () => {
         audioDownmix.checked = config.audio.downmix;
         setNocmig(config.detect.nocmig);
         const chirpityOnly = document.querySelectorAll('.chirpity-only');
-        if (config.model !== 'birdnet'){
-            // show chirpity-only features
-            chirpityOnly.forEach(element => element.classList.remove('d-none'));
-            contextAware.checked = config.detect.contextAware
-            SNRSlider.disabled = false;
-        } else {
+        if (config.model === 'birdnet'){
             // hide chirpity-only features
             chirpityOnly.forEach(element => element.classList.add('d-none'));
+            if (config.list === 'nocturnal')  {
+                localSwitchContainer.classList.remove('d-none');
+            }
             contextAware.checked = false;
             contextAware.disabed = true;
             config.detect.contextAware = false;
             SNRSlider.disabled = true;
             config.filters.SNR = 0;
+        } else {
+            // show chirpity-only features
+            chirpityOnly.forEach(element => element.classList.remove('d-none'));
+            contextAware.checked = config.detect.contextAware
+            SNRSlider.disabled = false;
         }
         contextAwareIconDisplay();
         debugMode.checked = config.debug;
@@ -1501,7 +1517,8 @@ window.onload = async () => {
             locale: config[config.model].locale,
             speciesThreshold: config.speciesThreshold,
             list: config.list,
-            useWeek: config.useWeek
+            useWeek: config.useWeek,
+            local: config.local
         });
         const {model, backend, list} = config;
         t0_warmup = Date.now();
@@ -2211,7 +2228,7 @@ function onChartData(args) {
         icon.src = icon.src.replace(/\w+\.png$/, config.list + '.png');
         const states = {
             location: 'Searching for birds in your region',
-            migrants: 'Searching for migrants and owls',
+            nocturnal: 'Searching for nocturnal birds',
             birds: 'Searching for all birds',
             everything: 'Searching for everything'
         };
@@ -2221,7 +2238,7 @@ function onChartData(args) {
         let img = listIcon.querySelector('img')
         const states = {
             location: 'Searching for birds in your region',
-            migrants: 'Searching for migrants and owls',
+            nocturnal: 'Searching for nocturnal birds',
             birds: 'Searching for all birds',
             everything: 'Searching for everything'
         };
@@ -2244,17 +2261,6 @@ function onChartData(args) {
         }
     })
     
-    
-    const listToUse = document.getElementById('list-to-use');
-    listToUse.addEventListener('change', function (e) {
-        config.list = e.target.value;
-        config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
-        speciesThresholdEl.classList.add('d-none');
-        updateListIcon();
-        updatePrefs();
-        resetResults({clearSummary: true, clearPagination: true, clearResults: true});
-        worker.postMessage({ action: 'update-list', list: config.list  })
-    })
     
     speciesThreshold.addEventListener('change', () =>{
         if (isNaN(speciesThreshold.value) || speciesThreshold.value === '') {
@@ -2280,29 +2286,6 @@ function onChartData(args) {
             clearCache: clearCache
         });
     }
-    
-    const modelToUse = document.getElementById('model-to-use');
-    modelToUse.addEventListener('change', function (e) {
-        config.model = e.target.value;
-        const chirpityOnly = document.querySelectorAll('.chirpity-only');
-        if (config.model === 'birdnet') { 
-            contextAware.checked = false;
-            // hide chirpity-only features
-            chirpityOnly.forEach(element => element.classList.add('d-none'));
-            contextAware.disabed = true;
-            config.detect.contextAware = false;
-            SNRSlider.disabled = true;
-            config.filters.SNR = 0;
-        } else {
-            // show chirpity-only features
-            chirpityOnly.forEach(element => element.classList.remove('d-none'));
-            contextAware.disabed = false;
-            SNRSlider.disabled = false;
-        }
-        document.getElementById('locale').value = config[config.model].locale;
-        updatePrefs();
-        loadModel();
-    })
     
     const handleBackendChange = (e) => {
         config.backend = e.target.value;
@@ -3385,10 +3368,11 @@ function onChartData(args) {
         const count = included.length;
         const current_file_text =  STATE.week !== -1 && STATE.week ? `. The current file was saved in week <b>${STATE.week}</b>` : '';
         const model = config.model === 'birdnet' ? 'BirdNET' : 'Chirpity';
+        const localBirdsOnly = config.local && config.model === 'birdnet' && config.list === 'nocturnal' ? ' limited to <b>local birds</b>' : '';
         const species_filter_text = config.useWeek && config.list === 'location' ? `week-specific species filter threshold of <b>${config.speciesThreshold}</b>` : config.list === 'location' ? `species filter threshold of <b>${config.speciesThreshold}</b>` : '';  
         const location_filter_text = config.list === 'location' ? ` focused on <b>${place.textContent.replace('fmd_good', '')}</b>, with a ${species_filter_text}${current_file_text}` : '';
         let includedContent = `<br/><p>The number of species detected depends on the model, the list being used and in the case of the location filter, the species filter threshold and possibly the week in which the recording was made.<p>
-        You are using the <b>${model}</b> model and the <b>${config.list}</b> list${location_filter_text}. With these settings, Chirpity will display detections for ${config.useWeek && config.list === 'location' && (STATE.week === -1 || !STATE.week ) ? 'up to' : ''} 
+        You are using the <b>${model}</b> model and the <b>${config.list}</b> list${localBirdsOnly}${location_filter_text}. With these settings, Chirpity will display detections for ${config.useWeek && config.list === 'location' && (STATE.week === -1 || !STATE.week ) ? 'up to' : ''} 
         <b>${count}</b> classes${config.useWeek && config.list === 'location' && (STATE.week === -1 || !STATE.week ) ? ', depending on the date of the file you analyse' : ''}:</p>`;
         includedContent += '<table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Common Name</th><th>Scientific Name</th></tr></thead><tbody>\n';
         includedContent += generateBirdIDList(included);
@@ -3585,22 +3569,7 @@ function onChartData(args) {
     });
     
     document.getElementById('zoomIn').addEventListener('click', zoomSpec);
-    document.getElementById('zoomOut').addEventListener('click', zoomSpec);
-    
-    // Listeners to set and display batch size
-    const batchSizeSlider = document.getElementById('batch-size');
-    
-    batchSizeSlider.addEventListener('input', (e) => {
-        batchSizeValue.textContent = BATCH_SIZE_LIST[batchSizeSlider.value].toString();
-    })
-    batchSizeSlider.addEventListener('change', (e) => {
-        config[config.backend].batchSize = BATCH_SIZE_LIST[e.target.value];
-        loadModel({clearCache: false});
-        updatePrefs();
-        // Reset region maxLength
-        initRegion();
-    })
-    
+    document.getElementById('zoomOut').addEventListener('click', zoomSpec); 
     
     // Listeners to sort results table
     const confidenceSort = document.getElementById('confidence-sort');
@@ -4078,17 +4047,7 @@ function onChartData(args) {
         lowShelfAttenuationThreshold.textContent = lowShelfAttenuation.value + 'dB';
     });
     
-    // number of threads
-    const numberOfThreads = document.getElementById('threads-value');
-    const ThreadSlider = document.getElementById('thread-slider');
-    ThreadSlider.addEventListener('input', () => {
-        numberOfThreads.textContent = ThreadSlider.value;
-    });
-    ThreadSlider.addEventListener('change', () => {
-        config[config.backend].threads = ThreadSlider.valueAsNumber;
-        loadModel({clearCache: false});
-        updatePrefs();
-    });
+
     
     
     // Audio preferences:
@@ -4171,14 +4130,30 @@ function onChartData(args) {
             switch (target) {
                 case 'species-week': {
                     config.useWeek = element.checked;
-                    updatePrefs();
+
                     if (! config.useWeek) STATE.week = -1;
                     worker.postMessage({action:'update-state', useWeek: config.useWeek})
                     break;
                 }
+                case 'list-to-use': {
+                    config.list = element.value;
+                    if (config.list === 'location') {
+                        speciesThresholdEl.classList.remove('d-none');
+                        localSwitchContainer.classList.add('d-none')
+                    }else if (config.list === 'nocturnal' && config.model === 'birdnet'){
+                        localSwitchContainer.classList.remove('d-none')
+                        speciesThresholdEl.classList.add('d-none');  
+                    } else { 
+                        speciesThresholdEl.classList.add('d-none');                        
+                        localSwitchContainer.classList.add('d-none')
+                    }                    
+                    updateListIcon();
+                    resetResults({clearSummary: true, clearPagination: true, clearResults: true});
+                    worker.postMessage({ action: 'update-list', list: config.list  })
+                    break;
+                }
                 case 'locale': {
                     config[config.model].locale = element.value;
-                    updatePrefs();
                     const chirpity = config[config.model].locale === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
                     const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${config[config.model].locale}.txt`; 
                     fetch(labelFile).then(response => {
@@ -4194,11 +4169,65 @@ function onChartData(args) {
                     })
                     break;
                 }
+                case 'local': {
+                    config.local = element.checked;
+                    worker.postMessage({action: 'update-state', local: config.local })
+                    break;
+                }
+                case 'model-to-use': {
+                    config.model = element.value;
+                    const chirpityOnly = document.querySelectorAll('.chirpity-only');
+                    if (config.model === 'birdnet') { 
+                        contextAware.checked = false;
+                        if (config.list === 'nocturnal') document.getElementById('use-location-container').classList.remove('d-none')
+                        // hide chirpity-only features
+                        chirpityOnly.forEach(element => element.classList.add('d-none'));
+                        contextAware.disabed = true;
+                        config.detect.contextAware = false;
+                        SNRSlider.disabled = true;
+                        config.filters.SNR = 0;
+                    } else {
+                        // show chirpity-only features
+                        chirpityOnly.forEach(element => element.classList.remove('d-none'));
+                        document.getElementById('use-location-container').classList.add('d-none')
+                        contextAware.disabed = false;
+                        SNRSlider.disabled = false;
+                    }
+                    document.getElementById('locale').value = config[config.model].locale;
+                    loadModel();
+                    break;
+                }
+                case 'thread-slider': {
+                        // number of threads
+                    numberOfThreads.textContent = ThreadSlider.value;
+                    config[config.backend].threads = ThreadSlider.valueAsNumber;
+                    loadModel({clearCache: false});
+                    break;
+                }
+                case 'batch-size': {
+                    batchSizeValue.textContent = BATCH_SIZE_LIST[batchSizeSlider.value].toString();
+                    config[config.backend].batchSize = BATCH_SIZE_LIST[element.value];
+                    loadModel({clearCache: false});
+                    // Reset region maxLength
+                    initRegion();
+                    break;
+                }
+                case 'gain': {
+                    gainAdjustment.textContent = element.value + 'dB'; //.toString();
+                    config.audio.gain = element.value;   
+                    worker.postMessage({action:'update-state', audio: config.audio})
+                    const position = wavesurfer.getCurrentTime() / windowLength;
+                    fileLoaded &&
+                        postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
+                    break;
+                }
             }
+            updatePrefs();
+            
         }
     })
     
-    
+
     
     async function createContextMenu(e) {
         const target = e.target;

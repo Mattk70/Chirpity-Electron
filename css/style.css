@@ -535,7 +535,6 @@ input[type="range"].vertical {
     line-height: 20px;
     float: right;
     text-decoration: none; /* Remove underline from <a> tags */
-    display: inline-block;
     transition: transform 0.2s; /* Add transition for smooth scaling */
 }
 
