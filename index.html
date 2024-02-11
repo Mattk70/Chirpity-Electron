@@ -243,19 +243,21 @@
                                             <form id="settingsForm" class="fs-6">
                                                 <div class="row">
                                                     <div class="col-6 pe-0">
-                                                        <fieldset class="border rounded m-2 p-1">
+                                                        <fieldset class="border rounded m-2 mb-0 p-1">
                                                             <legend style="font-size: large">Predictions</legend>
-                                                            <div class="row pe-3 form-group rounded m-1 bg-light">
-                                                                <label class="col" for="model-to-use">Model:</label>
-                                                                <select class="form-select col" id="model-to-use">
-                                                                    <option value="chirpity">Chirpity</option>
-                                                                    <option value="birdnet">BirdNet</option>
-                                                                    <!-- <option value="v4">Test chirp</option> -->
-                                                                </select>
-                                                                <div class="col-auto">
-                                                                    <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Model" data-bs-content="Select whether to use Chirpity, optimised for Nocturnal Migration Calls in Europe, or BirdNET, which can detect over 6000 species across the globe.">?</a>                                                                
+                                                            <div class="p-2 form-group rounded mb-2 bg-light">
+                                                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Model" data-bs-content="Select whether to use Chirpity, optimised for Nocturnal Migration Calls in Europe, or BirdNET, which can detect over 6000 species across the globe.">?</a>
+                                                                <div class="row pe-3">
+                                                                    <label class="col-auto" for="model-to-use">Model:</label>
+                                                                    <div class="col d-flex align-items-start">
+                                                                        <select class="form-select w-100" id="model-to-use">
+                                                                            <option value="chirpity">Chirpity</option>
+                                                                            <option value="birdnet">BirdNet</option>
+                                                                        </select>
+                                                                    </div>
                                                                 </div>
-                                                            </div>                                                            
+                                                            </div>
+                                                            
                                                             <div class="form-group rounded p-2 mb-2 bg-light">
                                                                 <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Confidence Threshold" data-bs-content="Determines the minimum confidence required for results to be returned">?</a>
                                                                 <label for="confidence">Confidence threshold:</label>
@@ -268,39 +270,44 @@
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                            <div class="row pe-3 form-group rounded p-2  m-2 bg-light">
-                                                                
-                                                                
-                                                                
-                                                                    <label class="col" for="list-to-use">List:</label>
-                                                                    <select class="form-select col" id="list-to-use">
-                                                                        <option value="location">Local Birds</option>
-                                                                        <option value="nocturnal">Nocturnal Birds</option>
-                                                                        <option value="birds">Birds</option>
-                                                                        <option value="everything">Everything</option>
-                                                                    </select>
-                                                                    <div class="col-auto">
-                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="List" data-bs-content="Filters the detections returned in results. Local Birds: excludes birds 
-                                                                        unlikely to be found in your region. Nocturnal Birds: excludes species' songs and species not known to call at night">?</a>
+                                                            <div class="row p-2">
+                                                                <div class="p-2 form-group rounded bg-light">
+                                                                    <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="List" data-bs-content="Filters the detections returned in results. Local Birds: excludes birds 
+                                                                    unlikely to be found in your region. Nocturnal Birds: excludes species' songs and species not known to call at night">?</a>
+                                                                    <div class="row pe-3">
+                                                                        <label class="col-auto" for="list-to-use">List:</label>
+                                                                        <div class="col d-flex align-items-start">
+                                                                            <select class="form-select w-100" id="list-to-use">
+                                                                                <option value="location">Local Birds</option>
+                                                                                <option value="nocturnal">Nocturnal Birds</option>
+                                                                                <option value="birds">Birds</option>
+                                                                                <option value="everything">Everything</option>
+                                                                            </select>
+                                                                        </div>
                                                                     </div>
-                                                                <div class="form-group rounded p-2 mb-2 bg-light d-none" id="use-location-container">
-                                                                    <div class="form-check form-switch">
-                                                                        <input class="form-check-input" type="checkbox" role="switch" id="local" checked>
-                                                                        <label class="form-check-label" for="local">Use Location settings</label>
-                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Use Location settings" data-bs-content="When enabled, the Nocturnal birds filter will only report birds included according to your location filter settings">?</a>
+                                                                
+                                                                
+                                                                
+                                                                    <div class="form-group rounded d-none" id="use-location-container">
+                                                                        <div class="form-check form-switch">
+                                                                            <input class="form-check-input" type="checkbox" role="switch" id="local" checked>
+                                                                            <label class="form-check-label" for="local">Use Location settings</label>
+                                                                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Use Location settings" data-bs-content="When enabled, the Nocturnal birds filter will only report birds included according to your location filter settings">?</a>
+                                                                        </div>
                                                                     </div>
-                                                                </div>
-                                                            
-                                                                <div id="species-threshold-el">
-                                                                    <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Species Threshold" data-bs-content="Set the minimum eBird checklist frequency for a bird to be included
-                                                                    If 'Use Week' is checked, the filter will be refined to include only the species likely in the week the recording was made.">?</a>
-                                                                    <div class="input-group w-100">
-                                                                        <span class="input-group-text col-auto">Threshold:</span>
-                                                                        <input id="species-frequency-threshold" type="number" class="form-control" style="width: 30%;" value="0.005" step="0.001" min="0.001" max="1" aria-label="species frequency threshold" aria-describedby="species-frequency-threshold">
-                                                                        <span class="text-nowrap"><label class="col-auto m-2 mt-0" for="species-week">Use Week</label><input id="species-week" type="checkbox" class="form-check-input form-check-inline"></span>
-                                                                    </div>                                                                
-                                                                </div>
+                                                                
+                                                                    <div id="species-threshold-el">
+                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Species Threshold" data-bs-content="Set the minimum eBird checklist frequency for a bird to be included
+                                                                        If 'Use Week' is checked, the filter will be refined to include only the species likely in the week the recording was made.">?</a>
+                                                                        <div class="input-group mt-0 w-100 align-bottom">
+                                                                            <span class="input-group-text col">Threshold:</span>
+                                                                            <input id="species-frequency-threshold" type="number" class="form-control" style="width: 30%;" value="0.005" step="0.001" min="0.001" max="1" aria-label="species frequency threshold" aria-describedby="species-frequency-threshold">
+                                                                            <label class="text-nowrap ms-2 me-2 " for="species-week">Use Week</label><div class="form-switch"><input id="species-week" role="switch"  type="checkbox" class="form-check-input form-check-inline"></div>
+                                                                        </div>                                                                
+                                                                    </div>
+                                                                
                                                             </div>
+                                                            <div class="m-2"></div>
                                                             <div class="form-group rounded p-2 mb-2 bg-light">
                                                                 <div class="form-check form-switch">
                                                                     <input class="form-check-input" type="checkbox"
@@ -499,7 +506,7 @@
                                                             <div class="col pe-0">
                                                                 <div class="me-auto">
                                                                     <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Gain" data-bs-content="Adjust the volume of the audio to compensate for low recording levels.">?</a>
+                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Gain" data-bs-content="Adjust the volume of audio to compensate for low recording levels.">?</a>
                                                                         <label for="gain" class="form-label">
                                                                             Gain Adjustment:
                                                                         </label>
@@ -542,44 +549,46 @@
                                                     </fieldset>
                                                     <fieldset class="border rounded m-2 p-1">
                                                         <legend style="font-size: large">Spectrogram Preferences</legend>
-                                                        <div class="form-group rounded p-2 mb-2 bg-light form-check form-check-inline">
-                                                            <div class="row pe-3 align-items-center">
-                                                                <label class="col text-center" for="colourmap">Colourmap:</label>
-                                                                <select class="form-select col" id="colourmap">
-                                                                    <option value="greys">Greyscale</option>
-                                                                    <option value="bone">Bone</option>
-                                                                    <option value="turbidity">Turbidity</option>
-                                                                    <option value="chlorophyll">Chlorophyll</option>
-                                                                    <option value="viridis">Viridis</option>
-                                                                    <option value="cdom">CDom</option>
-                                                                    <option value="temperature">Temperature</option>
-                                                                    <!-- <option value="density">Density</option>-->
-                                                                    <!-- <option value="oxygen">Oxygen</option>-->
-                                                                    <!-- <option value="copper">Copper</option>-->
-                                                                    <!-- <option value="earth">Earth</option>-->
-                                                                    <option value="inferno">Inferno</option>
-                                                                    <option value="magma">Magma</option>
-                                                                    <option value="plasma">Plasma</option>
-                                                                    <option value="hot">Hot</option>
-                                                                    <!-- <option value="cubehelix">CubeHelix</option>-->
-                                                                    <!-- <option value="phase">Phase</option>-->
-                                                                    <!-- <option value="YlOrRd">Yellow/red</option>-->
-                                                                    <!-- <option value="picnic">Picnic</option>-->
-                                                                    <!-- <option value="electric">Electric</option>-->
-                                                                    <!-- <option value="bluered">BlueRed</option>-->
-                                                                    <option value="blackbody">Blackbody</option>
-                                                                    <!-- <option value="rainbow">Rainbow</option>-->
-                                                                    <!-- <option value="rainbow-soft">Rainbow</option>-->
-                                                                </select>
+                                                        <div class="row">
+                                                            <div class="form-group rounded p-2 mb-2 bg-light form-check form-check-inline col">
+                                                                <div class="pe-3 align-items-center">
+                                                                    <label for="colourmap">Colourmap:</label>
+                                                                    <select class="form-select" id="colourmap">
+                                                                        <option value="greys">Greyscale</option>
+                                                                        <option value="bone">Bone</option>
+                                                                        <option value="turbidity">Turbidity</option>
+                                                                        <option value="chlorophyll">Chlorophyll</option>
+                                                                        <option value="viridis">Viridis</option>
+                                                                        <option value="cdom">CDom</option>
+                                                                        <option value="temperature">Temperature</option>
+                                                                        <!-- <option value="density">Density</option>-->
+                                                                        <!-- <option value="oxygen">Oxygen</option>-->
+                                                                        <!-- <option value="copper">Copper</option>-->
+                                                                        <!-- <option value="earth">Earth</option>-->
+                                                                        <option value="inferno">Inferno</option>
+                                                                        <option value="magma">Magma</option>
+                                                                        <option value="plasma">Plasma</option>
+                                                                        <option value="hot">Hot</option>
+                                                                        <!-- <option value="cubehelix">CubeHelix</option>-->
+                                                                        <!-- <option value="phase">Phase</option>-->
+                                                                        <!-- <option value="YlOrRd">Yellow/red</option>-->
+                                                                        <!-- <option value="picnic">Picnic</option>-->
+                                                                        <!-- <option value="electric">Electric</option>-->
+                                                                        <!-- <option value="bluered">BlueRed</option>-->
+                                                                        <option value="blackbody">Blackbody</option>
+                                                                        <!-- <option value="rainbow">Rainbow</option>-->
+                                                                        <!-- <option value="rainbow-soft">Rainbow</option>-->
+                                                                    </select>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                        <div class="w-50 form-group rounded p-2 mb-2 bg-light form-check form-check-inline">
-                                                            <div class="row pe-3 align-items-center">
-                                                                <label class="col" for="timelineSetting">Timeline:</label>
-                                                                <select class="form-select col" id="timelineSetting">
-                                                                    <option value="timecode">Timecode</option>
-                                                                    <option value="timeOfDay">Time of day</option>
-                                                                </select>
+                                                            <div class="form-group rounded p-2 mb-2 bg-light form-check form-check-inline col">
+                                                                <div class="pe-3 align-items-center">
+                                                                    <label for="timelineSetting">Timeline:</label>
+                                                                    <select class="form-select" id="timelineSetting">
+                                                                        <option value="timecode">Timecode</option>
+                                                                        <option value="timeOfDay">Time of day</option>
+                                                                    </select>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </fieldset>                                                                
@@ -1037,8 +1046,6 @@
                         class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">nights_stay</span>
                         <span style="max-width: 70px" id="audioFiltersIcon" title="Experimental audio filters applied"
                         class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">blur_on</span>
-                        <span style="max-width: 70px" id="volume" title="Volume control"
-                        class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">volume_up</span>
                         <span style="max-width: 70px" id="context-mode" title="Context Aware mode enabled"
                         class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2 text-warning">swap_horiz</span>
                         <span title="Toggle Fullscreen mode (Ctrl+F)" id="fullscreen"

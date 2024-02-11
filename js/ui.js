@@ -103,49 +103,52 @@ let fileStart, bufferStartTime, fileEnd;
 let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
 // set up some DOM element caches
 const bodyElement = document.body;
-let spectrogramWrapper = document.getElementById('spectrogramWrapper'), specElement, waveElement, specCanvasElement, specWaveElement;
-let waveCanvasElement, waveWaveElement,
-resultTableElement = document.getElementById('resultTableContainer');
-const contentWrapperElement = document.getElementById('contentWrapper');
-const nocmigButton = document.getElementById('nocmigMode');
-const summaryTable = document.getElementById('summaryTable');
-const progressDiv = document.getElementById('progressDiv');
-const progressBar = document.getElementById('progress-bar');
-const fileNumber = document.getElementById('fileNumber');
-const timelineSetting = document.getElementById('timelineSetting');
-const colourmap = document.getElementById('colourmap');
-const batchSizeSlider = document.getElementById('batch-size');
-const batchSizeValue = document.getElementById('batch-size-value');
-const nocmig = document.getElementById('nocmig');
-const contextAware = document.getElementById('context');
-const modelToUse = document.getElementById('model-to-use');
-const debugMode = document.getElementById('debug-mode');
-const listToUse = document.getElementById('list-to-use');
-const localSwitch = document.getElementById('local');
-const localSwitchContainer = document.getElementById('use-location-container');
-const gain = document.getElementById('gain');
-const gainAdjustment = document.getElementById('gain-adjustment');
-const audioFade = document.getElementById('fade');
-const audioBitrate = document.getElementById('bitrate');
-const audioQuality = document.getElementById('quality');
-const audioBitrateContainer = document.getElementById('bitrate-container');
-const audioQualityContainer = document.getElementById('quality-container');
-const audioPadding = document.getElementById('padding');
-const audioFormat = document.getElementById('format');
-const audioDownmix = document.getElementById('downmix');
-const audioFiltersIcon = document.getElementById('audioFiltersIcon')
-const contextAwareIcon = document.getElementById('context-mode');
-const defaultLat = document.getElementById('latitude');
-const defaultLon = document.getElementById('longitude');
-const ThreadSlider = document.getElementById('thread-slider');
-const numberOfThreads = document.getElementById('threads-value');
+let specElement, waveElement, specCanvasElement, specWaveElement;
+let waveCanvasElement, waveWaveElement;
+const DOM = {
+     audioBitrate: document.getElementById('bitrate'),
+     audioBitrateContainer: document.getElementById('bitrate-container'),
+     audioDownmix: document.getElementById('downmix'),
+     audioFade: document.getElementById('fade'),
+     audioFiltersIcon: document.getElementById('audioFiltersIcon'),
+     audioFormat: document.getElementById('format'),
+     audioPadding: document.getElementById('padding'),
+     audioQuality: document.getElementById('quality'),
+     audioQualityContainer: document.getElementById('quality-container'),
+     batchSizeSlider: document.getElementById('batch-size'),
+     batchSizeValue: document.getElementById('batch-size-value'),
+     colourmap: document.getElementById('colourmap'),
+     contentWrapperElement: document.getElementById('contentWrapper'),
+     contextAware: document.getElementById('context'),
+     contextAwareIcon: document.getElementById('context-mode'),
+     debugMode: document.getElementById('debug-mode'),
+     defaultLat: document.getElementById('latitude'),
+     defaultLon: document.getElementById('longitude'),
+     fileNumber: document.getElementById('fileNumber'),
+     gain: document.getElementById('gain'),
+     gainAdjustment: document.getElementById('gain-adjustment'),
+     listToUse: document.getElementById('list-to-use'),
+     localSwitch: document.getElementById('local'),
+     localSwitchContainer: document.getElementById('use-location-container'),
+     modelToUse: document.getElementById('model-to-use'),
+     nocmig: document.getElementById('nocmig'),
+     nocmigButton: document.getElementById('nocmigMode'),
+     numberOfThreads: document.getElementById('threads-value'),
+     progressDiv: document.getElementById('progressDiv'),
+     progressBar: document.getElementById('progress-bar'),
+     resultTableElement: document.getElementById('resultTableContainer'),
+     spectrogramWrapper: document.getElementById('spectrogramWrapper'),
+     summaryTable: document.getElementById('summaryTable'),
+     threadSlider: document.getElementById('thread-slider'),
+     timelineSetting: document.getElementById('timelineSetting')
+}
 let activeRow;
 let predictions = {},
 clickedIndex, currentFileDuration;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
 // Set content container height
-contentWrapperElement.style.height = (bodyElement.clientHeight - 80) + 'px';
+DOM.contentWrapperElement.style.height = (bodyElement.clientHeight - 80) + 'px';
 
 
 // Set default Options
@@ -182,7 +185,7 @@ function resetResults({clearSummary = true, clearPagination = true, clearResults
     predictions = {};
     seenTheDarkness = false;
     shownDaylightBanner = false;
-    progressDiv.classList.add('d-none');
+    DOM.progressDiv.classList.add('d-none');
     updateProgress(0)
 }
 
@@ -192,12 +195,12 @@ function resetResults({clearSummary = true, clearPagination = true, clearResults
 */
 function updateProgress(val) {
     if (val) {
-        progressBar.value = val;
+        DOM.progressBar.value = val;
         val = val.toString();
-        progressBar.textContent = val + '%';
+        DOM.progressBar.textContent = val + '%';
     }
     else {
-        progressBar.removeAttribute('value');
+        DOM.progressBar.removeAttribute('value');
     }
     
 }
@@ -296,7 +299,7 @@ const initWavesurfer = ({
     initSpectrogram();
     createTimeline();
     if (audio) wavesurfer.loadDecodedBuffer(audio);
-    colourmap.value = config.colormap;
+    DOM.colourmap.value = config.colormap;
     // Set click event that removes all regions
     
     waveElement.addEventListener('mousedown', resetRegions);
@@ -667,7 +670,7 @@ const displayLocationAddress = async (where) => {
         speciesThresholdEl.classList.remove('d-none');
         
         updateListIcon();
-        listToUse.value = config.list;
+        DOM.listToUse.value = config.list;
         resetResults();
         worker.postMessage({
             action: 'update-list',
@@ -789,11 +792,11 @@ function resetDiagnostics() {
 
 // Worker listeners
 function analyseReset() {
-    fileNumber.textContent = '';
+    DOM.fileNumber.textContent = '';
     PREDICTING = true;
     resetDiagnostics();
     AUDACITY_LABELS = {};
-    progressDiv.classList.remove('d-none');
+    DOM.progressDiv.classList.remove('d-none');
     // DIAGNOSTICS
     t0_analysis = Date.now();
 }
@@ -1143,12 +1146,12 @@ const footerHeight = document.getElementById('footer').offsetHeight;
 const navHeight = document.getElementById('navPadding').offsetHeight;
 function adjustSpecDims(redraw, fftSamples) {
     //Contentwrapper starts below navbar (66px) and ends above footer (30px). Hence - 96
-    contentWrapperElement.style.height = (bodyElement.clientHeight - footerHeight - navHeight) + 'px';
-    const contentHeight = contentWrapperElement.offsetHeight;
+    DOM.contentWrapperElement.style.height = (bodyElement.clientHeight - footerHeight - navHeight) + 'px';
+    const contentHeight = DOM.contentWrapperElement.offsetHeight;
     // + 2 for padding
     const formOffset = document.getElementById('exploreWrapper').offsetHeight;
     let specOffset;
-    if (!spectrogramWrapper.classList.contains('d-none')) {
+    if (!DOM.spectrogramWrapper.classList.contains('d-none')) {
         // Expand up to 512px unless fullscreen
         const controlsHeight = document.getElementById('controlsWrapper').offsetHeight;
         const timelineHeight = document.getElementById('timeline').offsetHeight;
@@ -1172,11 +1175,11 @@ function adjustSpecDims(redraw, fftSamples) {
             document.querySelector('.spec-labels').style.width = '55px';
         }
         if (wavesurfer && redraw) {}
-        specOffset = spectrogramWrapper.offsetHeight;
+        specOffset = DOM.spectrogramWrapper.offsetHeight;
     } else {
         specOffset = 0
     }
-    resultTableElement.style.height = (contentHeight - specOffset - formOffset) + 'px';
+    DOM.resultTableElement.style.height = (contentHeight - specOffset - formOffset) + 'px';
 }
 
 
@@ -1358,7 +1361,7 @@ let appPath, tempPath;
 window.onload = async () => {
     window.electron.requestWorkerChannel();
     replaceCtrlWithCommand()
-    contentWrapperElement.classList.add('loaded');
+    DOM.contentWrapperElement.classList.add('loaded');
     // Set config defaults
     const defaultConfig = {
         seenTour: false,
@@ -1420,17 +1423,17 @@ window.onload = async () => {
         // Set UI option state
         
         // Map slider value to batch size
-        batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
-        batchSizeSlider.max = (BATCH_SIZE_LIST.length - 1).toString();
-        batchSizeValue.textContent = config[config.backend].batchSize;
-        modelToUse.value = config.model;
+        DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
+        DOM.batchSizeSlider.max = (BATCH_SIZE_LIST.length - 1).toString();
+        DOM.batchSizeValue.textContent = config[config.backend].batchSize;
+        DOM.modelToUse.value = config.model;
         const backendEL = document.getElementById(config.backend);
         backendEL.checked = true;
         // Show time of day in results?
         setTimelinePreferences();
         // Show the list in use
-        listToUse.value = config.list;
-        localSwitch.checked = config.local;
+        DOM.listToUse.value = config.list;
+        DOM.localSwitch.checked = config.local;
 
         // Show Locale
         document.getElementById('locale').value = config[config.model].locale;
@@ -1443,43 +1446,43 @@ window.onload = async () => {
         
         // And update the icon
         updateListIcon();
-        timelineSetting.value = config.timeOfDay ? 'timeOfDay' : 'timecode';
+        DOM.timelineSetting.value = config.timeOfDay ? 'timeOfDay' : 'timecode';
         // Spectrogram colour
-        colourmap.value = config.colormap;
+        DOM.colourmap.value = config.colormap;
         // Nocmig mode state
         console.log('nocmig mode is ' + config.detect.nocmig);
         // Audio preferences:
-        gain.value = config.audio.gain;
-        gainAdjustment.textContent = config.audio.gain + 'dB';
-        audioFormat.value = config.audio.format;
-        audioBitrate.value = config.audio.bitrate;
-        audioQuality.value = config.audio.quality;
+        DOM.gain.value = config.audio.gain;
+        DOM.gainAdjustment.textContent = config.audio.gain + 'dB';
+        DOM.audioFormat.value = config.audio.format;
+        DOM.audioBitrate.value = config.audio.bitrate;
+        DOM.audioQuality.value = config.audio.quality;
         showRelevantAudioQuality();
-        audioFade.checked = config.audio.fade;
-        audioPadding.checked = config.audio.padding;
-        audioFade.disabled = !audioPadding.checked;
-        audioDownmix.checked = config.audio.downmix;
+        DOM.audioFade.checked = config.audio.fade;
+        DOM.audioPadding.checked = config.audio.padding;
+        DOM.audioFade.disabled = !DOM.audioPadding.checked;
+        DOM.audioDownmix.checked = config.audio.downmix;
         setNocmig(config.detect.nocmig);
         const chirpityOnly = document.querySelectorAll('.chirpity-only');
         if (config.model === 'birdnet'){
             // hide chirpity-only features
             chirpityOnly.forEach(element => element.classList.add('d-none'));
             if (config.list === 'nocturnal')  {
-                localSwitchContainer.classList.remove('d-none');
+                DOM.localSwitchContainer.classList.remove('d-none');
             }
-            contextAware.checked = false;
-            contextAware.disabed = true;
+            DOM.contextAware.checked = false;
+            DOM.contextAware.disabed = true;
             config.detect.contextAware = false;
             SNRSlider.disabled = true;
             config.filters.SNR = 0;
         } else {
             // show chirpity-only features
             chirpityOnly.forEach(element => element.classList.remove('d-none'));
-            contextAware.checked = config.detect.contextAware
+            DOM.contextAware.checked = config.detect.contextAware
             SNRSlider.disabled = false;
         }
         contextAwareIconDisplay();
-        debugMode.checked = config.debug;
+        DOM.debugMode.checked = config.debug;
         showThreshold(config.detect.confidence);
         SNRSlider.value = config.filters.SNR;
         SNRThreshold.textContent = config.filters.SNR;
@@ -1497,11 +1500,11 @@ window.onload = async () => {
         lowShelfAttenuationThreshold.textContent = lowShelfAttenuation.value + 'dB';
         filterIconDisplay();
         
-        ThreadSlider.max = DIAGNOSTICS['Cores'];
-        ThreadSlider.value = config[config.backend].threads;
-        numberOfThreads.textContent = config[config.backend].threads;
-        defaultLat.value = config.latitude;
-        defaultLon.value = config.longitude;
+        DOM.threadSlider.max = DIAGNOSTICS['Cores'];
+        DOM.threadSlider.value = config[config.backend].threads;
+        DOM.numberOfThreads.textContent = config[config.backend].threads;
+        DOM.defaultLat.value = config.latitude;
+        DOM.defaultLon.value = config.longitude;
         place.innerHTML = '<span class="material-symbols-outlined">fmd_good</span>' + config.location;
         
         worker.postMessage({
@@ -1535,7 +1538,7 @@ window.onload = async () => {
         // https://www.electron.build/auto-update#auto-updatable-targets
         isMac && checkForMacUpdates();
 
-        fetch(`https://analytics.mattkirkland.co.uk/matomo.php?&idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
+        fetch(`https://analytics.mattkirkland.co.uk/matomo.php?idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
         &dimension1=${config.model}
         &dimension2=${config.list}
         &dimension9=${JSON.stringify(config.detect)}
@@ -1641,7 +1644,7 @@ const setUpWorkerMessaging = () => {
                 break;
             }
             case "processing-complete": {        
-                progressDiv.classList.add('d-none');
+                DOM.progressDiv.classList.add('d-none');
                 break;
             }
             case "seen-species-list": {generateBirdList("seenSpecies", args.list);
@@ -2189,16 +2192,6 @@ function onChartData(args) {
         updateElementCache();
     }
     
-    colourmap.addEventListener('change', (e) => {
-        config.colormap = e.target.value;
-        updatePrefs();
-        if (wavesurfer) {
-            initSpectrogram();
-            // refresh caches
-            updateElementCache()
-            adjustSpecDims(true)
-        }
-    })
     
     // const locale = document.getElementById('locale')
     // locale.addEventListener('change', async ()=> {
@@ -2249,29 +2242,18 @@ function onChartData(args) {
                 const replace = (key === keys.length - 1) ? 0 : key + 1;
                 img.src = img.src.replace(keys[key], keys[replace]);
                 img.title = states[keys[replace]];
-                listToUse.value = keys[replace];
+                DOM.listToUse.value = keys[replace];
                 config.list = keys[replace];
                 updatePrefs();
                 resetResults({clearSummary: true, clearPagination: true, clearResults: true});
                 config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
                 speciesThresholdEl.classList.add('d-none');
-                worker.postMessage({ action: 'update-list', list: config.list })
+                worker.postMessage({ action: 'update-list', list: config.list, refreshResults: !!currentFile })
                 break
             }
         }
     })
     
-    
-    speciesThreshold.addEventListener('change', () =>{
-        if (isNaN(speciesThreshold.value) || speciesThreshold.value === '') {
-            alert('The threshold must be a number between 0.001 and 1');
-            return false
-        }
-        config.speciesThreshold = speciesThreshold.value;
-        updatePrefs();
-        worker.postMessage({ action: 'update-state', speciesThreshold: speciesThreshold.value });
-        worker.postMessage({ action: 'update-list', list: config.list })
-    })
     
     const loadModel = ({clearCache = true} = {})  => {
         t0_warmup = Date.now();
@@ -2295,8 +2277,8 @@ function onChartData(args) {
             config.filters.SNR = 0;
         } else {
             // powerSave(false)
-            contextAware.disabled = false;
-            if (contextAware.checked) {
+            DOM.contextAware.disabled = false;
+            if (DOM.contextAware.checked) {
                 config.detect.contextAware = true;
                 SNRSlider.disabled = true;
                 config.filters.SNR = 0;
@@ -2304,7 +2286,7 @@ function onChartData(args) {
                 SNRSlider.disabled = false;
                 config.filters.SNR = parseFloat(SNRSlider.value);
                 if (config.filters.SNR) {
-                    contextAware.disabed = true;
+                    DOM.contextAware.disabed = true;
                     config.detect.contextAware = false;
                     contextAwareIconDisplay();
                 }
@@ -2312,10 +2294,10 @@ function onChartData(args) {
             
         }
         // Update threads and batch Size in UI
-        ThreadSlider.value = config[config.backend].threads;
-        numberOfThreads.textContent = config[config.backend].threads;
-        batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
-        batchSizeValue.textContent = BATCH_SIZE_LIST[batchSizeSlider.value].toString();
+        DOM.threadSlider.value = config[config.backend].threads;
+        DOM.numberOfThreads.textContent = config[config.backend].threads;
+        DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
+        DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
         updatePrefs();
         // restart wavesurfer regions to set new maxLength
         initRegion();
@@ -2343,9 +2325,9 @@ function onChartData(args) {
     
     const timelineToggle = (fromKeys) => {
         if (fromKeys === true) {
-            timelineSetting.value === 'timeOfDay' ? timelineSetting.value = 'timecode' : timelineSetting.value = 'timeOfDay'
+            DOM.timelineSetting.value === 'timeOfDay' ? DOM.timelineSetting.value = 'timecode' : DOM.timelineSetting.value = 'timeOfDay'
         }
-        config.timeOfDay = timelineSetting.value === 'timeOfDay'; //toggle setting
+        config.timeOfDay = DOM.timelineSetting.value === 'timeOfDay'; //toggle setting
         setTimelinePreferences();
         if (fileLoaded) {
             // Reload wavesurfer with the new timeline
@@ -2354,7 +2336,7 @@ function onChartData(args) {
         }
         updatePrefs();
     };
-    document.getElementById('timelineSetting').addEventListener('change', timelineToggle);
+    //document.getElementById('timelineSetting').addEventListener('change', timelineToggle);
     
     /////////// Keyboard Shortcuts  ////////////
     
@@ -2426,7 +2408,7 @@ function onChartData(args) {
                     list: config.list
                 });
                 alert('Operation cancelled');
-                progressDiv.classList.add('d-none');
+                DOM.progressDiv.classList.add('d-none');
             }
         },
         Home: function () {
@@ -2761,25 +2743,25 @@ function onChartData(args) {
     }
     
     function onProgress(args) {
-        progressDiv.classList.remove('d-none');
+        DOM.progressDiv.classList.remove('d-none');
         if (args.text) {
-            fileNumber.innerHTML = args.text;
+            DOM.fileNumber.innerHTML = args.text;
             if (args.text.includes('decompressed')) {
-                progressDiv.classList.add('d-none');
+                DOM.progressDiv.classList.add('d-none');
             }
         } else {
-            progressDiv.classList.remove('d-none');
+            DOM.progressDiv.classList.remove('d-none');
             const count = fileList.indexOf(args.file) + 1;
-            fileNumber.textContent = `File ${count} of ${fileList.length}`;
+            DOM.fileNumber.textContent = `File ${count} of ${fileList.length}`;
         }
         if (args.progress) {
             let progress = Math.round(args.progress * 1000) / 10;
             updateProgress(progress);
             if (progress === 100) {
-                //progressDiv.classList.add('d-none');
+                //DOM.progressDiv.classList.add('d-none');
             }
         } else {
-            progressDiv.classList.remove('d-none');
+            DOM.progressDiv.classList.remove('d-none');
         }
     }
     
@@ -2813,7 +2795,7 @@ function onChartData(args) {
         }
         summaryHTML += '</tbody></table>';
         // Get rid of flicker...
-        const old_summary = document.getElementById('summaryTable');
+        const old_summary = summaryTable;
         const buffer = old_summary.cloneNode();
         buffer.innerHTML = summaryHTML;
         old_summary.replaceWith(buffer);
@@ -2857,7 +2839,7 @@ function onChartData(args) {
             activeRow.click();
         }
         // hide progress div
-        progressDiv.classList.add('d-none');
+        DOM.progressDiv.classList.add('d-none');
         
     }
     
@@ -3416,15 +3398,15 @@ function onChartData(args) {
     
     function setNocmig(on) {
         if (on) {
-            nocmigButton.textContent = 'nights_stay';
-            nocmigButton.title = 'Nocmig mode on';
-            nocmigButton.classList.add('text-info');
+            DOM.nocmigButton.textContent = 'nights_stay';
+            DOM.nocmigButton.title = 'Nocmig mode on';
+            DOM.nocmigButton.classList.add('text-info');
         } else {
-            nocmigButton.textContent = 'bedtime_off';
-            nocmigButton.title = 'Nocmig mode off';
-            nocmigButton.classList.remove('text-info');
+            DOM.nocmigButton.textContent = 'bedtime_off';
+            DOM.nocmigButton.title = 'Nocmig mode off';
+            DOM.nocmigButton.classList.remove('text-info');
         }
-        nocmig.checked = config.detect.nocmig;
+        DOM.nocmig.checked = config.detect.nocmig;
     }
     
     const changeNocmigMode = () => {
@@ -3459,11 +3441,11 @@ function onChartData(args) {
     
     const contextAwareIconDisplay = () => {
         if (config.detect.contextAware) {
-            contextAwareIcon.classList.add('text-warning');
-            contextAwareIcon.title = "Context aware mode enabled";
+            DOM.contextAwareIcon.classList.add('text-warning');
+            DOM.contextAwareIcon.title = "Context aware mode enabled";
         } else {
-            contextAwareIcon.classList.remove('text-warning');
-            contextAwareIcon.title = "Context aware mode disabled";
+            DOM.contextAwareIcon.classList.remove('text-warning');
+            DOM.contextAwareIcon.title = "Context aware mode disabled";
         }
     };
     
@@ -3478,11 +3460,11 @@ function onChartData(args) {
         filterIconDisplay();
     }
     
-    audioFiltersIcon.addEventListener('click', toggleFilters);
+    DOM.audioFiltersIcon.addEventListener('click', toggleFilters);
     
     const toggleContextAwareMode = () => {
         if (config.model !== 'birdnet') config.detect.contextAware = !config.detect.contextAware;
-        contextAware.checked = config.detect.contextAware;
+        DOM.contextAware.checked = config.detect.contextAware;
         contextAwareIconDisplay();
         if (config.detect.contextAware) {
             SNRSlider.disabled = true;
@@ -3498,18 +3480,18 @@ function onChartData(args) {
         });
         updatePrefs()
     }
-    contextAwareIcon.addEventListener('click', toggleContextAwareMode)
+    DOM.contextAwareIcon.addEventListener('click', toggleContextAwareMode)
     
-    debugMode.addEventListener('click', () =>{
+    DOM.debugMode.addEventListener('click', () =>{
         config.debug = !config.debug;
-        debugMode.checked = config.debug;
+        DOM.debugMode.checked = config.debug;
         updatePrefs()
     })
     
-    nocmigButton.addEventListener('click', changeNocmigMode);
-    nocmig.addEventListener('change', changeNocmigMode)
+    DOM.nocmigButton.addEventListener('click', changeNocmigMode);
+    //DOM.nocmig.addEventListener('change', changeNocmigMode)
     
-    contextAware.addEventListener('change', toggleContextAwareMode)
+    //DOM.contextAware.addEventListener('change', toggleContextAwareMode)
     
     const fullscreen = document.getElementById('fullscreen');
     
@@ -3530,8 +3512,7 @@ function onChartData(args) {
     
     const diagnosticMenu = document.getElementById('diagnostics');
     diagnosticMenu.addEventListener('click', async function () {
-        const modelToUse = document.getElementById('model-to-use');
-        DIAGNOSTICS['Model'] = modelToUse.options[modelToUse.selectedIndex].text;
+        DIAGNOSTICS['Model'] = DOM.modelToUse.options[DOM.modelToUse.selectedIndex].text;
         DIAGNOSTICS['Backend'] = config.backend;
         DIAGNOSTICS['Batch size'] = config[config.backend].batchSize;
         DIAGNOSTICS['Threads'] = config[config.backend].threads;
@@ -3907,11 +3888,17 @@ function onChartData(args) {
     
     filterPanelThresholdDisplay.addEventListener('click', (e) => {
         e.stopPropagation();
+        filterPanelRangeInput.autofucus = true
         confidenceSliderDisplay.classList.toggle('d-none');
+        
     })
     filterPanelRangeInput.addEventListener('click', (e) => {
         e.stopPropagation();
     })
+    filterPanelRangeInput.addEventListener('click', (e) => {
+        console.log('range input!')
+    })
+
     
     const hideConfidenceSlider = () => {
         confidenceSliderDisplay.classList.add('d-none');
@@ -3940,7 +3927,7 @@ function onChartData(args) {
             // Update the seen species list
             worker.postMessage({ action: 'get-detected-species-list' })
         }
-        if (!PREDICTING && !resultTableElement.classList.contains('d-none')) {
+        if (!PREDICTING && !DOM.resultTableElement.classList.contains('d-none')) {
             worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
             resetResults({clearSummary: true, clearPagination: true, clearResults: false});
             filterResults()
@@ -3951,18 +3938,15 @@ function onChartData(args) {
             // });
         }
     }
-    filterPanelRangeInput.addEventListener('change', handleThresholdChange);
-    settingsPanelRangeInput.addEventListener('change', handleThresholdChange);
-    
-    
+
     // Filter handling
     const filterIconDisplay = () => {
         if (config.filters.active && (config.filters.highPassFrequency || (config.filters.lowShelfAttenuation && config.filters.lowShelfFrequency) || config.filters.SNR)) {
-            audioFiltersIcon.classList.add('text-warning');
-            audioFiltersIcon.title = 'Experimental audio filters applied';
+            DOM.audioFiltersIcon.classList.add('text-warning');
+            DOM.audioFiltersIcon.title = 'Experimental audio filters applied';
         } else {
-            audioFiltersIcon.classList.remove('text-warning')
-            audioFiltersIcon.title = 'No audio filters applied';
+            DOM.audioFiltersIcon.classList.remove('text-warning')
+            DOM.audioFiltersIcon.title = 'No audio filters applied';
         }
     }
     // High pass threshold
@@ -3978,12 +3962,11 @@ function onChartData(args) {
         config.filters.SNR = parseFloat(SNRSlider.value);
         if (config.filters.SNR > 0) {
             config.detect.contextAware = false;
-            contextAware.disabled = true;
+            DOM.contextAware.disabled = true;
         } else {
-            config.detect.contextAware = contextAware.checked;
-            contextAware.disabled = false;
+            config.detect.contextAware = DOM.contextAware.checked;
+            DOM.contextAware.disabled = false;
         }
-        updatePrefs();
         worker.postMessage({ action: 'update-state', filters: { SNR: config.filters.SNR } })
         filterIconDisplay();
     }
@@ -3994,12 +3977,10 @@ function onChartData(args) {
     SNRSlider.addEventListener('input', () => {
         SNRThreshold.textContent = SNRSlider.value;
     });
-    SNRSlider.addEventListener('change', handleSNRchange);
     
     const handleHPchange = () => {
         config.filters.highPassFrequency = HPSlider.valueAsNumber;
         config.filters.active || toggleFilters();
-        updatePrefs();
         worker.postMessage({ action: 'update-state', filters: { highPassFrequency: config.filters.highPassFrequency } })
         showFilterEffect();
         filterIconDisplay();
@@ -4010,13 +3991,11 @@ function onChartData(args) {
     HPSlider.addEventListener('input', () => {
         HPThreshold.textContent = HPSlider.value + 'Hz';
     });
-    HPSlider.addEventListener('change', handleHPchange);
     
     // Low shelf threshold
     const handleLowShelfchange = () => {
         config.filters.lowShelfFrequency = LowShelfSlider.valueAsNumber;
         config.filters.active || toggleFilters();
-        updatePrefs();
         worker.postMessage({ action: 'update-state', filters: { lowShelfFrequency: config.filters.lowShelfFrequency } })
         showFilterEffect();
         filterIconDisplay();
@@ -4027,13 +4006,11 @@ function onChartData(args) {
     LowShelfSlider.addEventListener('input', () => {
         LowShelfThreshold.textContent = LowShelfSlider.value + 'Hz';
     });
-    LowShelfSlider.addEventListener('change', handleLowShelfchange);
     
     // Low shelf gain
     const handleAttenuationchange = () => {
         config.filters.lowShelfAttenuation = - lowShelfAttenuation.valueAsNumber;
         config.filters.active = true;
-        updatePrefs();
         worker.postMessage({ action: 'update-state', filters: { lowShelfAttenuation: config.filters.lowShelfAttenuation } })
         showFilterEffect();
         filterIconDisplay();
@@ -4041,68 +4018,40 @@ function onChartData(args) {
     
     const lowShelfAttenuation = document.getElementById('attenuation');
     const lowShelfAttenuationThreshold = document.getElementById('attenuation-threshold');
-    lowShelfAttenuation.addEventListener('change', handleAttenuationchange);
     
     lowShelfAttenuation.addEventListener('input', () => {
         lowShelfAttenuationThreshold.textContent = lowShelfAttenuation.value + 'dB';
     });
-    
+  
+// Show batch size / threads as user moves slider
+DOM.batchSizeSlider.addEventListener('input', () => {
+    DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value]
+})
 
-    
+DOM.threadSlider.addEventListener('input', () => {
+    DOM.numberOfThreads.textContent = DOM.threadSlider.value;
+})
+  
+DOM.gain.addEventListener('input', () => {
+    DOM.gainAdjustment.textContent = DOM.gain.value + 'dB';
+})
     
     // Audio preferences:
     
     const showRelevantAudioQuality = () => {
         if (['mp3', 'opus'].includes(config.audio.format)) {
-            audioBitrateContainer.classList.remove('d-none');
-            audioQualityContainer.classList.add('d-none');
+            DOM.audioBitrateContainer.classList.remove('d-none');
+            DOM.audioQualityContainer.classList.add('d-none');
         } else if (config.audio.format === 'flac') {
-            audioQualityContainer.classList.remove('d-none');
-            audioBitrateContainer.classList.add('d-none');
+            DOM.audioQualityContainer.classList.remove('d-none');
+            DOM.audioBitrateContainer.classList.add('d-none');
         } else {
-            audioQualityContainer.classList.add('d-none');
-            audioBitrateContainer.classList.add('d-none');
+            DOM.audioQualityContainer.classList.add('d-none');
+            DOM.audioBitrateContainer.classList.add('d-none');
         }
     }
     
-    audioFormat.addEventListener('change', (e) => {
-        config.audio.format = e.target.value;
-        showRelevantAudioQuality();
-        updatePrefs();
-        worker.postMessage({ action: 'update-state', audio: config.audio })
-    });
-    
-    audioBitrate.addEventListener('change', (e) => {
-        config.audio.bitrate = e.target.value;
-        updatePrefs();
-        worker.postMessage({ action: 'update-state', audio: config.audio })
-    });
-    
-    audioQuality.addEventListener('change', (e) => {
-        config.audio.quality = e.target.value;
-        updatePrefs();
-        worker.postMessage({ action: 'update-state', audio: config.audio })
-    });
-    
-    audioFade.addEventListener('change', (e) => {
-        config.audio.fade = e.target.checked;
-        updatePrefs();
-        worker.postMessage({ action: 'update-state', audio: config.audio })
-    });
-    
-    audioPadding.addEventListener('change', (e) => {
-        config.audio.padding = e.target.checked;
-        audioFade.disabled = !audioPadding.checked;
-        updatePrefs();
-        worker.postMessage({ action: 'update-state', audio: config.audio })
-    });
-    
-    audioDownmix.addEventListener('change', (e) => {
-        config.audio.downmix = e.target.checked;
-        updatePrefs();
-        worker.postMessage({ action: 'update-state', audio: config.audio })
-    });
-    
+
     function getSnameFromCname(cname) {
         for (let i = 0; i < LABELS.length; i++) {
             if (LABELS[i].includes(cname)) {
@@ -4128,28 +4077,73 @@ function onChartData(args) {
             const target = element.id;
             config.debug && console.log('Change target:', target)
             switch (target) {
+                
+                case 'species-frequency-threshold' : {
+                    if (isNaN(element.value) || element.value === '') {
+                        alert('The threshold must be a number between 0.001 and 1');
+                        return false
+                    }
+                    config.speciesThreshold = element.value;
+                    worker.postMessage({ action: 'update-state', speciesThreshold: element.value });
+                    worker.postMessage({ action: 'update-list', list: config.list, refreshResults: !!currentFile});
+                    break;
+                }
+                case 'timelineSetting': {
+                    timelineToggle(e);
+                    break;
+                }
+                case 'nocmig': {
+                    changeNocmigMode(e);
+                    break;
+                }
+                case 'confidenceValue':
+                case 'confidence': {
+                    handleThresholdChange(e);
+                    break;
+                }
+                case 'context' : {
+                    toggleContextAwareMode(e);
+                    break;
+                }
+                case 'attenuation': {
+                    handleAttenuationchange(e);
+                    break;
+                }
+                case 'lowShelfFrequency': {
+                    handleLowShelfchange(e);
+                    break;
+                }
+                case 'HighPassFrequency' : {
+                    handleHPchange(e);
+                    break;
+                }
+                case 'snrValue' : {
+                    handleSNRchange(e);
+                    break;
+                }
                 case 'species-week': {
                     config.useWeek = element.checked;
 
                     if (! config.useWeek) STATE.week = -1;
-                    worker.postMessage({action:'update-state', useWeek: config.useWeek})
+                    worker.postMessage({action:'update-state', useWeek: config.useWeek});
+                    worker.postMessage({ action: 'update-list', list: config.list, refreshResults: !!currentFile});
                     break;
                 }
                 case 'list-to-use': {
                     config.list = element.value;
                     if (config.list === 'location') {
                         speciesThresholdEl.classList.remove('d-none');
-                        localSwitchContainer.classList.add('d-none')
+                        DOM.localSwitchContainer.classList.add('d-none')
                     }else if (config.list === 'nocturnal' && config.model === 'birdnet'){
-                        localSwitchContainer.classList.remove('d-none')
+                        DOM.localSwitchContainer.classList.remove('d-none')
                         speciesThresholdEl.classList.add('d-none');  
                     } else { 
                         speciesThresholdEl.classList.add('d-none');                        
-                        localSwitchContainer.classList.add('d-none')
+                        DOM.localSwitchContainer.classList.add('d-none')
                     }                    
                     updateListIcon();
                     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
-                    worker.postMessage({ action: 'update-list', list: config.list  })
+                    worker.postMessage({ action: 'update-list', list: config.list, refreshResults: !!currentFile});
                     break;
                 }
                 case 'locale': {
@@ -4172,17 +4166,18 @@ function onChartData(args) {
                 case 'local': {
                     config.local = element.checked;
                     worker.postMessage({action: 'update-state', local: config.local })
+                    worker.postMessage({ action: 'update-list', list: config.list });
                     break;
                 }
                 case 'model-to-use': {
                     config.model = element.value;
                     const chirpityOnly = document.querySelectorAll('.chirpity-only');
                     if (config.model === 'birdnet') { 
-                        contextAware.checked = false;
+                        DOM.contextAware.checked = false;
                         if (config.list === 'nocturnal') document.getElementById('use-location-container').classList.remove('d-none')
                         // hide chirpity-only features
                         chirpityOnly.forEach(element => element.classList.add('d-none'));
-                        contextAware.disabed = true;
+                        DOM.contextAware.disabed = true;
                         config.detect.contextAware = false;
                         SNRSlider.disabled = true;
                         config.filters.SNR = 0;
@@ -4190,7 +4185,7 @@ function onChartData(args) {
                         // show chirpity-only features
                         chirpityOnly.forEach(element => element.classList.remove('d-none'));
                         document.getElementById('use-location-container').classList.add('d-none')
-                        contextAware.disabed = false;
+                        DOM.contextAware.disabed = false;
                         SNRSlider.disabled = false;
                     }
                     document.getElementById('locale').value = config[config.model].locale;
@@ -4199,21 +4194,31 @@ function onChartData(args) {
                 }
                 case 'thread-slider': {
                         // number of threads
-                    numberOfThreads.textContent = ThreadSlider.value;
-                    config[config.backend].threads = ThreadSlider.valueAsNumber;
+                    DOM.numberOfThreads.textContent = DOM.threadSlider.value;
+                    config[config.backend].threads = DOM.threadSlider.valueAsNumber;
                     loadModel({clearCache: false});
                     break;
                 }
                 case 'batch-size': {
-                    batchSizeValue.textContent = BATCH_SIZE_LIST[batchSizeSlider.value].toString();
+                    DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
                     config[config.backend].batchSize = BATCH_SIZE_LIST[element.value];
                     loadModel({clearCache: false});
                     // Reset region maxLength
                     initRegion();
                     break;
                 }
+                case 'colourmap': {
+                    config.colormap = element.value;
+                    if (wavesurfer) {
+                        initSpectrogram();
+                        // refresh caches
+                        updateElementCache()
+                        adjustSpecDims(true)
+                    }
+                    break;
+                }
                 case 'gain': {
-                    gainAdjustment.textContent = element.value + 'dB'; //.toString();
+                    DOM.gainAdjustment.textContent = element.value + 'dB'; //.toString();
                     config.audio.gain = element.value;   
                     worker.postMessage({action:'update-state', audio: config.audio})
                     const position = wavesurfer.getCurrentTime() / windowLength;
@@ -4221,9 +4226,51 @@ function onChartData(args) {
                         postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
                     break;
                 }
+                case 'format': {
+                    config.audio.format = element.value;
+                    showRelevantAudioQuality();
+                    worker.postMessage({ action: 'update-state', audio: config.audio })
+                    break;
+                };
+                
+                case 'bitrate': {
+                    config.audio.bitrate = e.target.value;
+                    worker.postMessage({ action: 'update-state', audio: config.audio })
+                    break;
+                };
+                
+                case 'quality': {
+                    config.audio.quality = element.value;
+                    worker.postMessage({ action: 'update-state', audio: config.audio })
+                    break;
+                };
+                
+                case 'fade': {
+                    config.audio.fade = element.checked;
+                    worker.postMessage({ action: 'update-state', audio: config.audio })
+                    break;
+                };
+                
+                case 'padding': {
+                    config.audio.padding = e.target.checked;
+                    DOM.audioFade.disabled = !DOM.audioPadding.checked;;
+                    worker.postMessage({ action: 'update-state', audio: config.audio })
+                    break;
+                };
+                
+                case 'downmix': {
+                    config.audio.downmix = e.target.checked;
+                    worker.postMessage({ action: 'update-state', audio: config.audio })
+                    break;
+                };
             }
             updatePrefs();
-            
+            fetch(`https://analytics.mattkirkland.co.uk/matomo.php?action_name=Settings%20Change&idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
+                &dimension9=${JSON.stringify([target, element.value])}}`)
+            .then(response => {
+                if (! response.ok) throw new Error('Network response was not ok', response);
+            })
+            .catch(error => console.log('Error posting tracking:', error))   
         }
     })
     
@@ -4342,7 +4389,7 @@ function onChartData(args) {
         menu.style.left =  left + 'px';
     }
     
-    [spectrogramWrapper, resultTableElement, selectionTable].forEach(el =>{
+    [DOM.spectrogramWrapper, DOM.resultTableElement, selectionTable].forEach(el =>{
         el.addEventListener('contextmenu', createContextMenu)
     })
     
