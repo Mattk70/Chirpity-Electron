@@ -19,6 +19,7 @@ let NUM_WORKERS;
 let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let LIST_WORKER;
+let normalizerNode;
 const DEBUG = false;
 
 const DATASET = false;
@@ -379,10 +380,11 @@ case "update-file-start": {await onUpdateFileStart(args);
     break;
 }
 case "update-list": {
-    UI.postMessage({ event: "show-spinner" });
+    //UI.postMessage({ event: "show-spinner" });
     STATE.list = args.list;
-    await setIncludedIDs(STATE.lat, STATE.lon, STATE.week)
-    await Promise.all([getResults(), getSummary()]);
+    const {lat, lon, week} = STATE;
+    await setIncludedIDs(lat, lon, week )
+    args.refreshResults && await Promise.all([getResults(), getSummary()]);
     break;
 }
 case 'update-locale': {
@@ -397,6 +399,10 @@ case "update-state": {
     if (args.speciesThreshold) {
         if (STATE.included?.['birdnet']?.['location'])  STATE.included.birdnet.location = {};
         if (STATE.included?.['chirpity']?.['location'])  STATE.included.chirpity.location = {};
+    }
+    // likewise, if we change the "use local birds" setting we need to flush the migrants cache"
+    if (args.local !== undefined){
+        if (STATE.included?.['birdnet']?.['nocturnal'])  delete STATE.included.birdnet.nocturnal;
     }
     STATE.update(args);
     break;
@@ -820,7 +826,7 @@ const prepSummaryStatement = (included) => {
             
             function onAbort({
                 model = STATE.model,
-                list = 'migrants',
+                list = 'nocturnal',
             }) {
                 aborted = true;
                 FILE_QUEUE = [];
@@ -858,10 +864,9 @@ const prepSummaryStatement = (included) => {
                 return new Promise(function (resolve) {
                     const sampleRate = STATE.model === 'birdnet' ? 48_000 :24_000, channels = 1;
                     let totalTime;
-                    ffmpeg(file)
+                    let command = ffmpeg(file)
                     .audioChannels(channels)
                     .audioFrequency(sampleRate)
-                    
                     .on('error', (err) => {
                         console.log('An error occurred: ' + err.message);
                         if (err) {
@@ -895,7 +900,8 @@ const prepSummaryStatement = (included) => {
                         UI.postMessage({ event: 'progress', text: 'File decompressed', progress: 1 })
                         resolve(destination)
                     })
-                    .save(destination)
+                    //STATE.audio.normalise && command.audioFilter("loudnorm=I=-16:LRA=11:TP=-1.5")
+                    command.save(destination)
                 });
             }
             
@@ -917,7 +923,7 @@ const prepSummaryStatement = (included) => {
                 if (!source_file) return false;
                 let proxy = source_file;
                 
-                if (!source_file.endsWith('.wav')) {
+                if (STATE.audio.normalise || ! source_file.endsWith('.wav')) {
                     const pc = p.parse(source_file);
                     const filename = pc.base + '.wav';
                     const prefix = pc.dir.replace(pc.root, '');
@@ -1186,9 +1192,11 @@ const prepSummaryStatement = (included) => {
                 }
                 
                 const audioCtxSource = audioCtx.createBufferSource();
+            
                 audioCtxSource.buffer = audioBufferChunk;
                 const duration = audioCtxSource.buffer.duration;
                 const buffer = audioCtxSource.buffer;
+                // IF we want to use worklets, we'll need to reuse the context across the whole file
                 const offlineCtx = new OfflineAudioContext(1, rate * duration, rate);
                 const offlineSource = offlineCtx.createBufferSource();
                 offlineSource.buffer = buffer;
@@ -1222,7 +1230,9 @@ const prepSummaryStatement = (included) => {
                 //     release: 0,
                 //   });
                 // previousFilter = offlineSource.connect(compressor) ;
-                previousFilter ? previousFilter.connect(offlineCtx.destination) : offlineSource.connect(offlineCtx.destination);
+
+
+                // previousFilter ? previousFilter.connect(offlineCtx.destination) : offlineSource.connect(offlineCtx.destination);
                 
                 
                 // // Create a highshelf filter to boost or attenuate high-frequency content
@@ -1232,40 +1242,24 @@ const prepSummaryStatement = (included) => {
                 // highshelfFilter.gain.value = 0; // This sets the boost or attenuation in decibels (dB)
                 
                 
-                // await offlineCtx.audioWorklet.addModule('js/audio_normalizer.js');
-                // const normalizerNode = new AudioWorkletNode(offlineCtx, 'audio-normalizer', {
-                //     processorOptions: {
-                //         cutoff: STATE.highPassFrequency,
-                //         frequency: 100,
-                //     }
-                // });
-                
-                // offlineSource.connect(normalizerNode);
-                // highshelfFilter.connect(offlineCtx.destination);
-                // normalizerNode.connect(offlineCtx.destination);
+                // Add audio normalizer as an Audio Worklet
+                // if (!normalizerNode){
+                //     await offlineCtx.audioWorklet.addModule('js/audio_normalizer_processor.js');
+                //     normalizerNode = new AudioWorkletNode(offlineCtx, 'audio-normalizer-processor');
+                // }
+                // // Connect the nodes
+                // previousFilter ? previousFilter.connect(normalizerNode) : offlineSource.connect(normalizerNode);
+                // previousFilter = normalizerNode;
                 
                 // // Create a gain node to adjust the audio level
-                // const gainNode = offlineCtx.createGain();
-                // const maxLevel = 0.5; // This sets the maximum audio level to 0.5 (50% of maximum)
-                // const minLevel = 0.05; // This sets the minimum audio level to 0.05 (5% of maximum)
-                // const scriptNode = offlineCtx.createScriptProcessor(4096, 1, 1); // This sets the buffer size to 4096 samples
-                // highshelfFilter.connect(scriptNode);
-                
-                // scriptNode.connect(gainNode);
-                // gainNode.connect(offlineCtx.destination);
-                // // Analyze the audio levels in real-time
-                // scriptNode.onaudioprocess = function (event) {
-                //     const inputBuffer = event.inputBuffer.getChannelData(0);
-                //     let max = 0;
-                //     for (let i = 0; i < inputBuffer.length; i++) {
-                //         const absValue = Math.abs(inputBuffer[i]);
-                //         if (absValue > max) {
-                //             max = absValue;
-                //         }
-                //     }
-                //     const level = max.toFixed(2); // Round the level to two decimal places
-                //     gainNode.gain.value = level >= maxLevel ? 1 : (level <= minLevel ? 0 : (level - minLevel) / (maxLevel - minLevel));
-                // };
+                if (STATE.audio.gain){
+                    var gainNode = offlineCtx.createGain();
+                    gainNode.gain.value = Math.pow(10, STATE.audio.gain / 20);
+                    previousFilter ? previousFilter.connect(gainNode) : offlineSource.connect(gainNode);
+                    gainNode.connect(offlineCtx.destination);
+                } else {
+                    previousFilter ? previousFilter.connect(offlineCtx.destination) : offlineSource.connect(offlineCtx.destination);
+                }
                 offlineSource.start();
                 return offlineCtx;
             };
@@ -1391,7 +1385,7 @@ const prepSummaryStatement = (included) => {
                     readStream.on('data', async chunk => {
                         // Ensure data is processed in order
                         readStream.pause();
-                        const offlineCtx = await setupCtx(chunk, metadata[file].header, sampleRate);
+                        const offlineCtx = await setupCtx(chunk, metadata[file].header, sampleRate).catch(error => {console.error(error)});
                         if (offlineCtx){
                             offlineCtx.startRendering().then(resampled => {
                                 // `resampled` contains an AudioBuffer resampled at 24000Hz.
@@ -1709,46 +1703,52 @@ const prepSummaryStatement = (included) => {
                                     filter: 'afade',
                                     options: `t=out:st=${duration - 1}:d=1`
                                 }
-                                )
+                            )}
+                    }
+                    if (STATE.audio.gain){
+                        ffmpgCommand = ffmpgCommand.audioFilters(
+                            {
+                                filter: `volume=${Math.pow(10, STATE.audio.gain / 20)}`
                             }
-                        }
-                        // This code doesn't weork: error opening filters
-                        // if (STATE.filters.active){
-                        //     ffmpgCommand = ffmpgCommand.audioFilters(
-                        //          {
-                        //              filter: 'lowshelf',
-                        //              options: `gain=${STATE.filters.lowShelfAttenuation}:f=${STATE.filters.lowShelfFrequency}`
-                        //          },
-                        //          {
-                        //              filter: 'highpass',
-                        //              options: `f=${STATE.filters.highPassFrequency}:poles=1`
-                        //          } 
-                        //      )
-                        //  }
-                        ffmpgCommand.on('start', function (commandLine) {
-                            DEBUG && console.log('FFmpeg command: ' + commandLine);
-                        })
-                        ffmpgCommand.on('error', (err) => {
-                            console.log('An error occurred: ' + err.message);
-                        })
-                        ffmpgCommand.on('end', function () {
-                            console.log(format + " file rendered")
-                        })
-                        ffmpgCommand.writeToStream(bufferStream);
-                        
-                        const buffers = [];
-                        bufferStream.on('data', (buf) => {
-                            buffers.push(buf);
-                        });
-                        bufferStream.on('end', function () {
-                            const outputBuffer = Buffer.concat(buffers);
-                            let audio = [];
-                            audio.push(new Int8Array(outputBuffer))
-                            const blob = new Blob(audio, { type: mimeType });
-                            resolve(blob);
-                        });
+                        )
+                    }
+                    if (STATE.filters.active) {
+                        ffmpgCommand = ffmpgCommand.audioFilters(
+                            {
+                                filter: 'lowshelf',
+                                options: `gain=${STATE.filters.lowShelfAttenuation}:f=${STATE.filters.lowShelfFrequency}`
+                            },
+                            {
+                                filter: 'highpass',
+                                options: `f=${STATE.filters.highPassFrequency}:poles=1`
+                            }
+                        )
+                    }
+
+                    ffmpgCommand.on('start', function (commandLine) {
+                        DEBUG && console.log('FFmpeg command: ' + commandLine);
                     })
-                };
+                    ffmpgCommand.on('error', (err) => {
+                        console.log('An error occurred: ' + err.message);
+                    })
+                    ffmpgCommand.on('end', function () {
+                        console.log(format + " file rendered")
+                    })
+                    ffmpgCommand.writeToStream(bufferStream);
+                    
+                    const buffers = [];
+                    bufferStream.on('data', (buf) => {
+                        buffers.push(buf);
+                    });
+                    bufferStream.on('end', function () {
+                        const outputBuffer = Buffer.concat(buffers);
+                        let audio = [];
+                        audio.push(new Int8Array(outputBuffer))
+                        const blob = new Blob(audio, { type: mimeType });
+                        resolve(blob);
+                    });
+                })
+            };
                 
                 async function saveAudio(file, start, end, filename, metadata, folder) {
                     const thisBlob = await bufferToAudio({
@@ -2077,6 +2077,7 @@ const prepSummaryStatement = (included) => {
                                 if ( !aborted) {
                                     predictWorkers[response.worker].isAvailable = true;
                                     let worker = await parsePredictions(response);
+                                    DEBUG && console.log('predictions left for', response.file, predictionsReceived[response.file] - predictionsRequested[response.file])
                                     if (predictionsReceived[response.file] === predictionsRequested[response.file]) {
                                         const limit = 10;
                                         clearCache(CACHE_LOCATION, limit);
@@ -3033,7 +3034,7 @@ const prepSummaryStatement = (included) => {
                     return STATE.included[STATE.model][STATE.list][week][location];
                     
                 } else {
-                    if (STATE.included?.[STATE.model]?.[STATE.list] === undefined ) {
+                    if (STATE.included?.[STATE.model]?.[STATE.list] === undefined) {
                         // The object lacks the week / location
                         await setIncludedIDs(lat,lon,week);
                         hitOrMiss = 'miss';
@@ -3057,10 +3058,11 @@ const prepSummaryStatement = (included) => {
                     message: 'get-list', 
                     model: STATE.model, 
                     listType: STATE.list, 
-                    lat: lat, 
-                    lon: lon, 
-                    week: week, 
+                    lat: lat || STATE.lat, 
+                    lon: lon || STATE.lon, 
+                    week: week || STATE.week, 
                     useWeek: STATE.useWeek,
+                    localBirdsOnly: STATE.local,
                     threshold: STATE.speciesThreshold
                 })
 

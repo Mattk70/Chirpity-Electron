@@ -103,16 +103,16 @@ test(`Audacity labels work`, async () => {
   await page.waitForFunction(() => donePredicting());
   const labels = await page.evaluate(() => getAudacityLabels());
   expect(labels.length).toBe(8);
-  // Migrants shows 2 rows @ 45%
+  // nocturnal shows 2 rows @ 45%
   await page.getByRole('button', { name: 'Settings' }).click();
-  await page.getByLabel('Show:').selectOption('migrants');
+  await page.getByLabel('Show:').selectOption('NOCTURNAL');
   await page.waitForFunction(() => donePredicting());
   const labels2 = await page.evaluate(() => getAudacityLabels());
   expect(labels2.length).toBe(2);
   expect(labels2[0].cname).toBe("Redwing (call)")
   // reset the list to default
   await page.evaluate(() => {
-    config.list = 'migrants'
+    config.list = 'nocturnal'
   })
 })
 
