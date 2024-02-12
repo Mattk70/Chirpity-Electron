@@ -320,9 +320,9 @@ class Model {
         const finalPrediction = newPrediction || prediction;
         
         const { indices, values } = tf.topk(finalPrediction, 5, true);
-        const topIndices = await indices.array();
+        const topIndices = indices.arraySync();
         indices.dispose();
-        const topValues = await values.array();
+        const topValues = values.arraySync();
         values.dispose();
         // end new
         // const array_of_predictions = finalPrediction.arraySync()

@@ -1389,6 +1389,7 @@ window.onload = async () => {
         webgl: { threads: 2, batchSize: 32 },
         audio: { gain: 0, format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false },
         limit: 500,
+        track: true,
         debug: false
     };
     // Load preferences and override defaults
@@ -2192,26 +2193,7 @@ function onChartData(args) {
         updateElementCache();
     }
     
-    
-    // const locale = document.getElementById('locale')
-    // locale.addEventListener('change', async ()=> {
-    //     config[config.model].locale = locale.value;
-    //     updatePrefs();
-    //     const chirpity = config[config.model].locale === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
-    //     const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${config[config.model].locale}.txt`; 
-    //     fetch(labelFile).then(response => {
-    //         if (! response.ok) throw new Error('Network response was not ok');
-    //         return response.text();
-    //     }).then(filecontents => {
-    //         LABELS = filecontents.trim().split(/\r?\n/);
-    //         // Add unknown species
-    //         LABELS.push('Unknown Sp._Unknown Sp.');
-    //         worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS})
-    //     }).catch(error =>{
-    //         console.error('There was a problem fetching the label file:', error);
-    //     })
-    // })
-    
+
     // list mode icons
     const listIcon = document.getElementById('list-icon')
     const speciesThresholdEl = document.getElementById('species-threshold-el');
@@ -2267,10 +2249,11 @@ function onChartData(args) {
             backend: config.backend,
             clearCache: clearCache
         });
+        
     }
     
-    const handleBackendChange = (e) => {
-        config.backend = e.target.value;
+    const handleBackendChange = (backend) => {
+        config.backend = backend instanceof Event ? backend.target.value : backend;
         if (config.backend === 'webgl') {
             //powerSave(true)
             SNRSlider.disabled = true;
@@ -2849,7 +2832,11 @@ function onChartData(args) {
         t1_analysis = Date.now();
         const analysisTime = ((t1_analysis - t0_analysis) / 1000).toFixed(2);
         DIAGNOSTICS['Analysis Duration'] = analysisTime + ' seconds';
-        DIAGNOSTICS['Analysis Rate'] = (DIAGNOSTICS['Audio Duration'] / analysisTime).toFixed(0) + 'x faster than real time performance.';
+        const rate = (DIAGNOSTICS['Audio Duration'] / analysisTime);
+        DIAGNOSTICS['Analysis Rate'] = rate.toFixed(0) + 'x faster than real time performance.';
+        track(`${config.model}-${config.backend}`, 'Audio Duration', config.backend, Math.round(DIAGNOSTICS['Audio Duration']));
+        track(`${config.model}-${config.backend}`, 'Analysis Duration', config.backend, parseInt(analysisTime));
+        track(`${config.model}-${config.backend}`, 'Analysis Rate', config.backend, parseInt(rate));
     }
     
     /* 
@@ -3614,6 +3601,7 @@ function onChartData(args) {
             filelist.push(f.path);
         }
         if (filelist.length) filterValidFiles({ filePaths: filelist })
+        track('UI', 'Drop', 'Open Folder(s)', filelist.length);
     });
     
     
@@ -4066,14 +4054,8 @@ DOM.gain.addEventListener('input', () => {
         const target = e.target.closest('[id]').id;
         contextMenu.classList.add("d-none");
         hideConfidenceSlider();
-        console.log('clicked', target);
-
-        fetch(`https://analytics.mattkirkland.co.uk/matomo.php?action_name=Settings%20Change&idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
-            &e_c=Click&e_a=${target}`)
-        .then(response => {
-            if (! response.ok) throw new Error('Network response was not ok', response);
-        })
-        .catch(error => console.log('Error posting click tracking:', error))   
+        config.debug && console.log('clicked', target);
+        track('UI', 'Click', target);  
     })
     
     
@@ -4116,6 +4098,10 @@ DOM.gain.addEventListener('input', () => {
                 }
                 case 'attenuation': {
                     handleAttenuationchange(e);
+                    break;
+                }
+                case 'do-not-track': {
+                    config.track = !element.checked;
                     break;
                 }
                 case 'lowShelfFrequency': {
@@ -4190,15 +4176,18 @@ DOM.gain.addEventListener('input', () => {
                         config.detect.contextAware = false;
                         SNRSlider.disabled = true;
                         config.filters.SNR = 0;
+                        
                     } else {
                         // show chirpity-only features
                         chirpityOnly.forEach(element => element.classList.remove('d-none'));
-                        document.getElementById('use-location-container').classList.add('d-none')
+                        document.getElementById('use-location-container').classList.add('d-none');
                         DOM.contextAware.disabed = false;
                         SNRSlider.disabled = false;
                     }
                     document.getElementById('locale').value = config[config.model].locale;
-                    loadModel();
+                    config.backend = 'tensorflow';
+                    document.getElementById('tensorflow').checked = true;
+                    handleBackendChange(config.backend);
                     break;
                 }
                 case 'thread-slider': {
@@ -4274,17 +4263,22 @@ DOM.gain.addEventListener('input', () => {
                 };
             }
             updatePrefs();
-            
-            fetch(`https://analytics.mattkirkland.co.uk/matomo.php?action_name=Settings%20Change&idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
-                &e_c=Change&e_a=${target}&e_n=${element.value}`)
-            .then(response => {
-                if (! response.ok) throw new Error('Network response was not ok', response);
-            })
-            .catch(error => console.log('Error posting tracking:', error))   
+            track('Settings Change', target, element.value);
         }
     })
     
-
+function track(event, action, name, value){
+    name = name ? `&e_n=${name}` : '';
+    value = value ? `&e_v=${value}` : '';
+    if (config.track){
+        fetch(`https://analytics.mattkirkland.co.uk/matomo.php?action_name=Settings%20Change&idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
+        &e_c=${event}&e_a=${action}${name}${value}`)
+        .then(response => {
+            if (! response.ok) throw new Error('Network response was not ok', response);
+        })
+        .catch(error => console.log('Error posting tracking:', error))  
+    }
+}
     
     async function createContextMenu(e) {
         const target = e.target;

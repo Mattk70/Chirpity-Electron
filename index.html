@@ -309,7 +309,7 @@
                                                                             </span>
                                                                         </div>                                                                
                                                                     </div>
-                                                                
+                                                                </div>
                                                             </div>
                                                             <div class="m-2"></div>
                                                             <div class="form-group rounded p-2 mb-2 bg-light">
@@ -510,9 +510,9 @@
                                                             <div class="col pe-0">
                                                                 <div class="me-auto">
                                                                     <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Gain" data-bs-content="Adjust the volume of audio to compensate for low recording levels.">?</a>
+                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Volume Adjustment" data-bs-content="Adjust the volume of audio to compensate for low recording levels.">?</a>
                                                                         <label for="gain" class="form-label">
-                                                                            Gain Adjustment:
+                                                                            Volume Adjustment:
                                                                         </label>
                                                                         <div class="input-group me-0 p-0">
                                                                             <input type="range" class="form-control-range w-75" min="0" max="50" id="gain">
@@ -549,7 +549,7 @@
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        
+                                                    </div>    
                                                     </fieldset>
                                                     <fieldset class="border rounded m-2 p-1">
                                                         <legend style="font-size: large">Spectrogram Preferences</legend>
@@ -598,7 +598,7 @@
                                                     </fieldset>                                                                
                                                     <fieldset class="border rounded m-2 p-1 pb-3 bg-warning">
                                                         <legend class="pb-2" style="font-size: large"><span
-                                                            class="material-symbols-outlined align-middle">science</span> Advanced features <a class="circle" style="background-color:darkgoldenrod" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Species Threshold" data-bs-content="The settings in this section can impact prediction quailty - for better or worse. Use them with caution!">?</a>
+                                                            class="material-symbols-outlined align-middle">science</span> Advanced features <a class="circle" style="background-color:darkgoldenrod" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Advanced Features" data-bs-content="The settings in this section can impact prediction quailty - for better or worse. Use them with caution!">?</a>
                                                         </legend>
                                                         <div class="row">
                                                             <div class="col">
@@ -615,7 +615,7 @@
                                                                 </div>
                                                                 <div class="chirpity-only me-auto">
                                                                     <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Signal to Noise Ration" data-bs-content="Skip over portions of audio with just background noise. Higher values skip increasingly noisy segments.
+                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Signal to Noise Ratio" data-bs-content="Skip over portions of audio with just background noise. Higher values skip increasingly noisy segments.
                                                                         Not available in the BirdNET model">?</a>
                                                                         <label for="snrValue" class="form-label">
                                                                             SNR filter:
@@ -674,19 +674,28 @@
                                                             </div>
                                                         </div>
                                                     </fieldset>
-                                                    <div class="row p-2 pe-2">
-                                                        <div class="col me-0">
-                                                            <div class="form-group rounded p-2 mb-2 text-bg-danger">
-                                                                <a class="circle" style="background-color:darkred" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Species Threshold" data-bs-content="Enter debug mode (changes to this setting require a Chirpity relaunch to take effect)">?</a>
+
+                                                    <div class="row p-2 m-2">
+                                                        <div class=" col-auto form-group rounded p-2 mb-2 text-bg-light">
+                                                            <div class="text-nowrap">   
                                                                 <div class="form-check form-switch">
                                                                     <input class="form-check-input" type="checkbox"
                                                                     role="switch" id="debug-mode">
-                                                                    <label class="form-check-label" for="debug-mode">Debug mode</label>
+                                                                    <label class="form-check-label me-2" for="debug-mode">Debug mode</label><a class="circle"  tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Debug Mode" data-bs-content="Enter debug mode (changes to this setting require a Chirpity relaunch to take effect)">?</a>
                                                                 </div>
-                                                                
                                                             </div>
                                                         </div>
-                                                    </div>                                                                                                                                
+                                                        <div class="col-auto form-group rounded p-2 mb-2 text-bg-light">
+                                                            <div class="text-nowrap">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox"
+                                                                    role="switch" id="do-not-track">
+                                                                    <label class="form-check-label me-2" for="do-not-track">Opt out of usage analytics</label><a class="circle"  tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Disable Tracking" data-bs-content="Chirpity collects anonymous system data to enhance user experience and aid bug tracking. If you do not want to share this information, you can disable it here.">?</a>
+                                                                </div>        
+                                                            </div>
+                                                        </div>
+                                                    </div>                                                   
+
                                                 </form>
                                             </li>
                                         </ul>
