@@ -147,7 +147,7 @@
             <div class="collapse navbar-collapse" id="main_nav">
                 <ul class="navbar-nav">
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" data-bs-toggle="dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navBarFile" data-bs-toggle="dropdown">
                             File
                         </a>
                         <ul class="dropdown-menu">
@@ -210,7 +210,7 @@
                         data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         Analysis
                     </a>
-                    <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                    <ul class="dropdown-menu" aria-labelledby="navbarAnalysis">
                         <!-- <li><a class="dropdown-item text-danger" href="#" id="warmup">Model Warming up
                             <div class="spinner-grow spinner-grow-sm" role="status">
                                 <span class="visually-hidden">Loading...</span>
@@ -273,7 +273,7 @@
                                                             <div class="row p-2">
                                                                 <div class="p-2 form-group rounded bg-light">
                                                                     <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="List" data-bs-content="Filters the detections returned in results. Local Birds: excludes birds 
-                                                                    unlikely to be found in your region. Nocturnal Birds: excludes species' songs and species not known to call at night">?</a>
+                                                                    unlikely to be found in your region. Nocturnal Birds: excludes bird song and species not known to call at night">?</a>
                                                                     <div class="row pe-3">
                                                                         <label class="col-auto" for="list-to-use">List:</label>
                                                                         <div class="col d-flex align-items-start">
@@ -292,17 +292,21 @@
                                                                         <div class="form-check form-switch">
                                                                             <input class="form-check-input" type="checkbox" role="switch" id="local" checked>
                                                                             <label class="form-check-label" for="local">Use Location settings</label>
-                                                                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Use Location settings" data-bs-content="When enabled, the Nocturnal birds filter will only report birds included according to your location filter settings">?</a>
+                                                                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Use Location settings" data-bs-content="When activated, the Nocturnal birds filter reports birds based on your location settings.">?</a>
                                                                         </div>
                                                                     </div>
                                                                 
                                                                     <div id="species-threshold-el">
-                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Species Threshold" data-bs-content="Set the minimum eBird checklist frequency for a bird to be included
-                                                                        If 'Use Week' is checked, the filter will be refined to include only the species likely in the week the recording was made.">?</a>
+                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Species Threshold" data-bs-content="Define the minimum eBird checklist frequency for species inclusion.
+                                                                        If 'Adjust for Seasons' is enabled, the list will be adjusted to include species expected for the recording week.">?</a>
                                                                         <div class="input-group mt-0 w-100 align-bottom">
                                                                             <span class="input-group-text col">Threshold:</span>
                                                                             <input id="species-frequency-threshold" type="number" class="form-control" style="width: 30%;" value="0.005" step="0.001" min="0.001" max="1" aria-label="species frequency threshold" aria-describedby="species-frequency-threshold">
-                                                                            <label class="text-nowrap ms-2 me-2 " for="species-week">Use Week</label><div class="form-switch"><input id="species-week" role="switch"  type="checkbox" class="form-check-input form-check-inline"></div>
+                                                                            <span class="text-nowrap"><label class="ms-2 me-2 " for="species-week">Adjust for seasons</label>
+                                                                                <span class="form-switch">
+                                                                                    <input id="species-week" role="switch"  type="checkbox" class="form-check-input form-check-inline">
+                                                                                </span>
+                                                                            </span>
                                                                         </div>                                                                
                                                                     </div>
                                                                 
@@ -688,20 +692,20 @@
                                         </ul>
                                     </li>
                                     <li class="nav-item dropdown">
-                                        <a class="nav-link dropdown-toggle" href="#" id="help" role="button"
+                                        <a class="nav-link dropdown-toggle" href="#" id="navbarHelp" role="button"
                                         data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                         Help
                                     </a>
-                                    <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                                    <ul class="dropdown-menu" aria-labelledby="navBarHelp">
                                         <li><a class="dropdown-item" id="usage" href="#">
                                             <span class="material-symbols-outlined">help</span> Using Chirpity</a>
                                         </li>
                                         <li>
-                                            <a class="dropdown-item" id="settings" href="#">
+                                            <a class="dropdown-item" id="settingsHelp" href="#">
                                                 <span class="material-symbols-outlined">help</span> Settings
                                             </a>
                                         </li>
-                                        <li><a class="dropdown-item" id="keyboard" href="#">
+                                        <li><a class="dropdown-item" id="keyboardHelp" href="#">
                                             <span class="material-symbols-outlined">help</span> Keyboard Shortcuts
                                         </a>
                                     </li>
