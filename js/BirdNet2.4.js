@@ -39,14 +39,7 @@ onmessage = async (e) => {
                 })
                 DEBUG && console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
                 
-                tf.setBackend(backend).then(async () => {
-                    if (backend === "webgl") {
-                        tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
-                        tf.env().set("WEBGL_PACK", true);
-                        tf.env().set("WEBGL_EXP_CONV", true);
-                        tf.env().set("TOPK_K_CPU_HANDOFF_THRESHOLD", 128);
-                        tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 0);
-                    }
+                tf.setBackend('tensorflow').then(async () => {
                     tf.enableProdMode();
                     if (DEBUG) {
                         console.log(tf.env());
@@ -327,9 +320,9 @@ class Model {
         const finalPrediction = newPrediction || prediction;
         
         const { indices, values } = tf.topk(finalPrediction, 5, true);
-        const topIndices = await indices.array();
+        const topIndices = indices.arraySync();
         indices.dispose();
-        const topValues = await values.array();
+        const topValues = values.arraySync();
         values.dispose();
         // end new
         // const array_of_predictions = finalPrediction.arraySync()
