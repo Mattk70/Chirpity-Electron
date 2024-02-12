@@ -4055,7 +4055,7 @@ DOM.gain.addEventListener('input', () => {
         contextMenu.classList.add("d-none");
         hideConfidenceSlider();
         config.debug && console.log('clicked', target);
-        track('UI', 'Click', target);  
+        target !== 'result1' && track('UI', 'Click', target);  
     })
     
     
