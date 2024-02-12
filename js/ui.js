@@ -3284,10 +3284,10 @@ function onChartData(args) {
     document.getElementById('exit').addEventListener('click', exitApplication);
     
     // Help menu handling
-    document.getElementById('keyboard').addEventListener('click', async () => {
+    document.getElementById('keyboardHelp').addEventListener('click', async () => {
         await populateHelpModal('Help/keyboard.html', 'Keyboard shortcuts');
     });
-    document.getElementById('settings').addEventListener('click', async () => {
+    document.getElementById('settingsHelp').addEventListener('click', async () => {
         await populateHelpModal('Help/settings.html', 'Settings Help');
     });
     
@@ -4063,8 +4063,17 @@ DOM.gain.addEventListener('input', () => {
     
     
     document.addEventListener('click', function (e) {
+        const target = e.target.closest('[id]').id;
         contextMenu.classList.add("d-none");
         hideConfidenceSlider();
+        console.log('clicked', target);
+
+        fetch(`https://analytics.mattkirkland.co.uk/matomo.php?action_name=Settings%20Change&idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
+            &e_c=Click&e_a=${target}`)
+        .then(response => {
+            if (! response.ok) throw new Error('Network response was not ok', response);
+        })
+        .catch(error => console.log('Error posting click tracking:', error))   
     })
     
     
@@ -4265,8 +4274,9 @@ DOM.gain.addEventListener('input', () => {
                 };
             }
             updatePrefs();
+            
             fetch(`https://analytics.mattkirkland.co.uk/matomo.php?action_name=Settings%20Change&idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
-                &dimension9=${JSON.stringify([target, element.value])}}`)
+                &e_c=Change&e_a=${target}&e_n=${element.value}`)
             .then(response => {
                 if (! response.ok) throw new Error('Network response was not ok', response);
             })

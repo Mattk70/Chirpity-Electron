@@ -900,7 +900,7 @@ const prepSummaryStatement = (included) => {
                         UI.postMessage({ event: 'progress', text: 'File decompressed', progress: 1 })
                         resolve(destination)
                     })
-                    STATE.audio.normalise && command.audioFilter("loudnorm=I=-16:LRA=11:TP=-1.5")
+                    //STATE.audio.normalise && command.audioFilter("loudnorm=I=-16:LRA=11:TP=-1.5")
                     command.save(destination)
                 });
             }
