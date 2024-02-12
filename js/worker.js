@@ -2077,6 +2077,7 @@ const prepSummaryStatement = (included) => {
                                 if ( !aborted) {
                                     predictWorkers[response.worker].isAvailable = true;
                                     let worker = await parsePredictions(response);
+                                    DEBUG && console.log('predictions left for', response.file, predictionsReceived[response.file] - predictionsRequested[response.file])
                                     if (predictionsReceived[response.file] === predictionsRequested[response.file]) {
                                         const limit = 10;
                                         clearCache(CACHE_LOCATION, limit);
