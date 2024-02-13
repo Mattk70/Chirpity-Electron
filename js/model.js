@@ -40,6 +40,7 @@ onmessage = async (e) => {
                         tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 0);
                     }
                     tf.enableProdMode();
+                    //tf.enableDebugMode();
                     if (DEBUG) {
                         console.log(tf.env());
                         console.log(tf.env().getFlags());
@@ -292,10 +293,10 @@ class Model {
         const finalPrediction = newPrediction || prediction;
         const { indices, values } = tf.topk(finalPrediction, 5, true)
         // For reasons I don't understand, the Promise.all approach is flakey: on occasion, not all predictions are returned
-        // const [topIndices, topValues] = await Promise.all([indices.array(), values.array()]).catch(err => console.log('Data transfer error:',err));
-        const topIndices = await indices.array();
+        const [topIndices, topValues] = await Promise.all([indices.array(), values.array()]).catch(err => console.log('Data transfer error:',err));
+//const topIndices = await indices.array();
         indices.dispose();
-        const topValues = await values.array();
+//const topValues = await values.array();
         values.dispose();
 
         finalPrediction.dispose();
@@ -333,7 +334,7 @@ class Model {
         return tf.tidy(() => {        
         const sigMax = tf.max(tensor, 1, true);
         const sigMin = tf.min(tensor, 1, true);
-        const normalized = tensor.sub(sigMin).div(sigMax.sub(sigMin)).mul(tf.scalar(2)).sub(tf.scalar(1));
+        const normalized = tensor.sub(sigMin).divNoNan(sigMax.sub(sigMin)).mul(tf.scalar(2)).sub(tf.scalar(1));
         return normalized;
         })
     }
@@ -346,7 +347,7 @@ class Model {
             const sigMin = tf.min(signal);
             const range = sigMax.sub(sigMin);
             //return signal.sub(sigMin).div(range).mul(tf.scalar(8192.0, 'float32')).sub(tf.scalar(4095, 'float32'))
-            return signal.sub(sigMin).div(range).mul(tf.scalar(2)).sub(tf.scalar(1))
+            return signal.sub(sigMin).divNoNan(range).mul(tf.scalar(2)).sub(tf.scalar(1))
         })
     };
     async predictChunk(audioBuffer, start, fileStart, file, threshold, confidence) {

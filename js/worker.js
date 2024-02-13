@@ -818,7 +818,7 @@ const prepSummaryStatement = (included) => {
                 
                 filesBeingProcessed = [...FILE_QUEUE];
                 
-                for (let i = 0; i < NUM_WORKERS; i++) {
+                for (let i = 0; i < filesBeingProcessed.length; i++) {
                     processNextFile({ start: start, end: end, worker: i });
                 }
             }
@@ -1314,14 +1314,13 @@ const prepSummaryStatement = (included) => {
                         return
                     }
                     const offlineCtx = await setupCtx(chunk, metadata[file].header);
+                    let worker;
                     if (offlineCtx) {
                         offlineCtx.startRendering().then((resampled) => {
                             const myArray = resampled.getChannelData(0);
                             
-                            if (++workerInstance >= NUM_WORKERS) {
-                                workerInstance = 0;
-                            }
-                            let worker = workerInstance;
+                            workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+                            worker = workerInstance;
                             feedChunksToModel(myArray, chunkStart, file, end, worker);
                             chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
                             // Now the async stuff is done ==>
@@ -1336,12 +1335,9 @@ const prepSummaryStatement = (included) => {
                         });
                     } else {
                         console.log('Short chunk', chunk.length, 'skipping')
-                        if (worker === undefined) {
-                            if (++workerInstance >= NUM_WORKERS) {
-                                workerInstance = 0;
-                            }
-                            worker = workerInstance;
-                        }
+                        workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+                        worker = workerInstance;
+
                         // Create array with 0's (short segment of silence that will trigger the finalChunk flag
                         const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
                         feedChunksToModel(myArray, chunkStart, file, end);
@@ -1350,6 +1346,7 @@ const prepSummaryStatement = (included) => {
                 })
                 readStream.on('end', function () {
                     readStream.close();
+                    console.log('All chunks sent for ', file)
                 })
                 readStream.on('error', err => {
                     console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
@@ -1438,7 +1435,6 @@ const prepSummaryStatement = (included) => {
                 };
                 predictWorkers[worker].isAvailable = false;
                 predictWorkers[worker].postMessage(objData, [channelData.buffer]);
-                
             }
             
             async function doPrediction({
@@ -1794,7 +1790,9 @@ const prepSummaryStatement = (included) => {
                             worker: i
                         })
                         worker.onmessage = async (e) => {
-                            await parseMessage(e)
+                            await parseMessage(e).catch(error => {
+                                console.warn("Parse message error", error, 'e was', e)
+                            })
                         }
                         worker.onerror = (e) => {
                             console.warn(`Worker ${i} is suffering, shutting it down. THe error was:`, e)
@@ -1966,7 +1964,7 @@ const prepSummaryStatement = (included) => {
                             }
                             // Remove the trailing comma and space
                             insertQuery = insertQuery.slice(0, -2);
-                            DEBUG && console.log(insertQuery);
+                            //DEBUG && console.log(insertQuery);
                             // Make sure we have some values to INSERT
                             insertQuery.endsWith(')') && await db.runAsync(insertQuery);
                             return fileID
@@ -1974,10 +1972,10 @@ const prepSummaryStatement = (included) => {
                         
                         const parsePredictions = async (response) => {
                             let file = response.file;
-                            const included = await getIncludedIDs(file);
+                            const included = await getIncludedIDs(file).catch(error => console.log('Error getting included IDs', error));
                             const latestResult = response.result, db = STATE.db;
                             DEBUG && console.log('worker being used:', response.worker);
-                            if (! STATE.selection) await generateInsertQuery(latestResult, file);
+                            if (! STATE.selection) await generateInsertQuery(latestResult, file).catch(error => console.log('Error generating insert query', error));
                             let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
                             for (let i = 0; i < keysArray.length; i++) {
                                 let updateUI = false;
@@ -2003,7 +2001,7 @@ const prepSummaryStatement = (included) => {
                                             confidenceRequired = STATE.detect.confidence;
                                         }
                                         if (confidence >= confidenceRequired) {
-                                            const { cname } = await memoryDB.getAsync(`SELECT cname FROM species WHERE id = ${speciesID}`);
+                                            const { cname } = await memoryDB.getAsync(`SELECT cname FROM species WHERE id = ${speciesID}`).catch(error => console.log('Error getting species name', error));
                                             const result = {
                                                 timestamp: timestamp,
                                                 position: key,
@@ -2041,6 +2039,7 @@ const prepSummaryStatement = (included) => {
                                             });
                                         }
                                     })
+                                    .catch(error => console.log('Error generating new result', error))
                                 }
                                 updateFilesBeingProcessed(response.file)
                                 console.log(`File ${file} processed after ${(new Date() - predictionStart) / 1000} seconds: ${filesBeingProcessed.length} files to go`);
@@ -2075,9 +2074,10 @@ const prepSummaryStatement = (included) => {
                             case "prediction": {
                                 if ( !aborted) {
                                     predictWorkers[response.worker].isAvailable = true;
-                                    let worker = await parsePredictions(response);
-                                    DEBUG && console.log('predictions left for', response.file, predictionsReceived[response.file] - predictionsRequested[response.file])
-                                    if (predictionsReceived[response.file] === predictionsRequested[response.file]) {
+                                    let worker = await parsePredictions(response).catch(error =>  console.log('Error parsing predictions', error));
+                                    console.log('predictions left for', response.file, predictionsReceived[response.file] - predictionsRequested[response.file])
+                                    const remaining = predictionsReceived[response.file] - predictionsRequested[response.file]
+                                    if (remaining === 0) {
                                         const limit = 10;
                                         clearCache(CACHE_LOCATION, limit);
                                         if (filesBeingProcessed.length) {
@@ -2271,7 +2271,7 @@ const prepSummaryStatement = (included) => {
             const params = getSummaryParams(included);
             const summary = await STATE.GET_SUMMARY_SQL.allAsync(...params);
             
-            DEBUG && console.log("Get Summary took", (Date.now() - t0) / 1000, "seconds");
+            //DEBUG && console.log("Get Summary took", (Date.now() - t0) / 1000, "seconds");
             const event = interim ? 'update-summary' : 'summary-complate';
             UI.postMessage({
                 event: event,
@@ -3038,7 +3038,7 @@ const prepSummaryStatement = (included) => {
                         await setIncludedIDs(lat,lon,week);
                         hitOrMiss = 'miss';
                     }
-                    DEBUG && console.log(`Cache ${hitOrMiss}: setting the ${STATE.list} list took ${Date.now() -t0}ms`)
+                    //DEBUG && console.log(`Cache ${hitOrMiss}: setting the ${STATE.list} list took ${Date.now() -t0}ms`)
                     return STATE.included[STATE.model][STATE.list];
                 }
             }
