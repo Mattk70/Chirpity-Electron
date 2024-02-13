@@ -1416,6 +1416,8 @@ window.onload = async () => {
         }
         // force backend to 'tensorflow' for Birdnet
         if (config.model === 'birdnet') config.backend = 'tensorflow';
+        // Rename migrants list from old versions to new name: nocturnal
+        if (config.list === 'migrants') config.list = 'nocturnal';
         // switch off fullscreen mode - we don't want to persist that setting
         config.fullscreen = false;
         // switch off debug mode we don't want this to be remembered
