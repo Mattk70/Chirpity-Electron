@@ -292,11 +292,9 @@ class Model {
 
         const finalPrediction = newPrediction || prediction;
         const { indices, values } = tf.topk(finalPrediction, 5, true)
-        // For reasons I don't understand, the Promise.all approach is flakey: on occasion, not all predictions are returned
+
         const [topIndices, topValues] = await Promise.all([indices.array(), values.array()]).catch(err => console.log('Data transfer error:',err));
-//const topIndices = await indices.array();
         indices.dispose();
-//const topValues = await values.array();
         values.dispose();
 
         finalPrediction.dispose();

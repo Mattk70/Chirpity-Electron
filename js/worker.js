@@ -1765,7 +1765,35 @@ const prepSummaryStatement = (included) => {
                     }
                 }
                 
-                
+                // Create a flag to indicate if parseMessage is currently being executed
+                let isParsing = false;
+
+                // Create a queue to hold messages while parseMessage is executing
+                const messageQueue = [];
+
+                // Function to process the message queue
+                const processQueue = async () => {
+                    if (!isParsing && messageQueue.length > 0) {
+                        // Set isParsing to true to prevent concurrent executions
+                        isParsing = true;
+                        
+                        // Get the first message from the queue
+                        const message = messageQueue.shift();
+
+                        // Parse the message
+                        await parseMessage(message).catch(error => {
+                            console.warn("Parse message error", error, 'message was', message);
+                        });
+
+                        // Set isParsing to false to allow the next message to be processed
+                        isParsing = false;
+                        
+                        // Process the next message in the queue
+                        processQueue();
+                    }
+                };
+
+               
                 /// Workers  From the MDN example5
                 function spawnPredictWorkers(model, list, batchSize, threads) {
                     NUM_WORKERS = threads;
@@ -1789,11 +1817,16 @@ const prepSummaryStatement = (included) => {
                             threshold: STATE.speciesThreshold,
                             worker: i
                         })
-                        worker.onmessage = async (e) => {
-                            await parseMessage(e).catch(error => {
-                                console.warn("Parse message error", error, 'e was', e)
-                            })
-                        }
+
+                        // Web worker message event handler
+                        worker.onmessage = (e) => {
+                            // Push the message to the queue
+                            messageQueue.push(e);
+                            // if the message queue is getting too long, ease back on the calls to update summary?
+                            
+                            // Process the queue
+                            processQueue();
+                        };
                         worker.onerror = (e) => {
                             console.warn(`Worker ${i} is suffering, shutting it down. THe error was:`, e)
                             predictWorkers.splice(i, 1);
@@ -1930,7 +1963,8 @@ const prepSummaryStatement = (included) => {
                         }
                         
                         const generateInsertQuery = async (latestResult, file) => {
-                            const db = STATE.db;
+                            const db = STATE.db;              
+                            await db.runAsync('BEGIN');              
                             let insertQuery = 'INSERT OR IGNORE INTO records VALUES ';
                             let fileID, changes;
                             let res = await db.getAsync('SELECT id FROM files WHERE name = ?', file);
@@ -1966,7 +2000,9 @@ const prepSummaryStatement = (included) => {
                             insertQuery = insertQuery.slice(0, -2);
                             //DEBUG && console.log(insertQuery);
                             // Make sure we have some values to INSERT
-                            insertQuery.endsWith(')') && await db.runAsync(insertQuery);
+                            insertQuery.endsWith(')') && await db.runAsync(insertQuery)
+                                .catch(error => console.log("Database error:", error))
+                            await db.runAsync('END');
                             return fileID
                         }
                         
@@ -2011,7 +2047,7 @@ const prepSummaryStatement = (included) => {
                                                 score: confidence
                                             }
                                             sendResult(++index, result, false);
-                                            // Only show the highest confidence detection, unless it's a slection analysis
+                                            // Only show the highest confidence detection, unless it's a selection analysis
                                             if (! STATE.selection) break;
                                         };
                                     }

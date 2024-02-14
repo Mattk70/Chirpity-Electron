@@ -320,9 +320,8 @@ class Model {
         const finalPrediction = newPrediction || prediction;
         
         const { indices, values } = tf.topk(finalPrediction, 5, true);
-        const topIndices = indices.arraySync();
+        const [topIndices, topValues] = await Promise.all([indices.array(), values.array()]).catch(err => console.log('Data transfer error:',err));
         indices.dispose();
-        const topValues = values.arraySync();
         values.dispose();
         // end new
         // const array_of_predictions = finalPrediction.arraySync()
