@@ -36,7 +36,7 @@ Date.prototype.getWeekNumber = function(){
 };
 
 
-if (DEBUG) console.log(staticFfmpeg.path);
+DEBUG && console.log(staticFfmpeg.path);
 ffmpeg.setFfmpegPath(staticFfmpeg.path.replace('app.asar', 'app.asar.unpacked'));
 
 let predictionsRequested = {}, predictionsReceived = {}, filesBeingProcessed = [];
@@ -60,7 +60,7 @@ const createDB = async (file) => {
         DEBUG && console.log("Created disk database", diskDB.filename);
     } else {
         memoryDB = new sqlite3.Database(':memory:');
-        console.log("Created new in-memory database");
+        DEBUG && console.log("Created new in-memory database");
     }
     const db = archiveMode ? diskDB : memoryDB;
     await db.runAsync('BEGIN');
@@ -231,15 +231,15 @@ const clearCache = async (fileCache, sizeLimitInGB) => {
                 fs.rmSync(proxy, { force: true });
                 // Delete the metadata
                 delete metadata[file];
-                console.log(`removed ${file} from cache`);
+                DEBUG && console.log(`removed ${file} from cache`);
                 size -= stat.size;
             }
         }
         if (!canBeRemovedFromCache.length) {
-            console.log('All completed files removed from cache')
+            DEBUG && console.log('All completed files removed from cache')
             // Cache still full?
             if (size > requiredSpace) {
-                console.log('Cache still full')
+                DEBUG && console.log('Cache still full')
             }
         }
         return true
@@ -256,7 +256,7 @@ async function handleMessage(e) {
             const {model, batchSize, threads, backend, list} = args;
             const t0 = Date.now();
             LIST_WORKER = await spawnListWorker();
-            console.log('List worker took', Date.now() - t0, 'ms to load');
+            DEBUG && console.log('List worker took', Date.now() - t0, 'ms to load');
             await onLaunch({model: model, batchSize: batchSize, threads: threads, backend: backend, list: list});
             break;
         }
@@ -303,7 +303,7 @@ async function handleMessage(e) {
         }
         case "file-load-request": {index = 0;
             filesBeingProcessed.length && onAbort(args);
-            console.log("Worker received audio " + args.file);
+            DEBUG && console.log("Worker received audio " + args.file);
             await loadAudioFile(args);
             metadata[args.file].isSaved ? onChangeMode("archive") : onChangeMode("analyse");
             break;
@@ -319,7 +319,7 @@ async function handleMessage(e) {
             const t2 = Date.now();
             args.included = await getIncludedIDs(args.file);
             await getTotal(args);
-            console.log("Filter took", (Date.now() - t0) / 1000, "seconds", "GetTotal took", (Date.now() - t2) / 1000, "seconds", "GetSummary took", (t2 - t1) / 1000, "seconds");
+            DEBUG && console.log("Filter took", (Date.now() - t0) / 1000, "seconds", "GetTotal took", (Date.now() - t2) / 1000, "seconds", "GetSummary took", (t2 - t1) / 1000, "seconds");
         }
         break;
     }
@@ -362,7 +362,7 @@ case "post": {await uploadOpus(args);
 case "purge-file": {onFileDelete(args.fileName);
     break;
 }
-case "save": {console.log("file save requested");
+case "save": {DEBUG && console.log("file save requested");
 await saveAudio(args.file, args.start, args.end, args.filename, args.metadata);
 break;
 }
@@ -754,7 +754,7 @@ const prepSummaryStatement = (included) => {
                 // Set the appropraite selection range if this is a selection analysis
                 STATE.update({ selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined });
                 
-                console.log(`Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`);
+                DEBUG && console.log(`Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`);
                 //Reset GLOBAL variables
                 index = 0;
                 AUDACITY = {};
@@ -777,13 +777,13 @@ const prepSummaryStatement = (included) => {
                         //STATE.db = diskDB;
                         const result = await diskDB.getAsync('SELECT name FROM files WHERE name = ?', file);
                         if (result && result.name !== FILE_QUEUE[0]) {
-                            console.log(`Skipping ${file}, already analysed`)
+                            DEBUG && console.log(`Skipping ${file}, already analysed`)
                             FILE_QUEUE.splice(i, 1)
                             //filesBeingProcessed.splice(i, 1)
                             count++
                             continue;
                         }
-                        console.log(`Adding ${file} to the queue.`)
+                        DEBUG && console.log(`Adding ${file} to the queue.`)
                     }
                 }
                 else {
@@ -813,12 +813,13 @@ const prepSummaryStatement = (included) => {
                     }
                     
                 }
-                console.log("FILE_QUEUE has", FILE_QUEUE.length, 'files', count, 'files ignored')
+                DEBUG && console.log("FILE_QUEUE has", FILE_QUEUE.length, 'files', count, 'files ignored')
                 STATE.selection || onChangeMode('analyse');
                 
                 filesBeingProcessed = [...FILE_QUEUE];
                 
-                for (let i = 0; i < filesBeingProcessed.length; i++) {
+                // for (let i = 0; i < filesBeingProcessed.length; i++) {
+                for (let i = 0; i < NUM_WORKERS; i++) {
                     processNextFile({ start: start, end: end, worker: i });
                 }
             }
@@ -830,7 +831,7 @@ const prepSummaryStatement = (included) => {
                 aborted = true;
                 FILE_QUEUE = [];
                 index = 0;
-                console.log("abort received")
+                DEBUG && console.log("abort received")
                 if (filesBeingProcessed.length) {
                     //restart the worker
                     terminateWorkers();
@@ -1346,7 +1347,7 @@ const prepSummaryStatement = (included) => {
                 })
                 readStream.on('end', function () {
                     readStream.close();
-                    console.log('All chunks sent for ', file)
+                    DEBUG && console.log('All chunks sent for ', file)
                 })
                 readStream.on('error', err => {
                     console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
@@ -1465,7 +1466,7 @@ const prepSummaryStatement = (included) => {
                     const path_to_save = path.replace('New_Dataset', 'New_Dataset_Converted') + p.sep + species;
                     const file_to_save = p.join(path_to_save, parts.base);
                     if (fs.existsSync(file_to_save)) {
-                        console.log("skipping file as it is already saved")
+                        DEBUG && console.log("skipping file as it is already saved")
                     } else {
                         const file_to_analyse = parts.dir.replace('New_Dataset', 'XC_ALL_mp3') + p.sep + filename + '.mp3';
                         const AudioBuffer = await fetchAudioBuffer({
@@ -1553,7 +1554,7 @@ const prepSummaryStatement = (included) => {
                             const filepath = p.join(rootDirectory, folder)
                             const file_to_save = p.join(filepath, file)
                             if (fs.existsSync(file_to_save)) {
-                                console.log("skipping file as it is already saved")
+                                DEBUG && console.log("skipping file as it is already saved")
                             } else {
                                 end = Math.min(end, result.duration);
                                 const AudioBuffer = await fetchAudioBuffer({
@@ -1594,7 +1595,7 @@ const prepSummaryStatement = (included) => {
                 let image = await png.encode({ width: 384, height: 256, data: data, channels: channels })
                 const file_to_save = p.join(filepath, file);
                 await writeFile(file_to_save, image);
-                console.log('saved:', file_to_save);
+                DEBUG && console.log('saved:', file_to_save);
             };
             
             async function uploadOpus({ file, start, end, defaultName, metadata, mode }) {
@@ -1610,7 +1611,7 @@ const prepSummaryStatement = (included) => {
                 xhr.responseType = 'text';
                 // log response
                 xhr.onload = () => {
-                    console.log(xhr.response);
+                    DEBUG && console.log(xhr.response);
                 };
                 // create and send the reqeust
                 xhr.open('POST', 'https://birds.mattkirkland.co.uk/upload');
@@ -1727,7 +1728,7 @@ const prepSummaryStatement = (included) => {
                         console.log('An error occurred: ' + err.message);
                     })
                     ffmpgCommand.on('end', function () {
-                        console.log(format + " file rendered")
+                        DEBUG && console.log(format + " file rendered")
                     })
                     ffmpgCommand.writeToStream(bufferStream);
                     
@@ -1804,7 +1805,7 @@ const prepSummaryStatement = (included) => {
                         worker.isAvailable = true;
                         worker.isReady = false;
                         predictWorkers.push(worker)
-                        console.log('loading a worker')
+                        DEBUG && console.log('loading a worker')
                         worker.postMessage({
                             message: 'load',
                             model: model,
@@ -1910,7 +1911,7 @@ const prepSummaryStatement = (included) => {
                                 })
                             }
                             await db.runAsync('END');
-                            console.log(`Batch record update  took ${(Date.now() - t0) / 1000} seconds`)
+                            DEBUG && console.log(`Batch record update  took ${(Date.now() - t0) / 1000} seconds`)
                             
                         }
                         
@@ -2078,7 +2079,7 @@ const prepSummaryStatement = (included) => {
                                     .catch(error => console.log('Error generating new result', error))
                                 }
                                 updateFilesBeingProcessed(response.file)
-                                console.log(`File ${file} processed after ${(new Date() - predictionStart) / 1000} seconds: ${filesBeingProcessed.length} files to go`);
+                                DEBUG && console.log(`File ${file} processed after ${(new Date() - predictionStart) / 1000} seconds: ${filesBeingProcessed.length} files to go`);
                             }
                             !STATE.selection && (!DATASET || STATE.increment() === 0) && getSummary({ interim: true });
                             return response.worker
@@ -2111,7 +2112,7 @@ const prepSummaryStatement = (included) => {
                                 if ( !aborted) {
                                     predictWorkers[response.worker].isAvailable = true;
                                     let worker = await parsePredictions(response).catch(error =>  console.log('Error parsing predictions', error));
-                                    console.log('predictions left for', response.file, predictionsReceived[response.file] - predictionsRequested[response.file])
+                                    DEBUG && console.log('predictions left for', response.file, predictionsReceived[response.file] - predictionsRequested[response.file])
                                     const remaining = predictionsReceived[response.file] - predictionsRequested[response.file]
                                     if (remaining === 0) {
                                         const limit = 10;
@@ -2182,7 +2183,7 @@ const prepSummaryStatement = (included) => {
                             UI.postMessage({
                                 event: 'new-result', file: file, result: result, index: index
                             });
-                            console.log('Recursion: start = end')
+                            DEBUG && console.log('Recursion: start = end')
                             await processNextFile(arguments[0]);
                             
                         } else {
@@ -2199,7 +2200,7 @@ const prepSummaryStatement = (included) => {
                         }
                     }
                 } else {
-                    console.log('Recursion: not found')
+                    DEBUG && console.log('Recursion: not found')
                     await processNextFile(arguments[0]);
                 }
             }
@@ -2383,7 +2384,7 @@ const prepSummaryStatement = (included) => {
                             // Audio export. Format date to YYYY-MM-DD-HH-MM-ss
                             const dateString = new Date(r.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
                             const filename = `${r.cname}-${dateString}.${STATE.audio.format}`
-                            console.log(`Exporting from ${r.file}, position ${r.position}, into folder ${directory}`)
+                            DEBUG && console.log(`Exporting from ${r.file}, position ${r.position}, into folder ${directory}`)
                             saveAudio(r.file, r.position, r.position + 3, filename, metadata, directory)
                             i === result.length - 1 && UI.postMessage({ event: 'generate-alert', message: `${result.length} files saved` })
                         } 
@@ -2537,15 +2538,15 @@ const prepSummaryStatement = (included) => {
             }
             // Update the duration table
             let response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.duration SELECT * FROM duration');
-            console.log(response.changes + ' date durations added to disk database');
+            DEBUG && console.log(response.changes + ' date durations added to disk database');
             // now update records
             response = await memoryDB.runAsync(`
             INSERT OR IGNORE INTO disk.records 
             SELECT * FROM records
             WHERE confidence >= ${STATE.detect.confidence} ${filterClause} `);
-            console.log(response?.changes + ' records added to disk database');
+            DEBUG && console.log(response?.changes + ' records added to disk database');
             await memoryDB.runAsync('END');
-            console.log("transaction ended");
+            DEBUG && console.log("transaction ended");
             if (response?.changes) {
                 UI.postMessage({ event: 'diskDB-has-records' });
                 if (!DATASET) {
@@ -2623,7 +2624,7 @@ const prepSummaryStatement = (included) => {
             
             // Work out sensible aggregations from hours difference in date range
             const hours_diff = dateRange.start ? Math.round((dateRange.end - dateRange.start) / (1000 * 60 * 60)) : 745;
-            console.log(hours_diff, "difference in hours")
+            DEBUG && console.log(hours_diff, "difference in hours")
             
             const dateFilter = dateRange.start ? ` AND dateTime BETWEEN ${dateRange.start} AND ${dateRange.end} ` : '';
             
@@ -2765,14 +2766,14 @@ const prepSummaryStatement = (included) => {
             let row = await db.getAsync('SELECT id from files where name = ?', file);
             let result;
             if (!row) {
-                console.log('File not found in database, adding.');
+                DEBUG && console.log('File not found in database, adding.');
                 await db.runAsync('INSERT INTO files (id, name, duration, filestart) values (?, ?, ?, ?)', undefined, file, metadata[file].duration, args.start);
                 // If no file, no records, so we're done.
             }
             else {
                 const id = row.id;
                 const { changes } = await db.runAsync('UPDATE files SET filestart = ? where id = ?', args.start, id);
-                console.log(changes ? `Changed ${file}` : `No changes made`);
+                DEBUG && console.log(changes ? `Changed ${file}` : `No changes made`);
                 // Fill with new values
                 result = await db.runAsync('UPDATE records set dateTime = (position * 1000) + ? WHERE fileID = ?', args.start, id);
             }
@@ -2852,7 +2853,7 @@ const prepSummaryStatement = (included) => {
         
         
         async function onChartRequest(args) {
-            console.log(`Getting chart for ${args.species} starting ${args.range.start}`);
+            DEBUG && console.log(`Getting chart for ${args.species} starting ${args.range.start}`);
             const dateRange = args.range, results = {}, dataRecords = {};
             // Escape apostrophes
             if (args.species) {
@@ -2873,7 +2874,7 @@ const prepSummaryStatement = (included) => {
                     console.log(error)
                 })
                 
-                console.log(`Season chart generation took ${(Date.now() - t0) / 1000} seconds`)
+                DEBUG && console.log(`Season chart generation took ${(Date.now() - t0) / 1000} seconds`)
                 t0 = Date.now();
                 await getMostCalls(args.species)
                 .then((row) => {
@@ -2882,7 +2883,7 @@ const prepSummaryStatement = (included) => {
                     console.log(error)
                 })
                 
-                console.log(`Most calls  chart generation took ${(Date.now() - t0) / 1000} seconds`)
+                DEBUG && console.log(`Most calls  chart generation took ${(Date.now() - t0) / 1000} seconds`)
                 t0 = Date.now();
                 args.species = prepSQL(args.species);
             }
@@ -2914,12 +2915,12 @@ const prepSummaryStatement = (included) => {
                 console.log(error)
             })
             
-            console.log(`Chart series generation took ${(Date.now() - t0) / 1000} seconds`)
+            DEBUG && console.log(`Chart series generation took ${(Date.now() - t0) / 1000} seconds`)
             t0 = Date.now();
             // If we have a years worth of data add total recording duration and rate
             let total, rate;
             if (dataPoints === 52) [total, rate] = await getRate(args.species)
-            console.log(`Chart rate generation took ${(Date.now() - t0) / 1000} seconds`)
+            DEBUG && console.log(`Chart rate generation took ${(Date.now() - t0) / 1000} seconds`)
             const pointStart = dateRange.start ??= Date.UTC(2020, 0, 0, 0, 0, 0);
             UI.postMessage({
                 event: 'chart-data', // Restore species name
