@@ -1355,7 +1355,16 @@ function updatePrefs() {
     }
 }
 
-
+function fillDefaults(config, defaultConfig) {
+    Object.keys(defaultConfig).forEach(key => {
+        if (!(key in config)) {
+            config[key] = defaultConfig[key];
+        } else if (typeof config[key] === 'object' && typeof defaultConfig[key] === 'object') {
+            // Recursively fill in defaults for nested objects
+            fillDefaults(config[key], defaultConfig[key]);
+        }
+    });
+}
 /////////////////////////  Window Handlers ////////////////////////////
 let appPath, tempPath;
 window.onload = async () => {
@@ -1369,7 +1378,7 @@ window.onload = async () => {
         UUID: uuidv4(),
         locale: 'en_uk',
         colormap: 'inferno',
-        timeOfDay: false,
+        timeOfDay: true,
         list: 'nocturnal',
         local: true,
         speciesThreshold: 0.03,
@@ -1404,11 +1413,8 @@ window.onload = async () => {
         }
         
         //fill in defaults - after updates add new items
-        Object.keys(defaultConfig).forEach(key => {
-            if (!(key in config)) {
-                config[key] = defaultConfig[key];
-            }
-        });
+        fillDefaults(config, defaultConfig);
+
         // Update model if old models in config
         if (!['chirpity', 'v3', 'v4', 'birdnet'].includes(config.model)) {
             config.model = config.model === 'v2.4' ? 'birdnet' : 'chirpity';
@@ -4053,11 +4059,11 @@ DOM.gain.addEventListener('input', () => {
     
     
     document.addEventListener('click', function (e) {
-        const target = e.target.closest('[id]').id;
+        const target = e.target.closest('[id]')?.id;
         contextMenu.classList.add("d-none");
         hideConfidenceSlider();
         config.debug && console.log('clicked', target);
-        target !== 'result1' && track('UI', 'Click', target);  
+        target && target !== 'result1' && track('UI', 'Click', target);  
     })
     
     
