@@ -326,6 +326,7 @@ app.whenReady().then(async () => {
     ipcMain.handle('getPath', () => app.getPath('userData'));
     ipcMain.handle('getTemp', () => app.getPath('temp'));
     ipcMain.handle('getVersion', () => app.getVersion());
+    ipcMain.handle('isMac', () => process.platform === 'darwin');
     ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
     
     // Debug mode
