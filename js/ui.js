@@ -25,7 +25,7 @@ const STATE = {
 }
 
 // Batch size map for slider
-const BATCH_SIZE_LIST = [1, 2, 4, 8, 12, 16, 32, 36, 48, 64, 128];
+const BATCH_SIZE_LIST = [1, 2, 4, 8, 12, 16, 32, 48, 64, 128];
 
 // Get the modules loaded in preload.js
 const fs = window.module.fs;
