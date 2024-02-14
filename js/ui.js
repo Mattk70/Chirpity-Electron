@@ -4,7 +4,7 @@ let LABELS = [], DELETE_HISTORY = [];
 
 
 // Mac Test: m2 macbook is reported as "MacIntel", I'd expect this to change at some point, hence regexp.
-const isMac = /mac/i.test(navigator.userAgentData.platform);
+
 
 
 const STATE = {
@@ -170,7 +170,6 @@ Analysis Rate: x real time performance
 */
 // Timers
 let t0_warmup, t1_warmup, t0_analysis, t1_analysis;
-
 DIAGNOSTICS['CPU'] = os.cpus()[0].model;
 DIAGNOSTICS['Cores'] = os.cpus().length;
 DIAGNOSTICS['System Memory'] = (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) + ' GB';
@@ -1366,9 +1365,10 @@ function fillDefaults(config, defaultConfig) {
     });
 }
 /////////////////////////  Window Handlers ////////////////////////////
-let appPath, tempPath;
+let appPath, tempPath, isMac;
 window.onload = async () => {
     window.electron.requestWorkerChannel();
+    isMac = await window.electron.isMac();
     replaceCtrlWithCommand()
     DOM.contentWrapperElement.classList.add('loaded');
     // Set config defaults
@@ -1473,6 +1473,7 @@ window.onload = async () => {
         DOM.audioDownmix.checked = config.audio.downmix;
         setNocmig(config.detect.nocmig);
         const chirpityOnly = document.querySelectorAll('.chirpity-only');
+        const noMac = document.querySelectorAll('.no-mac');
         if (config.model === 'birdnet'){
             // hide chirpity-only features
             chirpityOnly.forEach(element => element.classList.add('d-none'));
@@ -1487,6 +1488,8 @@ window.onload = async () => {
         } else {
             // show chirpity-only features
             chirpityOnly.forEach(element => element.classList.remove('d-none'));
+            // Remove GPU option on Mac
+            isMac && noMac.forEach(element => element.classList.add('d-none'));
             DOM.contextAware.checked = config.detect.contextAware
             SNRSlider.disabled = false;
         }
