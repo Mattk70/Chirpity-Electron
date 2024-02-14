@@ -4,6 +4,9 @@ Electron app to identify the calls of nocturnal migrants from audio files.
 
 Author: Matthew Kirkland
 
+![image](https://github.com/Mattk70/Chirpity-Electron/assets/61826357/96b0af44-3893-4288-8291-cf0f6db89a38)
+
+
 https://chirpity.mattkirkland.co.uk
 
 ## Application setup
