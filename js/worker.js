@@ -388,7 +388,7 @@ case "update-list": {
 }
 case 'update-locale': {
 
-    await onUpdateLocale(args.locale, args.labels)
+    await onUpdateLocale(args.locale, args.labels, args.refreshResults)
     break;
 }
 case "update-state": {
@@ -1953,8 +1953,7 @@ const prepSummaryStatement = (included) => {
                             if (response.changes){
                                 STATE.db === diskDB ? UI.postMessage({ event: 'diskDB-has-records' }) : UI.postMessage({event: 'unsaved-records'});
                             }
-                            // let test = await db.allAsync('SELECT * from records where datetime = ?', dateTime)
-                            // console.log('After insert: ',JSON.stringify(test));
+                            // WHY NOT USE FILTER DIRECTLY?
                             UI.postMessage({
                                 event: 'generate-alert',
                                 // message: `${count} ${args.cname} record has been saved to the archive.`,
@@ -2178,7 +2177,7 @@ const prepSummaryStatement = (included) => {
                             // Nothing to do for this file
                             
                             updateFilesBeingProcessed(file);
-                            const result = `No detections in ${file}. It has no period within it where predictions would be given`;
+                            const result = `No detections. The file has no period within it where predictions would be given. <b>Tip:</b> Disable nocmig mode.`;
                             index++;
                             UI.postMessage({
                                 event: 'new-result', file: file, result: result, index: index
@@ -2200,7 +2199,7 @@ const prepSummaryStatement = (included) => {
                         }
                     }
                 } else {
-                    DEBUG && console.log('Recursion: not found')
+                    DEBUG && console.log('Recursion: file not found')
                     await processNextFile(arguments[0]);
                 }
             }
@@ -2955,7 +2954,7 @@ const prepSummaryStatement = (included) => {
                 }
             }
             
-            async function onUpdateLocale(locale, labels){
+            async function onUpdateLocale(locale, labels, refreshResults){
                 let t0 = performance.now();
                 await diskDB.runAsync('BEGIN');
                 await memoryDB.runAsync('BEGIN');
@@ -2989,8 +2988,7 @@ const prepSummaryStatement = (included) => {
                 await diskDB.runAsync('END');
                 await memoryDB.runAsync('END');
                 STATE.update({locale: locale});
-                await getResults()
-                await getSummary();
+                if (refreshResults) await Promise.all([getResults(), getSummary()])
             }
             
             async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
