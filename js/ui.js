@@ -3,10 +3,6 @@ const startTime = performance.now();
 let LABELS = [], DELETE_HISTORY = [];
 
 
-// Mac Test: m2 macbook is reported as "MacIntel", I'd expect this to change at some point, hence regexp.
-
-
-
 const STATE = {
     mode: 'analyse',
     openFiles: [],
@@ -101,7 +97,7 @@ let fileList = [], analyseList = [];
 let fileStart, bufferStartTime, fileEnd;
 
 let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
-// set up some DOM element caches
+// set up some DOM element hamdles
 const bodyElement = document.body;
 let specElement, waveElement, specCanvasElement, specWaveElement;
 let waveCanvasElement, waveWaveElement;
@@ -1549,8 +1545,12 @@ window.onload = async () => {
         // check for new version on mac platform. pkg containers are not an auto-updatable target
         // https://www.electron.build/auto-update#auto-updatable-targets
         isMac && checkForMacUpdates();
-
+        const doNotTrack = document.getElementById('do-not-track')
+        doNotTrack.checked = !config.track;
+        if (config.track) {
+            const {width, height} = window.screen;
         fetch(`https://analytics.mattkirkland.co.uk/matomo.php?idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
+                &res=${width}x${height}
         &dimension1=${config.model}
         &dimension2=${config.list}
         &dimension9=${JSON.stringify(config.detect)}
@@ -1565,6 +1565,7 @@ window.onload = async () => {
             })
             .catch(error => console.log('Error posting tracking:', error))   
     }
+        }
     )
     // establish the message channel
     setUpWorkerMessaging()
@@ -1600,14 +1601,15 @@ const setUpWorkerMessaging = () => {
             case "files": {onOpenFiles(args);
                 break;
             }
-            case "generate-alert": {if (args.updateFilenamePanel) {
+            case "generate-alert": {
+                if (args.updateFilenamePanel) {
                 renderFilenamePanel();
                 window.electron.unsavedRecords(false);
                 document.getElementById("unsaved-icon").classList.add("d-none");
             }
             if (args.file) {
-                let message = args.message;
-                alert(message);
+                    //alert(message);
+                    generateToast({domID:'toastContainer', message: args.message, type: 'warning'});
             }  else {
                 if (args.filter) {
                     worker.postMessage({
@@ -1622,7 +1624,8 @@ const setUpWorkerMessaging = () => {
                         clearResults: true
                     });
                 }  else {
-                    alert(args.message);
+                        //alert(args.message);
+                        generateToast({domID:'toastContainer', message: args.message, type: 'warning'});
                 }
             }
             break;
@@ -2204,7 +2207,12 @@ function onChartData(args) {
         updateElementCache();
     }
     
-
+    const LIST_MAP = {
+        location: 'Searching for birds in your region',
+        nocturnal: 'Searching for nocturnal birds',
+        birds: 'Searching for all birds',
+        everything: 'Searching for everything'
+    };
     // list mode icons
     const listIcon = document.getElementById('list-icon')
     const speciesThresholdEl = document.getElementById('species-threshold-el');
@@ -2212,29 +2220,17 @@ function onChartData(args) {
     const updateListIcon = () => {
         const icon = listIcon.querySelector('img');
         icon.src = icon.src.replace(/\w+\.png$/, config.list + '.png');
-        const states = {
-            location: 'Searching for birds in your region',
-            nocturnal: 'Searching for nocturnal birds',
-            birds: 'Searching for all birds',
-            everything: 'Searching for everything'
-        };
-        icon.title = states[config.list];
+        icon.title = LIST_MAP[config.list];
     }
     listIcon.addEventListener('click', () => {
         let img = listIcon.querySelector('img')
-        const states = {
-            location: 'Searching for birds in your region',
-            nocturnal: 'Searching for nocturnal birds',
-            birds: 'Searching for all birds',
-            everything: 'Searching for everything'
-        };
-        const keys = Object.keys(states);
-        for (let key in Object.keys(states)) {
+        const keys = Object.keys(LIST_MAP);
+        for (let key in Object.keys(LIST_MAP)) {
             key = parseInt(key);
             if (img.src.includes(keys[key])) {
                 const replace = (key === keys.length - 1) ? 0 : key + 1;
                 img.src = img.src.replace(keys[key], keys[replace]);
-                img.title = states[keys[replace]];
+                img.title = LIST_MAP[keys[replace]];
                 DOM.listToUse.value = keys[replace];
                 config.list = keys[replace];
                 updatePrefs();
@@ -2994,7 +2990,8 @@ function onChartData(args) {
         }
         if (typeof (result) === 'string') {
             const nocturnal = config.detect.nocmig ? '<b>during the night</b>' : '';
-            tr += `<tr><td colspan="8">${result} (Showing ${config.list} detected ${nocturnal} with at least ${config.detect.confidence}% confidence in the prediction)</td></tr>`;
+            generateToast({domID:'toastContainer', message: `${result}<br> ${LIST_MAP[config.list]} detected ${nocturnal} with at least ${config.detect.confidence}% confidence in the prediction.`, type: 'warning'});
+            //tr += `<tr><td colspan="8">${result} (${LIST_MAP[config.list]} detected ${nocturnal} with at least ${config.detect.confidence}% confidence in the prediction)</td></tr>`;
         } else {
             const {
                 timestamp,
@@ -3413,17 +3410,13 @@ function onChartData(args) {
         worker.postMessage({
             action: 'update-state',
             detect: { nocmig: config.detect.nocmig },
+            globalOffset: 0, filteredOffset: {}
         });
         updatePrefs();
-        worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}}); 
-        
+        if (currentFile){
         resetResults({clearSummary: true, clearPagination: true, clearResults: false});
         filterResults()
-        // worker.postMessage({
-        //     action: 'filter',
-        //     species: isSpeciesViewFiltered(true),
-        //     updateSummary: true
-        // })
+        }
     }
     
     function filterResults({species = isSpeciesViewFiltered(true), updateSummary = true, offset = 0, limit = 500, range = undefined} = {}){
@@ -3487,10 +3480,6 @@ function onChartData(args) {
     })
     
     DOM.nocmigButton.addEventListener('click', changeNocmigMode);
-    //DOM.nocmig.addEventListener('change', changeNocmigMode)
-    
-    //DOM.contextAware.addEventListener('change', toggleContextAwareMode)
-    
     const fullscreen = document.getElementById('fullscreen');
     
     const toggleFullscreen = () => {
@@ -4163,7 +4152,7 @@ DOM.gain.addEventListener('input', () => {
                         LABELS = filecontents.trim().split(/\r?\n/);
                         // Add unknown species
                         LABELS.push('Unknown Sp._Unknown Sp.');
-                        worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS})
+                        worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS, refreshResults: !!currentFile})
                     }).catch(error =>{
                         console.error('There was a problem fetching the label file:', error);
                     })
@@ -4279,10 +4268,12 @@ DOM.gain.addEventListener('input', () => {
     })
     
 function track(event, action, name, value){
+    if (config.track){
+        const t = new Date()
     name = name ? `&e_n=${name}` : '';
     value = value ? `&e_v=${value}` : '';
-    if (config.track){
-        fetch(`https://analytics.mattkirkland.co.uk/matomo.php?action_name=Settings%20Change&idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
+        fetch(`https://analytics.mattkirkland.co.uk/matomo.php?h=${t.getHours()}&m=${t.getMinutes()}&s=${t.getSeconds()}
+        &action_name=Settings%20Change&idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
         &e_c=${event}&e_a=${action}${name}${value}`)
         .then(response => {
             if (! response.ok) throw new Error('Network response was not ok', response);
@@ -4630,7 +4621,7 @@ function track(event, action, name, value){
                 const current = parseSemVer(VERSION);
                 
                 if (isNewVersion(latest, current)) {
-                    const alertPlaceholder = document.getElementById('liveAlertPlaceholder')
+                    const alertPlaceholder = document.getElementById('updateAlert')
                     const alert = (message, type) => {
                         const wrapper = document.createElement('div')
                         wrapper.innerHTML = [
@@ -4644,7 +4635,7 @@ function track(event, action, name, value){
                     alert(`
                     <svg class="bi flex-shrink-0 me-2" width="20" height="20" role="img" aria-label="Info:"><use xlink:href="#info-fill"/></svg>
                     There's a new version of Chirpity available! <a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blacnk">Check the website</a> for more information`,
-                    'info')
+                    'warning')
                 }
                 config.lastUpdateCheck = latestCheck;
                 updatePrefs()
@@ -4655,6 +4646,32 @@ function track(event, action, name, value){
         }
     }
     
+    function generateToast({domID, message}) {
+        const domEl = document.getElementById(domID);
+        
+        const wrapper = document.createElement('div');
+        // Add toast attributes
+        wrapper.setAttribute("class", "toast");
+        wrapper.setAttribute("role", "alert");
+        wrapper.setAttribute("aria-live", "assertive");
+        wrapper.setAttribute("aria-atomic", "true");
+        
+        wrapper.innerHTML = `
+            <div class="toast-header">
+                <svg class="bi flex-shrink-0 me-2 text-primary" width="20" height="20" role="img" aria-label="Info:"><use xlink:href="#info-fill"/></svg>
+                <strong class="me-auto">Notice</strong>
+                <small class="text-muted">just now</small>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                ${message}
+            </div>`
+        
+        domEl.appendChild(wrapper)
+        const toast = new bootstrap.Toast(wrapper)
+        toast.show()
+    }
+
     function parseSemVer(versionString) {
         const semVerRegex = /^[vV]?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-.]+))?(?:\+([0-9A-Za-z-.]+))?$/;
         const matches = versionString.match(semVerRegex);
