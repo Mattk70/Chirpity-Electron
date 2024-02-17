@@ -4439,7 +4439,7 @@ function track(event, action, name, value){
             DBaction: action,
             batch: batch,
             confidence: confidence,
-            active: activeRow.rowIndex - 1 //  have to account for the header row
+            active: activeRow?.rowIndex - 1 //  have to account for the header row
         })
     }
     
