@@ -271,7 +271,7 @@ async function handleMessage(e) {
             break;
         }
         case "change-mode": {
-            onChangeMode(args.mode);
+            await onChangeMode(args.mode);
             break;
         }
         case "chart": {
@@ -305,7 +305,7 @@ async function handleMessage(e) {
             filesBeingProcessed.length && onAbort(args);
             DEBUG && console.log("Worker received audio " + args.file);
             await loadAudioFile(args);
-            metadata[args.file].isSaved ? onChangeMode("archive") : onChangeMode("analyse");
+            metadata[args.file].isSaved ? await onChangeMode("archive") : await onChangeMode("analyse");
             break;
         }
         case "filter": {if (STATE.db) {
@@ -804,10 +804,12 @@ const prepSummaryStatement = (included) => {
                             // handle circle here
                             await getResults({ topRankin: 5 });
                         } else {
-                            onChangeMode('archive');
-                            FILE_QUEUE.forEach(file => UI.postMessage({ event: 'update-audio-duration', value: metadata[file].duration }))
-                            await Promise.all([getResults(), getSummary()] );
-                            
+                            await onChangeMode('archive');
+                            FILE_QUEUE.forEach(file => UI.postMessage({ event: 'update-audio-duration', value: metadata[file].duration }));
+                            // Wierdness with promise all - list worker called 2x and no results returned
+                            //await Promise.all([getResults(), getSummary()] );
+                            await getResults();
+                            await getSummary();
                         }
                         return;
                     }
@@ -2552,7 +2554,7 @@ const prepSummaryStatement = (included) => {
                 if (!DATASET) {
                     
                     // Now we have saved the records, set state to DiskDB
-                    onChangeMode('archive');
+                    await onChangeMode('archive');
                     getLocations({ db: STATE.db, file: file });
                     UI.postMessage({
                         event: 'generate-alert',
@@ -2938,7 +2940,7 @@ const prepSummaryStatement = (included) => {
         const onFileDelete = async (fileName) => {
             const result = await diskDB.runAsync('DELETE FROM files WHERE name = ?', fileName);
             if (result.changes) {
-                onChangeMode('analyse');
+                await onChangeMode('analyse');
                 getDetectedSpecies();
                 UI.postMessage({
                     event: 'generate-alert',
