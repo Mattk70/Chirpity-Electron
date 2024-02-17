@@ -1041,6 +1041,8 @@ exploreLink.addEventListener('click', async () => {
     enableMenuItem(['saveCSV']);
     adjustSpecDims(true)
     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
+    // Analysis is done
+    STATE.analysisDone = true;
     filterResults({species: undefined, range: STATE.explore.range});
     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
 });
@@ -1485,7 +1487,8 @@ window.onload = async () => {
             chirpityOnly.forEach(element => element.classList.remove('d-none'));
             // Remove GPU option on Mac
             isMac && noMac.forEach(element => element.classList.add('d-none'));
-            DOM.contextAware.checked = config.detect.contextAware
+            DOM.contextAware.checked = config.detect.contextAware;
+            DOM.localSwitchContainer.classList.remove('d-none');
             SNRSlider.disabled = false;
         }
         contextAwareIconDisplay();
@@ -2792,12 +2795,13 @@ function onChartData(args) {
     /*
     onResultsComplete is called when the last result is sent
     */
-    function onResultsComplete({active = undefined} = {}){
+    function onResultsComplete({active = undefined, select = undefined} = {}){
         let table = document.getElementById('resultTableBody');
         table.replaceWith(resultsBuffer);
         table = document.getElementById('resultTableBody');
         PREDICTING = false;
         // Set active Row
+        
         if (active) {
             // Refresh node and scroll to active row:
             activeRow = table.rows[active];
@@ -2809,6 +2813,9 @@ function onChartData(args) {
             } else {
                 activeRow.classList.add('table-active');
             }
+        } else if (select) {
+            const row = getRowFromStart(table, select)
+            activeRow = table.rows[row];
         }
         else { // if (STATE.mode === 'analyse') {
             activeRow = table.querySelector('.table-active');
@@ -2827,6 +2834,22 @@ function onChartData(args) {
         // hide progress div
         DOM.progressDiv.classList.add('d-none');
         
+    }
+
+    function getRowFromStart(table, start){
+        for (var i = 0; i < table.rows.length; i++) {
+            const row = table.rows[i];
+            
+            // Get the value of the name attribute and split it on '|'
+            const nameValue = row.getAttribute('name');
+            // State time is the second value in the name string
+            const startTime = nameValue?.split('|')[1];
+            
+            // Check if the second value matches the 'select' variable
+            if (parseFloat(startTime) === start) {
+                return i;
+            }
+        }
     }
     
     function onAnalysisComplete(){
@@ -2879,6 +2902,10 @@ function onChartData(args) {
                 }
                 const limit = config.limit;
                 const offset = (clicked - 1) * limit;
+                // Tell the worker about the new offset
+                const species = isSpeciesViewFiltered(true);
+                species ? worker.postMessage({action:'update-state', filteredOffset: {[species]: offset} }) :
+                    worker.postMessage({action:'update-state', globalOffset: offset });
                 filterResults({offset: offset, limit:limit})
                 resetResults({clearSummary: false, clearPagination: false, clearResults: false});
             }
@@ -2957,13 +2984,18 @@ function onChartData(args) {
     }) {
         
         let tr = '';
+        if (typeof (result) === 'string') {
+            // const nocturnal = config.detect.nocmig ? '<b>during the night</b>' : '';
+            generateToast({domID:'toastContainer', message: result});
+            return
+        }
         if (index <= 1) {
             if (selection) {
                 const selectionTable = document.getElementById('selectionResultTableBody');
                 selectionTable.textContent = '';
             }
             else {
-                if (fileLoaded) showElement(['resultTableContainer', 'resultsHead'], false);
+                showElement(['resultTableContainer', 'resultsHead'], false);
                 const resultTable = document.getElementById('resultTableBody');
                 resultTable.textContent = ''
             }
@@ -2972,11 +3004,6 @@ function onChartData(args) {
         }
         if (!isFromDB && index > config.limit) {
             return
-        }
-        if (typeof (result) === 'string') {
-            const nocturnal = config.detect.nocmig ? '<b>during the night</b>' : '';
-            generateToast({domID:'toastContainer', message: result});
-            //tr += `<tr><td colspan="8">${result} (${LIST_MAP[config.list]} detected ${nocturnal} with at least ${config.detect.confidence}% confidence in the prediction)</td></tr>`;
         } else {
             const {
                 timestamp,
@@ -3404,7 +3431,7 @@ function onChartData(args) {
         }
     }
     
-    function filterResults({species = isSpeciesViewFiltered(true), updateSummary = true, offset = 0, limit = 500, range = undefined} = {}){
+    function filterResults({species = isSpeciesViewFiltered(true), updateSummary = true, offset = undefined, limit = 500, range = undefined} = {}){
         STATE.analysisDone && worker.postMessage({
             action: 'filter',
             species: species,
@@ -4439,7 +4466,8 @@ function track(event, action, name, value){
             DBaction: action,
             batch: batch,
             confidence: confidence,
-            active: activeRow?.rowIndex - 1 //  have to account for the header row
+            active: activeRow?.rowIndex - 1, //  have to account for the header row
+            speciesFiltered: isSpeciesViewFiltered(true)
         })
     }
     
