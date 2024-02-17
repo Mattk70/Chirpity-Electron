@@ -5,6 +5,7 @@ let LABELS = [], DELETE_HISTORY = [];
 
 const STATE = {
     mode: 'analyse',
+    analysisDone: false,
     openFiles: [],
     chart: {
         aggregation: 'Week',
@@ -740,7 +741,6 @@ async function onOpenFiles(args) {
     showElement(['spectrogramWrapper'], false);
     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
     resetDiagnostics();
-    //completeDiv.hide();
     // Store the file list and Load First audio file
     fileList = args.filePaths;
     STATE.openFiles = args.filePaths;
@@ -756,7 +756,8 @@ async function onOpenFiles(args) {
     } else {
         disableMenuItem(['analyseAll', 'reanalyseAll'])
     }
-    
+    // Reset analysis status
+    STATE.analysisDone = false;
     await loadAudioFile({ filePath: fileList[0] });
     disableMenuItem(['analyseSelection', 'analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'export2audio', 'save2db'])
     // Clear unsaved records warning
@@ -811,7 +812,6 @@ function refreshResultsView() {
         }
     } else if (!fileList.length) {
         hideAll();
-        //showElement(['loadFileHint', 'loadFileHintText'], true);
     }
     adjustSpecDims(true);
 }
@@ -889,7 +889,7 @@ function postAnalyseMessage(args) {
 
 function fetchLocationAddress(lat, lon) {
     if (isNaN(lat) || isNaN(lon  || lat === '' || lon === '')){
-        alert('Both lat and lon values need to be numbers between 180 and -180')
+        generateToast({domID:'toastContainer', message:'Both lat and lon values need to be numbers between 180 and -180'})
         return false
     }
     return new Promise((resolve, reject) => {
@@ -983,8 +983,8 @@ const export2audio = document.getElementById('export2audio');
 export2audio.addEventListener('click', batchExportAudio);
 
 async function batchExportAudio(e) {
-    const species = isSpeciesViewFiltered(true); // || getSpecies(e.target);
-    species ? exportData('audio', species, 1000) : alert("Filter results by species to export audio files");
+    const species = isSpeciesViewFiltered(true); 
+    species ? exportData('audio', species, 1000) : generateToast("Filter results by species to export audio files");
 }
 
 const export2CSV = ()  => exportData('text', isSpeciesViewFiltered(true), Infinity);
@@ -1026,7 +1026,7 @@ const handleLocationFilterChange = (e) => {
     // Update the seen species list
     worker.postMessage({ action: 'get-detected-species-list' })
     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
-    if (STATE.mode === 'explore') filterResults() // worker.postMessage({ action: 'filter', species: isSpeciesViewFiltered(true), updateSummary: true });
+    if (STATE.mode === 'explore') filterResults() 
 }
 
 const exploreLink = document.getElementById('explore');
@@ -1041,8 +1041,7 @@ exploreLink.addEventListener('click', async () => {
     enableMenuItem(['saveCSV']);
     adjustSpecDims(true)
     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
-    filterResults({species: undefined, range: STATE.explore.range})
-    //worker.postMessage({ action: 'filter', species: undefined, range: STATE.explore.range, updateSummary: true }); 
+    filterResults({species: undefined, range: STATE.explore.range});
     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
 });
 
@@ -1606,28 +1605,26 @@ const setUpWorkerMessaging = () => {
                 renderFilenamePanel();
                 window.electron.unsavedRecords(false);
                 document.getElementById("unsaved-icon").classList.add("d-none");
-            }
-            if (args.file) {
-                    //alert(message);
-                    generateToast({domID:'toastContainer', message: args.message, type: 'warning'});
-            }  else {
-                if (args.filter) {
-                    worker.postMessage({
-                        action: "filter",
-                        species: isSpeciesViewFiltered(true),
-                        active: args.active,
-                        updateSummary: true
-                    });
-                    resetResults({
-                        clearSummary: true,
-                        clearPagination: true,
-                        clearResults: true
-                    });
-                }  else {
-                        //alert(args.message);
-                        generateToast({domID:'toastContainer', message: args.message, type: 'warning'});
                 }
-            }
+                if (args.file) {
+                        generateToast({domID:'toastContainer', message: args.message});
+                }  else {
+                    if (args.filter) {
+                        worker.postMessage({
+                            action: "filter",
+                            species: isSpeciesViewFiltered(true),
+                            active: args.active,
+                            updateSummary: true
+                        });
+                        resetResults({
+                            clearSummary: true,
+                            clearPagination: true,
+                            clearResults: true
+                        });
+                    }  else {
+                            generateToast({domID:'toastContainer', message: args.message});
+                    }
+                }
             break;
         }
         case "results-complete": {onResultsComplete(args);
@@ -1658,7 +1655,8 @@ const setUpWorkerMessaging = () => {
             case "progress": {onProgress(args);
                 break;
             }
-            case "processing-complete": {        
+            case "processing-complete": {
+                STATE.analysisDone = true;
                 DOM.progressDiv.classList.add('d-none');
                 break;
             }
@@ -1688,10 +1686,11 @@ const setUpWorkerMessaging = () => {
     case "update-summary": {updateSummary(args);
         break;
     }
-    case "worker-loaded-audio": {onWorkerLoadedAudio(args);
+    case "worker-loaded-audio": {
+        onWorkerLoadedAudio(args);
         break;
     }
-    default: {alert(`Unrecognised message from worker:${args.event}`);
+    default: {generateToast({domID:'toastContainer', message:`Unrecognised message from worker:${args.event}`});
 }
 }
 })
@@ -2237,7 +2236,7 @@ function onChartData(args) {
                 resetResults({clearSummary: true, clearPagination: true, clearResults: true});
                 config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
                 speciesThresholdEl.classList.add('d-none');
-                worker.postMessage({ action: 'update-list', list: config.list, refreshResults: !!currentFile })
+                worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone })
                 break
             }
         }
@@ -2397,7 +2396,7 @@ function onChartData(args) {
                     threads: config[config.backend].threads,
                     list: config.list
                 });
-                alert('Operation cancelled');
+                generateToast({domID:'toastContainer', message:'Operation cancelled'});
                 DOM.progressDiv.classList.add('d-none');
             }
         },
@@ -2612,7 +2611,7 @@ function onChartData(args) {
                 seconds = Math.min(parseFloat(timeArray[2]), 59.999);
             } else {
                 // Invalid input
-                alert('Invalid time format. Please enter time in one of the following formats: \n1. Float (for seconds) \n2. Two numbers separated by a colon (for minutes and seconds) \n3. Three numbers separated by colons (for hours, minutes, and seconds)');
+                generateToast({domID:'toastContainer', message:'Invalid time format. Please enter time in one of the following formats: \n1. Float (for seconds) \n2. Two numbers separated by a colon (for minutes and seconds) \n3. Three numbers separated by colons (for hours, minutes, and seconds)'});
                 return;
             }
             let start = hours * 3600 + minutes * 60 + seconds;
@@ -2747,9 +2746,6 @@ function onChartData(args) {
         if (args.progress) {
             let progress = Math.round(args.progress * 1000) / 10;
             updateProgress(progress);
-            if (progress === 100) {
-                //DOM.progressDiv.classList.add('d-none');
-            }
         } else {
             DOM.progressDiv.classList.remove('d-none');
         }
@@ -2883,14 +2879,7 @@ function onChartData(args) {
                 }
                 const limit = config.limit;
                 const offset = (clicked - 1) * limit;
-                // const species = isSpeciesViewFiltered(true);
                 filterResults({offset: offset, limit:limit})
-                // worker.postMessage({
-                //     action: 'filter',
-                //     species: species,
-                //     offset: offset,
-                //     limit: limit,
-                // }); 
                 resetResults({clearSummary: false, clearPagination: false, clearResults: false});
             }
         })
@@ -2948,10 +2937,6 @@ function onChartData(args) {
             list.value = species || '';
         }
         filterResults()
-        // worker.postMessage({
-        //     action: 'filter',
-        //     species: species
-        // });
         resetResults({clearSummary: false, clearPagination: false, clearResults: false});
     }
     
@@ -2990,7 +2975,7 @@ function onChartData(args) {
         }
         if (typeof (result) === 'string') {
             const nocturnal = config.detect.nocmig ? '<b>during the night</b>' : '';
-            generateToast({domID:'toastContainer', message: `${result}<br> ${LIST_MAP[config.list]} detected ${nocturnal} with at least ${config.detect.confidence}% confidence in the prediction.`, type: 'warning'});
+            generateToast({domID:'toastContainer', message: result});
             //tr += `<tr><td colspan="8">${result} (${LIST_MAP[config.list]} detected ${nocturnal} with at least ${config.detect.confidence}% confidence in the prediction)</td></tr>`;
         } else {
             const {
@@ -3228,7 +3213,7 @@ function onChartData(args) {
             })
         } else {
             if (!config.seenThanks) {
-                alert('Thank you, your feedback helps improve Chirpity predictions');
+                generateToast({domID:'toastContainer', message:'Thank you, your feedback helps improve Chirpity predictions'});
                 config.seenThanks = true;
                 updatePrefs()
             }
@@ -3413,14 +3398,14 @@ function onChartData(args) {
             globalOffset: 0, filteredOffset: {}
         });
         updatePrefs();
-        if (currentFile){
+        if (STATE.analysisDone){
         resetResults({clearSummary: true, clearPagination: true, clearResults: false});
         filterResults()
         }
     }
     
     function filterResults({species = isSpeciesViewFiltered(true), updateSummary = true, offset = 0, limit = 500, range = undefined} = {}){
-        worker.postMessage({
+        STATE.analysisDone && worker.postMessage({
             action: 'filter',
             species: species,
             updateSummary: updateSummary,
@@ -3580,10 +3565,6 @@ function onChartData(args) {
         worker.postMessage({ action: 'update-state', sortOrder: order })
         resetResults({clearSummary: false, clearPagination: false, clearResults: true});
         filterResults()
-        // worker.postMessage({
-        //     action: 'filter',
-        //     species: isSpeciesViewFiltered(true)
-        // }) // re-prepare
         
     }
     // Drag file to app window to open
@@ -3735,12 +3716,6 @@ function onChartData(args) {
                     resetResults({clearSummary: true, clearPagination: true, clearResults: false});
                     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}, explore: STATE.explore}); 
                     filterResults({range:STATE.explore.range})
-                    // worker.postMessage({
-                    //     action: 'filter',
-                    //     species: isSpeciesViewFiltered(true),
-                    //     range: STATE.explore.range,
-                    //     updateSummary: true
-                    // }); // re-prepare
                 }
                 
                 // Update the seen species list
@@ -3762,13 +3737,7 @@ function onChartData(args) {
                     STATE.explore.range = {start: undefined, end: undefined};
                     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}, explore: STATE.explore}); 
                     resetResults({clearSummary: true, clearPagination: true, clearResults: false});
-                    filterResults({species:STATE.explore.species, range:STATE.explore.range})
-                    // worker.postMessage({
-                    //     action: 'filter',
-                    //     species: STATE.explore.species,
-                    //     range: STATE.explore.range,
-                    //     updateSummary: true
-                    // }); // re-prepare
+                    filterResults({species:STATE.explore.species, range:STATE.explore.range});
                 }
             })
             picker.on('click', (e) =>{
@@ -3918,12 +3887,7 @@ function onChartData(args) {
         if (!PREDICTING && !DOM.resultTableElement.classList.contains('d-none')) {
             worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
             resetResults({clearSummary: true, clearPagination: true, clearResults: false});
-            filterResults()
-            // worker.postMessage({
-            //     action: 'filter',
-            //     species: isSpeciesViewFiltered(true),
-            //     updateSummary: true
-            // });
+            filterResults();
         }
     }
 
@@ -4071,12 +4035,12 @@ DOM.gain.addEventListener('input', () => {
                 
                 case 'species-frequency-threshold' : {
                     if (isNaN(element.value) || element.value === '') {
-                        alert('The threshold must be a number between 0.001 and 1');
+                        generateToast({domID:'toastContainer', message:'The threshold must be a number between 0.001 and 1'});
                         return false
                     }
                     config.speciesThreshold = element.value;
                     worker.postMessage({ action: 'update-state', speciesThreshold: element.value });
-                    worker.postMessage({ action: 'update-list', list: config.list, refreshResults: !!currentFile});
+                    worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone});
                     break;
                 }
                 case 'timelineSetting': {
@@ -4121,7 +4085,7 @@ DOM.gain.addEventListener('input', () => {
 
                     if (! config.useWeek) STATE.week = -1;
                     worker.postMessage({action:'update-state', useWeek: config.useWeek});
-                    worker.postMessage({ action: 'update-list', list: config.list, refreshResults: !!currentFile});
+                    worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone});
                     break;
                 }
                 case 'list-to-use': {
@@ -4138,7 +4102,7 @@ DOM.gain.addEventListener('input', () => {
                     }                    
                     updateListIcon();
                     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
-                    worker.postMessage({ action: 'update-list', list: config.list, refreshResults: !!currentFile});
+                    worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone});
                     break;
                 }
                 case 'locale': {
@@ -4152,7 +4116,7 @@ DOM.gain.addEventListener('input', () => {
                         LABELS = filecontents.trim().split(/\r?\n/);
                         // Add unknown species
                         LABELS.push('Unknown Sp._Unknown Sp.');
-                        worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS, refreshResults: !!currentFile})
+                        worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS, refreshResults: STATE.analysisDone})
                     }).catch(error =>{
                         console.error('There was a problem fetching the label file:', error);
                     })
@@ -4188,6 +4152,7 @@ DOM.gain.addEventListener('input', () => {
                     config.backend = 'tensorflow';
                     document.getElementById('tensorflow').checked = true;
                     handleBackendChange(config.backend);
+                    STATE.analysisDone = false;
                     break;
                 }
                 case 'thread-slider': {
@@ -4610,7 +4575,7 @@ function track(event, action, name, value){
     
     function checkForMacUpdates() {
         // Do this at most daily
-        const latestCheck = Date.now()
+        const latestCheck = Date.now();
         const checkDue = (latestCheck - config.lastUpdateCheck) > 86_400_000;
         if (checkDue){
             fetch('https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest')

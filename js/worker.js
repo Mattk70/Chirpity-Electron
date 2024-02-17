@@ -2189,7 +2189,7 @@ const prepSummaryStatement = (included) => {
                             if (!sumObjectValues(predictionsReceived)) {
                                 UI.postMessage({
                                     event: 'progress',
-                                    text: "<span class='loading'>Awaiting detections</span>",
+                                    text: "<span class='loading text-nowrap'>Awaiting detections</span>",
                                     file: file
                                 });
                             }
@@ -2721,7 +2721,7 @@ const prepSummaryStatement = (included) => {
             JOIN files on records.fileID = files.id`;
             
             if (STATE.mode === 'explore') sql += ` WHERE confidence >= ${confidence}`;
-            if (STATE.list !== 'location' && filtersApplied(included)) {
+            if (STATE.list !== 'location' && filtersApplied(STATE.included)) {
                 sql += ` AND speciesID IN (${STATE.included.join(',')})`;
             }
             if (range?.start) sql += ` AND datetime BETWEEN ${range.start} AND ${range.end}`;
