@@ -2397,6 +2397,7 @@ const prepSummaryStatement = (included) => {
                     } else {
                         sendResult(++index, r, true)
                     }
+                    if (i === result.length -1) UI.postMessage({event: 'processing-complete'})
                 }
                 if (!result.length) {
                     if (STATE.selection) {
