@@ -271,7 +271,7 @@ async function handleMessage(e) {
             break;
         }
         case "change-mode": {
-            onChangeMode(args.mode);
+            await onChangeMode(args.mode);
             break;
         }
         case "chart": {
@@ -305,7 +305,7 @@ async function handleMessage(e) {
             filesBeingProcessed.length && onAbort(args);
             DEBUG && console.log("Worker received audio " + args.file);
             await loadAudioFile(args);
-            metadata[args.file].isSaved ? onChangeMode("archive") : onChangeMode("analyse");
+            metadata[args.file].isSaved ? await onChangeMode("archive") : await onChangeMode("analyse");
             break;
         }
         case "filter": {if (STATE.db) {
@@ -388,7 +388,7 @@ case "update-list": {
 }
 case 'update-locale': {
 
-    await onUpdateLocale(args.locale, args.labels)
+    await onUpdateLocale(args.locale, args.labels, args.refreshResults)
     break;
 }
 case "update-state": {
@@ -804,10 +804,12 @@ const prepSummaryStatement = (included) => {
                             // handle circle here
                             await getResults({ topRankin: 5 });
                         } else {
-                            onChangeMode('archive');
-                            FILE_QUEUE.forEach(file => UI.postMessage({ event: 'update-audio-duration', value: metadata[file].duration }))
-                            await Promise.all([getResults(), getSummary()] );
-                            
+                            await onChangeMode('archive');
+                            FILE_QUEUE.forEach(file => UI.postMessage({ event: 'update-audio-duration', value: metadata[file].duration }));
+                            // Wierdness with promise all - list worker called 2x and no results returned
+                            //await Promise.all([getResults(), getSummary()] );
+                            await getResults();
+                            await getSummary();
                         }
                         return;
                     }
@@ -1974,8 +1976,7 @@ const prepSummaryStatement = (included) => {
                             if (response.changes){
                                 STATE.db === diskDB ? UI.postMessage({ event: 'diskDB-has-records' }) : UI.postMessage({event: 'unsaved-records'});
                             }
-                            // let test = await db.allAsync('SELECT * from records where datetime = ?', dateTime)
-                            // console.log('After insert: ',JSON.stringify(test));
+                            // WHY NOT USE FILTER DIRECTLY?
                             UI.postMessage({
                                 event: 'generate-alert',
                                 // message: `${count} ${args.cname} record has been saved to the archive.`,
@@ -2199,7 +2200,7 @@ const prepSummaryStatement = (included) => {
                             // Nothing to do for this file
                             
                             updateFilesBeingProcessed(file);
-                            const result = `No detections in ${file}. It has no period within it where predictions would be given`;
+                            const result = `No detections. The file has no period within it where predictions would be given. <b>Tip:</b> Disable nocmig mode.`;
                             index++;
                             UI.postMessage({
                                 event: 'new-result', file: file, result: result, index: index
@@ -2211,7 +2212,7 @@ const prepSummaryStatement = (included) => {
                             if (!sumObjectValues(predictionsReceived)) {
                                 UI.postMessage({
                                     event: 'progress',
-                                    text: "<span class='loading'>Awaiting detections</span>",
+                                    text: "<span class='loading text-nowrap'>Awaiting detections</span>",
                                     file: file
                                 });
                             }
@@ -2221,7 +2222,7 @@ const prepSummaryStatement = (included) => {
                         }
                     }
                 } else {
-                    DEBUG && console.log('Recursion: not found')
+                    DEBUG && console.log('Recursion: file not found')
                     await processNextFile(arguments[0]);
                 }
             }
@@ -2419,6 +2420,7 @@ const prepSummaryStatement = (included) => {
                     } else {
                         sendResult(++index, r, true)
                     }
+                    if (i === result.length -1) UI.postMessage({event: 'processing-complete'})
                 }
                 if (!result.length) {
                     if (STATE.selection) {
@@ -2573,7 +2575,7 @@ const prepSummaryStatement = (included) => {
                 if (!DATASET) {
                     
                     // Now we have saved the records, set state to DiskDB
-                    onChangeMode('archive');
+                    await onChangeMode('archive');
                     getLocations({ db: STATE.db, file: file });
                     UI.postMessage({
                         event: 'generate-alert',
@@ -2743,7 +2745,7 @@ const prepSummaryStatement = (included) => {
             JOIN files on records.fileID = files.id`;
             
             if (STATE.mode === 'explore') sql += ` WHERE confidence >= ${confidence}`;
-            if (STATE.list !== 'location' && filtersApplied(included)) {
+            if (STATE.list !== 'location' && filtersApplied(STATE.included)) {
                 sql += ` AND speciesID IN (${STATE.included.join(',')})`;
             }
             if (range?.start) sql += ` AND datetime BETWEEN ${range.start} AND ${range.end}`;
@@ -2959,7 +2961,7 @@ const prepSummaryStatement = (included) => {
         const onFileDelete = async (fileName) => {
             const result = await diskDB.runAsync('DELETE FROM files WHERE name = ?', fileName);
             if (result.changes) {
-                onChangeMode('analyse');
+                await onChangeMode('analyse');
                 getDetectedSpecies();
                 UI.postMessage({
                     event: 'generate-alert',
@@ -2976,7 +2978,7 @@ const prepSummaryStatement = (included) => {
                 }
             }
             
-            async function onUpdateLocale(locale, labels){
+            async function onUpdateLocale(locale, labels, refreshResults){
                 let t0 = performance.now();
                 await diskDB.runAsync('BEGIN');
                 await memoryDB.runAsync('BEGIN');
@@ -3010,8 +3012,7 @@ const prepSummaryStatement = (included) => {
                 await diskDB.runAsync('END');
                 await memoryDB.runAsync('END');
                 STATE.update({locale: locale});
-                await getResults()
-                await getSummary();
+                if (refreshResults) await Promise.all([getResults(), getSummary()])
             }
             
             async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {

@@ -211,11 +211,6 @@
                         Analysis
                     </a>
                     <ul class="dropdown-menu" aria-labelledby="navbarAnalysis">
-                        <!-- <li><a class="dropdown-item text-danger" href="#" id="warmup">Model Warming up
-                            <div class="spinner-grow spinner-grow-sm" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                        </a></li> -->
                         <li><a class="dropdown-item disabled" href="#" id="analyse">
                             <span class="material-symbols-outlined">search</span> Analyse File
                             <span class="shortcut float-end">Ctrl+A</span> </a></li>
@@ -1085,9 +1080,6 @@
                 </div>
                 <!-- Results table -->
                 <div class="col-8 ps-1 pe-0 h-100 position-relative overflow-auto" id="resultsDiv">
-                    <!-- <nav aria-label="Identification results">
-                        <ul class="m-2 pagination justify-content-center"></ul>
-                    </nav> -->
                     <table id='results' class="text-center table w-100 align-middle">
                         <thead id="resultsHead" class="d-none">
                             <tr class="bg-dark">
@@ -1226,7 +1218,8 @@
     </symbol>
 </svg>
 <!-- Update alert placeholder -->
-<div id="liveAlertPlaceholder" style="position:absolute; bottom: 10px;"></div>
+<div id="updateAlert" style="position:absolute; bottom: 30px;"></div>
+<div id="toastContainer"  class="toast-container top-0 end-0 p-3"></div>
 <!-- Footer -->
 <footer class="p-1 text-bg-primary" id="footer">
     <div class="d-none text-sm-start" id="update-progress">Downloading update: 

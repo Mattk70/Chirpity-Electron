@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "minify": "node minify.js",
-    "export": "electron-builder build --win --x64",
+    "export": "electron-builder build --m",
     "publish": "electron-builder --win --x64 -p always"
   },
   "repository": {
