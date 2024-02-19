@@ -3,12 +3,9 @@ const startTime = performance.now();
 let LABELS = [], DELETE_HISTORY = [];
 
 
-// Mac Test: m2 macbook is reported as "MacIntel", I'd expect this to change at some point, hence regexp.
-
-
-
 const STATE = {
     mode: 'analyse',
+    analysisDone: false,
     openFiles: [],
     chart: {
         aggregation: 'Week',
@@ -101,7 +98,7 @@ let fileList = [], analyseList = [];
 let fileStart, bufferStartTime, fileEnd;
 
 let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
-// set up some DOM element caches
+// set up some DOM element hamdles
 const bodyElement = document.body;
 let specElement, waveElement, specCanvasElement, specWaveElement;
 let waveCanvasElement, waveWaveElement;
@@ -744,7 +741,6 @@ async function onOpenFiles(args) {
     showElement(['spectrogramWrapper'], false);
     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
     resetDiagnostics();
-    //completeDiv.hide();
     // Store the file list and Load First audio file
     fileList = args.filePaths;
     STATE.openFiles = args.filePaths;
@@ -760,7 +756,8 @@ async function onOpenFiles(args) {
     } else {
         disableMenuItem(['analyseAll', 'reanalyseAll'])
     }
-    
+    // Reset analysis status
+    STATE.analysisDone = false;
     await loadAudioFile({ filePath: fileList[0] });
     disableMenuItem(['analyseSelection', 'analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'export2audio', 'save2db'])
     // Clear unsaved records warning
@@ -815,7 +812,6 @@ function refreshResultsView() {
         }
     } else if (!fileList.length) {
         hideAll();
-        //showElement(['loadFileHint', 'loadFileHintText'], true);
     }
     adjustSpecDims(true);
 }
@@ -893,7 +889,7 @@ function postAnalyseMessage(args) {
 
 function fetchLocationAddress(lat, lon) {
     if (isNaN(lat) || isNaN(lon  || lat === '' || lon === '')){
-        alert('Both lat and lon values need to be numbers between 180 and -180')
+        generateToast({domID:'toastContainer', message:'Both lat and lon values need to be numbers between 180 and -180'})
         return false
     }
     return new Promise((resolve, reject) => {
@@ -987,8 +983,8 @@ const export2audio = document.getElementById('export2audio');
 export2audio.addEventListener('click', batchExportAudio);
 
 async function batchExportAudio(e) {
-    const species = isSpeciesViewFiltered(true); // || getSpecies(e.target);
-    species ? exportData('audio', species, 1000) : alert("Filter results by species to export audio files");
+    const species = isSpeciesViewFiltered(true); 
+    species ? exportData('audio', species, 1000) : generateToast("Filter results by species to export audio files");
 }
 
 const export2CSV = ()  => exportData('text', isSpeciesViewFiltered(true), Infinity);
@@ -1030,7 +1026,7 @@ const handleLocationFilterChange = (e) => {
     // Update the seen species list
     worker.postMessage({ action: 'get-detected-species-list' })
     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
-    if (STATE.mode === 'explore') filterResults() // worker.postMessage({ action: 'filter', species: isSpeciesViewFiltered(true), updateSummary: true });
+    if (STATE.mode === 'explore') filterResults() 
 }
 
 const exploreLink = document.getElementById('explore');
@@ -1045,8 +1041,7 @@ exploreLink.addEventListener('click', async () => {
     enableMenuItem(['saveCSV']);
     adjustSpecDims(true)
     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
-    filterResults({species: undefined, range: STATE.explore.range})
-    //worker.postMessage({ action: 'filter', species: undefined, range: STATE.explore.range, updateSummary: true }); 
+    filterResults({species: undefined, range: STATE.explore.range});
     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
 });
 
@@ -1549,8 +1544,12 @@ window.onload = async () => {
         // check for new version on mac platform. pkg containers are not an auto-updatable target
         // https://www.electron.build/auto-update#auto-updatable-targets
         isMac && checkForMacUpdates();
-
+        const doNotTrack = document.getElementById('do-not-track')
+        doNotTrack.checked = !config.track;
+        if (config.track) {
+            const {width, height} = window.screen;
         fetch(`https://analytics.mattkirkland.co.uk/matomo.php?idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
+                &res=${width}x${height}
         &dimension1=${config.model}
         &dimension2=${config.list}
         &dimension9=${JSON.stringify(config.detect)}
@@ -1565,6 +1564,7 @@ window.onload = async () => {
             })
             .catch(error => console.log('Error posting tracking:', error))   
     }
+        }
     )
     // establish the message channel
     setUpWorkerMessaging()
@@ -1600,31 +1600,31 @@ const setUpWorkerMessaging = () => {
             case "files": {onOpenFiles(args);
                 break;
             }
-            case "generate-alert": {if (args.updateFilenamePanel) {
+            case "generate-alert": {
+                if (args.updateFilenamePanel) {
                 renderFilenamePanel();
                 window.electron.unsavedRecords(false);
                 document.getElementById("unsaved-icon").classList.add("d-none");
-            }
-            if (args.file) {
-                let message = args.message;
-                alert(message);
-            }  else {
-                if (args.filter) {
-                    worker.postMessage({
-                        action: "filter",
-                        species: isSpeciesViewFiltered(true),
-                        active: args.active,
-                        updateSummary: true
-                    });
-                    resetResults({
-                        clearSummary: true,
-                        clearPagination: true,
-                        clearResults: true
-                    });
-                }  else {
-                    alert(args.message);
                 }
-            }
+                if (args.file) {
+                        generateToast({domID:'toastContainer', message: args.message});
+                }  else {
+                    if (args.filter) {
+                        worker.postMessage({
+                            action: "filter",
+                            species: isSpeciesViewFiltered(true),
+                            active: args.active,
+                            updateSummary: true
+                        });
+                        resetResults({
+                            clearSummary: true,
+                            clearPagination: true,
+                            clearResults: true
+                        });
+                    }  else {
+                            generateToast({domID:'toastContainer', message: args.message});
+                    }
+                }
             break;
         }
         case "results-complete": {onResultsComplete(args);
@@ -1655,7 +1655,8 @@ const setUpWorkerMessaging = () => {
             case "progress": {onProgress(args);
                 break;
             }
-            case "processing-complete": {        
+            case "processing-complete": {
+                STATE.analysisDone = true;
                 DOM.progressDiv.classList.add('d-none');
                 break;
             }
@@ -1685,10 +1686,11 @@ const setUpWorkerMessaging = () => {
     case "update-summary": {updateSummary(args);
         break;
     }
-    case "worker-loaded-audio": {onWorkerLoadedAudio(args);
+    case "worker-loaded-audio": {
+        onWorkerLoadedAudio(args);
         break;
     }
-    default: {alert(`Unrecognised message from worker:${args.event}`);
+    default: {generateToast({domID:'toastContainer', message:`Unrecognised message from worker:${args.event}`});
 }
 }
 })
@@ -2204,7 +2206,12 @@ function onChartData(args) {
         updateElementCache();
     }
     
-
+    const LIST_MAP = {
+        location: 'Searching for birds in your region',
+        nocturnal: 'Searching for nocturnal birds',
+        birds: 'Searching for all birds',
+        everything: 'Searching for everything'
+    };
     // list mode icons
     const listIcon = document.getElementById('list-icon')
     const speciesThresholdEl = document.getElementById('species-threshold-el');
@@ -2212,36 +2219,24 @@ function onChartData(args) {
     const updateListIcon = () => {
         const icon = listIcon.querySelector('img');
         icon.src = icon.src.replace(/\w+\.png$/, config.list + '.png');
-        const states = {
-            location: 'Searching for birds in your region',
-            nocturnal: 'Searching for nocturnal birds',
-            birds: 'Searching for all birds',
-            everything: 'Searching for everything'
-        };
-        icon.title = states[config.list];
+        icon.title = LIST_MAP[config.list];
     }
     listIcon.addEventListener('click', () => {
         let img = listIcon.querySelector('img')
-        const states = {
-            location: 'Searching for birds in your region',
-            nocturnal: 'Searching for nocturnal birds',
-            birds: 'Searching for all birds',
-            everything: 'Searching for everything'
-        };
-        const keys = Object.keys(states);
-        for (let key in Object.keys(states)) {
+        const keys = Object.keys(LIST_MAP);
+        for (let key in Object.keys(LIST_MAP)) {
             key = parseInt(key);
             if (img.src.includes(keys[key])) {
                 const replace = (key === keys.length - 1) ? 0 : key + 1;
                 img.src = img.src.replace(keys[key], keys[replace]);
-                img.title = states[keys[replace]];
+                img.title = LIST_MAP[keys[replace]];
                 DOM.listToUse.value = keys[replace];
                 config.list = keys[replace];
                 updatePrefs();
                 resetResults({clearSummary: true, clearPagination: true, clearResults: true});
                 config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
                 speciesThresholdEl.classList.add('d-none');
-                worker.postMessage({ action: 'update-list', list: config.list, refreshResults: !!currentFile })
+                worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone })
                 break
             }
         }
@@ -2401,7 +2396,7 @@ function onChartData(args) {
                     threads: config[config.backend].threads,
                     list: config.list
                 });
-                alert('Operation cancelled');
+                generateToast({domID:'toastContainer', message:'Operation cancelled'});
                 DOM.progressDiv.classList.add('d-none');
             }
         },
@@ -2616,7 +2611,7 @@ function onChartData(args) {
                 seconds = Math.min(parseFloat(timeArray[2]), 59.999);
             } else {
                 // Invalid input
-                alert('Invalid time format. Please enter time in one of the following formats: \n1. Float (for seconds) \n2. Two numbers separated by a colon (for minutes and seconds) \n3. Three numbers separated by colons (for hours, minutes, and seconds)');
+                generateToast({domID:'toastContainer', message:'Invalid time format. Please enter time in one of the following formats: \n1. Float (for seconds) \n2. Two numbers separated by a colon (for minutes and seconds) \n3. Three numbers separated by colons (for hours, minutes, and seconds)'});
                 return;
             }
             let start = hours * 3600 + minutes * 60 + seconds;
@@ -2751,9 +2746,6 @@ function onChartData(args) {
         if (args.progress) {
             let progress = Math.round(args.progress * 1000) / 10;
             updateProgress(progress);
-            if (progress === 100) {
-                //DOM.progressDiv.classList.add('d-none');
-            }
         } else {
             DOM.progressDiv.classList.remove('d-none');
         }
@@ -2887,14 +2879,7 @@ function onChartData(args) {
                 }
                 const limit = config.limit;
                 const offset = (clicked - 1) * limit;
-                // const species = isSpeciesViewFiltered(true);
                 filterResults({offset: offset, limit:limit})
-                // worker.postMessage({
-                //     action: 'filter',
-                //     species: species,
-                //     offset: offset,
-                //     limit: limit,
-                // }); 
                 resetResults({clearSummary: false, clearPagination: false, clearResults: false});
             }
         })
@@ -2952,10 +2937,6 @@ function onChartData(args) {
             list.value = species || '';
         }
         filterResults()
-        // worker.postMessage({
-        //     action: 'filter',
-        //     species: species
-        // });
         resetResults({clearSummary: false, clearPagination: false, clearResults: false});
     }
     
@@ -2994,7 +2975,8 @@ function onChartData(args) {
         }
         if (typeof (result) === 'string') {
             const nocturnal = config.detect.nocmig ? '<b>during the night</b>' : '';
-            tr += `<tr><td colspan="8">${result} (Showing ${config.list} detected ${nocturnal} with at least ${config.detect.confidence}% confidence in the prediction)</td></tr>`;
+            generateToast({domID:'toastContainer', message: result});
+            //tr += `<tr><td colspan="8">${result} (${LIST_MAP[config.list]} detected ${nocturnal} with at least ${config.detect.confidence}% confidence in the prediction)</td></tr>`;
         } else {
             const {
                 timestamp,
@@ -3231,7 +3213,7 @@ function onChartData(args) {
             })
         } else {
             if (!config.seenThanks) {
-                alert('Thank you, your feedback helps improve Chirpity predictions');
+                generateToast({domID:'toastContainer', message:'Thank you, your feedback helps improve Chirpity predictions'});
                 config.seenThanks = true;
                 updatePrefs()
             }
@@ -3413,21 +3395,17 @@ function onChartData(args) {
         worker.postMessage({
             action: 'update-state',
             detect: { nocmig: config.detect.nocmig },
+            globalOffset: 0, filteredOffset: {}
         });
         updatePrefs();
-        worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}}); 
-        
+        if (STATE.analysisDone){
         resetResults({clearSummary: true, clearPagination: true, clearResults: false});
         filterResults()
-        // worker.postMessage({
-        //     action: 'filter',
-        //     species: isSpeciesViewFiltered(true),
-        //     updateSummary: true
-        // })
+        }
     }
     
     function filterResults({species = isSpeciesViewFiltered(true), updateSummary = true, offset = 0, limit = 500, range = undefined} = {}){
-        worker.postMessage({
+        STATE.analysisDone && worker.postMessage({
             action: 'filter',
             species: species,
             updateSummary: updateSummary,
@@ -3487,10 +3465,6 @@ function onChartData(args) {
     })
     
     DOM.nocmigButton.addEventListener('click', changeNocmigMode);
-    //DOM.nocmig.addEventListener('change', changeNocmigMode)
-    
-    //DOM.contextAware.addEventListener('change', toggleContextAwareMode)
-    
     const fullscreen = document.getElementById('fullscreen');
     
     const toggleFullscreen = () => {
@@ -3591,10 +3565,6 @@ function onChartData(args) {
         worker.postMessage({ action: 'update-state', sortOrder: order })
         resetResults({clearSummary: false, clearPagination: false, clearResults: true});
         filterResults()
-        // worker.postMessage({
-        //     action: 'filter',
-        //     species: isSpeciesViewFiltered(true)
-        // }) // re-prepare
         
     }
     // Drag file to app window to open
@@ -3746,12 +3716,6 @@ function onChartData(args) {
                     resetResults({clearSummary: true, clearPagination: true, clearResults: false});
                     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}, explore: STATE.explore}); 
                     filterResults({range:STATE.explore.range})
-                    // worker.postMessage({
-                    //     action: 'filter',
-                    //     species: isSpeciesViewFiltered(true),
-                    //     range: STATE.explore.range,
-                    //     updateSummary: true
-                    // }); // re-prepare
                 }
                 
                 // Update the seen species list
@@ -3773,13 +3737,7 @@ function onChartData(args) {
                     STATE.explore.range = {start: undefined, end: undefined};
                     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}, explore: STATE.explore}); 
                     resetResults({clearSummary: true, clearPagination: true, clearResults: false});
-                    filterResults({species:STATE.explore.species, range:STATE.explore.range})
-                    // worker.postMessage({
-                    //     action: 'filter',
-                    //     species: STATE.explore.species,
-                    //     range: STATE.explore.range,
-                    //     updateSummary: true
-                    // }); // re-prepare
+                    filterResults({species:STATE.explore.species, range:STATE.explore.range});
                 }
             })
             picker.on('click', (e) =>{
@@ -3929,12 +3887,7 @@ function onChartData(args) {
         if (!PREDICTING && !DOM.resultTableElement.classList.contains('d-none')) {
             worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
             resetResults({clearSummary: true, clearPagination: true, clearResults: false});
-            filterResults()
-            // worker.postMessage({
-            //     action: 'filter',
-            //     species: isSpeciesViewFiltered(true),
-            //     updateSummary: true
-            // });
+            filterResults();
         }
     }
 
@@ -4082,12 +4035,12 @@ DOM.gain.addEventListener('input', () => {
                 
                 case 'species-frequency-threshold' : {
                     if (isNaN(element.value) || element.value === '') {
-                        alert('The threshold must be a number between 0.001 and 1');
+                        generateToast({domID:'toastContainer', message:'The threshold must be a number between 0.001 and 1'});
                         return false
                     }
                     config.speciesThreshold = element.value;
                     worker.postMessage({ action: 'update-state', speciesThreshold: element.value });
-                    worker.postMessage({ action: 'update-list', list: config.list, refreshResults: !!currentFile});
+                    worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone});
                     break;
                 }
                 case 'timelineSetting': {
@@ -4132,7 +4085,7 @@ DOM.gain.addEventListener('input', () => {
 
                     if (! config.useWeek) STATE.week = -1;
                     worker.postMessage({action:'update-state', useWeek: config.useWeek});
-                    worker.postMessage({ action: 'update-list', list: config.list, refreshResults: !!currentFile});
+                    worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone});
                     break;
                 }
                 case 'list-to-use': {
@@ -4149,7 +4102,7 @@ DOM.gain.addEventListener('input', () => {
                     }                    
                     updateListIcon();
                     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
-                    worker.postMessage({ action: 'update-list', list: config.list, refreshResults: !!currentFile});
+                    worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone});
                     break;
                 }
                 case 'locale': {
@@ -4163,7 +4116,7 @@ DOM.gain.addEventListener('input', () => {
                         LABELS = filecontents.trim().split(/\r?\n/);
                         // Add unknown species
                         LABELS.push('Unknown Sp._Unknown Sp.');
-                        worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS})
+                        worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS, refreshResults: STATE.analysisDone})
                     }).catch(error =>{
                         console.error('There was a problem fetching the label file:', error);
                     })
@@ -4199,6 +4152,7 @@ DOM.gain.addEventListener('input', () => {
                     config.backend = 'tensorflow';
                     document.getElementById('tensorflow').checked = true;
                     handleBackendChange(config.backend);
+                    STATE.analysisDone = false;
                     break;
                 }
                 case 'thread-slider': {
@@ -4279,10 +4233,12 @@ DOM.gain.addEventListener('input', () => {
     })
     
 function track(event, action, name, value){
+    if (config.track){
+        const t = new Date()
     name = name ? `&e_n=${name}` : '';
     value = value ? `&e_v=${value}` : '';
-    if (config.track){
-        fetch(`https://analytics.mattkirkland.co.uk/matomo.php?action_name=Settings%20Change&idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
+        fetch(`https://analytics.mattkirkland.co.uk/matomo.php?h=${t.getHours()}&m=${t.getMinutes()}&s=${t.getSeconds()}
+        &action_name=Settings%20Change&idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
         &e_c=${event}&e_a=${action}${name}${value}`)
         .then(response => {
             if (! response.ok) throw new Error('Network response was not ok', response);
@@ -4483,7 +4439,7 @@ function track(event, action, name, value){
             DBaction: action,
             batch: batch,
             confidence: confidence,
-            active: activeRow.rowIndex - 1 //  have to account for the header row
+            active: activeRow?.rowIndex - 1 //  have to account for the header row
         })
     }
     
@@ -4619,7 +4575,7 @@ function track(event, action, name, value){
     
     function checkForMacUpdates() {
         // Do this at most daily
-        const latestCheck = Date.now()
+        const latestCheck = Date.now();
         const checkDue = (latestCheck - config.lastUpdateCheck) > 86_400_000;
         if (checkDue){
             fetch('https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest')
@@ -4630,7 +4586,7 @@ function track(event, action, name, value){
                 const current = parseSemVer(VERSION);
                 
                 if (isNewVersion(latest, current)) {
-                    const alertPlaceholder = document.getElementById('liveAlertPlaceholder')
+                    const alertPlaceholder = document.getElementById('updateAlert')
                     const alert = (message, type) => {
                         const wrapper = document.createElement('div')
                         wrapper.innerHTML = [
@@ -4644,7 +4600,7 @@ function track(event, action, name, value){
                     alert(`
                     <svg class="bi flex-shrink-0 me-2" width="20" height="20" role="img" aria-label="Info:"><use xlink:href="#info-fill"/></svg>
                     There's a new version of Chirpity available! <a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blacnk">Check the website</a> for more information`,
-                    'info')
+                    'warning')
                 }
                 config.lastUpdateCheck = latestCheck;
                 updatePrefs()
@@ -4655,6 +4611,32 @@ function track(event, action, name, value){
         }
     }
     
+    function generateToast({domID, message}) {
+        const domEl = document.getElementById(domID);
+        
+        const wrapper = document.createElement('div');
+        // Add toast attributes
+        wrapper.setAttribute("class", "toast");
+        wrapper.setAttribute("role", "alert");
+        wrapper.setAttribute("aria-live", "assertive");
+        wrapper.setAttribute("aria-atomic", "true");
+        
+        wrapper.innerHTML = `
+            <div class="toast-header">
+                <svg class="bi flex-shrink-0 me-2 text-primary" width="20" height="20" role="img" aria-label="Info:"><use xlink:href="#info-fill"/></svg>
+                <strong class="me-auto">Notice</strong>
+                <small class="text-muted">just now</small>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                ${message}
+            </div>`
+        
+        domEl.appendChild(wrapper)
+        const toast = new bootstrap.Toast(wrapper)
+        toast.show()
+    }
+
     function parseSemVer(versionString) {
         const semVerRegex = /^[vV]?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-.]+))?(?:\+([0-9A-Za-z-.]+))?$/;
         const matches = versionString.match(semVerRegex);
