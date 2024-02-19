@@ -385,13 +385,12 @@ app.whenReady().then(async () => {
         }
     });
     
-    workerWindow.webContents.on('render-process-gone', (e, details) => {
-        console.log(e);
+    workerWindow.webContents.once('render-process-gone', (e, details) => {
         console.log(details);
         const dialogOpts = {
             type: 'warning',
             title: 'Crash report',
-            detail: 'Oh no! The model has crashed. Try lowering the batch size and / or number of threads in settings'
+            detail: 'Oh no! Chirpity has crashed. It is most likely that it has run out of memory.\nTry lowering the batch size and / or number of threads in settings'
         };
         
         dialog.showMessageBox(dialogOpts).then((returnValue) => {
