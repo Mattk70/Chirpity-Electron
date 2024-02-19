@@ -749,7 +749,7 @@ const prepSummaryStatement = (included) => {
                 circleClicked = false
             }) {
                 // Now we've asked for a new analysis, clear the aborted flag
-                aborted = false;
+                aborted = false; STATE.incrementor = 1;
                 predictionStart = new Date();
                 // Set the appropraite selection range if this is a selection analysis
                 STATE.update({ selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined });
@@ -861,7 +861,7 @@ const prepSummaryStatement = (included) => {
             }
 
             const convertFileFormat = (file, destination, size, error) => {
-                return new Promise(function (resolve) {
+                return new Promise(function (resolve, reject) {
                     const sampleRate = STATE.model === 'birdnet' ? 48_000 :24_000, channels = 1;
                     let totalTime;
                     let command = ffmpeg(file)
@@ -870,7 +870,7 @@ const prepSummaryStatement = (included) => {
                     .on('error', (err) => {
                         console.log('An error occurred: ' + err.message);
                         if (err) {
-                            error(err.message);
+                            reject(error(err.message));
                         }
                     })
                     // Handle progress % being undefined
@@ -900,8 +900,10 @@ const prepSummaryStatement = (included) => {
                         UI.postMessage({ event: 'progress', text: 'File decompressed', progress: 1 })
                         resolve(destination)
                     })
+                    .save(destination)
+                    
                     //STATE.audio.normalise && command.audioFilter("loudnorm=I=-16:LRA=11:TP=-1.5")
-                    command.save(destination)
+                    
                 });
             }
             
@@ -945,7 +947,11 @@ const prepSummaryStatement = (included) => {
                         });
                         // assign the source file's save time to the proxy file
                         const mtime = sourceMtime.getTime();
-                        utimesSync(proxy, mtime);
+                        try{
+                            utimesSync(proxy, mtime);
+                        } catch (error){
+                            console.log('error setting uTime', error)
+                        }
                     }
                 }
                 if (!metadata.file?.isComplete) {
@@ -1335,7 +1341,7 @@ const prepSummaryStatement = (included) => {
                             // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
                         });
                     } else {
-                        console.log('Short chunk', chunk.length, 'skipping')
+                        console.log('Short chunk', chunk.length, 'padding')
                         workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
                         worker = workerInstance;
 
@@ -1375,7 +1381,7 @@ const prepSummaryStatement = (included) => {
                     }
                     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
                     const highWaterMark = byteEnd - byteStart + 1;
-                    
+                    try {
                     const readStream = fs.createReadStream(proxy, {
                         start: byteStart, end: byteEnd, highWaterMark: highWaterMark
                     });
@@ -1405,6 +1411,15 @@ const prepSummaryStatement = (included) => {
                         console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
                         err.code === 'ENOENT' && notifyMissingFile(file);
                     })
+                } catch (error) {
+                    if (error instanceof TypeError) {
+                        // Handle the TypeError
+                        console.error('Caught a TypeError get predictbuffers:', error.message, 'bytestart', byteStart, 'byteend', byteEnd);
+                    } else {
+                        // Handle other types of errors
+                        console.error('An unexpected error occurred:', error.message);
+                    }
+                }
                 });
             }
             
@@ -1785,7 +1800,13 @@ const prepSummaryStatement = (included) => {
                         await parseMessage(message).catch(error => {
                             console.warn("Parse message error", error, 'message was', message);
                         });
+                        // Dial down the getSummary calls if the queue length starts growing
+                        if (messageQueue.length > NUM_WORKERS * 2 )  {
+                            STATE.incrementor = Math.min(STATE.incrementor *= 2, 256);
+                            console.log('increased incrementor to ', STATE.incrementor)
+                        }
 
+                        
                         // Set isParsing to false to allow the next message to be processed
                         isParsing = false;
                         
@@ -2081,7 +2102,7 @@ const prepSummaryStatement = (included) => {
                                 updateFilesBeingProcessed(response.file)
                                 DEBUG && console.log(`File ${file} processed after ${(new Date() - predictionStart) / 1000} seconds: ${filesBeingProcessed.length} files to go`);
                             }
-                            !STATE.selection && (!DATASET || STATE.increment() === 0) && getSummary({ interim: true });
+                            !STATE.selection && (STATE.increment() === 0) && getSummary({ interim: true });
                             return response.worker
                         }
                         
