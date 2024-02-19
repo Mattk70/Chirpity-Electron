@@ -1862,7 +1862,8 @@ const prepSummaryStatement = (included) => {
                     const updatedID = db.getAsync('SELECT id FROM species WHERE cname = ?', cname);
                     let count = 0;
                     await db.runAsync('BEGIN');
-                    for (const item of records) {
+                    for (let i = 0; i< records.length; i++) {
+                        const item = records[i];
                         const { dateTime, speciesID, fileID, position, end, comment, callCount } = item;
                         const { name } = await STATE.db.getAsync('SELECT name FROM files WHERE id = ?', fileID)
                         // Delete existing record
@@ -1876,18 +1877,19 @@ const prepSummaryStatement = (included) => {
                             file: name,
                             label: label,
                             batch: false,
-                            originalCname: undefined
+                            originalCname: undefined,
+                            updateResults: i === records.length -1 // trigger a UI update after the last item
                         })
                     }
                     await db.runAsync('END');
                     DEBUG && console.log(`Batch record update took ${(Date.now() - t0) / 1000} seconds`)
                 }
                         
-                const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label, batch, originalCname, confidence, speciesFiltered }) => {
+                const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label, batch, originalCname, confidence, speciesFiltered, updateResults = true }) => {
                     if (batch) return batchInsertRecords(cname, label, file, originalCname)
                     start = parseFloat(start), end = parseFloat(end);
                     const startMilliseconds = Math.round(start * 1000);
-                    let changes, fileID, fileStart;
+                    let changes = 0, fileID, fileStart;
                     const db = STATE.db;
                     const { speciesID } = await db.getAsync(`SELECT id as speciesID FROM species WHERE cname = ?`, cname);
                     let res = await db.getAsync(`SELECT id,filestart FROM files WHERE name = ?`, file);
@@ -1919,15 +1921,12 @@ const prepSummaryStatement = (included) => {
                     if (response.changes){
                         STATE.db === diskDB ? UI.postMessage({ event: 'diskDB-has-records' }) : UI.postMessage({event: 'unsaved-records'});
                     }
-                    // WHY NOT USE FILTER DIRECTLY? It's to get species and offset
-                    // UI.postMessage({
-                    //     event: 'generate-alert',
-                    //     // message: `${count} ${args.cname} record has been saved to the archive.`,
-                    //     filter: true, 
-                    //     active: active
-                    // })
-                    await getResults({species:speciesFiltered, select: start});
-                    await getSummary({species: speciesFiltered});
+                    if (updateResults){
+                        const select =  {start: start, dateTime: dateTime};
+                        await getResults({species:speciesFiltered, select: select});
+                        await getSummary({species: speciesFiltered});
+                    }
+                    return changes;
                 }
                         
                         const generateInsertQuery = async (latestResult, file) => {
@@ -2282,6 +2281,58 @@ const prepSummaryStatement = (included) => {
             })
         };
         
+
+        const getPosition = async ({species = undefined, dateTime = undefined, included = []} = {}) => {
+            const params = [STATE.detect.confidence];
+            let positionStmt = `      
+            WITH ranked_records AS (
+                SELECT 
+                dateTime,
+                RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
+                FROM records 
+                JOIN species ON records.speciesID = species.id 
+                JOIN files ON records.fileID = files.id 
+                WHERE confidence >= ?
+                `;
+                // might have two locations with same dates - so need to add files
+                if (['analyse', 'archive'].includes(STATE.mode) && !STATE.selection) {
+                    positionStmt += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+                    params.push(...STATE.filesToAnalyse)
+                }
+                // Prioritise selection ranges
+                const range = STATE.selection?.start ? STATE.selection :
+                STATE.mode === 'explore' ? STATE.explore.range : false;
+                const useRange = range?.start;  
+                if (useRange) {
+                    positionStmt += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
+                    params.push(range.start,range.end)
+                }    
+                if (filtersApplied(included)){
+                     const included = await getIncludedIDs();
+                     positionStmt += ` AND speciesID IN (${prepParams(included)}) `;
+                     params.push(...STATE.included)
+                }
+                if (STATE.locationID) {
+                    positionStmt += ` AND locationID = ${STATE.locationID} `;
+                    params.push(STATE.locationID)
+                }
+                if (STATE.detect.nocmig){
+                    positionStmt += ' AND COALESCE(isDaylight, 0) != 1 '; // Backward compatibility for < v0.9.
+                }
+                
+                positionStmt += `)
+                SELECT 
+                count(*) as count, dateTime
+                FROM ranked_records
+                WHERE rank <= ? AND dateTime < ?`;
+                params.push(STATE.topRankin, dateTime);
+                if (species) {
+                    positionStmt+=  ` AND  cname = ? `;
+                    params.push(species)
+                };
+            const {count} = await STATE.db.getAsync(positionStmt, ...params);
+            return count
+        }
         
         /**
         *
@@ -2306,21 +2357,18 @@ const prepSummaryStatement = (included) => {
             select = undefined
         } = {}) => {
             let confidence = STATE.detect.confidence;
-            if (offset === undefined) { // Get offset state
-                if (species) {
-                    if (!STATE.filteredOffset[species]) STATE.filteredOffset[species] = 0;
-                    offset = STATE.filteredOffset[species];
-                } else {
-                    offset = STATE.globalOffset;
-                }
-            } else { // Set offset state
-                if (species) STATE.filteredOffset[species] = offset;
-                else STATE.update({ globalOffset: offset });
+            const included = STATE.selection ? [] : await getIncludedIDs();
+            if (select) {
+                const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
+                offset = Math.floor(position/limit) * limit;
             }
+            offset = offset ?? (species ? (STATE.filteredOffset[species] ?? 0) : STATE.globalOffset);
+            if (species) STATE.filteredOffset[species] = offset;
+            else STATE.update({ globalOffset: offset });
+            
             
             let index = offset;
             AUDACITY = {};
-            const included = STATE.selection ? [] : await getIncludedIDs();
             const params = getResultsParams(species, confidence, offset, limit, topRankin, included);
             prepResultsStatement(species, limit === Infinity, included);
             
@@ -2372,7 +2420,7 @@ const prepSummaryStatement = (included) => {
                     }
                 }
             }
-            STATE.selection || UI.postMessage({event: 'results-complete', active: active, select: select});
+            STATE.selection || UI.postMessage({event: 'results-complete', active: active, select: select?.start});
         };
         
         // Function to format the CSV export
