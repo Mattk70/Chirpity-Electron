@@ -4568,7 +4568,7 @@ function track(event, action, name, value){
     // Event handler for starting the tour
     const prepTour = async () => {
         if (!fileLoaded) {
-            const example_file = 'Help/example.mp3'
+            const example_file = await window.electron.getAudio();
             // create a canvas for the audio spec
             showElement(['spectrogramWrapper'], false);
             await loadAudioFile({ filePath: example_file });
