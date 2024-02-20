@@ -4659,15 +4659,13 @@ function track(event, action, name, value){
                 if (Notification.permission === "granted") {
                     // Check whether notification permissions have already been granted;
                     // if so, create a notification
-                    const notification = new Notification(`Analysis completed in ${duration.toFixed(0)} seconds`, {requireInteraction: true});
-                    // …
+                    const notification = new Notification(`Analysis completed in ${duration.toFixed(0)} seconds`, {requireInteraction: true, icon: 'img/icon/chirpity_logo2.png'});
                 } else if (Notification.permission !== "denied") {
                     // We need to ask the user for permission
                     Notification.requestPermission().then((permission) => {
                     // If the user accepts, let's create a notification
                     if (permission === "granted") {
-                        const notification = new Notification(`Analysis completed in ${duration.toFixed(0)} seconds`, {requireInteraction: true});
-                        // …
+                        const notification = new Notification(`Analysis completed in ${duration.toFixed(0)} seconds`, {requireInteraction: true, icon: 'img/icon/chirpity_logo2.png'});
                     }
                     });
                 } else {

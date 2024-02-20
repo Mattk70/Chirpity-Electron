@@ -2310,7 +2310,7 @@ const prepSummaryStatement = (included) => {
                 if (filtersApplied(included)){
                      const included = await getIncludedIDs();
                      positionStmt += ` AND speciesID IN (${prepParams(included)}) `;
-                     params.push(...STATE.included)
+                     params.push(...included)
                 }
                 if (STATE.locationID) {
                     positionStmt += ` AND locationID = ${STATE.locationID} `;
@@ -2361,6 +2361,8 @@ const prepSummaryStatement = (included) => {
             if (select) {
                 const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
                 offset = Math.floor(position/limit) * limit;
+                // update the pagination
+                await getTotal({species: species, offset: offset, included: included})
             }
             offset = offset ?? (species ? (STATE.filteredOffset[species] ?? 0) : STATE.globalOffset);
             if (species) STATE.filteredOffset[species] = offset;
