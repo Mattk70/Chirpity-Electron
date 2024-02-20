@@ -1805,10 +1805,10 @@ const prepSummaryStatement = (included) => {
                             console.warn("Parse message error", error, 'message was', message);
                         });
                         // Dial down the getSummary calls if the queue length starts growing
-                        // if (messageQueue.length > NUM_WORKERS * 2 )  {
-                        //     STATE.incrementor = Math.min(STATE.incrementor *= 2, 256);
-                        //     DEBUG && console.log('increased incrementor to ', STATE.incrementor)
-                        // }
+                        if (messageQueue.length > NUM_WORKERS * 2 )  {
+                            STATE.incrementor = Math.min(STATE.incrementor *= 2, 256);
+                            DEBUG && console.log('increased incrementor to ', STATE.incrementor)
+                        }
 
                         
                         // Set isParsing to false to allow the next message to be processed
@@ -2158,11 +2158,12 @@ const prepSummaryStatement = (included) => {
                             // Nothing to do for this file
                             
                             updateFilesBeingProcessed(file);
-                            const result = `No detections. The file has no period within it where predictions would be given. <b>Tip:</b> Disable nocmig mode.`;
+                            const result = `No detections. ${file} has no period within it where predictions would be given. <b>Tip:</b> To see detections in this file, disable nocmig mode.`;
                             index++;
                             UI.postMessage({
                                 event: 'new-result', file: file, result: result, index: index
                             });
+                            index--;
                             DEBUG && console.log('Recursion: start = end')
                             await processNextFile(arguments[0]);
                             

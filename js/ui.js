@@ -1642,6 +1642,7 @@ const setUpWorkerMessaging = () => {
             }
             case "processing-complete": {
                 STATE.analysisDone = true;
+                PREDICTING = false;
                 DOM.progressDiv.classList.add('d-none');
                 break;
             }
@@ -2788,9 +2789,8 @@ function onChartData(args) {
         let table = document.getElementById('resultTableBody');
         table.replaceWith(resultsBuffer);
         table = document.getElementById('resultTableBody');
-        PREDICTING = false;
-        // Set active Row
-        
+
+        // Set active Row        
         if (active) {
             // Refresh node and scroll to active row:
             activeRow = table.rows[active];
@@ -2987,7 +2987,7 @@ function onChartData(args) {
             else {
                 showElement(['resultTableContainer', 'resultsHead'], false);
                 const resultTable = document.getElementById('resultTableBody');
-                resultTable.textContent = ''
+                resultTable.textContent = '';
             }
         }  else if (!isFromDB && index % (config.limit + 1) === 0) {
             addPagination(index, 0)
