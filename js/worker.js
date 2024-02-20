@@ -619,9 +619,10 @@ const prepSummaryStatement = (included) => {
         //console.log('Summary SQL statement:\n' + summaryStatement)
     }
     
-    const getTotal = async ({species = undefined, offset = 0, included = []}) => {
+    const getTotal = async ({species = undefined, offset = undefined, included = []}) => {
         let params = [];
         const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
+        offset = offset ?? (species !== undefined ? STATE.filteredOffset[species] : STATE.globalOffset);
         const useRange = range?.start;
         let SQL = ` WITH MaxConfidencePerDateTime AS (
             SELECT confidence,
@@ -1867,123 +1868,87 @@ const prepSummaryStatement = (included) => {
                     predictWorkers = [];
                 }
                 
-                // const insertRecord = async (timestamp, key, speciesID, confidence, file) => {
-                //     const isDaylight = isDuringDaylight(timestamp, STATE.lat, STATE.lon);
-                //     const offset = key * 1000;
-                //     let changes, fileID;
-                //     confidence = Math.round(confidence);
-                //     const db = STATE.db;
-                //     let res = await db.getAsync('SELECT id FROM files WHERE name = ?', file);
-                //     if (!res) {
-                //         res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,? )',
-                //             undefined, file, metadata[file].duration, metadata[file].fileStart, undefined);
-                //         fileID = res.lastID;
-                //         changes = 1;
-                //     } else {
-                //         fileID = res.id;
-                //     }
-                //     if (changes) {
-                //         const durationSQL = Object.entries(metadata[file].dateDuration)
-                //             .map(entry => `(${entry.toString()},${fileID})`).join(',');
-                //         // No "OR IGNORE" in this statement because it should only run when the file is new
-                //         await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
-                //     }
-                //     await db.runAsync('INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?,?,?)',
-                //         metadata[file].fileStart + offset, key, fileID, speciesID, confidence,
-                //         undefined, undefined, key + 3, undefined, isDaylight);
-                // }
-                
                 async function batchInsertRecords(cname, label, files, originalCname) {
                     const db = STATE.db;
                     let params = [originalCname, STATE.detect.confidence];
                     t0 = Date.now();
-                    let query = `
-                    SELECT * FROM records 
-                    WHERE speciesID = (
-                        SELECT id FROM species WHERE cname = ?
-                        ) 
-                        AND confidence >= ? `;
-                        if (STATE.mode !== 'explore') {
-                            query += `
-                            AND fileID in (
-                                SELECT id FROM files WHERE name IN (${files.map(() => '?').join(', ')})
-                                )`
-                                params.push(...files);
-                            } else if (STATE.explore.range.start) {
-                                query += ` AND dateTime BETWEEN ${STATE.explore.range.start} AND ${STATE.explore.range.end}`;
-                            }
-                            const records = await STATE.db.allAsync(query, ...params);
-                            const updatedID = db.getAsync('SELECT id FROM species WHERE cname = ?', cname);
-                            let count = 0;
-                            await db.runAsync('BEGIN');
-                            for (const item of records) {
-                                const { dateTime, speciesID, fileID, position, end, comment, callCount } = item;
-                                const { name } = await STATE.db.getAsync('SELECT name FROM files WHERE id = ?', fileID)
-                                // Delete existing record
-                                const changes = await db.runAsync('DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?', dateTime, speciesID, fileID)
-                                count += await onInsertManualRecord({
-                                    cname: cname,
-                                    start: position,
-                                    end: end,
-                                    comment: comment,
-                                    count: callCount,
-                                    file: name,
-                                    label: label,
-                                    batch: false,
-                                    originalCname: undefined
-                                })
-                            }
-                            await db.runAsync('END');
-                            DEBUG && console.log(`Batch record update  took ${(Date.now() - t0) / 1000} seconds`)
-                            
-                        }
+                    let query = `SELECT * FROM records WHERE speciesID = (SELECT id FROM species WHERE cname = ?) AND confidence >= ? `;
+                    if (STATE.mode !== 'explore') {
+                        query += ` AND fileID in (SELECT id FROM files WHERE name IN (${files.map(() => '?').join(', ')}))`
+                        params.push(...files);
+                    } else if (STATE.explore.range.start) {
+                        query += ` AND dateTime BETWEEN ${STATE.explore.range.start} AND ${STATE.explore.range.end}`;
+                    }
+                    const records = await STATE.db.allAsync(query, ...params);
+                    const updatedID = db.getAsync('SELECT id FROM species WHERE cname = ?', cname);
+                    let count = 0;
+                    await db.runAsync('BEGIN');
+                    for (let i = 0; i< records.length; i++) {
+                        const item = records[i];
+                        const { dateTime, speciesID, fileID, position, end, comment, callCount } = item;
+                        const { name } = await STATE.db.getAsync('SELECT name FROM files WHERE id = ?', fileID)
+                        // Delete existing record
+                        const changes = await db.runAsync('DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?', dateTime, speciesID, fileID)
+                        count += await onInsertManualRecord({
+                            cname: cname,
+                            start: position,
+                            end: end,
+                            comment: comment,
+                            count: callCount,
+                            file: name,
+                            label: label,
+                            batch: false,
+                            originalCname: undefined,
+                            updateResults: i === records.length -1 // trigger a UI update after the last item
+                        })
+                    }
+                    await db.runAsync('END');
+                    DEBUG && console.log(`Batch record update took ${(Date.now() - t0) / 1000} seconds`)
+                }
                         
-                        const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label, batch, originalCname, confidence, active }) => {
-                            if (batch) return batchInsertRecords(cname, label, file, originalCname)
-                            start = parseFloat(start), end = parseFloat(end);
-                            const startMilliseconds = Math.round(start * 1000);
-                            let changes, fileID, fileStart;
-                            const db = STATE.db;
-                            const { speciesID } = await db.getAsync(`SELECT id as speciesID FROM species
-                            WHERE cname = ?`, cname);
-                            let res = await db.getAsync(`SELECT id,filestart FROM files WHERE name = ?`, file);
-                            
-                            
-                            if (!res) { 
-                                // Manual records can be added off the bat, so there may be no record of the file in either db
-                                fileStart = metadata[file].fileStart;
-                                res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,? )',
-                                fileID, file, metadata[file].duration, fileStart, undefined);
-                                fileID = res.lastID;
-                                changes = 1;
-                                let durationSQL = Object.entries(metadata[file].dateDuration)
-                                .map(entry => `(${entry.toString()},${fileID})`).join(',');
-                                await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
-                            } else {
-                                fileID = res.id;
-                                fileStart = res.filestart;
-                            }
-                            
-                            const dateTime = fileStart + startMilliseconds;
-                            const isDaylight = isDuringDaylight(dateTime, STATE.lat, STATE.lon);
-                            confidence = confidence || 2000;
-                            // Delete an existing record if it exists
-                            const result = await db.getAsync(`SELECT id as originalSpeciesID FROM species WHERE cname = ?`, originalCname);
-                            result?.originalSpeciesID && await db.runAsync('DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?', dateTime, result.originalSpeciesID, fileID)
-                            const response = await db.runAsync('INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,?,?)',
-                            dateTime, start, fileID, speciesID, confidence, label, comment, end, parseInt(count), isDaylight);
-                            
-                            if (response.changes){
-                                STATE.db === diskDB ? UI.postMessage({ event: 'diskDB-has-records' }) : UI.postMessage({event: 'unsaved-records'});
-                            }
-                            // WHY NOT USE FILTER DIRECTLY?
-                            UI.postMessage({
-                                event: 'generate-alert',
-                                // message: `${count} ${args.cname} record has been saved to the archive.`,
-                                filter: true, 
-                                active: active
-                            })
-                        }
+                const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label, batch, originalCname, confidence, speciesFiltered, updateResults = true }) => {
+                    if (batch) return batchInsertRecords(cname, label, file, originalCname)
+                    start = parseFloat(start), end = parseFloat(end);
+                    const startMilliseconds = Math.round(start * 1000);
+                    let changes = 0, fileID, fileStart;
+                    const db = STATE.db;
+                    const { speciesID } = await db.getAsync(`SELECT id as speciesID FROM species WHERE cname = ?`, cname);
+                    let res = await db.getAsync(`SELECT id,filestart FROM files WHERE name = ?`, file);
+
+                    if (!res) { 
+                        // Manual records can be added off the bat, so there may be no record of the file in either db
+                        fileStart = metadata[file].fileStart;
+                        res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,? )',
+                        fileID, file, metadata[file].duration, fileStart, undefined);
+                        fileID = res.lastID;
+                        changes = 1;
+                        let durationSQL = Object.entries(metadata[file].dateDuration)
+                        .map(entry => `(${entry.toString()},${fileID})`).join(',');
+                        await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
+                    } else {
+                        fileID = res.id;
+                        fileStart = res.filestart;
+                    }
+                    
+                    const dateTime = fileStart + startMilliseconds;
+                    const isDaylight = isDuringDaylight(dateTime, STATE.lat, STATE.lon);
+                    confidence = confidence || 2000;
+                    // Delete an existing record if it exists
+                    const result = await db.getAsync(`SELECT id as originalSpeciesID FROM species WHERE cname = ?`, originalCname);
+                    result?.originalSpeciesID && await db.runAsync('DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?', dateTime, result.originalSpeciesID, fileID)
+                    const response = await db.runAsync('INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,?,?)',
+                    dateTime, start, fileID, speciesID, confidence, label, comment, end, parseInt(count), isDaylight);
+                    
+                    if (response.changes){
+                        STATE.db === diskDB ? UI.postMessage({ event: 'diskDB-has-records' }) : UI.postMessage({event: 'unsaved-records'});
+                    }
+                    if (updateResults){
+                        const select =  {start: start, dateTime: dateTime};
+                        await getResults({species:speciesFiltered, select: select});
+                        await getSummary({species: speciesFiltered});
+                    }
+                    return changes;
+                }
                         
                         const generateInsertQuery = async (latestResult, file) => {
                             const db = STATE.db;              
@@ -2084,22 +2049,16 @@ const prepSummaryStatement = (included) => {
                             const fileProgress = predictionsReceived[file] / batchChunksToSend[file];
                             UI.postMessage({ event: 'progress', progress: progress, file: file });
                             if (fileProgress === 1) {
-                                if (!STATE.selection) {
-                                    db.getAsync('SELECT id FROM files WHERE name = ?', file)
-                                    .then(row => {
-                                        if (!row) {
-                                            const result = `No predictions found in ${file}`;
-                                            UI.postMessage({
-                                                event: 'new-result',
-                                                file: file,
-                                                result: result,
-                                                index: index,
-                                                selection: STATE.selection
-                                            });
-                                        }
-                                    })
-                                    .catch(error => console.log('Error generating new result', error))
-                                }
+                                if (index === 0 ) {
+                                    const result = `No detections found in ${file}. Searched for records using the ${STATE.list} list and having a minimum confidence of ${STATE.detect.confidence/10}%`
+                                    UI.postMessage({
+                                        event: 'new-result',
+                                        file: file,
+                                        result: result,
+                                        index: index,
+                                        selection: STATE.selection
+                                    });  
+                                } 
                                 updateFilesBeingProcessed(response.file)
                                 DEBUG && console.log(`File ${file} processed after ${(new Date() - predictionStart) / 1000} seconds: ${filesBeingProcessed.length} files to go`);
                             }
@@ -2343,6 +2302,58 @@ const prepSummaryStatement = (included) => {
             })
         };
         
+
+        const getPosition = async ({species = undefined, dateTime = undefined, included = []} = {}) => {
+            const params = [STATE.detect.confidence];
+            let positionStmt = `      
+            WITH ranked_records AS (
+                SELECT 
+                dateTime,
+                RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
+                FROM records 
+                JOIN species ON records.speciesID = species.id 
+                JOIN files ON records.fileID = files.id 
+                WHERE confidence >= ?
+                `;
+                // might have two locations with same dates - so need to add files
+                if (['analyse', 'archive'].includes(STATE.mode) && !STATE.selection) {
+                    positionStmt += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+                    params.push(...STATE.filesToAnalyse)
+                }
+                // Prioritise selection ranges
+                const range = STATE.selection?.start ? STATE.selection :
+                STATE.mode === 'explore' ? STATE.explore.range : false;
+                const useRange = range?.start;  
+                if (useRange) {
+                    positionStmt += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
+                    params.push(range.start,range.end)
+                }    
+                if (filtersApplied(included)){
+                     const included = await getIncludedIDs();
+                     positionStmt += ` AND speciesID IN (${prepParams(included)}) `;
+                     params.push(...included)
+                }
+                if (STATE.locationID) {
+                    positionStmt += ` AND locationID = ${STATE.locationID} `;
+                    params.push(STATE.locationID)
+                }
+                if (STATE.detect.nocmig){
+                    positionStmt += ' AND COALESCE(isDaylight, 0) != 1 '; // Backward compatibility for < v0.9.
+                }
+                
+                positionStmt += `)
+                SELECT 
+                count(*) as count, dateTime
+                FROM ranked_records
+                WHERE rank <= ? AND dateTime < ?`;
+                params.push(STATE.topRankin, dateTime);
+                if (species) {
+                    positionStmt+=  ` AND  cname = ? `;
+                    params.push(species)
+                };
+            const {count} = await STATE.db.getAsync(positionStmt, ...params);
+            return count
+        }
         
         /**
         *
@@ -2363,24 +2374,24 @@ const prepSummaryStatement = (included) => {
             topRankin = STATE.topRankin,
             directory = undefined,
             format = undefined,
-            active = undefined
+            active = undefined,
+            select = undefined
         } = {}) => {
             let confidence = STATE.detect.confidence;
-            if (offset === undefined) { // Get offset state
-                if (species) {
-                    if (!STATE.filteredOffset[species]) STATE.filteredOffset[species] = 0;
-                    offset = STATE.filteredOffset[species];
-                } else {
-                    offset = STATE.globalOffset;
-                }
-            } else { // Set offset state
-                if (species) STATE.filteredOffset[species] = offset;
-                else STATE.update({ globalOffset: offset });
+            const included = STATE.selection ? [] : await getIncludedIDs();
+            if (select) {
+                const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
+                offset = Math.floor(position/limit) * limit;
+                // update the pagination
+                await getTotal({species: species, offset: offset, included: included})
             }
+            offset = offset ?? (species ? (STATE.filteredOffset[species] ?? 0) : STATE.globalOffset);
+            if (species) STATE.filteredOffset[species] = offset;
+            else STATE.update({ globalOffset: offset });
+            
             
             let index = offset;
             AUDACITY = {};
-            const included = STATE.selection ? [] : await getIncludedIDs();
             const params = getResultsParams(species, confidence, offset, limit, topRankin, included);
             prepResultsStatement(species, limit === Infinity, included);
             
@@ -2428,11 +2439,11 @@ const prepSummaryStatement = (included) => {
                         sendResult(++index, 'No detections found in the selection', true)
                     } else {
                         species = species || '';
-                        sendResult(++index, `No ${species} detections found.`, true)
+                        sendResult(++index, `No ${species} detections found using the ${STATE.list} list.`, true)
                     }
                 }
             }
-            STATE.selection || UI.postMessage({event: 'results-complete', active: active});
+            STATE.selection || UI.postMessage({event: 'results-complete', active: active, select: select?.start});
         };
         
         // Function to format the CSV export

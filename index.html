@@ -294,10 +294,10 @@
                                                                     <div id="species-threshold-el">
                                                                         <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Species Threshold" data-bs-content="Define the minimum eBird checklist frequency for species inclusion.
                                                                         If 'Adjust for Seasons' is enabled, the list will be adjusted to include species expected for the recording week.">?</a>
-                                                                        <div class="input-group mt-0 w-100 align-bottom">
+                                                                        <div class="input-group mt-2 w-100 align-bottom">
                                                                             <span class="input-group-text col">Threshold:</span>
                                                                             <input id="species-frequency-threshold" type="number" class="form-control" style="width: 30%;" value="0.005" step="0.001" min="0.001" max="1" aria-label="species frequency threshold" aria-describedby="species-frequency-threshold">
-                                                                            <span class="text-nowrap"><label class="ms-2 me-2 " for="species-week">Adjust for seasons</label>
+                                                                            <span class="text-nowrap"><label class="ms-2 me-2" for="species-week">Adjust for seasons</label>
                                                                                 <span class="form-switch">
                                                                                     <input id="species-week" role="switch"  type="checkbox" class="form-check-input form-check-inline">
                                                                                 </span>
@@ -414,6 +414,16 @@
                                                                                     id="batch-size-value">2</span>
                                                                                 </div>
                                                                             </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="row ">
+                                                                    <div class="col pe-3 form-group rounded p-2 mb-2 bg-light">
+                                                                        <div class="col form-check form-switch">
+                                                                            <input class="form-check-input" type="checkbox"
+                                                                            role="switch" id="audio-notification">
+                                                                            <label class="form-check-label" for="audio-notification"></label>Enable analysis completion notifications</label>
+                                                                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Audio notification" data-bs-content="When enabled, there will be a system notification when analyses that take over thirty seconds complete.">?</a>
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -542,7 +552,7 @@
                                                                         </div>
                                                                     </div>
                                                                 </div>
-                                                            </div>
+                                                            </div>                                            
                                                         </div>
                                                     </div>    
                                                     </fieldset>
@@ -982,7 +992,7 @@
             </div>
             <div class="col">
                 <div id="explore-location-list" class="form-floating">
-                    <select spellcheck="false" class="input form-select mb-3" aria-label=".form-select"
+                    <select spellcheck="false" class="input form-select" aria-label=".form-select"
                     id="explore-locations"></select>
                     <label for="explore-locations">Location</label>
                 </div>
@@ -1219,7 +1229,7 @@
 </svg>
 <!-- Update alert placeholder -->
 <div id="updateAlert" style="position:absolute; bottom: 30px;"></div>
-<div id="toastContainer"  class="toast-container top-0 end-0 p-3"></div>
+<div id="toastContainer" class="toast-container end-0 p-3" style="top:2rem"></div>
 <!-- Footer -->
 <footer class="p-1 text-bg-primary" id="footer">
     <div class="d-none text-sm-start" id="update-progress">Downloading update: 
@@ -1227,6 +1237,9 @@
     </div>
     <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span><br></small>
 </footer>
+<audio id="notification">
+    <source src="Help/notification.mp3" type="audio/mpeg">
+</audio>
 <script src="node_modules/wavesurfer.js/dist/wavesurfer.min.js"></script>
 <script  src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js"></script>
 <script  src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js"></script>
@@ -1336,7 +1349,7 @@
     }
     
 </script>
-
+</audio>
 </body>
 
 </html>
