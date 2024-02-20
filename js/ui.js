@@ -4446,7 +4446,6 @@ function track(event, action, name, value){
     
     
     const insertManualRecord = (cname, start, end, comment, count, label, action, batch, originalCname, confidence) => {
-        resetResults({clearPagination: false})
         const files = batch ? fileList : currentFile;
         worker.postMessage({
             action: 'insert-manual-record',
@@ -4464,6 +4463,7 @@ function track(event, action, name, value){
             active: activeRow?.rowIndex - 1, //  have to account for the header row
             speciesFiltered: isSpeciesViewFiltered(true)
         })
+        resetResults({clearPagination: false})
     }
     
     

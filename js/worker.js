@@ -2309,6 +2309,7 @@ const prepSummaryStatement = (included) => {
             WITH ranked_records AS (
                 SELECT 
                 dateTime,
+                cname,
                 RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
                 FROM records 
                 JOIN species ON records.speciesID = species.id 
