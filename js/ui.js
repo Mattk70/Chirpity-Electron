@@ -112,6 +112,7 @@ const DOM = {
      audioPadding: document.getElementById('padding'),
      audioQuality: document.getElementById('quality'),
      audioQualityContainer: document.getElementById('quality-container'),
+     audioNotification: document.getElementById('audio-notification'),
      batchSizeSlider: document.getElementById('batch-size'),
      batchSizeValue: document.getElementById('batch-size-value'),
      colourmap: document.getElementById('colourmap'),
@@ -889,7 +890,7 @@ function postAnalyseMessage(args) {
 
 function fetchLocationAddress(lat, lon) {
     if (isNaN(lat) || isNaN(lon  || lat === '' || lon === '')){
-        generateToast({domID:'toastContainer', message:'Both lat and lon values need to be numbers between 180 and -180'})
+        generateToast({ message:'Both lat and lon values need to be numbers between 180 and -180'})
         return false
     }
     return new Promise((resolve, reject) => {
@@ -1041,6 +1042,8 @@ exploreLink.addEventListener('click', async () => {
     enableMenuItem(['saveCSV']);
     adjustSpecDims(true)
     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
+    // Analysis is done
+    STATE.analysisDone = true;
     filterResults({species: undefined, range: STATE.explore.range});
     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
 });
@@ -1391,7 +1394,7 @@ window.onload = async () => {
         tensorflow: { threads: DIAGNOSTICS['Cores'], batchSize: 32 },
         webgpu: { threads: 2, batchSize: 32 },
         webgl: { threads: 2, batchSize: 32 },
-        audio: { gain: 0, format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false },
+        audio: { gain: 0, format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false, notification: true },
         limit: 500,
         track: true,
         debug: false
@@ -1441,7 +1444,8 @@ window.onload = async () => {
 
         // Show Locale
         document.getElementById('locale').value = config[config.model].locale;
-        
+        // remember audio notification setting
+        DOM.audioNotification.checked = config.audio.notification;
         
         config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
         speciesThresholdEl.classList.add('d-none');
@@ -1485,7 +1489,8 @@ window.onload = async () => {
             chirpityOnly.forEach(element => element.classList.remove('d-none'));
             // Remove GPU option on Mac
             isMac && noMac.forEach(element => element.classList.add('d-none'));
-            DOM.contextAware.checked = config.detect.contextAware
+            DOM.contextAware.checked = config.detect.contextAware;
+            DOM.localSwitchContainer.classList.remove('d-none');
             SNRSlider.disabled = false;
         }
         contextAwareIconDisplay();
@@ -1602,38 +1607,20 @@ const setUpWorkerMessaging = () => {
             }
             case "generate-alert": {
                 if (args.updateFilenamePanel) {
-                renderFilenamePanel();
-                window.electron.unsavedRecords(false);
-                document.getElementById("unsaved-icon").classList.add("d-none");
+                    renderFilenamePanel();
+                    window.electron.unsavedRecords(false);
+                    document.getElementById("unsaved-icon").classList.add("d-none");
                 }
-                if (args.file) {
-                        generateToast({domID:'toastContainer', message: args.message});
-                }  else {
-                    if (args.filter) {
-                        worker.postMessage({
-                            action: "filter",
-                            species: isSpeciesViewFiltered(true),
-                            active: args.active,
-                            updateSummary: true
-                        });
-                        resetResults({
-                            clearSummary: true,
-                            clearPagination: true,
-                            clearResults: true
-                        });
-                    }  else {
-                            generateToast({domID:'toastContainer', message: args.message});
-                    }
-                }
+                generateToast({ message: args.message});
             break;
-        }
-        case "results-complete": {onResultsComplete(args);
-            hideLoadingSpinner();
-            break;
-        }
-        case "labels": { 
-            LABELS = args.labels; 
-            break }
+            }
+            case "results-complete": {onResultsComplete(args);
+                hideLoadingSpinner();
+                break;
+            }
+            case "labels": { 
+                LABELS = args.labels; 
+                break }
             case "location-list": {LOCATIONS = args.locations;
                 locationID = args.currentLocation;
                 break;
@@ -1662,39 +1649,39 @@ const setUpWorkerMessaging = () => {
             }
             case "seen-species-list": {generateBirdList("seenSpecies", args.list);
             break;
+            }
+            case "valid-species-list": {populateSpeciesModal(args.included, args.excluded);
+                break;
+            }
+            case "show-spinner": {showLoadingSpinner(500);
+                break;
+            }
+            //                 case "spawning": {displayWarmUpMessage();
+            // break;
+            // }
+            case "total-records": {updatePagination(args.total, args.offset);
+                break;
+            }
+            case "unsaved-records": {window.electron.unsavedRecords(true);
+                document.getElementById("unsaved-icon").classList.remove("d-none");
+                break;
+            }
+            case "update-audio-duration": {DIAGNOSTICS["Audio Duration"] ??= 0;
+                DIAGNOSTICS["Audio Duration"] += args.value;
+                break;
+            }
+            case "update-summary": {updateSummary(args);
+                break;
+            }
+            case "worker-loaded-audio": {
+                onWorkerLoadedAudio(args);
+                break;
+            }
+            default: {generateToast({ message:`Unrecognised message from worker:${args.event}`});
+            }
         }
-        case "valid-species-list": {populateSpeciesModal(args.included, args.excluded);
-            break;
-        }
-        case "show-spinner": {showLoadingSpinner(500);
-            break;
-        }
-        //                 case "spawning": {displayWarmUpMessage();
-        // break;
-        // }
-        case "total-records": {updatePagination(args.total, args.offset);
-            break;
-        }
-        case "unsaved-records": {window.electron.unsavedRecords(true);
-            document.getElementById("unsaved-icon").classList.remove("d-none");
-            break;
-        }
-        case "update-audio-duration": {DIAGNOSTICS["Audio Duration"] ??= 0;
-        DIAGNOSTICS["Audio Duration"] += args.value;
-        break;
-    }
-    case "update-summary": {updateSummary(args);
-        break;
-    }
-    case "worker-loaded-audio": {
-        onWorkerLoadedAudio(args);
-        break;
-    }
-    default: {generateToast({domID:'toastContainer', message:`Unrecognised message from worker:${args.event}`});
-}
-}
-})
-})
+        })
+    })
 }
 
 function generateBirdList(store, rows) {
@@ -2396,7 +2383,7 @@ function onChartData(args) {
                     threads: config[config.backend].threads,
                     list: config.list
                 });
-                generateToast({domID:'toastContainer', message:'Operation cancelled'});
+                generateToast({ message:'Operation cancelled'});
                 DOM.progressDiv.classList.add('d-none');
             }
         },
@@ -2611,7 +2598,7 @@ function onChartData(args) {
                 seconds = Math.min(parseFloat(timeArray[2]), 59.999);
             } else {
                 // Invalid input
-                generateToast({domID:'toastContainer', message:'Invalid time format. Please enter time in one of the following formats: \n1. Float (for seconds) \n2. Two numbers separated by a colon (for minutes and seconds) \n3. Three numbers separated by colons (for hours, minutes, and seconds)'});
+                generateToast({ message:'Invalid time format. Please enter time in one of the following formats: \n1. Float (for seconds) \n2. Two numbers separated by a colon (for minutes and seconds) \n3. Three numbers separated by colons (for hours, minutes, and seconds)'});
                 return;
             }
             let start = hours * 3600 + minutes * 60 + seconds;
@@ -2792,12 +2779,13 @@ function onChartData(args) {
     /*
     onResultsComplete is called when the last result is sent
     */
-    function onResultsComplete({active = undefined} = {}){
+    function onResultsComplete({active = undefined, select = undefined} = {}){
         let table = document.getElementById('resultTableBody');
         table.replaceWith(resultsBuffer);
         table = document.getElementById('resultTableBody');
         PREDICTING = false;
         // Set active Row
+        
         if (active) {
             // Refresh node and scroll to active row:
             activeRow = table.rows[active];
@@ -2809,6 +2797,9 @@ function onChartData(args) {
             } else {
                 activeRow.classList.add('table-active');
             }
+        } else if (select) {
+            const row = getRowFromStart(table, select)
+            activeRow = table.rows[row];
         }
         else { // if (STATE.mode === 'analyse') {
             activeRow = table.querySelector('.table-active');
@@ -2828,6 +2819,22 @@ function onChartData(args) {
         DOM.progressDiv.classList.add('d-none');
         
     }
+
+    function getRowFromStart(table, start){
+        for (var i = 0; i < table.rows.length; i++) {
+            const row = table.rows[i];
+            
+            // Get the value of the name attribute and split it on '|'
+            const nameValue = row.getAttribute('name');
+            // State time is the second value in the name string
+            const startTime = nameValue?.split('|')[1];
+            
+            // Check if the second value matches the 'select' variable
+            if (parseFloat(startTime) === start) {
+                return i;
+            }
+        }
+    }
     
     function onAnalysisComplete(){
         PREDICTING = false;
@@ -2840,6 +2847,7 @@ function onChartData(args) {
         track(`${config.model}-${config.backend}`, 'Audio Duration', config.backend, Math.round(DIAGNOSTICS['Audio Duration']));
         track(`${config.model}-${config.backend}`, 'Analysis Duration', config.backend, parseInt(analysisTime));
         track(`${config.model}-${config.backend}`, 'Analysis Rate', config.backend, parseInt(rate));
+        generateToast({ message:'Analysis complete.'})
     }
     
     /* 
@@ -2879,6 +2887,10 @@ function onChartData(args) {
                 }
                 const limit = config.limit;
                 const offset = (clicked - 1) * limit;
+                // Tell the worker about the new offset
+                const species = isSpeciesViewFiltered(true);
+                species ? worker.postMessage({action:'update-state', filteredOffset: {[species]: offset} }) :
+                    worker.postMessage({action:'update-state', globalOffset: offset });
                 filterResults({offset: offset, limit:limit})
                 resetResults({clearSummary: false, clearPagination: false, clearResults: false});
             }
@@ -2957,13 +2969,18 @@ function onChartData(args) {
     }) {
         
         let tr = '';
+        if (typeof (result) === 'string') {
+            // const nocturnal = config.detect.nocmig ? '<b>during the night</b>' : '';
+            generateToast({ message: result});
+            return
+        }
         if (index <= 1) {
             if (selection) {
                 const selectionTable = document.getElementById('selectionResultTableBody');
                 selectionTable.textContent = '';
             }
             else {
-                if (fileLoaded) showElement(['resultTableContainer', 'resultsHead'], false);
+                showElement(['resultTableContainer', 'resultsHead'], false);
                 const resultTable = document.getElementById('resultTableBody');
                 resultTable.textContent = ''
             }
@@ -2972,11 +2989,6 @@ function onChartData(args) {
         }
         if (!isFromDB && index > config.limit) {
             return
-        }
-        if (typeof (result) === 'string') {
-            const nocturnal = config.detect.nocmig ? '<b>during the night</b>' : '';
-            generateToast({domID:'toastContainer', message: result});
-            //tr += `<tr><td colspan="8">${result} (${LIST_MAP[config.list]} detected ${nocturnal} with at least ${config.detect.confidence}% confidence in the prediction)</td></tr>`;
         } else {
             const {
                 timestamp,
@@ -3213,7 +3225,7 @@ function onChartData(args) {
             })
         } else {
             if (!config.seenThanks) {
-                generateToast({domID:'toastContainer', message:'Thank you, your feedback helps improve Chirpity predictions'});
+                generateToast({ message:'Thank you, your feedback helps improve Chirpity predictions'});
                 config.seenThanks = true;
                 updatePrefs()
             }
@@ -3404,7 +3416,7 @@ function onChartData(args) {
         }
     }
     
-    function filterResults({species = isSpeciesViewFiltered(true), updateSummary = true, offset = 0, limit = 500, range = undefined} = {}){
+    function filterResults({species = isSpeciesViewFiltered(true), updateSummary = true, offset = undefined, limit = 500, range = undefined} = {}){
         STATE.analysisDone && worker.postMessage({
             action: 'filter',
             species: species,
@@ -4035,7 +4047,7 @@ DOM.gain.addEventListener('input', () => {
                 
                 case 'species-frequency-threshold' : {
                     if (isNaN(element.value) || element.value === '') {
-                        generateToast({domID:'toastContainer', message:'The threshold must be a number between 0.001 and 1'});
+                        generateToast({ message:'The threshold must be a number between 0.001 and 1'});
                         return false
                     }
                     config.speciesThreshold = element.value;
@@ -4078,6 +4090,10 @@ DOM.gain.addEventListener('input', () => {
                 }
                 case 'snrValue' : {
                     handleSNRchange(e);
+                    break;
+                }
+                case 'audio-notification': {
+                    config.audio.notification = element.checked;
                     break;
                 }
                 case 'species-week': {
@@ -4425,6 +4441,7 @@ function track(event, action, name, value){
     
     
     const insertManualRecord = (cname, start, end, comment, count, label, action, batch, originalCname, confidence) => {
+        resetResults({clearPagination: false})
         const files = batch ? fileList : currentFile;
         worker.postMessage({
             action: 'insert-manual-record',
@@ -4439,7 +4456,8 @@ function track(event, action, name, value){
             DBaction: action,
             batch: batch,
             confidence: confidence,
-            active: activeRow?.rowIndex - 1 //  have to account for the header row
+            active: activeRow?.rowIndex - 1, //  have to account for the header row
+            speciesFiltered: isSpeciesViewFiltered(true)
         })
     }
     
@@ -4611,8 +4629,8 @@ function track(event, action, name, value){
         }
     }
     
-    function generateToast({domID, message}) {
-        const domEl = document.getElementById(domID);
+    function generateToast({message}) {
+        const domEl = document.getElementById('toastContainer');
         
         const wrapper = document.createElement('div');
         // Add toast attributes
@@ -4635,6 +4653,27 @@ function track(event, action, name, value){
         domEl.appendChild(wrapper)
         const toast = new bootstrap.Toast(wrapper)
         toast.show()
+        if (message === 'Analysis complete.'){
+            const duration = parseFloat(DIAGNOSTICS['Analysis Duration'].replace(' seconds', ''));
+            if (config.audio.notification && duration > 30){
+                if (Notification.permission === "granted") {
+                    // Check whether notification permissions have already been granted;
+                    // if so, create a notification
+                    const notification = new Notification(`Analysis completed in ${duration.toFixed(0)} seconds`, {requireInteraction: true, icon: 'img/icon/chirpity_logo2.png'});
+                } else if (Notification.permission !== "denied") {
+                    // We need to ask the user for permission
+                    Notification.requestPermission().then((permission) => {
+                    // If the user accepts, let's create a notification
+                    if (permission === "granted") {
+                        const notification = new Notification(`Analysis completed in ${duration.toFixed(0)} seconds`, {requireInteraction: true, icon: 'img/icon/chirpity_logo2.png'});
+                    }
+                    });
+                } else {
+                    notificationSound = document.getElementById('notification');
+                    notificationSound.play()
+                }
+            }
+        }
     }
 
     function parseSemVer(versionString) {

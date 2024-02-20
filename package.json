@@ -1,12 +1,12 @@
 {
   "name": "chirpity",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "minify": "node minify.js",
-    "export": "electron-builder build --m",
+    "export": "electron-builder build --win --x64",
     "publish": "electron-builder --win --x64 -p always"
   },
   "repository": {
@@ -14,6 +14,7 @@
     "url": "git+https://github.com/mattk70/Chirpity-Electron.git"
   },
   "build": {
+    "appId": "com.electron.chirpity",
     "publish": [
       {
         "provider": "github",
@@ -108,7 +109,7 @@
         "!node_modules/ffprobe-static-electron/bin/win${/*}",
         "!node_modules/ffprobe-static-electron/bin/linux${/*}"
       ],
-      "icon": "./img/icon/icon.icns",
+      "icon": "img/icon/icon.icns",
       "category": "public.app-category.utilities",
       "fileAssociations": [
         {

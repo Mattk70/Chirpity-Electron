@@ -1,4 +1,4 @@
-const { app, dialog, ipcMain, MessageChannelMain, BrowserWindow, globalShortcut } = require('electron');
+const { app, Menu, dialog, ipcMain, MessageChannelMain, BrowserWindow, globalShortcut } = require('electron');
 const { autoUpdater } = require("electron-updater")
 const log = require('electron-log');
 
@@ -24,6 +24,22 @@ console.error = log.error;
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = 'info';
 
+const menu = Menu.buildFromTemplate([{
+    label: app.name,
+    submenu: [
+      { role: 'about' },
+      { type: 'separator' },
+      { role: 'services' },
+      { type: 'separator' },
+      { role: 'hide' },
+      { role: 'hideOthers' },
+      { role: 'unhide' },
+      { type: 'separator' },
+      { role: 'quit' }
+    ]
+  }]);
+
+Menu.setApplicationMenu(menu);
 // Updates
 // Function to fetch release notes from GitHub API
 async function fetchReleaseNotes(version) {
@@ -323,6 +339,7 @@ async function createWorker() {
 
 // This method will be called when Electron has finished loading
 app.whenReady().then(async () => {
+
     ipcMain.handle('getPath', () => app.getPath('userData'));
     ipcMain.handle('getTemp', () => app.getPath('temp'));
     ipcMain.handle('getVersion', () => app.getVersion());
@@ -357,6 +374,7 @@ app.whenReady().then(async () => {
         })
     } else {
         // Quit when all windows are closed.
+        app.setAppUserModelId('chirpity')
         app.on('window-all-closed', () => {
             app.quit()
         })
