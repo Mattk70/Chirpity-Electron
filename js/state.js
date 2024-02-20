@@ -80,7 +80,7 @@ export class State {
     // Used to decrease calls to get summary when prepping a dataset
     // because it's an expensive op when the memory db is v. large
     increment() {
-        if (++this.predictionCount === 200) {
+        if (++this.predictionCount >= this.incrementor) {
             this.predictionCount = 0
         }
         return this.predictionCount;
