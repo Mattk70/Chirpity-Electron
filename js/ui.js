@@ -2728,7 +2728,7 @@ function onChartData(args) {
         if (args.text) {
             DOM.fileNumber.innerHTML = args.text;
             if (args.text.includes('decompressed')) {
-                //DOM.progressDiv.classList.add('d-none');
+                DOM.progressDiv.classList.add('d-none');
             }
         } else {
             DOM.progressDiv.classList.remove('d-none');
