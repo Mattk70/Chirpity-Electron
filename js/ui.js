@@ -514,7 +514,8 @@ filename.addEventListener('click', openFileInList);
 filename.addEventListener('contextmenu', buildFileMenu);
 
 function extractFileNameAndFolder(path) {
-    const regex = /[\\/]([^\\/]+)[\\/]([^\\/]+)$/; // Regular expression to match the parent folder and file name
+    const regex = /[\\/]?([^\\/]+)[\\/]?([^\\/]+)$/;
+    //const regex = /[\\/]([^\\/]+)[\\/]([^\\/]+)$/; // Regular expression to match the parent folder and file name
     
     const match = path.match(regex);
     
@@ -1542,10 +1543,7 @@ window.onload = async () => {
         const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]')
         const popoverList = [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl))
         
-        // New users - show the tour
-        if (!config.seenTour) {
-            setTimeout(prepTour, 2000)
-        }
+
         // check for new version on mac platform. pkg containers are not an auto-updatable target
         // https://www.electron.build/auto-update#auto-updatable-targets
         isMac && checkForMacUpdates();
@@ -1645,6 +1643,13 @@ const setUpWorkerMessaging = () => {
             case "processing-complete": {
                 STATE.analysisDone = true;
                 DOM.progressDiv.classList.add('d-none');
+                break;
+            }
+            case 'ready-for-tour':{
+                // New users - show the tour
+                if (!config.seenTour) {
+                    prepTour();
+                }
                 break;
             }
             case "seen-species-list": {generateBirdList("seenSpecies", args.list);
@@ -4563,7 +4568,7 @@ function track(event, action, name, value){
     // Event handler for starting the tour
     const prepTour = async () => {
         if (!fileLoaded) {
-            const example_file = await window.electron.getAudio();
+            const example_file = 'Help/example.mp3'
             // create a canvas for the audio spec
             showElement(['spectrogramWrapper'], false);
             await loadAudioFile({ filePath: example_file });
