@@ -1805,10 +1805,10 @@ const prepSummaryStatement = (included) => {
                             console.warn("Parse message error", error, 'message was', message);
                         });
                         // Dial down the getSummary calls if the queue length starts growing
-                        if (messageQueue.length > NUM_WORKERS * 2 )  {
-                            STATE.incrementor = Math.min(STATE.incrementor *= 2, 256);
-                            DEBUG && console.log('increased incrementor to ', STATE.incrementor)
-                        }
+                        // if (messageQueue.length > NUM_WORKERS * 2 )  {
+                        //     STATE.incrementor = Math.min(STATE.incrementor *= 2, 256);
+                        //     DEBUG && console.log('increased incrementor to ', STATE.incrementor)
+                        // }
 
                         
                         // Set isParsing to false to allow the next message to be processed
