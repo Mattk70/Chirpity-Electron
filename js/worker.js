@@ -1806,7 +1806,7 @@ const prepSummaryStatement = (included) => {
                         // Dial down the getSummary calls if the queue length starts growing
                         if (messageQueue.length > NUM_WORKERS * 2 )  {
                             STATE.incrementor = Math.min(STATE.incrementor *= 2, 256);
-                            console.log('increased incrementor to ', STATE.incrementor)
+                            DEBUG && console.log('increased incrementor to ', STATE.incrementor)
                         }
 
                         
@@ -1847,8 +1847,6 @@ const prepSummaryStatement = (included) => {
                         worker.onmessage = (e) => {
                             // Push the message to the queue
                             messageQueue.push(e);
-                            // if the message queue is getting too long, ease back on the calls to update summary?
-                            
                             // Process the queue
                             processQueue();
                         };

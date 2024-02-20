@@ -1490,7 +1490,7 @@ window.onload = async () => {
             // Remove GPU option on Mac
             isMac && noMac.forEach(element => element.classList.add('d-none'));
             DOM.contextAware.checked = config.detect.contextAware;
-            DOM.localSwitchContainer.classList.remove('d-none');
+            DOM.localSwitchContainer.classList.add('d-none');
             SNRSlider.disabled = false;
         }
         contextAwareIconDisplay();
