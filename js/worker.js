@@ -438,6 +438,7 @@ async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backen
     setAudioContext(sampleRate);
     // intentional nullish assignment
     CACHE_LOCATION ??= p.join(TEMP, "chirpity");
+    UI.postMessage({event:'ready-for-tour'});
     BACKEND = backend;
     BATCH_SIZE = batchSize;
     STATE.update({ model: model });
