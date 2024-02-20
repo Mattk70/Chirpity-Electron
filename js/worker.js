@@ -2159,11 +2159,11 @@ const prepSummaryStatement = (included) => {
                             
                             updateFilesBeingProcessed(file);
                             const result = `No detections. ${file} has no period within it where predictions would be given. <b>Tip:</b> To see detections in this file, disable nocmig mode.`;
-                            index++;
+                            
                             UI.postMessage({
                                 event: 'new-result', file: file, result: result, index: index
                             });
-                            index--;
+                            
                             DEBUG && console.log('Recursion: start = end')
                             await processNextFile(arguments[0]);
                             
