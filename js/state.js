@@ -21,7 +21,6 @@ export class State {
             this.model = undefined,
             this.predictionCount = 0,
             this.topRankin = 1,
-            this.GET_RESULT_SQL = undefined,
             this.lat = undefined,
             this.lon = undefined,
             this.locationID = undefined,
