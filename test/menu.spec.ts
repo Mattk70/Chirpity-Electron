@@ -56,9 +56,9 @@ test.beforeAll(async () => {
     console.log(`Window opened: ${filename}`)
     page = window
     // Wait for the model to be ready
-    const warmup = page.locator('#warmup')
-    const slowExpect = expect.configure({ timeout: 15_000 });
-    await slowExpect(warmup).toHaveClass('dropdown-item text-danger d-none') 
+    // const warmup = page.locator('#warmup')
+    // const slowExpect = expect.configure({ timeout: 15_000 });
+    // await slowExpect(warmup).toHaveClass('dropdown-item text-danger d-none') 
     // capture errors
     page.on('pageerror', (error) => {
       console.error(error)

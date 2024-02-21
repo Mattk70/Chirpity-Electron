@@ -617,7 +617,7 @@ const prepSummaryStatement = (included) => {
                 params.push(species);
                 SQL += ' AND speciesID = (SELECT id from species WHERE cname = ?) '; 
             }// This will overcount as there may be a valid species ranked above it
-            else if (included.length && filtersApplied(included)) SQL += ` AND speciesID IN (${included}) `;
+            else if (filtersApplied(included)) SQL += ` AND speciesID IN (${included}) `;
             if (useRange) SQL += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
             if (STATE.detect.nocmig) SQL += ' AND COALESCE(isDaylight, 0) != 1 ';
             if (STATE.locationID) SQL += ` AND locationID =  ${STATE.locationID}`;
@@ -631,21 +631,7 @@ const prepSummaryStatement = (included) => {
             const {total} = await STATE.db.getAsync(SQL, ...params)
             UI.postMessage({event: 'total-records', total: total, offset: offset, species: species})
         }
-        
-        
-        
-        // const getResultsParams = (species, confidence, offset, limit, topRankin, included) => {
-        //     const params = [];
-        //     params.push(confidence);
-        //     ['analyse', 'archive'].includes(STATE.mode) && !STATE.selection && params.push(...STATE.filesToAnalyse);
-        //     filtersApplied(included) && params.push(...included);
-            
-        //     params.push(topRankin);
-        //     species && params.push(species);
-        //     limit !== Infinity && params.push(limit, offset);
-        //     return params
-        // }
-        
+
         const prepResultsStatement = (species, noLimit, included, offset) => {
             const params = [STATE.detect.confidence];
             let resultStatement = `
@@ -1432,8 +1418,8 @@ const prepSummaryStatement = (included) => {
             async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
                 predictionsRequested[file]++;
                 if (worker === undefined) {
-                    // pick a worker
-                    worker = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+                    // pick a worker - this method is faster than looking for avialable workers
+                    worker = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance
                 }
                 const objData = {
                     message: 'predict',
