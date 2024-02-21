@@ -553,30 +553,12 @@ const getFilesInDirectory = async (dir) => {
 
 const prepParams = (list) => list.map(item => '?').join(',');
 
-/**
- * What do do with week numbers? We can't use file
- * @returns a string, like (?,?,?)
- */
-
-const getSummaryParams = (included) => {
-    
-    const range = STATE.mode === 'explore' ? STATE.explore.range : STATE.selection?.range;
-    const useRange = range?.start;
-    const params = [STATE.detect.confidence];
-    const extraParams = [];
-    if (['analyse', 'archive'].includes(STATE.mode)) {
-        extraParams.push(...STATE.filesToAnalyse);
-    }
-    else if (useRange) params.push(range.start, range.end);
-    filtersApplied(included) && extraParams.push(...included);
-    STATE.locationID && extraParams.push(STATE.locationID);
-    params.push(...extraParams);
-    return params
-}
 
 const prepSummaryStatement = (included) => {
     const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
     const useRange = range?.start;
+    const params = [STATE.detect.confidence];
+    const extraParams = [];
     let summaryStatement = `
     WITH ranked_records AS (
         SELECT records.dateTime, records.confidence, files.name, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight,
@@ -587,20 +569,17 @@ const prepSummaryStatement = (included) => {
         WHERE confidence >=  ? `;
         if (['analyse', 'archive'].includes(STATE.mode)) {
             summaryStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+            params.push(...STATE.filesToAnalyse);
         }
         else if (useRange) {
             summaryStatement += ' AND dateTime BETWEEN ? AND ? ';
+            params.push(range.start, range.end);
         }
         
         if (filtersApplied(included)) {
             const includedParams = prepParams(included);
             summaryStatement += ` AND speciesID IN (${includedParams}) `;
-            // ` AND NOT EXISTS (
-            //     SELECT 1
-            //     FROM blocked_species
-            //     WHERE blocked_species.fileID = files.id
-            //     AND blocked_species.speciesID = records.speciesID
-            // ) `
+            params.push(...included);
         }
         if (STATE.detect.nocmig){
             summaryStatement += ' AND COALESCE(isDaylight, 0) != 1 ';
@@ -608,6 +587,7 @@ const prepSummaryStatement = (included) => {
         
         if (STATE.locationID) {
             summaryStatement += ' AND locationID = ? ';
+            params.push(STATE.locationID);
         }
         summaryStatement += `
         )
@@ -616,10 +596,11 @@ const prepSummaryStatement = (included) => {
         WHERE ranked_records.rank <= ${STATE.topRankin}`;
         
         summaryStatement +=  ` GROUP BY speciesID  ORDER BY cname`;
-        STATE.GET_SUMMARY_SQL = STATE.db.prepare(summaryStatement);
-        //console.log('Summary SQL statement:\n' + summaryStatement)
+
+        return [summaryStatement, params]
     }
     
+
     const getTotal = async ({species = undefined, offset = undefined, included = []}) => {
         let params = [];
         const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
@@ -628,11 +609,10 @@ const prepSummaryStatement = (included) => {
         let SQL = ` WITH MaxConfidencePerDateTime AS (
             SELECT confidence,
             RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
-            FROM records `;
-            // if (['analyse', 'archive'].includes(STATE.mode)) {
-            //     SQL += ' JOIN files on files.id = records.fileid ';
-            // }
-            SQL += ` WHERE confidence >= ${STATE.detect.confidence} `;
+            FROM records 
+            JOIN files ON records.fileID = files.id 
+            WHERE confidence >= ${STATE.detect.confidence} `;
+
             if (species) {
                 params.push(species);
                 SQL += ' AND speciesID = (SELECT id from species WHERE cname = ?) '; 
@@ -641,10 +621,10 @@ const prepSummaryStatement = (included) => {
             if (useRange) SQL += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
             if (STATE.detect.nocmig) SQL += ' AND COALESCE(isDaylight, 0) != 1 ';
             if (STATE.locationID) SQL += ` AND locationID =  ${STATE.locationID}`;
-            // if (['analyse', 'archive'].includes(STATE.mode)) {
-            //     SQL += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
-            //     params.push(...STATE.filesToAnalyse)
-            // }
+            if (['analyse', 'archive'].includes(STATE.mode) && !STATE.selection) {
+                SQL += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+                params.push(...STATE.filesToAnalyse);
+            }
             SQL += ' ) '
             SQL += `SELECT COUNT(confidence) AS total FROM MaxConfidencePerDateTime WHERE rank <= ${STATE.topRankin}`;
             
@@ -654,19 +634,20 @@ const prepSummaryStatement = (included) => {
         
         
         
-        const getResultsParams = (species, confidence, offset, limit, topRankin, included) => {
-            const params = [];
-            params.push(confidence);
-            ['analyse', 'archive'].includes(STATE.mode) && !STATE.selection && params.push(...STATE.filesToAnalyse);
-            filtersApplied(included) && params.push(...included);
+        // const getResultsParams = (species, confidence, offset, limit, topRankin, included) => {
+        //     const params = [];
+        //     params.push(confidence);
+        //     ['analyse', 'archive'].includes(STATE.mode) && !STATE.selection && params.push(...STATE.filesToAnalyse);
+        //     filtersApplied(included) && params.push(...included);
             
-            params.push(topRankin);
-            species && params.push(species);
-            limit !== Infinity && params.push(limit, offset);
-            return params
-        }
+        //     params.push(topRankin);
+        //     species && params.push(species);
+        //     limit !== Infinity && params.push(limit, offset);
+        //     return params
+        // }
         
-        const prepResultsStatement = (species, noLimit, included) => {
+        const prepResultsStatement = (species, noLimit, included, offset) => {
+            const params = [STATE.detect.confidence];
             let resultStatement = `
             WITH ranked_records AS (
                 SELECT 
@@ -697,6 +678,7 @@ const prepSummaryStatement = (included) => {
                 // might have two locations with same dates - so need to add files
                 if (['analyse', 'archive'].includes(STATE.mode) && !STATE.selection) {
                     resultStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+                    params.push(...STATE.filesToAnalyse);
                 }
                 // Prioritise selection ranges
                 const range = STATE.selection?.start ? STATE.selection :
@@ -704,9 +686,19 @@ const prepSummaryStatement = (included) => {
                 const useRange = range?.start;  
                 if (useRange) {
                     resultStatement += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
-                }    
-                if (filtersApplied(included)) resultStatement += ` AND speciesID IN (${prepParams(included)}) `;
-                if (STATE.selection) resultStatement += ` AND name = '${FILE_QUEUE[0]}' `;
+                }
+                if (species){
+                    resultStatement+=  ` AND  cname = ? `;
+                    params.push(species);
+                }
+                else if (filtersApplied(included)) {
+                    resultStatement += ` AND speciesID IN (${prepParams(included)}) `;
+                    params.push(...included);
+                }
+                if (STATE.selection) {
+                    resultStatement += ` AND name = ? `;
+                    params.push(FILE_QUEUE[0])
+                }
                 if (STATE.locationID) {
                     resultStatement += ` AND locationID = ${STATE.locationID} `;
                 }
@@ -734,11 +726,14 @@ const prepSummaryStatement = (included) => {
                 FROM 
                 ranked_records 
                 WHERE rank <= ? `;
-                if (species) resultStatement+=  ` AND  cname = ? `;
-                
+                params.push(STATE.topRankin);
+
                 const limitClause = noLimit ? '' : 'LIMIT ?  OFFSET ?';
+                noLimit || params.push(STATE.limit, offset);
+
                 resultStatement += ` ORDER BY ${STATE.sortOrder}, callCount DESC ${limitClause} `;
-                STATE.GET_RESULT_SQL = STATE.db.prepare(resultStatement);
+                
+                return [resultStatement, params];
             }
             
             
@@ -2276,7 +2271,7 @@ const prepSummaryStatement = (included) => {
             const db = STATE.db;
 
             const included = STATE.selection ? [] : await getIncludedIDs();
-            prepSummaryStatement(included);
+            const [sql, params] = prepSummaryStatement(included);
             const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
             let range, files = [];
             if (['explore', 'chart'].includes(STATE.mode)) {
@@ -2286,10 +2281,7 @@ const prepSummaryStatement = (included) => {
             }
             
             t0 = Date.now();
-            const params = getSummaryParams(included);
-            const summary = await STATE.GET_SUMMARY_SQL.allAsync(...params);
-            
-            //DEBUG && console.log("Get Summary took", (Date.now() - t0) / 1000, "seconds");
+            const summary = await STATE.db.allAsync(sql, ...params);
             const event = interim ? 'update-summary' : 'summary-complate';
             UI.postMessage({
                 event: event,
@@ -2393,10 +2385,10 @@ const prepSummaryStatement = (included) => {
             
             let index = offset;
             AUDACITY = {};
-            const params = getResultsParams(species, confidence, offset, limit, topRankin, included);
-            prepResultsStatement(species, limit === Infinity, included);
+            //const params = getResultsParams(species, confidence, offset, limit, topRankin, included);
+            const [sql, params] = prepResultsStatement(species, limit === Infinity, included, offset);
             
-            const result = await STATE.GET_RESULT_SQL.allAsync(...params);
+            const result = await STATE.db.allAsync(sql, ...params);
             if (format === 'text'){
                 // CSV export. Format the values
                 const formattedValues = result.map(formatCSVValues);
