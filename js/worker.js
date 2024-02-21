@@ -448,25 +448,6 @@ async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backen
 }
 
 
-// function spawnListWorker() {
-//     const worker = new Worker('./js/listWorker.js', { type: 'module' });
-  
-//     return function listWorker(message) {
-//       return new Promise((resolve, reject) => {
-//         worker.onmessage = function(event) {
-//           resolve(event.data);
-//         };
-  
-//         worker.onerror = function(error) {
-//           reject(error);
-//         };
-  
-//         console.log('posting message')
-//         worker.postMessage(message);
-//       });
-//     };
-//   }
-
 async function spawnListWorker() {
     const worker_1 = await new Promise((resolve, reject) => {
         const worker = new Worker('./js/listWorker.js', { type: 'module' });
@@ -1386,6 +1367,7 @@ const prepSummaryStatement = (included) => {
                             });
                         }
                         // if the was a problem setting up the context remove the file from the files list
+                        !offlineCtx && console.error('No offline context created for ', file)
                         offlineCtx || updateFilesBeingProcessed(file)
                     })
                     
@@ -1786,10 +1768,10 @@ const prepSummaryStatement = (included) => {
                             console.warn("Parse message error", error, 'message was', message);
                         });
                         // Dial down the getSummary calls if the queue length starts growing
-                        if (messageQueue.length > NUM_WORKERS * 2 )  {
-                            STATE.incrementor = Math.min(STATE.incrementor *= 2, 256);
-                            DEBUG && console.log('increased incrementor to ', STATE.incrementor)
-                        }
+                        // if (messageQueue.length > NUM_WORKERS * 2 )  {
+                        //     STATE.incrementor = Math.min(STATE.incrementor *= 2, 256);
+                        //     console.log('increased incrementor to ', STATE.incrementor)
+                        // }
 
                         
                         // Set isParsing to false to allow the next message to be processed
@@ -2051,7 +2033,7 @@ const prepSummaryStatement = (included) => {
                             const response = e.data;
                             // Update this worker's avaialability
                             predictWorkers[response.worker].isAvailable = true;
-                            response.worker
+                            
                             switch (response['message']) {
                                 case "model-ready": {
                                     predictWorkers[response.worker].isReady = true;
@@ -2112,7 +2094,7 @@ const prepSummaryStatement = (included) => {
             }
             if (!filesBeingProcessed.length) {
                 if (!STATE.selection) getSummary();
-                UI.postMessage({event: 'processing-complete'})
+                //UI.postMessage({event: 'processing-complete'})
             }
         }
         
@@ -2123,10 +2105,6 @@ const prepSummaryStatement = (included) => {
         } = {}) { 
             if (FILE_QUEUE.length) {
                 let file = FILE_QUEUE.shift()
-                // if (DATASET && FILE_QUEUE.length % 100 === 0) {
-                //     await onSave2DiskDB({file: file});
-                //     console.log("Saved results to disk db", FILE_QUEUE.length, "files remaining")
-                // }
                 const found = await getWorkingFile(file);
                 if (found) {
                     if (end) {}
@@ -3094,53 +3072,63 @@ const prepSummaryStatement = (included) => {
 
             /**
              * setIncludedIDs
-             * Calls list_worker for a new list
+             * Calls list_worker for a new list, checks to see if a pending promise already exists
              * @param {*} lat 
              * @param {*} lon 
              * @param {*} week 
              * @returns 
              */
-            async function setIncludedIDs(lat,lon,week){
-                // Use the list worker
-                const {result} = await LIST_WORKER({
-                    message: 'get-list', 
-                    model: STATE.model, 
-                    listType: STATE.list, 
-                    lat: lat || STATE.lat, 
-                    lon: lon || STATE.lon, 
-                    week: week || STATE.week, 
-                    useWeek: STATE.useWeek,
-                    localBirdsOnly: STATE.local,
-                    threshold: STATE.speciesThreshold
-                })
 
+            const LIST_CACHE = {};
 
+async function setIncludedIDs(lat, lon, week) {
+    const key = `${lat}-${lon}-${week}`;
+    if (LIST_CACHE[key]) {
+        // If a promise is in the cache, return it
+        return await LIST_CACHE[key];
+    }
 
-                // Create the new object based on the returned message and the location key
-                let includedObject = {};
-                if (STATE.list === 'location') {
-                    // Create the location key based on lat and lon values
-                    const location = lat.toString() + lon.toString();
-                    includedObject = {
-                        [STATE.model]: {
-                            [STATE.list]: {
-                                [week]: {
-                                    [location]: result.included
-                                }
-                            }
+    // Store the promise in the cache immediately
+    LIST_CACHE[key] = (async () => {
+        const { result } = await LIST_WORKER({
+            message: 'get-list',
+            model: STATE.model,
+            listType: STATE.list,
+            lat: lat || STATE.lat,
+            lon: lon || STATE.lon,
+            week: week || STATE.week,
+            useWeek: STATE.useWeek,
+            localBirdsOnly: STATE.local,
+            threshold: STATE.speciesThreshold
+        });
+
+        let includedObject = {};
+        if (STATE.list === 'location') {
+            const location = lat.toString() + lon.toString();
+            includedObject = {
+                [STATE.model]: {
+                    [STATE.list]: {
+                        [week]: {
+                            [location]: result.included
                         }
-                    };
-                } else {
-                    includedObject = {
-                        [STATE.model]: {
-                            [STATE.list]: result
-                        }
-                    };
+                    }
                 }
+            };
+        } else {
+            includedObject = {
+                [STATE.model]: {
+                    [STATE.list]: result
+                }
+            };
+        }
 
-                // Merge the new object with the existing STATE.included object
-                if (STATE.included === undefined) STATE.included = {}
-                STATE.included = merge(STATE.included,includedObject);
-                UI.postMessage({ event: "results-complete" });
-                return STATE.included
-            }
+        if (STATE.included === undefined) STATE.included = {}
+        STATE.included = merge(STATE.included, includedObject);
+        //UI.postMessage({ event: "results-complete" });
+
+        return STATE.included;
+    })();
+
+    // Await the promise
+    return await LIST_CACHE[key];
+}

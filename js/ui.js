@@ -2843,6 +2843,8 @@ function onChartData(args) {
     
     function onAnalysisComplete(){
         PREDICTING = false;
+        STATE.analysisDone = true;
+        DOM.progressDiv.classList.add('d-none');
         // DIAGNOSTICS:
         t1_analysis = Date.now();
         const analysisTime = ((t1_analysis - t0_analysis) / 1000).toFixed(2);
