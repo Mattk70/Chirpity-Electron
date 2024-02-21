@@ -434,6 +434,7 @@ const filtersApplied = (list) => list?.length && list.length < LABELS.length -1;
 
 async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backend = 'tensorflow', list = 'everything'}){
     SEEN_MODEL_READY = false;
+    LIST_CACHE = {}
     sampleRate = model === "birdnet" ? 48_000 : 24_000;
     setAudioContext(sampleRate);
     // intentional nullish assignment
@@ -1396,7 +1397,7 @@ const prepSummaryStatement = (included) => {
                 const { dawn, dusk } = SunCalc.getTimes(date, lat, lon);
                 return datetime >= dawn && datetime <= dusk;
             }
-            
+
             async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
                 predictionsRequested[file]++;
                 if (worker === undefined) {
@@ -3079,7 +3080,7 @@ const prepSummaryStatement = (included) => {
              * @returns 
              */
 
-            const LIST_CACHE = {};
+            let LIST_CACHE = {};
 
 async function setIncludedIDs(lat, lon, week) {
     const key = `${lat}-${lon}-${week}`;
