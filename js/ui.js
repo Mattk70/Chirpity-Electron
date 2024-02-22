@@ -1555,13 +1555,14 @@ window.onload = async () => {
                 &res=${width}x${height}
         &dimension1=${config.model}
         &dimension2=${config.list}
-        &dimension9=${JSON.stringify(config.detect)}
         &dimension3=${config.useWeek}
         &dimension4=${config.locale}
         &dimension5=${config.speciesThreshold}
         &dimension6=${JSON.stringify(config.filters)}
         &dimension7=${JSON.stringify(config.audio)}
-        &dimension8=${JSON.stringify(config[config.backend])}`)
+        &dimension8=${JSON.stringify(config[config.backend])}
+        &dimension9=${JSON.stringify(config.detect)}
+        &dimension10=${VERSION}`)
             .then(response => {
                 if (! response.ok) throw new Error('Network response was not ok', response);
             })
