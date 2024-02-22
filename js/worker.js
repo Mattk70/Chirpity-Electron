@@ -2095,7 +2095,8 @@ const prepSummaryStatement = (included) => {
             }
             if (!filesBeingProcessed.length) {
                 if (!STATE.selection) getSummary();
-                //UI.postMessage({event: 'processing-complete'})
+                // Need this here in case last file is not sent for analysis (e.g. nocmig mode)
+                UI.postMessage({event: 'processing-complete'})
             }
         }
         
@@ -2401,7 +2402,7 @@ const prepSummaryStatement = (included) => {
                     }
                 }
             }
-            STATE.selection || UI.postMessage({event: 'results-complete', active: active, select: select?.start});
+            STATE.selection || UI.postMessage({event: 'database-results-complete', active: active, select: select?.start});
         };
         
         // Function to format the CSV export
@@ -3125,8 +3126,6 @@ async function setIncludedIDs(lat, lon, week) {
 
         if (STATE.included === undefined) STATE.included = {}
         STATE.included = merge(STATE.included, includedObject);
-        //UI.postMessage({ event: "results-complete" });
-
         return STATE.included;
     })();
 

@@ -1613,7 +1613,8 @@ const setUpWorkerMessaging = () => {
                 generateToast({ message: args.message});
             break;
             }
-            case "results-complete": {onResultsComplete(args);
+            // Called when last result is returned from a database query
+            case "database-results-complete": {onResultsComplete(args);
                 hideLoadingSpinner();
                 break;
             }
@@ -1641,10 +1642,10 @@ const setUpWorkerMessaging = () => {
             case "progress": {onProgress(args);
                 break;
             }
+            // called when an analysis ends, or when the filesbeingprocessed list is empty
             case "processing-complete": {
                 STATE.analysisDone = true;
                 PREDICTING = false;
-                DOM.progressDiv.classList.add('d-none');
                 break;
             }
             case 'ready-for-tour':{
@@ -2784,7 +2785,7 @@ function onChartData(args) {
     }
     
     /*
-    onResultsComplete is called when the last result is sent
+    onResultsComplete is called when the last result is sent from the database
     */
     function onResultsComplete({active = undefined, select = undefined} = {}){
         let table = document.getElementById('resultTableBody');
