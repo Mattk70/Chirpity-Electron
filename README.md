@@ -1,6 +1,6 @@
 # Chirpity
 
-Electron app to identify the calls of nocturnal migrants from audio files. 
+Desktop application to identify the calls of nocturnal migrants from audio files. 
 
 Author: Matthew Kirkland
 
