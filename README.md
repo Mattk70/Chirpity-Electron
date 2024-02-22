@@ -6,10 +6,10 @@ Author: Matthew Kirkland
 
 ![image](https://github.com/Mattk70/Chirpity-Electron/assets/61826357/96b0af44-3893-4288-8291-cf0f6db89a38)
 
-
-https://chirpity.mattkirkland.co.uk
-
 ## Application setup
+Visit https://chirpity.mattkirkland.co.uk for platform specific installation instructions - Chirpity is available for both Windows and Mac platforms
+
+## Development setup
 
 First, clone the project and install all dependencies:
 
