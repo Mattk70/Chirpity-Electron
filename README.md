@@ -1,6 +1,6 @@
 # Chirpity
 
-Desktop application to identify the calls of nocturnal migrants from audio files. 
+Desktop application to identify bird vocalisations in lengthy audio files. Uses either BirdNET or a native AI model tuned for the calls of nocturnal migrants.
 
 Author: Matthew Kirkland
 
