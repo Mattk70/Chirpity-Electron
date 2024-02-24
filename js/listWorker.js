@@ -144,7 +144,8 @@ onmessage = async (e) => {
         switch (message) {
 
             case "get-list": {
-                const {model, listType, useWeek}  = e.data;
+                const {model, listType, useWeek, customList}  = e.data;
+                listModel.customList = customList;
                 listModel.model = model;
                 NOT_BIRDS = model === 'birdnet' ? BIRDNET_NOT_BIRDS : CHIRPITY_NOT_BIRDS;
                 listModel.labels = model === 'birdnet' ? BIRDNET_LABELS : CHIRPITY_LABELS;
@@ -154,10 +155,11 @@ onmessage = async (e) => {
                 let threshold = parseFloat(e.data.threshold);
                 let localBirdsOnly = e.data.localBirdsOnly;
                 DEBUG && console.log(`Setting list to ${listType}`);
-                const includedIDs = await listModel.setList({lat, lon, week, listType, useWeek, threshold, localBirdsOnly});
+                const [includedIDs, messages] = await listModel.setList({lat, lon, week, listType, useWeek, threshold, localBirdsOnly});
                 postMessage({
                     message: "your-list-sir",
                     result: includedIDs,
+                    messages: messages
                 });
                 break;
                 }
@@ -187,7 +189,7 @@ class Model {
     }
 
     async setList({lat, lon, week, listType, useWeek, threshold, localBirdsOnly}) {
-        let includedIDs = [];
+        let includedIDs = [], messages = [];
         week = useWeek ? week : -1;
         if (listType === "everything") {
             includedIDs = this.labels.map((_, index) => index);
@@ -256,11 +258,26 @@ class Model {
                     includedIDs = includedIDs.filter(id => local_ids.included.includes(id));
                 }
             } 
+        } else if (listType === 'custom'){
+            if (this.customList){ // hack: why it gets called first without a customlist I don't know! But it will be called a second time with one.
+                const labelsScientificNames = this.labels.map(getFirstElement);
+                const customScienticNames = this.customList.map(getFirstElement);
+                let line = 0;
+                for (let sname of customScienticNames) {
+                    line++
+                    const index = labelsScientificNames.indexOf(sname);
+                    if (index  > -1){
+                        includedIDs.push(index)
+                    } else {
+                        sname === 'Unknown Sp.' || messages.push(`Cannot find '${sname}' (at line ${line} of the custom list) in the ${this.model} list`)
+                    }
+                }
+            }
         } else {
 
             // looking for birds (chirpity) or (birds or migrants) in the case of birdnet
             // Function to extract the first element after splitting on '_'
-            const getFirstElement = label => label.split('_')[0];
+            
 
             // Create a list of included labels' indices
             const t0 = Date.now()
@@ -272,10 +289,11 @@ class Model {
             }).filter(index => index !== null);
             DEBUG && console.log('filtering took', Date.now() - t0, 'ms')
         }
-        return includedIDs;
+        return [includedIDs, messages];
     }
 }
 
+const getFirstElement = label => label.split('_')[0];
 async function _init_(){
     DEBUG && console.log("load loading metadata_model");
     // const appPath = "../" + location + "/";

@@ -30,12 +30,7 @@
     <title>Chirpity Bird Call Detection</title>
 </head>
 <body>
-    <!-- Loading Spinner Overlay -->
-    <div id="loadingOverlay" class="overlay d-none">
-        <div class="spinner-border" role="status">
-            <span class="visually-hidden">Loading...</span>
-        </div>
-    </div>
+
     <!-- The modal for the tour -->
     <div class="modal modal-lg modal-fade" id="tourModal" tabindex="-1" aria-labelledby="tourModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -268,7 +263,7 @@
                                                             <div class="row p-2">
                                                                 <div class="p-2 form-group rounded bg-light">
                                                                     <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="List" data-bs-content="Filters the detections returned in results. Local Birds: excludes birds 
-                                                                    unlikely to be found in your region. Nocturnal Birds: excludes bird song and species not known to call at night">?</a>
+                                                                    unlikely to be found in your region. Nocturnal Birds: excludes bird song and species not known to call at night. The custom list allows you to upload a file listing the species to detect">?</a>
                                                                     <div class="row pe-3">
                                                                         <label class="col-auto" for="list-to-use">List:</label>
                                                                         <div class="col d-flex align-items-start">
@@ -277,10 +272,18 @@
                                                                                 <option value="nocturnal">Nocturnal Birds</option>
                                                                                 <option value="birds">Birds</option>
                                                                                 <option value="everything">Everything</option>
+                                                                                <option value="custom">Custom</option>
                                                                             </select>
                                                                         </div>
                                                                     </div>
-                                                                
+                                                                    <div class="row p-2 d-none" id="choose-file-container">
+                                                                        <div class="col">
+                                                                          <div class="input-group">
+                                                                            <button class="btn btn-outline-secondary" type="button" id="list-file-selector">Select file</button>
+                                                                            <input type="text" class="form-control" id="custom-list-location" aria-describedby="list-file-selector" placeholder="No custom list set" disabled readonly>
+                                                                          </div>
+                                                                        </div>
+                                                                    </div>
                                                                 
                                                                 
                                                                     <div class="form-group rounded d-none" id="use-location-container">
@@ -851,7 +854,8 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div id="speciesModalBody" class="modal-body"></div>
-                    <div class="modal-footer justify-content-center">
+                    <div class="modal-footer justify-content-evenly">
+                        <button id="export-list" type="button" class="btn btn-light">Export the Included List</button>
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>

@@ -66,17 +66,6 @@ async function getPaths() {
     return [appPath, tempPath];
 }
 
-// Function to show the loading spinner
-function showLoadingSpinner(durationThreshold) {
-    window.loadingTimer = setTimeout(function () {
-        document.getElementById('loadingOverlay').classList.remove('d-none');
-    }, durationThreshold);
-}
-// Function to hide the loading spinner
-function hideLoadingSpinner() {
-    clearTimeout(window.loadingTimer);
-    document.getElementById('loadingOverlay').classList.add('d-none');
-}
 let VERSION;
 let DIAGNOSTICS = {};
 
@@ -126,6 +115,13 @@ const DOM = {
      gain: document.getElementById('gain'),
      gainAdjustment: document.getElementById('gain-adjustment'),
      listToUse: document.getElementById('list-to-use'),
+     listIcon: document.getElementById('list-icon'),
+     exportList: document.getElementById('export-list'),
+     speciesThresholdEl: document.getElementById('species-threshold-el'),
+     speciesThreshold: document.getElementById('species-frequency-threshold'),
+     customListFile: document.getElementById('custom-list-location'),
+     customListSelector: document.getElementById('list-file-selector'),
+     customListContainer: document.getElementById('choose-file-container'),
      localSwitch: document.getElementById('local'),
      localSwitchContainer: document.getElementById('use-location-container'),
      modelToUse: document.getElementById('model-to-use'),
@@ -402,7 +398,7 @@ function zoomSpec(direction) {
 }
 
 async function showOpenDialog() {
-    const files = await window.electron.openDialog('showOpenDialog');
+    const files = await window.electron.openDialog('showOpenDialog', {type: 'audio'});
     if (!files.canceled) await onOpenFiles({ filePaths: files.filePaths });
 }
 
@@ -663,9 +659,9 @@ const displayLocationAddress = async (where) => {
             lon: config.longitude,
         });
         // Initially, so changes to the default location are immediately reflected in subsequent analyses
-        // We will switch to location filtersing when the default location is changed.
+        // We will switch to location filtering when the default location is changed.
         config.list = 'location';
-        speciesThresholdEl.classList.remove('d-none');
+        DOM.speciesThresholdEl.classList.remove('d-none');
         
         updateListIcon();
         DOM.listToUse.value = config.list;
@@ -1379,6 +1375,7 @@ window.onload = async () => {
         colormap: 'inferno',
         timeOfDay: true,
         list: 'nocturnal',
+        customListFile: {birdnet: '', chirpity: ''},
         local: true,
         speciesThreshold: 0.03,
         useWeek: false,
@@ -1402,6 +1399,12 @@ window.onload = async () => {
     };
     // Load preferences and override defaults
     [appPath, tempPath] = await getPaths();
+    // establish the message channel
+    setUpWorkerMessaging()
+
+    // Set footer year
+    document.getElementById('year').textContent = new Date().getFullYear();
+
     await fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
         if (err) {
             console.log('JSON parse error ' + err);
@@ -1448,13 +1451,14 @@ window.onload = async () => {
         // remember audio notification setting
         DOM.audioNotification.checked = config.audio.notification;
         
-        config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
-        speciesThresholdEl.classList.add('d-none');
-        speciesThreshold.value = config.speciesThreshold;
+        // List appearance in settings 
+        DOM.speciesThreshold.value = config.speciesThreshold;
         document.getElementById('species-week').checked = config.useWeek;
-        
+        DOM.customListFile.value = config.customListFile[config.model];
+
         // And update the icon
         updateListIcon();
+        // timeline
         DOM.timelineSetting.value = config.timeOfDay ? 'timeOfDay' : 'timecode';
         // Spectrogram colour
         DOM.colourmap.value = config.colormap;
@@ -1551,32 +1555,24 @@ window.onload = async () => {
         doNotTrack.checked = !config.track;
         if (config.track) {
             const {width, height} = window.screen;
-        fetch(`https://analytics.mattkirkland.co.uk/matomo.php?idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
-                &res=${width}x${height}
-        &dimension1=${config.model}
-        &dimension2=${config.list}
-        &dimension3=${config.useWeek}
-        &dimension4=${config.locale}
-        &dimension5=${config.speciesThreshold}
-        &dimension6=${JSON.stringify(config.filters)}
-        &dimension7=${JSON.stringify(config.audio)}
-        &dimension8=${JSON.stringify(config[config.backend])}
-        &dimension9=${JSON.stringify(config.detect)}
-        &dimension10=${VERSION}`)
-            .then(response => {
-                if (! response.ok) throw new Error('Network response was not ok', response);
-            })
-            .catch(error => console.log('Error posting tracking:', error))   
-    }
+            fetch(`https://analytics.mattkirkland.co.uk/matomo.php?idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
+                    &res=${width}x${height}
+                    &dimension1=${config.model}
+                    &dimension2=${config.list}
+                    &dimension3=${config.useWeek}
+                    &dimension4=${config.locale}
+                    &dimension5=${config.speciesThreshold}
+                    &dimension6=${JSON.stringify(config.filters)}
+                    &dimension7=${JSON.stringify(config.audio)}
+                    &dimension8=${JSON.stringify(config[config.backend])}
+                    &dimension9=${JSON.stringify(config.detect)}
+                    &dimension10=${VERSION}`)
+                .then(response => {
+                    if (! response.ok) throw new Error('Network response was not ok', response);
+                })
+                .catch(error => console.log('Error posting tracking:', error))
         }
-    )
-    // establish the message channel
-    setUpWorkerMessaging()
-    
-    // Set footer year
-    document.getElementById('year').textContent = new Date().getFullYear();
-    
-    
+    })
 }
 
 
@@ -1615,11 +1611,12 @@ const setUpWorkerMessaging = () => {
             }
             // Called when last result is returned from a database query
             case "database-results-complete": {onResultsComplete(args);
-                hideLoadingSpinner();
                 break;
             }
             case "labels": { 
                 LABELS = args.labels; 
+                // Read a custom list if applicable
+                config.list === 'custom' && setListUIState(config.list);
                 break }
             case "location-list": {LOCATIONS = args.locations;
                 locationID = args.currentLocation;
@@ -1646,6 +1643,7 @@ const setUpWorkerMessaging = () => {
             case "processing-complete": {
                 STATE.analysisDone = true;
                 PREDICTING = false;
+                DOM.progressDiv.classList.add('d-none');
                 break;
             }
             case 'ready-for-tour':{
@@ -1661,12 +1659,6 @@ const setUpWorkerMessaging = () => {
             case "valid-species-list": {populateSpeciesModal(args.included, args.excluded);
                 break;
             }
-            case "show-spinner": {showLoadingSpinner(500);
-                break;
-            }
-            //                 case "spawning": {displayWarmUpMessage();
-            // break;
-            // }
             case "total-records": {updatePagination(args.total, args.offset);
                 break;
             }
@@ -1769,6 +1761,7 @@ function getSpecies(target) {
     const species = speciesCell.textContent.split('\n')[0];
     return species;
 }
+
 
 
 const getDetectionContext = (target) => target.closest('table').id;
@@ -2205,38 +2198,44 @@ function onChartData(args) {
         location: 'Searching for birds in your region',
         nocturnal: 'Searching for nocturnal birds',
         birds: 'Searching for all birds',
-        everything: 'Searching for everything'
+        everything: 'Searching for everything',
+        custom: 'Using a custom list'
     };
-    // list mode icons
-    const listIcon = document.getElementById('list-icon')
-    const speciesThresholdEl = document.getElementById('species-threshold-el');
-    const speciesThreshold = document.getElementById('species-frequency-threshold');
+
     const updateListIcon = () => {
-        const icon = listIcon.querySelector('img');
-        icon.src = icon.src.replace(/\w+\.png$/, config.list + '.png');
-        icon.title = LIST_MAP[config.list];
+        DOM.listIcon.innerHTML = config.list === 'custom' ?
+            '<span class="material-symbols-outlined mt-1" style="width: 30px">fact_check</span>' :
+            `<img class="icon" src="img/${config.list}.png" alt="${config.list}">`;
+
     }
-    listIcon.addEventListener('click', () => {
-        let img = listIcon.querySelector('img')
+    DOM.listIcon.addEventListener('click', () => {
         const keys = Object.keys(LIST_MAP);
-        for (let key in Object.keys(LIST_MAP)) {
-            key = parseInt(key);
-            if (img.src.includes(keys[key])) {
-                const replace = (key === keys.length - 1) ? 0 : key + 1;
-                img.src = img.src.replace(keys[key], keys[replace]);
-                img.title = LIST_MAP[keys[replace]];
-                DOM.listToUse.value = keys[replace];
-                config.list = keys[replace];
-                updatePrefs();
-                resetResults({clearSummary: true, clearPagination: true, clearResults: true});
-                config.list === 'location' ? speciesThresholdEl.classList.remove('d-none') :
-                speciesThresholdEl.classList.add('d-none');
-                worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone })
-                break
-            }
+        const currentListIndex = keys.indexOf(config.list);
+        const next = (currentListIndex === keys.length - 1) ? 0 : currentListIndex + 1;
+        config.list = keys[next];
+        DOM.listToUse.value = config.list;
+        DOM.listIcon.innerHTML = config.list === 'custom' ?
+             '<span class="material-symbols-outlined mt-1" style="width: 30px">fact_check</span>' :
+             `<img class="icon" src="img/${config.list}.png" alt="${config.list}">`;
+        updatePrefs();
+        resetResults({clearSummary: true, clearPagination: true, clearResults: true});
+        setListUIState(config.list)
+        worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone })
+        }
+        
+    )
+    
+    DOM.customListSelector.addEventListener('click', async () =>{
+        const files = await window.electron.openDialog('showOpenDialog', {type: 'text'});
+        if (! files.canceled) {
+            DOM.customListSelector.classList.remove('btn-outline-danger');
+            const customListFile = files.filePaths[0];
+            config.customListFile[config.model] = customListFile;
+            DOM.customListFile.value = customListFile;
+            readLabels(config.customListFile[config.model], 'list');
+            updatePrefs();
         }
     })
-    
     
     const loadModel = ({clearCache = true} = {})  => {
         t0_warmup = Date.now();
@@ -3033,7 +3032,7 @@ function onChartData(args) {
             const isUncertain = score < 65 ? '&#63;' : '';
             // result.filename  and result.date used for feedback
             result.date = timestamp;
-            result.filename = cname.replace(/'/g, "\\'") + `_${timestamp}`;
+            result.filename = cname.replace(/\\/g, '\\').replace(/'/g, "\\'") + `_${timestamp}`;
             // store result for feedback function to use
             predictions[index] = result;
             // Format date and position for  UI
@@ -3133,6 +3132,7 @@ function onChartData(args) {
         if (target.childElementCount === 2) return; // No detections found in selection
         
         setClickedIndex(target);
+        // prepare the undelete record
         const [file, start, end,] = unpackNameAttr(target);
         const setting = target.closest('table');
         const row = target.closest('tr');
@@ -3159,9 +3159,9 @@ function onChartData(args) {
         })
         // Clear the record in the UI
         const index = row.rowIndex
-        setting.deleteRow(index);
+        // there may be no records remaining (no index)
+        index && setting.deleteRow(index);
         setting.rows[index]?.click()
-        
     }
     
     const deleteSpecies = (target) => {
@@ -3386,6 +3386,24 @@ function onChartData(args) {
         document.getElementById('speciesModalBody').innerHTML = modalContent;
         const species = new bootstrap.Modal(document.getElementById('speciesModal'));
         species.show();
+        STATE.includedList = included;
+    }
+
+    DOM.exportList.addEventListener('click', exportSpeciesList);
+    // exporting a list
+    function exportSpeciesList() {
+        const included = STATE.includedList;
+        // Create a blob containing the content of included array
+        const content = included.map(item => `${item.sname}_${item.cname}`).join('\n');
+        const blob = new Blob([content], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "species_list.txt";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
     
     // Prevent the settings menu disappearing on click or mouseout
@@ -3778,7 +3796,7 @@ function onChartData(args) {
                 if (! element.textContent){
                     // It's blank
                     element.innerHTML = '<span class="material-symbols-outlined align-bottom">date_range</span><span>Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>';
-                } else if (element.textContent.includes('Apply')){
+                } else if ( ! element.textContent.includes('Apply a date filter')){
                     createDateClearButton(element, picker);
                 }
             })
@@ -4114,17 +4132,8 @@ DOM.gain.addEventListener('input', () => {
                     break;
                 }
                 case 'list-to-use': {
+                    setListUIState(element.value)
                     config.list = element.value;
-                    if (config.list === 'location') {
-                        speciesThresholdEl.classList.remove('d-none');
-                        DOM.localSwitchContainer.classList.add('d-none')
-                    }else if (config.list === 'nocturnal' && config.model === 'birdnet'){
-                        DOM.localSwitchContainer.classList.remove('d-none')
-                        speciesThresholdEl.classList.add('d-none');  
-                    } else { 
-                        speciesThresholdEl.classList.add('d-none');                        
-                        DOM.localSwitchContainer.classList.add('d-none')
-                    }                    
                     updateListIcon();
                     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
                     worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone});
@@ -4134,17 +4143,7 @@ DOM.gain.addEventListener('input', () => {
                     config[config.model].locale = element.value;
                     const chirpity = config[config.model].locale === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
                     const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${config[config.model].locale}.txt`; 
-                    fetch(labelFile).then(response => {
-                        if (! response.ok) throw new Error('Network response was not ok');
-                        return response.text();
-                    }).then(filecontents => {
-                        LABELS = filecontents.trim().split(/\r?\n/);
-                        // Add unknown species
-                        LABELS.push('Unknown Sp._Unknown Sp.');
-                        worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS, refreshResults: STATE.analysisDone})
-                    }).catch(error =>{
-                        console.error('There was a problem fetching the label file:', error);
-                    })
+                    readLabels(labelFile, 'locale');
                     break;
                 }
                 case 'local': {
@@ -4173,6 +4172,7 @@ DOM.gain.addEventListener('input', () => {
                         DOM.contextAware.disabed = false;
                         SNRSlider.disabled = false;
                     }
+                    DOM.customListFile.value = config.customListFile[config.model];
                     document.getElementById('locale').value = config[config.model].locale;
                     config.backend = 'tensorflow';
                     document.getElementById('tensorflow').checked = true;
@@ -4257,6 +4257,47 @@ DOM.gain.addEventListener('input', () => {
         }
     })
     
+function setListUIState(list){
+    DOM.customListContainer.classList.add('d-none');  
+    DOM.localSwitchContainer.classList.add('d-none')
+    DOM.speciesThresholdEl.classList.add('d-none'); 
+    if (list === 'location') {
+        DOM.speciesThresholdEl.classList.remove('d-none');
+    } else if (list === 'nocturnal' && config.model === 'birdnet'){
+        DOM.localSwitchContainer.classList.remove('d-none')
+    } else if (list === 'custom') {
+        DOM.customListContainer.classList.remove('d-none');  
+        if (!config.customListFile[config.model]) {
+            generateToast({message: 'You need to upload a custom list for the model before using the custom list option.'})
+            return
+        }
+        readLabels(config.customListFile[config.model], 'list');
+    } 
+}
+
+    async function readLabels(labelFile, updating){
+    fetch(labelFile).then(response => {
+        if (! response.ok) throw new Error('Network response was not ok');
+        return response.text();
+    }).then(filecontents => {
+        LABELS = filecontents.trim().split(/\r?\n/);
+        // Add unknown species
+        LABELS.push('Unknown Sp._Unknown Sp.');
+        
+        if (updating === 'list'){
+            worker.postMessage({ action: 'update-list', list: config.list, customList: LABELS, refreshResults: STATE.analysisDone});
+        } else {
+            worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS, refreshResults: STATE.analysisDone})
+        }
+
+    }).catch(error =>{
+        if (error.message === 'Failed to fetch') {
+            generateToast({message: 'The custom list could not be found, <b class="text-danger">no filters will be applied</b>.'})
+            DOM.customListSelector.classList.add('btn-outline-danger')
+        }
+        else {console.error('There was a problem reading the label file:', error);}
+    })
+}
 function track(event, action, name, value){
     if (config.track){
         const t = new Date()
@@ -4309,7 +4350,7 @@ function track(event, action, name, value){
         <a class="dropdown-item" id="context-create-clip" href="#">
         <span class="material-symbols-outlined">music_note</span> Export Audio Clip${plural}
         </a>
-        <a class="dropdown-item" id="context-xc" href='#' target="xc">
+        <a class="dropdown-item d-none" id="context-xc" href='#' target="xc">
         <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> View Species on Xeno-Canto
         </a>
         <div class="dropdown-divider ${hideInSelection}"></div>
@@ -4354,7 +4395,8 @@ function track(event, action, name, value){
             const XC_type = cname.includes('(song)') ? "song" :
             cname.includes('call)') ? "nocturnal flight call" : "";
             xc.href = `https://xeno-canto.org/explore?query=${sname}%20type:"${XC_type}`;
-            xc.classList.remove('d-none');
+            // only offer XC lookup if we have an sname
+            sname && xc.classList.remove('d-none');
         }
         else {
             xc.classList.add('d-none');

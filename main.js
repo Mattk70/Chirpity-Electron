@@ -395,6 +395,39 @@ app.whenReady().then(async () => {
         console.log('file passed to open:', path)
     });
     
+    ipcMain.handle('openFiles', async (_event, _method, config) => {
+        const {type} = config;
+        let options;
+        if (type === 'audio') {
+             options = {
+                filters: [
+                    { name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus'] } 
+                ],
+                properties: ['openFile', 'multiSelections'] 
+            }
+        } else {
+            options = {
+                filters: [
+                    { name: 'Text Files', extensions: ['txt'] }
+                ],
+                properties: ['openFile']
+            }
+        }
+        // Show file dialog 
+        return await dialog.showOpenDialog(mainWindow, options);
+    })
+    
+    
+    ipcMain.handle('selectDirectory', async (config) => {
+        // Show file dialog to select a directory
+        return await dialog.showOpenDialog(mainWindow, {
+            // From docs:
+            // Note: On Windows and Linux an open dialog can not be both a file selector and a directory selector,
+            // so if you set properties to ['openFile', 'openDirectory'] on these platforms,
+            // a directory selector will be shown.
+            properties: ['openDirectory']
+        });
+    })
     
     mainWindow.webContents.setWindowOpenHandler(({ url, frameName }) => {
         require('electron').shell.openExternal(url);
@@ -451,31 +484,7 @@ ipcMain.handle('unsaved-records', (_event, data) => {
     console.log('Unsaved records:', unsavedRecords);
 });
 
-ipcMain.handle('openFiles', async (config) => {
-    // Show file dialog to select audio file
-    return await dialog.showOpenDialog(mainWindow, {
-        filters: [{
-            name: 'Audio Files',
-            extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus']
-        }],
-        // From docs:
-        // Note: On Windows and Linux an open dialog can not be both a file selector and a directory selector,
-        // so if you set properties to ['openFile', 'openDirectory'] on these platforms,
-        // a directory selector will be shown.
-        properties: ['openFile', 'multiSelections'],
-    });
-})
 
-ipcMain.handle('selectDirectory', async (config) => {
-    // Show file dialog to select a directory
-    return await dialog.showOpenDialog(mainWindow, {
-        // From docs:
-        // Note: On Windows and Linux an open dialog can not be both a file selector and a directory selector,
-        // so if you set properties to ['openFile', 'openDirectory'] on these platforms,
-        // a directory selector will be shown.
-        properties: ['openDirectory']
-    });
-})
 
 ipcMain.handle('saveFile', (event, arg) => {
     // Show file dialog to select audio file

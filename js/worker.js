@@ -19,7 +19,7 @@ let NUM_WORKERS;
 let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let LIST_WORKER;
-const DEBUG = false;
+const DEBUG = true;
 
 const DATASET = false;
 const adding_chirpity_additions = false;
@@ -310,9 +310,6 @@ async function handleMessage(e) {
         }
         case "filter": {if (STATE.db) {
             t0 = Date.now();
-            UI.postMessage({
-                event: "show-spinner"
-            });
             await getResults(args);
             const t1 = Date.now();
             args.updateSummary && await getSummary(args);
@@ -379,9 +376,14 @@ case "update-file-start": {await onUpdateFileStart(args);
     break;
 }
 case "update-list": {
-    //UI.postMessage({ event: "show-spinner" });
     STATE.list = args.list;
+    STATE.customList = args.list === 'custom' ? args.customList : STATE.customList;
     const {lat, lon, week} = STATE;
+    // Clear the LIST_CACHE & STATE.included kesy to force list regeneration
+    if (args.customList) {
+        delete LIST_CACHE[`${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`];
+        delete STATE.included?.[STATE.model]?.[STATE.list];
+    } 
     await setIncludedIDs(lat, lon, week )
     args.refreshResults && await Promise.all([getResults(), getSummary()]);
     break;
@@ -477,7 +479,7 @@ async function spawnListWorker() {
                 reject_1(error_1);
             };
 
-            console.log('posting message');
+            DEBUG && console.log('getting a list from the list worker');
             worker_1.postMessage(message_1);
         });
     };
@@ -2284,7 +2286,7 @@ const prepSummaryStatement = (included) => {
                 STATE.mode === 'explore' ? STATE.explore.range : false;
                 const useRange = range?.start;  
                 if (useRange) {
-                    positionStmt += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
+                    positionStmt += ' AND dateTime BETWEEN ? AND ? ';
                     params.push(range.start,range.end)
                 }    
                 if (filtersApplied(included)){
@@ -2956,25 +2958,36 @@ const prepSummaryStatement = (included) => {
                     for (let i = 0; i < labels.length; i++){
                         const id = i;
                         const [sname, cname] = labels[i].trim().split('_');
-                        await diskDB.runAsync('UPDATE species SET cname = ? WHERE id = ?', cname, id);
-                        await memoryDB.runAsync('UPDATE species SET cname = ? WHERE id = ?', cname, id);
+                        await diskDB.runAsync('UPDATE species SET cname = ? WHERE sname = ? AND id = ?', cname, sname, id);
+                        await memoryDB.runAsync('UPDATE species SET cname = ? WHERE sname = ? AND id = ?', cname, sname, id);
                     }
                 } else {
                     for (let i = 0; i < labels.length; i++) {
-                        const [sname, common] = labels[i].split('_');
-                        // Check if the existing cname ends with a word or words in brackets
+                        const [sname, newCname] = labels[i].split('_');
+                        // For chirpity, we check if the existing cname ends with a <call type> in brackets
                         const existingCnameResult = await memoryDB.allAsync('SELECT id, cname FROM species WHERE sname = ?', sname);
                         if (existingCnameResult.length) {
                             for (let i = 0; i < existingCnameResult.length; i++){
                                 const {id, cname} = existingCnameResult[i];
-                                const match = cname.match(/\(([^)]+)\)$/); // Regex to match word(s) within brackets at the end of the string
-                                let appendedCname = common;
-                                if (match) {
-                                    const bracketedWord = match[1];
-                                    appendedCname += ` (${bracketedWord})`; // Append the bracketed word to the new cname
+                                const existingCname = cname;
+                                const existingCnameMatch = existingCname.match(/\(([^)]+)\)$/); // Regex to match word(s) within brackets at the end of the string
+                                const newCnameMatch = newCname.match(/\(([^)]+)\)$/);
+                                // Do we have a spcific call type to match?
+                                if (newCnameMatch){
+                                    // then only update the database where existing and new call types match
+                                    if (newCnameMatch[1] === existingCnameMatch[1]){
+                                        await diskDB.runAsync('UPDATE species SET cname = ? WHERE sname = ? AND id = ?', newCname, sname, id);
+                                        await memoryDB.runAsync('UPDATE species SET cname = ? WHERE sname = ? AND id = ?', newCname, sname, id);    
+                                    }
+                                } else { // No (<call type>) in the new label - so we add the new name to all the species call types in the database
+                                    let appendedCname = newCname;
+                                    if (existingCnameMatch) {
+                                        const bracketedWord = existingCnameMatch[1];
+                                        appendedCname += ` (${bracketedWord})`; // Append the bracketed word to the new cname (for each of the existingCnameResults)
+                                    }
+                                    await diskDB.runAsync('UPDATE species SET cname = ? WHERE sname = ? AND id = ?', appendedCname, sname, id);
+                                    await memoryDB.runAsync('UPDATE species SET cname = ? WHERE sname = ? AND id = ?', appendedCname, sname, id);
                                 }
-                                await diskDB.runAsync('UPDATE species SET cname = ? WHERE id = ?', appendedCname, id);
-                                await memoryDB.runAsync('UPDATE species SET cname = ? WHERE id = ?', appendedCname, id);
                             }
                         }
                     }
@@ -3064,7 +3077,7 @@ const prepSummaryStatement = (included) => {
                 } else {
                     if (STATE.included?.[STATE.model]?.[STATE.list] === undefined) {
                         // The object lacks the week / location
-                        await setIncludedIDs(lat,lon,week);
+                        await setIncludedIDs();
                         hitOrMiss = 'miss';
                     }
                     //DEBUG && console.log(`Cache ${hitOrMiss}: setting the ${STATE.list} list took ${Date.now() -t0}ms`)
@@ -3084,18 +3097,19 @@ const prepSummaryStatement = (included) => {
             let LIST_CACHE = {};
 
 async function setIncludedIDs(lat, lon, week) {
-    const key = `${lat}-${lon}-${week}`;
+    const key = `${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`;
     if (LIST_CACHE[key]) {
         // If a promise is in the cache, return it
-        return await LIST_CACHE[key];
+        return LIST_CACHE[key];
     }
 
     // Store the promise in the cache immediately
     LIST_CACHE[key] = (async () => {
-        const { result } = await LIST_WORKER({
+        const { result, messages } = await LIST_WORKER({
             message: 'get-list',
             model: STATE.model,
             listType: STATE.list,
+            customList: STATE.customList,
             lat: lat || STATE.lat,
             lon: lon || STATE.lon,
             week: week || STATE.week,
@@ -3126,9 +3140,10 @@ async function setIncludedIDs(lat, lon, week) {
 
         if (STATE.included === undefined) STATE.included = {}
         STATE.included = merge(STATE.included, includedObject);
+        messages.forEach(message => UI.postMessage({event: 'generate-alert', message: message} ))
         return STATE.included;
     })();
 
     // Await the promise
-    return await LIST_CACHE[key];
+    return LIST_CACHE[key];
 }

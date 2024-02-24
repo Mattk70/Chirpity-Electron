@@ -29,6 +29,7 @@ export class State {
             this.useWeek = false,
             this.week = -1,
             this.list = 'everything',
+            this.customList = undefined,
             this.local = true,
             this.incrementor = 1
     }
