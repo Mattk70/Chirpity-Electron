@@ -246,7 +246,7 @@ class Model {
             } else {
                 // BirdNET nocturnal bird filter
                 const additionalIDs = [];
-                // Get list of IDs of birds that call through the might or all the time. Exclude non-avian classes
+                // Get list of IDs of birds that call through the night or all the time. Exclude non-avian classes
                 for (let i = 0; i < this.labels.length; i++) {
                     const item = this.labels[i];
                     if (ACTIVITY_INDEX[item]  !== 1 && BIRDNET_NOT_BIRDS.indexOf(item) < 0) includedIDs.push(i);     
@@ -263,13 +263,34 @@ class Model {
                 const labelsScientificNames = this.labels.map(getFirstElement);
                 const customScienticNames = this.customList.map(getFirstElement);
                 let line = 0;
-                for (let sname of customScienticNames) {
-                    line++
-                    const index = labelsScientificNames.indexOf(sname);
-                    if (index  > -1){
-                        includedIDs.push(index)
+                for (let i = 0; i < customScienticNames.length; i++) {
+                    const sname = customScienticNames[i];
+                    line++;
+                    const indexes = findAllIndexes(labelsScientificNames, sname);
+                    if (indexes.length) {
+                        let selectedIndexes = [];
+                        if (indexes.length > 1){
+                            for (let idx of indexes) {
+                                // Extract word in brackets from current index of this.labels
+                                const wordInBrackets = this.labels[idx].match(/\((.*?)\)/);
+                                if (wordInBrackets) {
+                                    const wordToMatch = wordInBrackets[0];
+                                    // Check if the word in brackets exists in the custom list at the same index position
+                                    if (this.customList[i].includes(wordToMatch)) {
+                                        selectedIndexes.push(idx);
+                                    }
+                                } else {
+                                    selectedIndexes.push(idx);
+                                }
+                            }
+                        } else { 
+                            selectedIndexes.push(...indexes)
+                        }
+                        if (selectedIndexes.length) {
+                            includedIDs.push(...selectedIndexes);
+                        }
                     } else {
-                        sname === 'Unknown Sp.' || messages.push(`Cannot find '${sname}' (at line ${line} of the custom list) in the ${this.model} list`)
+                        sname === 'Unknown Sp.' || messages.push(`Cannot find '${sname}' (at line ${line} of the custom list) in the ${this.model} list`);
                     }
                 }
             }
@@ -292,7 +313,14 @@ class Model {
         return [includedIDs, messages];
     }
 }
-
+function findAllIndexes(array, value) {
+    return array.reduce((acc, currentValue, currentIndex) => {
+        if (currentValue === value) {
+            acc.push(currentIndex);
+        }
+        return acc;
+    }, []);
+}
 const getFirstElement = label => label.split('_')[0];
 async function _init_(){
     DEBUG && console.log("load loading metadata_model");
