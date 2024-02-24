@@ -4286,6 +4286,7 @@ function setListUIState(list){
         
         if (updating === 'list'){
             worker.postMessage({ action: 'update-list', list: config.list, customList: LABELS, refreshResults: STATE.analysisDone});
+            track('UI', 'Create', 'Custom list', LABELS.length)
         } else {
             worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS, refreshResults: STATE.analysisDone})
         }
