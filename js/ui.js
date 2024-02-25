@@ -1113,7 +1113,7 @@ async function resultClick(e) {
     if (activeRow) activeRow.classList.remove('table-active');
     row.classList.add('table-active');
     activeRow = row;
-    const [file, start, end, label] = row.attributes[2].value.split('|');
+    const [file, start, end, sname, label] = row.getAttribute('name').split('|');
     loadResultRegion({ file, start, end, label });
     if (e.target.classList.contains('circle')) {
         await waitForFileLoad();
@@ -1749,10 +1749,9 @@ const isSpeciesViewFiltered = (sendSpecies) => {
 
 function unpackNameAttr(el, cname) {
     const currentRow = el.closest("tr");
-    const nameAttr = currentRow.attributes[2].value;
-    let [file, start, end, commonName] = nameAttr.split('|');
+    let [file, start, end, sname, commonName] = currentRow.getAttribute('name').split('|');
     if (cname) commonName = cname;
-    currentRow.attributes[0].value = [file, start, end, commonName].join('|');
+    currentRow.attributes[0].value = [file, start, end, sname, commonName].join('|');
     return [file, parseFloat(start), parseFloat(end), currentRow];
 }
 
@@ -2831,11 +2830,9 @@ function onChartData(args) {
     function getRowFromStart(table, start){
         for (var i = 0; i < table.rows.length; i++) {
             const row = table.rows[i];
-            
             // Get the value of the name attribute and split it on '|'
-            const nameValue = row.getAttribute('name');
             // State time is the second value in the name string
-            const startTime = nameValue?.split('|')[1];
+            const startTime = row.getAttribute('name').split('|')[1];
             
             // Check if the second value matches the 'select' variable
             if (parseFloat(startTime) === start) {
@@ -3050,7 +3047,7 @@ function onChartData(args) {
             const hide = selection ? 'd-none' : '';
             const countIcon = count > 1 ? `<span class="circle pointer" title="Click to view the ${count} detections at this timecode">${count}</span>` : '';
             const XC_type = cname.includes('(song)') ? "song" : "nocturnal flight call";
-            tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${end || position + 3}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
+            tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${end || position + 3}|${sname}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
             <td class='text-start text-nowrap timeOfDay ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-start timestamp ${showTimestamp}">${UI_position} </td>
             <td name="${cname}" class='text-start cname'>
@@ -4044,17 +4041,7 @@ DOM.gain.addEventListener('input', () => {
             DOM.audioBitrateContainer.classList.add('d-none');
         }
     }
-    
 
-    function getSnameFromCname(cname) {
-        for (let i = 0; i < LABELS.length; i++) {
-            if (LABELS[i].includes(cname)) {
-                return LABELS[i].split('_')[0];
-            }
-        }
-        return ; // Substring not found in any item
-    }
-    
     
     document.addEventListener('click', function (e) {
         const target = e.target.closest('[id]')?.id;
@@ -4388,14 +4375,7 @@ function track(event, action, name, value){
         }
         const xc = document.getElementById('context-xc');
         if (region?.attributes.label || hideInSummary) {
-            let cname;
-            if (hideInSummary) {
-                const row = target.closest('tr');
-                cname = row.querySelector('.cname .cname').textContent;
-            } else {
-                cname = region.attributes.label.replace('?', '');
-            }
-            const sname = getSnameFromCname(cname);
+            let [,,,sname,cname] = activeRow?.getAttribute('name').split('|');
             const XC_type = cname.includes('(song)') ? "song" :
             cname.includes('call)') ? "nocturnal flight call" : "";
             xc.href = `https://xeno-canto.org/explore?query=${sname}%20type:"${XC_type}`;
