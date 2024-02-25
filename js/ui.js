@@ -611,7 +611,7 @@ const showLocation = async (fromSelect) => {
     const customPlaceEl = document.getElementById('customPlace');
     const locationSelect = document.getElementById('savedLocations');
     // CHeck if currentfile has a location id
-    const id = fromSelect ? locationSelect.valueAsNumber : FILE_LOCATION_MAP[currentFile];
+    const id = fromSelect ? locationSelect.value : FILE_LOCATION_MAP[currentFile];
     
     if (id) {
         newLocation = LOCATIONS.find(obj => obj.id === id);
@@ -709,7 +709,7 @@ async function setLocation() {
     
     
     const addLocation = () => {
-        locationID = savedLocationSelect.valueAsNumber;
+        locationID = savedLocationSelect.value;
         const batch = document.getElementById('batchLocations').checked;
         const files = batch ? STATE.openFiles : [currentFile];
         worker.postMessage({ action: 'set-custom-file-location', lat: latEl.value, lon: lonEl.value, place: customPlaceEl.value, files: files })
@@ -1019,7 +1019,7 @@ chartsLink.addEventListener('click', async () => {
 });
 
 const handleLocationFilterChange = (e) => {
-    const location = e.target.valueAsNumber || undefined;
+    const location = e.target.value || undefined;
     worker.postMessage({ action: 'update-state', locationID: location });
     // Update the seen species list
     worker.postMessage({ action: 'get-detected-species-list' })
@@ -1566,7 +1566,7 @@ window.onload = async () => {
                     &dimension7=${JSON.stringify(config.audio)}
                     &dimension8=${JSON.stringify(config[config.backend])}
                     &dimension9=${JSON.stringify(config.detect)}
-                    &dimension10=${VERSION}`)
+                    &dimension11=${VERSION}`)
                 .then(response => {
                     if (! response.ok) throw new Error('Network response was not ok', response);
                 })

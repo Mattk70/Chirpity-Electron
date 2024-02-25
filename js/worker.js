@@ -19,7 +19,7 @@ let NUM_WORKERS;
 let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let LIST_WORKER;
-const DEBUG = true;
+const DEBUG = false;
 
 const DATASET = false;
 const adding_chirpity_additions = false;
@@ -2527,6 +2527,7 @@ const prepSummaryStatement = (included) => {
             const filterClause = filtersApplied(included) ? `AND speciesID IN (${included} )` : ''
             await memoryDB.runAsync('BEGIN');
             await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.files SELECT * FROM files`);
+            await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.locations SELECT * FROM locations`);
             // Set the saved flag on files' metadata
             for (let file in metadata) {
                 metadata[file].isSaved = true
