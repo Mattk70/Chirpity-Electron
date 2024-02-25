@@ -244,18 +244,17 @@ class Model {
                     if (NOCTURNAL.has(item)) includedIDs.push(i);
                 }
             } else {
-                // BirdNET nocturnal bird filter
-                const additionalIDs = [];
                 // Get list of IDs of birds that call through the night or all the time. Exclude non-avian classes
                 for (let i = 0; i < this.labels.length; i++) {
                     const item = this.labels[i];
                     if (ACTIVITY_INDEX[item]  !== 1 && BIRDNET_NOT_BIRDS.indexOf(item) < 0) includedIDs.push(i);     
                 }
-                if (localBirdsOnly){ // placeholder for condition
+                if (localBirdsOnly){
+                    const additionalIDs = includedIDs;
                     // Now get list of local birds
                     const local_ids = await this.setList({lat,lon,week, listType:'location', useWeek, threshold})
                     // Create a list of indices that appear in both lists
-                    includedIDs = includedIDs.filter(id => local_ids.included.includes(id));
+                    includedIDs = additionalIDs.filter(id => local_ids[0].included.includes(id));
                 }
             } 
         } else if (listType === 'custom'){

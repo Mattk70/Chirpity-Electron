@@ -31,10 +31,10 @@ const p = window.module.p;
 const SunCalc = window.module.SunCalc;
 const uuidv4 = window.module.uuidv4;
 const os = window.module.os;
-/// Set up communication channel between UI and worker window
 
 let worker;
 
+/// Set up communication channel between UI and worker window
 const establishMessageChannel =
 new Promise((resolve) => {
     window.onmessage = (event) => {
