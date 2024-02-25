@@ -220,12 +220,12 @@ async function loadAudioFile({ filePath = '', preserveResults = false }) {
 }
 
 
-function updateSpec({ buffer, play = false, position = 0, resetSpec = false }) {
+function updateSpec({ buffer, play = false, position = 0, resetSpec = true }) {
     showElement(['spectrogramWrapper'], false);
     wavesurfer.loadDecodedBuffer(buffer);
     wavesurfer.seekTo(position);
     play ? wavesurfer.play() : wavesurfer.pause();
-    if (resetSpec) adjustSpecDims(true);
+    adjustSpecDims(true);
     showElement(['fullscreen']);
 }
 
@@ -811,7 +811,6 @@ function refreshResultsView() {
     } else if (!fileList.length) {
         hideAll();
     }
-    adjustSpecDims(true);
 }
 
 // fromDB is requested when circle clicked
@@ -1037,7 +1036,6 @@ exploreLink.addEventListener('click', async () => {
     hideAll();
     showElement(['exploreWrapper'], false);
     enableMenuItem(['saveCSV']);
-    adjustSpecDims(true)
     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
     // Analysis is done
     STATE.analysisDone = true;
@@ -3032,7 +3030,8 @@ function onChartData(args) {
             const isUncertain = score < 65 ? '&#63;' : '';
             // result.filename  and result.date used for feedback
             result.date = timestamp;
-            result.filename = cname.replace(/\\/g, '\\').replace(/'/g, "\\'") + `_${timestamp}`;
+            // this may need revision now we have custom lists
+            result.filename = cname.replace(/'/g, "\\'") + `_${timestamp}`;
             // store result for feedback function to use
             predictions[index] = result;
             // Format date and position for  UI
