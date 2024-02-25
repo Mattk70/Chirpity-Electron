@@ -220,12 +220,12 @@ async function loadAudioFile({ filePath = '', preserveResults = false }) {
 }
 
 
-function updateSpec({ buffer, play = false, position = 0, resetSpec = true }) {
+function updateSpec({ buffer, play = false, position = 0, resetSpec = false }) {
     showElement(['spectrogramWrapper'], false);
     wavesurfer.loadDecodedBuffer(buffer);
     wavesurfer.seekTo(position);
     play ? wavesurfer.play() : wavesurfer.pause();
-    adjustSpecDims(true);
+    resetSpec && adjustSpecDims(true);
     showElement(['fullscreen']);
 }
 
@@ -835,6 +835,7 @@ const getSelectionResults = (fromDB) => {
 const analyseLink = document.getElementById('analyse');
 analyseLink.addEventListener('click', async () => {
     postAnalyseMessage({ filesInScope: [currentFile] });
+    adjustSpecDims(true)
 });
 
 const reanalyseLink = document.getElementById('reanalyse');
@@ -843,16 +844,19 @@ reanalyseLink.addEventListener('click', async () => {
         filesInScope: [currentFile],
         reanalyse: true
     });
+    adjustSpecDims(true)
 });
 
 const analyseAllLink = document.getElementById('analyseAll');
 analyseAllLink.addEventListener('click', async () => {
     postAnalyseMessage({ filesInScope: fileList });
+    adjustSpecDims(true)
 });
 
 const reanalyseAllLink = document.getElementById('reanalyseAll');
 reanalyseAllLink.addEventListener('click', async () => {
     postAnalyseMessage({ filesInScope: fileList, reanalyse: true });
+    adjustSpecDims(true)
 });
 
 
