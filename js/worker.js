@@ -1401,7 +1401,7 @@ const prepSummaryStatement = (included) => {
                 // const byteEnd = convertTimeToBytes(end, metadata[file]);
                 // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for WINDOW_SIZE second chunks
                 // mono 16bit wav @ 24k = 
-                const highWaterMark = 2 * sampleRate * BATCH_SIZE * WINDOW_SIZE;
+                const highWaterMark = sampleRate * BATCH_SIZE * WINDOW_SIZE; // 4608000
                 const stream = new PassThrough({highWaterMark: highWaterMark});
                 let chunkStart = start * sampleRate;
                 return new Promise((resolve, reject) => {
