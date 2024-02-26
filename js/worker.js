@@ -14,7 +14,14 @@ const merge = require('lodash.merge');
 import { State } from './state.js';
 import { sqlite3 } from './database.js';
 
+
+const { PassThrough } = require('stream');
+
 let WINDOW_SIZE = 3;
+let CHIRPITY_HEADER = Buffer.from([82,73,70,70,70,200,25,0,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,192,93,0,0,128,187,0,0,2,0,16,0,76,73,83,84,26,0,0,0,73,78,70,79,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,200,25,0]);
+
+
+
 let NUM_WORKERS;
 let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
@@ -1154,15 +1161,66 @@ const prepSummaryStatement = (included) => {
                 return (Math.round((time * metadata.bytesPerSec) / bytesPerSample) * bytesPerSample) + metadata.head;
             }
             
+            async function newSetupCtx(myBuffer, rate) {
+                rate ??= sampleRate;
+                // Deal with detached arraybuffer issue
+                const audioBufferChunk = await audioCtx.decodeAudioData(myBuffer);
+
+                
+                const audioCtxSource = audioCtx.createBufferSource();
             
+                audioCtxSource.buffer = audioBufferChunk;
+                const duration = audioCtxSource.buffer.duration;
+                const buffer = audioCtxSource.buffer;
+                // IF we want to use worklets, we'll need to reuse the context across the whole file
+                const offlineCtx = new OfflineAudioContext(1, rate * duration, rate);
+                const offlineSource = offlineCtx.createBufferSource();
+                offlineSource.buffer = buffer;
+                let previousFilter = undefined;
+                if (STATE.filters.active) {
+                    if (STATE.filters.highPassFrequency) {
+                        // Create a highpass filter to cut low-frequency noise
+                        const highpassFilter = offlineCtx.createBiquadFilter();
+                        highpassFilter.type = "highpass"; // Standard second-order resonant highpass filter with 12dB/octave rolloff. Frequencies below the cutoff are attenuated; frequencies above it pass through.
+                        highpassFilter.frequency.value = STATE.filters.highPassFrequency; //frequency || 0; // This sets the cutoff frequency. 0 is off. 
+                        highpassFilter.Q.value = 0; // Indicates how peaked the frequency is around the cutoff. The greater the value, the greater the peak.
+                        offlineSource.connect(highpassFilter);
+                        previousFilter = highpassFilter;
+                    }
+                    if (STATE.filters.lowShelfFrequency && STATE.filters.lowShelfAttenuation) {
+                        // Create a lowshelf filter to attenuate low-frequency noise
+                        const lowshelfFilter = offlineCtx.createBiquadFilter();
+                        lowshelfFilter.type = 'lowshelf';
+                        lowshelfFilter.frequency.value = STATE.filters.lowShelfFrequency; // This sets the cutoff frequency of the lowshelf filter to 1000 Hz
+                        lowshelfFilter.gain.value = STATE.filters.lowShelfAttenuation; // This sets the boost or attenuation in decibels (dB)
+                        previousFilter ? previousFilter.connect(lowshelfFilter) : offlineSource.connect(lowshelfFilter);
+                        previousFilter = lowshelfFilter;
+                    }
+                }
+                
+                // // Create a gain node to adjust the audio level
+                if (STATE.audio.gain){
+                    var gainNode = offlineCtx.createGain();
+                    gainNode.gain.value = Math.pow(10, STATE.audio.gain / 20);
+                    previousFilter ? previousFilter.connect(gainNode) : offlineSource.connect(gainNode);
+                    gainNode.connect(offlineCtx.destination);
+                } else {
+                    previousFilter ? previousFilter.connect(offlineCtx.destination) : offlineSource.connect(offlineCtx.destination);
+                }
+                offlineSource.start();
+                return offlineCtx;
+            };
+
+
             async function setupCtx(chunk, header, rate) {
                 rate ??= sampleRate;
                 // Deal with detached arraybuffer issue
                 let audioBufferChunk;
                 try {
                     chunk = Buffer.concat([header, chunk]);
-                    audioBufferChunk = await audioCtx.decodeAudioData(chunk.buffer);
-                } catch {
+                    audioBufferChunk = await audioCtx.decodeAudioData(chunk.buffer).catch(error => console.log(error));
+                } catch (e) {
+                    console.log(e)
                     return false
                 }
                 
@@ -1338,59 +1396,106 @@ const prepSummaryStatement = (included) => {
             const fetchAudioBuffer = async ({
                 file = '', start = 0, end = metadata[file].duration
             }) => {
-                if (end - start < 0.1) return  // prevents dataset creation barfing with  v. short buffers
-                const proxy = metadata[file]?.proxy || await getWorkingFile(file);
-                if (!proxy) return false
-                return new Promise(resolve => {
-                    const byteStart = convertTimeToBytes(start, metadata[file]);
-                    const byteEnd = convertTimeToBytes(end, metadata[file]);
-                    
-                    if (byteEnd < byteStart) {
-                        console.log(`!!!!!!!!!!!!! End < start encountered for ${file}, end was ${end} start is ${start}`)
-                    }
-                    // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
-                    const highWaterMark = byteEnd - byteStart + 1;
-                    try {
-                    const readStream = fs.createReadStream(proxy, {
-                        start: byteStart, end: byteEnd, highWaterMark: highWaterMark
+                //if (end - start < 0.1) return  // prevents dataset creation barfing with  v. short buffer
+                const stream = new PassThrough();
+                        // Use ffmpeg to extract the specified audio segment
+                return new Promise((resolve, reject) => {
+                    const command = ffmpeg(file)
+                        .seekInput(start)
+                        .duration(end - start)
+                        .format('s16le')
+                        .audioChannels(1) // Set to mono
+                        .audioFrequency(sampleRate) // Set sample rate to 24000 Hz
+                        .output(stream, { end:true });
+    
+                    command.on('error', error => {
+                        updateFilesBeingProcessed(file)
+                        reject(new Error('Error extracting audio segment:', error));
                     });
-                    readStream.on('data', async chunk => {
-                        // Ensure data is processed in order
-                        readStream.pause();
-                        const offlineCtx = await setupCtx(chunk, metadata[file].header, sampleRate).catch(error => {console.error(error)});
+                    command.on('start', function (commandLine) {
+                        DEBUG && console.log('FFmpeg command: ' + commandLine);
+                    })
+    
+                    command.on('end', () => {
+                        // End the stream to signify completion
+                        stream.end();
+                    });
+            
+                    const data = [];
+                    stream.on('data', chunk => {
+                        data.push(chunk);
+                    });
+
+                    stream.on('end', async () => {
+                        // Concatenate the data chunks into a single Buffer
+                        const arrayBuffer = Buffer.concat(data);
+                        const offlineCtx = await setupCtx(arrayBuffer, metadata[file].header, sampleRate).catch(error => {console.error(error.message)});
                         if (offlineCtx){
                             offlineCtx.startRendering().then(resampled => {
                                 // `resampled` contains an AudioBuffer resampled at 24000Hz.
                                 // use resampled.getChannelData(x) to get an Float32Array for channel x.
-                                readStream.resume();
+                                // readStream.resume();
                                 resolve(resampled);
                             }).catch((error) => {
                                 console.error(`FetchAudio rendering failed: ${error}`);
                                 // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
                             });
                         }
-                        // if the was a problem setting up the context remove the file from the files list
-                        !offlineCtx && console.error('No offline context created for ', file)
-                        offlineCtx || updateFilesBeingProcessed(file)
-                    })
-                    
-                    readStream.on('end', function () {
-                        readStream.close()
-                    })
-                    readStream.on('error', err => {
-                        console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
-                        err.code === 'ENOENT' && notifyMissingFile(file);
-                    })
-                } catch (error) {
-                    if (error instanceof TypeError) {
-                        // Handle the TypeError
-                        console.error('Caught a TypeError get predictbuffers:', error.message, 'bytestart', byteStart, 'byteend', byteEnd);
-                    } else {
-                        // Handle other types of errors
-                        console.error('An unexpected error occurred:', error.message);
-                    }
-                }
+                    });
+            
+                    command.run();
                 });
+
+
+                //     const byteStart = convertTimeToBytes(start, metadata[file]);
+                //     const byteEnd = convertTimeToBytes(end, metadata[file]);
+                    
+                //     if (byteEnd < byteStart) {
+                //         console.log(`!!!!!!!!!!!!! End < start encountered for ${file}, end was ${end} start is ${start}`)
+                //     }
+                //     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
+                //     const highWaterMark = byteEnd - byteStart + 1;
+                //     try {
+                //     const readStream = fs.createReadStream(proxy, {
+                //         start: byteStart, end: byteEnd, highWaterMark: highWaterMark
+                //     });
+                //     readStream.on('data', async chunk => {
+                //         // Ensure data is processed in order
+                //         readStream.pause();
+                //         const offlineCtx = await setupCtx(chunk, metadata[file].header, sampleRate).catch(error => {console.error(error)});
+                //         if (offlineCtx){
+                //             offlineCtx.startRendering().then(resampled => {
+                //                 // `resampled` contains an AudioBuffer resampled at 24000Hz.
+                //                 // use resampled.getChannelData(x) to get an Float32Array for channel x.
+                //                 readStream.resume();
+                //                 resolve(resampled);
+                //             }).catch((error) => {
+                //                 console.error(`FetchAudio rendering failed: ${error}`);
+                //                 // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
+                //             });
+                //         }
+                //         // if the was a problem setting up the context remove the file from the files list
+                //         !offlineCtx && console.error('No offline context created for ', file)
+                //         offlineCtx || updateFilesBeingProcessed(file)
+                //     })
+                    
+                //     readStream.on('end', function () {
+                //         readStream.close()
+                //     })
+                //     readStream.on('error', err => {
+                //         console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
+                //         err.code === 'ENOENT' && notifyMissingFile(file);
+                //     })
+                // } catch (error) {
+                //     if (error instanceof TypeError) {
+                //         // Handle the TypeError
+                //         console.error('Caught a TypeError get predictbuffers:', error.message, 'bytestart', byteStart, 'byteend', byteEnd);
+                //     } else {
+                //         // Handle other types of errors
+                //         console.error('An unexpected error occurred:', error.message);
+                //     }
+                // }
+                // });
             }
             
             // Helper function to check if a given time is within daylight hours
