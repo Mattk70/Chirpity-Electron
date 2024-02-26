@@ -840,6 +840,7 @@ const prepSummaryStatement = (included) => {
                     let command = ffmpeg(file)
                     .audioChannels(channels)
                     .audioFrequency(sampleRate)
+                    .duration(20) // just do 1 second - so we have something to get the headers from
                     .on('error', (err) => {
                         console.log('An error occurred: ' + err.message);
                         if (err) {
@@ -851,7 +852,7 @@ const prepSummaryStatement = (included) => {
                         // HERE YOU GET THE TOTAL TIME
                         const a = data.duration.split(':');
                         totalTime = parseInt(a[0]) * 3600 + parseInt(a[1]) * 60 + parseFloat(a[2]);
-                        metadata[file] = { duration: totalTime }
+                        //metadata[file] = { duration: totalTime }
                         //totalTime = parseInt(data.duration.replace(/:/g, ''))
                     })
                     .on('progress', (progress) => {
@@ -1069,7 +1070,7 @@ const prepSummaryStatement = (included) => {
                 // using the nullish coalescing operator
                 metadata[file].locationID ??= savedMeta?.locationID;
                 
-                metadata[file].duration ??= savedMeta?.duration || await getDuration(proxy);
+                metadata[file].duration ??= savedMeta?.duration || await getDuration(file);
                 
                 return new Promise((resolve) => {
                     if (metadata[file].isComplete) {
@@ -1138,6 +1139,8 @@ const prepSummaryStatement = (included) => {
                             metadata[file].fileStart = fileStart;
                             // Set complete flag
                             metadata[file].isComplete = true;
+                            metadata[file].proxy = file;  // now we have the wav metadata, we don't need the proxy any more
+                            // REMOVE PROXY
                             readStream.close()
                             return resolve(metadata[file]);
                         });
@@ -1158,57 +1161,6 @@ const prepSummaryStatement = (included) => {
                 return (Math.round((time * metadata.bytesPerSec) / bytesPerSample) * bytesPerSample) + metadata.head;
             }
             
-            async function newSetupCtx(myBuffer, rate) {
-                rate ??= sampleRate;
-                // Deal with detached arraybuffer issue
-                const audioBufferChunk = await audioCtx.decodeAudioData(myBuffer);
-
-                
-                const audioCtxSource = audioCtx.createBufferSource();
-            
-                audioCtxSource.buffer = audioBufferChunk;
-                const duration = audioCtxSource.buffer.duration;
-                const buffer = audioCtxSource.buffer;
-                // IF we want to use worklets, we'll need to reuse the context across the whole file
-                const offlineCtx = new OfflineAudioContext(1, rate * duration, rate);
-                const offlineSource = offlineCtx.createBufferSource();
-                offlineSource.buffer = buffer;
-                let previousFilter = undefined;
-                if (STATE.filters.active) {
-                    if (STATE.filters.highPassFrequency) {
-                        // Create a highpass filter to cut low-frequency noise
-                        const highpassFilter = offlineCtx.createBiquadFilter();
-                        highpassFilter.type = "highpass"; // Standard second-order resonant highpass filter with 12dB/octave rolloff. Frequencies below the cutoff are attenuated; frequencies above it pass through.
-                        highpassFilter.frequency.value = STATE.filters.highPassFrequency; //frequency || 0; // This sets the cutoff frequency. 0 is off. 
-                        highpassFilter.Q.value = 0; // Indicates how peaked the frequency is around the cutoff. The greater the value, the greater the peak.
-                        offlineSource.connect(highpassFilter);
-                        previousFilter = highpassFilter;
-                    }
-                    if (STATE.filters.lowShelfFrequency && STATE.filters.lowShelfAttenuation) {
-                        // Create a lowshelf filter to attenuate low-frequency noise
-                        const lowshelfFilter = offlineCtx.createBiquadFilter();
-                        lowshelfFilter.type = 'lowshelf';
-                        lowshelfFilter.frequency.value = STATE.filters.lowShelfFrequency; // This sets the cutoff frequency of the lowshelf filter to 1000 Hz
-                        lowshelfFilter.gain.value = STATE.filters.lowShelfAttenuation; // This sets the boost or attenuation in decibels (dB)
-                        previousFilter ? previousFilter.connect(lowshelfFilter) : offlineSource.connect(lowshelfFilter);
-                        previousFilter = lowshelfFilter;
-                    }
-                }
-                
-                // // Create a gain node to adjust the audio level
-                if (STATE.audio.gain){
-                    var gainNode = offlineCtx.createGain();
-                    gainNode.gain.value = Math.pow(10, STATE.audio.gain / 20);
-                    previousFilter ? previousFilter.connect(gainNode) : offlineSource.connect(gainNode);
-                    gainNode.connect(offlineCtx.destination);
-                } else {
-                    previousFilter ? previousFilter.connect(offlineCtx.destination) : offlineSource.connect(offlineCtx.destination);
-                }
-                offlineSource.start();
-                return offlineCtx;
-            };
-
-
             async function setupCtx(chunk, header, rate) {
                 rate ??= sampleRate;
                 // Deal with detached arraybuffer issue
@@ -1302,88 +1254,7 @@ const prepSummaryStatement = (included) => {
             * @returns {Promise<void>}
             */
             
-            // const getPredictBuffers = async ({
-            //     file = '', start = 0, end = undefined
-            // }) => {
-            //     let chunkLength = STATE.model === 'birdnet' ? 144_000 : 72_000;
-            //     // Ensure max and min are within range
-            //     start = Math.max(0, start);
-            //     end = Math.min(metadata[file].duration, end);
-            //     if (start > metadata[file].duration) {
-            //         return
-            //     }
-            //     batchChunksToSend[file] = Math.ceil((end - start) / (BATCH_SIZE * WINDOW_SIZE));
-            //     predictionsReceived[file] = 0;
-            //     predictionsRequested[file] = 0;
-            //     const byteStart = convertTimeToBytes(start, metadata[file]);
-            //     const byteEnd = convertTimeToBytes(end, metadata[file]);
-            //     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for WINDOW_SIZE second chunks
-            //     const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * WINDOW_SIZE;
-            //     const proxy = metadata[file].proxy;
-            //     let readStream;
-            //     try {
-            //         // Your code that may throw a TypeError
-            //         readStream = fs.createReadStream(proxy, {
-            //             start: byteStart, end: byteEnd, highWaterMark: highWaterMark
-            //         });
-            //     } catch (error) {
-            //         if (error instanceof TypeError) {
-            //             // Handle the TypeError
-            //             console.error('Caught a TypeError get predictbuffers:', error.message);
-            //         } else {
-            //             // Handle other types of errors
-            //             console.error('An unexpected error occurred:', error.message);
-            //         }
-            //     }
-                
-            //     let chunkStart = start * sampleRate;
-            //     readStream.on('data', async chunk => {
-            //         // Ensure data is processed in order
-            //         readStream.pause();
-            //         if (aborted) {
-            //             readStream.close()
-            //             return
-            //         }
-            //         const offlineCtx = await setupCtx(chunk, metadata[file].header);
-            //         let worker;
-            //         if (offlineCtx) {
-            //             offlineCtx.startRendering().then((resampled) => {
-            //                 const myArray = resampled.getChannelData(0);
-                            
-            //                 workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-            //                 worker = workerInstance;
-            //                 feedChunksToModel(myArray, chunkStart, file, end, worker);
-            //                 chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
-            //                 // Now the async stuff is done ==>
-            //                 readStream.resume();
-            //             }).catch((error) => {
-            //                 console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
-            //                 const fileIndex = filesBeingProcessed.indexOf(file);
-            //                 if (fileIndex !== -1) {
-            //                     canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
-            //                 }
-            //                 // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
-            //             });
-            //         } else {
-            //             console.log('Short chunk', chunk.length, 'padding')
-            //             workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-            //             worker = workerInstance;
 
-            //             // Create array with 0's (short segment of silence that will trigger the finalChunk flag
-            //             const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
-            //             feedChunksToModel(myArray, chunkStart, file, end);
-            //             readStream.resume();
-            //         }
-            //     })
-            //     readStream.on('end', function () {
-            //         readStream.close();
-            //         DEBUG && console.log('All chunks sent for ', file)
-            //     })
-            //     readStream.on('error', err => {
-            //         console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
-            //         err.code === 'ENOENT' && notifyMissingFile(file);
-            //     })
-            // }
             const getPredictBuffers = async ({
                 file = '', start = 0, end = undefined
             }) => {
@@ -1397,10 +1268,7 @@ const prepSummaryStatement = (included) => {
                 batchChunksToSend[file] = Math.ceil((end - start) / (BATCH_SIZE * WINDOW_SIZE));
                 predictionsReceived[file] = 0;
                 predictionsRequested[file] = 0;
-                // const byteStart = convertTimeToBytes(start, metadata[file]);
-                // const byteEnd = convertTimeToBytes(end, metadata[file]);
-                // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for WINDOW_SIZE second chunks
-                // mono 16bit wav @ 24k = 
+                let concatenatedBuffer = Buffer.alloc(0);
                 const highWaterMark = sampleRate * BATCH_SIZE * WINDOW_SIZE; // 4608000
                 const stream = new PassThrough({highWaterMark: highWaterMark});
                 let chunkStart = start * sampleRate;
@@ -1409,9 +1277,11 @@ const prepSummaryStatement = (included) => {
                         .seekInput(start)
                         .duration(end - start)
                         .format('s16le')
+                        .outputOptions('-f s16le')
                         .audioChannels(1) // Set to mono
                         .audioFrequency(sampleRate) // Set sample rate 
-                        .output(stream, { end:true });
+                        .output(stream, { highWaterMark: highWaterMark });
+                        //start === 0 && command.output('file.wav')
     
                     command.on('error', error => {
                         updateFilesBeingProcessed(file)
@@ -1426,40 +1296,17 @@ const prepSummaryStatement = (included) => {
                         stream.end();
                     });
             
-                    const data = [];
                     stream.on('data', async chunk => {
                         if (aborted) {
                             stream.end()
                             return
                         }
-                        const offlineCtx = await setupCtx(chunk, WAV_HEADER);
-                        let worker;
-                        if (offlineCtx) {
-                            offlineCtx.startRendering().then((resampled) => {
-                                const myArray = resampled.getChannelData(0);
-                                workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-                                worker = workerInstance;
-                                feedChunksToModel(myArray, chunkStart, file, end, worker);
-                                chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
-                                // Now the async stuff is done ==>
-                                //readStream.resume();
-                            }).catch((error) => {
-                                console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
-                                const fileIndex = filesBeingProcessed.indexOf(file);
-                                if (fileIndex !== -1) {
-                                    canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
-                                }
-                                // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
-                            });
-                        } else {
-                            console.log('Short chunk', chunk.length, 'padding')
-                            workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-                            worker = workerInstance;
-    
-                            // Create array with 0's (short segment of silence that will trigger the finalChunk flag
-                            const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
-                            feedChunksToModel(myArray, chunkStart, file, end);
-                            //readStream.resume();
+                        concatenatedBuffer = Buffer.concat([concatenatedBuffer, chunk]);
+                        // we have a full buffer
+                        if (concatenatedBuffer.length >= highWaterMark) {
+                            chunk = concatenatedBuffer.slice(0, highWaterMark);
+                            concatenatedBuffer = concatenatedBuffer.slice(highWaterMark);
+                            chunkStart = await sendBuffer(chunk, chunkStart, end, file)
                         }
                     });
 
@@ -1468,15 +1315,50 @@ const prepSummaryStatement = (included) => {
                         err.code === 'ENOENT' && notifyMissingFile(file);
                     })
 
-                    stream.on('end', function () {
+                    stream.on('end', async function () {
+                        // deal with part-full buffers
+                        if (concatenatedBuffer.length){
+                            chunkStart = await sendBuffer(concatenatedBuffer, chunkStart, end, file)
+                        }
                         DEBUG && console.log('All chunks sent for ', file)
                         resolve('finished')
                     })
-
                     command.run();
                 });
             }
 
+            async function sendBuffer(chunk, chunkStart, end, file){
+                const offlineCtx = await setupCtx(chunk,WAV_HEADER);
+                let worker;
+                if (offlineCtx) {
+                    offlineCtx.startRendering().then((resampled) => {
+                        const myArray = resampled.getChannelData(0);
+                        workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+                        worker = workerInstance;
+                        feedChunksToModel(myArray, chunkStart, file, end, worker);
+                        chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
+                        // Now the async stuff is done ==>
+                        //readStream.resume();
+                    }).catch((error) => {
+                        console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
+                        const fileIndex = filesBeingProcessed.indexOf(file);
+                        if (fileIndex !== -1) {
+                            canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
+                        }
+                        // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
+                    });
+                } else {
+                    console.log('Short chunk', chunk.length, 'padding')
+                    workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+                    worker = workerInstance;
+
+                    // Create array with 0's (short segment of silence that will trigger the finalChunk flag
+                    const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
+                    feedChunksToModel(myArray, chunkStart, file, end);
+                    //readStream.resume();
+                }
+                return chunkStart
+            }
             /**
             *  Called when file first loaded, when result clicked and when saving or sending file snippets
             * @param args
@@ -1515,7 +1397,7 @@ const prepSummaryStatement = (included) => {
                         data.push(chunk);
                     });
 
-                    stream.on('end', async () => {
+                    stream.on('end', async () => { 
                         // Concatenate the data chunks into a single Buffer
                         const arrayBuffer = Buffer.concat(data);
                         const offlineCtx = await setupCtx(arrayBuffer, WAV_HEADER, sampleRate).catch(error => {console.error(error.message)});
