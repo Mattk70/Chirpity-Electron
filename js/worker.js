@@ -19,7 +19,7 @@ let NUM_WORKERS;
 let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let LIST_WORKER;
-const DEBUG = false;
+const DEBUG = true;
 
 const DATASET = false;
 const adding_chirpity_additions = false;
@@ -2957,37 +2957,41 @@ const prepSummaryStatement = (included) => {
                 await memoryDB.runAsync('BEGIN');
                 if (STATE.model === 'birdnet'){
                     for (let i = 0; i < labels.length; i++){
-                        const id = i;
                         const [sname, cname] = labels[i].trim().split('_');
-                        await diskDB.runAsync('UPDATE species SET cname = ? WHERE sname = ? AND id = ?', cname, sname, id);
-                        await memoryDB.runAsync('UPDATE species SET cname = ? WHERE sname = ? AND id = ?', cname, sname, id);
+                        await diskDB.runAsync('UPDATE species SET cname = ? WHERE sname = ?', cname, sname);
+                        await memoryDB.runAsync('UPDATE species SET cname = ? WHERE sname = ?', cname, sname);
                     }
                 } else {
                     for (let i = 0; i < labels.length; i++) {
                         const [sname, newCname] = labels[i].split('_');
                         // For chirpity, we check if the existing cname ends with a <call type> in brackets
-                        const existingCnameResult = await memoryDB.allAsync('SELECT id, cname FROM species WHERE sname = ?', sname);
+                        const existingCnameResult = await memoryDB.allAsync('SELECT cname FROM species WHERE sname = ?', sname);
                         if (existingCnameResult.length) {
                             for (let i = 0; i < existingCnameResult.length; i++){
-                                const {id, cname} = existingCnameResult[i];
+                                const {cname} = existingCnameResult[i];
                                 const existingCname = cname;
                                 const existingCnameMatch = existingCname.match(/\(([^)]+)\)$/); // Regex to match word(s) within brackets at the end of the string
                                 const newCnameMatch = newCname.match(/\(([^)]+)\)$/);
                                 // Do we have a spcific call type to match?
                                 if (newCnameMatch){
                                     // then only update the database where existing and new call types match
-                                    if (newCnameMatch[1] === existingCnameMatch[1]){
-                                        await diskDB.runAsync('UPDATE species SET cname = ? WHERE sname = ? AND id = ?', newCname, sname, id);
-                                        await memoryDB.runAsync('UPDATE species SET cname = ? WHERE sname = ? AND id = ?', newCname, sname, id);    
+                                    if (newCnameMatch[0] === existingCnameMatch[0]){
+                                        const callTypeMatch = '%' + newCnameMatch[0] + '%' ;
+                                        await diskDB.runAsync("UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?", newCname, sname, callTypeMatch);
+                                        await memoryDB.runAsync("UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?", newCname, sname, callTypeMatch);
                                     }
                                 } else { // No (<call type>) in the new label - so we add the new name to all the species call types in the database
-                                    let appendedCname = newCname;
+                                    let appendedCname = newCname, bracketedWord;
                                     if (existingCnameMatch) {
-                                        const bracketedWord = existingCnameMatch[1];
-                                        appendedCname += ` (${bracketedWord})`; // Append the bracketed word to the new cname (for each of the existingCnameResults)
+                                        bracketedWord = existingCnameMatch[0];
+                                        appendedCname += ` ${bracketedWord}`; // Append the bracketed word to the new cname (for each of the existingCnameResults)
+                                        const callTypeMatch = '%' + bracketedWord + '%';
+                                        await diskDB.runAsync("UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?", appendedCname, sname, callTypeMatch);
+                                        await memoryDB.runAsync("UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?", appendedCname, sname, callTypeMatch);
+                                    } else {
+                                        await diskDB.runAsync("UPDATE species SET cname = ? WHERE sname = ?", appendedCname, sname);
+                                        await memoryDB.runAsync("UPDATE species SET cname = ? WHERE sname = ?", appendedCname, sname);
                                     }
-                                    await diskDB.runAsync('UPDATE species SET cname = ? WHERE sname = ? AND id = ?', appendedCname, sname, id);
-                                    await memoryDB.runAsync('UPDATE species SET cname = ? WHERE sname = ? AND id = ?', appendedCname, sname, id);
                                 }
                             }
                         }

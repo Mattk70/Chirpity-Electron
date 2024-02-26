@@ -4130,9 +4130,18 @@ DOM.gain.addEventListener('input', () => {
                     break;
                 }
                 case 'locale': {
+                    let labelFile;
+                    if (element.value === 'custom'){
+                        labelFile = config.customListFile[config.model];
+                        if (! labelFile) {
+                             generateToast({message: 'You must select a label file in the list settings to use the custom language option.'});
+                            return;
+                        }
+                    } else {
+                        const chirpity = element.value === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
+                        labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${element.value}.txt`; 
+                    }
                     config[config.model].locale = element.value;
-                    const chirpity = config[config.model].locale === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
-                    const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${config[config.model].locale}.txt`; 
                     readLabels(labelFile, 'locale');
                     break;
                 }
