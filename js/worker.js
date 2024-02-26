@@ -18,10 +18,7 @@ import { sqlite3 } from './database.js';
 const { PassThrough } = require('stream');
 
 let WINDOW_SIZE = 3;
-let CHIRPITY_HEADER = Buffer.from([82,73,70,70,70,200,25,0,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,192,93,0,0,128,187,0,0,2,0,16,0,76,73,83,84,26,0,0,0,73,78,70,79,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,200,25,0]);
-
-
-
+const WAV_HEADER = Buffer.from([82,73,70,70,70,200,25,0,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,192,93,0,0,128,187,0,0,2,0,16,0,76,73,83,84,26,0,0,0,73,78,70,79,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,200,25,0]);
 let NUM_WORKERS;
 let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
@@ -1305,6 +1302,88 @@ const prepSummaryStatement = (included) => {
             * @returns {Promise<void>}
             */
             
+            // const getPredictBuffers = async ({
+            //     file = '', start = 0, end = undefined
+            // }) => {
+            //     let chunkLength = STATE.model === 'birdnet' ? 144_000 : 72_000;
+            //     // Ensure max and min are within range
+            //     start = Math.max(0, start);
+            //     end = Math.min(metadata[file].duration, end);
+            //     if (start > metadata[file].duration) {
+            //         return
+            //     }
+            //     batchChunksToSend[file] = Math.ceil((end - start) / (BATCH_SIZE * WINDOW_SIZE));
+            //     predictionsReceived[file] = 0;
+            //     predictionsRequested[file] = 0;
+            //     const byteStart = convertTimeToBytes(start, metadata[file]);
+            //     const byteEnd = convertTimeToBytes(end, metadata[file]);
+            //     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for WINDOW_SIZE second chunks
+            //     const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * WINDOW_SIZE;
+            //     const proxy = metadata[file].proxy;
+            //     let readStream;
+            //     try {
+            //         // Your code that may throw a TypeError
+            //         readStream = fs.createReadStream(proxy, {
+            //             start: byteStart, end: byteEnd, highWaterMark: highWaterMark
+            //         });
+            //     } catch (error) {
+            //         if (error instanceof TypeError) {
+            //             // Handle the TypeError
+            //             console.error('Caught a TypeError get predictbuffers:', error.message);
+            //         } else {
+            //             // Handle other types of errors
+            //             console.error('An unexpected error occurred:', error.message);
+            //         }
+            //     }
+                
+            //     let chunkStart = start * sampleRate;
+            //     readStream.on('data', async chunk => {
+            //         // Ensure data is processed in order
+            //         readStream.pause();
+            //         if (aborted) {
+            //             readStream.close()
+            //             return
+            //         }
+            //         const offlineCtx = await setupCtx(chunk, metadata[file].header);
+            //         let worker;
+            //         if (offlineCtx) {
+            //             offlineCtx.startRendering().then((resampled) => {
+            //                 const myArray = resampled.getChannelData(0);
+                            
+            //                 workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+            //                 worker = workerInstance;
+            //                 feedChunksToModel(myArray, chunkStart, file, end, worker);
+            //                 chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
+            //                 // Now the async stuff is done ==>
+            //                 readStream.resume();
+            //             }).catch((error) => {
+            //                 console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
+            //                 const fileIndex = filesBeingProcessed.indexOf(file);
+            //                 if (fileIndex !== -1) {
+            //                     canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
+            //                 }
+            //                 // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
+            //             });
+            //         } else {
+            //             console.log('Short chunk', chunk.length, 'padding')
+            //             workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+            //             worker = workerInstance;
+
+            //             // Create array with 0's (short segment of silence that will trigger the finalChunk flag
+            //             const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
+            //             feedChunksToModel(myArray, chunkStart, file, end);
+            //             readStream.resume();
+            //         }
+            //     })
+            //     readStream.on('end', function () {
+            //         readStream.close();
+            //         DEBUG && console.log('All chunks sent for ', file)
+            //     })
+            //     readStream.on('error', err => {
+            //         console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
+            //         err.code === 'ENOENT' && notifyMissingFile(file);
+            //     })
+            // }
             const getPredictBuffers = async ({
                 file = '', start = 0, end = undefined
             }) => {
@@ -1318,76 +1397,86 @@ const prepSummaryStatement = (included) => {
                 batchChunksToSend[file] = Math.ceil((end - start) / (BATCH_SIZE * WINDOW_SIZE));
                 predictionsReceived[file] = 0;
                 predictionsRequested[file] = 0;
-                const byteStart = convertTimeToBytes(start, metadata[file]);
-                const byteEnd = convertTimeToBytes(end, metadata[file]);
+                // const byteStart = convertTimeToBytes(start, metadata[file]);
+                // const byteEnd = convertTimeToBytes(end, metadata[file]);
                 // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for WINDOW_SIZE second chunks
-                const highWaterMark = metadata[file].bytesPerSec * BATCH_SIZE * WINDOW_SIZE;
-                const proxy = metadata[file].proxy;
-                let readStream;
-                try {
-                    // Your code that may throw a TypeError
-                    readStream = fs.createReadStream(proxy, {
-                        start: byteStart, end: byteEnd, highWaterMark: highWaterMark
-                    });
-                } catch (error) {
-                    if (error instanceof TypeError) {
-                        // Handle the TypeError
-                        console.error('Caught a TypeError get predictbuffers:', error.message);
-                    } else {
-                        // Handle other types of errors
-                        console.error('An unexpected error occurred:', error.message);
-                    }
-                }
-                
+                // mono 16bit wav @ 24k = 
+                const highWaterMark = 2 * sampleRate * BATCH_SIZE * WINDOW_SIZE;
+                const stream = new PassThrough({highWaterMark: highWaterMark});
                 let chunkStart = start * sampleRate;
-                readStream.on('data', async chunk => {
-                    // Ensure data is processed in order
-                    readStream.pause();
-                    if (aborted) {
-                        readStream.close()
-                        return
-                    }
-                    const offlineCtx = await setupCtx(chunk, metadata[file].header);
-                    let worker;
-                    if (offlineCtx) {
-                        offlineCtx.startRendering().then((resampled) => {
-                            const myArray = resampled.getChannelData(0);
-                            
+                return new Promise((resolve, reject) => {
+                    const command = ffmpeg(file)
+                        .seekInput(start)
+                        .duration(end - start)
+                        .format('s16le')
+                        .audioChannels(1) // Set to mono
+                        .audioFrequency(sampleRate) // Set sample rate 
+                        .output(stream, { end:true });
+    
+                    command.on('error', error => {
+                        updateFilesBeingProcessed(file)
+                        reject(new Error('Error in ffmpeg extracting audio segment:', error));
+                    });
+                    command.on('start', function (commandLine) {
+                        DEBUG && console.log('FFmpeg command: ' + commandLine);
+                    })
+    
+                    command.on('end', () => {
+                        // End the stream to signify completion
+                        stream.end();
+                    });
+            
+                    const data = [];
+                    stream.on('data', async chunk => {
+                        if (aborted) {
+                            stream.end()
+                            return
+                        }
+                        const offlineCtx = await setupCtx(chunk, WAV_HEADER);
+                        let worker;
+                        if (offlineCtx) {
+                            offlineCtx.startRendering().then((resampled) => {
+                                const myArray = resampled.getChannelData(0);
+                                workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+                                worker = workerInstance;
+                                feedChunksToModel(myArray, chunkStart, file, end, worker);
+                                chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
+                                // Now the async stuff is done ==>
+                                //readStream.resume();
+                            }).catch((error) => {
+                                console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
+                                const fileIndex = filesBeingProcessed.indexOf(file);
+                                if (fileIndex !== -1) {
+                                    canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
+                                }
+                                // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
+                            });
+                        } else {
+                            console.log('Short chunk', chunk.length, 'padding')
                             workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
                             worker = workerInstance;
-                            feedChunksToModel(myArray, chunkStart, file, end, worker);
-                            chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
-                            // Now the async stuff is done ==>
-                            readStream.resume();
-                        }).catch((error) => {
-                            console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
-                            const fileIndex = filesBeingProcessed.indexOf(file);
-                            if (fileIndex !== -1) {
-                                canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
-                            }
-                            // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
-                        });
-                    } else {
-                        console.log('Short chunk', chunk.length, 'padding')
-                        workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-                        worker = workerInstance;
+    
+                            // Create array with 0's (short segment of silence that will trigger the finalChunk flag
+                            const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
+                            feedChunksToModel(myArray, chunkStart, file, end);
+                            //readStream.resume();
+                        }
+                    });
 
-                        // Create array with 0's (short segment of silence that will trigger the finalChunk flag
-                        const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
-                        feedChunksToModel(myArray, chunkStart, file, end);
-                        readStream.resume();
-                    }
-                })
-                readStream.on('end', function () {
-                    readStream.close();
-                    DEBUG && console.log('All chunks sent for ', file)
-                })
-                readStream.on('error', err => {
-                    console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
-                    err.code === 'ENOENT' && notifyMissingFile(file);
-                })
+                    stream.on('error', err => {
+                        console.log(`stream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
+                        err.code === 'ENOENT' && notifyMissingFile(file);
+                    })
+
+                    stream.on('end', function () {
+                        DEBUG && console.log('All chunks sent for ', file)
+                        resolve('finished')
+                    })
+
+                    command.run();
+                });
             }
-            
+
             /**
             *  Called when file first loaded, when result clicked and when saving or sending file snippets
             * @param args
@@ -1405,7 +1494,7 @@ const prepSummaryStatement = (included) => {
                         .duration(end - start)
                         .format('s16le')
                         .audioChannels(1) // Set to mono
-                        .audioFrequency(sampleRate) // Set sample rate to 24000 Hz
+                        .audioFrequency(24_000) // Set sample rate to 24000 Hz (always - this is for wavesurfer)
                         .output(stream, { end:true });
     
                     command.on('error', error => {
@@ -1429,7 +1518,7 @@ const prepSummaryStatement = (included) => {
                     stream.on('end', async () => {
                         // Concatenate the data chunks into a single Buffer
                         const arrayBuffer = Buffer.concat(data);
-                        const offlineCtx = await setupCtx(arrayBuffer, metadata[file].header, sampleRate).catch(error => {console.error(error.message)});
+                        const offlineCtx = await setupCtx(arrayBuffer, WAV_HEADER, sampleRate).catch(error => {console.error(error.message)});
                         if (offlineCtx){
                             offlineCtx.startRendering().then(resampled => {
                                 // `resampled` contains an AudioBuffer resampled at 24000Hz.
