@@ -926,10 +926,10 @@ const prepSummaryStatement = (included) => {
                 if (!metadata.file?.isComplete) {
                     await setMetadata({ file: file, proxy: proxy, source_file: source_file });
                         /*This is where we add week checking...
-                        GENERATING A WEEK SPECIFIC LIST FOR A LOCATION IS A *REALLY* EXPENSIVE TASK.
-                        LET'S CACHE included IDS FOR WEEK AND LOCATION. NEED TO ADAPT STATE.BLOCKED_IDS
-                        SO IT CAN BE USED THIS WAY. DEFAULT KEY -1. 
-                        STRUCTURE: BLOCKED_IDS.week.location = []; 
+                        SHOULD WE ADD WEEK (or even included ids) TO file METADATA?
+                        Also, does ths work for custom file locations?
+                        Also, looks like it's looking for the list in the wrong place - maybe should be calling get included ids
+                            - or better stil, defer incluided ids until analysis
                         */ 
                         if (STATE.list === 'location'){
                             const meta = metadata[file];
