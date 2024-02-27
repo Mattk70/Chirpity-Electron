@@ -24,7 +24,8 @@ const  BIRDNET_HEADER = Buffer.from([82,73,70,70,90,36,253,31,87,65,86,69,102,10
 let WAV_HEADER;
 let NUM_WORKERS;
 let workerInstance = 0;
-let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
+// let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
+let TEMP, appPath, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let LIST_WORKER;
 const DEBUG = true;
 
@@ -47,7 +48,7 @@ DEBUG && console.log(staticFfmpeg.path);
 ffmpeg.setFfmpegPath(staticFfmpeg.path.replace('app.asar', 'app.asar.unpacked'));
 
 let predictionsRequested = {}, predictionsReceived = {}, filesBeingProcessed = [];
-let canBeRemovedFromCache = [];
+// let canBeRemovedFromCache = [];
 let diskDB, memoryDB;
 
 let t0; // Application profiler
@@ -74,8 +75,6 @@ const createDB = async (file) => {
     await db.runAsync('CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL)');
     await db.runAsync(`CREATE TABLE files(id INTEGER PRIMARY KEY, name TEXT,duration  REAL,filestart INTEGER, locationID INTEGER, UNIQUE (name))`);
     await db.runAsync(`CREATE TABLE locations( id INTEGER PRIMARY KEY, lat REAL NOT NULL, lon  REAL NOT NULL, place TEXT NOT NULL, UNIQUE (lat, lon))`);
-    // await db.runAsync('CREATE TABLE blocked_species (lat REAL, lon REAL, week INTEGER, list TEXT NOT NULL, speciesID INTEGER NOT NULL, PRIMARY KEY (lat,lon,week,list,speciesID))');
-    //await db.runAsync('CREATE INDEX blocked_species_idx on blocked_species(lat,lon,week)');
     // Ensure place names are unique too
     await db.runAsync('CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)');
     await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT,  comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, UNIQUE (dateTime, fileID, speciesID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,  FOREIGN KEY (speciesID) REFERENCES species(id))`);
@@ -137,17 +136,6 @@ async function loadDB(path) {
         await createDB(file);
     } else if (diskDB?.filename !== file) {
         diskDB = new sqlite3.Database(file);
-        // // Add the blocked_species table if it is not present
-        // const {changes} = await diskDB.runAsync(`
-        //     CREATE TABLE IF NOT EXISTS blocked_species (
-        //         lat REAL NOT NULL,
-        //         lon REAL NOT NULL,
-        //         week INTEGER  NOT NULL,
-        //         list TEXT NOT NULL,
-        //         speciesID INTEGER  NOT NULL,
-        //         PRIMARY KEY (lat,lon,week,speciesID))`);
-        // await diskDB.runAsync('CREATE INDEX IF NOT EXISTS blocked_species_idx on blocked_species(lat,lon,week)')
-        // changes && console.log('Created a new blocked_species table and index');
         STATE.update({ db: diskDB });
         await diskDB.runAsync('VACUUM');
         await diskDB.runAsync('PRAGMA foreign_keys = ON');
@@ -212,8 +200,6 @@ const dirInfo = async ({ folder = undefined, recursive = false }) => {
     const pathResults = await Promise.all(paths);
     const flattenedPaths = pathResults.flat(Infinity);
     const size = flattenedPaths.reduce((i, size) => i + size, 0);
-    
-    //const size = (await Promise.all(paths)).flat(Infinity).reduce((i, size) => i + size, 0);
     // Newest to oldest file, so we can pop the list (faster)
     ctimes.sort((a, b) => {
         return a[1] - b[1]
@@ -222,37 +208,37 @@ const dirInfo = async ({ folder = undefined, recursive = false }) => {
     return [size, ctimes];
 }
 
-const clearCache = async (fileCache, sizeLimitInGB) => {
-    // Cache size
-    let [size,] = await dirInfo({ folder: fileCache });
-    const requiredSpace = sizeLimitInGB * 1024 ** 3;
-    // If Full, clear at least 25% of cache, so we're not doing this too frequently
-    if (size > requiredSpace) {
-        while (canBeRemovedFromCache.length > 1) {
-            const file = canBeRemovedFromCache.shift();
-            const proxy = metadata[file].proxy;
-            // Make sure we don't delete original files!
-            if (proxy !== file) {
-                const stat = fs.lstatSync(proxy);
-                // Remove tmp file from metadata
-                fs.rmSync(proxy, { force: true });
-                // Delete the metadata
-                delete metadata[file];
-                DEBUG && console.log(`removed ${file} from cache`);
-                size -= stat.size;
-            }
-        }
-        if (!canBeRemovedFromCache.length) {
-            DEBUG && console.log('All completed files removed from cache')
-            // Cache still full?
-            if (size > requiredSpace) {
-                DEBUG && console.log('Cache still full')
-            }
-        }
-        return true
-    }
-    return false
-}
+// const clearCache = async (fileCache, sizeLimitInGB) => {
+//     // Cache size
+//     let [size,] = await dirInfo({ folder: fileCache });
+//     const requiredSpace = sizeLimitInGB * 1024 ** 3;
+//     // If Full, clear at least 25% of cache, so we're not doing this too frequently
+//     if (size > requiredSpace) {
+//         while (canBeRemovedFromCache.length > 1) {
+//             const file = canBeRemovedFromCache.shift();
+//             const proxy = metadata[file].proxy;
+//             // Make sure we don't delete original files!
+//             if (proxy !== file) {
+//                 const stat = fs.lstatSync(proxy);
+//                 // Remove tmp file from metadata
+//                 fs.rmSync(proxy, { force: true });
+//                 // Delete the metadata
+//                 delete metadata[file];
+//                 DEBUG && console.log(`removed ${file} from cache`);
+//                 size -= stat.size;
+//             }
+//         }
+//         if (!canBeRemovedFromCache.length) {
+//             DEBUG && console.log('All completed files removed from cache')
+//             // Cache still full?
+//             if (size > requiredSpace) {
+//                 DEBUG && console.log('Cache still full')
+//             }
+//         }
+//         return true
+//     }
+//     return false
+// }
 
 async function handleMessage(e) {
     const args = e.data;
@@ -285,12 +271,12 @@ async function handleMessage(e) {
             await onChartRequest(args);
             break;
         }
-        case "clear-cache": {
-            CACHE_LOCATION = p.join(TEMP, "chirpity");
-            fs.existsSync(CACHE_LOCATION) || fs.mkdirSync(CACHE_LOCATION);
-            await clearCache(CACHE_LOCATION, 0);
-            break;
-        }
+        // case "clear-cache": {
+        //     CACHE_LOCATION = p.join(TEMP, "chirpity");
+        //     fs.existsSync(CACHE_LOCATION) || fs.mkdirSync(CACHE_LOCATION);
+        //     await clearCache(CACHE_LOCATION, 0);
+        //     break;
+        // }
         case "convert-dataset": {convertSpecsFromExistingSpecs();
             break;
         }
@@ -347,15 +333,15 @@ case "load-model": {
      Load model called with clear cache = false when: changing backend, bactchsize or threads
      */
     
-    DEBUG && console.log('clear cache', args.clearCache, 'location', CACHE_LOCATION)
-    if (args.clearCache) {
-    //  Since models have different sample rates, we need to clear the cache of 
-    //  files that have been resampled for a different model, and clear the proxy
-        Object.keys(metadata).forEach(key => metadata[key].proxy = undefined);
+    // DEBUG && console.log('clear cache', args.clearCache, 'location', CACHE_LOCATION)
+    // if (args.clearCache) {
+    // //  Since models have different sample rates, we need to clear the cache of 
+    // //  files that have been resampled for a different model, and clear the proxy
+    //     Object.keys(metadata).forEach(key => metadata[key].proxy = undefined);
 
-       // metadata = {};
-        ipcRenderer.invoke('clear-cache', CACHE_LOCATION)
-    }
+    //    // metadata = {};
+    //     ipcRenderer.invoke('clear-cache', CACHE_LOCATION)
+    // }
     predictWorkers.length && terminateWorkers();
     await onLaunch(args);
     break;
@@ -448,7 +434,7 @@ async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backen
     WAV_HEADER = model === 'birdnet' ? BIRDNET_HEADER : CHIRPITY_HEADER;
     setAudioContext(sampleRate);
     // intentional nullish assignment
-    CACHE_LOCATION ??= p.join(TEMP, "chirpity");
+    // CACHE_LOCATION ??= p.join(TEMP, "chirpity");
     UI.postMessage({event:'ready-for-tour'});
     BACKEND = backend;
     BATCH_SIZE = batchSize;
@@ -733,7 +719,7 @@ const prepSummaryStatement = (included) => {
                 //Reset GLOBAL variables
                 index = 0;
                 AUDACITY = {};
-                canBeRemovedFromCache = [];
+                // canBeRemovedFromCache = [];
                 batchChunksToSend = {};
                 FILE_QUEUE = filesInScope;
                 
@@ -1332,7 +1318,8 @@ const prepSummaryStatement = (included) => {
                                     console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
                                     const fileIndex = filesBeingProcessed.indexOf(file);
                                     if (fileIndex !== -1) {
-                                        canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
+                                        //canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
+                                        filesBeingProcessed.splice(fileIndex, 1)
                                     }
                                     // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
                                 });
@@ -1383,7 +1370,8 @@ const prepSummaryStatement = (included) => {
                         console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
                         const fileIndex = filesBeingProcessed.indexOf(file);
                         if (fileIndex !== -1) {
-                            canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
+                            // canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
+                            filesBeingProcessed.splice(fileIndex, 1)
                         }
                         // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
                     });
@@ -2129,8 +2117,8 @@ const prepSummaryStatement = (included) => {
                                     DEBUG && console.log('predictions left for', response.file, predictionsReceived[response.file] - predictionsRequested[response.file])
                                     const remaining = predictionsReceived[response.file] - predictionsRequested[response.file]
                                     if (remaining === 0) {
-                                        const limit = 10;
-                                        clearCache(CACHE_LOCATION, limit);
+                                        // const limit = 10;
+                                        // clearCache(CACHE_LOCATION, limit);
                                         if (filesBeingProcessed.length) {
                                             processNextFile({
                                                 worker: worker
@@ -2160,7 +2148,8 @@ const prepSummaryStatement = (included) => {
             // This method to determine batch complete
             const fileIndex = filesBeingProcessed.indexOf(file);
             if (fileIndex !== -1) {
-                canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
+                // canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
+                filesBeingProcessed.splice(fileIndex, 1)
                 UI.postMessage({ event: 'progress', progress: 1, file: file })
             }
             if (!filesBeingProcessed.length) {
