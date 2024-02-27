@@ -19,8 +19,28 @@ const { PassThrough } = require('stream');
 
 let WINDOW_SIZE = 3;
 const CHIRPITY_HEADER = Buffer.from([82,73,70,70,90,36,253,31,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,192,93,0,0,128,187,0,0,2,0,16,0,76,73,83,84,46,0,0,0,73,78,70,79,73,67,82,68,11,0,0,0,50,48,50,49,45,49,48,45,49,51,0,0,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,36,253,31]);
-const  BIRDNET_HEADER = Buffer.from([82,73,70,70,90,36,253,31,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,128,187,0,0,0,119,1,0,2,0,16,0,76,73,83,84,46,0,0,0,73,78,70,79,73,67,82,68,11,0,0,0,50,48,50,49,45,49,48,45,49,51,0,0,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,36,253,31]);
+//const  BIRDNET_HEADER = Buffer.from([82,73,70,70,90,36,253,31,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,128,187,0,0,0,119,1,0,2,0,16,0,76,73,83,84,46,0,0,0,73,78,70,79,73,67,82,68,11,0,0,0,50,48,50,49,45,49,48,45,49,51,0,0,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,36,253,31]);
+const  BIRDNET_HEADER = Buffer.from([82,73,70,70,128,134,250,63,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,68,172,0,0,136,88,1,0,2,0,16,0,76,73,83,84,84,0,0,0,73,78,70,79,73,67,82,68,11,0,0,0,50,48,50,52,45,48,50,45,49,50,0,0,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,73,84,67,72,29,0,0,0,84,65,83,67,65,77,32,80,67,77,32,82,101,99,111,100,101,114,32,68,82,45,49,48,48,109,107,51,0,0,100,97,116,97,0,134,250,63]);
 
+// Function to print the header elements and values
+function printWaveHeader(headerBuffer) {
+    console.log('Chunk ID:', headerBuffer.toString('utf8', 0, 4));
+    console.log('Chunk Size:', headerBuffer.readUInt32LE(4));
+    console.log('Format:', headerBuffer.toString('utf8', 8, 12));
+    console.log('Subchunk1 ID:', headerBuffer.toString('utf8', 12, 16));
+    console.log('Subchunk1 Size:', headerBuffer.readUInt32LE(16));
+    console.log('Audio Format:', headerBuffer.readUInt16LE(20));
+    console.log('Number of Channels:', headerBuffer.readUInt16LE(22));
+    console.log('Sample Rate:', headerBuffer.readUInt32LE(24));
+    console.log('Byte Rate:', headerBuffer.readUInt32LE(28));
+    console.log('Block Align:', headerBuffer.readUInt16LE(32));
+    console.log('Bits per Sample:', headerBuffer.readUInt16LE(34));
+    console.log('Subchunk2 ID:', headerBuffer.toString('utf8', 36, 40));
+    console.log('Subchunk2 Size:', headerBuffer.readUInt32LE(40));
+}
+
+// Example usage:
+printWaveHeader(BIRDNET_HEADER);
 let WAV_HEADER;
 let NUM_WORKERS;
 let workerInstance = 0;
@@ -1268,16 +1288,16 @@ const prepSummaryStatement = (included) => {
                 const highWaterMark = 2 * sampleRate * BATCH_SIZE * WINDOW_SIZE; // 4608000
                 const stream = new PassThrough({highWaterMark: highWaterMark});
                 let chunkStart = start * sampleRate;
+                let header;
                 return new Promise((resolve, reject) => {
                     const command = ffmpeg(file)
                         .seekInput(start)
                         .duration(end - start)
-                        .format('s16le')
-                        .outputOptions('-f s16le')
+                        .format('wav')
+                        .outputOptions('-acodec pcm_s16le')
                         .audioChannels(1) // Set to mono
                         .audioFrequency(sampleRate) // Set sample rate 
                         .output(stream, { highWaterMark: highWaterMark })
-                        //start === 0 && command.output('file.wav')
     
                     command.on('error', error => {
                         updateFilesBeingProcessed(file)
@@ -1289,12 +1309,18 @@ const prepSummaryStatement = (included) => {
                     command.on('end', () => {
                         // End the stream to signify completion
                         stream.end();
+                        console.log('file saved!')
                     });
             
                     stream.on('data', async chunk => {
                         if (aborted) {
                             stream.end()
                             return
+                        }
+                        if (! header){
+                            header = chunk.slice(0,44);
+                            chunk = chunk.slice(44);
+                            printWaveHeader(header);
                         }
                         concatenatedBuffer = Buffer.concat([concatenatedBuffer, chunk]);
                         // we have a full buffer
