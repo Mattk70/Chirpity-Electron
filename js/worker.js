@@ -1159,10 +1159,12 @@ const prepSummaryStatement = (included) => {
                 })
             }
             
-            const convertTimeToBytes = (time, metadata) => {
-                const bytesPerSample = metadata.bitsPerSample / 8;
+            const convertTimeToBytes = (time) => {
+                const bytesPerSample = 2; // 16bit WAV
+                const bytesPerSec = 2 * sampleRate;
+                const header_offset = 44; // length of wave header
                 // get the nearest sample start - they can be 2,3 or 4 bytes representations. Then add the header offest
-                return (Math.round((time * metadata.bytesPerSec) / bytesPerSample) * bytesPerSample) + metadata.head;
+                return (Math.round((time * bytesPerSec) / bytesPerSample) * bytesPerSample) + header_offset;
             }
             
             async function setupCtx(chunk, header, rate) {
@@ -1250,6 +1252,7 @@ const prepSummaryStatement = (included) => {
                 return offlineCtx;
             };
             
+
             /**
             *
             * @param file
@@ -1273,7 +1276,9 @@ const prepSummaryStatement = (included) => {
                 predictionsReceived[file] = 0;
                 predictionsRequested[file] = 0;
                 let concatenatedBuffer = Buffer.alloc(0);
-                const highWaterMark = 2 * sampleRate * BATCH_SIZE * WINDOW_SIZE; // 4608000
+                const byteStart = convertTimeToBytes(start);
+                const byteEnd = convertTimeToBytes(end);
+                const highWaterMark = (byteEnd - byteStart) * BATCH_SIZE * WINDOW_SIZE; // 4608000
                 const stream = new PassThrough({highWaterMark: highWaterMark});
                 let chunkStart = start * sampleRate;
                 return new Promise((resolve, reject) => {
@@ -1285,7 +1290,6 @@ const prepSummaryStatement = (included) => {
                         .audioChannels(1) // Set to mono
                         .audioFrequency(sampleRate) // Set sample rate 
                         .output(stream, { highWaterMark: highWaterMark })
-                        .output('temp.wav')
                         //start === 0 && command.output('file.wav')
     
                     command.on('error', error => {
