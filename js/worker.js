@@ -1273,7 +1273,7 @@ const prepSummaryStatement = (included) => {
                 predictionsReceived[file] = 0;
                 predictionsRequested[file] = 0;
                 let concatenatedBuffer = Buffer.alloc(0);
-                const highWaterMark = sampleRate * BATCH_SIZE * WINDOW_SIZE; // 4608000
+                const highWaterMark = 2 * sampleRate * BATCH_SIZE * WINDOW_SIZE; // 4608000
                 const stream = new PassThrough({highWaterMark: highWaterMark});
                 let chunkStart = start * sampleRate;
                 return new Promise((resolve, reject) => {
@@ -1284,7 +1284,8 @@ const prepSummaryStatement = (included) => {
                         .outputOptions('-f s16le')
                         .audioChannels(1) // Set to mono
                         .audioFrequency(sampleRate) // Set sample rate 
-                        .output(stream, { highWaterMark: highWaterMark });
+                        .output(stream, { highWaterMark: highWaterMark })
+                        .output('temp.wav')
                         //start === 0 && command.output('file.wav')
     
                     command.on('error', error => {
@@ -1293,10 +1294,6 @@ const prepSummaryStatement = (included) => {
                     });
                     command.on('start', function (commandLine) {
                         DEBUG && console.log('FFmpeg command: ' + commandLine);
-                    })
-                    command.on('codecdata', function (commandLine) {
-                        const a = data.duration.split(':');
-                        totalTime = parseInt(a[0]) * 3600 + parseInt(a[1]) * 60 + parseFloat(a[2]);
                     })
                     command.on('end', () => {
                         // End the stream to signify completion
@@ -1313,9 +1310,10 @@ const prepSummaryStatement = (included) => {
                         if (concatenatedBuffer.length >= highWaterMark) {
                             chunk = concatenatedBuffer.slice(0, highWaterMark);
                             concatenatedBuffer = concatenatedBuffer.slice(highWaterMark);
-                            chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
+                            
                             console.log('chunkstart is', chunkStart)
                             await sendBuffer(chunk, chunkStart, end, file)
+                            chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
                         }
                     });
 
@@ -1327,8 +1325,8 @@ const prepSummaryStatement = (included) => {
                     stream.on('end', async function () {
                         // deal with part-full buffers
                         if (concatenatedBuffer.length){
-                            chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
                             await sendBuffer(concatenatedBuffer, chunkStart, end, file)
+                            chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
                         }
                         DEBUG && console.log('All chunks sent for ', file)
                         resolve('finished')
@@ -2045,6 +2043,7 @@ const prepSummaryStatement = (included) => {
                             const received = sumObjectValues(predictionsReceived);
                             const total = sumObjectValues(batchChunksToSend);
                             const progress = received / total;
+                            console.log('received', received, 'total', total);
                             const fileProgress = predictionsReceived[file] / batchChunksToSend[file];
                             UI.postMessage({ event: 'progress', progress: progress, file: file });
                             if (fileProgress === 1) {
