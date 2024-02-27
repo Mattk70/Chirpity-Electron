@@ -19,7 +19,26 @@ const { PassThrough } = require('stream');
 
 let WINDOW_SIZE = 3;
 const CHIRPITY_HEADER = Buffer.from([82,73,70,70,90,36,253,31,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,192,93,0,0,128,187,0,0,2,0,16,0,76,73,83,84,46,0,0,0,73,78,70,79,73,67,82,68,11,0,0,0,50,48,50,49,45,49,48,45,49,51,0,0,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,36,253,31]);
-const  BIRDNET_HEADER  = Buffer.from([82,73,70,70,255,255,255,255,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,128,187,0,0,128,187,0,0,2,0,16,0,100,97,116,97,26,0,0,0,73,78,70,79,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,200,25,0]);
+const  BIRDNET_HEADER = Buffer.from([82,73,70,70,90,36,253,31,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,192,93,0,0,128,187,0,0,2,0,16,0,76,73,83,84,46,0,0,0,73,78,70,79,73,67,82,68,11,0,0,0,50,48,50,49,45,49,48,45,49,51,0,0,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,36,253,31]);
+function printWaveHeader(headerBuffer) {
+    console.log('Chunk ID:', headerBuffer.toString('utf8', 0, 4));
+    console.log('Chunk Size:', headerBuffer.readUInt32LE(4));
+    console.log('Format:', headerBuffer.toString('utf8', 8, 12));
+    console.log('Subchunk1 ID:', headerBuffer.toString('utf8', 12, 16));
+    console.log('Subchunk1 Size:', headerBuffer.readUInt32LE(16));
+    console.log('Audio Format:', headerBuffer.readUInt16LE(20));
+    console.log('Number of Channels:', headerBuffer.readUInt16LE(22));
+    console.log('Sample Rate:', headerBuffer.readUInt32LE(24));
+    console.log('Byte Rate:', headerBuffer.readUInt32LE(28));
+    console.log('Block Align:', headerBuffer.readUInt16LE(32));
+    console.log('Bits per Sample:', headerBuffer.readUInt16LE(34));
+    console.log('Subchunk2 ID:', headerBuffer.toString('utf8', 36, 40));
+    console.log('Subchunk2 Size:', headerBuffer.readUInt32LE(40));
+}
+console.log('chirpity header')
+printWaveHeader(CHIRPITY_HEADER)
+console.log('birdnet header')
+printWaveHeader(BIRDNET_HEADER)
 let WAV_HEADER;
 let NUM_WORKERS;
 let workerInstance = 0;
@@ -902,35 +921,35 @@ const prepSummaryStatement = (included) => {
                 if (!source_file) return false;
                 let proxy = source_file;
                 
-                if (STATE.audio.normalise || ! source_file.endsWith('.wav')) {
-                    const pc = p.parse(source_file);
-                    const filename = pc.base + '.wav';
-                    const prefix = pc.dir.replace(pc.root, '');
-                    const path = p.join(CACHE_LOCATION, prefix);
-                    if (!fs.existsSync(path)) {
-                        await mkdir(path, { recursive: true });
-                    }
-                    const destination = p.join(path, filename);
+                // if (STATE.audio.normalise || ! source_file.endsWith('.wav')) {
+                //     const pc = p.parse(source_file);
+                //     const filename = pc.base + '.wav';
+                //     const prefix = pc.dir.replace(pc.root, '');
+                //     const path = p.join(CACHE_LOCATION, prefix);
+                //     if (!fs.existsSync(path)) {
+                //         await mkdir(path, { recursive: true });
+                //     }
+                //     const destination = p.join(path, filename);
                     
-                    if (fs.existsSync(destination)) {
-                        proxy = destination;
-                    } else {
-                        // get some metadata from the source file
-                        const statsObj = fs.statSync(source_file);
-                        const sourceMtime = statsObj.mtime;
-                        proxy = await convertFileFormat(source_file, destination, statsObj.size, function (errorMessage) {
-                            console.log('An error occurred converting to wav:', errorMessage);
-                            return true;
-                        });
-                        // assign the source file's save time to the proxy file
-                        const mtime = sourceMtime.getTime();
-                        try{
-                            utimesSync(proxy, mtime);
-                        } catch (error){
-                            console.log('error setting uTime', error)
-                        }
-                    }
-                }
+                //     if (fs.existsSync(destination)) {
+                //         proxy = destination;
+                //     } else {
+                //         // get some metadata from the source file
+                //         const statsObj = fs.statSync(source_file);
+                //         const sourceMtime = statsObj.mtime;
+                //         proxy = await convertFileFormat(source_file, destination, statsObj.size, function (errorMessage) {
+                //             console.log('An error occurred converting to wav:', errorMessage);
+                //             return true;
+                //         });
+                //         // assign the source file's save time to the proxy file
+                //         const mtime = sourceMtime.getTime();
+                //         try{
+                //             utimesSync(proxy, mtime);
+                //         } catch (error){
+                //             console.log('error setting uTime', error)
+                //         }
+                //     }
+                // }
                 if (!metadata.file?.isComplete) {
                     await setMetadata({ file: file, proxy: proxy, source_file: source_file });
                         /*This is where we add week checking...
@@ -1107,54 +1126,56 @@ const prepSummaryStatement = (included) => {
                         }
                         // Now we have completed the date comparison above, we convert fileStart to millis
                         fileStart = fileStart.getTime();
+                        metadata[file].fileStart = fileStart;
+                        return resolve(metadata[file]);
                         // We use proxy here as the file *must* be a wav file
-                        let readStream;
-                        try {
-                            // Your code that may throw a TypeError
-                            readStream = fs.createReadStream(proxy);
-                        } catch (error) {
-                            if (error instanceof TypeError) {
-                                // Handle the TypeError
-                                console.error('Caught a TypeError setmetadata:', error.message);
-                            } else {
-                                // Handle other types of errors
-                                console.error('An unexpected error occurred:', error.message);
-                            }
-                        }
+                        // let readStream;
+                        // try {
+                        //     // Your code that may throw a TypeError
+                        //     readStream = fs.createReadStream(proxy);
+                        // } catch (error) {
+                        //     if (error instanceof TypeError) {
+                        //         // Handle the TypeError
+                        //         console.error('Caught a TypeError setmetadata:', error.message);
+                        //     } else {
+                        //         // Handle other types of errors
+                        //         console.error('An unexpected error occurred:', error.message);
+                        //     }
+                        // }
                         
                         
-                        readStream.on('data', async chunk => {
-                            let wav = new wavefileReader.WaveFileReader();
-                            wav.fromBuffer(chunk);
-                            // Extract Header
-                            let headerEnd;
-                            wav.signature.subChunks.forEach(el => {
-                                if (el['chunkId'] === 'data') {
-                                    headerEnd = el.chunkData.start;
-                                }
-                            });
-                            // Update relevant file properties
-                            metadata[file].head = headerEnd;
-                            metadata[file].header = chunk.subarray(0, headerEnd)
-                            metadata[file].bytesPerSec = wav.fmt.byteRate;
-                            metadata[file].numChannels = wav.fmt.numChannels;
-                            metadata[file].sampleRate = wav.fmt.sampleRate;
-                            metadata[file].bitsPerSample = wav.fmt.bitsPerSample
-                            metadata[file].fileStart = fileStart;
-                            // Set complete flag
-                            metadata[file].isComplete = true;
-                            metadata[file].proxy = file;  // now we have the wav metadata, we don't need the proxy any more
-                            // REMOVE PROXY
-                            readStream.close()
-                            return resolve(metadata[file]);
-                        });
-                        readStream.on('error', err => {
-                            UI.postMessage({
-                                event: 'generate-alert',
-                                message: `Error reading file: ` + file
-                            })
-                            console.log('readstream error:' + err)
-                        })
+                        // readStream.on('data', async chunk => {
+                        //     let wav = new wavefileReader.WaveFileReader();
+                        //     wav.fromBuffer(chunk);
+                        //     // Extract Header
+                        //     let headerEnd;
+                        //     wav.signature.subChunks.forEach(el => {
+                        //         if (el['chunkId'] === 'data') {
+                        //             headerEnd = el.chunkData.start;
+                        //         }
+                        //     });
+                        //     // Update relevant file properties
+                        //     metadata[file].head = headerEnd;
+                        //     metadata[file].header = chunk.subarray(0, headerEnd)
+                        //     metadata[file].bytesPerSec = wav.fmt.byteRate;
+                        //     metadata[file].numChannels = wav.fmt.numChannels;
+                        //     metadata[file].sampleRate = wav.fmt.sampleRate;
+                        //     metadata[file].bitsPerSample = wav.fmt.bitsPerSample
+                        //     metadata[file].fileStart = fileStart;
+                        //     // Set complete flag
+                        //     metadata[file].isComplete = true;
+                        //     metadata[file].proxy = file;  // now we have the wav metadata, we don't need the proxy any more
+                        //     // REMOVE PROXY
+                        //     readStream.close()
+                        //     return resolve(metadata[file]);
+                        // });
+                        // readStream.on('error', err => {
+                        //     UI.postMessage({
+                        //         event: 'generate-alert',
+                        //         message: `Error reading file: ` + file
+                        //     })
+                        //     console.log('readstream error:' + err)
+                        // })
                     }
                 })
             }
@@ -1276,8 +1297,6 @@ const prepSummaryStatement = (included) => {
                 predictionsReceived[file] = 0;
                 predictionsRequested[file] = 0;
                 let concatenatedBuffer = Buffer.alloc(0);
-                const byteStart = convertTimeToBytes(start);
-                const byteEnd = convertTimeToBytes(end);
                 const highWaterMark = 2 * sampleRate * BATCH_SIZE * WINDOW_SIZE; // 4608000
                 const stream = new PassThrough({highWaterMark: highWaterMark});
                 let chunkStart = start * sampleRate;
@@ -1315,9 +1334,37 @@ const prepSummaryStatement = (included) => {
                             chunk = concatenatedBuffer.slice(0, highWaterMark);
                             concatenatedBuffer = concatenatedBuffer.slice(highWaterMark);
                             
-                            console.log('chunkstart is', chunkStart)
-                            await sendBuffer(chunk, chunkStart, end, file)
-                            chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
+                            const offlineCtx = await setupCtx(chunk,WAV_HEADER);
+                            let worker;
+                            if (offlineCtx) {
+                                offlineCtx.startRendering().then((resampled) => {
+                                    const myArray = resampled.getChannelData(0);
+                                    workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+                                    worker = workerInstance;
+                                    console.log('chunkstart:', chunkStart, 'file', file)
+                                    feedChunksToModel(myArray, chunkStart, file, end, worker);
+                                    chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
+                                    // Now the async stuff is done ==>
+                                    //readStream.resume();
+                                }).catch((error) => {
+                                    console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
+                                    const fileIndex = filesBeingProcessed.indexOf(file);
+                                    if (fileIndex !== -1) {
+                                        canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
+                                    }
+                                    // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
+                                });
+                            } else {
+                                console.error('Short chunk', chunk.length, 'padding')
+                                workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+                                worker = workerInstance;
+
+                                // Create array with 0's (short segment of silence that will trigger the finalChunk flag
+                                const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
+                                feedChunksToModel(myArray, chunkStart, file, end);
+                                console.log('chunkstart:', chunkStart, 'file', file)
+                                //readStream.resume();
+                            }
                         }
                     });
 
@@ -1330,7 +1377,6 @@ const prepSummaryStatement = (included) => {
                         // deal with part-full buffers
                         if (concatenatedBuffer.length){
                             await sendBuffer(concatenatedBuffer, chunkStart, end, file)
-                            chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
                         }
                         DEBUG && console.log('All chunks sent for ', file)
                         resolve('finished')
@@ -1348,7 +1394,7 @@ const prepSummaryStatement = (included) => {
                         workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
                         worker = workerInstance;
                         feedChunksToModel(myArray, chunkStart, file, end, worker);
-                        
+                        chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
                         // Now the async stuff is done ==>
                         //readStream.resume();
                     }).catch((error) => {
@@ -1370,6 +1416,7 @@ const prepSummaryStatement = (included) => {
                     //readStream.resume();
                 }
             }
+
             /**
             *  Called when file first loaded, when result clicked and when saving or sending file snippets
             * @param args
