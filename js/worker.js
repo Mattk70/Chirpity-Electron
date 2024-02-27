@@ -19,28 +19,8 @@ const { PassThrough } = require('stream');
 
 let WINDOW_SIZE = 3;
 const CHIRPITY_HEADER = Buffer.from([82,73,70,70,90,36,253,31,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,192,93,0,0,128,187,0,0,2,0,16,0,76,73,83,84,46,0,0,0,73,78,70,79,73,67,82,68,11,0,0,0,50,48,50,49,45,49,48,45,49,51,0,0,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,36,253,31]);
-//const  BIRDNET_HEADER = Buffer.from([82,73,70,70,90,36,253,31,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,128,187,0,0,0,119,1,0,2,0,16,0,76,73,83,84,46,0,0,0,73,78,70,79,73,67,82,68,11,0,0,0,50,48,50,49,45,49,48,45,49,51,0,0,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,36,253,31]);
-const  BIRDNET_HEADER = Buffer.from([82,73,70,70,128,134,250,63,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,68,172,0,0,136,88,1,0,2,0,16,0,76,73,83,84,84,0,0,0,73,78,70,79,73,67,82,68,11,0,0,0,50,48,50,52,45,48,50,45,49,50,0,0,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,73,84,67,72,29,0,0,0,84,65,83,67,65,77,32,80,67,77,32,82,101,99,111,100,101,114,32,68,82,45,49,48,48,109,107,51,0,0,100,97,116,97,0,134,250,63]);
+const  BIRDNET_HEADER = Buffer.from([82,73,70,70,92,247,162,69,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,128,187,0,0,0,119,1,0,2,0,16,0,76,73,83,84,84,0,0,0,73,78,70,79,73,67,82,68,11,0,0,0,50,48,50,52,45,48,50,45,49,50,0,0,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,73,84,67,72,29,0,0,0,84,65,83,67,65,77,32,80,67,77,32,82,101,99,111,100,101,114,32,68,82,45,49,48,48,109,107,51,0,0,100,97,116,97,220,246,162,69]);
 
-// Function to print the header elements and values
-function printWaveHeader(headerBuffer) {
-    console.log('Chunk ID:', headerBuffer.toString('utf8', 0, 4));
-    console.log('Chunk Size:', headerBuffer.readUInt32LE(4));
-    console.log('Format:', headerBuffer.toString('utf8', 8, 12));
-    console.log('Subchunk1 ID:', headerBuffer.toString('utf8', 12, 16));
-    console.log('Subchunk1 Size:', headerBuffer.readUInt32LE(16));
-    console.log('Audio Format:', headerBuffer.readUInt16LE(20));
-    console.log('Number of Channels:', headerBuffer.readUInt16LE(22));
-    console.log('Sample Rate:', headerBuffer.readUInt32LE(24));
-    console.log('Byte Rate:', headerBuffer.readUInt32LE(28));
-    console.log('Block Align:', headerBuffer.readUInt16LE(32));
-    console.log('Bits per Sample:', headerBuffer.readUInt16LE(34));
-    console.log('Subchunk2 ID:', headerBuffer.toString('utf8', 36, 40));
-    console.log('Subchunk2 Size:', headerBuffer.readUInt32LE(40));
-}
-
-// Example usage:
-printWaveHeader(BIRDNET_HEADER);
 let WAV_HEADER;
 let NUM_WORKERS;
 let workerInstance = 0;
@@ -68,7 +48,6 @@ DEBUG && console.log(staticFfmpeg.path);
 ffmpeg.setFfmpegPath(staticFfmpeg.path.replace('app.asar', 'app.asar.unpacked'));
 
 let predictionsRequested = {}, predictionsReceived = {}, filesBeingProcessed = [];
-// let canBeRemovedFromCache = [];
 let diskDB, memoryDB;
 
 let t0; // Application profiler
@@ -99,9 +78,7 @@ const createDB = async (file) => {
     await db.runAsync('CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)');
     await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT,  comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, UNIQUE (dateTime, fileID, speciesID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,  FOREIGN KEY (speciesID) REFERENCES species(id))`);
     await db.runAsync(`CREATE TABLE duration( day INTEGER, duration INTEGER, fileID INTEGER, UNIQUE (day, fileID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`);
-    // await db.runAsync('CREATE INDEX idx_datetime ON records(dateTime)');
-    // await db.runAsync('CREATE INDEX idx_species ON records(speciesID)');
-    // await db.runAsync('CREATE INDEX idx_files ON records(fileID)');
+
     if (archiveMode) {
         for (let i = 0; i < LABELS.length; i++) {
             const [sname, cname] = LABELS[i].replaceAll("'", "''").split('_');
@@ -228,38 +205,6 @@ const dirInfo = async ({ folder = undefined, recursive = false }) => {
     return [size, ctimes];
 }
 
-// const clearCache = async (fileCache, sizeLimitInGB) => {
-//     // Cache size
-//     let [size,] = await dirInfo({ folder: fileCache });
-//     const requiredSpace = sizeLimitInGB * 1024 ** 3;
-//     // If Full, clear at least 25% of cache, so we're not doing this too frequently
-//     if (size > requiredSpace) {
-//         while (canBeRemovedFromCache.length > 1) {
-//             const file = canBeRemovedFromCache.shift();
-//             const proxy = metadata[file].proxy;
-//             // Make sure we don't delete original files!
-//             if (proxy !== file) {
-//                 const stat = fs.lstatSync(proxy);
-//                 // Remove tmp file from metadata
-//                 fs.rmSync(proxy, { force: true });
-//                 // Delete the metadata
-//                 delete metadata[file];
-//                 DEBUG && console.log(`removed ${file} from cache`);
-//                 size -= stat.size;
-//             }
-//         }
-//         if (!canBeRemovedFromCache.length) {
-//             DEBUG && console.log('All completed files removed from cache')
-//             // Cache still full?
-//             if (size > requiredSpace) {
-//                 DEBUG && console.log('Cache still full')
-//             }
-//         }
-//         return true
-//     }
-//     return false
-// }
-
 async function handleMessage(e) {
     const args = e.data;
     const action = args.action;
@@ -291,12 +236,6 @@ async function handleMessage(e) {
             await onChartRequest(args);
             break;
         }
-        // case "clear-cache": {
-        //     CACHE_LOCATION = p.join(TEMP, "chirpity");
-        //     fs.existsSync(CACHE_LOCATION) || fs.mkdirSync(CACHE_LOCATION);
-        //     await clearCache(CACHE_LOCATION, 0);
-        //     break;
-        // }
         case "convert-dataset": {convertSpecsFromExistingSpecs();
             break;
         }
@@ -349,19 +288,6 @@ case "insert-manual-record": { await onInsertManualRecord(args);
     break;
 }
 case "load-model": {
-    /* Load model called with cleaCache=true when switching model *after* app launch
-     Load model called with clear cache = false when: changing backend, bactchsize or threads
-     */
-    
-    // DEBUG && console.log('clear cache', args.clearCache, 'location', CACHE_LOCATION)
-    // if (args.clearCache) {
-    // //  Since models have different sample rates, we need to clear the cache of 
-    // //  files that have been resampled for a different model, and clear the proxy
-    //     Object.keys(metadata).forEach(key => metadata[key].proxy = undefined);
-
-    //    // metadata = {};
-    //     ipcRenderer.invoke('clear-cache', CACHE_LOCATION)
-    // }
     predictWorkers.length && terminateWorkers();
     await onLaunch(args);
     break;
@@ -453,8 +379,6 @@ async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backen
     sampleRate = model === "birdnet" ? 48_000 : 24_000;
     WAV_HEADER = model === 'birdnet' ? BIRDNET_HEADER : CHIRPITY_HEADER;
     setAudioContext(sampleRate);
-    // intentional nullish assignment
-    // CACHE_LOCATION ??= p.join(TEMP, "chirpity");
     UI.postMessage({event:'ready-for-tour'});
     BACKEND = backend;
     BATCH_SIZE = batchSize;
@@ -843,53 +767,6 @@ const prepSummaryStatement = (included) => {
                 });
             }
 
-            const convertFileFormat = (file, destination, size, error) => {
-                return new Promise(function (resolve, reject) {
-                    const sampleRate = STATE.model === 'birdnet' ? 48_000 :24_000, channels = 1;
-                    let totalTime;
-                    let command = ffmpeg(file)
-                    .audioChannels(channels)
-                    .audioFrequency(sampleRate)
-                    .duration(20) // just do 1 second - so we have something to get the headers from
-                    .on('error', (err) => {
-                        console.log('An error occurred: ' + err.message);
-                        if (err) {
-                            reject(error(err.message));
-                        }
-                    })
-                    // Handle progress % being undefined
-                    .on('codecData', async data => {
-                        // HERE YOU GET THE TOTAL TIME
-                        const a = data.duration.split(':');
-                        totalTime = parseInt(a[0]) * 3600 + parseInt(a[1]) * 60 + parseFloat(a[2]);
-                        //metadata[file] = { duration: totalTime }
-                        //totalTime = parseInt(data.duration.replace(/:/g, ''))
-                    })
-                    .on('progress', (progress) => {
-                        // HERE IS THE CURRENT TIME
-                        //const time = parseInt(progress.timemark.replace(/:/g, ''))
-                        const a = progress.timemark.split(':');
-                        const time = parseInt(a[0]) * 3600 + parseInt(a[1]) * 60 + parseFloat(a[2]);
-                        // AND HERE IS THE CALCULATION
-                        const extractionProgress = time / totalTime;
-                        //process.stdout.write(`Processing: ${((time / totalTime) * 100).toFixed(0)}% converted\r`);
-                        UI.postMessage({
-                            event: 'progress', text: 'Extracting file', progress: extractionProgress
-                        })
-                    })
-                    .on('start', function (commandLine) {
-                        DEBUG && console.log('FFmpeg command: ' + commandLine);
-                    })
-                    .on('end', () => {
-                        UI.postMessage({ event: 'progress', text: 'File decompressed', progress: 1 })
-                        resolve(destination)
-                    })
-                    .save(destination)
-                    
-                    //STATE.audio.normalise && command.audioFilter("loudnorm=I=-16:LRA=11:TP=-1.5")
-                    
-                });
-            }
             
             /**
             * getWorkingFile called by loadAudioFile, getPredictBuffers, fetchAudioBuffer and processNextFile
@@ -909,35 +786,6 @@ const prepSummaryStatement = (included) => {
                 if (!source_file) return false;
                 let proxy = source_file;
                 
-                // if (STATE.audio.normalise || ! source_file.endsWith('.wav')) {
-                //     const pc = p.parse(source_file);
-                //     const filename = pc.base + '.wav';
-                //     const prefix = pc.dir.replace(pc.root, '');
-                //     const path = p.join(CACHE_LOCATION, prefix);
-                //     if (!fs.existsSync(path)) {
-                //         await mkdir(path, { recursive: true });
-                //     }
-                //     const destination = p.join(path, filename);
-                    
-                //     if (fs.existsSync(destination)) {
-                //         proxy = destination;
-                //     } else {
-                //         // get some metadata from the source file
-                //         const statsObj = fs.statSync(source_file);
-                //         const sourceMtime = statsObj.mtime;
-                //         proxy = await convertFileFormat(source_file, destination, statsObj.size, function (errorMessage) {
-                //             console.log('An error occurred converting to wav:', errorMessage);
-                //             return true;
-                //         });
-                //         // assign the source file's save time to the proxy file
-                //         const mtime = sourceMtime.getTime();
-                //         try{
-                //             utimesSync(proxy, mtime);
-                //         } catch (error){
-                //             console.log('error setting uTime', error)
-                //         }
-                //     }
-                // }
                 if (!metadata.file?.isComplete) {
                     await setMetadata({ file: file, proxy: proxy, source_file: source_file });
                         /*This is where we add week checking...
@@ -997,11 +845,9 @@ const prepSummaryStatement = (included) => {
                 UI.postMessage({
                     event: 'generate-alert',
                     message: `Unable to locate source file with any supported file extension: ${file}`,
-                    // If we have this file in the archive, but can't find it, prompt to delete it
                     file: missingFile
                 })
             }
-            // Function to convert a WAVE header buffer to human-readable text
 
             async function loadAudioFile({
                 file = '',
@@ -1116,64 +962,8 @@ const prepSummaryStatement = (included) => {
                         fileStart = fileStart.getTime();
                         metadata[file].fileStart = fileStart;
                         return resolve(metadata[file]);
-                        // We use proxy here as the file *must* be a wav file
-                        // let readStream;
-                        // try {
-                        //     // Your code that may throw a TypeError
-                        //     readStream = fs.createReadStream(proxy);
-                        // } catch (error) {
-                        //     if (error instanceof TypeError) {
-                        //         // Handle the TypeError
-                        //         console.error('Caught a TypeError setmetadata:', error.message);
-                        //     } else {
-                        //         // Handle other types of errors
-                        //         console.error('An unexpected error occurred:', error.message);
-                        //     }
-                        // }
-                        
-                        
-                        // readStream.on('data', async chunk => {
-                        //     let wav = new wavefileReader.WaveFileReader();
-                        //     wav.fromBuffer(chunk);
-                        //     // Extract Header
-                        //     let headerEnd;
-                        //     wav.signature.subChunks.forEach(el => {
-                        //         if (el['chunkId'] === 'data') {
-                        //             headerEnd = el.chunkData.start;
-                        //         }
-                        //     });
-                        //     // Update relevant file properties
-                        //     metadata[file].head = headerEnd;
-                        //     metadata[file].header = chunk.subarray(0, headerEnd)
-                        //     metadata[file].bytesPerSec = wav.fmt.byteRate;
-                        //     metadata[file].numChannels = wav.fmt.numChannels;
-                        //     metadata[file].sampleRate = wav.fmt.sampleRate;
-                        //     metadata[file].bitsPerSample = wav.fmt.bitsPerSample
-                        //     metadata[file].fileStart = fileStart;
-                        //     // Set complete flag
-                        //     metadata[file].isComplete = true;
-                        //     metadata[file].proxy = file;  // now we have the wav metadata, we don't need the proxy any more
-                        //     // REMOVE PROXY
-                        //     readStream.close()
-                        //     return resolve(metadata[file]);
-                        // });
-                        // readStream.on('error', err => {
-                        //     UI.postMessage({
-                        //         event: 'generate-alert',
-                        //         message: `Error reading file: ` + file
-                        //     })
-                        //     console.log('readstream error:' + err)
-                        // })
                     }
                 })
-            }
-            
-            const convertTimeToBytes = (time) => {
-                const bytesPerSample = 2; // 16bit WAV
-                const bytesPerSec = 2 * sampleRate;
-                const header_offset = 44; // length of wave header
-                // get the nearest sample start - they can be 2,3 or 4 bytes representations. Then add the header offest
-                return (Math.round((time * bytesPerSec) / bytesPerSample) * bytesPerSample) + header_offset;
             }
             
             async function setupCtx(chunk, header, rate) {
@@ -1320,7 +1110,6 @@ const prepSummaryStatement = (included) => {
                         if (! header){
                             header = chunk.slice(0,44);
                             chunk = chunk.slice(44);
-                            printWaveHeader(header);
                         }
                         concatenatedBuffer = Buffer.concat([concatenatedBuffer, chunk]);
                         // we have a full buffer
@@ -1328,41 +1117,37 @@ const prepSummaryStatement = (included) => {
                             chunk = concatenatedBuffer.slice(0, highWaterMark);
                             concatenatedBuffer = concatenatedBuffer.slice(highWaterMark);
                             
-                            const offlineCtx = await setupCtx(chunk,WAV_HEADER);
-                            let worker;
-                            if (offlineCtx) {
-                                offlineCtx.startRendering().then((resampled) => {
+                            setupCtx(chunk,WAV_HEADER)
+                            .then(offlineCtx => offlineCtx.startRendering()
+                            .then((resampled) => {
                                     const myArray = resampled.getChannelData(0);
                                     workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-                                    worker = workerInstance;
-                                    console.log('chunkstart:', chunkStart, 'file', file)
+                                    let worker = workerInstance;
+                                    DEBUG && console.log('chunkstart:', chunkStart, 'file', file)
                                     feedChunksToModel(myArray, chunkStart, file, end, worker);
                                     chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
-                                    // Now the async stuff is done ==>
-                                    //readStream.resume();
-                                }).catch((error) => {
+                                })
+                            .catch((error) => {
                                     console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
                                     const fileIndex = filesBeingProcessed.indexOf(file);
                                     if (fileIndex !== -1) {
-                                        //canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
                                         filesBeingProcessed.splice(fileIndex, 1)
                                     }
-                                    // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
-                                });
-                            } else {
-                                console.error('Short chunk', chunk.length, 'padding')
-                                workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-                                worker = workerInstance;
-
-                                // Create array with 0's (short segment of silence that will trigger the finalChunk flag
-                                const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
-                                feedChunksToModel(myArray, chunkStart, file, end);
-                                console.log('chunkstart:', chunkStart, 'file', file)
-                                //readStream.resume();
-                            }
+                                }))
+                            .catch(error => {
+                                    console.error('Short chunk', chunk.length, 'padding')
+                                    workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+                                    worker = workerInstance;
+                                    // Create array with 0's (short segment of silence that will trigger the finalChunk flag
+                                    const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
+                                    feedChunksToModel(myArray, chunkStart, file, end);
+                                    console.log('chunkstart:', chunkStart, 'file', file)
+                                })
+                                
+                            
+                            
                         }
-                    });
-
+                    })
                     stream.on('error', err => {
                         console.log(`stream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
                         err.code === 'ENOENT' && notifyMissingFile(file);
@@ -1371,7 +1156,7 @@ const prepSummaryStatement = (included) => {
                     stream.on('end', async function () {
                         // deal with part-full buffers
                         if (concatenatedBuffer.length){
-                            await sendBuffer(concatenatedBuffer, chunkStart, end, file)
+                            await sendBuffer(concatenatedBuffer, chunkStart, chunkLength, end, file)
                         }
                         DEBUG && console.log('All chunks sent for ', file)
                         resolve('finished')
@@ -1380,7 +1165,7 @@ const prepSummaryStatement = (included) => {
                 });
             }
 
-            async function sendBuffer(chunk, chunkStart, end, file){
+            async function sendBuffer(chunk, chunkStart, chunkLength, end, file){
                 const offlineCtx = await setupCtx(chunk,WAV_HEADER);
                 let worker;
                 if (offlineCtx) {
@@ -1396,20 +1181,17 @@ const prepSummaryStatement = (included) => {
                         console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
                         const fileIndex = filesBeingProcessed.indexOf(file);
                         if (fileIndex !== -1) {
-                            // canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
                             filesBeingProcessed.splice(fileIndex, 1)
                         }
-                        // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
                     });
                 } else {
-                    console.log('Short chunk', chunk.length, 'padding')
+                    console.error('Short chunk', chunk.length, 'padding')
                     workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
                     worker = workerInstance;
 
                     // Create array with 0's (short segment of silence that will trigger the finalChunk flag
                     const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
                     feedChunksToModel(myArray, chunkStart, file, end);
-                    //readStream.resume();
                 }
             }
 
@@ -2092,7 +1874,6 @@ const prepSummaryStatement = (included) => {
                             const received = sumObjectValues(predictionsReceived);
                             const total = sumObjectValues(batchChunksToSend);
                             const progress = received / total;
-                            console.log('received', received, 'total', total);
                             const fileProgress = predictionsReceived[file] / batchChunksToSend[file];
                             UI.postMessage({ event: 'progress', progress: progress, file: file });
                             if (fileProgress === 1) {
@@ -2143,8 +1924,6 @@ const prepSummaryStatement = (included) => {
                                     DEBUG && console.log('predictions left for', response.file, predictionsReceived[response.file] - predictionsRequested[response.file])
                                     const remaining = predictionsReceived[response.file] - predictionsRequested[response.file]
                                     if (remaining === 0) {
-                                        // const limit = 10;
-                                        // clearCache(CACHE_LOCATION, limit);
                                         if (filesBeingProcessed.length) {
                                             processNextFile({
                                                 worker: worker

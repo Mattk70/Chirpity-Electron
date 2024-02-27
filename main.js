@@ -116,24 +116,8 @@ function logUpdateStatus(message) {
 process.stdin.resume();//so the program will not close instantly
 
 
-const clearCache = (file_cache) => {
-    return new Promise((resolve) => {
-        // clear & recreate file cache folder
-        fs.rmSync(file_cache, { recursive: true, force: true });
-        fs.mkdir(file_cache, (err, path) => {
-            resolve(path);
-        })
-    })
-}
-
-
-
 async function exitHandler(options, exitCode) {
     if (options.cleanup) {
-        const tmp = path.join(app.getPath('temp'), 'chirpity');
-        // size of cache
-        await clearCache(tmp);
-        console.log('cleaned ' + tmp)
         // clean up settings.json litter
         const conf = app.getPath('userData');
         fs.readdir(conf, (err, files) => {
@@ -517,8 +501,3 @@ ipcMain.handle('saveFile', (event, arg) => {
     mainWindow.webContents.send('saveFile', { message: 'file saved!' });
 });
 
-ipcMain.handle('clear-cache', (event, filePath) => {
-    // console.log("cache location:", event, filePath);
-    // return
-    clearCache(filePath)
-})

@@ -2238,7 +2238,7 @@ function onChartData(args) {
         }
     })
     
-    const loadModel = ({clearCache = true} = {})  => {
+    const loadModel = ()  => {
         t0_warmup = Date.now();
         worker.postMessage({
             action: 'load-model',
@@ -2247,8 +2247,7 @@ function onChartData(args) {
             batchSize: config[config.backend].batchSize,
             warmup: config.warmup,
             threads: config[config.backend].threads,
-            backend: config.backend,
-            clearCache: clearCache
+            backend: config.backend
         });
         
     }
@@ -2285,7 +2284,7 @@ function onChartData(args) {
         updatePrefs();
         // restart wavesurfer regions to set new maxLength
         initRegion();
-        loadModel({clearCache: false});
+        loadModel();
     }
     
     const backend = document.getElementsByName('backend');
@@ -4184,13 +4183,13 @@ DOM.gain.addEventListener('input', () => {
                         // number of threads
                     DOM.numberOfThreads.textContent = DOM.threadSlider.value;
                     config[config.backend].threads = DOM.threadSlider.valueAsNumber;
-                    loadModel({clearCache: false});
+                    loadModel();
                     break;
                 }
                 case 'batch-size': {
                     DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
                     config[config.backend].batchSize = BATCH_SIZE_LIST[element.value];
-                    loadModel({clearCache: false});
+                    loadModel();
                     // Reset region maxLength
                     initRegion();
                     break;
