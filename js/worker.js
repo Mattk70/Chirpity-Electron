@@ -18,7 +18,9 @@ import { sqlite3 } from './database.js';
 const { PassThrough } = require('stream');
 
 let WINDOW_SIZE = 3;
-const WAV_HEADER = Buffer.from([82,73,70,70,70,200,25,0,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,192,93,0,0,128,187,0,0,2,0,16,0,76,73,83,84,26,0,0,0,73,78,70,79,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,200,25,0]);
+const CHIRPITY_HEADER = Buffer.from([82,73,70,70,255,255,255,255,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,192,93,0,0,128,187,0,0,2,0,16,0,100,97,116,97,26,0,0,0,73,78,70,79,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,200,25,0]);
+const  BIRDNET_HEADER  = Buffer.from([82,73,70,70,255,255,255,255,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,128,187,0,0,128,187,0,0,2,0,16,0,100,97,116,97,26,0,0,0,73,78,70,79,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,200,25,0]);
+let WAV_HEADER;
 let NUM_WORKERS;
 let workerInstance = 0;
 let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
@@ -442,6 +444,7 @@ async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backen
     SEEN_MODEL_READY = false;
     LIST_CACHE = {}
     sampleRate = model === "birdnet" ? 48_000 : 24_000;
+    WAV_HEADER = model === 'birdnet' ? BIRDNET_HEADER : CHIRPITY_HEADER;
     setAudioContext(sampleRate);
     // intentional nullish assignment
     CACHE_LOCATION ??= p.join(TEMP, "chirpity");
@@ -991,7 +994,8 @@ const prepSummaryStatement = (included) => {
                     file: missingFile
                 })
             }
-            
+            // Function to convert a WAVE header buffer to human-readable text
+
             async function loadAudioFile({
                 file = '',
                 start = 0,
@@ -1290,7 +1294,10 @@ const prepSummaryStatement = (included) => {
                     command.on('start', function (commandLine) {
                         DEBUG && console.log('FFmpeg command: ' + commandLine);
                     })
-    
+                    command.on('codecdata', function (commandLine) {
+                        const a = data.duration.split(':');
+                        totalTime = parseInt(a[0]) * 3600 + parseInt(a[1]) * 60 + parseFloat(a[2]);
+                    })
                     command.on('end', () => {
                         // End the stream to signify completion
                         stream.end();
@@ -1306,7 +1313,9 @@ const prepSummaryStatement = (included) => {
                         if (concatenatedBuffer.length >= highWaterMark) {
                             chunk = concatenatedBuffer.slice(0, highWaterMark);
                             concatenatedBuffer = concatenatedBuffer.slice(highWaterMark);
-                            chunkStart = await sendBuffer(chunk, chunkStart, end, file)
+                            chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
+                            console.log('chunkstart is', chunkStart)
+                            await sendBuffer(chunk, chunkStart, end, file)
                         }
                     });
 
@@ -1318,7 +1327,8 @@ const prepSummaryStatement = (included) => {
                     stream.on('end', async function () {
                         // deal with part-full buffers
                         if (concatenatedBuffer.length){
-                            chunkStart = await sendBuffer(concatenatedBuffer, chunkStart, end, file)
+                            chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
+                            await sendBuffer(concatenatedBuffer, chunkStart, end, file)
                         }
                         DEBUG && console.log('All chunks sent for ', file)
                         resolve('finished')
@@ -1336,7 +1346,7 @@ const prepSummaryStatement = (included) => {
                         workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
                         worker = workerInstance;
                         feedChunksToModel(myArray, chunkStart, file, end, worker);
-                        chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
+                        
                         // Now the async stuff is done ==>
                         //readStream.resume();
                     }).catch((error) => {
@@ -1357,7 +1367,6 @@ const prepSummaryStatement = (included) => {
                     feedChunksToModel(myArray, chunkStart, file, end);
                     //readStream.resume();
                 }
-                return chunkStart
             }
             /**
             *  Called when file first loaded, when result clicked and when saving or sending file snippets
@@ -1416,57 +1425,6 @@ const prepSummaryStatement = (included) => {
             
                     command.run();
                 });
-
-
-                //     const byteStart = convertTimeToBytes(start, metadata[file]);
-                //     const byteEnd = convertTimeToBytes(end, metadata[file]);
-                    
-                //     if (byteEnd < byteStart) {
-                //         console.log(`!!!!!!!!!!!!! End < start encountered for ${file}, end was ${end} start is ${start}`)
-                //     }
-                //     // Match highWaterMark to batch size... so we efficiently read bytes to feed to model - 3 for 3 second chunks
-                //     const highWaterMark = byteEnd - byteStart + 1;
-                //     try {
-                //     const readStream = fs.createReadStream(proxy, {
-                //         start: byteStart, end: byteEnd, highWaterMark: highWaterMark
-                //     });
-                //     readStream.on('data', async chunk => {
-                //         // Ensure data is processed in order
-                //         readStream.pause();
-                //         const offlineCtx = await setupCtx(chunk, metadata[file].header, sampleRate).catch(error => {console.error(error)});
-                //         if (offlineCtx){
-                //             offlineCtx.startRendering().then(resampled => {
-                //                 // `resampled` contains an AudioBuffer resampled at 24000Hz.
-                //                 // use resampled.getChannelData(x) to get an Float32Array for channel x.
-                //                 readStream.resume();
-                //                 resolve(resampled);
-                //             }).catch((error) => {
-                //                 console.error(`FetchAudio rendering failed: ${error}`);
-                //                 // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
-                //             });
-                //         }
-                //         // if the was a problem setting up the context remove the file from the files list
-                //         !offlineCtx && console.error('No offline context created for ', file)
-                //         offlineCtx || updateFilesBeingProcessed(file)
-                //     })
-                    
-                //     readStream.on('end', function () {
-                //         readStream.close()
-                //     })
-                //     readStream.on('error', err => {
-                //         console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
-                //         err.code === 'ENOENT' && notifyMissingFile(file);
-                //     })
-                // } catch (error) {
-                //     if (error instanceof TypeError) {
-                //         // Handle the TypeError
-                //         console.error('Caught a TypeError get predictbuffers:', error.message, 'bytestart', byteStart, 'byteend', byteEnd);
-                //     } else {
-                //         // Handle other types of errors
-                //         console.error('An unexpected error occurred:', error.message);
-                //     }
-                // }
-                // });
             }
             
             // Helper function to check if a given time is within daylight hours
