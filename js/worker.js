@@ -19,26 +19,8 @@ const { PassThrough } = require('stream');
 
 let WINDOW_SIZE = 3;
 const CHIRPITY_HEADER = Buffer.from([82,73,70,70,90,36,253,31,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,192,93,0,0,128,187,0,0,2,0,16,0,76,73,83,84,46,0,0,0,73,78,70,79,73,67,82,68,11,0,0,0,50,48,50,49,45,49,48,45,49,51,0,0,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,36,253,31]);
-const  BIRDNET_HEADER = Buffer.from([82,73,70,70,90,36,253,31,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,192,93,0,0,128,187,0,0,2,0,16,0,76,73,83,84,46,0,0,0,73,78,70,79,73,67,82,68,11,0,0,0,50,48,50,49,45,49,48,45,49,51,0,0,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,36,253,31]);
-function printWaveHeader(headerBuffer) {
-    console.log('Chunk ID:', headerBuffer.toString('utf8', 0, 4));
-    console.log('Chunk Size:', headerBuffer.readUInt32LE(4));
-    console.log('Format:', headerBuffer.toString('utf8', 8, 12));
-    console.log('Subchunk1 ID:', headerBuffer.toString('utf8', 12, 16));
-    console.log('Subchunk1 Size:', headerBuffer.readUInt32LE(16));
-    console.log('Audio Format:', headerBuffer.readUInt16LE(20));
-    console.log('Number of Channels:', headerBuffer.readUInt16LE(22));
-    console.log('Sample Rate:', headerBuffer.readUInt32LE(24));
-    console.log('Byte Rate:', headerBuffer.readUInt32LE(28));
-    console.log('Block Align:', headerBuffer.readUInt16LE(32));
-    console.log('Bits per Sample:', headerBuffer.readUInt16LE(34));
-    console.log('Subchunk2 ID:', headerBuffer.toString('utf8', 36, 40));
-    console.log('Subchunk2 Size:', headerBuffer.readUInt32LE(40));
-}
-console.log('chirpity header')
-printWaveHeader(CHIRPITY_HEADER)
-console.log('birdnet header')
-printWaveHeader(BIRDNET_HEADER)
+const  BIRDNET_HEADER = Buffer.from([82,73,70,70,90,36,253,31,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,128,187,0,0,0,119,1,0,2,0,16,0,76,73,83,84,46,0,0,0,73,78,70,79,73,67,82,68,11,0,0,0,50,48,50,49,45,49,48,45,49,51,0,0,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,36,253,31]);
+
 let WAV_HEADER;
 let NUM_WORKERS;
 let workerInstance = 0;
@@ -1458,7 +1440,9 @@ const prepSummaryStatement = (included) => {
                     stream.on('end', async () => { 
                         // Concatenate the data chunks into a single Buffer
                         const arrayBuffer = Buffer.concat(data);
-                        const offlineCtx = await setupCtx(arrayBuffer, WAV_HEADER, sampleRate).catch(error => {console.error(error.message)});
+
+                        // Navtive CHIRPITY_HEADER (24kHz) here for UI
+                        const offlineCtx = await setupCtx(arrayBuffer, CHIRPITY_HEADER, sampleRate).catch(error => {console.error(error.message)});
                         if (offlineCtx){
                             offlineCtx.startRendering().then(resampled => {
                                 // `resampled` contains an AudioBuffer resampled at 24000Hz.
