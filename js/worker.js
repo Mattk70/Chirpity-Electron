@@ -1278,7 +1278,7 @@ const prepSummaryStatement = (included) => {
                 let concatenatedBuffer = Buffer.alloc(0);
                 const byteStart = convertTimeToBytes(start);
                 const byteEnd = convertTimeToBytes(end);
-                const highWaterMark = (byteEnd - byteStart) * BATCH_SIZE * WINDOW_SIZE; // 4608000
+                const highWaterMark = 2 * sampleRate * BATCH_SIZE * WINDOW_SIZE; // 4608000
                 const stream = new PassThrough({highWaterMark: highWaterMark});
                 let chunkStart = start * sampleRate;
                 return new Promise((resolve, reject) => {
