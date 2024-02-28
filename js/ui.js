@@ -2385,6 +2385,7 @@ function onChartData(args) {
             if (PREDICTING) {
                 console.log('Operation aborted');
                 PREDICTING = false;
+                STATE.analysisDone = true;
                 worker.postMessage({
                     action: 'abort',
                     model: config.model,
