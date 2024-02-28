@@ -69,7 +69,7 @@ onmessage = async (e) => {
                 break;
                 }
             case "predict": {
-                if (! myModel.model_loaded) { console.log("worker", worker, "received a prediction request before it was ready") }
+                if (! myModel.model_loaded) { return console.log("worker", worker, "received a prediction request before it was ready") }
                 const { chunks: chunks, start: start, fileStart: fileStart, file: file, snr: snr, confidence: confidence, context: context, resetResults: resetResults } = e.data;
                 myModel.useContext = context;
                 myModel.selection =  !resetResults;
