@@ -969,45 +969,52 @@ const prepSummaryStatement = (included) => {
             async function setupCtx(chunk, header, rate) {
                 rate ??= sampleRate;
                 // Deal with detached arraybuffer issue
-                let audioBufferChunk;
-                try {
-                    chunk = Buffer.concat([header, chunk]);
-                    audioBufferChunk = await audioCtx.decodeAudioData(chunk.buffer).catch(error => console.log(error));
-                } catch (e) {
-                    console.log(e)
-                    return false
-                }
+                const buffer = Buffer.concat([header, chunk])
+                return audioCtx.decodeAudioData(buffer.buffer)
+                .then( audioBufferChunk => {
+                    const audioCtxSource = audioCtx.createBufferSource();
+                    audioCtxSource.buffer = audioBufferChunk;
+                    const duration = audioCtxSource.buffer.duration;
+                    const buffer = audioCtxSource.buffer;
+                    // IF we want to use worklets, we'll need to reuse the context across the whole file
+                    const offlineCtx = new OfflineAudioContext(1, rate * duration, rate);
+                    const offlineSource = offlineCtx.createBufferSource();
+                    offlineSource.buffer = buffer;
+                    let previousFilter = undefined;
+                    if (STATE.filters.active) {
+                        if (STATE.filters.highPassFrequency) {
+                            // Create a highpass filter to cut low-frequency noise
+                            const highpassFilter = offlineCtx.createBiquadFilter();
+                            highpassFilter.type = "highpass"; // Standard second-order resonant highpass filter with 12dB/octave rolloff. Frequencies below the cutoff are attenuated; frequencies above it pass through.
+                            highpassFilter.frequency.value = STATE.filters.highPassFrequency; //frequency || 0; // This sets the cutoff frequency. 0 is off. 
+                            highpassFilter.Q.value = 0; // Indicates how peaked the frequency is around the cutoff. The greater the value, the greater the peak.
+                            offlineSource.connect(highpassFilter);
+                            previousFilter = highpassFilter;
+                        }
+                        if (STATE.filters.lowShelfFrequency && STATE.filters.lowShelfAttenuation) {
+                            // Create a lowshelf filter to attenuate low-frequency noise
+                            const lowshelfFilter = offlineCtx.createBiquadFilter();
+                            lowshelfFilter.type = 'lowshelf';
+                            lowshelfFilter.frequency.value = STATE.filters.lowShelfFrequency; // This sets the cutoff frequency of the lowshelf filter to 1000 Hz
+                            lowshelfFilter.gain.value = STATE.filters.lowShelfAttenuation; // This sets the boost or attenuation in decibels (dB)
+                            previousFilter ? previousFilter.connect(lowshelfFilter) : offlineSource.connect(lowshelfFilter);
+                            previousFilter = lowshelfFilter;
+                        }
+                    }
+                    if (STATE.audio.gain){
+                        var gainNode = offlineCtx.createGain();
+                        gainNode.gain.value = Math.pow(10, STATE.audio.gain / 20);
+                        previousFilter ? previousFilter.connect(gainNode) : offlineSource.connect(gainNode);
+                        gainNode.connect(offlineCtx.destination);
+                    } else {
+                        previousFilter ? previousFilter.connect(offlineCtx.destination) : offlineSource.connect(offlineCtx.destination);
+                    }
+                    offlineSource.start();
+                    return offlineCtx;
+                } )
+                .catch(error => console.log(error));
+
                 
-                const audioCtxSource = audioCtx.createBufferSource();
-            
-                audioCtxSource.buffer = audioBufferChunk;
-                const duration = audioCtxSource.buffer.duration;
-                const buffer = audioCtxSource.buffer;
-                // IF we want to use worklets, we'll need to reuse the context across the whole file
-                const offlineCtx = new OfflineAudioContext(1, rate * duration, rate);
-                const offlineSource = offlineCtx.createBufferSource();
-                offlineSource.buffer = buffer;
-                let previousFilter = undefined;
-                if (STATE.filters.active) {
-                    if (STATE.filters.highPassFrequency) {
-                        // Create a highpass filter to cut low-frequency noise
-                        const highpassFilter = offlineCtx.createBiquadFilter();
-                        highpassFilter.type = "highpass"; // Standard second-order resonant highpass filter with 12dB/octave rolloff. Frequencies below the cutoff are attenuated; frequencies above it pass through.
-                        highpassFilter.frequency.value = STATE.filters.highPassFrequency; //frequency || 0; // This sets the cutoff frequency. 0 is off. 
-                        highpassFilter.Q.value = 0; // Indicates how peaked the frequency is around the cutoff. The greater the value, the greater the peak.
-                        offlineSource.connect(highpassFilter);
-                        previousFilter = highpassFilter;
-                    }
-                    if (STATE.filters.lowShelfFrequency && STATE.filters.lowShelfAttenuation) {
-                        // Create a lowshelf filter to attenuate low-frequency noise
-                        const lowshelfFilter = offlineCtx.createBiquadFilter();
-                        lowshelfFilter.type = 'lowshelf';
-                        lowshelfFilter.frequency.value = STATE.filters.lowShelfFrequency; // This sets the cutoff frequency of the lowshelf filter to 1000 Hz
-                        lowshelfFilter.gain.value = STATE.filters.lowShelfAttenuation; // This sets the boost or attenuation in decibels (dB)
-                        previousFilter ? previousFilter.connect(lowshelfFilter) : offlineSource.connect(lowshelfFilter);
-                        previousFilter = lowshelfFilter;
-                    }
-                }
                 // // Create a compressor node
                 // const compressor = new DynamicsCompressorNode(offlineCtx, {
                 //     threshold: -30,
@@ -1039,16 +1046,7 @@ const prepSummaryStatement = (included) => {
                 // previousFilter = normalizerNode;
                 
                 // // Create a gain node to adjust the audio level
-                if (STATE.audio.gain){
-                    var gainNode = offlineCtx.createGain();
-                    gainNode.gain.value = Math.pow(10, STATE.audio.gain / 20);
-                    previousFilter ? previousFilter.connect(gainNode) : offlineSource.connect(gainNode);
-                    gainNode.connect(offlineCtx.destination);
-                } else {
-                    previousFilter ? previousFilter.connect(offlineCtx.destination) : offlineSource.connect(offlineCtx.destination);
-                }
-                offlineSource.start();
-                return offlineCtx;
+
             };
             
 
@@ -1074,13 +1072,13 @@ const prepSummaryStatement = (included) => {
                 batchChunksToSend[file] = Math.ceil((end - start) / (BATCH_SIZE * WINDOW_SIZE));
                 predictionsReceived[file] = 0;
                 predictionsRequested[file] = 0;
-                let concatenatedBuffer = Buffer.alloc(0);
                 const highWaterMark = 2 * sampleRate * BATCH_SIZE * WINDOW_SIZE; // 4608000
+                let concatenatedBuffer = Buffer.allocUnsafe(highWaterMark);
                 const stream = new PassThrough({highWaterMark: highWaterMark});
                 let chunkStart = start * sampleRate;
                 let header;
                 return new Promise((resolve, reject) => {
-                    const command = ffmpeg(file)
+                    let command = ffmpeg(file)
                         .seekInput(start)
                         .duration(end - start)
                         .format('wav')
@@ -1098,8 +1096,7 @@ const prepSummaryStatement = (included) => {
                     })
                     command.on('end', () => {
                         // End the stream to signify completion
-                        stream.end();
-                        console.log('file saved!')
+                        //stream.end();
                     });
             
                     stream.on('data', async chunk => {
@@ -1108,46 +1105,23 @@ const prepSummaryStatement = (included) => {
                             return
                         }
                         if (! header){
-                            header = chunk.slice(0,44);
-                            chunk = chunk.slice(44);
+                            header = chunk.subarray(0,44);
+                            chunk = chunk.subarray(44);
                         }
-                        concatenatedBuffer = Buffer.concat([concatenatedBuffer, chunk]);
-                        // we have a full buffer
-                        if (concatenatedBuffer.length >= highWaterMark) {
-                            chunk = concatenatedBuffer.slice(0, highWaterMark);
-                            concatenatedBuffer = concatenatedBuffer.slice(highWaterMark);
-                            
-                            setupCtx(chunk,WAV_HEADER)
-                            .then(offlineCtx => offlineCtx.startRendering()
-                            .then((resampled) => {
-                                    const myArray = resampled.getChannelData(0);
-                                    workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-                                    let worker = workerInstance;
-                                    DEBUG && console.log('chunkstart:', chunkStart, 'file', file)
-                                    feedChunksToModel(myArray, chunkStart, file, end, worker);
-                                    chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
-                                })
-                            .catch((error) => {
-                                    console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
-                                    const fileIndex = filesBeingProcessed.indexOf(file);
-                                    if (fileIndex !== -1) {
-                                        filesBeingProcessed.splice(fileIndex, 1)
-                                    }
-                                }))
-                            .catch(error => {
-                                    console.error('Short chunk', chunk.length, 'padding')
-                                    workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-                                    worker = workerInstance;
-                                    // Create array with 0's (short segment of silence that will trigger the finalChunk flag
-                                    const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
-                                    feedChunksToModel(myArray, chunkStart, file, end);
-                                    console.log('chunkstart:', chunkStart, 'file', file)
-                                })
-                                
-                            
-                            
+                        try{
+                            concatenatedBuffer = concatenatedBuffer.length ? Buffer.concat([concatenatedBuffer, chunk]) : chunk;
+                            // we have a full buffer
+                            if (concatenatedBuffer.length >= highWaterMark) {
+                                chunk = concatenatedBuffer.subarray(0, highWaterMark);
+                                concatenatedBuffer = concatenatedBuffer.subarray(highWaterMark);
+                                await sendBuffer(chunk, chunkStart, chunkLength, end, file)
+                            }
+                        } catch (error) {
+                            console.error(error)
                         }
-                    })
+
+                    });
+
                     stream.on('error', err => {
                         console.log(`stream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
                         err.code === 'ENOENT' && notifyMissingFile(file);
@@ -1166,7 +1140,7 @@ const prepSummaryStatement = (included) => {
             }
 
             async function sendBuffer(chunk, chunkStart, chunkLength, end, file){
-                const offlineCtx = await setupCtx(chunk,WAV_HEADER);
+                const offlineCtx = await setupCtx(chunk,WAV_HEADER).catch(error => console.warn(error));
                 let worker;
                 if (offlineCtx) {
                     offlineCtx.startRendering().then((resampled) => {
@@ -1185,13 +1159,15 @@ const prepSummaryStatement = (included) => {
                         }
                     });
                 } else {
-                    console.error('Short chunk', chunk.length, 'padding')
-                    workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-                    worker = workerInstance;
+                    if (chunk.length){
+                        console.warn('Short chunk', chunk.length, 'padding')
+                        workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+                        worker = workerInstance;
 
-                    // Create array with 0's (short segment of silence that will trigger the finalChunk flag
-                    const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
-                    feedChunksToModel(myArray, chunkStart, file, end);
+                        // Create array with 0's (short segment of silence that will trigger the finalChunk flag
+                        const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
+                        feedChunksToModel(myArray, chunkStart, file, end);
+                    }
                 }
             }
 
@@ -1923,12 +1899,13 @@ const prepSummaryStatement = (included) => {
                                     let worker = await parsePredictions(response).catch(error =>  console.log('Error parsing predictions', error));
                                     DEBUG && console.log('predictions left for', response.file, predictionsReceived[response.file] - predictionsRequested[response.file])
                                     const remaining = predictionsReceived[response.file] - predictionsRequested[response.file]
+                                    
                                     if (remaining === 0) {
                                         if (filesBeingProcessed.length) {
                                             processNextFile({
                                                 worker: worker
                                             });
-                                        }  else if ( !STATE.selection) {
+                                        }  else if ( !STATE.selection && (sumObjectValues(predictionsRequested) - sumObjectValues(predictionsReceived)) === 0) {
                                             getSummary();
                                             UI.postMessage({
                                                 event: "analysis-complete"
