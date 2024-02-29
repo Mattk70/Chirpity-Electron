@@ -110,7 +110,7 @@ async function loadDB(path) {
     DEBUG && console.log("Loading db " + path)
     let modelLabels;
     if (STATE.model === 'birdnet'){
-        const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${STATE.locale}.txt`; 
+        const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`; 
         await fetch(labelFile).then(response => {
             if (! response.ok) throw new Error('Network response was not ok');
             return response.text();
