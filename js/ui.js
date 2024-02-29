@@ -658,6 +658,7 @@ const displayLocationAddress = async (where) => {
             action: 'update-state',
             lat: config.latitude,
             lon: config.longitude,
+            place: config.location
         });
         // Initially, so changes to the default location are immediately reflected in subsequent analyses
         // We will switch to location filtering when the default location is changed.
@@ -1534,6 +1535,7 @@ window.onload = async () => {
             temp: tempPath,
             lat: config.latitude,
             lon: config.longitude,
+            place: config.location,
             detect: config.detect,
             filters: config.filters,
             audio: config.audio,

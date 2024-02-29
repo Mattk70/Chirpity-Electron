@@ -438,7 +438,7 @@ app.whenReady().then(async () => {
     //Update handling
     autoUpdater.autoDownload = false;
     autoUpdater.checkForUpdatesAndNotify()
-    
+
 });
 
 

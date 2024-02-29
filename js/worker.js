@@ -769,12 +769,7 @@ const prepSummaryStatement = (included) => {
 
             
             /**
-            * getWorkingFile called by loadAudioFile, getPredictBuffers, fetchAudioBuffer and processNextFile
-            * purpose is to create a wav file from the source file and set its metadata. If the file *is* a wav file, it returns
-            * that file, else it checks for a temp wav file, if not found it calls convertFileFormat to extract
-            * and create a wav file in the users temp folder and returns that file's path. The flag for this file is set in the
-            * metadata object as metadata[file].proxy
-            *
+            * getWorkingFile's purpose is to locate a file and set its metadata. 
             * @param file: full path to source file
             * @returns {Promise<boolean|*>}
             */
@@ -788,20 +783,6 @@ const prepSummaryStatement = (included) => {
                 
                 if (!metadata.file?.isComplete) {
                     await setMetadata({ file: file, proxy: proxy, source_file: source_file });
-                        /*This is where we add week checking...
-                        SHOULD WE ADD WEEK (or even included ids) TO file METADATA?
-                        Also, does ths work for custom file locations?
-                        Also, looks like it's looking for the list in the wrong place - maybe should be calling get included ids
-                            - or better stil, defer incluided ids until analysis
-                        */ 
-                        if (STATE.list === 'location'){
-                            const meta = metadata[file];
-                            const week = STATE.useWeek ? new Date(meta.fileStart).getWeekNumber() : "-1";
-                            const location = STATE.lat + STATE.lon;
-                            if (! (STATE.included?.[week] && STATE.included[week][location])) {
-                                await setIncludedIDs(STATE.lat,STATE.lon,week)
-                            }
-                        }
                 }
                 return proxy;
             }
@@ -2324,7 +2305,10 @@ const prepSummaryStatement = (included) => {
             const result = await STATE.db.allAsync(sql, ...params);
             if (format === 'text'){
                 // CSV export. Format the values
-                const formattedValues = result.map(formatCSVValues);
+                const formattedValues = await Promise.all(result.map(async (item) => {
+                    return await formatCSVValues(item);
+                }));
+                
                 // Create a write stream for the CSV file
                 let filename = species || 'All';
                 filename += '_detections.csv';
@@ -2373,10 +2357,17 @@ const prepSummaryStatement = (included) => {
         };
         
         // Function to format the CSV export
-        function formatCSVValues(obj) {
+        async function formatCSVValues(obj) {
             // Create a copy of the original object to avoid modifying it directly
             const modifiedObj = { ...obj };
-            
+            // Get lat and lon
+            const result = await STATE.db.getAsync(`
+                SELECT lat, lon, place 
+                FROM files JOIN locations on locations.id = files.locationID 
+                WHERE files.name = ? `, modifiedObj.file);
+            const latitude =  result?.lat || STATE.lat;
+            const longitude =  result?.lon || STATE.lon;
+            const place =  result?.place || STATE.place;
             // Step 1: Remove specified keys
             delete modifiedObj.confidence_rank;
             delete modifiedObj.filestart;
@@ -2413,6 +2404,9 @@ const prepSummaryStatement = (included) => {
             delete modifiedObj.callCount;
             modifiedObj['File offset'] = secondsToHHMMSS(modifiedObj.position)
             delete modifiedObj.position;
+            modifiedObj['Latitude'] = latitude;
+            modifiedObj['Longitude'] = longitude;
+            modifiedObj['Place'] = place;
             return modifiedObj;
         }
         
@@ -2970,7 +2964,7 @@ const prepSummaryStatement = (included) => {
             
             async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
                 if (!place) {
-                    const { id } = await db.getAsync(`SELECT ID FROM locations WHERE lat = ? AND lon = ?`, lat, lon);
+                    const { id } = await db.getAsync(`SELECT id FROM locations WHERE lat = ? AND lon = ?`, lat, lon);
                     const result = await db.runAsync(`DELETE FROM locations WHERE lat = ? AND lon = ?`, lat, lon);
                     if (result.changes) {
                         await db.runAsync(`UPDATE files SET locationID = null WHERE locationID = ?`, id);

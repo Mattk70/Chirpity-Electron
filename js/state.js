@@ -23,6 +23,7 @@ export class State {
             this.topRankin = 1,
             this.lat = undefined,
             this.lon = undefined,
+            this.place = undefined,
             this.locationID = undefined,
             this.locale = 'en_uk',
             this.speciesThreshold = undefined,
