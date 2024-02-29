@@ -114,6 +114,7 @@ const DOM = {
      fileNumber: document.getElementById('fileNumber'),
      gain: document.getElementById('gain'),
      gainAdjustment: document.getElementById('gain-adjustment'),
+     normalise: document.getElementById('normalise'),
      listToUse: document.getElementById('list-to-use'),
      listIcon: document.getElementById('list-icon'),
      exportList: document.getElementById('export-list'),
@@ -1394,7 +1395,7 @@ window.onload = async () => {
         tensorflow: { threads: DIAGNOSTICS['Cores'], batchSize: 32 },
         webgpu: { threads: 2, batchSize: 32 },
         webgl: { threads: 2, batchSize: 32 },
-        audio: { gain: 0, format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false, notification: true },
+        audio: { gain: 0, format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false, notification: true, normalise: false },
         limit: 500,
         track: true,
         debug: false
@@ -1469,6 +1470,7 @@ window.onload = async () => {
         // Audio preferences:
         DOM.gain.value = config.audio.gain;
         DOM.gainAdjustment.textContent = config.audio.gain + 'dB';
+        DOM.normalise.checked = config.audio.normalise;
         DOM.audioFormat.value = config.audio.format;
         DOM.audioBitrate.value = config.audio.bitrate;
         DOM.audioQuality.value = config.audio.quality;
@@ -2730,9 +2732,6 @@ function onChartData(args) {
         DOM.progressDiv.classList.remove('d-none');
         if (args.text) {
             DOM.fileNumber.innerHTML = args.text;
-            if (args.text.includes('decompressed')) {
-                DOM.progressDiv.classList.add('d-none');
-            }
         } else {
             DOM.progressDiv.classList.remove('d-none');
             const count = fileList.indexOf(args.file) + 1;
@@ -4207,6 +4206,14 @@ DOM.gain.addEventListener('input', () => {
                 case 'gain': {
                     DOM.gainAdjustment.textContent = element.value + 'dB'; //.toString();
                     config.audio.gain = element.value;   
+                    worker.postMessage({action:'update-state', audio: config.audio})
+                    const position = wavesurfer.getCurrentTime() / windowLength;
+                    fileLoaded &&
+                        postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
+                    break;
+                }
+                case 'normalise': {
+                    config.audio.normalise = element.checked;
                     worker.postMessage({action:'update-state', audio: config.audio})
                     const position = wavesurfer.getCurrentTime() / windowLength;
                     fileLoaded &&

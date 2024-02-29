@@ -1303,14 +1303,14 @@ const prepSummaryStatement = (included) => {
                 const stream = new PassThrough();
                         // Use ffmpeg to extract the specified audio segment
                 return new Promise((resolve, reject) => {
-                    const command = ffmpeg(file)
+                    let command = ffmpeg(file)
                         .seekInput(start)
                         .duration(end - start)
                         .format('s16le')
                         .audioChannels(1) // Set to mono
                         .audioFrequency(24_000) // Set sample rate to 24000 Hz (always - this is for wavesurfer)
                         .output(stream, { end:true });
-    
+                    if (STATE.audio.normalise) command = command.audioFilter("loudnorm=I=-16:LRA=11:TP=-1.5") //
                     command.on('error', error => {
                         updateFilesBeingProcessed(file)
                         reject(new Error('Error extracting audio segment:', error));
