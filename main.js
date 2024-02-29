@@ -438,8 +438,8 @@ app.whenReady().then(async () => {
     //Update handling
     autoUpdater.autoDownload = false;
     autoUpdater.checkForUpdatesAndNotify()
-    // Allow multiple instances of Chirpity - experimental!
-    app.releaseSingleInstanceLock()
+    // Allow multiple instances of Chirpity - experimental! This alone doesn't work:
+    //app.releaseSingleInstanceLock()
 });
 
 

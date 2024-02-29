@@ -1162,17 +1162,20 @@ const prepSummaryStatement = (included) => {
                     command.on('error', error => {
                         updateFilesBeingProcessed(file)
                         if (error.message.includes('SIGKILL')) DEBUG && console.log('FFMPEG process shut down')
-                        else reject(new Error('Error in ffmpeg extracting audio segment:', error));
+                        else reject(console.warn('Error in ffmpeg extracting audio segment:', error.message));
                     });
                     command.on('start', function (commandLine) {
                         DEBUG && console.log('FFmpeg command: ' + commandLine);
                     })
                     command.on('end', () => {
                         // End the stream to signify completion
+                        stream.read();
                         stream.end();
                     });
 
                     stream.on('data', async chunk => {
+                        stream.pause()
+                        stream.destroyed && console.log('stream destroyed before data finished being read')
                         if (aborted) {
                             command.kill()
                             stream.destroy()
@@ -1199,8 +1202,6 @@ const prepSummaryStatement = (included) => {
                                     DEBUG && console.log('chunkstart:', chunkStart, 'file', file)
                                     feedChunksToModel(myArray, chunkStart, file, end, worker);
                                     chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
-                                    // Now the async stuff is done ==>
-                                    //readStream.resume();
                                 }).catch((error) => {
                                     console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
                                     const fileIndex = filesBeingProcessed.indexOf(file);
@@ -1217,9 +1218,10 @@ const prepSummaryStatement = (included) => {
                                 const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
                                 feedChunksToModel(myArray, chunkStart, file, end);
                                 console.log('chunkstart:', chunkStart, 'file', file)
-                                //readStream.resume();
+
                             }
                         }
+                        stream.resume()
                     });
 
                     stream.on('error', err => {
@@ -2055,11 +2057,11 @@ const prepSummaryStatement = (included) => {
         } = {}) { 
             if (FILE_QUEUE.length) {
                 let file = FILE_QUEUE.shift()
-                const found = await getWorkingFile(file);
+                const found = await getWorkingFile(file).catch(error => console.warn('Error in getWorkingFile', error.message));
                 if (found) {
                     if (end) {}
                     let boundaries = [];
-                    if (!start) boundaries = await setStartEnd(file);
+                    if (!start) boundaries = await setStartEnd(file).catch(error => console.warn('Error in setStartEnd', error.message));
                     else boundaries.push({ start: start, end: end });
                     for (let i = 0; i < boundaries.length; i++) {
                         const { start, end } = boundaries[i];
@@ -2074,7 +2076,7 @@ const prepSummaryStatement = (included) => {
                             });
                             
                             DEBUG && console.log('Recursion: start = end')
-                            await processNextFile(arguments[0]);
+                            await processNextFile(arguments[0]).catch(error => console.warn('Error in processNextFile call', error.message));
                             
                         } else {
                             if (!sumObjectValues(predictionsReceived)) {
@@ -2086,12 +2088,12 @@ const prepSummaryStatement = (included) => {
                             }
                             await doPrediction({
                                 start: start, end: end, file: file, worker: worker
-                            });
+                            }).catch(error => console.warn('Error in doPrediction', error, 'file', file, 'start', start, 'end', end));
                         }
                     }
                 } else {
                     DEBUG && console.log('Recursion: file not found')
-                    await processNextFile(arguments[0]);
+                    await processNextFile(arguments[0]).catch(error => console.warn('Error in recursive processNextFile call', error.message));
                 }
             }
         }
