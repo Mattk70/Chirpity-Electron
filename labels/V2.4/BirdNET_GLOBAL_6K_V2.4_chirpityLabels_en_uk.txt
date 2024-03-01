@@ -95,7 +95,7 @@ Circus cyaneus_Hen Harrier
 Circus pygargus_Montagu's Harrier
 Clangula hyemalis_Long-tailed Duck
 Coccothraustes coccothraustes_Hawfinch
-Coloeus monedula_Jackdaw
+Corvus monedula_Jackdaw
 Columba livia_Rock Dove
 Columba oenas_Stock Dove
 Columba palumbus_Woodpigeon
@@ -284,7 +284,7 @@ Strix aluco_Tawny Owl
 Sturnus vulgaris_Starling
 Sylvia atricapilla_Blackcap
 Sylvia borin_Garden Warbler
-Curruca cantillans_Subalpine Warbler
+Curruca iberiae_Subalpine Warbler
 Curruca communis_Whitethroat
 Curruca curruca_Lesser Whitethroat
 Curruca nisoria_Barred Warbler

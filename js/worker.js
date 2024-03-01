@@ -1136,7 +1136,8 @@ const prepSummaryStatement = (included) => {
                                 readStream.resume();
                             }
                         } catch (error) {
-                            trackError(error.message, 'getWavePredictBuffers', STATE.batchSize);
+                            console.warn(error)
+                            //trackError(error.message, 'getWavePredictBuffers', STATE.batchSize);
                             //UI.postMessage({event: 'generate-alert', message: "Chirpity is struggling to handle the high number of prediction requests. You should <b>increasse</b> the batch size in settings to compensate for this, or risk skipping audio sections. Press <b>Esc</b> to abort."})
                         }
                     })
@@ -1206,7 +1207,8 @@ const prepSummaryStatement = (included) => {
                         try {
                             concatenatedBuffer = Buffer.concat(bufferList);
                         } catch (error) {
-                            trackError(error.message, 'getPredictBuffers', STATE.batchSize);
+                            console.warn(error)
+                            //trackError(error.message, 'getPredictBuffers', STATE.batchSize);
                             //UI.postMessage({event: 'generate-alert', message: "Chirpity is struggling to handle the high number of prediction requests. You should <b>increasse</b> the batch size in settings to compensate for this, or risk skipping audio sections. Press <b>Esc</b> to abort."})
 
                         }
@@ -1260,6 +1262,7 @@ const prepSummaryStatement = (included) => {
                             await sendBuffer(audio, chunkStart, chunkLength, end, file)
                         }
                         DEBUG && console.log('All chunks sent for ', file)
+                        STREAM.destroy()
                         resolve('finished')
                     })
                     command.run();
