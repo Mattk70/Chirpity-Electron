@@ -1364,6 +1364,7 @@ function fillDefaults(config, defaultConfig) {
     });
 }
 /////////////////////////  Window Handlers ////////////////////////////
+
 let appPath, tempPath, isMac;
 window.onload = async () => {
     window.electron.requestWorkerChannel();
@@ -1418,6 +1419,14 @@ window.onload = async () => {
             config = JSON.parse(data);
         }
         
+        // Attach an error event listener to the window object
+        window.onerror = function(message, file, lineno, colno, error) {
+            const source = `${file}:${lineno}:${colno}`;
+
+            track('Error', message, source);
+            // Return false not to inhibit the default browser error handling
+            return false;
+            };
         //fill in defaults - after updates add new items
         fillDefaults(config, defaultConfig);
 
@@ -1598,6 +1607,10 @@ const setUpWorkerMessaging = () => {
                 case "current-file-week": { STATE.week = args.week}
                 case "diskDB-has-records": {chartsLink.classList.remove("disabled");
                 exploreLink.classList.remove("disabled");
+                break;
+            }
+            case 'error': {
+                track('Error', args.message, args.source, args.value);
                 break;
             }
             case "file-location-id": {onFileLocationID(args);
@@ -4308,6 +4321,7 @@ function setListUIState(list){
     })
 }
 function track(event, action, name, value){
+    config.debug && event === 'Error' && console.log(action, name);
     if (config.track){
         const t = new Date()
     name = name ? `&e_n=${name}` : '';
@@ -4761,3 +4775,4 @@ function track(event, action, name, value){
         }
         return false;
     }
+

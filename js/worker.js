@@ -13,9 +13,9 @@ const {writeToPath} = require('@fast-csv/format');
 const merge = require('lodash.merge');
 import { State } from './state.js';
 import { sqlite3 } from './database.js';
+const { PassThrough } = require('node:stream');
 
 
-const { PassThrough } = require('stream');
 
 let WINDOW_SIZE = 3;
 const CHIRPITY_HEADER = Buffer.from([82,73,70,70,90,36,253,31,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,192,93,0,0,128,187,0,0,2,0,16,0,76,73,83,84,46,0,0,0,73,78,70,79,73,67,82,68,11,0,0,0,50,48,50,49,45,49,48,45,49,51,0,0,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,36,253,31]);
@@ -1088,36 +1088,43 @@ const prepSummaryStatement = (included) => {
                             readStream.destroy()
                             return
                         }
-                        let audio = Buffer.concat([meta.header, chunk]);
-                        const offlineCtx = await setupCtx(audio);
-                        let worker;
-                        if (offlineCtx) {
-                            offlineCtx.startRendering().then((resampled) => {
-                                const myArray = resampled.getChannelData(0);
-                                
+                        
+                        try {
+                            let audio = Buffer.concat([meta.header, chunk]);
+                            
+                            const offlineCtx = await setupCtx(audio);
+                            let worker;
+                            if (offlineCtx) {
+                                offlineCtx.startRendering().then((resampled) => {
+                                    const myArray = resampled.getChannelData(0);
+                                    
+                                    workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+                                    worker = workerInstance;
+                                    feedChunksToModel(myArray, chunkStart, file, end, worker);
+                                    chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
+                                    // Now the async stuff is done ==>
+                                    readStream.resume();
+                                }).catch((error) => {
+                                    console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
+                                    const fileIndex = filesBeingProcessed.indexOf(file);
+                                    if (fileIndex !== -1) {
+                                        canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
+                                    }
+                                    // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
+                                });
+                            } else {
+                                console.log('Short chunk', chunk.length, 'padding')
                                 workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
                                 worker = workerInstance;
-                                feedChunksToModel(myArray, chunkStart, file, end, worker);
-                                chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
-                                // Now the async stuff is done ==>
+        
+                                // Create array with 0's (short segment of silence that will trigger the finalChunk flag
+                                const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
+                                feedChunksToModel(myArray, chunkStart, file, end);
                                 readStream.resume();
-                            }).catch((error) => {
-                                console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
-                                const fileIndex = filesBeingProcessed.indexOf(file);
-                                if (fileIndex !== -1) {
-                                    canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
-                                }
-                                // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
-                            });
-                        } else {
-                            console.log('Short chunk', chunk.length, 'padding')
-                            workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-                            worker = workerInstance;
-    
-                            // Create array with 0's (short segment of silence that will trigger the finalChunk flag
-                            const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
-                            feedChunksToModel(myArray, chunkStart, file, end);
-                            readStream.resume();
+                            }
+                        } catch (error) {
+                            trackError(error.message, 'getWavePredictBuffers', STATE.batchSize);
+                            UI.postMessage({event: 'generate-alert', message: "Chirpity is struggling to handle the high number of prediction requests. You should <b>increasse</b> the batch size in settings to compensate for this, or risk skipping audio sections. Press <b>Esc</b> to abort."})
                         }
                     })
                     readStream.on('end', function () {
@@ -1181,13 +1188,17 @@ const prepSummaryStatement = (included) => {
                             stream.destroy()
                             return
                         }
-                        // if (! header){
-                        //     header = chunk.subarray(0,44);
-                        //     chunk = chunk.subarray(44);
-                        // }
+
+                        const bufferList = [concatenatedBuffer, chunk].filter(buf => buf.length > 0);
+                        try {
+                            concatenatedBuffer = Buffer.concat(bufferList);
+                        } catch (error) {
+                            trackError(error.message, 'getPredictBuffers', STATE.batchSize);
+                            UI.postMessage({event: 'generate-alert', message: "Chirpity is struggling to handle the high number of prediction requests. You should <b>increasse</b> the batch size in settings to compensate for this, or risk skipping audio sections. Press <b>Esc</b> to abort."})
+
+                        }
                         
-                        concatenatedBuffer = Buffer.concat([concatenatedBuffer, chunk]);
-                        // we have a full buffer
+                        // if we have a full buffer
                         if (concatenatedBuffer.length >= highWaterMark) {
                             chunk = concatenatedBuffer.subarray(0, highWaterMark);
                             concatenatedBuffer = concatenatedBuffer.subarray(highWaterMark);
@@ -1363,8 +1374,8 @@ const prepSummaryStatement = (included) => {
                     confidence: STATE.detect.confidence,
                     chunks: channelData
                 };
-                predictWorkers[worker].isAvailable = false;
-                predictWorkers[worker].postMessage(objData, [channelData.buffer]);
+                if (predictWorkers[worker]) predictWorkers[worker].isAvailable = false;
+                predictWorkers[worker]?.postMessage(objData, [channelData.buffer]);
             }
             
             async function doPrediction({
@@ -3112,4 +3123,9 @@ async function setIncludedIDs(lat, lon, week) {
 
     // Await the promise
     return LIST_CACHE[key];
+}
+
+/// Track errors
+function trackError(message, source, value){ 
+    UI.postMessage({event: 'error', message: message, source: source, value}) 
 }

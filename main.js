@@ -115,7 +115,6 @@ function logUpdateStatus(message) {
 
 process.stdin.resume();//so the program will not close instantly
 
-
 async function exitHandler(options, exitCode) {
     if (options.cleanup) {
         // clean up settings.json litter
