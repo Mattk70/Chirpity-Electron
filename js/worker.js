@@ -480,11 +480,10 @@ const prepSummaryStatement = (included) => {
     const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
     const useRange = range?.start;
     const params = [STATE.detect.confidence];
-    const extraParams = [];
     let summaryStatement = `
     WITH ranked_records AS (
         SELECT records.dateTime, records.confidence, files.name, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight,
-        RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
+        RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
         FROM records
         JOIN files ON files.id = records.fileID
         JOIN species ON species.id = records.speciesID
@@ -530,7 +529,7 @@ const prepSummaryStatement = (included) => {
         const useRange = range?.start;
         let SQL = ` WITH MaxConfidencePerDateTime AS (
             SELECT confidence,
-            RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
+            RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
             FROM records 
             JOIN files ON records.fileID = files.id 
             WHERE confidence >= ${STATE.detect.confidence} `;
@@ -554,7 +553,7 @@ const prepSummaryStatement = (included) => {
             UI.postMessage({event: 'total-records', total: total, offset: offset, species: species})
         }
 
-        const prepResultsStatement = (species, noLimit, included, offset) => {
+        const prepResultsStatement = (species, noLimit, included, offset, topRankin) => {
             const params = [STATE.detect.confidence];
             let resultStatement = `
             WITH ranked_records AS (
@@ -562,6 +561,7 @@ const prepSummaryStatement = (included) => {
                 records.dateTime, 
                 files.duration, 
                 files.filestart, 
+                fileID,
                 files.name,
                 files.locationID,
                 records.position, 
@@ -574,7 +574,7 @@ const prepSummaryStatement = (included) => {
                 records.end,
                 records.callCount,
                 records.isDaylight,
-                RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
+                RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
                 FROM records 
                 JOIN species ON records.speciesID = species.id 
                 JOIN files ON records.fileID = files.id 
@@ -621,6 +621,7 @@ const prepSummaryStatement = (included) => {
                 duration, 
                 filestart, 
                 name as file, 
+                fileID,
                 position, 
                 speciesID,
                 sname, 
@@ -634,7 +635,7 @@ const prepSummaryStatement = (included) => {
                 FROM 
                 ranked_records 
                 WHERE rank <= ? `;
-                params.push(STATE.topRankin);
+                params.push(topRankin);
 
                 const limitClause = noLimit ? '' : 'LIMIT ?  OFFSET ?';
                 noLimit || params.push(STATE.limit, offset);
@@ -1304,7 +1305,7 @@ const prepSummaryStatement = (included) => {
                         .audioChannels(1) // Set to mono
                         .audioFrequency(24_000) // Set sample rate to 24000 Hz (always - this is for wavesurfer)
                         .output(stream, { end:true });
-                    if (STATE.audio.normalise) command = command.audioFilter("loudnorm=I=-16:LRA=11:TP=-1.5") //
+                    if (STATE.audio.normalise) command = command.audioFilter("loudnorm=I=-16:LRA=11:TP=-1.5");
                     command.on('error', error => {
                         updateFilesBeingProcessed(file)
                         reject(new Error('Error extracting audio segment:', error));
@@ -2196,17 +2197,10 @@ const prepSummaryStatement = (included) => {
             action = undefined,
         } = {}) => {
             const db = STATE.db;
-
             const included = STATE.selection ? [] : await getIncludedIDs();
             const [sql, params] = prepSummaryStatement(included);
             const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
-            let range, files = [];
-            if (['explore', 'chart'].includes(STATE.mode)) {
-                range = STATE[STATE.mode].range;
-            } else {
-                files = STATE.filesToAnalyse;
-            }
-            
+      
             t0 = Date.now();
             const summary = await STATE.db.allAsync(sql, ...params);
             const event = interim ? 'update-summary' : 'summary-complate';
@@ -2229,7 +2223,7 @@ const prepSummaryStatement = (included) => {
                 SELECT 
                 dateTime,
                 cname,
-                RANK() OVER (PARTITION BY records.dateTime ORDER BY records.confidence DESC) AS rank
+                RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
                 FROM records 
                 JOIN species ON records.speciesID = species.id 
                 JOIN files ON records.fileID = files.id 
@@ -2298,7 +2292,7 @@ const prepSummaryStatement = (included) => {
             select = undefined
         } = {}) => {
             let confidence = STATE.detect.confidence;
-            const included = STATE.selection ? [] : await getIncludedIDs();
+                        const included = STATE.selection ? [] : await getIncludedIDs();
             if (select) {
                 const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
                 offset = Math.floor(position/limit) * limit;
@@ -2313,7 +2307,7 @@ const prepSummaryStatement = (included) => {
             let index = offset;
             AUDACITY = {};
             //const params = getResultsParams(species, confidence, offset, limit, topRankin, included);
-            const [sql, params] = prepResultsStatement(species, limit === Infinity, included, offset);
+            const [sql, params] = prepResultsStatement(species, limit === Infinity, included, offset, topRankin);
             
             const result = await STATE.db.allAsync(sql, ...params);
             if (format === 'text'){
@@ -2348,7 +2342,7 @@ const prepSummaryStatement = (included) => {
                     else if (species && STATE.mode !== 'explore') {
                         // get a number for the circle
                         const { count } = await STATE.db.getAsync(`SELECT COUNT(*) as count FROM records WHERE dateTime = ?
-                        AND confidence >= ?`, r.timestamp, confidence);
+                        AND confidence >= ? and fileID = ?`, r.timestamp, confidence, r.fileID);
                         r.count = count;
                         sendResult(++index, r, true);
                     } else {
