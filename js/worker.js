@@ -116,7 +116,7 @@ async function loadDB(path) {
             return response.text();
         }).then(filecontents => {
             modelLabels = filecontents.trim().split(/\r?\n/);
-        }).catch(error =>{
+        }).catch( (error) =>{
             console.error('There was a problem fetching the label file:', error);
         })
     } else {
@@ -488,7 +488,12 @@ const prepSummaryStatement = (included) => {
         JOIN files ON files.id = records.fileID
         JOIN species ON species.id = records.speciesID
         WHERE confidence >=  ? `;
-        if (['analyse', 'archive'].includes(STATE.mode)) {
+        // If you're using the memory db, you're either anlaysing one,  or all of the files
+        if (['analyse'].includes(STATE.mode) && STATE.filesToAnalyse.length === 1) {
+            summaryStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+            params.push(...STATE.filesToAnalyse);
+        }
+        else if (['archive'].includes(STATE.mode)) {
             summaryStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
             params.push(...STATE.filesToAnalyse);
         }
@@ -542,7 +547,12 @@ const prepSummaryStatement = (included) => {
             if (useRange) SQL += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
             if (STATE.detect.nocmig) SQL += ' AND COALESCE(isDaylight, 0) != 1 ';
             if (STATE.locationID) SQL += ` AND locationID =  ${STATE.locationID}`;
-            if (['analyse', 'archive'].includes(STATE.mode) && !STATE.selection) {
+            // If you're using the memory db, you're either anlaysing one,  or all of the files
+            if (['analyse'].includes(STATE.mode) && STATE.filesToAnalyse.length === 1) {
+                SQL += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+                params.push(...STATE.filesToAnalyse);
+            }
+            else if (['archive'].includes(STATE.mode)) {
                 SQL += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
                 params.push(...STATE.filesToAnalyse);
             }
@@ -581,69 +591,71 @@ const prepSummaryStatement = (included) => {
                 WHERE confidence >= ?
                 `;
                 
-                //if (species) resultStatement+=  ` AND speciesID = (SELECT id FROM species WHERE cname = ?) `;
-                
-                // might have two locations with same dates - so need to add files
-                if (['analyse', 'archive'].includes(STATE.mode) && !STATE.selection) {
-                    resultStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
-                    params.push(...STATE.filesToAnalyse);
-                }
-                // Prioritise selection ranges
-                const range = STATE.selection?.start ? STATE.selection :
-                STATE.mode === 'explore' ? STATE.explore.range : false;
-                const useRange = range?.start;  
-                if (useRange) {
-                    resultStatement += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
-                }
-                if (species){
-                    resultStatement+=  ` AND  cname = ? `;
-                    params.push(species);
-                }
-                else if (filtersApplied(included)) {
-                    resultStatement += ` AND speciesID IN (${prepParams(included)}) `;
-                    params.push(...included);
-                }
-                if (STATE.selection) {
-                    resultStatement += ` AND name = ? `;
-                    params.push(FILE_QUEUE[0])
-                }
-                if (STATE.locationID) {
-                    resultStatement += ` AND locationID = ${STATE.locationID} `;
-                }
-                if (STATE.detect.nocmig){
-                    resultStatement += ' AND COALESCE(isDaylight, 0) != 1 '; // Backward compatibility for < v0.9.
-                }
-                
-                resultStatement += `)
-                SELECT 
-                dateTime as timestamp, 
-                score,
-                duration, 
-                filestart, 
-                name as file, 
-                fileID,
-                position, 
-                speciesID,
-                sname, 
-                cname, 
-                score, 
-                label, 
-                comment,
-                end,
-                callCount,
-                rank
-                FROM 
-                ranked_records 
-                WHERE rank <= ? `;
-                params.push(topRankin);
-
-                const limitClause = noLimit ? '' : 'LIMIT ?  OFFSET ?';
-                noLimit || params.push(STATE.limit, offset);
-
-                resultStatement += ` ORDER BY ${STATE.sortOrder}, callCount DESC ${limitClause} `;
-                
-                return [resultStatement, params];
+            // If you're using the memory db, you're either anlaysing one,  or all of the files
+            if (['analyse'].includes(STATE.mode) && STATE.filesToAnalyse.length === 1) {
+                resultStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+                params.push(...STATE.filesToAnalyse);
             }
+            else if (['archive'].includes(STATE.mode)) {
+                resultStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+                params.push(...STATE.filesToAnalyse);
+            }
+            // Prioritise selection ranges
+            const range = STATE.selection?.start ? STATE.selection :
+            STATE.mode === 'explore' ? STATE.explore.range : false;
+            const useRange = range?.start;  
+            if (useRange) {
+                resultStatement += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
+            }
+            if (species){
+                resultStatement+=  ` AND  cname = ? `;
+                params.push(species);
+            }
+            else if (filtersApplied(included)) {
+                resultStatement += ` AND speciesID IN (${prepParams(included)}) `;
+                params.push(...included);
+            }
+            if (STATE.selection) {
+                resultStatement += ` AND name = ? `;
+                params.push(FILE_QUEUE[0])
+            }
+            if (STATE.locationID) {
+                resultStatement += ` AND locationID = ${STATE.locationID} `;
+            }
+            if (STATE.detect.nocmig){
+                resultStatement += ' AND COALESCE(isDaylight, 0) != 1 '; // Backward compatibility for < v0.9.
+            }
+            
+            resultStatement += `)
+            SELECT 
+            dateTime as timestamp, 
+            score,
+            duration, 
+            filestart, 
+            name as file, 
+            fileID,
+            position, 
+            speciesID,
+            sname, 
+            cname, 
+            score, 
+            label, 
+            comment,
+            end,
+            callCount,
+            rank
+            FROM 
+            ranked_records 
+            WHERE rank <= ? `;
+            params.push(topRankin);
+
+            const limitClause = noLimit ? '' : 'LIMIT ?  OFFSET ?';
+            noLimit || params.push(STATE.limit, offset);
+
+            resultStatement += ` ORDER BY ${STATE.sortOrder}, callCount DESC ${limitClause} `;
+            
+            return [resultStatement, params];
+        }
             
             
             // Not an arrow function. Async function has access to arguments - so we can pass them to processnextfile
@@ -864,7 +876,7 @@ const prepSummaryStatement = (included) => {
                             goToRegion
                         }, [audioArray.buffer]);
                     })
-                    .catch(error => {
+                    .catch( (error) => {
                         console.log(error);
                     })
                     let week;
@@ -994,7 +1006,7 @@ const prepSummaryStatement = (included) => {
                         offlineSource.start();
                         return offlineCtx;
                     } )
-                    .catch(error => console.log(error));
+                    .catch( (error) => console.log(error));
 
                 
                 // // Create a compressor node
@@ -1125,7 +1137,7 @@ const prepSummaryStatement = (included) => {
                             }
                         } catch (error) {
                             trackError(error.message, 'getWavePredictBuffers', STATE.batchSize);
-                            UI.postMessage({event: 'generate-alert', message: "Chirpity is struggling to handle the high number of prediction requests. You should <b>increasse</b> the batch size in settings to compensate for this, or risk skipping audio sections. Press <b>Esc</b> to abort."})
+                            //UI.postMessage({event: 'generate-alert', message: "Chirpity is struggling to handle the high number of prediction requests. You should <b>increasse</b> the batch size in settings to compensate for this, or risk skipping audio sections. Press <b>Esc</b> to abort."})
                         }
                     })
                     readStream.on('end', function () {
@@ -1138,7 +1150,7 @@ const prepSummaryStatement = (included) => {
                     })
                 })    
             }
-
+            
             const getPredictBuffers = async ({
                 file = '', start = 0, end = undefined
             }) => {
@@ -1149,14 +1161,15 @@ const prepSummaryStatement = (included) => {
                 if (start > metadata[file].duration) {
                     return
                 }
+
                 batchChunksToSend[file] = Math.ceil((end - start) / (BATCH_SIZE * WINDOW_SIZE));
                 predictionsReceived[file] = 0;
                 predictionsRequested[file] = 0;
                 let concatenatedBuffer = Buffer.alloc(0);
                 const highWaterMark = 2 * sampleRate * BATCH_SIZE * WINDOW_SIZE; 
-                const stream = new PassThrough({highWaterMark: highWaterMark});
+                const STREAM = new PassThrough({ highWaterMark: highWaterMark, end: true});
+
                 let chunkStart = start * sampleRate;
-                let header;
                 return new Promise((resolve, reject) => {
                     const command = ffmpeg(file)
                         .seekInput(start)
@@ -1165,7 +1178,7 @@ const prepSummaryStatement = (included) => {
                         //.outputOptions('-acodec pcm_s16le')
                         .audioChannels(1) // Set to mono
                         .audioFrequency(sampleRate) // Set sample rate 
-                        .output(stream, { highWaterMark: highWaterMark })
+                        .output(STREAM)
     
                     command.on('error', error => {
                         updateFilesBeingProcessed(file)
@@ -1177,16 +1190,15 @@ const prepSummaryStatement = (included) => {
                     })
                     command.on('end', () => {
                         // End the stream to signify completion
-                        stream.read();
-                        stream.end();
+                        STREAM.end();
                     });
 
-                    stream.on('data', async chunk => {
-                        stream.pause()
-                        stream.destroyed && console.log('stream destroyed before data finished being read')
+                    STREAM.on('data', async chunk => {
+                        STREAM.pause()
+                        STREAM.destroyed && console.log('stream destroyed before data finished being read')
                         if (aborted) {
                             command.kill()
-                            stream.destroy()
+                            STREAM.destroy()
                             return
                         }
 
@@ -1195,7 +1207,7 @@ const prepSummaryStatement = (included) => {
                             concatenatedBuffer = Buffer.concat(bufferList);
                         } catch (error) {
                             trackError(error.message, 'getPredictBuffers', STATE.batchSize);
-                            UI.postMessage({event: 'generate-alert', message: "Chirpity is struggling to handle the high number of prediction requests. You should <b>increasse</b> the batch size in settings to compensate for this, or risk skipping audio sections. Press <b>Esc</b> to abort."})
+                            //UI.postMessage({event: 'generate-alert', message: "Chirpity is struggling to handle the high number of prediction requests. You should <b>increasse</b> the batch size in settings to compensate for this, or risk skipping audio sections. Press <b>Esc</b> to abort."})
 
                         }
                         
@@ -1204,7 +1216,7 @@ const prepSummaryStatement = (included) => {
                             chunk = concatenatedBuffer.subarray(0, highWaterMark);
                             concatenatedBuffer = concatenatedBuffer.subarray(highWaterMark);
                             const audio = Buffer.concat([WAV_HEADER, chunk])
-                            const offlineCtx = await setupCtx(audio);
+                            const offlineCtx = await setupCtx(audio).catch( (error) => console.warn(error));
                             let worker;
                             if (offlineCtx) {
                                 offlineCtx.startRendering().then((resampled) => {
@@ -1233,15 +1245,15 @@ const prepSummaryStatement = (included) => {
 
                             }
                         }
-                        stream.resume()
+                        STREAM.resume()
                     });
 
-                    stream.on('error', err => {
-                        console.log(`stream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
+                    STREAM.on('error', err => {
+                        console.log('stream error: ', err);
                         err.code === 'ENOENT' && notifyMissingFile(file);
                     })
 
-                    stream.on('end', async function () {
+                    STREAM.on('end', async function () {
                         // deal with part-full buffers
                         if (concatenatedBuffer.length){
                             const audio = Buffer.concat([WAV_HEADER, concatenatedBuffer]);
@@ -1331,7 +1343,7 @@ const prepSummaryStatement = (included) => {
                         const audio = Buffer.concat(data);
 
                         // Navtive CHIRPITY_HEADER (24kHz) here for UI
-                        const offlineCtx = await setupCtx(audio, sampleRate).catch(error => {console.error(error.message)});
+                        const offlineCtx = await setupCtx(audio, sampleRate).catch( (error) => {console.error(error.message)});
                         if (offlineCtx){
                             offlineCtx.startRendering().then(resampled => {
                                 // `resampled` contains an AudioBuffer resampled at 24000Hz.
@@ -1385,9 +1397,9 @@ const prepSummaryStatement = (included) => {
                 end = metadata[file].duration,
             }) {
                 if (file.endsWith('.wav')){
-                    await getWavePredictBuffers({ file: file, start: start, end: end });
+                    await getWavePredictBuffers({ file: file, start: start, end: end }).catch( (error) => console.warn(error));
                 } else {
-                    await getPredictBuffers({ file: file, start: start, end: end });
+                    await getPredictBuffers({ file: file, start: start, end: end }).catch( (error) => console.warn(error));
                 }
                 
                 UI.postMessage({ event: 'update-audio-duration', value: metadata[file].duration });
@@ -1728,7 +1740,7 @@ const prepSummaryStatement = (included) => {
                         const message = messageQueue.shift();
 
                         // Parse the message
-                        await parseMessage(message).catch(error => {
+                        await parseMessage(message).catch( (error) => {
                             console.warn("Parse message error", error, 'message was', message);
                         });
                         // Dial down the getSummary calls if the queue length starts growing
@@ -1915,17 +1927,17 @@ const prepSummaryStatement = (included) => {
                             //DEBUG && console.log(insertQuery);
                             // Make sure we have some values to INSERT
                             insertQuery.endsWith(')') && await db.runAsync(insertQuery)
-                                .catch(error => console.log("Database error:", error))
+                                .catch( (error) => console.log("Database error:", error))
                             await db.runAsync('END');
                             return fileID
                         }
                         
                         const parsePredictions = async (response) => {
                             let file = response.file;
-                            const included = await getIncludedIDs(file).catch(error => console.log('Error getting included IDs', error));
+                            const included = await getIncludedIDs(file).catch( (error) => console.log('Error getting included IDs', error));
                             const latestResult = response.result, db = STATE.db;
                             DEBUG && console.log('worker being used:', response.worker);
-                            if (! STATE.selection) await generateInsertQuery(latestResult, file).catch(error => console.log('Error generating insert query', error));
+                            if (! STATE.selection) await generateInsertQuery(latestResult, file).catch( (error) => console.log('Error generating insert query', error));
                             let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
                             for (let i = 0; i < keysArray.length; i++) {
                                 let updateUI = false;
@@ -1951,7 +1963,7 @@ const prepSummaryStatement = (included) => {
                                             confidenceRequired = STATE.detect.confidence;
                                         }
                                         if (confidence >= confidenceRequired) {
-                                            const { cname } = await memoryDB.getAsync(`SELECT cname FROM species WHERE id = ${speciesID}`).catch(error => console.log('Error getting species name', error));
+                                            const { cname } = await memoryDB.getAsync(`SELECT cname FROM species WHERE id = ${speciesID}`).catch( (error) => console.log('Error getting species name', error));
                                             const result = {
                                                 timestamp: timestamp,
                                                 position: key,
@@ -2018,7 +2030,7 @@ const prepSummaryStatement = (included) => {
                             case "prediction": {
                                 if ( !aborted) {
                                     predictWorkers[response.worker].isAvailable = true;
-                                    let worker = await parsePredictions(response).catch(error =>  console.log('Error parsing predictions', error));
+                                    let worker = await parsePredictions(response).catch( (error) =>  console.log('Error parsing predictions', error));
                                     DEBUG && console.log('predictions left for', response.file, predictionsReceived[response.file] - predictionsRequested[response.file])
                                     const remaining = predictionsReceived[response.file] - predictionsRequested[response.file]
                                     if (remaining === 0) {
@@ -2069,11 +2081,11 @@ const prepSummaryStatement = (included) => {
         } = {}) { 
             if (FILE_QUEUE.length) {
                 let file = FILE_QUEUE.shift()
-                const found = await getWorkingFile(file).catch(error => console.warn('Error in getWorkingFile', error.message));
+                const found = await getWorkingFile(file).catch( (error) => console.warn('Error in getWorkingFile', error.message));
                 if (found) {
                     if (end) {}
                     let boundaries = [];
-                    if (!start) boundaries = await setStartEnd(file).catch(error => console.warn('Error in setStartEnd', error.message));
+                    if (!start) boundaries = await setStartEnd(file).catch( (error) => console.warn('Error in setStartEnd', error.message));
                     else boundaries.push({ start: start, end: end });
                     for (let i = 0; i < boundaries.length; i++) {
                         const { start, end } = boundaries[i];
@@ -2088,7 +2100,7 @@ const prepSummaryStatement = (included) => {
                             });
                             
                             DEBUG && console.log('Recursion: start = end')
-                            await processNextFile(arguments[0]).catch(error => console.warn('Error in processNextFile call', error.message));
+                            await processNextFile(arguments[0]).catch( (error) => console.warn('Error in processNextFile call', error.message));
                             
                         } else {
                             if (!sumObjectValues(predictionsReceived)) {
@@ -2100,12 +2112,12 @@ const prepSummaryStatement = (included) => {
                             }
                             await doPrediction({
                                 start: start, end: end, file: file, worker: worker
-                            }).catch(error => console.warn('Error in doPrediction', error, 'file', file, 'start', start, 'end', end));
+                            }).catch( (error) => console.warn('Error in doPrediction', error, 'file', file, 'start', start, 'end', end));
                         }
                     }
                 } else {
                     DEBUG && console.log('Recursion: file not found')
-                    await processNextFile(arguments[0]).catch(error => console.warn('Error in recursive processNextFile call', error.message));
+                    await processNextFile(arguments[0]).catch( (error) => console.warn('Error in recursive processNextFile call', error.message));
                 }
             }
         }
@@ -2229,11 +2241,15 @@ const prepSummaryStatement = (included) => {
                 JOIN files ON records.fileID = files.id 
                 WHERE confidence >= ?
                 `;
-                // might have two locations with same dates - so need to add files
-                if (['analyse', 'archive'].includes(STATE.mode) && !STATE.selection) {
-                    positionStmt += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
-                    params.push(...STATE.filesToAnalyse)
-                }
+            // If you're using the memory db, you're either anlaysing one,  or all of the files
+            if (['analyse'].includes(STATE.mode) && STATE.filesToAnalyse.length === 1) {
+                positionStmt += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+                params.push(...STATE.filesToAnalyse);
+            }
+            else if (['archive'].includes(STATE.mode)) {
+                positionStmt += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+                params.push(...STATE.filesToAnalyse);
+            }
                 // Prioritise selection ranges
                 const range = STATE.selection?.start ? STATE.selection :
                 STATE.mode === 'explore' ? STATE.explore.range : false;
