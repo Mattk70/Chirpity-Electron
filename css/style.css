@@ -553,14 +553,10 @@ input[type="range"].vertical {
     transform: scale(0.9); /* Shrink on click */
 }
 
+.offcanvas {
+    --bs-offcanvas-width: 450px; /* Change the width as desired */
+  }
 
-#settingsForm {
-    height: 75vh;
-    width: 65vw;
-    max-height: 925px;
-    overflow-y: auto;
-    overflow-x: hidden;
-}
 
 #settingsMap {
     height: 300px;

@@ -111,6 +111,8 @@ const DOM = {
      debugMode: document.getElementById('debug-mode'),
      defaultLat: document.getElementById('latitude'),
      defaultLon: document.getElementById('longitude'),
+     applyLocationButton: document.getElementById('apply-location'),
+     cancelLocationButton: document.getElementById('cancel-location'),
      fileNumber: document.getElementById('fileNumber'),
      gain: document.getElementById('gain'),
      gainAdjustment: document.getElementById('gain-adjustment'),
@@ -418,16 +420,16 @@ const buildFileMenu = (e) => {
     e.stopImmediatePropagation();
     const menu = document.getElementById('context-menu');
     menu.innerHTML = `
-    <a class="dropdown-item" id="setLocation"><span
+    <a class="dropdown-item" id="setCustomLocation"><span
     class="material-symbols-outlined align-bottom pointer">edit_location_alt</span> Amend File Recording Location</a>
     <a class="dropdown-item" id="setFileStart"><span
     class="material-symbols-outlined align-bottom pointer">edit_calendar</span> Amend File Start Time
     `;
     positionMenu(menu, e);
-    // Add the setLocation handler
-    const setLocationLink = document.getElementById('setLocation');
+    // Add the setCustomLocation handler
+    const setLocationLink = document.getElementById('setCustomLocation');
     setLocationLink.addEventListener('click', () => {
-        setLocation()
+        setCustomLocation()
     })
     const setFileStartLink = document.getElementById('setFileStart');
     setFileStartLink.addEventListener('click', () => {
@@ -611,7 +613,7 @@ const showLocation = async (fromSelect) => {
     const lonEl = document.getElementById('customLon');
     const customPlaceEl = document.getElementById('customPlace');
     const locationSelect = document.getElementById('savedLocations');
-    // CHeck if currentfile has a location id
+    // Check if currentfile has a location id
     const id = fromSelect ? locationSelect.value : FILE_LOCATION_MAP[currentFile];
     
     if (id) {
@@ -650,32 +652,57 @@ const displayLocationAddress = async (where) => {
         if (address === false) return
         const content = '<span class="material-symbols-outlined">fmd_good</span> ' + address;
         placeEl.innerHTML = content;
-        config.latitude = parseFloat(latEl.value).toFixed(2);
-        config.longitude = parseFloat(lonEl.value).toFixed(2);
-        config.location = address;
-        updatePrefs();
-        worker.postMessage({
-            action: 'update-state',
-            lat: config.latitude,
-            lon: config.longitude,
-            place: config.location
-        });
-        // Initially, so changes to the default location are immediately reflected in subsequent analyses
-        // We will switch to location filtering when the default location is changed.
-        config.list = 'location';
-        DOM.speciesThresholdEl.classList.remove('d-none');
-        
-        updateListIcon();
-        DOM.listToUse.value = config.list;
-        resetResults();
-        worker.postMessage({
-            action: 'update-list',
-            list: 'location'
-        });
+        const button = document.getElementById('apply-location')
+        button.classList.add('btn-danger');
+        button.textContent = 'Apply';
     }
 }
 
-async function setLocation() {
+const cancelDefaultLocation = () => {
+    const latEl = document.getElementById('latitude');
+    const lonEl = document.getElementById('longitude');
+    const placeEl = document.getElementById('place');
+    latEl.value = config.latitude;
+    lonEl.value = config.longitude;
+    placeEl.innerHTML = '<span class="material-symbols-outlined">fmd_good</span> ' + config.location;
+    updateMap(latEl.value, lonEl.value)
+    const button = document.getElementById('apply-location')
+    button.classList.remove('btn-danger');
+    button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
+}
+
+const setDefaultLocation = () => {
+    config.latitude = parseFloat(DOM.defaultLat.value).toFixed(2);
+    config.longitude = parseFloat(parseFloat(DOM.defaultLon.value)).toFixed(2);
+    config.location = document.getElementById('place').textContent.replace('fmd_good ', '');
+    updateMap(parseFloat(DOM.defaultLat.value), parseFloat(DOM.defaultLon.value));
+    updatePrefs();
+    worker.postMessage({
+        action: 'update-state',
+        lat: config.latitude,
+        lon: config.longitude,
+        place: config.location
+    });
+    // Initially, so changes to the default location are immediately reflected in subsequent analyses
+    // We will switch to location filtering when the default location is changed.
+    config.list = 'location';
+    DOM.speciesThresholdEl.classList.remove('d-none');
+    
+    updateListIcon();
+    DOM.listToUse.value = config.list;
+    resetResults();
+    worker.postMessage({
+        action: 'update-list',
+        list: 'location'
+    });
+    const button = document.getElementById('apply-location')
+    button.classList.remove('btn-danger');
+    button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
+}
+
+DOM.applyLocationButton.addEventListener('click', setDefaultLocation);
+DOM.cancelLocationButton.addEventListener('click', cancelDefaultLocation);
+async function setCustomLocation() {
     const savedLocationSelect = await generateLocationList('savedLocations');
     const latEl = document.getElementById('customLat');
     const lonEl = document.getElementById('customLon');
@@ -722,7 +749,7 @@ async function setLocation() {
         locationForm.reset();
         locationAdd.removeEventListener('click', addLocation);
         locationModalDiv.removeEventListener('hide.bs.modal', onModalDismiss);
-        if (showLocation) savedLocationSelect.removeEventListener('change', setLocation)
+        if (showLocation) savedLocationSelect.removeEventListener('change', setCustomLocation)
     }
     locationModalDiv.addEventListener('hide.bs.modal', onModalDismiss);
 }
@@ -3420,14 +3447,14 @@ function onChartData(args) {
         URL.revokeObjectURL(url);
     }
     
-    // Prevent the settings menu disappearing on click or mouseout
-    const settingsMenu = document.getElementById('settingsMenu')
-    settingsMenu.addEventListener('click', (e) => {
-        e.stopImmediatePropagation();
-    })
-    settingsMenu.addEventListener('mouseout', (e) => {
-        e.stopImmediatePropagation()
-    })
+    // // Prevent the settings menu disappearing on click or mouseout
+    // const settingsMenu = document.getElementById('settingsMenu')
+    // settingsMenu.addEventListener('click', (e) => {
+    //     e.stopImmediatePropagation();
+    // })
+    // settingsMenu.addEventListener('mouseout', (e) => {
+    //     e.stopImmediatePropagation()
+    // })
     
     function setNocmig(on) {
         if (on) {

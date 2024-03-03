@@ -1953,7 +1953,7 @@ const prepSummaryStatement = (included) => {
                                     if (confidence < 0.05) break;
                                     confidence*=1000;
                                     let speciesID = speciesIDArray[j];
-                                    updateUI = (confidence > STATE.detect.confidence && included.includes(speciesID));
+                                    updateUI = (confidence > STATE.detect.confidence && (! included.length || included.includes(speciesID)));
                                     if (STATE.selection || updateUI) {
                                         let end, confidenceRequired;
                                         if (STATE.selection) {

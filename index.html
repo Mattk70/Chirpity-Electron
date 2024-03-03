@@ -22,7 +22,6 @@
     <script>
         function goFullscreen(){
             const container = document.getElementById('chart-week');
-            
             container.requestFullscreen();
         }
     </script>
@@ -30,7 +29,407 @@
     <title>Chirpity Bird Call Detection</title>
 </head>
 <body>
+    <div class="offcanvas offcanvas-start text-bg-dark" tabindex="-1" id="settings" aria-labelledby="offcanvasExampleLabel">
+        <div class="offcanvas-header pb-2">
+            <h5 class="offcanvas-title" id="offcanvasExampleLabel">Settings</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body pt-1">
+            <!-- Your offcanvas content goes here -->
+            <form id="settingsForm" class="fs-6">
+                <fieldset class="border border-secondary rounded m-2 mt-0 mb-0 p-2">
+                    <legend style="font-size: large;font-weight:bold">Predictions</legend>
+                    <div>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Model" data-bs-content="Select whether to use Chirpity, optimised for Nocturnal Migration Calls in Europe, or BirdNET, which can detect over 6000 species across the globe.">?</a>
+                        <div class="pe-3 input-group rounded p-2 mb-1">
+                            <label class="input-group-text col-5" for="model-to-use">Model:</label>
+                            <select class="form-select mb-0" id="model-to-use">
+                                <option value="chirpity">Chirpity</option>
+                                <option value="birdnet">BirdNet</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group rounded p-2 pe-0 mb-2">
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Confidence Threshold" data-bs-content="Determines the minimum confidence required for results to be returned">?</a>
+                        <label for="confidence">Confidence threshold:</label>
+                        <div class="input-group">
+                            <input type="range" class="form-control-range w-75" id="confidence" min="5" max="100" step="5">
+                            <div class="input-group-append">
+                                <span class="input-group-text" id="confidence-value">50%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="List" data-bs-content="Filters the detections returned in results. Local Birds: excludes birds 
+                        unlikely to be found in your region. Nocturnal Birds: excludes bird song and species not known to call at night. The custom list allows you to upload a file listing the species to detect">?</a>
+                        <div class="pe-3 input-group rounded p-2 mb-1">
+                            <label class="input-group-text col-5" for="list-to-use">List:</label>
+                            <select class="form-select mb-0" id="list-to-use">
+                                <option value="location">Local Birds</option>
+                                <option value="nocturnal">Nocturnal Birds</option>
+                                <option value="birds">Birds</option>
+                                <option value="everything">Everything</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        <div class="row p-2 d-none" id="choose-file-container">
+                            <div class="col">
+                                <div class="input-group">
+                                    <button class="btn btn-outline-secondary" type="button" id="list-file-selector">Select file</button>
+                                    <input type="text" class="form-control" id="custom-list-location" aria-describedby="list-file-selector" placeholder="No custom list set" disabled="" readonly="">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group rounded d-none" id="use-location-container">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="local" checked="">
+                                <label class="form-check-label" for="local">Use Location settings</label>
+                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Use Location settings" data-bs-content="When activated, the Nocturnal birds filter reports birds based on your location settings.">?</a>
+                            </div>
+                        </div>
+                        <div id="species-threshold-el">
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Species Threshold" data-bs-content="Define the minimum eBird checklist frequency for species inclusion.
+                            If 'Adjust for Seasons' is enabled, the list will be adjusted to include species expected for the recording week.">?</a>
+                            <div class="pe-3 input-group rounded p-2 mb-1">
+                                <span class="input-group-text col-5">Threshold:</span>
+                                <input id="species-frequency-threshold" type="number" class="form-control" style="width: 30%;" value="0.005" step="0.001" min="0.001" max="1" aria-label="species frequency threshold" aria-describedby="species-frequency-threshold">
+                            </div>
+                            <div class="text-nowrap mt-2"><label class="ms-2 me-2" for="species-week">Adjust list for the week of the year</label>
+                                <span class="form-switch ms-2">
+                                    <input id="species-week" role="switch" type="checkbox" class="form-check-input form-check-inline">
+                                </span>
+                            </div>                                                                
+                        </div>
+                    </div>
+                    <div class="m-2"></div>
+                    <div class="form-group rounded p-2 pe-0 mb-2">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="nocmig">
+                            <label class="form-check-label" for="nocmig">Nocmig mode</label>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Nocmig Mode" data-bs-content="When enabled, Nocmig mode only searches for and only displays detections found during the night">?</a>
+                        </div>
+                    </div>
+                </fieldset>
+                <fieldset class="border border-secondary rounded m-2 mb-0 p-2">
+                    <legend style="font-size: large;font-weight:bold">Default Location <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Default Location" data-bs-content="Chirpity uses location information to determine the dawn and dusk times for recordings">?</a></legend>
+                    <div class="form-group rounded p-2 mb-2">
+                        <div class="input-group">
+                            <span class="input-group-text pe-2">Lat:</span>
+                            <input id="latitude" type="text" class="form-control ps-2 " placeholder="0.0" aria-label="Latitude" aria-describedby="latitude">
+                            <span class="input-group-text pe-2">Lon:</span>
+                            <input id="longitude" type="text" class="form-control ps-2" placeholder="0.0" aria-label="Longitude" aria-describedby="longitude">
+                        </div>
+                        <div class="mt-1 float-end">
+                            <button class="btn btn-primary" id="apply-location" onclick="return false">Set</button>
+                            <button class="btn btn-secondary" id="cancel-location" onclick="return false">Cancel</button>
+                        </div>
+                        <div class="clearfix"></div>
+                        <div id="settingsMap" class="mt-2 border border-secondary rounded"></div>
+                        <div class="mt-2" id="place"></div>
+                    </div>
+                </fieldset>
+                <fieldset class="border border-secondary rounded m-2 mb-0 p-2">
+                    <legend style="font-size: large;font-weight:bold">System</legend>
+                    <div>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Language" data-bs-content="Select your preferred language for birds' common names">?</a>
+                        <div class="pe-3 input-group rounded p-2 mb-1">
+                            <label class="input-group-text col-5" for="list-to-use">Language:</label>
+                            <select class="form-select mb-0" id="locale">
+                                <option value="en_uk">English (UK)</option>
+                                <option value="en">English (US)</option>
+                                <option value="af">Afrikaans</option>
+                                <option value="ar">العربية</option>
+                                <option value="cs">Čeština</option>
+                                <option value="ca">Català</option>
+                                <option value="da">Dansk</option>
+                                <option value="de">Deutsch</option>
+                                <option value="es">Español</option>
+                                <option value="fi">Suomi</option>
+                                <option value="fr">Français</option>
+                                <option value="hu">Magyar</option>
+                                <option value="it">Italiano</option>
+                                <option value="ja">日本語</option>
+                                <option value="ko">한국어</option>
+                                <option value="nl">Nederlands</option>
+                                <option value="no">Norsk</option>
+                                <option value="pl">Polski</option>
+                                <option value="pt">Português</option>
+                                <option value="ro">Română</option>
+                                <option value="ru">Русский</option>
+                                <option value="sk">Slovenčina</option>
+                                <option value="sl">Slovenščina</option>
+                                <option value="sv">Svenska</option>
+                                <option value="th">ไทย</option>
+                                <option value="tr">Türkçe</option>
+                                <option value="uk">Українська</option>
+                                <option value="zh">中文</option>
+                                <!-- <option value="custom">Custom</option> -->
+                            </select>
+                        </div>
+                    </div>
+                    <div class="p-0 chirpity-only no-mac">
+                        <div class="form-group rounded p-2 pe-0 mb-2">
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Backend" data-bs-content="The GPU backend can improve performance if you have a dedicated graphics card.">?</a>
+                            <div>
+                                <label class="ps-0 pe-1 fs-6 text-start">Backend:</label>
+                                <div class="form-check form-check-inline">
+                                    <label class="form-check-label" for="tensorflow">CPU</label>
+                                    <input class="form-check-input" type="radio" name="backend" id="tensorflow" value="tensorflow" checked="">
 
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="backend" id="webgl" value="webgl">
+                                    <label class="form-check-label" for="webgl">GPU</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Threads" data-bs-content="The number of parallel predictions to run. By default, 
+                        this is set to the number of CPU cores on the machine for fastest performance. With the GPU backend, a lower number works better e.g. 1-3">?</a>
+                        <div class="form-group rounded p-2 pe-0 mb-2">
+                            <label for="thread-slider">Threads:</label>
+                            <div class="input-group">
+                                <input type="range" class="form-control-range w-75" id="thread-slider" min="1" max="24">
+                                <div class="input-group-append">
+                                    <span class="input-group-text" id="threads-value">12</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Batch Size" data-bs-content="Optimising the batch size can increase processing speed on longer files.">?</a>
+                        <div class="form-group rounded p-2 pe-0 mb-2">
+                            <label for="batch-size">Batch Size:</label>
+                            <div class="input-group">
+                                <input type="range" class="form-control-range w-75" id="batch-size" min="0" max="7">
+                                <div class="input-group-append">
+                                    <span class="input-group-text" id="batch-size-value">2</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Audio notification" data-bs-content="When enabled, there will be a system notification when analyses that take over thirty seconds complete.">?</a>
+                        <div class="pe-3 form-group rounded p-2 mb-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="audio-notification">
+                                <label class="form-check-label" for="audio-notification"></label>Enable analysis completion notifications
+                            </div>
+                        </div>
+                    </div>
+                </fieldset>
+                <fieldset class="border border-secondary rounded m-2 mb-0 p-2">
+                    <legend style="font-size: large;font-weight:bold">Audio Preferences</legend>
+                    <div class="me-auto">
+                        <div class="form-group rounded p-2 mb-2">
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Volume Adjustment" data-bs-content="Adjust the volume of audio to compensate for low recording levels.">?</a>
+                            <label for="gain" class="form-label">
+                                Volume Adjustment:
+                            </label>
+                            <div class="input-group me-0 p-0">
+                                <input type="range" class="form-control-range w-75" min="0" max="50" id="gain">
+                                <div class="input-group-append">
+                                    <span class="input-group-text" id="gain-adjustment">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group rounded p-2 mb-2">
+                        <div class="col form-check form-switch">
+                            <label class="form-check-label" for="normalise">Normalise Audio:
+                                <input class="form-check-input" type="checkbox" role="switch" id="normalise">
+                            </label>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Normalise" data-bs-content="When enabled, the audio you hear will be normalised, expanding the dynamic range.">?</a>
+                        </div>
+                    </div>
+                    <hr>
+                    <h6 class="fs-6">Audio Export:</h6>
+                    <div class="pe-3 input-group rounded p-2 mb-1">
+                        <label for="format" class="input-group-text col-5">Export Format:</label>
+                        <select class="form-select mb-0" id="format">
+                            <option value="wav">WAV</option>
+                            <option value="flac">FLAC</option>
+                            <option value="mp3">MP3</option>
+                            <!-- <option value="m4a">M4A</option> -->
+                            <option value="opus">Opus</option>
+                        </select>
+                    </div>
+                    <div id="bitrate-container" class="pe-3 input-group rounded p-2 mb-1">
+                        <label for="bitrate" class="input-group-text col-5">Export Bitrate:</label>
+                        <select class="form-select mb-0" id="bitrate">
+                            <option value="320">320 kbps</option>
+                            <option value="192">192 kbps</option>
+                            <option value="160">160 kbps</option>
+                            <option value="128">128 kbps</option>
+                            <option value="96">96 kbps</option>
+                        </select>
+                    </div>
+                    <div id="quality-container" class="pe-3 input-group rounded p-2 mb-1">
+                        <label for="quality" class="input-group-text  col-6">Compression:</label>
+                        <select class="form-select mb-0" id="quality">
+                            <option value="0">0</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                            <option value="9">9</option>
+                            <option value="10">10</option>
+                        </select>
+                    </div>
+                    <div class="pe-2 form-group rounded p-2 mb-2">
+                        <div class="form-check-inline w-75 form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="downmix">
+                            <label class="form-check-label" for="downmix">Convert to mono</label>
+                        </div>
+                        <a class="ms-auto circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Downmix" data-bs-content="When enabled, exported audio will be downmixed to mono">?</a>
+                    </div>
+                    <div class="form-group rounded p-2 pe-0 mb-2">
+                        <div class="row pe-2">
+                            <label class="col-3">Decorators: </label>
+                            <div class="col-6 ">
+                                <div class="form-check-inline text-nowrap">
+                                    <input class="form-check-input" type="checkbox" id="padding" value="2" checked="">
+                                    <label class="form-check-label" for="padding">
+                                        Pad
+                                    </label>
+                                    <input class="form-check-input" type="checkbox" id="fade" disabled="" value="1">
+                                    <label class="form-check-label" for="fade">
+                                        Fade
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Decorators" data-bs-content="'Pad' adds 2 seconds before and after a selection to the exported audio.
+                                'Fade' adds a 1 second fade effect to the start and end of the audio">?</a>
+                            </div>
+                        </div>
+                    </div>
+                </fieldset>
+                <fieldset class="border border-secondary rounded m-2 mb-0 p-2">
+                    <legend style="font-size: large;font-weight:bold">Spectrogram Preferences</legend>
+                    <div class="pe-3 input-group rounded p-2 mb-1">
+                        <label for="colourmap" class="input-group-text col-5">Colourmap:</label>
+                        <select class="form-select mb-0" id="colourmap">
+                            <option value="greys">Greyscale</option>
+                            <option value="bone">Bone</option>
+                            <option value="turbidity">Turbidity</option>
+                            <option value="chlorophyll">Chlorophyll</option>
+                            <option value="viridis">Viridis</option>
+                            <option value="cdom">CDom</option>
+                            <option value="temperature">Temperature</option>
+                            <!-- <option value="density">Density</option>-->
+                            <!-- <option value="oxygen">Oxygen</option>-->
+                            <!-- <option value="copper">Copper</option>-->
+                            <!-- <option value="earth">Earth</option>-->
+                            <option value="inferno">Inferno</option>
+                            <option value="magma">Magma</option>
+                            <option value="plasma">Plasma</option>
+                            <option value="hot">Hot</option>
+                            <!-- <option value="cubehelix">CubeHelix</option>-->
+                            <!-- <option value="phase">Phase</option>-->
+                            <!-- <option value="YlOrRd">Yellow/red</option>-->
+                            <!-- <option value="picnic">Picnic</option>-->
+                            <!-- <option value="electric">Electric</option>-->
+                            <!-- <option value="bluered">BlueRed</option>-->
+                            <option value="blackbody">Blackbody</option>
+                            <!-- <option value="rainbow">Rainbow</option>-->
+                            <!-- <option value="rainbow-soft">Rainbow</option>-->
+                        </select>
+                    </div>
+                    <div class="pe-3 input-group rounded p-2 mb-1">
+                        <label for="timelineSetting" class="input-group-text col-5">Timeline:</label>
+                        <select class="form-select mb-0" id="timelineSetting">
+                            <option value="timecode">Timecode</option>
+                            <option value="timeOfDay">Time of day</option>
+                        </select>
+                    </div>
+                </fieldset>                                                        
+                <fieldset class="border border-secondary rounded m-2 p-2 bg-secondary">
+                    <legend class="pb-2" style="font-size: large"><span class="material-symbols-outlined align-middle">science</span> Advanced features <a class="circle" style="background-color:darkgoldenrod" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Advanced Features" data-bs-content="The settings in this section can impact prediction quailty - for better or worse. Use them with caution!">?</a>
+                    </legend>
+                    <div class="chirpity-only form-group rounded p-2 mb-2">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="context">
+                            <label class="form-check-label" for="context">
+                                Context mode
+                            </label>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Context Mode" data-bs-content="When enabled, context mode adapts predictions by analyzing the surrounding context.
+                            Not available in the BirdNET model">?</a>
+                        </div>
+                    </div>
+                    <div class="chirpity-only me-auto">
+                        <div class="form-group rounded p-2 mb-2">
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Signal to Noise Ratio" data-bs-content="Skip over portions of audio with just background noise. Higher values skip increasingly noisy segments.
+                            Not available in the BirdNET model">?</a>
+                            <label for="snrValue" class="form-label">
+                                SNR filter:
+                            </label>
+                            <div class="input-group">
+                                <input type="range" class="form-control-range w-75" min="0" max="10" step="0.5" id="snrValue">
+                                <div class="input-group-append">
+                                    <span class="input-group-text" id="SNR-threshold">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="me-auto">
+                        <div class="form-group rounded p-2 mb-2">
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="High Pass Filter" data-bs-content="When set, removes low frequency noise below the threshold. If enabled before analysis, the modified audio is sent to the model. If only enabled after analysis, this just affects audio playback">?</a>
+                            <label for="HighPassFrequency" class="form-label">
+                                High Pass filter:
+                            </label>
+                            <div class="input-group me-0 p-0">
+                                <input type="range" class="form-control-range w-75" min="0" max="2500" step="25" id="HighPassFrequency">
+                                <div class="input-group-append">
+                                    <span class="input-group-text" id="HP-threshold">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group rounded p-2 me-0 mb-2">
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Low Shelf Filter" data-bs-content="When used, attenuates low frequency noise below the frequency thresshold. If enabled before analysis, the modified audio is sent to the model. If only enabled after analysis, this just affects audio playback">?</a>
+                        <label for="lowShelfFrequency" class="form-label">
+                            Low Shelf filter:
+                        </label>
+                        <div class="input-group me-0 p-0">
+                            <input type="range" class="form-control-range w-75" min="0" max="2500" step="100" id="lowShelfFrequency">
+                            <div class="input-group-append">
+                                <span class="input-group-text" id="LowShelf-threshold">0</span>
+                            </div>
+                        </div>
+                        <label for="attenuation" class="form-label">Attenuation:</label>
+                        <div class="input-group me-0 p-0">
+                            <input type="range" class="form-control-range w-75" min="0" max="50" id="attenuation">
+                            <div class="input-group-append">
+                                <span class="input-group-text" id="attenuation-threshold">0 dB</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class=" col-auto form-group rounded p-2 mb-2 text-bg-light">
+                        <div class="text-nowrap">   
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="debug-mode">
+                                <label class="form-check-label me-2" for="debug-mode">Debug mode</label><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Debug Mode" data-bs-content="Enter debug mode (changes to this setting require a Chirpity relaunch to take effect)">?</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-auto form-group rounded p-2 mb-2 text-bg-light">
+                        <div class="text-nowrap">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="do-not-track">
+                                <label class="form-check-label me-2" for="do-not-track">Opt out of usage analytics</label><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Disable Tracking" data-bs-content="Chirpity collects anonymous system data to enhance user experience and aid bug tracking. If you do not want to share this information, you can disable it here.">?</a>
+                            </div>        
+                        </div>
+                    </div>
+                </fieldset>
+            </form>                        
+        </div>
+    </div>      
     <!-- The modal for the tour -->
     <div class="modal modal-lg modal-fade" id="tourModal" tabindex="-1" aria-labelledby="tourModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -74,20 +473,19 @@
                             <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chiprity Nocmig">
                             <div class="text-center pb-4">
                                 <h5>Quick access settings panel</h5>
-                                <p>The icons here allow you to qucikly toggle some frequently used settings. 
-                                    These include:
-                                    <div class="w-75 ms-5">
-                                        <ol class="text-start ps-5"> 
-                                            <li>Nocmig mode</li>
-                                            <li>Audio filters</li>
-                                            <li>Context-aware mode (Chirpity model only)</li>
-                                            <li>Fullscreen mode for the spectrogram</li>
-                                            <li>Which detection list to use</li>
-                                            <li>And the confidence threshold</li>
-                                        </ol>
-                                    </div>
-                                    Explanations for each of these settings can be found under "Settings" in the Help menu.
-                                </p>
+                                <p>The icons here allow you to qucikly toggle some frequently used settings.</p>
+                                These include:
+                                <div class="w-75 ms-5">
+                                    <ol class="text-start ps-5"> 
+                                        <li>Nocmig mode</li>
+                                        <li>Audio filters</li>
+                                        <li>Context-aware mode (Chirpity model only)</li>
+                                        <li>Fullscreen mode for the spectrogram</li>
+                                        <li>Which detection list to use</li>
+                                        <li>And the confidence threshold</li>
+                                    </ol>
+                                </div>
+                                <p>Explanations for each of these settings can be found under "Settings" in the Help menu.</p>
                             </div>
                         </div>
                         <div class="carousel-item" data-element-selector="#fileContainer">
@@ -133,13 +531,9 @@
     </div>
     <!-- Navigation bar -->
     <div id="navPadding" class="position-absolute top-0 w-100">
-        <nav class="navbar navbar-expand-md navbar-dark bg-dark" id="primary_nav_wrap">
+        <nav class="navbar navbar-expand-sm navbar-dark bg-dark" id="primary_nav_wrap">
             <div class="container-fluid">
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main_nav"
-                aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="main_nav">
+            <div id="main_nav">
                 <ul class="navbar-nav">
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navBarFile" data-bs-toggle="dropdown">
@@ -150,7 +544,7 @@
                                 <span class="material-symbols-outlined">file_open</span> Open Audio
                                 File(s) <span class="shortcut float-end">Ctrl+O</span></a>
                             </li>
-                            <hr class="dropdown-divider">
+                            <div class="dropdown-divider"></div>
                             <li><a class="dropdown-item disabled" id="saveCSV" href="#">
                                 <span class="material-symbols-outlined">ios_share</span> Export Results
                                 to CSV</a>
@@ -163,13 +557,11 @@
                                 <span class="material-symbols-outlined">label</span> Save Audacity
                                 Labels</a>
                             </li>
-                            
-                            <hr class="dropdown-divider">
+                            <div class="dropdown-divider"></div>
                             <li><a class="dropdown-item" href="#" id="exit">
                                 <span class="material-symbols-outlined">highlight_off</span> Exit</a>
                             </li>
                         </ul>
-                        
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarRecords" role="button"
                             data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -226,975 +618,475 @@
                                     </ul>
                                 </li>
                                 <li class="nav-item dropdown">
-                                    <a class="nav-link dropdown-toggle" href="#" role="button" id="navbarSettings" onclick="placeMap('settingsMap')"
-                                    data-bs-toggle="dropdown" data-bs-auto-close="false">Settings</a>
-                                    <ul id="settingsMenu" class="nav-item dropdown-menu">
-                                        <li>
-                                            <form id="settingsForm" class="fs-6">
-                                                <div class="row">
-                                                    <div class="col-6 pe-0">
-                                                        <fieldset class="border rounded m-2 mb-0 p-1">
-                                                            <legend style="font-size: large">Predictions</legend>
-                                                            <div class="p-2 form-group rounded mb-2 bg-light">
-                                                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Model" data-bs-content="Select whether to use Chirpity, optimised for Nocturnal Migration Calls in Europe, or BirdNET, which can detect over 6000 species across the globe.">?</a>
-                                                                <div class="row pe-3">
-                                                                    <label class="col-auto" for="model-to-use">Model:</label>
-                                                                    <div class="col d-flex align-items-start">
-                                                                        <select class="form-select w-100" id="model-to-use">
-                                                                            <option value="chirpity">Chirpity</option>
-                                                                            <option value="birdnet">BirdNet</option>
-                                                                        </select>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            
-                                                            <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Confidence Threshold" data-bs-content="Determines the minimum confidence required for results to be returned">?</a>
-                                                                <label for="confidence">Confidence threshold:</label>
-                                                                <div class="input-group">
-                                                                    <input type="range" class="form-control-range w-75"
-                                                                    id="confidence" min="5" max="100" step="5">
-                                                                    <div class="input-group-append">
-                                                                        <span class="input-group-text"
-                                                                        id="confidence-value">50%</span>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="row p-2">
-                                                                <div class="p-2 form-group rounded bg-light">
-                                                                    <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="List" data-bs-content="Filters the detections returned in results. Local Birds: excludes birds 
-                                                                    unlikely to be found in your region. Nocturnal Birds: excludes bird song and species not known to call at night. The custom list allows you to upload a file listing the species to detect">?</a>
-                                                                    <div class="row pe-3">
-                                                                        <label class="col-auto" for="list-to-use">List:</label>
-                                                                        <div class="col d-flex align-items-start">
-                                                                            <select class="form-select w-100" id="list-to-use">
-                                                                                <option value="location">Local Birds</option>
-                                                                                <option value="nocturnal">Nocturnal Birds</option>
-                                                                                <option value="birds">Birds</option>
-                                                                                <option value="everything">Everything</option>
-                                                                                <option value="custom">Custom</option>
-                                                                            </select>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div class="row p-2 d-none" id="choose-file-container">
-                                                                        <div class="col">
-                                                                          <div class="input-group">
-                                                                            <button class="btn btn-outline-secondary" type="button" id="list-file-selector">Select file</button>
-                                                                            <input type="text" class="form-control" id="custom-list-location" aria-describedby="list-file-selector" placeholder="No custom list set" disabled readonly>
-                                                                          </div>
-                                                                        </div>
-                                                                    </div>
-                                                                
-                                                                
-                                                                    <div class="form-group rounded d-none" id="use-location-container">
-                                                                        <div class="form-check form-switch">
-                                                                            <input class="form-check-input" type="checkbox" role="switch" id="local" checked>
-                                                                            <label class="form-check-label" for="local">Use Location settings</label>
-                                                                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Use Location settings" data-bs-content="When activated, the Nocturnal birds filter reports birds based on your location settings.">?</a>
-                                                                        </div>
-                                                                    </div>
-                                                                
-                                                                    <div id="species-threshold-el">
-                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Species Threshold" data-bs-content="Define the minimum eBird checklist frequency for species inclusion.
-                                                                        If 'Adjust for Seasons' is enabled, the list will be adjusted to include species expected for the recording week.">?</a>
-                                                                        <div class="input-group mt-2 w-100 align-bottom">
-                                                                            <span class="input-group-text col">Threshold:</span>
-                                                                            <input id="species-frequency-threshold" type="number" class="form-control" style="width: 30%;" value="0.005" step="0.001" min="0.001" max="1" aria-label="species frequency threshold" aria-describedby="species-frequency-threshold">
-                                                                            <span class="text-nowrap"><label class="ms-2 me-2" for="species-week">Adjust for seasons</label>
-                                                                                <span class="form-switch">
-                                                                                    <input id="species-week" role="switch"  type="checkbox" class="form-check-input form-check-inline">
-                                                                                </span>
-                                                                            </span>
-                                                                        </div>                                                                
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="m-2"></div>
-                                                            <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                <div class="form-check form-switch">
-                                                                    <input class="form-check-input" type="checkbox"
-                                                                    role="switch" id="nocmig">
-                                                                    <label class="form-check-label" for="nocmig">Nocmig mode</label>
-                                                                    <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Nocmig Mode" data-bs-content="When enabled, Nocmig mode only searches for and only displays detections found during the night">?</a>
-                                                                </div>
-                                                            </div>
-                                                        </fieldset>
-                                                    </div>
-                                                    <div class="col-6 ps-0">
-                                                        <fieldset class="border rounded m-2 p-1">
-                                                            <legend style="font-size: large">System</legend>
-                                                            <div class="container">
-                                                                <div class="row">
-                                                                    <div class="col p-0">
-                                                                        <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Language" data-bs-content="Select your preferred language for birds' common names">?</a>
-                                                                            
-                                                                            <div class="row pe-3">
-                                                                                <label class="col-auto ps-0 pe-3 fs-6" for="list-to-use">Language:</label>
-                                                                                <select  class="form-select col" id="locale">
-                                                                                    <option value="en_uk">English (UK)</option>
-                                                                                    <option value="en">English (US)</option>
-                                                                                    <option value="af">Afrikaans</option>
-                                                                                    <option value="ar">العربية</option>
-                                                                                    <option value="cs">Čeština</option>
-                                                                                    <option value="ca">Català</option>
-                                                                                    <option value="da">Dansk</option>
-                                                                                    <option value="de">Deutsch</option>
-                                                                                    <option value="es">Español</option>
-                                                                                    <option value="fi">Suomi</option>
-                                                                                    <option value="fr">Français</option>
-                                                                                    <option value="hu">Magyar</option>
-                                                                                    <option value="it">Italiano</option>
-                                                                                    <option value="ja">日本語</option>
-                                                                                    <option value="ko">한국어</option>
-                                                                                    <option value="nl">Nederlands</option>
-                                                                                    <option value="no">Norsk</option>
-                                                                                    <option value="pl">Polski</option>
-                                                                                    <option value="pt">Português</option>
-                                                                                    <option value="ro">Română</option>
-                                                                                    <option value="ru">Русский</option>
-                                                                                    <option value="sk">Slovenčina</option>
-                                                                                    <option value="sl">Slovenščina</option>
-                                                                                    <option value="sv">Svenska</option>
-                                                                                    <option value="th">ไทย</option>
-                                                                                    <option value="tr">Türkçe</option>
-                                                                                    <option value="uk">Українська</option>
-                                                                                    <option value="zh">中文</option>
-                                                                                    <!-- <option value="custom">Custom</option> -->
-                                                                                </select>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <div class="row">
-                                                                    <div class="col p-0 chirpity-only no-mac">
-                                                                        <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Backend" data-bs-content="The GPU backend can improve performance if you have a dedicated graphics card.">?</a>
-                                                                            <div class="row">
-                                                                                <div class="col-auto">
-                                                                                    <label class="ps-0 pe-1 fs-6 text-start">Backend:</label>
-                                                                                    <div class="form-check form-check-inline">
-                                                                                        <label class="form-check-label" for="tensorflow">CPU</label>
-                                                                                        <input class="form-check-input" type="radio" name="backend" id="tensorflow" value="tensorflow" checked>
-                                                                                    </div>
-                                                                                </div>
-                                                                                <div class="col-auto">
-                                                                                    <div class="form-check form-check-inline">
-                                                                                        <input class="form-check-input" type="radio" name="backend" id="webgl" value="webgl">
-                                                                                        <label class="form-check-label" for="webgl">GPU</label>
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <div class="row">
-                                                                    <div class="col p-0">
-                                                                        <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Threads" data-bs-content="The number of parallel predictions to run. By default, 
-                                                                            this is set to the number of CPU cores on the machine for fastest performance. With the GPU backend, a lower number works better e.g. 1-3">?</a>
-                                                                            <label for="thread-slider">Threads:</label>
-                                                                            <div class="input-group">
-                                                                                <input type="range" class="form-control-range w-75"
-                                                                                id="thread-slider" min="1" max="24">
-                                                                                <div class="input-group-append">
-                                                                                    <span class="input-group-text"
-                                                                                    id="threads-value">12</span>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <div class="row">
-                                                                    <div class="col p-0">
-                                                                        <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Batch Size" data-bs-content="Optimising the batch size can increase processing speed on longer files.">?</a>
-                                                                            <label for="batch-size">Batch Size:</label>
-                                                                            <div class="input-group">
-                                                                                <input type="range" class="form-control-range w-75"
-                                                                                id="batch-size" min="0" max="7">
-                                                                                <div class="input-group-append">
-                                                                                    <span class="input-group-text"
-                                                                                    id="batch-size-value">2</span>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <div class="row ">
-                                                                    <div class="col pe-3 form-group rounded p-2 mb-2 bg-light">
-                                                                        <div class="col form-check form-switch">
-                                                                            <input class="form-check-input" type="checkbox"
-                                                                            role="switch" id="audio-notification">
-                                                                            <label class="form-check-label" for="audio-notification"></label>Enable analysis completion notifications</label>
-                                                                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Audio notification" data-bs-content="When enabled, there will be a system notification when analyses that take over thirty seconds complete.">?</a>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </fieldset>
-                                                        
-                                                    </div>
-                                                </div>
-                                                <div class="row">
-                                                    <div class="col-12">
-                                                        <fieldset class="border rounded m-2 p-1">
-                                                            <legend style="font-size: large">Default Location </legend>
-                                                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Default Location" data-bs-content="Chirpity uses location information to determine the dawn and dusk times for recordings">?</a>
-                                                            <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                <div class="row">
-                                                                    <div class="input-group col">
-                                                                        <span class="input-group-text pe-2">Lat:</span>
-                                                                        <input id="latitude" type="text"
-                                                                        class="form-control ps-2 " placeholder="0.0"
-                                                                        aria-label="Latitude" aria-describedby="latitude">
-                                                                        
-                                                                        <span class="input-group-text pe-2">Lon:</span>
-                                                                        <input id="longitude" type="text"
-                                                                        class="form-control ps-2" placeholder="0.0"
-                                                                        aria-label="Longitude" aria-describedby="longitude">
-                                                                    </div>
-                                                                </div>
-                                                                <div id="settingsMap" class="mt-2 border border-secondary rounded"></div>
-                                                                <div class="mt-2" id="place"></div>
-                                                                
-                                                            </div>
-                                                        </fieldset>
-                                                    </div>
-                                                </div>
-                                                <fieldset class="border rounded m-2 p-1">
-                                                    <legend style="font-size: large">Audio Preferences</legend>
-                                                    <div class="container">
-                                                        <div class="row">
-                                                            <div class="col ">
-                                                                <div class="row pe-3 form-group rounded p-2 mb-2 bg-light">
-                                                                    <label class="col" for="format">Export Format:</label>
-                                                                    <select class="form-select col" id="format">
-                                                                        <option value="wav">WAV</option>
-                                                                        <option value="flac">FLAC</option>
-                                                                        <option value="mp3">MP3</option>
-                                                                        <!-- <option value="m4a">M4A</option> -->
-                                                                        <option value="opus">Opus</option>
-                                                                    </select>
-                                                                </div>
-                                                                <div id="bitrate-container" class="row pe-3 form-group rounded p-2 mb-2 bg-light">
-                                                                    <label class="col" for="bitrate">Bitrate:</label>
-                                                                    <select class="form-select col" id="bitrate">
-                                                                        <option value="320">320 kbps</option>
-                                                                        <option value="192">192 kbps</option>
-                                                                        <option value="160">160 kbps</option>
-                                                                        <option value="128">128 kbps</option>
-                                                                        <option value="96">96 kbps</option>
-                                                                    </select>
-                                                                </div>
-                                                                <div id="quality-container" class="row pe-3 form-group rounded p-2 mb-2 bg-light">
-                                                                    <label class="col-auto" for="quality">Compression Level:</label>
-                                                                    <select class="form-select col" id="quality">
-                                                                        <option value="0">0</option>
-                                                                        <option value="1">1</option>
-                                                                        <option value="2">2</option>
-                                                                        <option value="3">3</option>
-                                                                        <option value="4">4</option>
-                                                                        <option value="5">5</option>
-                                                                        <option value="6">6</option>
-                                                                        <option value="7">7</option>
-                                                                        <option value="8">8</option>
-                                                                        <option value="9">9</option>
-                                                                        <option value="10">10</option>
-                                                                    </select>
-                                                                </div>
-                                                                <div class="row pe-3 form-group rounded p-2 mb-2 bg-light">
-                                                                    <div class="col form-check form-switch">
-                                                                        <input class="form-check-input" type="checkbox"
-                                                                        role="switch" id="downmix">
-                                                                        <label class="form-check-label" for="downmix">Convert to mono</label>
-                                                                    </div>
-                                                                    <div class="col">
-                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Downmix" data-bs-content="When enabled, exported audio will be downmixed to mono">?</a>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            
-                                                            
-                                                            <div class="col pe-0">
-                                                                <div class="me-auto">
-                                                                    <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Volume Adjustment" data-bs-content="Adjust the volume of audio to compensate for low recording levels.">?</a>
-                                                                        <label for="gain" class="form-label">
-                                                                            Volume Adjustment:
-                                                                        </label>
-                                                                        <div class="input-group me-0 p-0">
-                                                                            <input type="range" class="form-control-range w-75" min="0" max="50" id="gain">
-                                                                            <div class="input-group-append">
-                                                                                <span class="input-group-text" id="gain-adjustment">0</span>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                
-                                                                <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                    <div class="col form-check form-switch">
-                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Normalise" data-bs-content="When enabled, the audio you hear will be normalised, expanding the dynamic range.">?</a>
-                                                                        <input class="form-check-input" type="checkbox"
-                                                                        role="switch" id="normalise">
-                                                                        <label class="form-check-label" for="normalise">Normalise Audio</label>
-                                                                    </div>
-                                                                </div>
-                                                                <div class="form-group rounded p-2 pe-0 mb-2 bg-light">
-                                                                    <div class="row pe-3">
-                                                                        <label class="col">Decorators:</label>
-                                                                        <div class="col">
-                                                                            <div class="form-check">
-                                                                                <input class="form-check-input" type="checkbox"
-                                                                                id="padding" value="2" checked>
-                                                                                <label class="form-check-label" for="padding">
-                                                                                    Pad
-                                                                                </label>
-                                                                            </div>
-                                                                            <div class="form-check">
-                                                                                <input class="form-check-input" type="checkbox"
-                                                                                id="fade" disabled value="1">
-                                                                                <label class="form-check-label" for="fade">
-                                                                                    Fade
-                                                                                </label>
-                                                                            </div>
-                                                                        </div>
-                                                                        <div class="col">
-                                                                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Decorators" data-bs-content="'Pad' adds 2 seconds before and after a selection to the exported audio.
-                                                                            'Fade' adds a 1 second fade effect to the start and end of the audio">?</a>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>                                            
-                                                        </div>
-                                                    </div>    
-                                                    </fieldset>
-                                                    <fieldset class="border rounded m-2 p-1">
-                                                        <legend style="font-size: large">Spectrogram Preferences</legend>
-                                                        <div class="row">
-                                                            <div class="form-group rounded p-2 mb-2 bg-light form-check form-check-inline col">
-                                                                <div class="pe-3 align-items-center">
-                                                                    <label for="colourmap">Colourmap:</label>
-                                                                    <select class="form-select" id="colourmap">
-                                                                        <option value="greys">Greyscale</option>
-                                                                        <option value="bone">Bone</option>
-                                                                        <option value="turbidity">Turbidity</option>
-                                                                        <option value="chlorophyll">Chlorophyll</option>
-                                                                        <option value="viridis">Viridis</option>
-                                                                        <option value="cdom">CDom</option>
-                                                                        <option value="temperature">Temperature</option>
-                                                                        <!-- <option value="density">Density</option>-->
-                                                                        <!-- <option value="oxygen">Oxygen</option>-->
-                                                                        <!-- <option value="copper">Copper</option>-->
-                                                                        <!-- <option value="earth">Earth</option>-->
-                                                                        <option value="inferno">Inferno</option>
-                                                                        <option value="magma">Magma</option>
-                                                                        <option value="plasma">Plasma</option>
-                                                                        <option value="hot">Hot</option>
-                                                                        <!-- <option value="cubehelix">CubeHelix</option>-->
-                                                                        <!-- <option value="phase">Phase</option>-->
-                                                                        <!-- <option value="YlOrRd">Yellow/red</option>-->
-                                                                        <!-- <option value="picnic">Picnic</option>-->
-                                                                        <!-- <option value="electric">Electric</option>-->
-                                                                        <!-- <option value="bluered">BlueRed</option>-->
-                                                                        <option value="blackbody">Blackbody</option>
-                                                                        <!-- <option value="rainbow">Rainbow</option>-->
-                                                                        <!-- <option value="rainbow-soft">Rainbow</option>-->
-                                                                    </select>
-                                                                </div>
-                                                            </div>
-                                                            <div class="form-group rounded p-2 mb-2 bg-light form-check form-check-inline col">
-                                                                <div class="pe-3 align-items-center">
-                                                                    <label for="timelineSetting">Timeline:</label>
-                                                                    <select class="form-select" id="timelineSetting">
-                                                                        <option value="timecode">Timecode</option>
-                                                                        <option value="timeOfDay">Time of day</option>
-                                                                    </select>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </fieldset>                                                                
-                                                    <fieldset class="border rounded m-2 p-1 pb-3 bg-warning">
-                                                        <legend class="pb-2" style="font-size: large"><span
-                                                            class="material-symbols-outlined align-middle">science</span> Advanced features <a class="circle" style="background-color:darkgoldenrod" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Advanced Features" data-bs-content="The settings in this section can impact prediction quailty - for better or worse. Use them with caution!">?</a>
-                                                        </legend>
-                                                        <div class="row">
-                                                            <div class="col">
-                                                                <div class="chirpity-only form-group rounded p-2 mb-2 bg-light">
-                                                                    <div class="form-check form-switch">
-                                                                        <input class="form-check-input" type="checkbox"
-                                                                        role="switch" id="context">
-                                                                        <label class="form-check-label" for="context">
-                                                                            Context mode
-                                                                        </label>
-                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Context Mode" data-bs-content="When enabled, context mode adapts predictions by analyzing the surrounding context.
-                                                                        Not available in the BirdNET model">?</a>
-                                                                    </div>
-                                                                </div>
-                                                                <div class="chirpity-only me-auto">
-                                                                    <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Signal to Noise Ratio" data-bs-content="Skip over portions of audio with just background noise. Higher values skip increasingly noisy segments.
-                                                                        Not available in the BirdNET model">?</a>
-                                                                        <label for="snrValue" class="form-label">
-                                                                            SNR filter:
-                                                                        </label>
-                                                                        <div class="input-group">
-                                                                            <input type="range" class="form-control-range w-75" min="0"
-                                                                            max="10" step="0.5" id="snrValue">
-                                                                            <div class="input-group-append">
-                                                                                <span class="input-group-text"
-                                                                                id="SNR-threshold">0</span>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <div class="me-auto">
-                                                                    <div class="form-group rounded p-2 mb-2 bg-light">
-                                                                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="High Pass Filter" data-bs-content="When set, removes low frequency noise below the threshold. If enabled before analysis, the modified audio is sent to the model. If only enabled after analysis, this just affects audio playback">?</a>
-                                                                        
-                                                                        <label for="HighPassFrequency" class="form-label">
-                                                                            High Pass filter:
-                                                                        </label>
-                                                                        <div class="input-group me-0 p-0">
-                                                                            <input type="range" class="form-control-range w-75" min="0"
-                                                                            max="2500" step="25" id="HighPassFrequency">
-                                                                            <div class="input-group-append">
-                                                                                <span class="input-group-text"
-                                                                                id="HP-threshold">0</span>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="col">
-                                                                <div class="form-group rounded p-2 me-2 bg-light">
-                                                                    <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Low Shelf Filter" data-bs-content="When used, attenuates low frequency noise below the frequency thresshold. If enabled before analysis, the modified audio is sent to the model. If only enabled after analysis, this just affects audio playback">?</a>
-                                                                    <label for="lowShelfFrequency" class="form-label">
-                                                                        Low Shelf filter:
-                                                                    </label>
-                                                                    <div class="input-group me-0 p-0">
-                                                                        <input type="range" class="form-control-range w-75" min="0"
-                                                                        max="2500" step="100" id="lowShelfFrequency">
-                                                                        <div class="input-group-append">
-                                                                            <span class="input-group-text" id="LowShelf-threshold">0</span>
-                                                                        </div>
-                                                                    </div>
-                                                                    
-                                                                    <label for="attenuation" class="form-label">Attenuation:</label>
-                                                                    <div class="input-group me-0 p-0">
-                                                                        
-                                                                        <input type="range" class="form-control-range w-75" min="0" max="50" id="attenuation">
-                                                                        <div class="input-group-append">
-                                                                            <span class="input-group-text" id="attenuation-threshold">0 dB</span>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </fieldset>
-
-                                                    <div class="row p-2 m-2">
-                                                        <div class=" col-auto form-group rounded p-2 mb-2 text-bg-light">
-                                                            <div class="text-nowrap">   
-                                                                <div class="form-check form-switch">
-                                                                    <input class="form-check-input" type="checkbox"
-                                                                    role="switch" id="debug-mode">
-                                                                    <label class="form-check-label me-2" for="debug-mode">Debug mode</label><a class="circle"  tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Debug Mode" data-bs-content="Enter debug mode (changes to this setting require a Chirpity relaunch to take effect)">?</a>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div class="col-auto form-group rounded p-2 mb-2 text-bg-light">
-                                                            <div class="text-nowrap">
-                                                                <div class="form-check form-switch">
-                                                                    <input class="form-check-input" type="checkbox"
-                                                                    role="switch" id="do-not-track">
-                                                                    <label class="form-check-label me-2" for="do-not-track">Opt out of usage analytics</label><a class="circle"  tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Disable Tracking" data-bs-content="Chirpity collects anonymous system data to enhance user experience and aid bug tracking. If you do not want to share this information, you can disable it here.">?</a>
-                                                                </div>        
-                                                            </div>
-                                                        </div>
-                                                    </div>                                                   
-
-                                                </form>
-                                            </li>
-                                        </ul>
+                                    <a class="nav-link dropdown-toggle" href="#" id="navbarHelp" role="button"
+                                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    Help
+                                </a>
+                                <ul class="dropdown-menu" aria-labelledby="navBarHelp">
+                                    <li><a class="dropdown-item" id="usage" href="#">
+                                        <span class="material-symbols-outlined">help</span> Using Chirpity</a>
                                     </li>
-                                    <li class="nav-item dropdown">
-                                        <a class="nav-link dropdown-toggle" href="#" id="navbarHelp" role="button"
-                                        data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                        Help
-                                    </a>
-                                    <ul class="dropdown-menu" aria-labelledby="navBarHelp">
-                                        <li><a class="dropdown-item" id="usage" href="#">
-                                            <span class="material-symbols-outlined">help</span> Using Chirpity</a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item" id="settingsHelp" href="#">
-                                                <span class="material-symbols-outlined">help</span> Settings
-                                            </a>
-                                        </li>
-                                        <li><a class="dropdown-item" id="keyboardHelp" href="#">
-                                            <span class="material-symbols-outlined">help</span> Keyboard Shortcuts
+                                    <li>
+                                        <a class="dropdown-item" id="settingsHelp" href="#">
+                                            <span class="material-symbols-outlined">help</span> Settings
                                         </a>
                                     </li>
-                                    <li><a class="dropdown-item" id="diagnostics" href="#">
-                                        <span class="material-symbols-outlined">insights</span> Diagnostics
+                                    <li><a class="dropdown-item" id="keyboardHelp" href="#">
+                                        <span class="material-symbols-outlined">help</span> Keyboard Shortcuts
                                     </a>
                                 </li>
-                                <li>
-                                    <a class="dropdown-item" id="startTour" href="#">
-                                        <span class="material-symbols-outlined">tour</span> Show Tour
-                                    </a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" id="bugs" href="#">
-                                        <span class="material-symbols-outlined">bug_report</span> Issues, queries or bugs?
-                                    </a>
-                                </li>                                                
-                                <div class="dropdown-divider"></div>
-                                <h6 class="fs-6 ps-3">FAQs</h6>
-                                <li>
-                                    <a class="dropdown-item" id="species" href="#">
-                                        <span class="material-symbols-outlined">help</span> What species are detected?
-                                    </a>
-                                </li>
-                            </ul>
-                        </li>
-                    </ul>
-                </div>
-                <!-- navbar-collapse.// -->
-                <img src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"
-                height="40" />
+                                <li><a class="dropdown-item" id="diagnostics" href="#">
+                                    <span class="material-symbols-outlined">insights</span> Diagnostics
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" id="startTour" href="#">
+                                    <span class="material-symbols-outlined">tour</span> Show Tour
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" id="bugs" href="#">
+                                    <span class="material-symbols-outlined">bug_report</span> Issues, queries or bugs?
+                                </a>
+                            </li>                                                
+                            <div class="dropdown-divider"></div>
+                            <h6 class="fs-6 ps-3">FAQs</h6>
+                            <li>
+                                <a class="dropdown-item" id="species" href="#">
+                                    <span class="material-symbols-outlined">help</span> What species are detected?
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
             </div>
-            <!-- container-fluid.// -->
-        </nav>
+            <div class="container-fluid">
+                <button class="btn btn-outline-secondary float-end" type="button" onclick="placeMap('settingsMap')" id="navbarSettings"
+                data-bs-toggle="offcanvas" data-bs-target="#settings" aria-controls="settings">Settings</button>
+            </div>
+            <!-- navbar-collapse.// -->
+            <img src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"
+            height="40">
+        </div>
+        <!-- container-fluid.// -->
+    </nav>
+</div>
+<!-- Content wrapper -->
+<div id="contentWrapper">
+    <!-- DIV to Hold the bird list  -->
+    <div id="allSpecies" class="d-none"></div>
+    <div id="seenSpecies" class="d-none"></div>
+    <!-- Diagnostic Modal -->
+    <div class="modal fade" id="diagnosticsModal" tabindex="-1" aria-labelledby="diagnosticsModalLabel" aria-hidden="true">
+        <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center">
+                    <h5 class="modal-title" id="diagnosticsModalLabel">Diagnostic Information</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div id="diagnosticsModalBody" class="modal-body"></div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>  
+    <!-- Record Entry Modal -->
+    <div class="modal fade" id="record-entry-modal" tabindex="-1" aria-labelledby="record-entry-modal-label" aria-hidden="true">
+        <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center">
+                    <h5 class="modal-title" id="record-entry-modal-label">Edit Record</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="record-entry-form">
+                    <div id="record-entry-modal-body" class="modal-body">
+                        <div class="row">
+                            <div class="col-8" id="record-entry-birdlist"></div>
+                            <div class="col hide-in-batch">
+                                <div class="form-floating mb-3">
+                                    <input type="number" id="call-count" class="form-control" min="1">
+                                    <label for="call-count">Call Count</label>
+                                </div>
+                            </div>
+                        </div>
+                        <fieldset class="border  ps-3 pt-1">
+                            <label for="record-label" class="text-muted" style="font-size: .75em">Call Type</label><br>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="record-label" id="label-local" value="Local">
+                                <label class="form-check-label" for="label-local">Local</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="record-label" id="label-nocmig" value="Nocmig">
+                                <label class="form-check-label" for="label-nocmig">Nocmig</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="record-label" id="label-unknown" value="">
+                                <label class="form-check-label" for="label-unknown">Not specified</label>
+                            </div>
+                        </fieldset>
+                        <div class="form-floating mt-3 hide-in-batch">
+                            <textarea class="form-control" id="record-comment" style="height: 200px"></textarea>
+                            <label for="record-comment">Comments</label>
+                            <input type='hidden' id='DBmode'>
+                            <input type='hidden' id='batch-mode'>
+                            <input type='hidden' id='original-id'>
+                        </div>
+                    </div>
+                    <div class="modal-footer justify-content-center">
+                        <button id="record-add" type="submit" class="btn btn-success">Add</button>
+                        <button id="record-dismiss" type="button" class="btn btn-danger" data-bs-dismiss="modal">Dismiss</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
-    <!-- Content wrapper -->
-    <div id="contentWrapper">
-        <!-- DIV to Hold the bird list  -->
-        <div id="allSpecies" class="d-none"></div>
-        <div id="seenSpecies" class="d-none"></div>
-        
-        <!-- Diagnostic Modal -->
-        <div class="modal fade" id="diagnosticsModal" tabindex="-1" aria-labelledby="diagnosticsModalLabel" aria-hidden="true">
-            <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header justify-content-center">
-                        <h5 class="modal-title" id="diagnosticsModalLabel">Diagnostic Information</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div id="diagnosticsModalBody" class="modal-body"></div>
-                    <div class="modal-footer justify-content-center">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
+    <!-- Help Modal -->
+    <div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+        <div class="modal-dialog  modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center">
+                    <h5 class="modal-title" id="helpModalLabel">Help</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-            </div>
-        </div>  
-        <!-- Record Entry Modal -->
-        <div class="modal fade" id="record-entry-modal" tabindex="-1" aria-labelledby="record-entry-modal-label" aria-hidden="true">
-            <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header justify-content-center">
-                        <h5 class="modal-title" id="record-entry-modal-label">Edit Record</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <form id="record-entry-form">
-                        <div id="record-entry-modal-body" class="modal-body">
-                            <div class="row">
-                                <div class="col-8" id="record-entry-birdlist"></div>
-                                <div class="col hide-in-batch">
-                                    <div class="form-floating mb-3">
-                                        <input type="number" id="call-count" class="form-control" min="1">
-                                        <label for="call-count">Call Count</label>
-                                    </div>
-                                </div>
-                            </div>
-                            <fieldset class="border  ps-3 pt-1">
-                                <label for="record-label" class="text-muted" style="font-size: .75em">Call Type</label><br>
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="record-label" id="label-local" value="Local">
-                                    <label class="form-check-label" for="label-local">Local</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="record-label" id="label-nocmig" value="Nocmig">
-                                    <label class="form-check-label" for="label-nocmig">Nocmig</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="record-label" id="label-unknown" value="">
-                                    <label class="form-check-label" for="label-unknown">Not specified</label>
-                                </div>
-                            </fieldset>
-                            <div class="form-floating mt-3 hide-in-batch">
-                                <textarea class="form-control" id="record-comment" style="height: 200px"></textarea>
-                                <label for="record-comment">Comments</label>
-                                <input type='hidden' id='DBmode'>
-                                <input type='hidden' id='batch-mode'>
-                                <input type='hidden' id='original-id'>
-                            </div>
-                            
-                        </div>
-                        <div class="modal-footer justify-content-center">
-                            <button id="record-add" type="submit" class="btn btn-success">Add</button>
-                            <button id="record-dismiss" type="button" class="btn btn-danger" data-bs-dismiss="modal">Dismiss</button>
-                        </div>
-                    </form>
+                <div id="helpModalBody" class="modal-body"></div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
-        <!-- Help Modal -->
-        <div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
-            <div class="modal-dialog  modal-xl modal-dialog-centered modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header justify-content-center">
-                        <h5 class="modal-title" id="helpModalLabel">Help</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div id="helpModalBody" class="modal-body"></div>
-                    <div class="modal-footer justify-content-center">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
+    </div>
+    <!-- Species Modal -->
+    <div class="modal fade" id="speciesModal" tabindex="-1" aria-labelledby="speciesModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered ">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center">
+                    <h5 class="modal-title" id="speciesModalLabel">Current Species List</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div id="speciesModalBody" class="modal-body"></div>
+                <div class="modal-footer justify-content-evenly">
+                    <button id="export-list" type="button" class="btn btn-light">Export the Included List</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
-        <!-- Species Modal -->
-        <div class="modal fade" id="speciesModal" tabindex="-1" aria-labelledby="speciesModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered ">
-                <div class="modal-content">
-                    <div class="modal-header justify-content-center">
-                        <h5 class="modal-title" id="speciesModalLabel">Current Species List</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div id="speciesModalBody" class="modal-body"></div>
-                    <div class="modal-footer justify-content-evenly">
-                        <button id="export-list" type="button" class="btn btn-light">Export the Included List</button>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
+    </div>
+    <!-- Analyse selection modal -->
+    <div class="modal fade" id="detectionsModal" tabindex="-1" aria-labelledby="detectionsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center text-bg-dark">
+                    <h5 class="modal-title" id="detectionsModalLabel">Audio Selection Analysis</h5>
                 </div>
-            </div>
-        </div>
-        <!-- Analyse selection modal -->
-        <div class="modal fade" id="detectionsModal" tabindex="-1" aria-labelledby="detectionsModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header justify-content-center text-bg-dark">
-                        <h5 class="modal-title" id="detectionsModalLabel">Audio Selection Analysis</h5>
-                    </div>
-                    <div id="detectionsModalBody" class="modal-body p-0 ">
-                        <table id='selectionResults' class="text-center table w-100 align-middle">
-                            <thead id="selectionResultsHead">
-                                <tr class="text-bg-dark">
-                                    <th class="text-start timeOfDay">Time</th>
-                                    <th class="text-start timestamp">Position</th>
-                                    <th class="text-start">Species</th>
-                                </tr>
-                            </thead>
-                            <tbody class="text-dark" id="selectionResultTableBody">
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="modal-footer justify-content-center">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Goto Modal -->
-        <div class="modal fade" id="gotoModal" tabindex="-1" aria-labelledby="gotoModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered modal-sm">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="gotoModalLabel">Go to Position</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <form id="gotoForm">
-                            <div class="mb-3">
-                                <label for="timeInput" class="form-label">
-                                    <input type="text" class="form-control" id="timeInput" name="timeInput"
-                                    placeholder="Enter timecode">
-                                    <small id="gotoHelp" class="form-text text-muted">Accepts seconds, mm:ss and
-                                        hh:mm:ss.</small>
-                                    </label>
-                                </div>
-                            </form>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="button" class="btn btn-primary" id="go">Go</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- Location Modal -->
-            <div class="modal fade" id="locationModal" tabindex="-1" aria-labelledby="locationModalLabel"
-            aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="locationModalLabel">Set Location</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <form id="locationForm" class="fs-6">
-                        <div class="modal-body">
-                            <fieldset class="border rounded m-2 p-1">
-                                <legend class="h6">Pick A Saved Location</legend>
-                                <div class="form-group rounded p-2 mb-2 bg-light">
-                                    <div class="row">
-                                        <div class="input-group col">
-                                            <div class="form-group w-100">
-                                                <label for="savedLocations"></label>
-                                                <select class="form-select" id="savedLocations">
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </fieldset>
-                            <fieldset class="border rounded m-2 p-1">
-                                <legend class="h6">Add, Edit or Delete Location</legend>
-                                <div class="form-group rounded p-2 mb-2 bg-light">
-                                    <div class="row">
-                                        <div class="input-group col">
-                                            <span class="input-group-text pe-2">Lat:</span>
-                                            <input id="customLat" type="text" class="form-control ps-2"
-                                            placeholder="0.0" aria-label="Latitude" aria-describedby="customLat"
-                                            required>
-                                            
-                                            <span class="input-group-text pe-2">Lon:</span>
-                                            <input id="customLon" type="text" class="form-control ps-2"
-                                            placeholder="0.0" aria-label="Longitude" aria-describedby="customLon"
-                                            required>
-                                        </div>
-                                        <div id="customLocationMap" class="mt-2 border border-secondary rounded" style="height: 200px"></div>
-                                    </div>
-                                    
-                                    <div class="row">
-                                        <div class="input-group col">
-                                            <textarea class="mt-2 w-100" id="customPlace" spellcheck="false"
-                                            maxlength="100" required>...</textarea>
-                                        </div>
-                                    </div>
-                                    <div class="row d-none" id="location-batch-wrapper">
-                                        <div class="input-group col mt-2">
-                                            <input class="form-check-input" type="checkbox" value="" id="batchLocations">
-                                            <label class="form-check-label ps-2" for="batchLocations">
-                                                Update ALL open files to this location
-                                            </label> 
-                                        </div>
-                                    </div>
-                                </div>
-                            </fieldset>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="button" class="btn btn-primary" id="set-location">Set Location</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-        <!-- Explore Div -->
-        <div id="exploreWrapper" class="p-2 row d-none justify-content-evenly">
-            <div class="col align-middle">
-                <div class="btn btn-light me-2 pt-3" id="exploreRange">
-                    <span class="material-symbols-outlined align-bottom">date_range</span>&nbsp;
-                    <span>Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>
-                </div>
-            </div>
-            <div class="species-selector col" id="exploreSpeciesSearch">
-                <div id="explore-list" class="explore bird-list-wrapper form-floating"></div>
-            </div>
-            <div class="col">
-                <div id="explore-location-list" class="form-floating">
-                    <select spellcheck="false" class="input form-select" aria-label=".form-select"
-                    id="explore-locations"></select>
-                    <label for="explore-locations">Location</label>
-                </div>
-            </div>
-        </div>
-        <!-- context menu-->
-        <div class="dropdown-menu dropdown-menu-sm" id="context-menu">
-            <a class="dropdown-item play"><span class='material-symbols-outlined'>play_circle</span> Play</a>
-            <a class="dropdown-item" href="#" id="context-analyse-selection"><span class="material-symbols-outlined">
-                search
-            </span> Analyse</a>
-            <div class="dropdown-divider"></div>
-            <a class="dropdown-item" id="create-manual-record" href="#"><span class="material-symbols-outlined">
-                edit_document
-            </span> Edit Record</a>
-            <a class="dropdown-item" id="context-create-clip" href="#"><span class="material-symbols-outlined">
-                music_note
-            </span> Export Audio Clip</a>
-            <a class="dropdown-item d-none" id="context-xc" href='#' target="xc">
-                <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> Explore on
-                Xeno-Canto</a>
-                
-                <div class="dropdown-divider"></div>
-                <a class="dropdown-item d-none" id="context-delete" href="#">
-                    <span class='delete material-symbols-outlined'>delete_forever</span> Delete Record</a>
-                    
-                </div>
-                <!-- End context menu -->
-                <!-- Spectrogram view -->
-                <div class="w-100 d-none" id="spectrogramWrapper">
-                    <div>
-                        <div class="bg-dark border border-secondary w-100" id="timeline"></div>
-                        <div class="w-100" id="spectrogram">
-                            
-                        </div>
-                        <div class="w-100" id="waveform"></div>
-                    </div>
-                    <!-- Controls view -->
-                    <div class="container-fluid p-1 text-bg-dark d-inline-flex" id="controlsWrapper" style="max-height: 50px">
-                        <div id="filename" class="col-auto ps-1 overflow-visible flex-nowrap"></div>
-                        <div id="unsaved-icon" class="material-symbols-outlined ms-2 me-2 text-warning d-none" title="There are unsaved edits">warning</div>
-                        <div class="col-auto btn-group bg-dark ms-2 me-2 text-nowrap" role="group">
-                            <button id="playToggle" class="p-1 pe-2 btn btn-outline-secondary">
-                                <span class="material-symbols-outlined ">play_circle</span><span
-                                class="align-middle d-none d-lg-inline"> Play </span>
-                                /
-                                <span class="material-symbols-outlined">pause</span><span
-                                class="align-middle d-none d-lg-inline-block">Pause</span>
-                            </button>
-                        </div>
-                        
-                        <div class="col btn-group bg-dark  pe-2" role="group">
-                            <button id="zoomIn" title="Zoom into the spectrogram (Ctrl +)" class="btn btn-outline-secondary"
-                            style="max-width: 70px">
-                            <span class="material-symbols-outlined zoom">zoom_in</span>
-                        </button>
-                        <button id="zoomOut" title="Zoom out of the spectrogram (Ctrl -)" class="btn btn-outline-secondary"
-                        style="max-width: 70px"><span class="material-symbols-outlined zoom align-middle">zoom_out</span>
-                    </button>
-                </div>
-                <div id="progressDiv" class="col-2 d-none"><span id="fileNumber"></span><br>
-                    <progress id="progress-bar" max="100" style="width:90%"></progress>
-                </div>
-                <div id="complete" class="col-2 pe-2" style="display:none">
-                </div>
-                <div class="col pe-1">
-                    <div class="btn-group float-end" id="filter-panel">
-                        <span style="max-width: 70px" title="Nocmig mode on" id="nocmigMode"
-                        class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">nights_stay</span>
-                        <span style="max-width: 70px" id="audioFiltersIcon" title="Experimental audio filters applied"
-                        class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">blur_on</span>
-                        <span style="max-width: 70px" id="context-mode" title="Context Aware mode enabled"
-                        class="chirpity-only material-symbols-outlined btn btn-outline-secondary p-1 pt-2 text-warning">swap_horiz</span>
-                        <span title="Toggle Fullscreen mode (Ctrl+F)" id="fullscreen"
-                        class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">fullscreen</span>
-                        <span style="max-width: 70px" id="list-icon" class="btn btn-outline-secondary p-1"><img
-                            class="icon" src="img/nocturnal.png" alt="nocturnal"></span>
-                            <span style="max-width: 70px" title="Prediction confidence threshold" id="threshold-value"
-                            class="btn btn-outline-secondary p-1 fs-5"><b>50%</b>
-                        </span>
-                        <span id="confidenceSliderContainer" class="d-none">
-                            <label for="confidenceValue" class="visually-hidden">confidence</label><input type="range"
-                            class="form-range vertical position-absolute" step="5" min="5" id="confidenceValue">
-                        </span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- Result container -->
-        <div class="d-none" id="resultTableContainer">
-            <div class="row g-0 h-100">
-                <div class="col-4 h-100 overflow-auto" id="summary">
-                    <!-- Summary table -->
-                    <div id='summaryTable'></div>
-                </div>
-                <!-- Results table -->
-                <div class="col-8 ps-1 pe-0 h-100 position-relative overflow-auto" id="resultsDiv">
-                    <table id='results' class="text-center table w-100 align-middle">
-                        <thead id="resultsHead" class="d-none">
-                            <tr class="bg-dark">
-                                <th class="time-sort col text-start timeOfDay pointer" title="Sort results by detection time"><span class="text-muted material-symbols-outlined time-sort-icon">sort</span> Time</th>
-                                <th class="time-sort text-start timestamp pointer" title="Sort results by detection time"><span class="text-muted material-symbols-outlined time-sort-icon">sort</span> Position</th>
-                                <th id="confidence-sort" class="text-start pointer" title="Sort results by detection confidence"><span class="text-muted material-symbols-outlined species-sort-icon  d-none">sort</span> Species</th>
-                                <th class="text-end">Calls</th>
-                                <th class="col">Label</th>
-                                <th class="col text-end">Notes</th>
+                <div id="detectionsModalBody" class="modal-body p-0 ">
+                    <table id='selectionResults' class="text-center table w-100 align-middle">
+                        <thead id="selectionResultsHead">
+                            <tr class="text-bg-dark">
+                                <th class="text-start timeOfDay">Time</th>
+                                <th class="text-start timestamp">Position</th>
+                                <th class="text-start">Species</th>
                             </tr>
                         </thead>
-                        <tbody class="text-dark" id="resultTableBody">
+                        <tbody class="text-dark" id="selectionResultTableBody">
                         </tbody>
                     </table>
-                    <nav aria-label="Identification results">
-                        <ul class="m-2 pagination justify-content-center"></ul>
-                    </nav>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
-        
-        <!-- Records container -->
-        <div class="d-none h-100 overflow-auto" id="recordsContainer">
-            <div class="container-fluid">
-                <div class="row p-1 g-1 justify-content-evenly">
-                    <div class="col-3 pt-4">
-                        <div class="col d-none">
-                            <div class="btn btn-light pt-3 mb-2" id="chartRange">
-                                <span class="material-symbols-outlined align-bottom">date_range</span>&nbsp;
-                                <span>Apply a date filter</span> <span
-                                class="material-symbols-outlined  align-bottom">expand_more</span>
+    </div>
+    <!-- Goto Modal -->
+    <div class="modal fade" id="gotoModal" tabindex="-1" aria-labelledby="gotoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="gotoModalLabel">Go to Position</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="gotoForm">
+                        <div class="mb-3">
+                            <label for="timeInput" class="form-label">
+                                <input type="text" class="form-control" id="timeInput" name="timeInput"
+                                placeholder="Enter timecode">
+                                <small id="gotoHelp" class="form-text text-muted">Accepts seconds, mm:ss and
+                                    hh:mm:ss.</small>
+                                </label>
                             </div>
-                        </div>
-                        <div class="col mb-2">
-                            <div id="speciesSearch" class="species-selector">
-                                <div id="chart-list" class="chart bird-list-wrapper form-floating"></div>
-                            </div>
-                        </div>
-                        <div class="col d-none">
-                            <div id="chart-location-list" class="form-floating">
-                                <select spellcheck="false" class="input form-select mb-3" aria-label=".form-select"
-                                id="chart-locations"></select>
-                                <label for="explore-locations">Location</label>
-                            </div>
-                        </div>
-                        <div class="col d-none">
-                            <fieldset class="border border rounded bg-light p-2">
-                                <legend class="h6">Sum Detections by:</legend>
-                                <div class="form-row">
-                                    <div class="form-check-inline">
-                                        <input class="form-check-input" type="radio" name="showTotals" id="hourTotal" value="Hour">
-                                        <label class="form-check-label" for="hourTotal">Hour</label>
-                                    </div>
-                                    <div class="form-check-inline">
-                                        <input class="form-check-input" type="radio" name="showTotals" id="dayTotal" value="Day">
-                                        <label class="form-check-label" for="dayTotal">Day</label>
-                                    </div>
-                                    <div class="form-check-inline pb-3">
-                                        <input class="form-check-input" type="radio" name="showTotals" id="weekTotal" value="Week">
-                                        <label class="form-check-label" for="weekTotal">Week</label>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="go">Go</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Location Modal -->
+        <div class="modal fade" id="locationModal" tabindex="-1" aria-labelledby="locationModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="locationModalLabel">Set Location</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="locationForm" class="fs-6">
+                    <div class="modal-body">
+                        <fieldset class="border rounded m-2 p-1">
+                            <legend class="h6">Pick A Saved Location</legend>
+                            <div class="form-group rounded p-2 mb-2 bg-light">
+                                <div class="row">
+                                    <div class="input-group col">
+                                        <div class="form-group w-100">
+                                            <label for="savedLocations"></label>
+                                            <select class="form-select" id="savedLocations">
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
-                                <legend class="h6">Group Detections by:</legend>
-                                <div class="form-row">
-                                    <div class="form-check-inline">
-                                        <input class="form-check-input" type="radio" name="groupTotals" id="dayGroup" value="Day">
-                                        <label class="form-check-label" for="dayGroup">Day</label>
+                            </div>
+                        </fieldset>
+                        <fieldset class="border rounded m-2 p-1">
+                            <legend class="h6">Add, Edit or Delete Location</legend>
+                            <div class="form-group rounded p-2 mb-2 bg-light">
+                                <div class="row">
+                                    <div class="input-group col">
+                                        <span class="input-group-text pe-2">Lat:</span>
+                                        <input id="customLat" type="text" class="form-control ps-2"
+                                        placeholder="0.0" aria-label="Latitude" aria-describedby="customLat"
+                                        required>
+                                        <span class="input-group-text pe-2">Lon:</span>
+                                        <input id="customLon" type="text" class="form-control ps-2"
+                                        placeholder="0.0" aria-label="Longitude" aria-describedby="customLon"
+                                        required>
                                     </div>
-                                    <div class="form-check-inline">
-                                        <input class="form-check-input" type="radio" name="groupTotals" id="weekGroup" value="Week">
-                                        <label class="form-check-label" for="weekGroup">Week</label>
-                                    </div>
-                                    <div class="form-check-inline">
-                                        <input class="form-check-input" type="radio" name="groupTotals" id="monthGroup" value="Month">
-                                        <label class="form-check-label" for="monthGroup">Month</label>
+                                    <div id="customLocationMap" class="mt-2 border border-secondary rounded" style="height: 200px"></div>
+                                </div>
+                                <div class="row">
+                                    <div class="input-group col">
+                                        <textarea class="mt-2 w-100" id="customPlace" spellcheck="false"
+                                        maxlength="100" required>...</textarea>
                                     </div>
                                 </div>
-                                <div class="form-row pt-3">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" role="switch" name="stackYears" id="stackYears" checked>
-                                        <label class="form-check-label" for="stackYears">Stack Years</label>
+                                <div class="row d-none" id="location-batch-wrapper">
+                                    <div class="input-group col mt-2">
+                                        <input class="form-check-input" type="checkbox" value="" id="batchLocations">
+                                        <label class="form-check-label ps-2" for="batchLocations">
+                                            Update ALL open files to this location
+                                        </label> 
                                     </div>
                                 </div>
-                            </fieldset>
+                            </div>
+                        </fieldset>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="set-location">Set Location</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- Explore Div -->
+    <div id="exploreWrapper" class="p-2 row d-none justify-content-evenly">
+        <div class="col align-middle">
+            <div class="btn btn-light me-2 pt-3" id="exploreRange">
+                <span class="material-symbols-outlined align-bottom">date_range</span>&nbsp;
+                <span>Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>
+            </div>
+        </div>
+        <div class="species-selector col" id="exploreSpeciesSearch">
+            <div id="explore-list" class="explore bird-list-wrapper form-floating"></div>
+        </div>
+        <div class="col">
+            <div id="explore-location-list" class="form-floating">
+                <select spellcheck="false" class="input form-select" aria-label=".form-select"
+                id="explore-locations"></select>
+                <label for="explore-locations">Location</label>
+            </div>
+        </div>
+    </div>
+    <!-- context menu-->
+    <div class="dropdown-menu dropdown-menu-sm" id="context-menu">
+        <a class="dropdown-item play"><span class='material-symbols-outlined'>play_circle</span> Play</a>
+        <a class="dropdown-item" href="#" id="context-analyse-selection"><span class="material-symbols-outlined">
+            search
+        </span> Analyse</a>
+        <div class="dropdown-divider"></div>
+        <a class="dropdown-item" id="create-manual-record" href="#"><span class="material-symbols-outlined">
+            edit_document
+        </span> Edit Record</a>
+        <a class="dropdown-item" id="context-create-clip" href="#"><span class="material-symbols-outlined">
+            music_note
+        </span> Export Audio Clip</a>
+        <a class="dropdown-item d-none" id="context-xc" href='#' target="xc">
+            <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> Explore on
+            Xeno-Canto</a>
+            <div class="dropdown-divider"></div>
+            <a class="dropdown-item d-none" id="context-delete" href="#">
+                <span class='delete material-symbols-outlined'>delete_forever</span> Delete Record</a>
+            </div>
+            <!-- End context menu -->
+            <!-- Spectrogram view -->
+            <div class="w-100 d-none" id="spectrogramWrapper">
+                <div>
+                    <div class="bg-dark border border-secondary w-100" id="timeline"></div>
+                    <div class="w-100" id="spectrogram">
+                    </div>
+                    <div class="w-100" id="waveform"></div>
+                </div>
+                <!-- Controls view -->
+                <div class="container-fluid p-1 text-bg-dark d-inline-flex" id="controlsWrapper" style="max-height: 50px">
+                    <div id="filename" class="col-auto ps-1 overflow-visible flex-nowrap"></div>
+                    <div id="unsaved-icon" class="material-symbols-outlined ms-2 me-2 text-warning d-none" title="There are unsaved edits">warning</div>
+                    <div class="col-auto btn-group bg-dark ms-2 me-2 text-nowrap" role="group">
+                        <button id="playToggle" class="p-1 pe-2 btn btn-outline-secondary">
+                            <span class="material-symbols-outlined ">play_circle</span><span
+                            class="align-middle d-none d-lg-inline"> Play </span>
+                            /
+                            <span class="material-symbols-outlined">pause</span><span
+                            class="align-middle d-none d-lg-inline-block">Pause</span>
+                        </button>
+                    </div>
+                    <div class="col btn-group bg-dark  pe-2" role="group">
+                        <button id="zoomIn" title="Zoom into the spectrogram (Ctrl +)" class="btn btn-outline-secondary"
+                        style="max-width: 70px">
+                        <span class="material-symbols-outlined zoom">zoom_in</span>
+                    </button>
+                    <button id="zoomOut" title="Zoom out of the spectrogram (Ctrl -)" class="btn btn-outline-secondary"
+                    style="max-width: 70px"><span class="material-symbols-outlined zoom align-middle">zoom_out</span>
+                </button>
+            </div>
+            <div id="progressDiv" class="col-2 d-none"><span id="fileNumber"></span><br>
+                <progress id="progress-bar" max="100" style="width:90%"></progress>
+            </div>
+            <div id="complete" class="col-2 pe-2" style="display:none">
+            </div>
+            <div class="col pe-1">
+                <div class="btn-group float-end" id="filter-panel">
+                    <span style="max-width: 70px" title="Nocmig mode on" id="nocmigMode"
+                    class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">nights_stay</span>
+                    <span style="max-width: 70px" id="audioFiltersIcon" title="Experimental audio filters applied"
+                    class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">blur_on</span>
+                    <span style="max-width: 70px" id="context-mode" title="Context Aware mode enabled"
+                    class="chirpity-only material-symbols-outlined btn btn-outline-secondary p-1 pt-2 text-warning">swap_horiz</span>
+                    <span title="Toggle Fullscreen mode (Ctrl+F)" id="fullscreen"
+                    class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">fullscreen</span>
+                    <span style="max-width: 70px" id="list-icon" class="btn btn-outline-secondary p-1"><img
+                        class="icon" src="img/nocturnal.png" alt="nocturnal"></span>
+                        <span style="max-width: 70px" title="Prediction confidence threshold" id="threshold-value"
+                        class="btn btn-outline-secondary p-1 fs-5"><b>50%</b>
+                    </span>
+                    <span id="confidenceSliderContainer" class="d-none">
+                        <label for="confidenceValue" class="visually-hidden">confidence</label><input type="range"
+                        class="form-range vertical position-absolute" step="5" min="5" id="confidenceValue">
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Result container -->
+    <div class="d-none" id="resultTableContainer">
+        <div class="row g-0 h-100">
+            <div class="col-4 h-100 overflow-auto" id="summary">
+                <!-- Summary table -->
+                <div id='summaryTable'></div>
+            </div>
+            <!-- Results table -->
+            <div class="col-8 ps-1 pe-0 h-100 position-relative overflow-auto" id="resultsDiv">
+                <table id='results' class="text-center table w-100 align-middle">
+                    <thead id="resultsHead" class="d-none">
+                        <tr class="bg-dark">
+                            <th class="time-sort col text-start timeOfDay pointer" title="Sort results by detection time"><span class="text-muted material-symbols-outlined time-sort-icon">sort</span> Time</th>
+                            <th class="time-sort text-start timestamp pointer" title="Sort results by detection time"><span class="text-muted material-symbols-outlined time-sort-icon">sort</span> Position</th>
+                            <th id="confidence-sort" class="text-start pointer" title="Sort results by detection confidence"><span class="text-muted material-symbols-outlined species-sort-icon  d-none">sort</span> Species</th>
+                            <th class="text-end">Calls</th>
+                            <th class="col">Label</th>
+                            <th class="col text-end">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-dark" id="resultTableBody">
+                    </tbody>
+                </table>
+                <nav aria-label="Identification results">
+                    <ul class="m-2 pagination justify-content-center"></ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+    <!-- Records container -->
+    <div class="d-none h-100 overflow-auto" id="recordsContainer">
+        <div class="container-fluid">
+            <div class="row p-1 g-1 justify-content-evenly">
+                <div class="col-3 pt-4">
+                    <div class="col d-none">
+                        <div class="btn btn-light pt-3 mb-2" id="chartRange">
+                            <span class="material-symbols-outlined align-bottom">date_range</span>&nbsp;
+                            <span>Apply a date filter</span> <span
+                            class="material-symbols-outlined  align-bottom">expand_more</span>
                         </div>
-                    </div>                            
-                    <div class="col-9">
-                        <div class="chart-outer position-relative">
-                            <span class="material-symbols-outlined text-muted" style="z-index: 2;position: absolute; top: 40px; left: 30px" title="View Fullscreen" onclick="goFullscreen()">fullscreen</span>
-                            <canvas class="border border-dark rounded-3 w-100" id="chart-week"></canvas>
-                        </canvas>
+                    </div>
+                    <div class="col mb-2">
+                        <div id="speciesSearch" class="species-selector">
+                            <div id="chart-list" class="chart bird-list-wrapper form-floating"></div>
+                        </div>
+                    </div>
+                    <div class="col d-none">
+                        <div id="chart-location-list" class="form-floating">
+                            <select spellcheck="false" class="input form-select mb-3" aria-label=".form-select"
+                            id="chart-locations"></select>
+                            <label for="explore-locations">Location</label>
+                        </div>
+                    </div>
+                    <div class="col d-none">
+                        <fieldset class="border border rounded bg-light p-2">
+                            <legend class="h6">Sum Detections by:</legend>
+                            <div class="form-row">
+                                <div class="form-check-inline">
+                                    <input class="form-check-input" type="radio" name="showTotals" id="hourTotal" value="Hour">
+                                    <label class="form-check-label" for="hourTotal">Hour</label>
+                                </div>
+                                <div class="form-check-inline">
+                                    <input class="form-check-input" type="radio" name="showTotals" id="dayTotal" value="Day">
+                                    <label class="form-check-label" for="dayTotal">Day</label>
+                                </div>
+                                <div class="form-check-inline pb-3">
+                                    <input class="form-check-input" type="radio" name="showTotals" id="weekTotal" value="Week">
+                                    <label class="form-check-label" for="weekTotal">Week</label>
+                                </div>
+                            </div>
+                            <legend class="h6">Group Detections by:</legend>
+                            <div class="form-row">
+                                <div class="form-check-inline">
+                                    <input class="form-check-input" type="radio" name="groupTotals" id="dayGroup" value="Day">
+                                    <label class="form-check-label" for="dayGroup">Day</label>
+                                </div>
+                                <div class="form-check-inline">
+                                    <input class="form-check-input" type="radio" name="groupTotals" id="weekGroup" value="Week">
+                                    <label class="form-check-label" for="weekGroup">Week</label>
+                                </div>
+                                <div class="form-check-inline">
+                                    <input class="form-check-input" type="radio" name="groupTotals" id="monthGroup" value="Month">
+                                    <label class="form-check-label" for="monthGroup">Month</label>
+                                </div>
+                            </div>
+                            <div class="form-row pt-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" name="stackYears" id="stackYears" checked>
+                                    <label class="form-check-label" for="stackYears">Stack Years</label>
+                                </div>
+                            </div>
+                        </fieldset>
+                    </div>
+                </div>                            
+                <div class="col-9">
+                    <div class="chart-outer position-relative">
+                        <span class="material-symbols-outlined text-muted" style="z-index: 2;position: absolute; top: 40px; left: 30px" title="View Fullscreen" onclick="goFullscreen()">fullscreen</span>
+                        <canvas class="border border-dark rounded-3 w-100" id="chart-week"></canvas>
                     </div>
                 </div>
             </div>
@@ -1228,7 +1120,6 @@
             </div>
         </div>
     </div>
-    
 </div>
 <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
     <symbol id="check-circle-fill" viewBox="0 0 16 16">
@@ -1267,8 +1158,8 @@
         if (target === 'settingsMap'){
             const latEl = document.getElementById('latitude')
             const lonEl = document.getElementById('longitude')
-            latEl.value = config.latitude = lat.toFixed(2); 
-            lonEl.value = config.longitude = lng.toFixed(2);
+            latEl.value = lat.toFixed(2); 
+            lonEl.value = lng.toFixed(2);
             const placeEl = document.getElementById('place');
             placeEl.innerHTML = 'Fetching...'
         } else {
@@ -1284,28 +1175,22 @@
         // Stop propagation of the click event to the map
         L.DomEvent.stopPropagation(e);
     }
-    
     const showMap = (where) => {
         if (where === 'customLocationMap' && LOCATIONS.length){
             const markerGroup = L.featureGroup(); // Create a feature group to hold the markers
             const bounds = L.latLngBounds(); // Create bounds to include all markers
             // Add default location
             const marker = L.marker([config.latitude, config.longitude]).addTo(markerGroup);
-            
             bounds.extend(marker.getLatLng()); // Extend the bounds to include this marker
-            
             LOCATIONS.forEach(markerData => {
                 const { lat, lon } = markerData;
-                
                 const marker = L.marker([lat, lon]).addTo(markerGroup);
-                
                 bounds.extend(marker.getLatLng()); // Extend the bounds to include this marker
             });
-            
             map.fitBounds(bounds)
             const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 15,
-                minZoom: 3,
+                minZoom: 2,
                 attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             }).addTo(map);
             markerGroup.addTo(map)
@@ -1315,7 +1200,7 @@
                 onMapClick(e)
             });
         } else{
-            map.setView([config.latitude, config.longitude], 11);
+            map.setView([config.latitude, config.longitude], 2);
             const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 15,
                 minZoom: 3,
@@ -1336,7 +1221,6 @@
             displayLocationAddress(where);
         });
     })
-    
     function updateMap(lat,lng){
         // Update the marker's position
         if (!marker) marker = L.marker([lat, lng]).addTo(map);
@@ -1356,14 +1240,10 @@
         }
         const latEl = document.getElementById(latTxt);
         const lonEl = document.getElementById(lonTxt);
-        
         showMap(divID);
         map.on('click', onMapClick);
-        
     }
-    
 </script>
-</audio>
 </body>
 
 </html>
