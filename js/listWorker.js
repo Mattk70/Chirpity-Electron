@@ -236,7 +236,7 @@ class Model {
             }
             DEBUG && console.log('Total species considered at this location: ', count)
             // return an object
-            includedIDs = {week: week, lat: lat, lon:lon, included: includedIDs}            
+            //includedIDs = {week: week, lat: lat, lon:lon, included: includedIDs}            
         } else if (listType === 'nocturnal') {
             if (this.model === 'chirpity') {
                 for (let i = 0; i < this.labels.length; i++) {
@@ -254,7 +254,7 @@ class Model {
                     // Now get list of local birds
                     const local_ids = await this.setList({lat,lon,week, listType:'location', useWeek, threshold})
                     // Create a list of indices that appear in both lists
-                    includedIDs = additionalIDs.filter(id => local_ids[0].included.includes(id));
+                    includedIDs = additionalIDs.filter(id => local_ids[0].includes(id));
                 }
             } 
         } else if (listType === 'custom'){

@@ -32,7 +32,7 @@
     <div class="offcanvas offcanvas-start text-bg-dark" tabindex="-1" id="settings" aria-labelledby="offcanvasExampleLabel">
         <div class="offcanvas-header pb-2">
             <h5 class="offcanvas-title" id="offcanvasExampleLabel">Settings</h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" id="close-settings" aria-label="Close"></button>
         </div>
         <div class="offcanvas-body pt-1">
             <!-- Your offcanvas content goes here -->
@@ -80,16 +80,16 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="form-group rounded d-none" id="use-location-container">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" role="switch" id="local" checked="">
+                        <div class="d-none" id="use-location-container">
+                            <div class="form-switch ms-2">
+                                <input class="form-check-input" type="checkbox" role="switch" id="local">
                                 <label class="form-check-label" for="local">Use Location settings</label>
                                 <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Use Location settings" data-bs-content="When activated, the Nocturnal birds filter reports birds based on your location settings.">?</a>
                             </div>
                         </div>
                         <div id="species-threshold-el">
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Species Threshold" data-bs-content="Define the minimum eBird checklist frequency for species inclusion.
-                            If 'Adjust for Seasons' is enabled, the list will be adjusted to include species expected for the recording week.">?</a>
+                            If 'Adjust list for the week of the year' is enabled, the list will be adjusted to include species expected for the recording week.">?</a>
                             <div class="pe-3 input-group rounded p-2 mb-1">
                                 <span class="input-group-text col-5">Threshold:</span>
                                 <input id="species-frequency-threshold" type="number" class="form-control" style="width: 30%;" value="0.03" step="0.01" min="0.01" max="1" aria-label="species frequency threshold" aria-describedby="species-frequency-threshold">
@@ -105,8 +105,8 @@
                     <div class="form-group rounded p-2 pe-0 mb-2">
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" role="switch" id="nocmig">
-                            <label class="form-check-label" for="nocmig">Nocmig mode</label>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Nocmig Mode" data-bs-content="When enabled, Nocmig mode only searches for and only displays detections found during the night">?</a>
+                            <label class="form-check-label" for="nocmig">Only analyse night time periods.</label>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Nocmig Mode" data-bs-content="When enabled, this Nocmig mode only searches for and only displays detections found during the night">?</a>
                         </div>
                     </div>
                 </fieldset>
@@ -383,8 +383,8 @@
                     </div>
                 </fieldset>                                                        
                 <fieldset class="border border-secondary rounded m-2 p-2">
-                    <legend class="pb-2" style="font-size: large"><span class="material-symbols-outlined align-middle fs-5 align-middle">science</span> Advanced</legend>
-                    <div class="chirpity-only form-group rounded p-2 mb-2">
+                    <legend class="pb-2" style="font-size: large;font-weight:bold;">Advanced</legend>
+                    <div class="form-group rounded p-2 mb-2">
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" role="switch" id="send-filtered-audio-to-model">
                             <label class="form-check-label" for="send-filtered-audio-to-model">
@@ -419,7 +419,7 @@
                         </div>
                     </div>
                     <hr>
-                    <div class=" col-auto form-group rounded p-2 mb-2 text-bg-light">
+                    <div class=" col-auto form-group rounded p-2 mb-2">
                         <div class="text-nowrap">   
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" role="switch" id="debug-mode">
@@ -427,7 +427,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-auto form-group rounded p-2 mb-2 text-bg-light">
+                    <div class="col-auto form-group rounded p-2 mb-2">
                         <div class="text-nowrap">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" role="switch" id="do-not-track">
@@ -571,6 +571,7 @@
                                 <span class="material-symbols-outlined">highlight_off</span> Exit</a>
                             </li>
                         </ul>
+                        </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarRecords" role="button"
                             data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -737,9 +738,9 @@
                         <div class="form-floating mt-3 hide-in-batch">
                             <textarea class="form-control" id="record-comment" style="height: 200px"></textarea>
                             <label for="record-comment">Comments</label>
-                            <input type='hidden' id='DBmode'>
-                            <input type='hidden' id='batch-mode'>
-                            <input type='hidden' id='original-id'>
+                            <input type="hidden" id="DBmode">
+                            <input type="hidden" id="batch-mode">
+                            <input type="hidden" id="original-id">
                         </div>
                     </div>
                     <div class="modal-footer justify-content-center">
@@ -789,7 +790,7 @@
                     <h5 class="modal-title" id="detectionsModalLabel">Audio Selection Analysis</h5>
                 </div>
                 <div id="detectionsModalBody" class="modal-body p-0 ">
-                    <table id='selectionResults' class="text-center table w-100 align-middle">
+                    <table id="selectionResults" class="text-center table w-100 align-middle">
                         <thead id="selectionResultsHead">
                             <tr class="text-bg-dark">
                                 <th class="text-start timeOfDay">Time</th>
@@ -921,7 +922,7 @@
     </div>
     <!-- context menu-->
     <div class="dropdown-menu dropdown-menu-sm" id="context-menu">
-        <a class="dropdown-item play"><span class='material-symbols-outlined'>play_circle</span> Play</a>
+        <a class="dropdown-item play"><span class="material-symbols-outlined">play_circle</span> Play</a>
         <a class="dropdown-item" href="#" id="context-analyse-selection"><span class="material-symbols-outlined">
             search
         </span> Analyse</a>
@@ -932,12 +933,12 @@
         <a class="dropdown-item" id="context-create-clip" href="#"><span class="material-symbols-outlined">
             music_note
         </span> Export Audio Clip</a>
-        <a class="dropdown-item d-none" id="context-xc" href='#' target="xc">
-            <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> Explore on
+        <a class="dropdown-item d-none" id="context-xc" href="#" target="xc">
+            <img src="img/logo/XC.png" alt="" style="filter:grayscale(100%);height: 1.5em"> Explore on
             Xeno-Canto</a>
             <div class="dropdown-divider"></div>
             <a class="dropdown-item d-none" id="context-delete" href="#">
-                <span class='delete material-symbols-outlined'>delete_forever</span> Delete Record</a>
+                <span class="delete material-symbols-outlined">delete_forever</span> Delete Record</a>
             </div>
             <!-- End context menu -->
             <!-- Spectrogram view -->
@@ -1003,11 +1004,11 @@
         <div class="row g-0 h-100">
             <div class="col-4 h-100 overflow-auto" id="summary">
                 <!-- Summary table -->
-                <div id='summaryTable'></div>
+                <div id="summaryTable"></div>
             </div>
             <!-- Results table -->
             <div class="col-8 ps-1 pe-0 h-100 position-relative overflow-auto" id="resultsDiv">
-                <table id='results' class="text-center table w-100 align-middle">
+                <table id="results" class="text-center table w-100 align-middle">
                     <thead id="resultsHead" class="d-none">
                         <tr class="bg-dark">
                             <th class="time-sort col text-start timeOfDay pointer" title="Sort results by detection time"><span class="text-muted material-symbols-outlined time-sort-icon">sort</span> Time</th>
@@ -1101,7 +1102,7 @@
             </div>
             <div class="row">
                 <div class="col-3"></div>
-                <div id='dataRecords' class="col-9 ps-5">
+                <div id="dataRecords" class="col-9 ps-5">
                     <table class="table table-striped border border-dark rounded-border">
                         <tbody id="recordsTableBody">
                             <tr>

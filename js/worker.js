@@ -16,6 +16,38 @@ import { sqlite3 } from './database.js';
 const { PassThrough } = require('node:stream');
 
 
+// Save console.warn and console.error functions
+const originalWarn = console.warn;
+const originalError = console.error;
+
+// Override console.warn to intercept and track warnings
+console.warn = function(message) {
+    // Call the original console.warn to maintain default behavior
+    originalWarn.apply(console, arguments);
+    
+    // Track the warning message using your tracking function
+    track('Warnings', message);
+};
+
+// Override console.error to intercept and track errors
+console.error = function(message) {
+    // Call the original console.error to maintain default behavior
+    originalError.apply(console, arguments);
+    
+    // Track the error message using your tracking function
+    track('Errors', message);
+};
+// Implement error handling in the worker
+self.onerror = function (message) {
+    //split the message back to message & stack
+    const [msg, stack] = message.split('|')
+    // Send an error message
+    track('Unhandled%20Worker%20Error', msg, stack);
+};
+
+//Object will hold files in the diskDB, and the active timestamp from the most recent selection analysis.
+const STATE = new State();
+
 
 let WINDOW_SIZE = 3;
 const CHIRPITY_HEADER = Buffer.from([82,73,70,70,90,36,253,31,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,192,93,0,0,128,187,0,0,2,0,16,0,76,73,83,84,46,0,0,0,73,78,70,79,73,67,82,68,11,0,0,0,50,48,50,49,45,49,48,45,49,51,0,0,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,36,253,31]);
@@ -52,8 +84,7 @@ let diskDB, memoryDB;
 
 let t0; // Application profiler
 
-//Object will hold files in the diskDB, and the active timestamp from the most recent selection analysis.
-const STATE = new State();
+
 
 
 const getSelectionRange = (file, start, end) => {
@@ -1186,7 +1217,11 @@ const prepSummaryStatement = (included) => {
                     command.on('error', error => {
                         updateFilesBeingProcessed(file)
                         if (error.message.includes('SIGKILL')) DEBUG && console.log('FFMPEG process shut down')
-                        else reject(console.warn('Error in ffmpeg extracting audio segment:', error.message));
+                        else {
+                            error.message = error.message + '|' + error.stack;
+                            throw error;
+                        }
+                        reject(console.warn('Error in ffmpeg extracting audio segment:', error.message));
                     });
                     command.on('start', function (commandLine) {
                         DEBUG && console.log('FFmpeg command: ' + commandLine);
@@ -1268,7 +1303,7 @@ const prepSummaryStatement = (included) => {
                         resolve('finished')
                     })
                     command.run();
-                });
+                }).catch(error => console.log(error));
             }
 
             async function sendBuffer(audio, chunkStart, chunkLength, end, file){
@@ -1968,13 +2003,14 @@ const prepSummaryStatement = (included) => {
                                             confidenceRequired = STATE.detect.confidence;
                                         }
                                         if (confidence >= confidenceRequired) {
-                                            const { cname } = await memoryDB.getAsync(`SELECT cname FROM species WHERE id = ${speciesID}`).catch( (error) => console.log('Error getting species name', error));
+                                            const { cname, sname } = await memoryDB.getAsync(`SELECT cname, sname FROM species WHERE id = ${speciesID}`).catch( (error) => console.log('Error getting species name', error));
                                             const result = {
                                                 timestamp: timestamp,
                                                 position: key,
                                                 end: end,
                                                 file: file,
                                                 cname: cname,
+                                                sname: sname,
                                                 score: confidence
                                             }
                                             sendResult(++index, result, false);
@@ -3045,7 +3081,7 @@ const prepSummaryStatement = (included) => {
             async function getIncludedIDs(file){
                 t0 = Date.now();
                 let lat, lon, week, hitOrMiss = 'hit';
-                if (STATE.list === 'location'){
+                if (STATE.list === 'location' || (STATE.list === 'nocturnal' && STATE.local)){
                     if (file){
                         file = metadata[file];
                         week = STATE.useWeek ? new Date(file.fileStart).getWeekNumber() : "-1";
@@ -3111,13 +3147,13 @@ async function setIncludedIDs(lat, lon, week) {
         });
 
         let includedObject = {};
-        if (STATE.list === 'location') {
+        if (STATE.list === 'location' || (STATE.list === 'nocturnal' && STATE.local)){
             const location = lat.toString() + lon.toString();
             includedObject = {
                 [STATE.model]: {
                     [STATE.list]: {
                         [week]: {
-                            [location]: result.included
+                            [location]: result
                         }
                     }
                 }
@@ -3141,6 +3177,18 @@ async function setIncludedIDs(lat, lon, week) {
 }
 
 /// Track errors
-function trackError(message, source, value){ 
-    UI.postMessage({event: 'error', message: message, source: source, value}) 
+function track(event, action, name, value){ 
+    const t = new Date()
+    name = name ? `&e_n=${name}` : '';
+    value = value ? `&e_v=${value}` : '';
+    const state = STATE ? STATE.UUID : 0
+    const errURL = `https://analytics.mattkirkland.co.uk/matomo.php?h=${t.getHours()}&m=${t.getMinutes()}&s=${t.getSeconds()}
+    &action_name=${event}&idsite=2&rand=${Date.now()}&rec=1&uid=${state}&apiv=1
+    &e_c=${event}&e_a=${action}${name}${value}`;
+    console.log(errURL);
+    fetch(errURL)
+    .then(response => {
+        if (! response.ok) console.log('Network response was not ok', response);
+    })
+    .catch(error => console.log('Error posting error report:', error))  
 }

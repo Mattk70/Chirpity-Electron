@@ -557,6 +557,9 @@ input[type="range"].vertical {
     --bs-offcanvas-width: 450px; /* Change the width as desired */
   }
 
+.offcanvas-backdrop {
+    display: none !important;
+}
 
 #settingsMap {
     height: 300px;

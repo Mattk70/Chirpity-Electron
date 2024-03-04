@@ -32,7 +32,8 @@ export class State {
             this.list = 'everything',
             this.customList = undefined,
             this.local = true,
-            this.incrementor = 1
+            this.incrementor = 1,
+            this.UUID = 0
     }
 
 

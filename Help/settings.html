@@ -8,13 +8,14 @@
 
 <table class="table table-hover p-1">
     <tr>
-        <td colspan="2" class="text-center text-bg-light"><h5>Predictions</h5></td>
+        <td colspan="2" class="text-center text-bg-light"><h5>Detections</h5></td>
     </tr>
+    <tr>
     <th>Model</th>
-        <td>Choose the model to use for prediction.
+        <td>Choose the model to use for detection.
             <ul>
                 <li>
-                    <b>Chirpity</b> will use the native Chirpity model for predictions.
+                    <b>Chirpity</b> will use the native Chirpity model for analysis.
                 </li>
                 <li>
                     <b>BirdNET</b> will use the <a href="https://github.com/kahst/BirdNET-Analyzer" target="_blank">BirdNET</a> model developed by Stefan Kahl et al. from the K. Lisa Yang Center for Conservation Bioacoustics
@@ -39,10 +40,10 @@
                     list from the latest file in a batch of files. 
                     For example, if you analyse files from April 22, October 23 and February 24 in a batch, the list for February 24 will be used for the summary.
                 </p>
-            <p><b>Nocturnal Birds</b>. This will exclude detections of bird song and the calls of species which do not typically vocalise during the night.
-            <p><b>Birds</b>. Include detections for all but non-avian classes.
+            <p><b>Nocturnal Birds</b>. This will exclude detections of bird song and the calls of species which do not typically vocalise during the night.</p>
+            <p><b>Birds</b>. Include detections for all birds, excluding non-avian classes.
             </p>
-            <p><b>Everything</b>. In addition to birds, show non-bird detections including segments that were considered noise.</p>
+            <p><b>Everything</b>. In addition to all bird species, show non-bird detections including segments that were considered noise.</p>
             <p><b>Custom</b>. Provide a list for the model to use. You may use a different custom list for both BirdNET and Chirpity models. The format for a 
                 custom list file is, as for BirdNET Analyzer's custom lists, "scientific name_common name", with each species on a new line. You can export a starting
                 list in the correct format from the Help menu, using the "<i>What species are detected?</i>" link. 
@@ -53,15 +54,27 @@
                 </ol>
                 
             
-            </ul>
-            <p><i>If you wish to see the full list of species used for predictions each model was trained on, check the Help menu > <b>What species are detected?</b></i>.</p>
+            
+            <p><i>If you wish to see the full list of species used for predictions each model was trained on, check the Help menu &gt; <b>What species are detected?</b></i>.</p>
         </td>
     </tr>
     <tr>
-        <th>Nocmig Mode</th>
+        <th>Only analyse night time periods</th>
         <td>
             Only search for detections at night. Chirpity calculates the end and start of civil twilight for the dates
             of the files and the location that is set.
+        </td>
+    </tr>
+    <tr>
+        <th>Default Location</th>
+        <td>
+            <figure class="figure float-end m-3">
+                <img src="Help/amend file.png"
+                    alt="The context menu accessed from the filename contains options to amend the file's start time and the recording location"
+                    class="rounded figure-img float-end img-fluid">
+                <figcaption class="figure-caption text-muted text-end">File name context menu.</figcaption>
+            </figure>
+            Set the default location to use for calculating the start and end of civil twilight. This setting can be overriden for individual files by assigning a custom location in the filename context menu.
         </td>
     </tr>
     <tr>
@@ -69,18 +82,13 @@
     </tr>
     <tr>
         <th>Language</th>
-        <td>Choose the language for the "common name" labels, where translations exist. The translated labels have been obtained from <a href="https://ebird.org/home" target="_blank">eBird</a>. 
-            <ul>
-                <li>If you wish to apply a new translation, or modify a bird's name you can use a custom list. The will be read from the custom list file and names updated if you select "Custom" from the Language dropdown.
-                    <br /><b>N.B.</b> You cannot change the call type label, this should remain one of (call), (flight call) or (song).
-                </li>
-            </ul>
-        
+        <td>
+            Choose the language for the "common name" labels, where translations exist. The translated labels have been obtained from <a href="https://ebird.org/home" target="_blank">eBird</a>. 
         </td>
     </tr>
     <tr>
         <th>Backend</th>
-        <td>Choose how predictions are calculated on you computer.
+        <td>This option is only visible when using the Chirpity model. Choose how predictions are calculated on you computer.
             <ul>
                 <li>
                     <b>CPU</b> will use the CPU for predictions, this is generally faster if you have an integrated
@@ -103,7 +111,7 @@
     </tr>
     <tr>
         <th>Batch Size</th>
-        <td>This setting determines the number of three-second audio chunks to process each time a prediction is requested.
+        <td>This setting determines the number of three-second audio chunks to process for each model request.
             Larger values lead to faster processing, especially on long files.
         </td>
     </tr>
@@ -115,21 +123,6 @@
         </td>
     </tr>
     <tr>
-        <td colspan="2" class="text-center text-bg-light"><h5>Location</h5></td>
-    </tr>
-    <tr>
-        <th>Default Location</th>
-        <td>
-            <figure class="figure float-end m-3">
-                <img src="Help/amend file.png"
-                    alt="The context menu accessed from the filename contains options to amend the file's start time and the recording location"
-                    class="rounded figure-img float-end img-fluid">
-                <figcaption class="figure-caption text-muted text-end">File name context menu.</figcaption>
-            </figure>
-            Set the default location to use for calculating the start and end of civil twilight. This setting can be overriden for individual files by assigning a custom location in the filename context menu.
-        </td>
-    </tr>
-    <tr>
         <td colspan="2" class="text-center text-bg-light"><h5>Audio Preferences</h5></td>
     </tr>
     <tr>
@@ -137,8 +130,35 @@
         <td>If your recordings are very quiet, you can increase the loudness of the audio by adding gain. The volume of audio can be increased by up to 50 decibels.</td>
     </tr>
     <tr>
+        <td><b>Normalise audio</b></td>
+        <td>
+            If enabled, the levels in the audio file will be normalised. In simple terms, this will maximise the volume range between the quietest and loudest sounds. 
+            The effect will ensure all audio plays at a similar volume, and vocalisations in quiet audio files will be easier to hear.
+        </td>
+    </tr>
+    <tr>
+        <th>High Pass filter</th>
+        <td> This applies a filter to the audio, removing the sound below the frequency selected. 
+            Intended primarily for recordings made in in urban settings, this will reduce the level of low-frequency hum.
+        </td>
+    </tr>
+    <tr>
+        <th>Low Shelf filter</th>
+        <td> This applies an audio filter similar to the High Pass filter, however, rather than simply remove noise, it reduces the volume of low frequency noise. 
+            The advantage of a low shelf filter is that you can reduce the hum, whilst still being able to hear species which have low frequency calls.
+            You can set the threshold frequency, and the strength of the filter to apply (Attenuation).
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h6>Audio Export</h6></td>
+    </tr>
+    <tr>
         <td><b>Format and Bitrate</b></td>
         <td>Choose from lossless or lossy formats for the audio clips you export from Chirpity.</td>
+    </tr>
+    <tr>
+        <td><b>Convet to mono</b></td>
+        <td>Combine stereo tracks to a single channel. This will result in smaller file sizes.</td>
     </tr>
     <tr>
         <th>Decorators</th>
@@ -158,7 +178,7 @@
     </tr>
     <tr>
         <td><b>Colourmap</b></td>
-        <td>Choose the colour map for the spectrogram display</td>
+        <td>Choose the colour theme for the spectrogram display</td>
     </tr>
     <tr>
         <th>Timeline</th>
@@ -169,7 +189,7 @@
                 </li>
                 <li>
                     <b>Time of Day</b> relies on file timestamps to determine the actual time of detected calls.
-                    If a file's timestamp does not reflect the recording time, the readonig will be inaccurate.
+                    If a file's timestamp does not reflect the recording time, the reading will be inaccurate.
                     To edit the start time of the current file, set the desired date and time using the filename context menu.
                 </li>
             </ul>
@@ -177,31 +197,45 @@
     </tr>
  
     <tr>
-        <td colspan="2" class="text-center text-bg-warning"><h5>Advanced Features</h5></td>
+        <td colspan="2" class="text-center text-bg-light"><h5>Advanced</h5></td>
+    </tr>
+    <tr>
+        <th>Send Filtered Audio for Analysis</th>
+        <td> 
+            By default, the filter settings in the Audio Preferences are just used to modify the audio in the application interface. If you enable this setting, 
+            the modified audio will be used for analysis. This is usually a bad idea, as it impairs the accuracy of the models in most situations. However, if your 
+            recordings have a considerable amount of low frequency noise, it <i>may</i> be that modifying the audio using these filters will improve the models' ability to 
+            make accurate detections.
+        </td>
     </tr>
     <tr>
         <th>Context Mode</th>
-        <td> In this mode, Chirpity will use the surrounding context when making predictions. This helps mitigate
+        <td> This mode is only available for the native Chirpity model. When enabled, the model will use the surrounding context when making predictions. This helps mitigate
             against false positive detections.
         </td>
     </tr>
+    <tr>
         <th>SNR filter</th>
-        <td>The SNR (Signal to Noise Ratio) filter can only be enabled when using the CPU backend. When enabled, Chirpity will disregard audio segments with no distinct sound event.
+        <td>This setting is also only avaliable for the native Chirpity model. The SNR (Signal to Noise Ratio) filter can only be enabled when using the CPU backend. 
+            When enabled, Chirpity will disregard audio segments with no distinct sound event.
             A stronger signal is required for a prediction to be attempted when higher signal-to-noise values are set.
             The purpose is to deliver significant speed gains, however, the setting may cause Chirpity to miss quieter, more distant calls.
         </td>
     </tr>
     <tr>
-        <th>High Pass filter</th>
-        <td> This applies a filter to the audio, removing the sound below the frequency selected. 
-            Intended primarily for recordings made in in urban settings, this is desirable to compensate for strong low-frequency noise which is not present in the training data.
+        <th>Debug mode</th>
+        <td>
+            If you have encountered an issue while using Chirpity, you can enable debug mode. When you change this setting, you will need to quit and relaunch the application 
+            for the change to take effect. When launched in debug mode, two windows will open, and each will print debugging information to a console on the right of the window.
+            This is <b>extremely </b> useful if you want to report a bug - as you can share a screenshot of any errors that appear (these will show up in red in the console).
         </td>
     </tr>
     <tr>
-        <th>Low Shelf filter</th>
-        <td> This applies an audio filter similar to the High Pass filter, however, rather than simply remove noise, it reduces the volume of low frequency noise. 
-            You can set the threshold frequency, and the strength of the filter to apply (Attenuation).
-            Also intended for recordings made in in urban settings, this helps tune the audio to the noise profile of the training data.
+        <th>Opt out of usage analytics</th>
+        <td>
+            Chirpity sends usage information anonymously to an analytics server. This information is used to help understand how people use Chirpity, and try to identify any bugs
+            or errors. Both help improve the software and prioritise changes for future releases. If you would prefer that Chirpity did not send any usage data, you can disable it here. 
+            
         </td>
     </tr>
 </table>

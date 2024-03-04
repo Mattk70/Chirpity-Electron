@@ -1,7 +1,34 @@
 let seenTheDarkness = false, shownDaylightBanner = false, LOCATIONS, locationID = undefined;
 const startTime = performance.now();
 let LABELS = [], DELETE_HISTORY = [];
+// Save console.warn and console.error functions
+const originalWarn = console.warn;
+const originalError = console.error;
 
+// Override console.warn to intercept and track warnings
+console.warn = function(message) {
+    // Call the original console.warn to maintain default behavior
+    originalWarn.apply(console, arguments);
+    
+    // Track the warning message using your tracking function
+    track('Warnings', message);
+};
+
+// Override console.error to intercept and track errors
+console.error = function(message) {
+    // Call the original console.error to maintain default behavior
+    originalError.apply(console, arguments);
+    
+    // Track the error message using your tracking function
+    track('Errors', message);
+};
+// Implement error handling in the worker
+self.onerror = function (message) {
+    //split the message back to message & stack
+    const [msg, stack] = message.split('|')
+    // Send an error message
+    track('Unhandled%20Worker%20Error', msg, stack);
+};
 
 const STATE = {
     mode: 'analyse',
@@ -675,7 +702,7 @@ const cancelDefaultLocation = () => {
 const setDefaultLocation = () => {
     config.latitude = parseFloat(DOM.defaultLat.value).toFixed(2);
     config.longitude = parseFloat(parseFloat(DOM.defaultLon.value)).toFixed(2);
-    config.location = document.getElementById('place').textContent.replace('fmd_good ', '');
+    config.location = document.getElementById('place').textContent.replace('fmd_good', '');
     updateMap(parseFloat(DOM.defaultLat.value), parseFloat(DOM.defaultLon.value));
     updatePrefs();
     worker.postMessage({
@@ -934,7 +961,8 @@ function fetchLocationAddress(lat, lon) {
         fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`)
         .then(response => {
             if (!response.ok) {
-                throw new Error('Network error: ' + JSON.stringify(response));
+                console.warn('Network error: ' + JSON.stringify(response));
+                
             }
             return response.json()
         })
@@ -1412,7 +1440,7 @@ window.onload = async () => {
         locale: 'en_uk',
         colormap: 'inferno',
         timeOfDay: true,
-        list: 'nocturnal',
+        list: 'birds',
         customListFile: {birdnet: '', chirpity: ''},
         local: true,
         speciesThreshold: 0.03,
@@ -1587,7 +1615,8 @@ window.onload = async () => {
             speciesThreshold: config.speciesThreshold,
             list: config.list,
             useWeek: config.useWeek,
-            local: config.local
+            local: config.local,
+            UUID: config.UUID
         });
         const {model, backend, list} = config;
         t0_warmup = Date.now();
