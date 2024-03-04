@@ -22,7 +22,7 @@ const STATE = {
 }
 
 // Batch size map for slider
-const BATCH_SIZE_LIST = [1, 2, 4, 8, 12, 16, 32, 48, 64, 128];
+const BATCH_SIZE_LIST = [16, 32, 48, 64, 128];
 
 // Get the modules loaded in preload.js
 const fs = window.module.fs;
@@ -101,6 +101,7 @@ const DOM = {
      audioPadding: document.getElementById('padding'),
      audioQuality: document.getElementById('quality'),
      audioQualityContainer: document.getElementById('quality-container'),
+     sendFilteredAudio: document.getElementById('send-filtered-audio-to-model'),
      audioNotification: document.getElementById('audio-notification'),
      batchSizeSlider: document.getElementById('batch-size'),
      batchSizeValue: document.getElementById('batch-size-value'),
@@ -938,14 +939,19 @@ function fetchLocationAddress(lat, lon) {
             return response.json()
         })
         .then(data => {
-            // Just take the first two elements of the address
-            let address = data.display_name.split(',').slice(0,2).join(", ");
-            
-            LOCATIONS.push({ id: LOCATIONS.length + 1, lat: lat, lon: lon, place: address })
+            let address;
+            if (data.error) {
+                address = "No location found for this map point";
+            } else {
+                // Just take the first two elements of the address
+                address = data.display_name.split(',').slice(0,2).join(", ");
+                
+                LOCATIONS.push({ id: LOCATIONS.length + 1, lat: lat, lon: lon, place: address })
+            }
             resolve(address);
         })
         .catch(error => {
-            console.log("There was a problem connecting to OpenStreetMap")
+            console.log("A location for this point could not be retrieved from OpenStreetMap")
             reject(error);
         })
     })
@@ -1418,7 +1424,7 @@ window.onload = async () => {
         longitude: 0.89, 
         location: 'Great Snoring, North Norfolk',
         detect: { nocmig: false, contextAware: false, confidence: 45 },
-        filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0 },
+        filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0, sendToModel: false },
         warmup: true,
         backend: 'tensorflow',
         tensorflow: { threads: DIAGNOSTICS['Cores'], batchSize: 32 },
@@ -1556,6 +1562,7 @@ window.onload = async () => {
         LowShelfThreshold.textContent = config.filters.lowShelfFrequency + 'Hz';
         lowShelfAttenuation.value = -config.filters.lowShelfAttenuation;
         lowShelfAttenuationThreshold.textContent = lowShelfAttenuation.value + 'dB';
+        DOM.sendFilteredAudio.checked = config.filters.sendToModel;
         filterIconDisplay();
         
         DOM.threadSlider.max = DIAGNOSTICS['Cores'];
@@ -1615,6 +1622,7 @@ window.onload = async () => {
                 .catch(error => console.log('Error posting tracking:', error))
         }
     })
+    adjustSpecDims(true)
 }
 
 
@@ -2424,7 +2432,7 @@ function onChartData(args) {
         KeyZ: function (e) {
             if (( e.ctrlKey || e.metaKey) && DELETE_HISTORY.length) insertManualRecord(...DELETE_HISTORY.pop());
         },
-        Escape: function () {
+        Escape: function (e) {
             if (PREDICTING) {
                 console.log('Operation aborted');
                 PREDICTING = false;
@@ -4262,6 +4270,12 @@ DOM.gain.addEventListener('input', () => {
                         postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
                     break;
                 }
+                case 'send-filtered-audio-to-model': {
+                    config.filters.sendToModel = element.checked;
+                    worker.postMessage({ action: 'update-state', filters: config.filters })
+                    break;
+                }
+
                 case 'format': {
                     config.audio.format = element.value;
                     showRelevantAudioQuality();

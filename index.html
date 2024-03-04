@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
     <!-- Required meta tags -->
     <meta charset="utf-8">
@@ -38,7 +38,7 @@
             <!-- Your offcanvas content goes here -->
             <form id="settingsForm" class="fs-6">
                 <fieldset class="border border-secondary rounded m-2 mt-0 mb-0 p-2">
-                    <legend style="font-size: large;font-weight:bold">Predictions</legend>
+                    <legend style="font-size: large;font-weight:bold">Detections</legend>
                     <div>
                         <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Model" data-bs-content="Select whether to use Chirpity, optimised for Nocturnal Migration Calls in Europe, or BirdNET, which can detect over 6000 species across the globe.">?</a>
                         <div class="pe-3 input-group rounded p-2 mb-1">
@@ -92,7 +92,7 @@
                             If 'Adjust for Seasons' is enabled, the list will be adjusted to include species expected for the recording week.">?</a>
                             <div class="pe-3 input-group rounded p-2 mb-1">
                                 <span class="input-group-text col-5">Threshold:</span>
-                                <input id="species-frequency-threshold" type="number" class="form-control" style="width: 30%;" value="0.005" step="0.001" min="0.001" max="1" aria-label="species frequency threshold" aria-describedby="species-frequency-threshold">
+                                <input id="species-frequency-threshold" type="number" class="form-control" style="width: 30%;" value="0.03" step="0.01" min="0.01" max="1" aria-label="species frequency threshold" aria-describedby="species-frequency-threshold">
                             </div>
                             <div class="text-nowrap mt-2"><label class="ms-2 me-2" for="species-week">Adjust list for the week of the year</label>
                                 <span class="form-switch ms-2">
@@ -185,7 +185,7 @@
                         </div>
                     </div>
                     <div>
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Threads" data-bs-content="The number of parallel predictions to run. By default, 
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Threads" data-bs-content="The number of parallel analyses to run. By default, 
                         this is set to the number of CPU cores on the machine for fastest performance. With the GPU backend, a lower number works better e.g. 1-3">?</a>
                         <div class="form-group rounded p-2 pe-0 mb-2">
                             <label for="thread-slider">Threads:</label>
@@ -243,10 +243,43 @@
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Normalise" data-bs-content="When enabled, the audio you hear will be normalised, expanding the dynamic range.">?</a>
                         </div>
                     </div>
+                    <div class="me-auto">
+                        <div class="form-group rounded p-2 mb-2">
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="High Pass Filter" data-bs-content="When set, removes low frequency noise below the threshold. If enabled before analysis, the modified audio is sent to the model. If only enabled after analysis, this just affects audio playback">?</a>
+                            <label for="HighPassFrequency" class="form-label">
+                                High Pass filter:
+                            </label>
+                            <div class="input-group me-0 p-0">
+                                <input type="range" class="form-control-range w-75" min="0" max="2500" step="25" id="HighPassFrequency">
+                                <div class="input-group-append">
+                                    <span class="input-group-text" id="HP-threshold">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group rounded p-2 me-0 mb-2">
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Low Shelf Filter" data-bs-content="When used, attenuates low frequency noise below the frequency thresshold. If enabled before analysis, the modified audio is sent to the model. If only enabled after analysis, this just affects audio playback">?</a>
+                        <label for="lowShelfFrequency" class="form-label">
+                            Low Shelf filter:
+                        </label>
+                        <div class="input-group me-0 p-0">
+                            <input type="range" class="form-control-range w-75" min="0" max="2500" step="100" id="lowShelfFrequency">
+                            <div class="input-group-append">
+                                <span class="input-group-text" id="LowShelf-threshold">0</span>
+                            </div>
+                        </div>
+                        <label for="attenuation" class="form-label">Attenuation:</label>
+                        <div class="input-group me-0 p-0">
+                            <input type="range" class="form-control-range w-75" min="0" max="50" id="attenuation">
+                            <div class="input-group-append">
+                                <span class="input-group-text" id="attenuation-threshold">0 dB</span>
+                            </div>
+                        </div>
+                    </div>
                     <hr>
                     <h6 class="fs-6">Audio Export:</h6>
                     <div class="pe-3 input-group rounded p-2 mb-1">
-                        <label for="format" class="input-group-text col-5">Export Format:</label>
+                        <label for="format" class="input-group-text col-5">Format:</label>
                         <select class="form-select mb-0" id="format">
                             <option value="wav">WAV</option>
                             <option value="flac">FLAC</option>
@@ -256,7 +289,7 @@
                         </select>
                     </div>
                     <div id="bitrate-container" class="pe-3 input-group rounded p-2 mb-1">
-                        <label for="bitrate" class="input-group-text col-5">Export Bitrate:</label>
+                        <label for="bitrate" class="input-group-text col-5">Bitrate:</label>
                         <select class="form-select mb-0" id="bitrate">
                             <option value="320">320 kbps</option>
                             <option value="192">192 kbps</option>
@@ -349,9 +382,17 @@
                         </select>
                     </div>
                 </fieldset>                                                        
-                <fieldset class="border border-secondary rounded m-2 p-2 bg-secondary">
-                    <legend class="pb-2" style="font-size: large"><span class="material-symbols-outlined align-middle">science</span> Advanced features <a class="circle" style="background-color:darkgoldenrod" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Advanced Features" data-bs-content="The settings in this section can impact prediction quailty - for better or worse. Use them with caution!">?</a>
-                    </legend>
+                <fieldset class="border border-secondary rounded m-2 p-2">
+                    <legend class="pb-2" style="font-size: large"><span class="material-symbols-outlined align-middle fs-5 align-middle">science</span> Advanced</legend>
+                    <div class="chirpity-only form-group rounded p-2 mb-2">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="send-filtered-audio-to-model">
+                            <label class="form-check-label" for="send-filtered-audio-to-model">
+                                Send Filtered Audio for Analysis
+                            </label>
+                            <a class="circle text-bg-danger" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Send Filtered Audio" data-bs-content="Sending High Pass or Low Shelf filtered audio to a model will usually have a negative impact on its accuracy. Use this option with caution!">?</a>
+                        </div>
+                    </div>
                     <div class="chirpity-only form-group rounded p-2 mb-2">
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" role="switch" id="context">
@@ -377,39 +418,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="me-auto">
-                        <div class="form-group rounded p-2 mb-2">
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="High Pass Filter" data-bs-content="When set, removes low frequency noise below the threshold. If enabled before analysis, the modified audio is sent to the model. If only enabled after analysis, this just affects audio playback">?</a>
-                            <label for="HighPassFrequency" class="form-label">
-                                High Pass filter:
-                            </label>
-                            <div class="input-group me-0 p-0">
-                                <input type="range" class="form-control-range w-75" min="0" max="2500" step="25" id="HighPassFrequency">
-                                <div class="input-group-append">
-                                    <span class="input-group-text" id="HP-threshold">0</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-group rounded p-2 me-0 mb-2">
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Low Shelf Filter" data-bs-content="When used, attenuates low frequency noise below the frequency thresshold. If enabled before analysis, the modified audio is sent to the model. If only enabled after analysis, this just affects audio playback">?</a>
-                        <label for="lowShelfFrequency" class="form-label">
-                            Low Shelf filter:
-                        </label>
-                        <div class="input-group me-0 p-0">
-                            <input type="range" class="form-control-range w-75" min="0" max="2500" step="100" id="lowShelfFrequency">
-                            <div class="input-group-append">
-                                <span class="input-group-text" id="LowShelf-threshold">0</span>
-                            </div>
-                        </div>
-                        <label for="attenuation" class="form-label">Attenuation:</label>
-                        <div class="input-group me-0 p-0">
-                            <input type="range" class="form-control-range w-75" min="0" max="50" id="attenuation">
-                            <div class="input-group-append">
-                                <span class="input-group-text" id="attenuation-threshold">0 dB</span>
-                            </div>
-                        </div>
-                    </div>
+                    <hr>
                     <div class=" col-auto form-group rounded p-2 mb-2 text-bg-light">
                         <div class="text-nowrap">   
                             <div class="form-check form-switch">
@@ -661,8 +670,8 @@
                 </ul>
             </div>
             <div class="container-fluid">
-                <button class="btn btn-outline-secondary float-end" type="button" onclick="placeMap('settingsMap')" id="navbarSettings"
-                data-bs-toggle="offcanvas" data-bs-target="#settings" aria-controls="settings">Settings</button>
+                <button class="btn btn-outline-secondary border-dark float-end" style="--bs-btn-padding-y: .25rem;" type="button" onclick="placeMap('settingsMap')" id="navbarSettings"
+                data-bs-toggle="offcanvas" data-bs-target="#settings" aria-controls="settings">Settings <span class="material-symbols-outlined fs-5 align-middle">settings</span></button>
             </div>
             <!-- navbar-collapse.// -->
             <img src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"
@@ -944,7 +953,7 @@
                     <div id="filename" class="col-auto ps-1 overflow-visible flex-nowrap"></div>
                     <div id="unsaved-icon" class="material-symbols-outlined ms-2 me-2 text-warning d-none" title="There are unsaved edits">warning</div>
                     <div class="col-auto btn-group bg-dark ms-2 me-2 text-nowrap" role="group">
-                        <button id="playToggle" class="p-1 pe-2 btn btn-outline-secondary">
+                        <button id="playToggle" class="p-1 pe-2 btn btn-outline-secondary" title="Play / Pause (SpaceBar)">
                             <span class="material-symbols-outlined ">play_circle</span><span
                             class="align-middle d-none d-lg-inline"> Play </span>
                             /
@@ -1161,7 +1170,7 @@
             latEl.value = lat.toFixed(2); 
             lonEl.value = lng.toFixed(2);
             const placeEl = document.getElementById('place');
-            placeEl.innerHTML = 'Fetching...'
+            placeEl.innerHTML = 'Getting location...'
         } else {
             const latEl = document.getElementById('customLat')
             const lonEl = document.getElementById('customLon')

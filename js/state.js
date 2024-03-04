@@ -14,7 +14,7 @@ export class State {
             this.selection = false,
             this.blocked = [],
             this.audio = { gain: 0, format: 'mp3', bitrate: 128, padding: false, fade: false, downmix: false, quality: 5, notification: true, normalise: false},
-            this.filters = { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0 },
+            this.filters = { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0, sendToModel: false },
             this.detect = { nocmig: false, contextAware: false, confidence: 450 },
             this.chart = { range: { start: undefined, end: undefined }, species: undefined },
             this.explore = { range: { start: undefined, end: undefined } },

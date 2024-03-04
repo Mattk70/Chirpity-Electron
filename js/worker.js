@@ -960,10 +960,10 @@ const prepSummaryStatement = (included) => {
                 })
             }
             
-            async function setupCtx(audio, rate) {
+            async function setupCtx(audio, rate, destination) {
                 rate ??= sampleRate;
                 // Deal with detached arraybuffer issue
-
+                const useFilters = (STATE.filters.sendToModel && STATE.filters.active) || destination === 'UI';
                 return audioCtx.decodeAudioData(audio.buffer)
                 .then( audioBufferChunk => {
                     const audioCtxSource = audioCtx.createBufferSource();
@@ -975,38 +975,40 @@ const prepSummaryStatement = (included) => {
                     const offlineSource = offlineCtx.createBufferSource();
                     offlineSource.buffer = buffer;
                     let previousFilter = undefined;
-                    if (STATE.filters.active) {
-                        if (STATE.filters.highPassFrequency) {
-                            // Create a highpass filter to cut low-frequency noise
-                            const highpassFilter = offlineCtx.createBiquadFilter();
-                            highpassFilter.type = "highpass"; // Standard second-order resonant highpass filter with 12dB/octave rolloff. Frequencies below the cutoff are attenuated; frequencies above it pass through.
-                            highpassFilter.frequency.value = STATE.filters.highPassFrequency; //frequency || 0; // This sets the cutoff frequency. 0 is off. 
-                            highpassFilter.Q.value = 0; // Indicates how peaked the frequency is around the cutoff. The greater the value, the greater the peak.
-                            offlineSource.connect(highpassFilter);
-                            previousFilter = highpassFilter;
-                        }
-                        if (STATE.filters.lowShelfFrequency && STATE.filters.lowShelfAttenuation) {
-                            // Create a lowshelf filter to attenuate low-frequency noise
-                            const lowshelfFilter = offlineCtx.createBiquadFilter();
-                            lowshelfFilter.type = 'lowshelf';
-                            lowshelfFilter.frequency.value = STATE.filters.lowShelfFrequency; // This sets the cutoff frequency of the lowshelf filter to 1000 Hz
-                            lowshelfFilter.gain.value = STATE.filters.lowShelfAttenuation; // This sets the boost or attenuation in decibels (dB)
-                            previousFilter ? previousFilter.connect(lowshelfFilter) : offlineSource.connect(lowshelfFilter);
-                            previousFilter = lowshelfFilter;
+                    if (useFilters){
+                        if (STATE.filters.active) {
+                            if (STATE.filters.highPassFrequency) {
+                                // Create a highpass filter to cut low-frequency noise
+                                const highpassFilter = offlineCtx.createBiquadFilter();
+                                highpassFilter.type = "highpass"; // Standard second-order resonant highpass filter with 12dB/octave rolloff. Frequencies below the cutoff are attenuated; frequencies above it pass through.
+                                highpassFilter.frequency.value = STATE.filters.highPassFrequency; //frequency || 0; // This sets the cutoff frequency. 0 is off. 
+                                highpassFilter.Q.value = 0; // Indicates how peaked the frequency is around the cutoff. The greater the value, the greater the peak.
+                                offlineSource.connect(highpassFilter);
+                                previousFilter = highpassFilter;
+                            }
+                            if (STATE.filters.lowShelfFrequency && STATE.filters.lowShelfAttenuation) {
+                                // Create a lowshelf filter to attenuate low-frequency noise
+                                const lowshelfFilter = offlineCtx.createBiquadFilter();
+                                lowshelfFilter.type = 'lowshelf';
+                                lowshelfFilter.frequency.value = STATE.filters.lowShelfFrequency; // This sets the cutoff frequency of the lowshelf filter to 1000 Hz
+                                lowshelfFilter.gain.value = STATE.filters.lowShelfAttenuation; // This sets the boost or attenuation in decibels (dB)
+                                previousFilter ? previousFilter.connect(lowshelfFilter) : offlineSource.connect(lowshelfFilter);
+                                previousFilter = lowshelfFilter;
+                            }
                         }
                     }
                     if (STATE.audio.gain){
-                            var gainNode = offlineCtx.createGain();
-                            gainNode.gain.value = Math.pow(10, STATE.audio.gain / 20);
-                            previousFilter ? previousFilter.connect(gainNode) : offlineSource.connect(gainNode);
-                            gainNode.connect(offlineCtx.destination);
-                        } else {
-                            previousFilter ? previousFilter.connect(offlineCtx.destination) : offlineSource.connect(offlineCtx.destination);
-                        }
-                        offlineSource.start();
-                        return offlineCtx;
-                    } )
-                    .catch( (error) => console.log(error));
+                        var gainNode = offlineCtx.createGain();
+                        gainNode.gain.value = Math.pow(10, STATE.audio.gain / 20);
+                        previousFilter ? previousFilter.connect(gainNode) : offlineSource.connect(gainNode);
+                        gainNode.connect(offlineCtx.destination);
+                    } else {
+                        previousFilter ? previousFilter.connect(offlineCtx.destination) : offlineSource.connect(offlineCtx.destination);
+                    }
+                    offlineSource.start();
+                    return offlineCtx;
+                } )
+                .catch( (error) => console.log(error));
 
                 
                 // // Create a compressor node
@@ -1105,7 +1107,7 @@ const prepSummaryStatement = (included) => {
                         try {
                             let audio = Buffer.concat([meta.header, chunk]);
                             
-                            const offlineCtx = await setupCtx(audio);
+                            const offlineCtx = await setupCtx(audio, undefined, 'model');
                             let worker;
                             if (offlineCtx) {
                                 offlineCtx.startRendering().then((resampled) => {
@@ -1218,7 +1220,7 @@ const prepSummaryStatement = (included) => {
                             chunk = concatenatedBuffer.subarray(0, highWaterMark);
                             concatenatedBuffer = concatenatedBuffer.subarray(highWaterMark);
                             const audio = Buffer.concat([WAV_HEADER, chunk])
-                            const offlineCtx = await setupCtx(audio).catch( (error) => console.warn(error));
+                            const offlineCtx = await setupCtx(audio, undefined, 'model').catch( (error) => console.warn(error));
                             let worker;
                             if (offlineCtx) {
                                 offlineCtx.startRendering().then((resampled) => {
@@ -1270,7 +1272,7 @@ const prepSummaryStatement = (included) => {
             }
 
             async function sendBuffer(audio, chunkStart, chunkLength, end, file){
-                const offlineCtx = await setupCtx(audio);
+                const offlineCtx = await setupCtx(audio, undefined, 'model');
                 let worker;
                 if (offlineCtx) {
                     offlineCtx.startRendering().then((resampled) => {
@@ -1346,7 +1348,7 @@ const prepSummaryStatement = (included) => {
                         const audio = Buffer.concat(data);
 
                         // Navtive CHIRPITY_HEADER (24kHz) here for UI
-                        const offlineCtx = await setupCtx(audio, sampleRate).catch( (error) => {console.error(error.message)});
+                        const offlineCtx = await setupCtx(audio, sampleRate, 'UI').catch( (error) => {console.error(error.message)});
                         if (offlineCtx){
                             offlineCtx.startRendering().then(resampled => {
                                 // `resampled` contains an AudioBuffer resampled at 24000Hz.
