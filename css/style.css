@@ -558,7 +558,7 @@ input[type="range"].vertical {
   }
 
 .offcanvas-backdrop {
-    display: none !important;
+    background-color: rgba(0, 0, 72, 0.1);
 }
 
 #settingsMap {

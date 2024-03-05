@@ -139,15 +139,12 @@ const DOM = {
      debugMode: document.getElementById('debug-mode'),
      defaultLat: document.getElementById('latitude'),
      defaultLon: document.getElementById('longitude'),
-     applyLocationButton: document.getElementById('apply-location'),
-     cancelLocationButton: document.getElementById('cancel-location'),
      fileNumber: document.getElementById('fileNumber'),
      gain: document.getElementById('gain'),
      gainAdjustment: document.getElementById('gain-adjustment'),
      normalise: document.getElementById('normalise'),
      listToUse: document.getElementById('list-to-use'),
      listIcon: document.getElementById('list-icon'),
-     exportList: document.getElementById('export-list'),
      speciesThresholdEl: document.getElementById('species-threshold-el'),
      speciesThreshold: document.getElementById('species-frequency-threshold'),
      customListFile: document.getElementById('custom-list-location'),
@@ -164,6 +161,7 @@ const DOM = {
      resultTableElement: document.getElementById('resultTableContainer'),
      spectrogramWrapper: document.getElementById('spectrogramWrapper'),
      summaryTable: document.getElementById('summaryTable'),
+     resultHeader: document.getElementById('resultsHead'),
      threadSlider: document.getElementById('thread-slider'),
      timelineSetting: document.getElementById('timelineSetting')
 }
@@ -205,7 +203,10 @@ function resetResults({clearSummary = true, clearPagination = true, clearResults
     clearPagination && pagination.forEach(item => item.classList.add('d-none'));
     const resultTable = document.getElementById('resultTableBody');
     resultsBuffer = resultTable.cloneNode(false)
-    if (clearResults) resultTable.textContent = '';
+    if (clearResults) {
+        resultTable.textContent = '';
+        DOM.resultHeader.textContent = '';
+    }
     predictions = {};
     seenTheDarkness = false;
     shownDaylightBanner = false;
@@ -454,15 +455,6 @@ const buildFileMenu = (e) => {
     class="material-symbols-outlined align-bottom pointer">edit_calendar</span> Amend File Start Time
     `;
     positionMenu(menu, e);
-    // Add the setCustomLocation handler
-    const setLocationLink = document.getElementById('setCustomLocation');
-    setLocationLink.addEventListener('click', () => {
-        setCustomLocation()
-    })
-    const setFileStartLink = document.getElementById('setFileStart');
-    setFileStartLink.addEventListener('click', () => {
-        showDatePicker()
-    })
 }
 
 function getDatetimeLocalFromEpoch(date) {
@@ -541,8 +533,7 @@ filename.addEventListener('click', openFileInList);
 filename.addEventListener('contextmenu', buildFileMenu);
 
 function extractFileNameAndFolder(path) {
-    const regex = /[\\/]?([^\\/]+)[\\/]?([^\\/]+)$/;
-    //const regex = /[\\/]([^\\/]+)[\\/]([^\\/]+)$/; // Regular expression to match the parent folder and file name
+    const regex = /[\\/]?([^\\/]+)[\\/]?([^\\/]+)$/; // Regular expression to match the parent folder and file name
     
     const match = path.match(regex);
     
@@ -728,8 +719,7 @@ const setDefaultLocation = () => {
     button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
 }
 
-DOM.applyLocationButton.addEventListener('click', setDefaultLocation);
-DOM.cancelLocationButton.addEventListener('click', cancelDefaultLocation);
+
 async function setCustomLocation() {
     const savedLocationSelect = await generateLocationList('savedLocations');
     const latEl = document.getElementById('customLat');
@@ -890,36 +880,7 @@ const getSelectionResults = (fromDB) => {
 }
 
 const analyseLink = document.getElementById('analyse');
-analyseLink.addEventListener('click', async () => {
-    postAnalyseMessage({ filesInScope: [currentFile] });
-    adjustSpecDims(true)
-});
-
-const reanalyseLink = document.getElementById('reanalyse');
-reanalyseLink.addEventListener('click', async () => {
-    postAnalyseMessage({
-        filesInScope: [currentFile],
-        reanalyse: true
-    });
-    adjustSpecDims(true)
-});
-
 const analyseAllLink = document.getElementById('analyseAll');
-analyseAllLink.addEventListener('click', async () => {
-    postAnalyseMessage({ filesInScope: fileList });
-    adjustSpecDims(true)
-});
-
-const reanalyseAllLink = document.getElementById('reanalyseAll');
-reanalyseAllLink.addEventListener('click', async () => {
-    postAnalyseMessage({ filesInScope: fileList, reanalyse: true });
-    adjustSpecDims(true)
-});
-
-
-const analyseSelectionLink = document.getElementById('analyseSelection');
-analyseSelectionLink.addEventListener('click', getSelectionResults);
-
 
 function postAnalyseMessage(args) {
     if (!PREDICTING) {
@@ -1037,16 +998,16 @@ function hideAll() {
     'spectrogramWrapper', 'resultTableContainer', 'recordsContainer', 'fullscreen', 'resultsHead']);
 }
 
-const save2dbLink = document.getElementById('save2db');
-save2dbLink.addEventListener('click', async () => {
-    worker.postMessage({ action: 'save2db', file: currentFile })
-    renderFilenamePanel();
-});
+// const save2dbLink = document.getElementById('save2db');
+// save2dbLink.addEventListener('click', async () => {
+//     worker.postMessage({ action: 'save2db', file: currentFile })
 
-const export2audio = document.getElementById('export2audio');
-export2audio.addEventListener('click', batchExportAudio);
+// });
 
-async function batchExportAudio(e) {
+// const export2audio = document.getElementById('export2audio');
+// export2audio.addEventListener('click', batchExportAudio);
+
+async function batchExportAudio() {
     const species = isSpeciesViewFiltered(true); 
     species ? exportData('audio', species, 1000) : generateToast("Filter results by species to export audio files");
 }
@@ -1110,10 +1071,10 @@ exploreLink.addEventListener('click', async () => {
     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
 });
 
-const datasetLink = document.getElementById('dataset');
-datasetLink.addEventListener('click', async () => {
-    worker.postMessage({ action: 'create-dataset', species: isSpeciesViewFiltered(true) });
-});
+// const datasetLink = document.getElementById('dataset');
+// datasetLink.addEventListener('click', async () => {
+//     worker.postMessage({ action: 'create-dataset', species: isSpeciesViewFiltered(true) });
+// });
 
 const checkWidth = (text) => {
     // Create a temporary element to measure the width of the text
@@ -1732,7 +1693,7 @@ const setUpWorkerMessaging = () => {
             case 'ready-for-tour':{
                 // New users - show the tour
                 if (!config.seenTour) {
-                    prepTour();
+                    setTimeout(prepTour, 1500);
                 }
                 break;
             }
@@ -2190,11 +2151,11 @@ function onChartData(args) {
     }
     
     const contextMenu = document.getElementById('context-menu')
-    contextMenu.addEventListener('click', function (e) {
-        if (e.target.closest('.play')){
-            (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
-        }
-    })
+    // contextMenu.addEventListener('click', function (e) {
+    //     if (e.target.closest('.play')){
+    //         (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
+    //     }
+    // })
     
     
     function handleKeyDownDeBounce(e) {
@@ -2403,7 +2364,7 @@ function onChartData(args) {
     //document.getElementById('timelineSetting').addEventListener('change', timelineToggle);
     
     /////////// Keyboard Shortcuts  ////////////
-    
+      
     const GLOBAL_ACTIONS = { // eslint-disable-line
         KeyA: async function (e) {
             if ( e.ctrlKey || e.metaKey) {
@@ -2700,8 +2661,6 @@ function onChartData(args) {
         }
     }
     
-    const go = document.getElementById('go')
-    go.addEventListener('click', gotoTime)
     const gotoForm = document.getElementById('gotoForm')
     gotoForm.addEventListener('submit', gotoTime)
     
@@ -3010,7 +2969,7 @@ function onChartData(args) {
     }
     
     const summary = document.getElementById('summary');
-    summary.addEventListener('click', speciesFilter);
+    // summary.addEventListener('click', speciesFilter);
     
     function speciesFilter(e) {
         if (['TBODY', 'TH', 'DIV'].includes(e.target.tagName)) return; // on Drag or clicked header
@@ -3065,9 +3024,19 @@ function onChartData(args) {
                 selectionTable.textContent = '';
             }
             else {
+                
+                DOM.resultHeader.innerHTML =`
+                <tr class="bg-dark">
+                    <th id="sort-time" class="time-sort col text-start timeOfDay pointer" title="Sort results by detection time"><span class="text-muted material-symbols-outlined time-sort-icon">sort</span> Time</th>
+                    <th id="sort-position" class="time-sort text-start timestamp pointer" title="Sort results by detection time"><span class="text-muted material-symbols-outlined time-sort-icon">sort</span> Position</th>
+                    <th id="confidence-sort" class="text-start pointer" title="Sort results by detection confidence"><span class="text-muted material-symbols-outlined species-sort-icon">sort</span> Species</th>
+                    <th class="text-end">Calls</th>
+                    <th class="col">Label</th>
+                    <th class="col text-end">Notes</th>
+                </tr>`;
+                setTimelinePreferences();
+                showSortIcon();
                 showElement(['resultTableContainer', 'resultsHead'], false);
-                const resultTable = document.getElementById('resultTableBody');
-                resultTable.textContent = '';
             }
         }  else if (!isFromDB && index % (config.limit + 1) === 0) {
             addPagination(index, 0)
@@ -3352,36 +3321,7 @@ function onChartData(args) {
         sendFile('save', result)
     }
     
-    document.getElementById('open').addEventListener('click', showOpenDialog);
-    document.getElementById('saveLabels').addEventListener('click', showSaveDialog);
-    document.getElementById('saveCSV').addEventListener('click', export2CSV);
-    document.getElementById('export-audio').addEventListener('click', exportAudio);
-    
-    
-    
-    
-    document.getElementById('exit').addEventListener('click', exitApplication);
-    
-    // Help menu handling
-    document.getElementById('keyboardHelp').addEventListener('click', async () => {
-        await populateHelpModal('Help/keyboard.html', 'Keyboard shortcuts');
-    });
-    document.getElementById('settingsHelp').addEventListener('click', async () => {
-        await populateHelpModal('Help/settings.html', 'Settings Help');
-    });
-    
-    document.getElementById('species').addEventListener('click', async () => {
-        worker.postMessage({action: 'get-valid-species', file: currentFile})
-    });
-    
-    document.getElementById('usage').addEventListener('click', async () => {
-        await populateHelpModal('Help/usage.html', 'Usage Guide');
-    });
-    
-    document.getElementById('bugs').addEventListener('click', async () => {
-        await populateHelpModal('Help/bugs.html', 'Issues, queries or bugs');
-    });
-    
+
     const populateHelpModal = async (file, label) => {
         document.getElementById('helpModalLabel').textContent = label;
         const response = await fetch(file);
@@ -3467,7 +3407,7 @@ function onChartData(args) {
         STATE.includedList = included;
     }
 
-    DOM.exportList.addEventListener('click', exportSpeciesList);
+
     // exporting a list
     function exportSpeciesList() {
         const included = STATE.includedList;
@@ -3483,15 +3423,6 @@ function onChartData(args) {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
-    
-    // // Prevent the settings menu disappearing on click or mouseout
-    // const settingsMenu = document.getElementById('settingsMenu')
-    // settingsMenu.addEventListener('click', (e) => {
-    //     e.stopImmediatePropagation();
-    // })
-    // settingsMenu.addEventListener('mouseout', (e) => {
-    //     e.stopImmediatePropagation()
-    // })
     
     function setNocmig(on) {
         if (on) {
@@ -3553,7 +3484,7 @@ function onChartData(args) {
         filterIconDisplay();
     }
     
-    DOM.audioFiltersIcon.addEventListener('click', toggleFilters);
+    // DOM.audioFiltersIcon.addEventListener('click', toggleFilters);
     
     const toggleContextAwareMode = () => {
         if (config.model !== 'birdnet') config.detect.contextAware = !config.detect.contextAware;
@@ -3573,7 +3504,7 @@ function onChartData(args) {
         });
         updatePrefs()
     }
-    DOM.contextAwareIcon.addEventListener('click', toggleContextAwareMode)
+    //DOM.contextAwareIcon.addEventListener('click', toggleContextAwareMode)
     
     DOM.debugMode.addEventListener('click', () =>{
         config.debug = !config.debug;
@@ -3581,8 +3512,8 @@ function onChartData(args) {
         updatePrefs()
     })
     
-    DOM.nocmigButton.addEventListener('click', changeNocmigMode);
-    const fullscreen = document.getElementById('fullscreen');
+    //DOM.nocmigButton.addEventListener('click', changeNocmigMode);
+    //const fullscreen = document.getElementById('fullscreen');
     
     const toggleFullscreen = () => {
         if (config.fullscreen) {
@@ -3593,10 +3524,10 @@ function onChartData(args) {
             fullscreen.textContent = 'fullscreen_exit';
         }
         updatePrefs();
-        adjustSpecDims(true, 1024);
+        adjustSpecDims(true, 512);
     }
     
-    fullscreen.addEventListener('click', toggleFullscreen);
+    //fullscreen.addEventListener('click', toggleFullscreen);
     
     
     const diagnosticMenu = document.getElementById('diagnostics');
@@ -3633,27 +3564,7 @@ function onChartData(args) {
         testModal.show();
     });
     
-    // Transport controls handling
-    document.getElementById('playToggle').addEventListener('mousedown', async () => {
-        await wavesurfer.playPause();
-    });
-    
-    document.getElementById('zoomIn').addEventListener('click', zoomSpec);
-    document.getElementById('zoomOut').addEventListener('click', zoomSpec); 
-    
-    // Listeners to sort results table
-    const confidenceSort = document.getElementById('confidence-sort');
-    confidenceSort.addEventListener('click', () => {
-        const sortBy = STATE.sortOrder === 'score DESC ' ? 'score ASC ' : 'score DESC ';
-        setSortOrder(sortBy)
-    });
-    
-    const timeSort = document.querySelectorAll('.time-sort');
-    timeSort.forEach(el => {
-        el.addEventListener('click', () => {
-            setSortOrder('timestamp')
-        });
-    })
+
     
     function showSortIcon() {
         const timeHeadings = document.getElementsByClassName('time-sort-icon');
@@ -3678,11 +3589,9 @@ function onChartData(args) {
     
     const setSortOrder = (order) => {
         STATE.sortOrder = order;
-        showSortIcon()
         worker.postMessage({ action: 'update-state', sortOrder: order })
         resetResults({clearSummary: false, clearPagination: false, clearResults: true});
         filterResults()
-        
     }
     // Drag file to app window to open
     document.addEventListener('dragover', (event) => {
@@ -4123,6 +4032,64 @@ DOM.gain.addEventListener('input', () => {
     
     document.addEventListener('click', function (e) {
         const target = e.target.closest('[id]')?.id;
+        switch (target)
+        {
+            case 'open': { showOpenDialog(); break }
+            case 'saveLabels': { showSaveDialog(); break }
+            case 'saveCSV': { export2CSV(); break }
+            case 'export-audio': { export2audio(); break }
+            case 'exit': { exitApplication(); break }
+
+            case 'save2db': { worker.postMessage({ action: 'save2db', file: currentFile }); break }
+            case 'export2audio': { batchExportAudio(); break }
+            case 'dataset': { worker.postMessage({ action: 'create-dataset', species: isSpeciesViewFiltered(true) }); break }
+
+            case 'analyse': {postAnalyseMessage({ filesInScope: [currentFile] }); break }
+            case 'analyseSelection': {getSelectionResults(); break }
+            case 'analyseAll': {postAnalyseMessage({ filesInScope: fileList }); break }
+            case 'reanalyse': {postAnalyseMessage({ filesInScope: [currentFile], reanlayse: true }); break }
+            case 'reanalyseAll': {postAnalyseMessage({ filesInScope: fileList, reanlayse: true }); break }
+
+            case 'keyboardHelp': { (async () => await populateHelpModal('Help/keyboard.html', 'Keyboard shortcuts'))(); break }
+            case 'settingsHelp': { (async () => await populateHelpModal('Help/settings.html', 'Settings Help'))(); break }
+            case 'usage': { (async () => await populateHelpModal('Help/usage.html', 'Usage Guide'))(); break }
+            case 'bugs': { (async () => await populateHelpModal('Help/bugs.html', 'Issues, queries or bugs'))(); break }
+            case 'species': { worker.postMessage({action: 'get-valid-species', file: currentFile}); break }
+            case 'export-list': { exportSpeciesList(); break }
+
+            case 'confidence-sort': {
+                const sortBy = STATE.sortOrder === 'score DESC ' ? 'score ASC ' : 'score DESC ';
+                setSortOrder(sortBy);
+                break;
+            }
+            case 'speciesFilter': { speciesFilter(e); break}
+            case 'context-menu': { e.target.closest('.play') && typeof region !== 'undefined' ? region.play() : console.log('Region undefined') }
+
+            case 'audioFiltersIcon': { toggleFilters(); break }
+            case 'context-mode': { toggleContextAwareMode(); break }
+            case 'nocmigMode': { changeNocmigMode(); break }
+            case 'fullscreen': { toggleFullscreen(); break}
+
+            case 'apply-location': {setDefaultLocation(); break }
+            case 'cancel-location': {cancelDefaultLocation(); break }
+
+            case 'sort-position':
+            case 'sort-time': {
+                setSortOrder('timestamp')
+                break;
+            }
+            case 'zoomIn':
+            case 'zoomOut': {
+                zoomSpec(e)
+                break;
+            }
+            case 'playToggle': {
+                (async () => await wavesurfer.playPause())()
+                break;
+            }
+            case 'setCustomLocation': { setCustomLocation(); break }
+            case 'setFileStart': { showDatePicker(); break }
+        }
         contextMenu.classList.add("d-none");
         hideConfidenceSlider();
         config.debug && console.log('clicked', target);
@@ -4344,7 +4311,8 @@ DOM.gain.addEventListener('input', () => {
                 };
             }
             updatePrefs();
-            track('Settings Change', target, element.value);
+            const value = element.hasAttribute("checked") ? element.checked : element.value;
+            track('Settings Change', target, value);
         }
     })
     
@@ -4700,7 +4668,7 @@ function track(event, action, name, value){
     // Event handler for starting the tour
     const prepTour = async () => {
         if (!fileLoaded) {
-            const example_file = await window.electron.getAudio();
+            const example_file = 'Help/example.mp3';
             // create a canvas for the audio spec
             showElement(['spectrogramWrapper'], false);
             await loadAudioFile({ filePath: example_file });

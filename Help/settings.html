@@ -27,42 +27,46 @@
         <th>Confidence Threshold</th>
         <td>This setting determines the minimum confidence level required for the model to report a detection.
             Increasing the value reduces false positives but increases the risk of missing genuine calls.
-            A value around 50% provides a good balance between detecting genuine calls and minimizing false positives.
+            <b>N.B.</b> Confidence can be adjusted at any time. The results are updated even after analysis.
         </td>
     </tr>
     <tr>
         <th>List</th>
         <td><p><b>Local Birds</b>. Exclude birds unlikely to be found in your location.</p>
             <p style="padding-left: 2em">With this option selected, an additional panel appears. The <b>Threshold</b> value represents the eBird checklist frequency. 
-                    So, a value of 0.03 means birds that are predicted to occur in less than 3% of eBird checlists in the area are excluded. 
-                    If you also check "Use Week", it excludes birds not expected at the time of year the recording was made - which is read from the files' timestamp.
+                    So, a value of 0.03 means birds that are predicted to occur in less than 3% of eBird checklists in the area are excluded. 
+                    If you also check "Use Week", it excludes birds not expected at the time of year the recording was made - which is read from the file's timestamp.
                     <br /> <b>N.B.</b> Currently, a limitation to the week specific filters is that the summary of detections will use the 
                     list from the latest file in a batch of files. 
                     For example, if you analyse files from April 22, October 23 and February 24 in a batch, the list for February 24 will be used for the summary.
                 </p>
-            <p><b>Nocturnal Birds</b>. This will exclude detections of bird song and the calls of species which do not typically vocalise during the night.</p>
+            <p><b>Nocturnal Birds</b>. This will exclude detections of bird song and the calls of species which do not typically vocalise during the night. 
+                When you enable "<b>Use Location settings</b>" for the BirdNET model, the list will comprise the birds on the <b>Local Birds</b> list, excluding those 
+                which do not call at night.</p>
             <p><b>Birds</b>. Include detections for all birds, excluding non-avian classes.
             </p>
             <p><b>Everything</b>. In addition to all bird species, show non-bird detections including segments that were considered noise.</p>
-            <p><b>Custom</b>. Provide a list for the model to use. You may use a different custom list for both BirdNET and Chirpity models. The format for a 
-                custom list file is, as for BirdNET Analyzer's custom lists, "scientific name_common name", with each species on a new line. You can export a starting
-                list in the correct format from the Help menu, using the "<i>What species are detected?</i>" link. 
-            </p><p>Custom lists allow you to:</p>
+            <p><b>Custom</b>. Provide a list for the model to use. Custom lists allow you to:</p>
                 <ol>
                     <li>Precisely define the detections you would like Chirpity to report on</li>
                     <li>Search only for a specific species</li>
                 </ol>
-                
-            
-            
-            <p><i>If you wish to see the full list of species used for predictions each model was trained on, check the Help menu &gt; <b>What species are detected?</b></i>.</p>
+                You may use a different custom list for both BirdNET and Chirpity models. The format for a 
+                custom list file is "scientific name_common name", with each species on a new line. You can export a starting
+                list in the correct format from the Help menu, using the "<i>What species are detected?</i>" link. 
+            </p>
+            <p><i>If you wish to see the full list of classes each model was trained on, check the Help menu &gt; <b>What species are detected?</b></i>.</p>
         </td>
     </tr>
     <tr>
         <th>Only analyse night time periods</th>
         <td>
-            Only search for detections at night. Chirpity calculates the end and start of civil twilight for the dates
-            of the files and the location that is set.
+            Only search for detections at night. Chirpity calculates the end and start of civil twilight from the timestamps of your audio files using the location you have set. If your recording
+            spans both daylight and nighttime periods, the day periods will be skipped. If you are only interested in nocturnal calls this has two benefits: 
+            <ol>
+                <li>There will be fewer false positves, since both models make more mistakes when many species vocalise at once (e.g. during the dawn chorus)</li>
+                <li>The analysis will complete faster, since it ignores any daytime period</li>
+            </ol>
         </td>
     </tr>
     <tr>
@@ -74,7 +78,8 @@
                     class="rounded figure-img float-end img-fluid">
                 <figcaption class="figure-caption text-muted text-end">File name context menu.</figcaption>
             </figure>
-            Set the default location to use for calculating the start and end of civil twilight. This setting can be overriden for individual files by assigning a custom location in the filename context menu.
+            Set the default location to use for calculating the start and end of civil twilight and also generating your <b>Local Birds</b> list. This setting can be overriden for individual
+            files by assigning a custom location in the filename context menu.
         </td>
     </tr>
     <tr>
@@ -127,7 +132,7 @@
     </tr>
     <tr>
         <td><b>Volume Adjustment</b></td>
-        <td>If your recordings are very quiet, you can increase the loudness of the audio by adding gain. The volume of audio can be increased by up to 50 decibels.</td>
+        <td>If your recordings are very quiet, you can increase the loudness of the audio by increasing the gain. The volume of audio can be increased by up to 50 decibels.</td>
     </tr>
     <tr>
         <td><b>Normalise audio</b></td>
@@ -138,13 +143,13 @@
     </tr>
     <tr>
         <th>High Pass filter</th>
-        <td> This applies a filter to the audio, removing the sound below the frequency selected. 
-            Intended primarily for recordings made in in urban settings, this will reduce the level of low-frequency hum.
+        <td> This filter removes the sound below the frequency selected. 
+            Intended primarily for recordings made in in urban settings, this suppresses low-frequency hum.
         </td>
     </tr>
     <tr>
         <th>Low Shelf filter</th>
-        <td> This applies an audio filter similar to the High Pass filter, however, rather than simply remove noise, it reduces the volume of low frequency noise. 
+        <td> This filter is similar to the High Pass filter. However, rather than simply remove noise, it reduces the volume of low frequency noise. 
             The advantage of a low shelf filter is that you can reduce the hum, whilst still being able to hear species which have low frequency calls.
             You can set the threshold frequency, and the strength of the filter to apply (Attenuation).
         </td>
@@ -235,7 +240,6 @@
         <td>
             Chirpity sends usage information anonymously to an analytics server. This information is used to help understand how people use Chirpity, and try to identify any bugs
             or errors. Both help improve the software and prioritise changes for future releases. If you would prefer that Chirpity did not send any usage data, you can disable it here. 
-            
         </td>
     </tr>
 </table>

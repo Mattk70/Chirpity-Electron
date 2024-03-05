@@ -1448,7 +1448,7 @@ const prepSummaryStatement = (included) => {
             const speciesMatch = (path, sname) => {
                 const pathElements = path.split(p.sep);
                 const species = pathElements[pathElements.length - 2];
-                sname = sname.replaceAll(' ', '_');
+                sname = sname.replace(/ /g, '_');
                 return species.includes(sname)
             }
             

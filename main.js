@@ -342,7 +342,7 @@ app.whenReady().then(async () => {
     }
     catch (error) {
         // Handle errors, for example, file not found
-        console.error('Error reading file:', error.message);
+        console.warn('Error reading file:', error.message);
     }
     await createWorker();
     await createWindow();
