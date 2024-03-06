@@ -57,7 +57,7 @@ self.addEventListener('unhandledrejection', function(event) {
     track('Unhandled Worker Promise Rejections', errorMessage, stackTrace);
 });
 
-self.addEventListener('handledrejection', function(event) {
+self.addEventListener('rejectionhandled', function(event) {
     // Extract the error message and stack trace from the event
     const errorMessage = event.reason.message;
     const stackTrace = event.reason.stack;

@@ -42,7 +42,7 @@ window.addEventListener('unhandledrejection', function(event) {
     track('Unhandled UI Promise Rejection', errorMessage, stackTrace);
 });
 
-window.addEventListener('handledrejection', function(event) {
+window.addEventListener('rejectionhandled', function(event) {
     // Extract the error message and stack trace from the event
     const errorMessage = event.reason.message;
     const stackTrace = event.reason.stack;
