@@ -319,7 +319,8 @@ case "insert-manual-record": { await onInsertManualRecord(args);
     break;
 }
 case "load-model": {
-    predictWorkers.length && terminateWorkers();
+    if (filesBeingProcessed.length) onAbort(args);
+    else predictWorkers.length && terminateWorkers();
     await onLaunch(args);
     break;
 }
@@ -350,10 +351,8 @@ case "update-list": {
     STATE.customList = args.list === 'custom' ? args.customList : STATE.customList;
     const {lat, lon, week} = STATE;
     // Clear the LIST_CACHE & STATE.included kesy to force list regeneration
-    if (args.customList) {
-        delete LIST_CACHE[`${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`];
-        delete STATE.included?.[STATE.model]?.[STATE.list];
-    } 
+    LIST_CACHE = {}; //[`${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`];
+    delete STATE.included?.[STATE.model]?.[STATE.list];
     await setIncludedIDs(lat, lon, week )
     args.refreshResults && await Promise.all([getResults(), getSummary()]);
     break;
@@ -3096,7 +3095,7 @@ const prepSummaryStatement = (included) => {
                     const location = lat.toString() + lon.toString();
                     if (STATE.included?.[STATE.model]?.[STATE.list]?.[week]?.[location] === undefined ) {
                         // Cache miss
-                        await setIncludedIDs(lat,lon,week)
+                        const list = await setIncludedIDs(lat,lon,week)
                         hitOrMiss = 'miss';
                     } 
                     DEBUG && console.log(`Cache ${hitOrMiss}: setting the ${STATE.list} list took ${Date.now() -t0}ms`)
@@ -3128,9 +3127,9 @@ async function setIncludedIDs(lat, lon, week) {
     const key = `${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`;
     if (LIST_CACHE[key]) {
         // If a promise is in the cache, return it
-        return LIST_CACHE[key];
+        return await LIST_CACHE[key];
     }
-
+    console.log('calling for a new list')
     // Store the promise in the cache immediately
     LIST_CACHE[key] = (async () => {
         const { result, messages } = await LIST_WORKER({
@@ -3173,7 +3172,7 @@ async function setIncludedIDs(lat, lon, week) {
     })();
 
     // Await the promise
-    return LIST_CACHE[key];
+    return await LIST_CACHE[key];
 }
 
 /// Track errors

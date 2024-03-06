@@ -1560,7 +1560,7 @@ window.onload = async () => {
         DOM.defaultLat.value = config.latitude;
         DOM.defaultLon.value = config.longitude;
         place.innerHTML = '<span class="material-symbols-outlined">fmd_good</span>' + config.location;
-        
+        setListUIState(config.list);
         worker.postMessage({
             action: 'update-state',
             path: appPath,
@@ -2281,6 +2281,7 @@ function onChartData(args) {
     })
     
     const loadModel = ()  => {
+        if (PREDICTING)
         t0_warmup = Date.now();
         worker.postMessage({
             action: 'load-model',
@@ -2316,7 +2317,8 @@ function onChartData(args) {
                     contextAwareIconDisplay();
                 }
             }
-            
+            PREDICTING = false;
+            STATE.analysisDone = true;
         }
         // Update threads and batch Size in UI
         DOM.threadSlider.value = config[config.backend].threads;
@@ -4221,7 +4223,7 @@ DOM.gain.addEventListener('input', () => {
                     config.backend = 'tensorflow';
                     document.getElementById('tensorflow').checked = true;
                     handleBackendChange(config.backend);
-                    STATE.analysisDone = false;
+                    setListUIState(config.list)
                     break;
                 }
                 case 'thread-slider': {
