@@ -1,3 +1,6 @@
+const ID_SITE = 2;
+
+
 const { ipcRenderer } = require('electron');
 const fs = require('node:fs');
 const wavefileReader = require('wavefile-reader');
@@ -26,7 +29,7 @@ console.warn = function(message) {
     originalWarn.apply(console, arguments);
     
     // Track the warning message using your tracking function
-    track('Warnings', message);
+    track('Warnings', arguments[0], arguments[1]);
 };
 
 // Override console.error to intercept and track errors
@@ -35,15 +38,33 @@ console.error = function(message) {
     originalError.apply(console, arguments);
     
     // Track the error message using your tracking function
-    track('Errors', message);
+    track('Handled Errors', arguments[0], arguments[1]);
 };
 // Implement error handling in the worker
 self.onerror = function (message) {
     //split the message back to message & stack
     const [msg, stack] = message.split('|')
     // Send an error message
-    track('Unhandled%20Worker%20Error', msg, stack);
+    track('Unhandled Worker Errors', msg, stack);
 };
+
+self.addEventListener('unhandledrejection', function(event) {
+    // Extract the error message and stack trace from the event
+    const errorMessage = event.reason.message;
+    const stackTrace = event.reason.stack;
+    
+    // Track the unhandled promise rejection
+    track('Unhandled Worker Promise Rejections', errorMessage, stackTrace);
+});
+
+self.addEventListener('handledrejection', function(event) {
+    // Extract the error message and stack trace from the event
+    const errorMessage = event.reason.message;
+    const stackTrace = event.reason.stack;
+    
+    // Track the unhandled promise rejection
+    track('Handled Worker Promise Rejections', errorMessage, stackTrace);
+});
 
 //Object will hold files in the diskDB, and the active timestamp from the most recent selection analysis.
 const STATE = new State();
@@ -3182,7 +3203,7 @@ function track(event, action, name, value){
     value = value ? `&e_v=${value}` : '';
     const state = STATE ? STATE.UUID : 0
     const errURL = `https://analytics.mattkirkland.co.uk/matomo.php?h=${t.getHours()}&m=${t.getMinutes()}&s=${t.getSeconds()}
-    &action_name=${event}&idsite=2&rand=${Date.now()}&rec=1&uid=${state}&apiv=1
+    &action_name=${event}&idsite=${ID_SITE}&rand=${Date.now()}&rec=1&uid=${state}&apiv=1
     &e_c=${event}&e_a=${action}${name}${value}`;
     console.log(errURL);
     fetch(errURL)

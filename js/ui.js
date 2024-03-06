@@ -1,3 +1,6 @@
+const ID_SITE = 2;
+
+
 let seenTheDarkness = false, shownDaylightBanner = false, LOCATIONS, locationID = undefined;
 const startTime = performance.now();
 let LABELS = [], DELETE_HISTORY = [];
@@ -11,7 +14,7 @@ console.warn = function(message) {
     originalWarn.apply(console, arguments);
     
     // Track the warning message using your tracking function
-    track('Warnings', message);
+    track('Warnings', arguments[0], arguments[1]);
 };
 
 // Override console.error to intercept and track errors
@@ -20,15 +23,33 @@ console.error = function(message) {
     originalError.apply(console, arguments);
     
     // Track the error message using your tracking function
-    track('Errors', message);
+    track('Errors', arguments[0], arguments[1]);
 };
 // Implement error handling in the worker
-self.onerror = function (message) {
+window.onerror = function (message) {
     //split the message back to message & stack
     const [msg, stack] = message.split('|')
     // Send an error message
-    track('Unhandled%20Worker%20Error', msg, stack);
+    track('Unhandled UI Error', msg, stack);
 };
+
+window.addEventListener('unhandledrejection', function(event) {
+    // Extract the error message and stack trace from the event
+    const errorMessage = event.reason.message;
+    const stackTrace = event.reason.stack;
+    
+    // Track the unhandled promise rejection
+    track('Unhandled UI Promise Rejection', errorMessage, stackTrace);
+});
+
+window.addEventListener('handledrejection', function(event) {
+    // Extract the error message and stack trace from the event
+    const errorMessage = event.reason.message;
+    const stackTrace = event.reason.stack;
+    
+    // Track the unhandled promise rejection
+    track('Handled UI Promise Rejection', errorMessage, stackTrace);
+});
 
 const STATE = {
     mode: 'analyse',
@@ -922,7 +943,7 @@ function fetchLocationAddress(lat, lon) {
         fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`)
         .then(response => {
             if (!response.ok) {
-                console.warn('Network error: ' + JSON.stringify(response));
+                console.warn('Network error: ', response.status, response.url );
                 
             }
             return response.json()
@@ -1594,7 +1615,7 @@ window.onload = async () => {
         doNotTrack.checked = !config.track;
         if (config.track) {
             const {width, height} = window.screen;
-            fetch(`https://analytics.mattkirkland.co.uk/matomo.php?idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
+            fetch(`https://analytics.mattkirkland.co.uk/matomo.php?idsite=${ID_SITE}&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
                     &res=${width}x${height}
                     &dimension1=${config.model}
                     &dimension2=${config.list}
@@ -4313,7 +4334,7 @@ DOM.gain.addEventListener('input', () => {
                 };
             }
             updatePrefs();
-            const value = element.hasAttribute("checked") ? element.checked : element.value;
+            const value = element.type === "checkbox" ? element.checked : element.value;
             track('Settings Change', target, value);
         }
     })
@@ -4367,7 +4388,7 @@ function track(event, action, name, value){
     name = name ? `&e_n=${name}` : '';
     value = value ? `&e_v=${value}` : '';
         fetch(`https://analytics.mattkirkland.co.uk/matomo.php?h=${t.getHours()}&m=${t.getMinutes()}&s=${t.getSeconds()}
-        &action_name=Settings%20Change&idsite=2&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
+        &action_name=Settings%20Change&idsite=${ID_SITE}&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
         &e_c=${event}&e_a=${action}${name}${value}`)
         .then(response => {
             if (! response.ok) throw new Error('Network response was not ok', response);
