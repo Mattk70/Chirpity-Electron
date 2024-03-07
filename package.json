@@ -1,6 +1,6 @@
 {
   "name": "chirpity",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
@@ -13,6 +13,7 @@
     "type": "git",
     "url": "git+https://github.com/mattk70/Chirpity-Electron.git"
   },
+  "beforeBuild": "prebuild.js",
   "build": {
     "appId": "com.electron.chirpity",
     "publish": [
@@ -29,6 +30,7 @@
       "!.vscode${/*}",
       "!.idea{*/}",
       "!kernels.txt",
+      "!prebuild.js",
       "!minify.js",
       "!playwright.*",
       "!dist${/*}",
@@ -36,11 +38,9 @@
       "!*fixed_roll*${/*}",
       "!Help/example.mp3",
       "!venv${/*}",
-      "!test${/*}",
       "!custom_tfjs${/*}",
       "!*git*${/*}",
       "!package-lock.json",
-      "!poetry.lock*",
       "!pyproject.toml",
       "!README.md",
       "!saved_model$(/*)",

@@ -1215,9 +1215,10 @@ function adjustSpecDims(redraw, fftSamples) {
             specElement.style.zIndex = 0;
             document.querySelector('.spec-labels').style.width = '55px';
         }
-        if (wavesurfer && redraw) {}
-        specOffset = DOM.spectrogramWrapper.offsetHeight;
-    } else {
+        if (wavesurfer && redraw) {
+            specOffset = DOM.spectrogramWrapper.offsetHeight;
+        }
+            } else {
         specOffset = 0
     }
     DOM.resultTableElement.style.height = (contentHeight - specOffset - formOffset) + 'px';
@@ -1482,6 +1483,7 @@ window.onload = async () => {
         if (config.model === 'birdnet') config.backend = 'tensorflow';
         // Rename migrants list from old versions to new name: nocturnal
         if (config.list === 'migrants') config.list = 'nocturnal';
+        
         // switch off fullscreen mode - we don't want to persist that setting
         config.fullscreen = false;
         // switch off debug mode we don't want this to be remembered
@@ -4060,7 +4062,7 @@ DOM.gain.addEventListener('input', () => {
             case 'open': { showOpenDialog(); break }
             case 'saveLabels': { showSaveDialog(); break }
             case 'saveCSV': { export2CSV(); break }
-            case 'export-audio': { export2audio(); break }
+            case 'export-audio': { exportAudio(); break }
             case 'exit': { exitApplication(); break }
 
             case 'save2db': { worker.postMessage({ action: 'save2db', file: currentFile }); break }
@@ -4468,10 +4470,12 @@ function track(event, action, name, value){
         }
         const xc = document.getElementById('context-xc');
         if (region?.attributes.label || hideInSummary) {
+            // the following line errors out when there's no active row: "undefined is not iterable"
+            // will need to think how to get sname in that situation (and how you can have a lebel without an active row!)
             let [,,,sname,cname] = activeRow?.getAttribute('name').split('|');
             const XC_type = cname.includes('(song)') ? "song" :
-            cname.includes('call)') ? "nocturnal flight call" : "";
-            xc.href = `https://xeno-canto.org/explore?query=${sname}%20type:"${XC_type}`;
+            cname.includes('call)') ? "call" : "";
+            xc.href = `https://xeno-canto.org/explore?query=${sname}%20type:"${XC_type}"`;
             // only offer XC lookup if we have an sname
             sname && xc.classList.remove('d-none');
         }

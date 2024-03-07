@@ -761,10 +761,14 @@ const prepSummaryStatement = (included) => {
                     // BECAUSE we want to change state.db to disk if they are
                     let allCached = true;
                     for (let i = 0; i < FILE_QUEUE.length; i++) {
-                        if (!await getSavedFileInfo(FILE_QUEUE[i])) {
+                        const file = FILE_QUEUE[i];
+                        const row = await getSavedFileInfo(file)
+                        if (row) {
+                            await setMetadata({file: file})
+                        } else {
                             allCached = false;
                             break;
-                        }
+                        } 
                     }
                     const retrieveFromDatabase = ((allCached && !reanalyse && !STATE.selection) || circleClicked);
                     if (retrieveFromDatabase) {
@@ -906,7 +910,7 @@ const prepSummaryStatement = (included) => {
                 goToRegion = true
             }) {
                 
-                const found = await getWorkingFile(file);
+                const found = metadata[file]?.proxy || await getWorkingFile(file);
                 if (found) {
                     await fetchAudioBuffer({ file, start, end })
                     .then((buffer) => {
@@ -2548,7 +2552,7 @@ const prepSummaryStatement = (included) => {
             if (!row) {
                 const baseName = file.replace(/^(.*)\..*$/g, '$1%');
                 row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)',baseName);
-            }
+            } 
             return row
         };
         
