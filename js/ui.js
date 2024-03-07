@@ -4469,10 +4469,8 @@ function track(event, action, name, value){
             })
         }
         const xc = document.getElementById('context-xc');
-        if (region?.attributes.label || hideInSummary) {
-            // the following line errors out when there's no active row: "undefined is not iterable"
-            // will need to think how to get sname in that situation (and how you can have a lebel without an active row!)
-            let [,,,sname,cname] = activeRow?.getAttribute('name').split('|');
+        if (activeRow && (region?.attributes.label || hideInSummary)) {
+            let [,,,sname,cname] = activeRow.getAttribute('name').split('|');
             const XC_type = cname.includes('(song)') ? "song" :
             cname.includes('call)') ? "call" : "";
             xc.href = `https://xeno-canto.org/explore?query=${sname}%20type:"${XC_type}"`;
