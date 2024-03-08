@@ -1475,16 +1475,12 @@ window.onload = async () => {
         //fill in defaults - after updates add new items
         fillDefaults(config, defaultConfig);
 
-        // Update model if old models in config
-        if (!['chirpity', 'v3', 'v4', 'birdnet'].includes(config.model)) {
-            config.model = config.model === 'v2.4' ? 'birdnet' : 'chirpity';
-            updatePrefs()
-        }
-        // force backend to 'tensorflow' for Birdnet
-        if (config.model === 'birdnet') config.backend = 'tensorflow';
-        // Rename migrants list from old versions to new name: nocturnal
-        if (config.list === 'migrants') config.list = 'nocturnal';
-        
+            // force backend to 'tensorflow' for Birdnet
+            if (config.model === 'birdnet') config.backend = 'tensorflow';
+            // Rename migrants list from old versions to new name: nocturnal
+            if (config.list === 'migrants') config.list = 'nocturnal';
+            if (config.tensorflow.batchSize < 16) config.tensorflow.batchSize = 16;
+
         // switch off fullscreen mode - we don't want to persist that setting
         config.fullscreen = false;
         // switch off debug mode we don't want this to be remembered
