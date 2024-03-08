@@ -453,9 +453,15 @@ function zoomSpec(direction) {
     }
 }
 
-async function showOpenDialog() {
-    const files = await window.electron.openDialog('showOpenDialog', {type: 'audio'});
-    if (!files.canceled) await onOpenFiles({ filePaths: files.filePaths });
+async function showOpenDialog(fileOrFolder) {
+    const files = await window.electron.openDialog('showOpenDialog', {type: 'audio', fileOrFolder: fileOrFolder});
+    if (!files.canceled) {
+        if (fileOrFolder === 'openFiles'){
+            await onOpenFiles({ filePaths: files.filePaths });
+        } else {
+            filterValidFiles({ filePaths: files.filePaths })
+        }
+    }
 }
 
 // function powerSave(on) {
@@ -2427,7 +2433,7 @@ function onChartData(args) {
             if ( e.ctrlKey || e.metaKey) showGoToPosition();
         },
         KeyO: async function (e) {
-            if ( e.ctrlKey || e.metaKey) await showOpenDialog();
+            if ( e.ctrlKey || e.metaKey) await showOpenDialog('openFile');
         },
         KeyP: function () {
             (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
@@ -4057,7 +4063,8 @@ DOM.gain.addEventListener('input', () => {
         const target = e.target.closest('[id]')?.id;
         switch (target)
         {
-            case 'open': { showOpenDialog(); break }
+            case 'open-file': { showOpenDialog('openFile'); break }
+            case 'open-folder': { showOpenDialog('openDirectory'); break }
             case 'saveLabels': { showSaveDialog(); break }
             case 'saveCSV': { export2CSV(); break }
             case 'export-audio': { exportAudio(); break }
