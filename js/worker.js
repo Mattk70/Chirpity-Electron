@@ -1131,9 +1131,10 @@ const prepSummaryStatement = (included) => {
                     try {
                         wav.fromBuffer(chunk);
                     } catch (e) {
-                        e.message === 'Could not find the "fmt " chunk' && 
-                            UI.postMessage({event: 'generate-alert', message: `Cannot parse ${file}, it has an invalid header.`});
-                            return
+                        UI.postMessage({event: 'generate-alert', message: `Cannot parse ${file}, it has an invalid wav header.`});
+                        headerStream.close();
+                        updateFilesBeingProcessed(file);
+                        return;
                     }
                     let headerEnd;
                     wav.signature.subChunks.forEach(el => {
