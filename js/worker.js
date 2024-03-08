@@ -29,7 +29,7 @@ console.warn = function(message) {
     originalWarn.apply(console, arguments);
     
     // Track the warning message using your tracking function
-    track('Warnings', arguments[0], arguments[1]);
+    track('Warnings', arguments[0], encodeURIComponent(arguments[1]));
 };
 
 // Override console.error to intercept and track errors
@@ -38,15 +38,14 @@ console.error = function(message) {
     originalError.apply(console, arguments);
     
     // Track the error message using your tracking function
-    track('Handled Errors', arguments[0], arguments[1]);
+    track('Handled Errors', arguments[0], encodeURIComponent(arguments[1]));
 };
 // Implement error handling in the worker
-self.onerror = function (message) {
-    //split the message back to message & stack
-    const [msg, stack] = message.split('|')
-    // Send an error message
-    track('Unhandled Worker Errors', msg, stack);
-};
+self.onerror = function(message, file, lineno, colno, error) {
+    track('Unhandled Worker Error', error.message, encodeURIComponent(error.stack));
+    // Return false not to inhibit the default error handling
+    return false;
+    };
 
 self.addEventListener('unhandledrejection', function(event) {
     // Extract the error message and stack trace from the event
@@ -54,7 +53,7 @@ self.addEventListener('unhandledrejection', function(event) {
     const stackTrace = event.reason.stack;
     
     // Track the unhandled promise rejection
-    track('Unhandled Worker Promise Rejections', errorMessage, stackTrace);
+    track('Unhandled Worker Promise Rejections', errorMessage, encodeURIComponent(stackTrace));
 });
 
 self.addEventListener('rejectionhandled', function(event) {
@@ -63,7 +62,7 @@ self.addEventListener('rejectionhandled', function(event) {
     const stackTrace = event.reason.stack;
     
     // Track the unhandled promise rejection
-    track('Handled Worker Promise Rejections', errorMessage, stackTrace);
+    track('Handled Worker Promise Rejections', errorMessage, encodeURIComponent(stackTrace));
 });
 
 //Object will hold files in the diskDB, and the active timestamp from the most recent selection analysis.

@@ -8,13 +8,22 @@ let LABELS = [], DELETE_HISTORY = [];
 const originalWarn = console.warn;
 const originalError = console.error;
 
+function customURLEncode(str) {
+    return encodeURIComponent(str)
+      .replace(/[!'()*]/g, (c) => {
+        // Replacing additional characters manually
+        return '%' + c.charCodeAt(0).toString(16).toUpperCase();
+      })
+      .replace(/%20/g, '+'); // Optionally replace space with '+' instead of '%20'
+  }
+
 // Override console.warn to intercept and track warnings
 console.warn = function(message) {
     // Call the original console.warn to maintain default behavior
     originalWarn.apply(console, arguments);
     
     // Track the warning message using your tracking function
-    track('Warnings', arguments[0], arguments[1]);
+    track('Warnings', arguments[0], encodeURIComponent(arguments[1]));
 };
 
 // Override console.error to intercept and track errors
@@ -23,15 +32,9 @@ console.error = function(message) {
     originalError.apply(console, arguments);
     
     // Track the error message using your tracking function
-    track('Errors', arguments[0], arguments[1]);
+    track('Errors', arguments[0], encodeURIComponent(arguments[1]));
 };
-// Implement error handling in the worker
-window.onerror = function (message) {
-    //split the message back to message & stack
-    const [msg, stack] = message.split('|')
-    // Send an error message
-    track('Unhandled UI Error', msg, stack);
-};
+
 
 window.addEventListener('unhandledrejection', function(event) {
     // Extract the error message and stack trace from the event
@@ -39,7 +42,7 @@ window.addEventListener('unhandledrejection', function(event) {
     const stackTrace = event.reason.stack;
     
     // Track the unhandled promise rejection
-    track('Unhandled UI Promise Rejection', errorMessage, stackTrace);
+    track('Unhandled UI Promise Rejection', errorMessage, encodeURIComponent(stackTrace));
 });
 
 window.addEventListener('rejectionhandled', function(event) {
@@ -48,7 +51,7 @@ window.addEventListener('rejectionhandled', function(event) {
     const stackTrace = event.reason.stack;
     
     // Track the unhandled promise rejection
-    track('Handled UI Promise Rejection', errorMessage, stackTrace);
+    track('Handled UI Promise Rejection', errorMessage, encodeURIComponent(stackTrace));
 });
 
 const STATE = {
@@ -1465,10 +1468,8 @@ window.onload = async () => {
         
         // Attach an error event listener to the window object
         window.onerror = function(message, file, lineno, colno, error) {
-            const source = `${file}:${lineno}:${colno}`;
-
-            track('Error', message, source);
-            // Return false not to inhibit the default browser error handling
+            track('Error', error.message, encodeURIComponent(error.stack));
+            // Return false not to inhibit the default error handling
             return false;
             };
         //fill in defaults - after updates add new items
@@ -1635,7 +1636,6 @@ window.onload = async () => {
                 .catch(error => console.log('Error posting tracking:', error))
         }
     })
-    adjustSpecDims(true)
 }
 
 
