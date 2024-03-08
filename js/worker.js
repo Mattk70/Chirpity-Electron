@@ -1783,14 +1783,7 @@ const prepSummaryStatement = (included) => {
                         fs.writeFile(p.join(folder, filename), buffer, () => { if (DEBUG) console.log('Audio file saved') });
                     }
                     else {
-                        const anchor = document.createElement('a');
-                        document.body.appendChild(anchor);
-                        anchor.style = 'display: none';
-                        const url = window.URL.createObjectURL(thisBlob);
-                        anchor.href = url;
-                        anchor.download = filename;
-                        anchor.click();
-                        window.URL.revokeObjectURL(url);
+                        UI.postMessage({event:'audio-file-to-save', file: thisBlob, filename: filename})
                     }
                 }
                 

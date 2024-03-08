@@ -1651,6 +1651,9 @@ const setUpWorkerMessaging = () => {
                 case "analysis-complete": {onAnalysisComplete();
                     break;
                 }
+                case "audio-file-to-save": {onSaveAudio(args);
+                    break;
+                }
                 case "chart-data": {onChartData(args);
                     break;
                 }
@@ -1865,6 +1868,18 @@ document.addEventListener('change', function (e) {
         });
     }
 })
+
+// Save audio clip
+function onSaveAudio({file: file, filename: filename}){
+    const anchor = document.createElement('a');
+    document.body.appendChild(anchor);
+    anchor.style = 'display: none';
+    const url = window.URL.createObjectURL(file);
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+}
 
 
 // Chart functions
