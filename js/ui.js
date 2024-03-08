@@ -2893,12 +2893,14 @@ function onChartData(args) {
         for (var i = 0; i < table.rows.length; i++) {
             const row = table.rows[i];
             // Get the value of the name attribute and split it on '|'
-            // State time is the second value in the name string
-            const startTime = row.getAttribute('name').split('|')[1];
+            // Start time is the second value in the name string
+            const nameAttr = row.getAttribute('name')
+            // no nameAttr for start civil twilight row
+            const startTime = nameAttr ? nameAttr.split('|')[1] : 0;
             
             // Check if the second value matches the 'select' variable
             if (parseFloat(startTime) === start) {
-                return i;
+                return i; 
             }
         }
     }
