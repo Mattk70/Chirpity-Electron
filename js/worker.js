@@ -1128,7 +1128,13 @@ const prepSummaryStatement = (included) => {
                 const headerStream = fs.createReadStream(file, {start: 0, end: 4096});
                 headerStream.on('data', function (chunk) {
                     let wav = new wavefileReader.WaveFileReader();
-                    wav.fromBuffer(chunk);
+                    try {
+                        wav.fromBuffer(chunk);
+                    } catch (e) {
+                        e.message === 'Could not find the "fmt " chunk' && 
+                            UI.postMessage({event: 'generate-alert', message: `Cannot parse ${file}, it has an invalid header.`});
+                            return
+                    }
                     let headerEnd;
                     wav.signature.subChunks.forEach(el => {
                         if (el['chunkId'] === 'data') {
