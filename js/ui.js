@@ -1879,6 +1879,7 @@ function onSaveAudio({file: file, filename: filename}){
     anchor.download = filename;
     anchor.click();
     window.URL.revokeObjectURL(url);
+    anchor.remove()
 }
 
 
