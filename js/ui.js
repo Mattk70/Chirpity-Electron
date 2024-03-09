@@ -1,5 +1,4 @@
-const ID_SITE = 2;
-
+import {trackVisit, trackEvent} from './tracking.js';
 
 let seenTheDarkness = false, shownDaylightBanner = false, LOCATIONS, locationID = undefined;
 const startTime = performance.now();
@@ -23,7 +22,7 @@ console.warn = function(message) {
     originalWarn.apply(console, arguments);
     
     // Track the warning message using your tracking function
-    track('Warnings', arguments[0], customURLEncode(arguments[1]));
+    config.track && trackEvent(config.UUID, 'Warnings', arguments[0], customURLEncode(arguments[1]));
 };
 
 // Override console.error to intercept and track errors
@@ -32,7 +31,7 @@ console.error = function(message) {
     originalError.apply(console, arguments);
     
     // Track the error message using your tracking function
-    track('Errors', arguments[0], customURLEncode(arguments[1]));
+    config.track && trackEvent(config.UUID, 'Errors', arguments[0], customURLEncode(arguments[1]));
 };
 
 
@@ -42,7 +41,7 @@ window.addEventListener('unhandledrejection', function(event) {
     const stackTrace = event.reason.stack;
     
     // Track the unhandled promise rejection
-    track('Unhandled UI Promise Rejection', errorMessage, customURLEncode(stackTrace));
+    config.track && trackEvent(config.UUID, 'Unhandled UI Promise Rejection', errorMessage, customURLEncode(stackTrace));
 });
 
 window.addEventListener('rejectionhandled', function(event) {
@@ -51,7 +50,7 @@ window.addEventListener('rejectionhandled', function(event) {
     const stackTrace = event.reason.stack;
     
     // Track the unhandled promise rejection
-    track('Handled UI Promise Rejection', errorMessage, customURLEncode(stackTrace));
+    config.track && trackEvent(config.UUID, 'Handled UI Promise Rejection', errorMessage, customURLEncode(stackTrace));
 });
 
 const STATE = {
@@ -685,7 +684,7 @@ const showLocation = async (fromSelect) => {
 
 const displayLocationAddress = async (where) => {
     const custom = where.includes('custom');
-    let latEl, lonEl, placeEl;
+    let latEl, lonEl, placeEl, address;
     if (custom){
         latEl = document.getElementById('customLat');
         lonEl = document.getElementById('customLon');
@@ -1453,7 +1452,8 @@ window.onload = async () => {
         audio: { gain: 0, format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false, notification: true, normalise: false },
         limit: 500,
         track: true,
-        debug: false
+        debug: false,
+        VERSION: VERSION
     };
     // Load preferences and override defaults
     [appPath, tempPath] = await getPaths();
@@ -1474,7 +1474,7 @@ window.onload = async () => {
         
         // Attach an error event listener to the window object
         window.onerror = function(message, file, lineno, colno, error) {
-            track('Error', error.message, encodeURIComponent(error.stack));
+            config.track && trackEvent(config.UUID, 'Error', error.message, encodeURIComponent(error.stack));
             // Return false not to inhibit the default error handling
             return false;
             };
@@ -1618,25 +1618,7 @@ window.onload = async () => {
         isMac && checkForMacUpdates();
         const doNotTrack = document.getElementById('do-not-track')
         doNotTrack.checked = !config.track;
-        if (config.track) {
-            const {width, height} = window.screen;
-            fetch(`https://analytics.mattkirkland.co.uk/matomo.php?idsite=${ID_SITE}&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
-                    &res=${width}x${height}
-                    &dimension1=${config.model}
-                    &dimension2=${config.list}
-                    &dimension3=${config.useWeek}
-                    &dimension4=${config.locale}
-                    &dimension5=${config.speciesThreshold}
-                    &dimension6=${JSON.stringify(config.filters)}
-                    &dimension7=${JSON.stringify(config.audio)}
-                    &dimension8=${JSON.stringify(config[config.backend])}
-                    &dimension9=${JSON.stringify(config.detect)}
-                    &dimension11=${VERSION}`)
-                .then(response => {
-                    if (! response.ok) throw new Error('Network response was not ok', response);
-                })
-                .catch(error => console.log('Error posting tracking:', error))
-        }
+        if (config.track) trackVisit(config);
     })
 }
 
@@ -1660,10 +1642,6 @@ const setUpWorkerMessaging = () => {
                 case "current-file-week": { STATE.week = args.week}
                 case "diskDB-has-records": {chartsLink.classList.remove("disabled");
                 exploreLink.classList.remove("disabled");
-                break;
-            }
-            case 'error': {
-                track('Error', args.message, args.source, args.value);
                 break;
             }
             case "file-location-id": {onFileLocationID(args);
@@ -2933,9 +2911,9 @@ function onChartData(args) {
         DIAGNOSTICS['Analysis Duration'] = analysisTime + ' seconds';
         const rate = (DIAGNOSTICS['Audio Duration'] / analysisTime);
         DIAGNOSTICS['Analysis Rate'] = rate.toFixed(0) + 'x faster than real time performance.';
-        track(`${config.model}-${config.backend}`, 'Audio Duration', config.backend, Math.round(DIAGNOSTICS['Audio Duration']));
-        track(`${config.model}-${config.backend}`, 'Analysis Duration', config.backend, parseInt(analysisTime));
-        track(`${config.model}-${config.backend}`, 'Analysis Rate', config.backend, parseInt(rate));
+        trackEvent(config.UUID, `${config.model}-${config.backend}`, 'Audio Duration', config.backend, Math.round(DIAGNOSTICS['Audio Duration']));
+        trackEvent(config.UUID, `${config.model}-${config.backend}`, 'Analysis Duration', config.backend, parseInt(analysisTime));
+        trackEvent(config.UUID, `${config.model}-${config.backend}`, 'Analysis Rate', config.backend, parseInt(rate));
         generateToast({ message:'Analysis complete.'})
     }
     
@@ -3653,7 +3631,7 @@ function onChartData(args) {
             filelist.push(f.path);
         }
         if (filelist.length) filterValidFiles({ filePaths: filelist })
-        track('UI', 'Drop', 'Open Folder(s)', filelist.length);
+        trackEvent(config.UUID, 'UI', 'Drop', 'Open Folder(s)', filelist.length);
     });
     
     
@@ -4139,7 +4117,7 @@ DOM.gain.addEventListener('input', () => {
         contextMenu.classList.add("d-none");
         hideConfidenceSlider();
         config.debug && console.log('clicked', target);
-        target && target !== 'result1' && track('UI', 'Click', target);  
+        target && target !== 'result1' && trackEvent(config.UUID, 'UI', 'Click', target);  
     })
     
     
@@ -4186,6 +4164,7 @@ DOM.gain.addEventListener('input', () => {
                 }
                 case 'do-not-track': {
                     config.track = !element.checked;
+                    worker.postMessage({ action: 'update-state', track: config.track })
                     break;
                 }
                 case 'lowShelfFrequency': {
@@ -4358,7 +4337,7 @@ DOM.gain.addEventListener('input', () => {
             }
             updatePrefs();
             const value = element.type === "checkbox" ? element.checked : element.value;
-            track('Settings Change', target, value);
+            trackEvent(config.UUID, 'Settings Change', target, value);
         }
     })
     
@@ -4391,7 +4370,7 @@ function setListUIState(list){
         
         if (updating === 'list'){
             worker.postMessage({ action: 'update-list', list: config.list, customList: LABELS, refreshResults: STATE.analysisDone});
-            track('UI', 'Create', 'Custom list', LABELS.length)
+            trackEvent(config.UUID, 'UI', 'Create', 'Custom list', LABELS.length)
         } else {
             worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS, refreshResults: STATE.analysisDone})
         }
@@ -4404,21 +4383,7 @@ function setListUIState(list){
         else {console.error('There was a problem reading the label file:', error);}
     })
 }
-function track(event, action, name, value){
-    config.debug && event === 'Error' && console.log(action, name);
-    if (config.track){
-        const t = new Date()
-    name = name ? `&e_n=${name}` : '';
-    value = value ? `&e_v=${value}` : '';
-        fetch(`https://analytics.mattkirkland.co.uk/matomo.php?h=${t.getHours()}&m=${t.getMinutes()}&s=${t.getSeconds()}
-        &action_name=Settings%20Change&idsite=${ID_SITE}&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
-        &e_c=${event}&e_a=${action}${name}${value}`)
-        .then(response => {
-            if (! response.ok) throw new Error('Network response was not ok', response);
-        })
-        .catch(error => console.log('Error posting tracking:', error))  
-    }
-}
+
     
     async function createContextMenu(e) {
         const target = e.target;
@@ -4860,3 +4825,5 @@ function track(event, action, name, value){
         return false;
     }
 
+    // Make config and displayLocationAddress available to the map script in index.html
+    export { config, displayLocationAddress, LOCATIONS };

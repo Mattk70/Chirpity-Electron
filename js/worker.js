@@ -1,22 +1,19 @@
-const ID_SITE = 3;
-
-
 const { ipcRenderer } = require('electron');
 const fs = require('node:fs');
-const wavefileReader = require('wavefile-reader');
 const p = require('node:path');
+const { writeFile, mkdir, readdir, stat } = require('node:fs/promises');
+const { PassThrough } = require('node:stream');
+const wavefileReader = require('wavefile-reader');
 const SunCalc = require('suncalc');
 const ffmpeg = require('fluent-ffmpeg');
 const png = require('fast-png');
-const { writeFile, mkdir, readdir, stat } = require('node:fs/promises');
 const { utimesSync } = require('utimes');
-const stream = require("node:stream");
 const staticFfmpeg = require('ffmpeg-static-electron');
 const {writeToPath} = require('@fast-csv/format');
 const merge = require('lodash.merge');
 import { State } from './state.js';
 import { sqlite3 } from './database.js';
-const { PassThrough } = require('node:stream');
+import {trackEvent} from './tracking.js';
 
 
 // Save console.warn and console.error functions
@@ -38,7 +35,7 @@ console.warn = function(message) {
     originalWarn.apply(console, arguments);
     
     // Track the warning message using your tracking function
-    track('Warnings', arguments[0], customURLEncode(arguments[1]));
+    STATE.track && trackEvent(STATE.UUID, 'Worker Warning', arguments[0], customURLEncode(arguments[1]));
 };
 
 // Override console.error to intercept and track errors
@@ -47,11 +44,11 @@ console.error = function(message) {
     originalError.apply(console, arguments);
     
     // Track the error message using your tracking function
-    track('Handled Errors', arguments[0], customURLEncode(arguments[1]));
+    STATE.track && trackEvent(STATE.UUID, 'Worker Handled Errors', arguments[0], customURLEncode(arguments[1]));
 };
 // Implement error handling in the worker
 self.onerror = function(message, file, lineno, colno, error) {
-    track('Unhandled Worker Error', error.message, customURLEncode(error.stack));
+    STATE.track && trackEvent(STATE.UUID, 'Unhandled Worker Error', error.message, customURLEncode(error.stack));
     // Return false not to inhibit the default error handling
     return false;
     };
@@ -62,7 +59,7 @@ self.addEventListener('unhandledrejection', function(event) {
     const stackTrace = event.reason?.stack;
     
     // Track the unhandled promise rejection
-    track('Unhandled Worker Promise Rejections', errorMessage, customURLEncode(stackTrace));
+    STATE.track && trackEvent(STATE.UUID, 'Unhandled Worker Promise Rejections', errorMessage, customURLEncode(stackTrace));
 });
 
 self.addEventListener('rejectionhandled', function(event) {
@@ -71,7 +68,7 @@ self.addEventListener('rejectionhandled', function(event) {
     const stackTrace = event.reason?.stack;
     
     // Track the unhandled promise rejection
-    track('Handled Worker Promise Rejections', errorMessage, customURLEncode(stackTrace));
+    STATE.track && trackEvent(STATE.UUID, 'Handled Worker Promise Rejections', errorMessage, customURLEncode(stackTrace));
 });
 
 //Object will hold files in the diskDB, and the active timestamp from the most recent selection analysis.
@@ -1707,7 +1704,7 @@ const prepSummaryStatement = (included) => {
                 }
                 
                 return new Promise(function (resolve) {
-                    const bufferStream = new stream.PassThrough();
+                    const bufferStream = new PassThrough();
                     let ffmpgCommand = ffmpeg(file)
                     .toFormat(soundFormat)
                     .seekInput(start)
@@ -1864,7 +1861,7 @@ const prepSummaryStatement = (included) => {
                             processQueue();
                         };
                         worker.onerror = (e) => {
-                            console.warn(`Worker ${i} is suffering, shutting it down. THe error was:`, e)
+                            console.warn(`Worker ${i} is suffering, shutting it down. THe error was:`, e.message)
                             predictWorkers.splice(i, 1);
                             worker.terminate();
                         }
@@ -3209,19 +3206,3 @@ async function setIncludedIDs(lat, lon, week) {
     return await LIST_CACHE[key];
 }
 
-/// Track errors
-function track(event, action, name, value){ 
-    const t = new Date()
-    name = name ? `&e_n=${name}` : '';
-    value = value ? `&e_v=${value}` : '';
-    const state = STATE ? STATE.UUID : 0
-    const errURL = `https://analytics.mattkirkland.co.uk/matomo.php?h=${t.getHours()}&m=${t.getMinutes()}&s=${t.getSeconds()}
-    &action_name=${event}&idsite=${ID_SITE}&rand=${Date.now()}&rec=1&uid=${state}&apiv=1
-    &e_c=${event}&e_a=${action}${name}${value}`;
-    console.log(errURL);
-    fetch(errURL)
-    .then(response => {
-        if (! response.ok) console.log('Network response was not ok', response);
-    })
-    .catch(error => console.log('Error posting error report:', error))  
-}

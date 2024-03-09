@@ -194,7 +194,6 @@
     "@fast-csv/format": "^4.3.5",
     "@popperjs/core": "^2.9.2",
     "@tensorflow/tfjs-core": "4.17.0",
-    "@tensorflow/tfjs-backend-webgpu": "4.17.0",
     "@tensorflow/tfjs-node": "4.17.0",
     "bootstrap": "5.2.3",
     "browser-id3-writer": "^4.4.0",
