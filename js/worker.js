@@ -1,4 +1,4 @@
-const ID_SITE = 2;
+const ID_SITE = 3;
 
 
 const { ipcRenderer } = require('electron');
@@ -23,13 +23,22 @@ const { PassThrough } = require('node:stream');
 const originalWarn = console.warn;
 const originalError = console.error;
 
+function customURLEncode(str) {
+    return encodeURIComponent(str)
+      .replace(/[!'()*]/g, (c) => {
+        // Replacing additional characters not handled by encodeURIComponent 
+        return '%' + c.charCodeAt(0).toString(16).toUpperCase();
+      })
+      .replace(/%20/g, '+'); // Replace space with '+' instead of '%20'
+  }
+
 // Override console.warn to intercept and track warnings
 console.warn = function(message) {
     // Call the original console.warn to maintain default behavior
     originalWarn.apply(console, arguments);
     
     // Track the warning message using your tracking function
-    track('Warnings', arguments[0], encodeURIComponent(arguments[1]));
+    track('Warnings', arguments[0], customURLEncode(arguments[1]));
 };
 
 // Override console.error to intercept and track errors
@@ -38,31 +47,31 @@ console.error = function(message) {
     originalError.apply(console, arguments);
     
     // Track the error message using your tracking function
-    track('Handled Errors', arguments[0], encodeURIComponent(arguments[1]));
+    track('Handled Errors', arguments[0], customURLEncode(arguments[1]));
 };
 // Implement error handling in the worker
 self.onerror = function(message, file, lineno, colno, error) {
-    track('Unhandled Worker Error', error.message, encodeURIComponent(error.stack));
+    track('Unhandled Worker Error', error.message, customURLEncode(error.stack));
     // Return false not to inhibit the default error handling
     return false;
     };
 
 self.addEventListener('unhandledrejection', function(event) {
     // Extract the error message and stack trace from the event
-    const errorMessage = event.reason.message;
-    const stackTrace = event.reason.stack;
+    const errorMessage = event.reason?.message;
+    const stackTrace = event.reason?.stack;
     
     // Track the unhandled promise rejection
-    track('Unhandled Worker Promise Rejections', errorMessage, encodeURIComponent(stackTrace));
+    track('Unhandled Worker Promise Rejections', errorMessage, customURLEncode(stackTrace));
 });
 
 self.addEventListener('rejectionhandled', function(event) {
     // Extract the error message and stack trace from the event
-    const errorMessage = event.reason.message;
-    const stackTrace = event.reason.stack;
+    const errorMessage = event.reason?.message;
+    const stackTrace = event.reason?.stack;
     
     // Track the unhandled promise rejection
-    track('Handled Worker Promise Rejections', errorMessage, encodeURIComponent(stackTrace));
+    track('Handled Worker Promise Rejections', errorMessage, customURLEncode(stackTrace));
 });
 
 //Object will hold files in the diskDB, and the active timestamp from the most recent selection analysis.
@@ -670,7 +679,8 @@ const prepSummaryStatement = (included) => {
                 params.push(FILE_QUEUE[0])
             }
             if (STATE.locationID) {
-                resultStatement += ` AND locationID = ${STATE.locationID} `;
+                resultStatement += ` AND locationID = ? `;
+                params.push(STATE.locationID)
             }
             if (STATE.detect.nocmig){
                 resultStatement += ' AND COALESCE(isDaylight, 0) != 1 '; // Backward compatibility for < v0.9.
@@ -2328,7 +2338,7 @@ const prepSummaryStatement = (included) => {
                      params.push(...included)
                 }
                 if (STATE.locationID) {
-                    positionStmt += ` AND locationID = ${STATE.locationID} `;
+                    positionStmt += ` AND locationID = ? `;
                     params.push(STATE.locationID)
                 }
                 if (STATE.detect.nocmig){

@@ -1,6 +1,6 @@
 {
   "name": "chirpity",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
@@ -144,7 +144,8 @@
       ]
     },
     "nsis": {
-      "deleteAppDataOnUninstall": true
+      "deleteAppDataOnUninstall": true,
+      "perMachine": true
     },
     "win": {
       "publish": [

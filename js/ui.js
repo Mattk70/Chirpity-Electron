@@ -11,10 +11,10 @@ const originalError = console.error;
 function customURLEncode(str) {
     return encodeURIComponent(str)
       .replace(/[!'()*]/g, (c) => {
-        // Replacing additional characters manually
+        // Replacing additional characters not handled by encodeURIComponent 
         return '%' + c.charCodeAt(0).toString(16).toUpperCase();
       })
-      .replace(/%20/g, '+'); // Optionally replace space with '+' instead of '%20'
+      .replace(/%20/g, '+'); // Replace space with '+' instead of '%20'
   }
 
 // Override console.warn to intercept and track warnings
@@ -23,7 +23,7 @@ console.warn = function(message) {
     originalWarn.apply(console, arguments);
     
     // Track the warning message using your tracking function
-    track('Warnings', arguments[0], encodeURIComponent(arguments[1]));
+    track('Warnings', arguments[0], customURLEncode(arguments[1]));
 };
 
 // Override console.error to intercept and track errors
@@ -32,7 +32,7 @@ console.error = function(message) {
     originalError.apply(console, arguments);
     
     // Track the error message using your tracking function
-    track('Errors', arguments[0], encodeURIComponent(arguments[1]));
+    track('Errors', arguments[0], customURLEncode(arguments[1]));
 };
 
 
@@ -42,7 +42,7 @@ window.addEventListener('unhandledrejection', function(event) {
     const stackTrace = event.reason.stack;
     
     // Track the unhandled promise rejection
-    track('Unhandled UI Promise Rejection', errorMessage, encodeURIComponent(stackTrace));
+    track('Unhandled UI Promise Rejection', errorMessage, customURLEncode(stackTrace));
 });
 
 window.addEventListener('rejectionhandled', function(event) {
@@ -51,7 +51,7 @@ window.addEventListener('rejectionhandled', function(event) {
     const stackTrace = event.reason.stack;
     
     // Track the unhandled promise rejection
-    track('Handled UI Promise Rejection', errorMessage, encodeURIComponent(stackTrace));
+    track('Handled UI Promise Rejection', errorMessage, customURLEncode(stackTrace));
 });
 
 const STATE = {
