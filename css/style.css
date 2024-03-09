@@ -589,21 +589,21 @@ input[type="range"].vertical {
     box-shadow: 0 0 10px 5px #ff6;
 }
 
-.carousel {
+#tourModal .carousel {
     overflow: hidden;
     padding-bottom: rem;
 }
 
-.carousel-caption {
+#tourModal .carousel-caption {
     top: 100%;
 }
 
-.carousel-inner {
+#tourModal .carousel-inner {
     overflow: visible;
 }
 
-.carousel-control-next,
-.carousel-control-prev {
+#tourModal .carousel-control-next,
+#tourModal .carousel-control-prev {
     top: 8rem;
 }
 

@@ -1397,9 +1397,10 @@ function secondaryLabelInterval(pxPerSec) {
 
 ////////// Store preferences //////////
 
-function updatePrefs() {
+function updatePrefs(file) {
+    file = file || 'config.json';
     try {
-        fs.writeFileSync(p.join(appPath, 'config.json'), JSON.stringify(config))
+        fs.writeFileSync(p.join(appPath, file), JSON.stringify(config))
     } catch (error) {
         console.log(error)
     }
@@ -1453,7 +1454,8 @@ window.onload = async () => {
         limit: 500,
         track: true,
         debug: false,
-        VERSION: VERSION
+        VERSION: VERSION,
+        XCcache: {}
     };
     // Load preferences and override defaults
     [appPath, tempPath] = await getPaths();
@@ -3422,7 +3424,6 @@ function onChartData(args) {
         <div class="tab-pane fade show active" id="included-tab-pane" role="tabpanel" aria-labelledby="included-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${includedContent}</div>
         <div class="tab-pane fade" id="excluded-tab-pane" role="tabpanel" aria-labelledby="excluded-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${excludedContent}</div>
         </div>
-        </ul>
         `;
         document.getElementById('speciesModalBody').innerHTML = modalContent;
         const species = new bootstrap.Modal(document.getElementById('speciesModal'));
@@ -3641,8 +3642,12 @@ function onChartData(args) {
     });
     
     // Make modals draggable
-    // Make modals draggable
-    document.querySelectorAll('.modal-header').forEach(function (header) {
+    document.querySelectorAll('.modal-header').forEach(header => {
+        header.removeEventListener('mousedown',makeDraggable);
+        makeDraggable(header)
+    });
+    
+    function makeDraggable(header){
         header.addEventListener('mousedown', function (mousedownEvt) {
             const draggable = this;
             const x = mousedownEvt.pageX - draggable.offsetLeft,
@@ -3663,8 +3668,7 @@ function onChartData(args) {
             document.body.addEventListener('mouseup', stopDrag);
             draggable.closest('.modal').addEventListener('hide.bs.modal', stopDrag);
         });
-    });
-    
+    }
     ////////// Date Picker ///////////////
     
     function initialiseDatePicker() {
@@ -4113,6 +4117,9 @@ DOM.gain.addEventListener('input', () => {
             }
             case 'setCustomLocation': { setCustomLocation(); break }
             case 'setFileStart': { showDatePicker(); break }
+
+            // XC API calls
+            case 'context-xc': { getXCComparisons(); break}
         }
         contextMenu.classList.add("d-none");
         hideConfidenceSlider();
@@ -4422,9 +4429,9 @@ function setListUIState(list){
         <a class="dropdown-item" id="context-create-clip" href="#">
         <span class="material-symbols-outlined">music_note</span> Export Audio Clip${plural}
         </a>
-        <a class="dropdown-item d-none" id="context-xc" href='#' target="xc">
-        <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> View Species on Xeno-Canto
-        </a>
+        <span class="dropdown-item" id="context-xc" href='#' target="xc">
+        <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> Compare Species from Xeno-Canto
+        </span>
         <div class="dropdown-divider ${hideInSelection}"></div>
         <a class="dropdown-item ${hideInSelection}" id="context-delete" href="#">
         <span class='delete material-symbols-outlined'>delete_forever</span> Delete Record${plural}
@@ -4454,16 +4461,9 @@ function setListUIState(list){
                 }
             })
         }
-        const xc = document.getElementById('context-xc');
-        if (activeRow && (region?.attributes.label || hideInSummary)) {
-            let [,,,sname,cname] = activeRow.getAttribute('name').split('|');
-            const XC_type = cname.includes('(song)') ? "song" :
-            cname.includes('call)') ? "call" : "";
-            xc.href = `https://xeno-canto.org/explore?query=${sname}%20type:"${XC_type}"`;
-            // only offer XC lookup if we have an sname
-            sname && xc.classList.remove('d-none');
-        }
+        if (activeRow && (region?.attributes.label || hideInSummary)) {}
         else {
+            const xc = document.getElementById('context-xc');
             xc.classList.add('d-none');
             contextDelete.classList.add('d-none');
         }
@@ -4825,5 +4825,246 @@ function setListUIState(list){
         return false;
     }
 
+
+function getXCComparisons(){
+    const xc = document.getElementById('context-xc');
+    let [,,,sname,cname] = activeRow.getAttribute('name').split('|');
+    const XC_type = cname.includes('(song)') ? "song" :
+    cname.includes('call)') ? "call" : "";
+    if (config.XCcache[sname]) renderComparisons(config.XCcache[sname]);
+    else {
+        fetch(`https://xeno-canto.org/api/2/recordings?query=${sname}`)
+        .then(response =>{
+            if (! response.ok) return generateToast({message: 'The Xeno-canto API is not responding'})
+            return response.json()
+        })
+        .then(data => {
+            // Extract the first 10 items from the recordings array
+            const recordings = data.recordings.map(record => ({
+                file: record.file, // media file
+                rec: record.rec, // recordist
+                url: record.url, // URL on XC
+                type: record.type, // call type
+                smp: record.smp // sample rate
+              }));
+            // Initialize an object to store the lists
+            const filteredLists = {
+              'song': [],
+              'call': [],
+              'flight call': [],
+              'nocturnal flight call': []
+            };
+            
+            // Counters to track the number of items added to each list
+            let songCount = 0;
+            let callCount = 0;
+            let flightCallCount = 0;
+            let nocturnalFlightCallCount = 0;
+            
+            // Iterate over the recordings array and filter items
+            recordings.forEach(record => {
+              if (record.type === 'song' && songCount < 10) {
+                filteredLists.song.push(record);
+                songCount++;
+              } else if (record.type === 'nocturnal flight call' && nocturnalFlightCallCount < 10) {
+                filteredLists['nocturnal flight call'].push(record);
+                nocturnalFlightCallCount++;
+              } else if (record.type === 'flight call' && flightCallCount < 10) {
+                filteredLists['flight call'].push(record);
+                flightCallCount++;
+              } else if (record.type === 'call' && callCount < 10) {
+                filteredLists.call.push(record);
+                callCount++;
+              }
+            });
+            if (songCount === 0 && callCount === 0 && flightCallCount === 0 && nocturnalFlightCallCount === 0) {
+                generateToast({message: 'The Xeno-canto site has no comparisons available'})
+                return
+              } else {
+                // Let's cache the result, 'cos the XC API is quite slow
+                config.XCcache[sname] = filteredLists;
+                //updatePrefs(); // TODO: separate the caches, add expiry - a week?
+                console.log('XC response', filteredLists)
+                renderComparisons(filteredLists)
+              }
+        })
+    }
+}
+
+function capitalizeEachWord(str) {
+    return str.replace(/\b\w/g, function(char) {
+      return char.toUpperCase();
+    });
+  }
+function renderComparisons(lists){
+    const compareDiv = document.createElement('div');
+    compareDiv.classList.add('modal', 'modal-fade', 'model-lg')
+    compareDiv.id = "compareModal";
+    compareDiv.tabIndex = -1;
+    compareDiv.setAttribute('aria-labelledby', "compareModalLabel");
+    compareDiv.setAttribute('aria-hidden', "true");
+    const compareHTML = `
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header"><h5>Xeno-Canto species recordings</h5></div>
+                    <div class="modal-body pt-0 pb-1">
+                        <ul class="nav nav-tabs navbar navbar-expand" id="callTypeHeader" role="tablist"></ul>
+                        <div class="tab-content" id="recordings"></div>
+                        <div class="modal-footer justify-content-center pb-0">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    compareDiv.innerHTML = compareHTML;
+    const indicatorList = compareDiv.querySelector('.carousel-indicators');
+    const callTypeHeader = compareDiv.querySelector('#callTypeHeader');
+    const recordings = compareDiv.querySelector('#recordings');
+    let count = 0;
+    Object.keys(lists).forEach(callType =>{
+        const active = count === 0 ? 'active' : '';
+        const callTypePrefix = callType.replaceAll(' ','-');
+        if (lists[callType].length){
+            // tab headings
+            const tabHeading = document.createElement('li');
+            tabHeading.classList.add('nav-item')
+            tabHeading.setAttribute('role', 'presentation');
+            const button = `<button class="nav-link text-nowrap ${active}" id="${callTypePrefix}-tab" data-bs-toggle="tab" data-bs-target="#${callTypePrefix}-tab-pane" type="button" role="tab" aria-controls="${callTypePrefix}-tab-pane" aria-selected="${count === 0}">${capitalizeEachWord(callType)}</button>`;
+            tabHeading.innerHTML = button;
+            callTypeHeader.appendChild(tabHeading);
+
+            // Tab pane for each call type
+            const tabContentPane = document.createElement('div');
+            tabContentPane.classList.add('tab-pane', 'fade');
+            count === 0 && tabContentPane.classList.add('show', 'active');
+            tabContentPane.id = callTypePrefix + '-tab-pane';
+            tabContentPane.setAttribute('role', 'tabpanel');
+            tabContentPane.setAttribute('aria-labelled-by', callTypePrefix + '-tab');
+            tabContentPane.tabIndex = -1;
+            recordings.appendChild(tabContentPane);
+            // Content carousels in each tab-pane
+            const carousel = document.createElement('div');
+            carousel.classList.add('carousel', 'carousel-dark', 'slide');
+            carousel.id = `${callTypePrefix}-comparisons`;
+            carousel.setAttribute('data-bs-ride', 'false');
+            carousel.setAttribute('data-bs-wrap', 'true'); 
+            //carousel indicators
+            carousel.innerHTML = `<div class="carousel-indicators"></div> <div class="carousel-inner"></div>`;
+            tabContentPane.appendChild(carousel);
+            //carousel items for each recording in the list
+            const carouselIndicators = tabContentPane.querySelector('.carousel-indicators');
+            const examples = lists[callType];
+            const carouselInner = carousel.querySelector('.carousel-inner');
+            for (let i=0; i < examples.length; i++){
+                const recording = examples[i];
+                const carouselItem = document.createElement('div');
+                const indicatorItem = document.createElement('button');
+                indicatorItem.setAttribute('data-bs-target', `#${callTypePrefix}-comparisons`);
+                indicatorItem.setAttribute('data-bs-slide-to', `${i}`);
+                carouselItem.classList.add('carousel-item');
+                i === 0 && carouselItem.classList.add('active');
+                i === 0 && indicatorItem.classList.add('active');
+                // create div for wavesurfer
+                const mediaDiv = document.createElement('div');
+                mediaDiv.id = `${callType}-${i}`;
+                mediaDiv.style.height = "400px";
+                mediaDiv.style.width = "100%";
+                mediaDiv.style.backgroundColor = "black";
+                carouselItem.appendChild(mediaDiv);
+
+
+                const ws = WaveSurfer.create({
+                        container: `#${mediaDiv.id}`,
+                        waveColor: 'rgb(200, 0, 200)',
+                        progressColor: 'rgb(100, 0, 100)',
+                        url: recording.url,
+                        sampleRate: recording.smp,
+                      })
+                
+                // Initialize the Spectrogram plugin
+                ws.registerPlugin(
+                    Spectrogram.create({
+                    labels: true,
+                    height: 400,
+                    splitChannels: false,
+                    }),
+                )
+                //carouselItem.innerHTML = JSON.stringify(recording);
+                carouselInner.appendChild(carouselItem)
+                carouselIndicators.appendChild(indicatorItem);
+            }
+            const innerHTML = `
+                <!-- Carousel navigation controls -->
+                <button class="carousel-control-prev" href="#${callTypePrefix}-comparisons" role="button" data-bs-slide="prev">
+                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                    <span class="visually-hidden">Previous</span>
+                </button>
+                <button class="carousel-control-next" href="#${callTypePrefix}-comparisons" role="button" data-bs-slide="next">
+                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                    <span class="visually-hidden">Next</span>
+                </button>
+            `;
+            const controls = document.createElement('div');
+            controls.innerHTML = innerHTML;
+            carouselInner.appendChild(controls);
+            count++;
+        }
+    })
+
+    // carousel.innerHTML = `
+    // <ul class="nav nav-tabs" id="callType" role="tablist">
+    //     <li class="nav-item" role="presentation">
+    //         <button class="nav-link active" id="song-tab" data-bs-toggle="tab" data-bs-target="#included-tab-pane" type="button" role="tab" aria-controls="included-tab-pane" aria-selected="true">Included</button>
+    //     </li>
+    //     <li class="nav-item" role="presentation">
+    //         <button class="nav-link" id="excluded-tab" data-bs-toggle="tab" data-bs-target="#excluded-tab-pane" type="button" role="tab" aria-controls="excluded-tab-pane" aria-selected="false" ${disable}>Excluded</button>
+    //     </li>
+    // </ul>
+    // <div class="tab-content" id="myTabContent">
+    //     <div class="tab-pane fade show active" id="included-tab-pane" role="tabpanel" aria-labelledby="included-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${includedContent}</div>
+    //     <div class="tab-pane fade" id="excluded-tab-pane" role="tabpanel" aria-labelledby="excluded-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${excludedContent}</div>
+    // </div>
+    // `
+    document.body.appendChild(compareDiv)
+    const header = compareDiv.querySelector('.modal-header');
+    makeDraggable(header);
+
+    const comparisonModal = new bootstrap.Modal(compareDiv);
+    compareDiv.addEventListener('hidden.bs.modal', () => compareDiv.remove())
+    comparisonModal.show()
+}
+
     // Make config and displayLocationAddress available to the map script in index.html
     export { config, displayLocationAddress, LOCATIONS };
+
+    /*
+    <div id="comparisons" class="carousel carousel-dark slide" data-bs-ride="false" data-bs-wrap="true">
+        <!-- Carousel indicators -->
+        <ol class="carousel-indicators">
+            <li data-bs-target="#comparisons" data-bs-slide-to="0" class="active"></li>
+            <li data-bs-target="#comparisons" data-bs-slide-to="1"></li>
+            <li data-bs-target="#comparisons" data-bs-slide-to="2"></li>
+            <li data-bs-target="#comparisons" data-bs-slide-to="3"></li>
+            <li data-bs-target="#comparisons" data-bs-slide-to="4"></li>
+            <!-- Add more indicators as needed -->
+        </ol>
+        <div class="carousel-inner" style="min-height: 400px;">
+            <!-- Carousel items -->
+            <div class="carousel-item active">
+                
+            </div>
+
+            <!-- Carousel navigation controls -->
+            <a class="carousel-control-prev" href="#comparisons" role="button" data-bs-slide="prev">
+                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Previous</span>
+            </a>
+            <a class="carousel-control-next" href="#comparisons" role="button" data-bs-slide="next">
+                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Next</span>
+            </a>
+        </div>
+    </div>
+    */
