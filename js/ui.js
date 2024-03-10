@@ -3650,8 +3650,11 @@ function onChartData(args) {
     function makeDraggable(header){
         header.addEventListener('mousedown', function (mousedownEvt) {
             const draggable = this;
-            const x = mousedownEvt.pageX - draggable.offsetLeft,
-            y = mousedownEvt.pageY - draggable.offsetTop;
+            const modalContent = draggable.closest('.modal-content');
+            const initialLeft = parseFloat(getComputedStyle(modalContent).left);
+            const initialTop = parseFloat(getComputedStyle(modalContent).top);
+            const x = mousedownEvt.pageX - initialLeft,
+                  y = mousedownEvt.pageY - initialTop;
             
             function handleDrag(moveEvt) {
                 draggable.closest('.modal-content').style.left = moveEvt.pageX - x + 'px';
@@ -4833,26 +4836,36 @@ function getXCComparisons(){
     cname.includes('call)') ? "call" : "";
     if (config.XCcache[sname]) renderComparisons(config.XCcache[sname]);
     else {
-        fetch(`https://xeno-canto.org/api/2/recordings?query=${sname}`)
+        const loading = document.getElementById('loadingOverlay')
+        loading.classList.remove('d-none');
+        const quality = '+q:%22>C%22';
+        const length = '+len:3-30';
+        fetch(`https://xeno-canto.org/api/2/recordings?query=${sname}${quality}${length}`)
         .then(response =>{
-            if (! response.ok) return generateToast({message: 'The Xeno-canto API is not responding'})
+            if (! response.ok) {
+                loading.classList.add('d-none');
+                return generateToast({message: 'The Xeno-canto API is not responding'})
+            }
             return response.json()
         })
         .then(data => {
+            // Hide loading
+            loading.classList.add('d-none');
             // Extract the first 10 items from the recordings array
             const recordings = data.recordings.map(record => ({
                 file: record.file, // media file
                 rec: record.rec, // recordist
                 url: record.url, // URL on XC
                 type: record.type, // call type
-                smp: record.smp // sample rate
+                smp: record.smp, // sample rate
+                licence: record.lic //// licence
               }));
             // Initialize an object to store the lists
             const filteredLists = {
-              'song': [],
-              'call': [],
+              'nocturnal flight call': [],
               'flight call': [],
-              'nocturnal flight call': []
+              'call': [],
+              'song': [],
             };
             
             // Counters to track the number of items added to each list
@@ -4885,8 +4898,12 @@ function getXCComparisons(){
                 config.XCcache[sname] = filteredLists;
                 //updatePrefs(); // TODO: separate the caches, add expiry - a week?
                 console.log('XC response', filteredLists)
-                renderComparisons(filteredLists)
+                renderComparisons(filteredLists, cname)
               }
+        })
+        .catch(error => {
+            loading.classList.add('d-none');
+            console.warn('Error getting XC data', error)
         })
     }
 }
@@ -4896,22 +4913,30 @@ function capitalizeEachWord(str) {
       return char.toUpperCase();
     });
   }
-function renderComparisons(lists){
+function renderComparisons(lists, cname){
+    cname = cname.replace(/\(.*\)/, '').replace('?', '');
     const compareDiv = document.createElement('div');
     compareDiv.classList.add('modal', 'modal-fade', 'model-lg')
     compareDiv.id = "compareModal";
     compareDiv.tabIndex = -1;
     compareDiv.setAttribute('aria-labelledby', "compareModalLabel");
     compareDiv.setAttribute('aria-hidden', "true");
+    compareDiv.setAttribute( "data-bs-backdrop", "static")
     const compareHTML = `
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-lg modal-dialog-bottom w-100 modal-dialog-dark">
             <div class="modal-content">
-                <div class="modal-header"><h5>Xeno-Canto species recordings</h5></div>
+                <div class="modal-header"><h5>${cname} Vocalisations</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
                     <div class="modal-body pt-0 pb-1">
-                        <ul class="nav nav-tabs navbar navbar-expand" id="callTypeHeader" role="tablist"></ul>
+                        <ul class="nav nav-tabs navbar navbar-expand p-0" id="callTypeHeader" role="tablist"></ul>
                         <div class="tab-content" id="recordings"></div>
                         <div class="modal-footer justify-content-center pb-0">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button id="playComparison" class="p-1 pe-2 btn btn-outline-secondary" title="Play / Pause (SpaceBar)">
+                        <span class="material-symbols-outlined ">play_circle</span><span
+                        class="align-middle d-none d-lg-inline"> Play </span>
+                        /
+                        <span class="material-symbols-outlined">pause</span><span
+                        class="align-middle d-none d-lg-inline-block">Pause</span>
+                    </button>
                         </div>
                     </div>
                 </div>
@@ -4942,7 +4967,6 @@ function renderComparisons(lists){
             tabContentPane.id = callTypePrefix + '-tab-pane';
             tabContentPane.setAttribute('role', 'tabpanel');
             tabContentPane.setAttribute('aria-labelled-by', callTypePrefix + '-tab');
-            tabContentPane.tabIndex = -1;
             recordings.appendChild(tabContentPane);
             // Content carousels in each tab-pane
             const carousel = document.createElement('div');
@@ -4951,10 +4975,10 @@ function renderComparisons(lists){
             carousel.setAttribute('data-bs-ride', 'false');
             carousel.setAttribute('data-bs-wrap', 'true'); 
             //carousel indicators
-            carousel.innerHTML = `<div class="carousel-indicators"></div> <div class="carousel-inner"></div>`;
+            carousel.innerHTML = `<div class="carousel-inner"></div><div class="carousel-indicators position-relative"></div> `;
             tabContentPane.appendChild(carousel);
             //carousel items for each recording in the list
-            const carouselIndicators = tabContentPane.querySelector('.carousel-indicators');
+            const carouselIndicators = carousel.querySelector('.carousel-indicators');
             const examples = lists[callType];
             const carouselInner = carousel.querySelector('.carousel-inner');
             for (let i=0; i < examples.length; i++){
@@ -4969,30 +4993,24 @@ function renderComparisons(lists){
                 // create div for wavesurfer
                 const mediaDiv = document.createElement('div');
                 mediaDiv.id = `${callType}-${i}`;
-                mediaDiv.style.height = "400px";
+                //mediaDiv.style.height = "350px";
                 mediaDiv.style.width = "100%";
-                mediaDiv.style.backgroundColor = "black";
                 carouselItem.appendChild(mediaDiv);
-
-
-                const ws = WaveSurfer.create({
-                        container: `#${mediaDiv.id}`,
-                        waveColor: 'rgb(200, 0, 200)',
-                        progressColor: 'rgb(100, 0, 100)',
-                        url: recording.url,
-                        sampleRate: recording.smp,
-                      })
-                
-                // Initialize the Spectrogram plugin
-                ws.registerPlugin(
-                    Spectrogram.create({
-                    labels: true,
-                    height: 400,
-                    splitChannels: false,
-                    }),
-                )
-                //carouselItem.innerHTML = JSON.stringify(recording);
+                const specDiv = document.createElement('div');
+                specDiv.id = `${callTypePrefix}-${i}-compareSpec`;
+                mediaDiv.setAttribute('name', `${specDiv.id}|${recording.file}`)
+                mediaDiv.appendChild(specDiv);
+                const creditContainer = document.createElement('div');
+                creditContainer.classList.add('text-end');
+                creditContainer.innerHTML = 'Source: Xeno-Canto &copy;';
+                const creditLink = document.createElement('a');
+                creditContainer.appendChild(creditLink);
+                carouselItem.appendChild(creditContainer);
+                creditLink.setAttribute('href', 'https:' + recording.url);
+                creditLink.setAttribute('target', '_blank');
+                creditLink.textContent = recording.rec;
                 carouselInner.appendChild(carouselItem)
+
                 carouselIndicators.appendChild(indicatorItem);
             }
             const innerHTML = `
@@ -5008,63 +5026,80 @@ function renderComparisons(lists){
             `;
             const controls = document.createElement('div');
             controls.innerHTML = innerHTML;
-            carouselInner.appendChild(controls);
+            carouselIndicators.appendChild(controls);
             count++;
         }
     })
 
-    // carousel.innerHTML = `
-    // <ul class="nav nav-tabs" id="callType" role="tablist">
-    //     <li class="nav-item" role="presentation">
-    //         <button class="nav-link active" id="song-tab" data-bs-toggle="tab" data-bs-target="#included-tab-pane" type="button" role="tab" aria-controls="included-tab-pane" aria-selected="true">Included</button>
-    //     </li>
-    //     <li class="nav-item" role="presentation">
-    //         <button class="nav-link" id="excluded-tab" data-bs-toggle="tab" data-bs-target="#excluded-tab-pane" type="button" role="tab" aria-controls="excluded-tab-pane" aria-selected="false" ${disable}>Excluded</button>
-    //     </li>
-    // </ul>
-    // <div class="tab-content" id="myTabContent">
-    //     <div class="tab-pane fade show active" id="included-tab-pane" role="tabpanel" aria-labelledby="included-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${includedContent}</div>
-    //     <div class="tab-pane fade" id="excluded-tab-pane" role="tabpanel" aria-labelledby="excluded-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${excludedContent}</div>
-    // </div>
-    // `
     document.body.appendChild(compareDiv)
     const header = compareDiv.querySelector('.modal-header');
     makeDraggable(header);
-
+    const navTabs = document.getElementById('callTypeHeader');
+    callTypeHeader.addEventListener('click', showCompareSpec)
     const comparisonModal = new bootstrap.Modal(compareDiv);
     compareDiv.addEventListener('hidden.bs.modal', () => compareDiv.remove())
+    compareDiv.addEventListener('slid.bs.carousel', () => showCompareSpec())
+    compareDiv.addEventListener('shown.bs.modal', () => showCompareSpec())
     comparisonModal.show()
 }
 
-    // Make config and displayLocationAddress available to the map script in index.html
-    export { config, displayLocationAddress, LOCATIONS };
+let ws;
+function showCompareSpec() {
+    if (ws) ws.destroy()
+    const activeCarouselItem = document.querySelector('#recordings .tab-pane.active .carousel-item.active');
+    const mediaContainer = activeCarouselItem.firstChild;
+    console.log("id is ", mediaContainer.id)
+    const [specContainer, file] = mediaContainer.getAttribute('name').split('|');
+    // Create an instance of WaveSurfer
+    const audioCtx = new AudioContext({ latencyHint: 'interactive', sampleRate: sampleRate });
+    // Setup waveform and spec views
+    ws = WaveSurfer.create({
+        container: mediaContainer,
+        audioContext: audioCtx,
+        backend: 'WebAudio',
+        // make waveform transparent
+        backgroundColor: 'rgba(0,0,0,0)',
+        waveColor: 'rgba(109,41,164,0)',
+        progressColor: 'rgba(109,41,16,0)',
+        // but keep the playhead
+        cursorColor: '#fff',
+        cursorWidth: 2,
+        skipLength: 0.1,
+        partialRender: true,
+        scrollParent: false,
+        fillParent: true,
+        responsive: false,
+        height: 250
+    });
+    
+    ws.addPlugin(WaveSurfer.spectrogram.create({
+        //deferInit: false,
+        wavesurfer: ws,
+        container: "#" + specContainer,
+        scrollParent: false,
+        fillParent: true,
+        windowFunc: 'hamming',
+        minPxPerSec: 1,
+        frequencyMin: 0,
+        frequencyMax: 12_000,
+        normalize: false,
+        hideScrollbar: true,
+        labels: true,
+        fftSamples: 512,
+        height: 250,
+        colorMap: colormap({
+            colormap: config.colormap, nshades: 256, format: 'float'
+        }),
+    })).initPlugin('spectrogram')
 
-    /*
-    <div id="comparisons" class="carousel carousel-dark slide" data-bs-ride="false" data-bs-wrap="true">
-        <!-- Carousel indicators -->
-        <ol class="carousel-indicators">
-            <li data-bs-target="#comparisons" data-bs-slide-to="0" class="active"></li>
-            <li data-bs-target="#comparisons" data-bs-slide-to="1"></li>
-            <li data-bs-target="#comparisons" data-bs-slide-to="2"></li>
-            <li data-bs-target="#comparisons" data-bs-slide-to="3"></li>
-            <li data-bs-target="#comparisons" data-bs-slide-to="4"></li>
-            <!-- Add more indicators as needed -->
-        </ol>
-        <div class="carousel-inner" style="min-height: 400px;">
-            <!-- Carousel items -->
-            <div class="carousel-item active">
-                
-            </div>
+    ws.load(file)
+    const playButton = document.getElementById('playComparison')
+    //playButton.removeEventListener('click', playComparison )
+    playButton.addEventListener('click', playComparison)
 
-            <!-- Carousel navigation controls -->
-            <a class="carousel-control-prev" href="#comparisons" role="button" data-bs-slide="prev">
-                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                <span class="visually-hidden">Previous</span>
-            </a>
-            <a class="carousel-control-next" href="#comparisons" role="button" data-bs-slide="next">
-                <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                <span class="visually-hidden">Next</span>
-            </a>
-        </div>
-    </div>
-    */
+}
+
+const playComparison = () => {ws.playPause()}
+
+// Make config and displayLocationAddress available to the map script in index.html
+export { config, displayLocationAddress, LOCATIONS };

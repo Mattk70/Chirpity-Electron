@@ -29,6 +29,19 @@
     <title>Chirpity Bird Call Detection</title>
 </head>
 <body>
+    <!-- Loading Spinner Overlay -->
+    <div id="loadingOverlay" class="overlay d-none text-white">
+        <div class="d-flex justify-content-evenly">
+            <div class="spinner-grow spinner-grow-sm m-3" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <div class="spinner-grow spinner-grow-sm m-3" role="status" style="animation-delay: 0.5s;">
+            </div>
+            <div class="spinner-grow spinner-grow-sm m-3" role="status" style="animation-delay: 1s;">
+            </div>
+          </div>
+    </div>
+
     <div class="offcanvas offcanvas-start text-bg-dark" tabindex="-1" id="settings" aria-labelledby="offcanvasExampleLabel">
         <div class="offcanvas-header pb-2">
             <h5 class="offcanvas-title" id="offcanvasExampleLabel">Settings</h5>
@@ -955,7 +968,7 @@
                 <!-- Controls view -->
                 <div class="container-fluid p-1 text-bg-dark d-inline-flex" id="controlsWrapper" style="max-height: 50px">
                     <div id="filename" class="col-auto ps-1 overflow-visible flex-nowrap"></div>
-                    <div id="unsaved-icon" class="material-symbols-outlined ms-2 me-2 text-warning d-none" title="There are unsaved edits">warning</div>
+                    <div id="unsaved-icon" class="material-symbols-outlined ms-2 me-2 text-warning pointer d-none"  tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Unsaved Edits" data-bs-content="There are changes to the results that haven't been saved.">warning</div>
                     <div class="col-auto btn-group bg-dark ms-2 me-2 text-nowrap" role="group">
                         <button id="playToggle" class="p-1 pe-2 btn btn-outline-secondary" title="Play / Pause (SpaceBar)">
                             <span class="material-symbols-outlined ">play_circle</span><span

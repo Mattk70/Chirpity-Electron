@@ -55,9 +55,10 @@ body {
     z-index: 5;
 }
 
-#spectrogram {
+#spectrogram, [id$=compareSpec] {
     position: absolute;
     width: 100%;
+    z-index:0;
 }
 
 .spec-labels {
@@ -453,7 +454,7 @@ footer {
 Modal customisations
  */
 /* Move header */
-.modal-header:active {
+.modal-header {
     cursor: move;
 }
 
@@ -471,6 +472,13 @@ Modal customisations
 .modal-content {
     box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
 }
+
+.modal-dialog-bottom {
+    position: absolute;
+    bottom: 30px;
+    left: 10px;
+    margin: auto;
+  }
 
 input[type="range"] {
     width: 140px;
@@ -524,6 +532,13 @@ input[type="range"].vertical {
     }
 }
 
+#loadingOverlay {
+    position: absolute;
+    top: 20vh;
+}
+.spinner-grow {
+    animation-duration: 2.8s; /* Adjust the duration as needed */
+  }
 .circle {
     width: 20px;
     height: 20px;
