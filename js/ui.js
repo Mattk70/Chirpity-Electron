@@ -4834,7 +4834,7 @@ function getXCComparisons(){
     let [,,,sname,cname] = activeRow.getAttribute('name').split('|');
     const XC_type = cname.includes('(song)') ? "song" :
     cname.includes('call)') ? "call" : "";
-    if (config.XCcache[sname]) renderComparisons(config.XCcache[sname]);
+    if (config.XCcache[sname]) renderComparisons(config.XCcache[sname], cname);
     else {
         const loading = document.getElementById('loadingOverlay')
         loading.classList.remove('d-none');
@@ -4925,18 +4925,27 @@ function renderComparisons(lists, cname){
     const compareHTML = `
         <div class="modal-dialog modal-lg modal-dialog-bottom w-100 modal-dialog-dark">
             <div class="modal-content">
-                <div class="modal-header"><h5>${cname} Vocalisations</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-header pb-0"><h5>${cname} Vocalisations</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
                     <div class="modal-body pt-0 pb-1">
                         <ul class="nav nav-tabs navbar navbar-expand p-0" id="callTypeHeader" role="tablist"></ul>
                         <div class="tab-content" id="recordings"></div>
                         <div class="modal-footer justify-content-center pb-0">
-                        <button id="playComparison" class="p-1 pe-2 btn btn-outline-secondary" title="Play / Pause (SpaceBar)">
-                        <span class="material-symbols-outlined ">play_circle</span><span
-                        class="align-middle d-none d-lg-inline"> Play </span>
-                        /
-                        <span class="material-symbols-outlined">pause</span><span
-                        class="align-middle d-none d-lg-inline-block">Pause</span>
-                    </button>
+                            <button id="playComparison" class="p-1 pe-2 btn btn-outline-secondary" title="Play / Pause (SpaceBar)">
+                                <span class="material-symbols-outlined ">play_circle</span><span
+                                class="align-middle d-none d-lg-inline"> Play </span>
+                                /
+                                <span class="material-symbols-outlined">pause</span><span
+                                class="align-middle d-none d-lg-inline-block">Pause</span>
+                            </button>
+                            <div class="btn-group" role="group">
+                                <button id="cmpZoomIn" title="Zoom into the spectrogram (Ctrl +)" class="btn btn-outline-secondary"
+                                style="max-width: 70px">
+                                <span class="material-symbols-outlined zoom">zoom_in</span>
+                                </button>
+                                <button id="cmpZoomOut" title="Zoom out of the spectrogram (Ctrl -)" class="btn btn-outline-secondary"
+                                style="max-width: 70px"><span class="material-symbols-outlined zoom align-middle">zoom_out</span>
+                                </button>
+                        </div>
                         </div>
                     </div>
                 </div>
@@ -4975,7 +4984,7 @@ function renderComparisons(lists, cname){
             carousel.setAttribute('data-bs-ride', 'false');
             carousel.setAttribute('data-bs-wrap', 'true'); 
             //carousel indicators
-            carousel.innerHTML = `<div class="carousel-inner"></div><div class="carousel-indicators position-relative"></div> `;
+            carousel.innerHTML = `<div class="carousel-inner"></div><div class="carousel-indicators position-relative mt-3"></div> `;
             tabContentPane.appendChild(carousel);
             //carousel items for each recording in the list
             const carouselIndicators = carousel.querySelector('.carousel-indicators');
@@ -4995,17 +5004,23 @@ function renderComparisons(lists, cname){
                 mediaDiv.id = `${callType}-${i}`;
                 //mediaDiv.style.height = "350px";
                 mediaDiv.style.width = "100%";
-                carouselItem.appendChild(mediaDiv);
                 const specDiv = document.createElement('div');
                 specDiv.id = `${callTypePrefix}-${i}-compareSpec`;
                 mediaDiv.setAttribute('name', `${specDiv.id}|${recording.file}`)
                 mediaDiv.appendChild(specDiv);
                 const creditContainer = document.createElement('div');
                 creditContainer.classList.add('text-end');
-                creditContainer.innerHTML = 'Source: Xeno-Canto &copy;';
+                creditContainer.style.width = "100%";
+                const creditText = document.createElement('div');
+                creditText.style.zIndex = 1;
+                creditText.classList.add('float-end', 'w-100', 'position-absolute', 'text-muted', 'pe-1');
+                creditText.innerHTML = 'Source: Xeno-Canto &copy; ';
                 const creditLink = document.createElement('a');
-                creditContainer.appendChild(creditLink);
+                creditLink.classList.add('text-muted');
+                creditText.appendChild(creditLink);
+                creditContainer.appendChild(creditText);
                 carouselItem.appendChild(creditContainer);
+                carouselItem.appendChild(mediaDiv);
                 creditLink.setAttribute('href', 'https:' + recording.url);
                 creditLink.setAttribute('target', '_blank');
                 creditLink.textContent = recording.rec;
@@ -5047,7 +5062,7 @@ let ws;
 function showCompareSpec() {
     if (ws) ws.destroy()
     const activeCarouselItem = document.querySelector('#recordings .tab-pane.active .carousel-item.active');
-    const mediaContainer = activeCarouselItem.firstChild;
+    const mediaContainer = activeCarouselItem.lastChild;
     console.log("id is ", mediaContainer.id)
     const [specContainer, file] = mediaContainer.getAttribute('name').split('|');
     // Create an instance of WaveSurfer
@@ -5069,6 +5084,7 @@ function showCompareSpec() {
         scrollParent: false,
         fillParent: true,
         responsive: false,
+        normalize: true,
         height: 250
     });
     
@@ -5082,7 +5098,6 @@ function showCompareSpec() {
         minPxPerSec: 1,
         frequencyMin: 0,
         frequencyMax: 12_000,
-        normalize: false,
         hideScrollbar: true,
         labels: true,
         fftSamples: 512,

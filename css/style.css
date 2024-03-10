@@ -475,10 +475,9 @@ Modal customisations
 
 .modal-dialog-bottom {
     position: absolute;
-    bottom: 30px;
-    left: 10px;
-    margin: auto;
-  }
+    bottom: 1px;
+    left: 24%;
+}
 
 input[type="range"] {
     width: 140px;
