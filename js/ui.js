@@ -936,7 +936,7 @@ function postAnalyseMessage(args) {
 
 
 function fetchLocationAddress(lat, lon) {
-    if (isNaN(lat) || isNaN(lon  || lat === '' || lon === '')){
+    if (isNaN(lat) || isNaN(lon)  || !lat || !lon){
         generateToast({ message:'Both lat and lon values need to be numbers between 180 and -180'})
         return false
     }
@@ -1454,8 +1454,7 @@ window.onload = async () => {
         limit: 500,
         track: true,
         debug: false,
-        VERSION: VERSION,
-        XCcache: {}
+        VERSION: VERSION
     };
     // Load preferences and override defaults
     [appPath, tempPath] = await getPaths();
@@ -4121,7 +4120,7 @@ DOM.gain.addEventListener('input', () => {
             case 'setCustomLocation': { setCustomLocation(); break }
             case 'setFileStart': { showDatePicker(); break }
 
-            // XC API calls
+            // XC API calls (no await)
             case 'context-xc': { getXCComparisons(); break}
         }
         contextMenu.classList.add("d-none");
@@ -4829,12 +4828,20 @@ function setListUIState(list){
     }
 
 
-function getXCComparisons(){
+async function getXCComparisons(){
     const xc = document.getElementById('context-xc');
     let [,,,sname,cname] = activeRow.getAttribute('name').split('|');
     const XC_type = cname.includes('(song)') ? "song" :
     cname.includes('call)') ? "call" : "";
-    if (config.XCcache[sname]) renderComparisons(config.XCcache[sname], cname);
+    const XCcache = await fs.readFile(p.join(appPath, 'XCcache.json'), 'utf8', (err, data) => {
+        if (err) {
+            console.warn('No XC cache found' + err)
+            return;
+        } else {
+            return JSON.parse(data);
+        }
+    })
+    if (XCcache && XCcache[sname]) renderComparisons(config.XCcache[sname], cname);
     else {
         const loading = document.getElementById('loadingOverlay')
         loading.classList.remove('d-none');
@@ -4896,7 +4903,7 @@ function getXCComparisons(){
               } else {
                 // Let's cache the result, 'cos the XC API is quite slow
                 config.XCcache[sname] = filteredLists;
-                //updatePrefs(); // TODO: separate the caches, add expiry - a week?
+                updatePrefs('XCcache.json'); // TODO: separate the caches, add expiry - a week?
                 console.log('XC response', filteredLists)
                 renderComparisons(filteredLists, cname)
               }
@@ -4923,11 +4930,11 @@ function renderComparisons(lists, cname){
     compareDiv.setAttribute('aria-hidden', "true");
     compareDiv.setAttribute( "data-bs-backdrop", "static")
     const compareHTML = `
-        <div class="modal-dialog modal-lg modal-dialog-bottom w-100 modal-dialog-dark">
+        <div class="modal-dialog modal-lg modal-dialog-bottom w-100">
             <div class="modal-content">
-                <div class="modal-header pb-0"><h5>${cname} Vocalisations</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-header pt-1 pb-0 bg-dark bg-opacity-25"><h5>${cname}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
                     <div class="modal-body pt-0 pb-1">
-                        <ul class="nav nav-tabs navbar navbar-expand p-0" id="callTypeHeader" role="tablist"></ul>
+                        <ul class="nav nav-tabs navbar navbar-expand p-0 pt-1" id="callTypeHeader" role="tablist"></ul>
                         <div class="tab-content" id="recordings"></div>
                         <div class="modal-footer justify-content-center pb-0">
                             <button id="playComparison" class="p-1 pe-2 btn btn-outline-secondary" title="Play / Pause (SpaceBar)">
@@ -4938,14 +4945,13 @@ function renderComparisons(lists, cname){
                                 class="align-middle d-none d-lg-inline-block">Pause</span>
                             </button>
                             <div class="btn-group" role="group">
-                                <button id="cmpZoomIn" title="Zoom into the spectrogram (Ctrl +)" class="btn btn-outline-secondary"
-                                style="max-width: 70px">
+                                <button id="cmpZoomIn" title="Zoom into the spectrogram" class="btn btn-outline-secondary p-0">
                                 <span class="material-symbols-outlined zoom">zoom_in</span>
                                 </button>
-                                <button id="cmpZoomOut" title="Zoom out of the spectrogram (Ctrl -)" class="btn btn-outline-secondary"
+                                <button id="cmpZoomOut" title="Zoom out of the spectrogram" class="btn btn-outline-secondary p-0"
                                 style="max-width: 70px"><span class="material-symbols-outlined zoom align-middle">zoom_out</span>
                                 </button>
-                        </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -5059,6 +5065,8 @@ function renderComparisons(lists, cname){
 }
 
 let ws;
+const playComparison = () => {ws.playPause()}
+
 function showCompareSpec() {
     if (ws) ws.destroy()
     const activeCarouselItem = document.querySelector('#recordings .tab-pane.active .carousel-item.active');
@@ -5109,12 +5117,9 @@ function showCompareSpec() {
 
     ws.load(file)
     const playButton = document.getElementById('playComparison')
-    //playButton.removeEventListener('click', playComparison )
     playButton.addEventListener('click', playComparison)
 
 }
-
-const playComparison = () => {ws.playPause()}
 
 // Make config and displayLocationAddress available to the map script in index.html
 export { config, displayLocationAddress, LOCATIONS };
