@@ -314,7 +314,7 @@ async function handleMessage(e) {
             filesBeingProcessed.length && onAbort(args);
             DEBUG && console.log("Worker received audio " + args.file);
             await loadAudioFile(args);
-            metadata[args.file].isSaved ? await onChangeMode("archive") : await onChangeMode("analyse");
+            metadata[args.file]?.isSaved ? await onChangeMode("archive") : await onChangeMode("analyse");
             break;
         }
         case "filter": {if (STATE.db) {
@@ -2376,7 +2376,8 @@ const prepSummaryStatement = (included) => {
             directory = undefined,
             format = undefined,
             active = undefined,
-            select = undefined
+            select = undefined,
+            duration = undefined
         } = {}) => {
             let confidence = STATE.detect.confidence;
                         const included = STATE.selection ? [] : await getIncludedIDs();
@@ -2397,10 +2398,10 @@ const prepSummaryStatement = (included) => {
             const [sql, params] = prepResultsStatement(species, limit === Infinity, included, offset, topRankin);
             
             const result = await STATE.db.allAsync(sql, ...params);
-            if (format === 'text'){
+            if (format === 'text' || format === 'eBird'){
                 // CSV export. Format the values
                 const formattedValues = await Promise.all(result.map(async (item) => {
-                    return await formatCSVValues(item);
+                    return format === 'text' ? await formatCSVValues(item) : await formateBirdValues(item, duration) 
                 }));
                 
                 // Create a write stream for the CSV file
@@ -2501,6 +2502,66 @@ const prepSummaryStatement = (included) => {
             modifiedObj['Latitude'] = latitude;
             modifiedObj['Longitude'] = longitude;
             modifiedObj['Place'] = place;
+            return modifiedObj;
+        }
+
+        // Function to format the CSV export
+        async function formateBirdValues(obj, duration) {
+            // Create a copy of the original object to avoid modifying it directly
+            const modifiedObj = { ...obj };
+            // Get lat and lon
+            const result = await STATE.db.getAsync(`
+                SELECT lat, lon, place 
+                FROM files JOIN locations on locations.id = files.locationID 
+                WHERE files.name = ? `, modifiedObj.file);
+            const latitude =  result?.lat || STATE.lat;
+            const longitude =  result?.lon || STATE.lon;
+            const place =  result?.place || STATE.place;
+            // Step 1: Remove specified keys
+            const keysToRemove = ['confidence_rank', 'filestart', 'speciesID', 'file', 'duration', 'fileID', 'label', 'rank', 'end', 'score', 'position'];
+            keysToRemove.forEach(key => delete modifiedObj[key]);
+            modifiedObj.timestamp = formatDate(modifiedObj.timestamp);
+            let [date, time] = modifiedObj.timestamp.split(' ');
+            const [year, month, day] = date.split('-');
+            date = `${month}/${day}/${year}`;
+            const [hours, minutes] = time.split(':')
+            time = `${hours}:${minutes}`;
+            delete modifiedObj.timestamp;
+            if (STATE.model === 'chirpity'){
+                // Regular expression to match the words inside parentheses
+                const regex = /\(([^)]+)\)/;
+                const matches = modifiedObj.cname.match(regex);
+                // Splitting the input string based on the regular expression match
+                const [name, calltype] = modifiedObj.cname.split(regex);
+                modifiedObj.cname = name.trim(); // Output: "words words"
+                modifiedObj.comment ??= calltype;
+            }
+            // Rename the headers
+            modifiedObj['Common name'] = modifiedObj.cname
+            delete modifiedObj.cname;
+            const [genus, species] = modifiedObj.sname.split(' ');
+            delete modifiedObj.sname;
+            modifiedObj['Genus'] = genus;
+            modifiedObj['Species'] = species;
+            modifiedObj['Species Count'] = modifiedObj.callCount
+            delete modifiedObj.callCount;
+            modifiedObj['Species Comments'] = modifiedObj.comment?.replace(/\r?\n/g, ' ');
+            delete modifiedObj.comment;
+            modifiedObj['Location Name'] = place;
+            modifiedObj['Latitude'] = latitude;
+            modifiedObj['Longitude'] = longitude;
+            modifiedObj['Date'] = date;
+            modifiedObj['Start Time'] = time;
+            modifiedObj['State/Province'] = '';
+            modifiedObj['Country'] = '';
+            modifiedObj['Protocol'] = 'Stationary';
+            modifiedObj['Number of observers'] = '';
+            modifiedObj['Duration'] = duration; // todo: get audio duration;
+            delete modifiedObj.duration;
+            modifiedObj['All observations reported?'] = 'N';
+            modifiedObj['Distance covered'] = '';
+            modifiedObj['Area covered'] = '';
+            modifiedObj['Submission Comments'] = 'Submission initially generated from Chirpity';
             return modifiedObj;
         }
         

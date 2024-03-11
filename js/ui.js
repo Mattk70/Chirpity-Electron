@@ -1042,8 +1042,15 @@ async function batchExportAudio() {
 }
 
 const export2CSV = ()  => exportData('text', isSpeciesViewFiltered(true), Infinity);
+const exporteBird = ()  => exportData('eBird', isSpeciesViewFiltered(true), Infinity, DIAGNOSTICS['Audio Duration']);
 
-async function exportData(format, species, limit){
+async function exportData(format, species, limit, duration){
+    //convert duration to minutes
+    if (duration) {
+        duration = Math.ceil(duration/60)
+        // having a duration means it's an eBird submission, so we need US common names
+        if (config[config.model].locale !== 'en') return generateToast({message: 'eBird submissions require US common names. To generate this submission you must select <b>English (US)</b> as your language in Settings.'})
+    }
     const response = await window.electron.selectDirectory('selectDirectory');
     if (!response.canceled) {
         const directory = response.filePaths[0];
@@ -1051,6 +1058,7 @@ async function exportData(format, species, limit){
             action: 'export-results',
             directory: directory,
             format: format,
+            duration: duration,
             species: species,
             files: isExplore() ? [] : fileList,
             explore: isExplore(),
@@ -1092,7 +1100,7 @@ exploreLink.addEventListener('click', async () => {
     locationFilter.addEventListener('change', handleLocationFilterChange);
     hideAll();
     showElement(['exploreWrapper'], false);
-    enableMenuItem(['saveCSV']);
+    enableMenuItem(['saveCSV, save-eBird']);
     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
     // Analysis is done
     STATE.analysisDone = true;
@@ -1428,7 +1436,6 @@ window.onload = async () => {
         seenTour: false,
         lastUpdateCheck: 0,
         UUID: uuidv4(),
-        locale: 'en_uk',
         colormap: 'inferno',
         timeOfDay: true,
         list: 'birds',
@@ -2926,9 +2933,9 @@ function onChartData(args) {
         // Why do we do audacity labels here?
         AUDACITY_LABELS = audacityLabels;
         if (! isEmptyObject(AUDACITY_LABELS)) {
-            enableMenuItem(['saveLabels', 'saveCSV', 'save2db', 'export2audio']);
+            enableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save2db', 'export2audio']);
         } else {
-            disableMenuItem(['saveLabels', 'saveCSV']);
+            disableMenuItem(['saveLabels', 'saveCSV', 'save-eBird']);
         }
         if (currentFile) enableMenuItem(['analyse'])
     }
@@ -4062,6 +4069,7 @@ DOM.gain.addEventListener('input', () => {
             case 'open-folder': { showOpenDialog('openDirectory'); break }
             case 'saveLabels': { showSaveDialog(); break }
             case 'saveCSV': { export2CSV(); break }
+            case 'save-eBird': { exporteBird(); break }
             case 'export-audio': { exportAudio(); break }
             case 'exit': { exitApplication(); break }
 
@@ -4838,7 +4846,15 @@ function setListUIState(list){
         return false;
     }
 
-
+    // Not Harlem, but Fisher-Yates shuffle
+    function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+    
 async function getXCComparisons(){
     const xc = document.getElementById('context-xc');
     let [,,,sname,cname] = activeRow.getAttribute('name').split('|');
@@ -4879,6 +4895,10 @@ async function getXCComparisons(){
                 smp: record.smp, // sample rate
                 licence: record.lic //// licence
               }));
+
+            // Shuffle recordings so new cache returns a different set
+            shuffle(recordings);
+
             // Initialize an object to store the lists
             const filteredLists = {
               'nocturnal flight call': [],
