@@ -31,6 +31,7 @@
 <body>
     <!-- Loading Spinner Overlay -->
     <div id="loadingOverlay" class="overlay d-none text-white">
+        <div class="d-flex text-white">Loading Xento Canto data...</div>
         <div class="d-flex justify-content-evenly">
             <div class="spinner-grow spinner-grow-sm m-3" role="status">
               <span class="visually-hidden">Loading...</span>
@@ -120,6 +121,13 @@
                             <input class="form-check-input" type="checkbox" role="switch" id="nocmig">
                             <label class="form-check-label" for="nocmig">Only analyse night time periods.</label>
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Nocmig Mode" data-bs-content="When enabled, this 'Nocmig mode' only searches for and only displays detections found during the night">?</a>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="form-group rounded">
+                        <div class="form-check form-switch ps-2">
+                            <button class="btn btn-primary" id="clear-call-cache" onclick="return false">Clear Reference Call Cache</button>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Clear Call Cache" data-bs-content="The data used for the reference call comparisons are cached. Clearing the cache will refresh the calls for each species the next time a comparison is requested">?</a>
                         </div>
                     </div>
                 </fieldset>

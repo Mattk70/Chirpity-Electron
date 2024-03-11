@@ -724,7 +724,7 @@ const setDefaultLocation = () => {
     config.longitude = parseFloat(parseFloat(DOM.defaultLon.value)).toFixed(2);
     config.location = document.getElementById('place').textContent.replace('fmd_good', '');
     updateMap(parseFloat(DOM.defaultLat.value), parseFloat(DOM.defaultLon.value));
-    updatePrefs();
+    updatePrefs('config.json', config)
     worker.postMessage({
         action: 'update-state',
         lat: config.latitude,
@@ -1397,10 +1397,9 @@ function secondaryLabelInterval(pxPerSec) {
 
 ////////// Store preferences //////////
 
-function updatePrefs(file) {
-    file = file || 'config.json';
+function updatePrefs(file, data) {
     try {
-        fs.writeFileSync(p.join(appPath, file), JSON.stringify(config))
+        fs.writeFileSync(p.join(appPath, file), JSON.stringify(data))
     } catch (error) {
         console.log(error)
     }
@@ -2242,9 +2241,8 @@ function onChartData(args) {
             scrollParent: false,
             fillParent: true,
             windowFunc: 'hamming',
-            minPxPerSec: 1,
             frequencyMin: 0,
-            frequencyMax: 11_750,
+            frequencyMax: 12_000,
             normalize: false,
             hideScrollbar: true,
             labels: true,
@@ -2267,26 +2265,23 @@ function onChartData(args) {
 
     const updateListIcon = () => {
         DOM.listIcon.innerHTML = config.list === 'custom' ?
-            '<span class="material-symbols-outlined mt-1" style="width: 30px">fact_check</span>' :
-            `<img class="icon" src="img/${config.list}.png" alt="${config.list}">`;
+            `<span class="material-symbols-outlined mt-1" title="${LIST_MAP[config.list]}" style="width: 30px">fact_check</span>` :
+            `<img class="icon" src="img/${config.list}.png" alt="${config.list}"  title="${LIST_MAP[config.list]}">`;
 
     }
     DOM.listIcon.addEventListener('click', () => {
+        // todo: skip custom list if custom list not set
         const keys = Object.keys(LIST_MAP);
         const currentListIndex = keys.indexOf(config.list);
         const next = (currentListIndex === keys.length - 1) ? 0 : currentListIndex + 1;
         config.list = keys[next];
         DOM.listToUse.value = config.list;
-        DOM.listIcon.innerHTML = config.list === 'custom' ?
-             '<span class="material-symbols-outlined mt-1" style="width: 30px">fact_check</span>' :
-             `<img class="icon" src="img/${config.list}.png" alt="${config.list}">`;
-        updatePrefs();
+        updateListIcon();
+        updatePrefs('config.json', config)
         resetResults({clearSummary: true, clearPagination: true, clearResults: true});
         setListUIState(config.list)
         worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone })
-        }
-        
-    )
+    })
     
     DOM.customListSelector.addEventListener('click', async () =>{
         const files = await window.electron.openDialog('showOpenDialog', {type: 'text'});
@@ -2296,7 +2291,7 @@ function onChartData(args) {
             config.customListFile[config.model] = customListFile;
             DOM.customListFile.value = customListFile;
             readLabels(config.customListFile[config.model], 'list');
-            updatePrefs();
+            updatePrefs('config.json', config)
         }
     })
     
@@ -2345,7 +2340,7 @@ function onChartData(args) {
         DOM.numberOfThreads.textContent = config[config.backend].threads;
         DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
         DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
-        updatePrefs();
+        updatePrefs('config.json', config)
         // restart wavesurfer regions to set new maxLength
         initRegion();
         loadModel();
@@ -2381,7 +2376,7 @@ function onChartData(args) {
             const position = wavesurfer.getCurrentTime() / windowLength;
             postBufferUpdate({ begin: bufferBegin, position: position })
         }
-        updatePrefs();
+        updatePrefs('config.json', config)
     };
     //document.getElementById('timelineSetting').addEventListener('change', timelineToggle);
     
@@ -3307,7 +3302,7 @@ function onChartData(args) {
             if (!config.seenThanks) {
                 generateToast({ message:'Thank you, your feedback helps improve Chirpity predictions'});
                 config.seenThanks = true;
-                updatePrefs()
+                updatePrefs('config.json', config)
             }
             worker.postMessage({
                 action: 'post',
@@ -3468,7 +3463,7 @@ function onChartData(args) {
             detect: { nocmig: config.detect.nocmig },
             globalOffset: 0, filteredOffset: {}
         });
-        updatePrefs();
+        updatePrefs('config.json', config)
         if (STATE.analysisDone){
         resetResults({clearSummary: true, clearPagination: true, clearResults: false});
         filterResults()
@@ -3502,7 +3497,7 @@ function onChartData(args) {
             action: 'update-state',
             filters: { active: config.filters.active },
         });
-        updatePrefs();
+        updatePrefs('config.json', config)
         showFilterEffect();
         filterIconDisplay();
     }
@@ -3525,14 +3520,14 @@ function onChartData(args) {
             detect: { contextAware: config.detect.contextAware },
             filters: { SNR: config.filters.SNR },
         });
-        updatePrefs()
+        updatePrefs('config.json', config)
     }
     //DOM.contextAwareIcon.addEventListener('click', toggleContextAwareMode)
     
     DOM.debugMode.addEventListener('click', () =>{
         config.debug = !config.debug;
         DOM.debugMode.checked = config.debug;
-        updatePrefs()
+        updatePrefs('config.json', config)
     })
     
     //DOM.nocmigButton.addEventListener('click', changeNocmigMode);
@@ -3546,7 +3541,7 @@ function onChartData(args) {
             config.fullscreen = true;
             fullscreen.textContent = 'fullscreen_exit';
         }
-        updatePrefs();
+        updatePrefs('config.json', config)
         adjustSpecDims(true, 512);
     }
     
@@ -3930,7 +3925,7 @@ function onChartData(args) {
     const handleThresholdChange = (e) => {
         const threshold = e.target.valueAsNumber;
         config.detect.confidence = threshold;
-        updatePrefs();
+        updatePrefs('config.json', config)
         worker.postMessage({
             action: 'update-state',
             detect: { confidence: config.detect.confidence }
@@ -4113,6 +4108,22 @@ DOM.gain.addEventListener('input', () => {
                 zoomSpec(e)
                 break;
             }
+            case 'cmpZoomIn':
+            case 'cmpZoomOut': {
+                let minPxPerSec = ws.params.minPxPerSec;
+                minPxPerSec = target === 'cmpZoomOut' ? Math.max(minPxPerSec /= 2, 195) : Math.min(minPxPerSec *= 2, 780) ;
+                ws.zoom(minPxPerSec);
+                ws.spectrogram.init();
+                document.querySelector("#recordings .tab-pane.active .carousel-item.active spectrogram > canvas").width = `${ws.drawer.width / ws.params.pixelRatio}px`;
+                break;
+            }
+            case 'clear-call-cache': {
+                const data = fs.rm(p.join(appPath, 'XCcache.json'), err =>{
+                    if (err) generateToast({message: 'No call cache was found.'}) && console.warn('No XC cache found', err);
+                    else generateToast({message: 'The call cache was successfully cleared.'})
+                })
+                break;
+            }
             case 'playToggle': {
                 (async () => await wavesurfer.playPause())()
                 break;
@@ -4126,7 +4137,7 @@ DOM.gain.addEventListener('input', () => {
         contextMenu.classList.add("d-none");
         hideConfidenceSlider();
         config.debug && console.log('clicked', target);
-        target && target !== 'result1' && trackEvent(config.UUID, 'UI', 'Click', target);  
+        target && target !== 'result1' && trackEvent(config.UUID, 'UI', 'Click', target);
     })
     
     
@@ -4344,7 +4355,7 @@ DOM.gain.addEventListener('input', () => {
                     break;
                 };
             }
-            updatePrefs();
+            updatePrefs('config.json', config)
             const value = element.type === "checkbox" ? element.checked : element.value;
             trackEvent(config.UUID, 'Settings Change', target, value);
         }
@@ -4432,7 +4443,7 @@ function setListUIState(list){
         <span class="material-symbols-outlined">music_note</span> Export Audio Clip${plural}
         </a>
         <span class="dropdown-item" id="context-xc" href='#' target="xc">
-        <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> Compare Species from Xeno-Canto
+        <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> Compare with Reference Calls
         </span>
         <div class="dropdown-divider ${hideInSelection}"></div>
         <a class="dropdown-item ${hideInSelection}" id="context-delete" href="#">
@@ -4675,7 +4686,7 @@ function setListUIState(list){
             element.classList.remove('highlighted');
         });
         config.seenTour = true;
-        updatePrefs();
+        updatePrefs('config.json', config)
     });
     
     // Event handler for starting the tour
@@ -4739,7 +4750,7 @@ function setListUIState(list){
                     'warning')
                 }
                 config.lastUpdateCheck = latestCheck;
-                updatePrefs()
+                updatePrefs('config.json', config)
             })
             .catch(error => {
                 console.warn('Error checking for updates:', error);
@@ -4833,20 +4844,21 @@ async function getXCComparisons(){
     let [,,,sname,cname] = activeRow.getAttribute('name').split('|');
     const XC_type = cname.includes('(song)') ? "song" :
     cname.includes('call)') ? "call" : "";
-    const XCcache = await fs.readFile(p.join(appPath, 'XCcache.json'), 'utf8', (err, data) => {
-        if (err) {
-            console.warn('No XC cache found' + err)
-            return;
-        } else {
-            return JSON.parse(data);
-        }
-    })
-    if (XCcache && XCcache[sname]) renderComparisons(config.XCcache[sname], cname);
+    let XCcache;
+    try {
+        const data = await fs.promises.readFile(p.join(appPath, 'XCcache.json'), 'utf8');
+        XCcache = JSON.parse(data);
+    } catch (err) {
+        console.warn('No XC cache found', err);
+        XCcache = {}; // Set XCcache as an empty object
+    }
+    
+    if (XCcache[sname]) renderComparisons(XCcache[sname], cname);
     else {
         const loading = document.getElementById('loadingOverlay')
         loading.classList.remove('d-none');
         const quality = '+q:%22>C%22';
-        const length = '+len:3-30';
+        const length = '+len:3-15';
         fetch(`https://xeno-canto.org/api/2/recordings?query=${sname}${quality}${length}`)
         .then(response =>{
             if (! response.ok) {
@@ -4902,8 +4914,8 @@ async function getXCComparisons(){
                 return
               } else {
                 // Let's cache the result, 'cos the XC API is quite slow
-                config.XCcache[sname] = filteredLists;
-                updatePrefs('XCcache.json'); // TODO: separate the caches, add expiry - a week?
+                XCcache[sname] = filteredLists;
+                updatePrefs('XCcache.json', XCcache); // TODO: separate the caches, add expiry - a week?
                 console.log('XC response', filteredLists)
                 renderComparisons(filteredLists, cname)
               }
@@ -5008,8 +5020,6 @@ function renderComparisons(lists, cname){
                 // create div for wavesurfer
                 const mediaDiv = document.createElement('div');
                 mediaDiv.id = `${callType}-${i}`;
-                //mediaDiv.style.height = "350px";
-                mediaDiv.style.width = "100%";
                 const specDiv = document.createElement('div');
                 specDiv.id = `${callTypePrefix}-${i}-compareSpec`;
                 mediaDiv.setAttribute('name', `${specDiv.id}|${recording.file}`)
@@ -5087,26 +5097,23 @@ function showCompareSpec() {
         // but keep the playhead
         cursorColor: '#fff',
         cursorWidth: 2,
-        skipLength: 0.1,
-        partialRender: true,
-        scrollParent: false,
+        partialRender: false,
+        scrollParent: true,
         fillParent: true,
         responsive: false,
         normalize: true,
-        height: 250
+        height: 250,
+        minPxPerSec: 195
     });
     
     ws.addPlugin(WaveSurfer.spectrogram.create({
         //deferInit: false,
         wavesurfer: ws,
         container: "#" + specContainer,
-        scrollParent: false,
-        fillParent: true,
         windowFunc: 'hamming',
-        minPxPerSec: 1,
         frequencyMin: 0,
         frequencyMax: 12_000,
-        hideScrollbar: true,
+        hideScrollbar: false,
         labels: true,
         fftSamples: 512,
         height: 250,
@@ -5117,6 +5124,8 @@ function showCompareSpec() {
 
     ws.load(file)
     const playButton = document.getElementById('playComparison')
+    // prevent listener accumulation
+    playButton.removeEventListener('click', playComparison)
     playButton.addEventListener('click', playComparison)
 
 }
