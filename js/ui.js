@@ -1038,7 +1038,7 @@ function hideAll() {
 
 async function batchExportAudio() {
     const species = isSpeciesViewFiltered(true); 
-    species ? exportData('audio', species, 1000) : generateToast("Filter results by species to export audio files");
+    species ? exportData('audio', species, 1000) : generateToast({message: "Filter results by species to export audio files"});
 }
 
 const export2CSV = ()  => exportData('text', isSpeciesViewFiltered(true), Infinity);
