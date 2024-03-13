@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>eBird Record FAQ</title>
+</head>
+<body>
+
+<table class="table table-hover p-1">
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>eBird Record FAQ</h5></td>
+    </tr>
+    <tr>
+        <td><b>What is eBird?</b></td>
+        <td><a href="https://ebird.org/about" target="_blank">eBird</a> is an online platform for sharing bird observation data, managed by the Cornell Lab of Ornithology. </td>
+    </tr>
+    <tr>
+        <td><b>What is an eBird Record File?</b></td>
+        <td>The record file is a spreadsheet of bird observation data that can be imported into the eBird platform.
+        </td>
+    </tr>
+    <tr>
+        <td><b>How does Chirpity organise my detections</b></td>
+        <td>
+            <p>The application creates a checklist for each file associated with your export. These checklists contain a total of the call detections for each species in that file.
+            Where you have entered a call count, this figure is used, otherwise one call is assumed.</p>
+            <p>The exported file contains a row of headers explaining what each column represents. 
+                You'll find <a href="https://support.ebird.org/en/support/solutions/articles/48000907878-upload-spreadsheet-data-to-ebird#anchorRecordFormat" target="_blank">further details</a> 
+                on the eBird site.
+            </p>
+            <p><b>Important:</b> the header row needs to be deleted before you upload the file.</p> 
+        </td>
+    </tr>
+    <tr>
+        <td><b>How do I upload my eBird record file?</b></td>
+        <td>
+            Visit <a href="https://www.ebird.org/home" target="_blank">eBird</a> and sign up for or sign in to your eBird account. Once you have an account
+            and are logged in go to <a href="https://ebird.org/import/upload.form?theme=ebird" target="_blank">the import form</a>.
+            <ol>
+                <li>Click "Choose file" and select the file you have prepared</li>
+                <li><b>Important:</b> check &quot;eBird Record format (Extended)&quot;</li>
+                <li>Hit &quot;Import file&quot;</li>
+            </ol>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Why are there errors when I try to upload my record file?</b></td>
+        <td>
+            <p>Firstly, make sure you have deleted the header row. eBird expects the first row in the file to contain an observation.</p>
+            <p>If this is not the problem, and you are seeing errors relating to species not being recognised, make sure the language preferences you have set in Chirpity 
+                match those you have set for your eBird account.</p> 
+        </td>
+    </tr>
+    <tr>
+        <td><b>Why are Country and State/Province columns blank?</b></td>
+        <td>
+            <p>These fields are optional in the eBird record format. Although the open streetmap place lookup API used by Chirpity will give State and Country, it does not supply them in the 
+                format used by eBird. You can look up the correct format for your country and region in this <a href="https://support.ebird.org/helpdesk/attachments/48293281603" target="_blank">spreadsheet</a>.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Why did you choose eBird? Do you have plans to allow sharing with other sites?</b></td>
+        <td>
+            <p>eBird is the simplest platform to use. This is because it has a published record format, and perhaps most importantly, the eBird taxonomy aligns to the one
+            used by the both the BirdNET and Chirpity models.</p>
+            <p>I hope to offer the ability to share audio clips with Xeno-Canto in a future release. This depends on them releasing a suitable upload API.</p>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2">
+            <h6 class="justify-content-center">The responsibility for checking the record file for accuracy is yours. Chirpity makes no guarantees whatsoever for the accuracy of any of 
+            the data in the record files. By using this feature, you acknowledge and agree to this.</h6></td>
+    </tr>
+</table>
+
+</body>
+</html>

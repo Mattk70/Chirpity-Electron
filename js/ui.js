@@ -1042,15 +1042,9 @@ async function batchExportAudio() {
 }
 
 const export2CSV = ()  => exportData('text', isSpeciesViewFiltered(true), Infinity);
-const exporteBird = ()  => exportData('eBird', isSpeciesViewFiltered(true), Infinity, DIAGNOSTICS['Audio Duration']);
+const exporteBird = ()  => exportData('eBird', isSpeciesViewFiltered(true), Infinity);
 
 async function exportData(format, species, limit, duration){
-    //convert duration to minutes
-    if (duration) {
-        duration = Math.ceil(duration/60)
-        // having a duration means it's an eBird submission, so we need US common names
-        if (config[config.model].locale !== 'en') return generateToast({message: 'eBird submissions require US common names. To generate this submission you must select <b>English (US)</b> as your language in Settings.'})
-    }
     const response = await window.electron.selectDirectory('selectDirectory');
     if (!response.canceled) {
         const directory = response.filePaths[0];
@@ -1100,7 +1094,7 @@ exploreLink.addEventListener('click', async () => {
     locationFilter.addEventListener('change', handleLocationFilterChange);
     hideAll();
     showElement(['exploreWrapper'], false);
-    enableMenuItem(['saveCSV, save-eBird']);
+    enableMenuItem(['saveCSV', 'save-eBird']);
     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
     // Analysis is done
     STATE.analysisDone = true;
@@ -2249,7 +2243,7 @@ function onChartData(args) {
             fillParent: true,
             windowFunc: 'hamming',
             frequencyMin: 0,
-            frequencyMax: 12_000,
+            frequencyMax: 11_950,
             normalize: false,
             hideScrollbar: true,
             labels: true,
@@ -2825,7 +2819,7 @@ function onChartData(args) {
         for (let i = 0; i < summary.length; i++) {
             const item = summary[i];
             const selected = item.cname === filterSpecies ? ' text-warning' : '';
-            summaryHTML += `<tr tabindex="-1" class="${selected}">
+            summaryHTML += `<tr class="${selected}">
             <td class="max">${iconizeScore(item.max)}</td>
             <td class="cname">
             <span class="pointer"><span class="cname">${item.cname}</span> <br><i>${item.sname}</i></span>
@@ -4080,14 +4074,15 @@ DOM.gain.addEventListener('input', () => {
             case 'analyse': {postAnalyseMessage({ filesInScope: [currentFile] }); break }
             case 'analyseSelection': {getSelectionResults(); break }
             case 'analyseAll': {postAnalyseMessage({ filesInScope: fileList }); break }
-            case 'reanalyse': {postAnalyseMessage({ filesInScope: [currentFile], reanlayse: true }); break }
-            case 'reanalyseAll': {postAnalyseMessage({ filesInScope: fileList, reanlayse: true }); break }
+            case 'reanalyse': {postAnalyseMessage({ filesInScope: [currentFile], reanalyse: true }); break }
+            case 'reanalyseAll': {postAnalyseMessage({ filesInScope: fileList, reanalyse: true }); break }
 
             case 'keyboardHelp': { (async () => await populateHelpModal('Help/keyboard.html', 'Keyboard shortcuts'))(); break }
             case 'settingsHelp': { (async () => await populateHelpModal('Help/settings.html', 'Settings Help'))(); break }
             case 'usage': { (async () => await populateHelpModal('Help/usage.html', 'Usage Guide'))(); break }
             case 'bugs': { (async () => await populateHelpModal('Help/bugs.html', 'Issues, queries or bugs'))(); break }
             case 'species': { worker.postMessage({action: 'get-valid-species', file: currentFile}); break }
+            case 'eBird': { (async () => await populateHelpModal('Help/ebird.html', 'eBird Record FAQ'))(); break }
             case 'export-list': { exportSpeciesList(); break }
 
             case 'confidence-sort': {
@@ -5049,17 +5044,16 @@ function renderComparisons(lists, cname){
                 creditContainer.style.width = "100%";
                 const creditText = document.createElement('div');
                 creditText.style.zIndex = 1;
-                creditText.classList.add('float-end', 'w-100', 'position-absolute', 'text-muted', 'pe-1');
-                creditText.innerHTML = 'Source: Xeno-Canto &copy; ';
+                creditText.classList.add('float-end', 'w-100', 'position-absolute', 'pe-1');
                 const creditLink = document.createElement('a');
-                creditLink.classList.add('text-muted');
+                creditLink.classList.add('xc-link');
                 creditText.appendChild(creditLink);
                 creditContainer.appendChild(creditText);
                 carouselItem.appendChild(creditContainer);
                 carouselItem.appendChild(mediaDiv);
                 creditLink.setAttribute('href', 'https:' + recording.url);
                 creditLink.setAttribute('target', '_blank');
-                creditLink.textContent = recording.rec;
+                creditLink.innerHTML = 'Source: Xeno-Canto &copy; ' + recording.rec;
                 carouselInner.appendChild(carouselItem)
 
                 carouselIndicators.appendChild(indicatorItem);
@@ -5132,7 +5126,7 @@ function showCompareSpec() {
         container: "#" + specContainer,
         windowFunc: 'hamming',
         frequencyMin: 0,
-        frequencyMax: 12_000,
+        frequencyMax: 11_950,
         hideScrollbar: false,
         labels: true,
         fftSamples: 512,

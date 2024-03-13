@@ -49,7 +49,7 @@
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" id="close-settings" aria-label="Close"></button>
         </div>
         <div class="offcanvas-body pt-1">
-            <!-- Your offcanvas content goes here -->
+            <!-- Offcanvas -->
             <form id="settingsForm" class="fs-6">
                 <fieldset class="border border-secondary rounded m-2 mt-0 mb-0 p-2">
                     <legend style="font-size: large;font-weight:bold">Detections</legend>
@@ -583,7 +583,7 @@
                                 to CSV</a>
                             </li>
                             <li><a class="dropdown-item disabled" id="save-eBird" href="#">
-                                <span class="material-symbols-outlined">ios_share</span> Export eBird Record file</a>
+                                <span class="material-symbols-outlined">ios_share</span><span class="badge text-bg-warning">Beta</span> Export eBird Record file</a>
                             </li>
                             <li><a class="dropdown-item disabled" id="export-audio" href="#">
                                 <span class="material-symbols-outlined">music_note</span> Export Selected
@@ -685,12 +685,17 @@
                                 <a class="dropdown-item" id="bugs" href="#">
                                     <span class="material-symbols-outlined">bug_report</span> Issues, queries or bugs?
                                 </a>
-                            </li>                                                
+                            </li>
                             <div class="dropdown-divider"></div>
                             <h6 class="fs-6 ps-3">FAQs</h6>
                             <li>
                                 <a class="dropdown-item" id="species" href="#">
                                     <span class="material-symbols-outlined">help</span> What species are detected?
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" id="eBird" href="#">
+                                    <span class="material-symbols-outlined">help</span> What is an eBird Record?
                                 </a>
                             </li>
                         </ul>

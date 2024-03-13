@@ -1164,14 +1164,20 @@ const prepSummaryStatement = (included) => {
                 
                     
                     let chunkStart = start * sampleRate;
-                    readStream.on('data', async chunk => {
-                        // Ensure data is processed in order
-                        readStream.pause();
+                    // Changed on.('data') handler because of:  https://stackoverflow.com/questions/32978094/nodejs-streams-and-premature-end
+                    readStream.on('readable', async () => {
+                        const chunk = readStream.read();
+                        if (chunk === null) return;
+                        // The stream seems to read one more byte than the end
+                        else if (chunk.byteLength <= 1 ) {
+                            predictionsReceived[file]++;
+                            return
+                        }
                         if (aborted) {
                             readStream.destroy()
                             return
                         }
-                        
+
                         try {
                             let audio = Buffer.concat([meta.header, chunk]);
                             
@@ -1180,13 +1186,10 @@ const prepSummaryStatement = (included) => {
                             if (offlineCtx) {
                                 offlineCtx.startRendering().then((resampled) => {
                                     const myArray = resampled.getChannelData(0);
-                                    
                                     workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
                                     worker = workerInstance;
                                     feedChunksToModel(myArray, chunkStart, file, end, worker);
                                     chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
-                                    // Now the async stuff is done ==>
-                                    readStream.resume();
                                 }).catch((error) => {
                                     console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
                                     const fileIndex = filesBeingProcessed.indexOf(file);
@@ -1203,18 +1206,18 @@ const prepSummaryStatement = (included) => {
                                 // Create array with 0's (short segment of silence that will trigger the finalChunk flag
                                 const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
                                 feedChunksToModel(myArray, chunkStart, file, end);
-                                readStream.resume();
+                                //readStream.resume();
                             }
                         } catch (error) {
-                            console.warn(error)
+                            console.warn(file, error)
                             //trackError(error.message, 'getWavePredictBuffers', STATE.batchSize);
                             //UI.postMessage({event: 'generate-alert', message: "Chirpity is struggling to handle the high number of prediction requests. You should <b>increasse</b> the batch size in settings to compensate for this, or risk skipping audio sections. Press <b>Esc</b> to abort."})
                         }
                     })
-                    readStream.on('end', function () {
-                        readStream.close();
-                        DEBUG && console.log('All chunks sent for ', file)
-                    })
+                    // readStream.on('end', function () {
+                    //     //readStream.close();
+                    //     DEBUG && console.log('All chunks sent for ', file)
+                    // })
                     readStream.on('error', err => {
                         console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
                         err.code === 'ENOENT' && notifyMissingFile(file);
@@ -1256,7 +1259,6 @@ const prepSummaryStatement = (included) => {
                         if (error.message.includes('SIGKILL')) DEBUG && console.log('FFMPEG process shut down')
                         else {
                             error.message = error.message + '|' + error.stack;
-                            throw error;
                         }
                         reject(console.warn('Error in ffmpeg extracting audio segment:', error.message));
                     });
@@ -1265,63 +1267,73 @@ const prepSummaryStatement = (included) => {
                     })
                     command.on('end', () => {
                         // End the stream to signify completion
-                        STREAM.end();
+                        //STREAM.end();
                     });
 
-                    STREAM.on('data', async chunk => {
-                        STREAM.pause()
-                        STREAM.destroyed && console.log('stream destroyed before data finished being read')
+                    STREAM.on('readable', async () => {
+                        let  chunk = STREAM.read();
+                        
                         if (aborted) {
                             command.kill()
                             STREAM.destroy()
                             return
                         }
-
-                        const bufferList = [concatenatedBuffer, chunk].filter(buf => buf.length > 0);
-                        try {
-                            concatenatedBuffer = Buffer.concat(bufferList);
-                        } catch (error) {
-                            console.warn(error)
-                            //trackError(error.message, 'getPredictBuffers', STATE.batchSize);
-                            //UI.postMessage({event: 'generate-alert', message: "Chirpity is struggling to handle the high number of prediction requests. You should <b>increasse</b> the batch size in settings to compensate for this, or risk skipping audio sections. Press <b>Esc</b> to abort."})
-
+                        if (chunk === null  || chunk.byteLength <= 1) {
+                        // deal with part-full buffers
+                        if (concatenatedBuffer.length){
+                            const audio = Buffer.concat([WAV_HEADER, concatenatedBuffer]);
+                            await sendBuffer(audio, chunkStart, chunkLength, end, file)
+                            }
+                            DEBUG && console.log('All chunks sent for ', file);
+                            //command.kill();
+                            resolve('finished')
                         }
-                        
-                        // if we have a full buffer
-                        if (concatenatedBuffer.length >= highWaterMark) {
-                            chunk = concatenatedBuffer.subarray(0, highWaterMark);
-                            concatenatedBuffer = concatenatedBuffer.subarray(highWaterMark);
-                            const audio = Buffer.concat([WAV_HEADER, chunk])
-                            const offlineCtx = await setupCtx(audio, undefined, 'model').catch( (error) => console.warn(error));
-                            let worker;
-                            if (offlineCtx) {
-                                offlineCtx.startRendering().then((resampled) => {
-                                    const myArray = resampled.getChannelData(0);
-                                    workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-                                    worker = workerInstance;
-                                    DEBUG && console.log('chunkstart:', chunkStart, 'file', file)
-                                    feedChunksToModel(myArray, chunkStart, file, end, worker);
-                                    chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
-                                }).catch((error) => {
-                                    console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
-                                    const fileIndex = filesBeingProcessed.indexOf(file);
-                                    if (fileIndex !== -1) {
-                                        filesBeingProcessed.splice(fileIndex, 1)
-                                    }
-                                });
-                            } else {
-                                console.warn('Short chunk', chunk.length, 'padding')
-                                workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-                                worker = workerInstance;
-
-                                // Create array with 0's (short segment of silence that will trigger the finalChunk flag
-                                const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
-                                feedChunksToModel(myArray, chunkStart, file, end);
-                                console.log('chunkstart:', chunkStart, 'file', file)
+                        else {
+                            const bufferList = [concatenatedBuffer, chunk].filter(buf => buf.length > 0);
+                            try {
+                                concatenatedBuffer = Buffer.concat(bufferList);
+                            } catch (error) {
+                                console.warn(error)
+                                //trackError(error.message, 'getPredictBuffers', STATE.batchSize);
+                                //UI.postMessage({event: 'generate-alert', message: "Chirpity is struggling to handle the high number of prediction requests. You should <b>increasse</b> the batch size in settings to compensate for this, or risk skipping audio sections. Press <b>Esc</b> to abort."})
 
                             }
+                            
+                            // if we have a full buffer
+                            if (concatenatedBuffer.length >= highWaterMark) {
+                                chunk = concatenatedBuffer.subarray(0, highWaterMark);
+                                concatenatedBuffer = concatenatedBuffer.subarray(highWaterMark);
+                                const audio = Buffer.concat([WAV_HEADER, chunk])
+                                const offlineCtx = await setupCtx(audio, undefined, 'model').catch( (error) => console.warn(error));
+                                let worker;
+                                if (offlineCtx) {
+                                    offlineCtx.startRendering().then((resampled) => {
+                                        const myArray = resampled.getChannelData(0);
+                                        workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+                                        worker = workerInstance;
+                                        DEBUG && console.log('chunkstart:', chunkStart, 'file', file)
+                                        feedChunksToModel(myArray, chunkStart, file, end, worker);
+                                        chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
+                                    }).catch((error) => {
+                                        console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
+                                        const fileIndex = filesBeingProcessed.indexOf(file);
+                                        if (fileIndex !== -1) {
+                                            filesBeingProcessed.splice(fileIndex, 1)
+                                        }
+                                    });
+                                } else {
+                                    console.warn('Short chunk', chunk.length, 'padding')
+                                    workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+                                    worker = workerInstance;
+
+                                    // Create array with 0's (short segment of silence that will trigger the finalChunk flag
+                                    const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
+                                    feedChunksToModel(myArray, chunkStart, file, end);
+                                    console.log('chunkstart:', chunkStart, 'file', file)
+
+                                }
+                            }
                         }
-                        STREAM.resume()
                     });
 
                     STREAM.on('error', err => {
@@ -1330,14 +1342,14 @@ const prepSummaryStatement = (included) => {
                     })
 
                     STREAM.on('end', async function () {
-                        // deal with part-full buffers
-                        if (concatenatedBuffer.length){
-                            const audio = Buffer.concat([WAV_HEADER, concatenatedBuffer]);
-                            await sendBuffer(audio, chunkStart, chunkLength, end, file)
-                        }
-                        DEBUG && console.log('All chunks sent for ', file)
-                        STREAM.destroy()
-                        resolve('finished')
+                        // // deal with part-full buffers
+                        // if (concatenatedBuffer.length){
+                        //     const audio = Buffer.concat([WAV_HEADER, concatenatedBuffer]);
+                        //     await sendBuffer(audio, chunkStart, chunkLength, end, file)
+                        // }
+                        // DEBUG && console.log('All chunks sent for ', file)
+                        // STREAM.destroy()
+                        // resolve('finished')
                     })
                     command.run();
                 }).catch(error => console.log(error));
@@ -1410,10 +1422,11 @@ const prepSummaryStatement = (included) => {
             
                     const data = [];
                     stream.on('data', chunk => {
-                        data.push(chunk);
+                        if (chunk.byteLength > 1) data.push(chunk);
                     });
 
                     stream.on('end', async () => { 
+                        if (data.length === 0) return
                         //Add the audio header
                         data.unshift(CHIRPITY_HEADER)
                         // Concatenate the data chunks into a single Buffer
@@ -2376,8 +2389,7 @@ const prepSummaryStatement = (included) => {
             directory = undefined,
             format = undefined,
             active = undefined,
-            select = undefined,
-            duration = undefined
+            select = undefined
         } = {}) => {
             let confidence = STATE.detect.confidence;
                         const included = STATE.selection ? [] : await getIncludedIDs();
@@ -2398,12 +2410,49 @@ const prepSummaryStatement = (included) => {
             const [sql, params] = prepResultsStatement(species, limit === Infinity, included, offset, topRankin);
             
             const result = await STATE.db.allAsync(sql, ...params);
+            let formattedValues;
             if (format === 'text' || format === 'eBird'){
                 // CSV export. Format the values
-                const formattedValues = await Promise.all(result.map(async (item) => {
-                    return format === 'text' ? await formatCSVValues(item) : await formateBirdValues(item, duration) 
+                formattedValues = await Promise.all(result.map(async (item) => {
+                    return format === 'text' ? await formatCSVValues(item) : await formateBirdValues(item) 
+
                 }));
-                
+                if (format === 'eBird'){
+                    // Group the data by "Start Time", "Common name", and "Species" and calculate total species count for each group
+                    const summary = formattedValues.reduce((acc, curr) => {
+                        const key = `${curr["Start Time"]}_${curr["Common name"]}_${curr["Species"]}`;
+                        if (!acc[key]) {
+                            acc[key] = {
+                                "Common name": curr["Common name"],
+                                // Include other fields from the original data
+                                "Genus": curr["Genus"],
+                                "Species": curr["Species"],
+                                "Species Count": 0,
+                                "Species Comments": curr["Species Comments"],
+                                "Location Name": curr["Location Name"],
+                                "Latitude": curr["Latitude"],
+                                "Longitude": curr["Longitude"],
+                                "Date": curr["Date"],
+                                "Start Time": curr["Start Time"],
+                                "State/Province": curr["State/Province"],
+                                "Country": curr["Country"],
+                                "Protocol": curr["Protocol"],
+                                "Number of observers": curr["Number of observers"],
+                                "Duration": curr["Duration"],
+                                "All observations reported?": curr["All observations reported?"],
+                                "Distance covered": curr["Distance covered"],
+                                "Area covered": curr["Area covered"],
+                                "Submission Comments": curr["Submission Comments"]
+                            };
+                        }
+                        // Increment total species count for the group
+                        acc[key]["Species Count"] += curr["Species Count"];
+                        return acc;
+                    }, {});
+                    // Convert summary object into an array of objects
+                    formattedValues = Object.values(summary);
+
+                }
                 // Create a write stream for the CSV file
                 let filename = species || 'All';
                 filename += '_detections.csv';
@@ -2506,7 +2555,7 @@ const prepSummaryStatement = (included) => {
         }
 
         // Function to format the CSV export
-        async function formateBirdValues(obj, duration) {
+        async function formateBirdValues(obj) {
             // Create a copy of the original object to avoid modifying it directly
             const modifiedObj = { ...obj };
             // Get lat and lon
@@ -2518,7 +2567,9 @@ const prepSummaryStatement = (included) => {
             const longitude =  result?.lon || STATE.lon;
             const place =  result?.place || STATE.place;
             // Step 1: Remove specified keys
-            const keysToRemove = ['confidence_rank', 'filestart', 'speciesID', 'file', 'duration', 'fileID', 'label', 'rank', 'end', 'score', 'position'];
+            const keysToRemove = ['confidence_rank', 'speciesID', 'file', 'fileID', 'label', 'rank', 'end', 'score', 'position'];
+            modifiedObj.timestamp = modifiedObj.filestart;
+            delete modifiedObj.filestart;
             keysToRemove.forEach(key => delete modifiedObj[key]);
             modifiedObj.timestamp = formatDate(modifiedObj.timestamp);
             let [date, time] = modifiedObj.timestamp.split(' ');
@@ -2543,7 +2594,7 @@ const prepSummaryStatement = (included) => {
             delete modifiedObj.sname;
             modifiedObj['Genus'] = genus;
             modifiedObj['Species'] = species;
-            modifiedObj['Species Count'] = modifiedObj.callCount
+            modifiedObj['Species Count'] = modifiedObj.callCount || 1;
             delete modifiedObj.callCount;
             modifiedObj['Species Comments'] = modifiedObj.comment?.replace(/\r?\n/g, ' ');
             delete modifiedObj.comment;
@@ -2555,8 +2606,8 @@ const prepSummaryStatement = (included) => {
             modifiedObj['State/Province'] = '';
             modifiedObj['Country'] = '';
             modifiedObj['Protocol'] = 'Stationary';
-            modifiedObj['Number of observers'] = '';
-            modifiedObj['Duration'] = duration; // todo: get audio duration;
+            modifiedObj['Number of observers'] = '1';
+            modifiedObj['Duration'] = Math.ceil(modifiedObj.duration / 60); // todo: get audio duration;
             delete modifiedObj.duration;
             modifiedObj['All observations reported?'] = 'N';
             modifiedObj['Distance covered'] = '';
@@ -2614,13 +2665,18 @@ const prepSummaryStatement = (included) => {
         
         
         const getSavedFileInfo = async (file) => {
-            // look for file in the disk DB, ignore extension        
-            let row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name = ?',file);
-            if (!row) {
-                const baseName = file.replace(/^(.*)\..*$/g, '$1%');
-                row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)',baseName);
-            } 
-            return row
+            if (diskDB){
+                // look for file in the disk DB, ignore extension        
+                let row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name = ?',file);
+                if (!row) {
+                    const baseName = file.replace(/^(.*)\..*$/g, '$1%');
+                    row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)',baseName);
+                } 
+                return row
+            } else {
+                UI.postMessage({event: 'generate-alert', message: 'The database has not finished loading. The check for the presence of the file in the archive has been skipped'})
+                return undefined
+            }
         };
         
         
