@@ -1,5 +1,5 @@
-const DEBUG = true;
-const ID_SITE = 3;
+const DEBUG = false;
+const ID_SITE = 2;
 
 
 function trackEvent(uuid, event, action, name, value){

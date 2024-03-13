@@ -1027,14 +1027,6 @@ function hideAll() {
     'spectrogramWrapper', 'resultTableContainer', 'recordsContainer', 'fullscreen', 'resultsHead']);
 }
 
-// const save2dbLink = document.getElementById('save2db');
-// save2dbLink.addEventListener('click', async () => {
-//     worker.postMessage({ action: 'save2db', file: currentFile })
-
-// });
-
-// const export2audio = document.getElementById('export2audio');
-// export2audio.addEventListener('click', batchExportAudio);
 
 async function batchExportAudio() {
     const species = isSpeciesViewFiltered(true); 
@@ -4511,7 +4503,7 @@ function setListUIState(list){
     [DOM.spectrogramWrapper, DOM.resultTableElement, selectionTable].forEach(el =>{
         el.addEventListener('contextmenu', createContextMenu)
     })
-    
+
     
     const recordEntryModalDiv = document.getElementById('record-entry-modal')
     const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, { backdrop: 'static' });
