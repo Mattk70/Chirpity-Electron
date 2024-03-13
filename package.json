@@ -13,8 +13,8 @@
     "type": "git",
     "url": "git+https://github.com/mattk70/Chirpity-Electron.git"
   },
-  "beforeBuild": "prebuild.js",
   "build": {
+    "beforeBuild": "prebuild.js",
     "appId": "com.electron.chirpity",
     "publish": [
       {

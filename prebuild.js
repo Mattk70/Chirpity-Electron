@@ -10,6 +10,7 @@ function searchPatterns(directory, patterns) {
 
     files.forEach(file => {
         const filePath = path.join(directory, file);
+        console.log(filePath)
         const stats = fs.statSync(filePath);
         if (stats.isDirectory() || file.endsWith('.js')){
             if (stats.isDirectory()) {
