@@ -379,7 +379,7 @@ case "update-list": {
     // Clear the LIST_CACHE & STATE.included kesy to force list regeneration
     LIST_CACHE = {}; //[`${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`];
     delete STATE.included?.[STATE.model]?.[STATE.list];
-    await setIncludedIDs(lat, lon, week )
+    LIST_WORKER && await setIncludedIDs(lat, lon, week )
     args.refreshResults && await Promise.all([getResults(), getSummary()]);
     break;
 }
