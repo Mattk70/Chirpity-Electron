@@ -1187,7 +1187,7 @@
 <script src="./js/ui.js" type="module"></script>
 <script type="module" defer>
     import { config, displayLocationAddress, LOCATIONS } from './js/ui.js';
-    let map, marker;
+    let map, marker, clickTimer = 0;
     async function onMapClick(e) {
         const {lat, lng} = e.latlng;
         const target = map.getContainer().id;
@@ -1278,7 +1278,15 @@
         const latEl = document.getElementById(latTxt);
         const lonEl = document.getElementById(lonTxt);
         showMap(divID);
-        map.on('click', onMapClick);
+        map.on('click', (e) => {
+            clearTimeout(clickTimer);
+            //Wait for doubleclick
+            clickTimer = setTimeout(() => {onMapClick(e)}, 250);
+        })
+        // don't call onMapClick if doubleclicked
+        map.on('dblclick', (e) => {
+            clearTimeout(clickTimer);
+        })
     }
 
     window.placeMap = placeMap;

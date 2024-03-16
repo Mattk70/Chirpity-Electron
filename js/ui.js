@@ -2181,6 +2181,8 @@ function onChartData(args) {
         let action = e.code;
         if (action in GLOBAL_ACTIONS) {
             if (document === e.target || document.body === e.target || e.target.attributes["data-action"]) {}
+            const modifier = e.shiftKey ? 'Shift' : e.ctrlKey ? 'Control' : e.metaKey ? 'Alt' : 'no';
+            trackEvent(config.UUID, 'KeyPress', action, modifier );
             GLOBAL_ACTIONS[action](e);
         }
         
