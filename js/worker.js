@@ -2512,49 +2512,34 @@ const prepSummaryStatement = (included) => {
             const latitude =  result?.lat || STATE.lat;
             const longitude =  result?.lon || STATE.lon;
             const place =  result?.place || STATE.place;
-            // Step 1: Remove specified keys
-            delete modifiedObj.confidence_rank;
-            delete modifiedObj.filestart;
-            delete modifiedObj.speciesID;
-            delete modifiedObj.duration;
             modifiedObj.score /= 1000;
             modifiedObj.score = modifiedObj.score.toString().replace(/^2$/, 'confirmed');
             // Step 2: Multiply 'end' by 1000 and add 'timestamp'
             modifiedObj.end = (modifiedObj.end - modifiedObj.position) * 1000  + modifiedObj.timestamp;
             
             // Step 3: Convert 'timestamp' and 'end' to a formatted string
-            //const date = new Date(modifiedObj.timestamp);
             modifiedObj.timestamp = formatDate(modifiedObj.timestamp)
             const end = new Date(modifiedObj.end);
             modifiedObj.end = end.toISOString().slice(0, 19).replace('T', ' ');
-            // Rename the headers
-            modifiedObj['File'] = modifiedObj.file
-            delete modifiedObj.file;
-            modifiedObj['Detection start'] = modifiedObj.timestamp
-            delete modifiedObj.timestamp;
-            modifiedObj['Detection end'] = modifiedObj.end
-            delete modifiedObj.end;
-            modifiedObj['Common name'] = modifiedObj.cname
-            delete modifiedObj.cname;
-            modifiedObj['Latin name'] = modifiedObj.sname
-            delete modifiedObj.sname;
-            modifiedObj['Confidence'] = modifiedObj.score
-            delete modifiedObj.score;
-            modifiedObj['Label'] = modifiedObj.label
-            delete modifiedObj.label;
-            modifiedObj['Comment'] = modifiedObj.comment
-            delete modifiedObj.comment;
-            modifiedObj['Call count'] = modifiedObj.callCount
-            delete modifiedObj.callCount;
-            modifiedObj['File offset'] = secondsToHHMMSS(modifiedObj.position)
-            delete modifiedObj.position;
-            modifiedObj['Latitude'] = latitude;
-            modifiedObj['Longitude'] = longitude;
-            modifiedObj['Place'] = place;
-            return modifiedObj;
+            // Create a new object with the right headers
+            const newObj = {};
+            newObj['File'] = modifiedObj.file
+            newObj['Detection start'] = modifiedObj.timestamp
+            newObj['Detection end'] = modifiedObj.end
+            newObj['Common name'] = modifiedObj.cname
+            newObj['Latin name'] = modifiedObj.sname
+            newObj['Confidence'] = modifiedObj.score
+            newObj['Label'] = modifiedObj.label
+            newObj['Comment'] = modifiedObj.comment
+            newObj['Call count'] = modifiedObj.callCount
+            newObj['File offset'] = secondsToHHMMSS(modifiedObj.position)
+            newObj['Latitude'] = latitude;
+            newObj['Longitude'] = longitude;
+            newObj['Place'] = place;
+            return newObj;
         }
 
-        // Function to format the CSV export
+        // Function to format the eBird export
         async function formateBirdValues(obj) {
             // Create a copy of the original object to avoid modifying it directly
             const modifiedObj = { ...obj };
@@ -2566,18 +2551,12 @@ const prepSummaryStatement = (included) => {
             const latitude =  result?.lat || STATE.lat;
             const longitude =  result?.lon || STATE.lon;
             const place =  result?.place || STATE.place;
-            // Step 1: Remove specified keys
-            const keysToRemove = ['confidence_rank', 'speciesID', 'file', 'fileID', 'label', 'rank', 'end', 'score', 'position'];
-            modifiedObj.timestamp = modifiedObj.filestart;
-            delete modifiedObj.filestart;
-            keysToRemove.forEach(key => delete modifiedObj[key]);
-            modifiedObj.timestamp = formatDate(modifiedObj.timestamp);
+            modifiedObj.timestamp = formatDate(modifiedObj.filestart);
             let [date, time] = modifiedObj.timestamp.split(' ');
             const [year, month, day] = date.split('-');
             date = `${month}/${day}/${year}`;
             const [hours, minutes] = time.split(':')
             time = `${hours}:${minutes}`;
-            delete modifiedObj.timestamp;
             if (STATE.model === 'chirpity'){
                 // Regular expression to match the words inside parentheses
                 const regex = /\(([^)]+)\)/;
@@ -2587,33 +2566,29 @@ const prepSummaryStatement = (included) => {
                 modifiedObj.cname = name.trim(); // Output: "words words"
                 modifiedObj.comment ??= calltype;
             }
-            // Rename the headers
-            modifiedObj['Common name'] = modifiedObj.cname
-            delete modifiedObj.cname;
             const [genus, species] = modifiedObj.sname.split(' ');
-            delete modifiedObj.sname;
-            modifiedObj['Genus'] = genus;
-            modifiedObj['Species'] = species;
-            modifiedObj['Species Count'] = modifiedObj.callCount || 1;
-            delete modifiedObj.callCount;
-            modifiedObj['Species Comments'] = modifiedObj.comment?.replace(/\r?\n/g, ' ');
-            delete modifiedObj.comment;
-            modifiedObj['Location Name'] = place;
-            modifiedObj['Latitude'] = latitude;
-            modifiedObj['Longitude'] = longitude;
-            modifiedObj['Date'] = date;
-            modifiedObj['Start Time'] = time;
-            modifiedObj['State/Province'] = '';
-            modifiedObj['Country'] = '';
-            modifiedObj['Protocol'] = 'Stationary';
-            modifiedObj['Number of observers'] = '1';
-            modifiedObj['Duration'] = Math.ceil(modifiedObj.duration / 60); // todo: get audio duration;
-            delete modifiedObj.duration;
-            modifiedObj['All observations reported?'] = 'N';
-            modifiedObj['Distance covered'] = '';
-            modifiedObj['Area covered'] = '';
-            modifiedObj['Submission Comments'] = 'Submission initially generated from Chirpity';
-            return modifiedObj;
+            // Create a new object with the right keys
+            const newObj = {};
+            newObj['Common name'] = modifiedObj.cname;
+            newObj['Genus'] = genus;
+            newObj['Species'] = species;
+            newObj['Species Count'] = modifiedObj.callCount || 1;
+            newObj['Species Comments'] = modifiedObj.comment?.replace(/\r?\n/g, ' ');
+            newObj['Location Name'] = place;
+            newObj['Latitude'] = latitude;
+            newObj['Longitude'] = longitude;
+            newObj['Date'] = date;
+            newObj['Start Time'] = time;
+            newObj['State/Province'] = '';
+            newObj['Country'] = '';
+            newObj['Protocol'] = 'Stationary';
+            newObj['Number of observers'] = '1';
+            newObj['Duration'] = Math.ceil(modifiedObj.duration / 60);
+            newObj['All observations reported?'] = 'N';
+            newObj['Distance covered'] = '';
+            newObj['Area covered'] = '';
+            newObj['Submission Comments'] = 'Submission initially generated from Chirpity';
+            return newObj;
         }
         
         function secondsToHHMMSS(seconds) {
