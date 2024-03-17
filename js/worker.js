@@ -733,7 +733,6 @@ async function onAnalyse({
     //Reset GLOBAL variables
     index = 0;
     AUDACITY = {};
-    // canBeRemovedFromCache = [];
     batchChunksToSend = {};
     FILE_QUEUE = filesInScope;
     
@@ -1113,6 +1112,9 @@ async function setupCtx(audio, rate, destination) {
 * @param end
 * @returns {Promise<void>}
 */
+
+let predictQueue = [];
+let processing = false;
             
 const getWavePredictBuffers = async ({
     file = '', start = 0, end = undefined
@@ -1162,10 +1164,10 @@ const getWavePredictBuffers = async ({
             start: meta.byteStart, end: meta.byteEnd, highWaterMark: meta.highWaterMark
         });
     
-        
+
         let chunkStart = start * sampleRate;
         // Changed on.('data') handler because of:  https://stackoverflow.com/questions/32978094/nodejs-streams-and-premature-end
-        readStream.on('readable', async () => {
+        readStream.on('readable', () => {
             const chunk = readStream.read();
             if (chunk === null) return;
             // The stream seems to read one more byte than the end
@@ -1177,54 +1179,53 @@ const getWavePredictBuffers = async ({
                 readStream.destroy()
                 return
             }
-
-            try {
-                let audio = Buffer.concat([meta.header, chunk]);
-                
-                const offlineCtx = await setupCtx(audio, undefined, 'model');
-                let worker;
-                if (offlineCtx) {
-                    offlineCtx.startRendering().then((resampled) => {
-                        const myArray = resampled.getChannelData(0);
-                        workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-                        worker = workerInstance;
-                        feedChunksToModel(myArray, chunkStart, file, end, worker);
-                        chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
-                    }).catch((error) => {
-                        console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
-                        const fileIndex = filesBeingProcessed.indexOf(file);
-                        if (fileIndex !== -1) {
-                            canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
-                        }
-                        // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
-                    });
-                } else {
-                    console.log('Short chunk', chunk.length, 'padding')
-                    workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-                    worker = workerInstance;
-
-                    // Create array with 0's (short segment of silence that will trigger the finalChunk flag
-                    const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
-                    feedChunksToModel(myArray, chunkStart, file, end);
-                    //readStream.resume();
-                }
-            } catch (error) {
-                console.warn(file, error)
-                //trackError(error.message, 'getWavePredictBuffers', STATE.batchSize);
-                //UI.postMessage({event: 'generate-alert', message: "Chirpity is struggling to handle the high number of prediction requests. You should <b>increasse</b> the batch size in settings to compensate for this, or risk skipping audio sections. Press <b>Esc</b> to abort."})
-            }
+            const audio = Buffer.concat([meta.header, chunk]);
+            predictQueue.push([audio, file, end, chunkStart]);
+            chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate
+            processPredictQueue();
         })
-        // readStream.on('end', function () {
-        //     //readStream.close();
-        //     DEBUG && console.log('All chunks sent for ', file)
-        // })
+
         readStream.on('error', err => {
             console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
             err.code === 'ENOENT' && notifyMissingFile(file);
         })
     })    
 }
-            
+
+async function processPredictQueue(){
+    if (processing || predictQueue.length === 0) return; // Exit if already processing or queue is empty
+    processing = true; // Set processing flag to true
+
+    const [audio, file, end, chunkStart]  = predictQueue.shift(); // Dequeue chunk
+    await setupCtx(audio, undefined, 'model').then(offlineCtx => {
+        let worker;
+        if (offlineCtx) {
+            offlineCtx.startRendering().then((resampled) => {
+                const myArray = resampled.getChannelData(0);
+                workerInstance = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+                worker = workerInstance;
+                console.log('ChunkStart', chunkStart, 'array length', myArray.length, 'file', file);
+                feedChunksToModel(myArray, chunkStart, file, end, worker);
+                //chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
+                processing = false; // Reset processing flag
+                processPredictQueue(); // Process next chunk in the queue
+            }).catch((error) => {
+                console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
+                const fileIndex = filesBeingProcessed.indexOf(file);
+                processing = false; // Reset processing flag
+                processPredictQueue(); // Process next chunk in the queue
+            });
+        } else {
+            console.log('Short chunk', chunk.length, 'padding');
+            workerInstance = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+            worker = workerInstance;
+            const myArray = new Float32Array(Array.from({ length: chunkLength }).fill(0));
+            feedChunksToModel(myArray, chunkStart, file, end);
+        }}).catch(error => {
+        console.warn(file, error);
+    })
+}
+
 const getPredictBuffers = async ({
     file = '', start = 0, end = undefined
 }) => {
@@ -1279,10 +1280,11 @@ const getPredictBuffers = async ({
                 return
             }
             if (chunk === null  || chunk.byteLength <= 1) {
-            // deal with part-full buffers
-            if (concatenatedBuffer.length){
-                const audio = Buffer.concat([WAV_HEADER, concatenatedBuffer]);
-                await sendBuffer(audio, chunkStart, chunkLength, end, file)
+                // EOF: deal with part-full buffers
+                if (concatenatedBuffer.length){
+                    const audio = Buffer.concat([WAV_HEADER, concatenatedBuffer]);
+                    predictQueue.push([audio, file, end, chunkStart]);
+                    processPredictQueue();
                 }
                 DEBUG && console.log('All chunks sent for ', file);
                 //command.kill();
@@ -1294,9 +1296,6 @@ const getPredictBuffers = async ({
                     concatenatedBuffer = Buffer.concat(bufferList);
                 } catch (error) {
                     console.warn(error)
-                    //trackError(error.message, 'getPredictBuffers', STATE.batchSize);
-                    //UI.postMessage({event: 'generate-alert', message: "Chirpity is struggling to handle the high number of prediction requests. You should <b>increasse</b> the batch size in settings to compensate for this, or risk skipping audio sections. Press <b>Esc</b> to abort."})
-
                 }
                 
                 // if we have a full buffer
@@ -1304,34 +1303,9 @@ const getPredictBuffers = async ({
                     chunk = concatenatedBuffer.subarray(0, highWaterMark);
                     concatenatedBuffer = concatenatedBuffer.subarray(highWaterMark);
                     const audio = Buffer.concat([WAV_HEADER, chunk])
-                    const offlineCtx = await setupCtx(audio, undefined, 'model').catch( (error) => console.warn(error));
-                    let worker;
-                    if (offlineCtx) {
-                        offlineCtx.startRendering().then((resampled) => {
-                            const myArray = resampled.getChannelData(0);
-                            workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-                            worker = workerInstance;
-                            DEBUG && console.log('chunkstart:', chunkStart, 'file', file)
-                            feedChunksToModel(myArray, chunkStart, file, end, worker);
-                            chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
-                        }).catch((error) => {
-                            console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
-                            const fileIndex = filesBeingProcessed.indexOf(file);
-                            if (fileIndex !== -1) {
-                                filesBeingProcessed.splice(fileIndex, 1)
-                            }
-                        });
-                    } else {
-                        console.warn('Short chunk', chunk.length, 'padding')
-                        workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-                        worker = workerInstance;
-
-                        // Create array with 0's (short segment of silence that will trigger the finalChunk flag
-                        const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
-                        feedChunksToModel(myArray, chunkStart, file, end);
-                        console.log('chunkstart:', chunkStart, 'file', file)
-
-                    }
+                    predictQueue.push([audio, file, end, chunkStart]);
+                    chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate
+                    processPredictQueue();
                 }
             }
         });
@@ -1355,37 +1329,6 @@ const getPredictBuffers = async ({
     }).catch(error => console.log(error));
 }
 
-async function sendBuffer(audio, chunkStart, chunkLength, end, file){
-    const offlineCtx = await setupCtx(audio, undefined, 'model');
-    let worker;
-    if (offlineCtx) {
-        offlineCtx.startRendering().then((resampled) => {
-            const myArray = resampled.getChannelData(0);
-            workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-            worker = workerInstance;
-            feedChunksToModel(myArray, chunkStart, file, end, worker);
-            //chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
-            // Now the async stuff is done ==>
-            //readStream.resume();
-        }).catch((error) => {
-            console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
-            const fileIndex = filesBeingProcessed.indexOf(file);
-            if (fileIndex !== -1) {
-                filesBeingProcessed.splice(fileIndex, 1)
-            }
-        });
-    } else {
-        if (audio.length){
-            console.warn('Short chunk', audio.length, 'padding')
-            workerInstance  = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-            worker = workerInstance;
-
-            // Create array with 0's (short segment of silence that will trigger the finalChunk flag
-            const myArray = new Float32Array(Array.from({length: chunkLength}).fill(0));
-            feedChunksToModel(myArray, chunkStart, file, end);
-        }
-    }
-}
 
 /**
 *  Called when file first loaded, when result clicked and when saving or sending file snippets
@@ -2145,7 +2088,6 @@ function updateFilesBeingProcessed(file) {
     // This method to determine batch complete
     const fileIndex = filesBeingProcessed.indexOf(file);
     if (fileIndex !== -1) {
-        // canBeRemovedFromCache.push(filesBeingProcessed.splice(fileIndex, 1))
         filesBeingProcessed.splice(fileIndex, 1)
         UI.postMessage({ event: 'progress', progress: 1, file: file })
     }
