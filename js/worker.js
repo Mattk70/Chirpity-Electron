@@ -2339,12 +2339,12 @@ const getResults = async ({
     select = undefined
 } = {}) => {
     let confidence = STATE.detect.confidence;
-                const included = STATE.selection ? [] : await getIncludedIDs();
+    const included = STATE.selection ? [] : await getIncludedIDs();
     if (select) {
         const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
         offset = Math.floor(position/limit) * limit;
         // update the pagination
-        const [total, , species] = await getTotal({species: species, offset: offset, included: included})
+        const [total, , ] = await getTotal({species: species, offset: offset, included: included})
         UI.postMessage({event: 'total-records', total: total, offset: offset, species: species})
     }
     offset = offset ?? (species ? (STATE.filteredOffset[species] ?? 0) : STATE.globalOffset);
