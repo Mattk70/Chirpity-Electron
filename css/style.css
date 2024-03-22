@@ -200,12 +200,6 @@ ul {
     color: whitesmoke; /* White color on hover */
 }
 
-/*
-tbody tr:not(.table-active):hover {
-    background-color: whitesmoke; 
-}
-*/
-
 #results>thead,
 #results>th,
 #resultSummary>thead,
