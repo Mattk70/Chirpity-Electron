@@ -328,6 +328,11 @@ footer {
     white-space: nowrap;
 }
 
+.dropdown-menu-dark {
+    overflow: auto;
+  max-height: 30vh;
+}
+
 .filename,
 .dropdown-menu-dark>a {
     max-width: 300px;
