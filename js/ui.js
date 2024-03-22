@@ -1857,7 +1857,7 @@ document.addEventListener('change', function (e) {
 })
 
 // Save audio clip
-function onSaveAudio({file: file, filename: filename}){
+function onSaveAudio({file, filename}){
     const anchor = document.createElement('a');
     document.body.appendChild(anchor);
     anchor.style = 'display: none';

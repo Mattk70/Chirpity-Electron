@@ -317,96 +317,97 @@ async function handleMessage(e) {
             metadata[args.file]?.isSaved ? await onChangeMode("archive") : await onChangeMode("analyse");
             break;
         }
-        case "filter": {if (STATE.db) {
-            t0 = Date.now();
-            await getResults(args);
-            const t1 = Date.now();
-            args.updateSummary && await getSummary(args);
-            const t2 = Date.now();
-            args.included = await getIncludedIDs(args.file);
-            const [total, offset, species] = await getTotal(args);
-            UI.postMessage({event: 'total-records', total: total, offset: offset, species: species})
-            DEBUG && console.log("Filter took", (Date.now() - t0) / 1000, "seconds", "GetTotal took", (Date.now() - t2) / 1000, "seconds", "GetSummary took", (t2 - t1) / 1000, "seconds");
+        case "filter": {
+            if (STATE.db) {
+                t0 = Date.now();
+                await getResults(args);
+                const t1 = Date.now();
+                args.updateSummary && await getSummary(args);
+                const t2 = Date.now();
+                args.included = await getIncludedIDs(args.file);
+                const [total, offset, species] = await getTotal(args);
+                UI.postMessage({event: 'total-records', total: total, offset: offset, species: species})
+                DEBUG && console.log("Filter took", (Date.now() - t0) / 1000, "seconds", "GetTotal took", (Date.now() - t2) / 1000, "seconds", "GetSummary took", (t2 - t1) / 1000, "seconds");
+            }
+            break;
         }
+        case "get-detected-species-list": {getDetectedSpecies();
+            break;
+        }
+        case "get-valid-species": {getValidSpecies(args.file);
+            break;
+        }
+        case "get-locations": { getLocations({ db: STATE.db, file: args.file });
         break;
-    }
-    case "get-detected-species-list": {getDetectedSpecies();
+        }
+        case "get-valid-files-list": { await getFiles(args.files);
+            break;
+        }
+        case "insert-manual-record": { await onInsertManualRecord(args);
+            break;
+        }
+        case "load-model": {
+            if (filesBeingProcessed.length) onAbort(args);
+            else predictWorkers.length && terminateWorkers();
+            await onLaunch(args);
+            break;
+        }
+        case "post": {await uploadOpus(args);
+            break;
+        }
+        case "purge-file": {onFileDelete(args.fileName);
+            break;
+        }
+        case "save": {DEBUG && console.log("file save requested");
+        await saveAudio(args.file, args.start, args.end, args.filename, args.metadata);
         break;
-    }
-    case "get-valid-species": {getValidSpecies(args.file);
-        break;
-    }
-    case "get-locations": { getLocations({ db: STATE.db, file: args.file });
-    break;
-}
-case "get-valid-files-list": { await getFiles(args.files);
-    break;
-}
-case "insert-manual-record": { await onInsertManualRecord(args);
-    break;
-}
-case "load-model": {
-    if (filesBeingProcessed.length) onAbort(args);
-    else predictWorkers.length && terminateWorkers();
-    await onLaunch(args);
-    break;
-}
-case "post": {await uploadOpus(args);
-    break;
-}
-case "purge-file": {onFileDelete(args.fileName);
-    break;
-}
-case "save": {DEBUG && console.log("file save requested");
-await saveAudio(args.file, args.start, args.end, args.filename, args.metadata);
-break;
-}
-case "save2db": {await onSave2DiskDB(args);
-    break;
-}
-case "set-custom-file-location": {onSetCustomLocation(args);
-    break;
-}
-case "update-buffer": {await loadAudioFile(args);
-    break;
-}
-case "update-file-start": {await onUpdateFileStart(args);
-    break;
-}
-case "update-list": {
-    STATE.list = args.list;
-    STATE.customList = args.list === 'custom' ? args.customList : STATE.customList;
-    const {lat, lon, week} = STATE;
-    // Clear the LIST_CACHE & STATE.included kesy to force list regeneration
-    LIST_CACHE = {}; //[`${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`];
-    delete STATE.included?.[STATE.model]?.[STATE.list];
-    LIST_WORKER && await setIncludedIDs(lat, lon, week )
-    args.refreshResults && await Promise.all([getResults(), getSummary()]);
-    break;
-}
-case 'update-locale': {
+        }
+        case "save2db": {await onSave2DiskDB(args);
+            break;
+        }
+        case "set-custom-file-location": {onSetCustomLocation(args);
+            break;
+        }
+        case "update-buffer": {await loadAudioFile(args);
+            break;
+        }
+        case "update-file-start": {await onUpdateFileStart(args);
+            break;
+        }
+        case "update-list": {
+            STATE.list = args.list;
+            STATE.customList = args.list === 'custom' ? args.customList : STATE.customList;
+            const {lat, lon, week} = STATE;
+            // Clear the LIST_CACHE & STATE.included kesy to force list regeneration
+            LIST_CACHE = {}; //[`${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`];
+            delete STATE.included?.[STATE.model]?.[STATE.list];
+            LIST_WORKER && await setIncludedIDs(lat, lon, week )
+            args.refreshResults && await Promise.all([getResults(), getSummary()]);
+            break;
+        }
+        case 'update-locale': {
 
-    await onUpdateLocale(args.locale, args.labels, args.refreshResults)
-    break;
-}
-case "update-state": {
-    TEMP = args.temp || TEMP;
-    appPath = args.path || appPath;
-    // If we change the speciesThreshold, we need to invalidate any location caches
-    if (args.speciesThreshold) {
-        if (STATE.included?.['birdnet']?.['location'])  STATE.included.birdnet.location = {};
-        if (STATE.included?.['chirpity']?.['location'])  STATE.included.chirpity.location = {};
+            await onUpdateLocale(args.locale, args.labels, args.refreshResults)
+            break;
+        }
+        case "update-state": {
+            TEMP = args.temp || TEMP;
+            appPath = args.path || appPath;
+            // If we change the speciesThreshold, we need to invalidate any location caches
+            if (args.speciesThreshold) {
+                if (STATE.included?.['birdnet']?.['location'])  STATE.included.birdnet.location = {};
+                if (STATE.included?.['chirpity']?.['location'])  STATE.included.chirpity.location = {};
+            }
+            // likewise, if we change the "use local birds" setting we need to flush the migrants cache"
+            if (args.local !== undefined){
+                if (STATE.included?.['birdnet']?.['nocturnal'])  delete STATE.included.birdnet.nocturnal;
+            }
+            STATE.update(args);
+            break;
+        }
+        default: {UI.postMessage("Worker communication lines open");
+        }
     }
-    // likewise, if we change the "use local birds" setting we need to flush the migrants cache"
-    if (args.local !== undefined){
-        if (STATE.included?.['birdnet']?.['nocturnal'])  delete STATE.included.birdnet.nocturnal;
-    }
-    STATE.update(args);
-    break;
-}
-default: {UI.postMessage("Worker communication lines open");
-}
-}
 }
 
 ipcRenderer.on('new-client', (event) => {
@@ -2342,7 +2343,7 @@ const getResults = async ({
         const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
         offset = Math.floor(position/limit) * limit;
         // update the pagination
-        const [total, offset, species] = await getTotal({species: species, offset: offset, included: included})
+        const [total, , species] = await getTotal({species: species, offset: offset, included: included})
         UI.postMessage({event: 'total-records', total: total, offset: offset, species: species})
     }
     offset = offset ?? (species ? (STATE.filteredOffset[species] ?? 0) : STATE.globalOffset);
