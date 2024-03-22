@@ -1,5 +1,5 @@
 name: Test Chirpity Compilation
-run-name: ${{ github.actor }} is installing chirpoity
+run-name: ${{ github.actor }} is installing chirpity
 on: [push]
 jobs:
   Explore-GitHub-Actions:
