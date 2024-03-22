@@ -1485,6 +1485,8 @@ window.onload = async () => {
 
         // switch off fullscreen mode - we don't want to persist that setting
         config.fullscreen = false;
+        // set version
+        config.VERSION = VERSION;
         // switch off debug mode we don't want this to be remembered
         // Initialize Spectrogram
         initWavesurfer({});
