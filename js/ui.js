@@ -932,6 +932,8 @@ function postAnalyseMessage(args) {
             SNR: config.filters.SNR,
             circleClicked: args.fromDB
         });
+    } else {
+        generateToast({message: 'An analysis is underway. Press <b>Esc</b> to cancel it before running a new analysis.'})
     }
 }
 

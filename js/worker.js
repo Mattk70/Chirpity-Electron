@@ -2441,7 +2441,8 @@ const getResults = async ({
                 sendResult(++index, 'No detections found in the selection', true)
             } else {
                 species = species || '';
-                sendResult(++index, `No ${species} detections found using the ${STATE.list} list.`, true)
+                const nocmig = STATE.detect.nocmig ? '<b>nocturnal</b>' : ''
+                sendResult(++index, `No ${nocmig} ${species} detections found using the ${STATE.list} list.`, true)
             }
         }
     }
