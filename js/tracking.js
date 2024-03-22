@@ -4,6 +4,8 @@ const ID_SITE = 3;
 
 function trackEvent(uuid, event, action, name, value){
     DEBUG && event === 'Error' && console.log(action, name);
+    // Squash result numbers
+    name = typeof name == 'string' ? name.replace(/result\d+/, 'result') : name;
     const t = new Date()
     name = name ? `&e_n=${name}` : '';
     value = value ? `&e_v=${value}` : '';

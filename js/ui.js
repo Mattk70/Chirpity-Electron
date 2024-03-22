@@ -863,12 +863,10 @@ function resetDiagnostics() {
 // Worker listeners
 function analyseReset() {
     DOM.fileNumber.textContent = '';
-    PREDICTING = true;
+    if (STATE.mode === 'analyse') PREDICTING = true;
     resetDiagnostics();
     AUDACITY_LABELS = {};
     DOM.progressDiv.classList.remove('d-none');
-    // DIAGNOSTICS
-    t0_analysis = Date.now();
 }
 
 function isEmptyObject(obj) {
@@ -908,11 +906,11 @@ const getSelectionResults = (fromDB) => {
     });
 }
 
-const analyseLink = document.getElementById('analyse');
-const analyseAllLink = document.getElementById('analyseAll');
 
 function postAnalyseMessage(args) {
     if (!PREDICTING) {
+        // Start a timer
+        t0_analysis = Date.now();
         disableMenuItem(['analyseSelection']);
         const selection = !!args.end;
         const filesInScope = args.filesInScope;
@@ -921,6 +919,9 @@ function postAnalyseMessage(args) {
             analyseReset();
             refreshResultsView();
             resetResults({clearSummary: true, clearPagination: true, clearResults: true});
+            // change result header to indicate deactivation
+            DOM.resultHeader.classList.add('text-bg-secondary');
+            DOM.resultHeader.classList.remove('text-bg-dark');
         }
         worker.postMessage({
             action: 'analyse',
@@ -1668,9 +1669,24 @@ const setUpWorkerMessaging = () => {
             case "model-ready": {onModelReady(args);
                 break;
             }
-            case "mode-changed": {STATE.mode = args.mode;
+            case "mode-changed": {
+                const mode = args.mode;
+                STATE.mode = mode;
                 renderFilenamePanel();
-                config.debug && console.log("Mode changed to: " + args.mode);
+                config.debug && console.log("Mode changed to: " + mode);
+                if (mode === 'archive' || mode === 'explore') {
+                    enableMenuItem(['purge-file']);
+                    // change header to indicate activation
+                    DOM.resultHeader.classList.remove('text-bg-secondary');
+                    DOM.resultHeader.classList.add('text-bg-dark');
+                    // PREDICTING = false;
+                    // STATE.analysisDone = true;
+                } else {
+                    disableMenuItem(['purge-file']);
+                    // change header to indicate deactivation
+                    DOM.resultHeader.classList.add('text-bg-secondary');
+                    DOM.resultHeader.classList.remove('text-bg-dark');   
+                }
                 break;
             }
             case "summary-complate": {onSummaryComplete(args);
@@ -1685,8 +1701,8 @@ const setUpWorkerMessaging = () => {
             // called when an analysis ends, or when the filesbeingprocessed list is empty
             case "processing-complete": {
                 STATE.analysisDone = true;
-                PREDICTING = false;
-                DOM.progressDiv.classList.add('d-none');
+                //PREDICTING = false;
+                //DOM.progressDiv.classList.add('d-none');
                 break;
             }
             case 'ready-for-tour':{
@@ -2291,7 +2307,6 @@ function onChartData(args) {
     })
     
     const loadModel = ()  => {
-        if (PREDICTING)
         t0_warmup = Date.now();
         worker.postMessage({
             action: 'load-model',
@@ -2381,8 +2396,8 @@ function onChartData(args) {
         KeyA: async function (e) {
             if ( e.ctrlKey || e.metaKey) {
                 if (currentFile) {
-                    if (e.shiftKey) analyseAllLink.click();
-                    else analyseLink.click()
+                    if (e.shiftKey) document.getElementById('analyseAll').click();
+                    else document.getElementById('analyse').click()
                 }
             }
         },
@@ -2422,6 +2437,9 @@ function onChartData(args) {
         },
         KeyP: function () {
             (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
+        },
+        KeyQ: function (e) {
+            e.metaKey && isMac && window.electron.exitApplication()
         },
         KeyS: function (e) {
             if ( e.ctrlKey || e.metaKey) {
@@ -2816,7 +2834,7 @@ function onChartData(args) {
             summaryHTML += `<tr class="${selected}">
             <td class="max">${iconizeScore(item.max)}</td>
             <td class="cname">
-            <span class="pointer"><span class="cname">${item.cname}</span> <br><i>${item.sname}</i></span>
+            <span class="cname">${item.cname}</span> <br><i>${item.sname}</i>
             </td>
             <td class="text-end">${item.count}</td>
             <td class="text-end">${item.calls}</td>
@@ -2863,7 +2881,7 @@ function onChartData(args) {
                 // Select the first row
                 activeRow = table.querySelector('tr:first-child');
                 activeRow?.classList.add('table-active');
-                document.getElementById('resultsDiv').scrollTo({ top: 0, left: 0, behavior: "smooth" });
+                //document.getElementById('resultsDiv').scrollTo({ top: 0, left: 0, behavior: "smooth" });
             }
         }
         
@@ -2905,7 +2923,8 @@ function onChartData(args) {
         trackEvent(config.UUID, `${config.model}-${config.backend}`, 'Audio Duration', config.backend, Math.round(DIAGNOSTICS['Audio Duration']));
         trackEvent(config.UUID, `${config.model}-${config.backend}`, 'Analysis Duration', config.backend, parseInt(analysisTime));
         trackEvent(config.UUID, `${config.model}-${config.backend}`, 'Analysis Rate', config.backend, parseInt(rate));
-        generateToast({ message:'Analysis complete.'})
+        STATE.selection || generateToast({ message:'Analysis complete.'})
+        activateResultFilters();
     }
     
     /* 
@@ -2918,6 +2937,7 @@ function onChartData(args) {
         active = undefined,
     }) {
         updateSummary({ summary: summary, filterSpecies: filterSpecies });
+        if (! PREDICTING  || STATE.mode !== 'analyse') activateResultFilters();
         // Why do we do audacity labels here?
         AUDACITY_LABELS = audacityLabels;
         if (! isEmptyObject(AUDACITY_LABELS)) {
@@ -2986,7 +3006,7 @@ function onChartData(args) {
     // summary.addEventListener('click', speciesFilter);
     
     function speciesFilter(e) {
-        if (['TBODY', 'TH', 'DIV'].includes(e.target.tagName)) return; // on Drag or clicked header
+        if (PREDICTING || ['TBODY', 'TH', 'DIV'].includes(e.target.tagName)) return; // on Drag or clicked header
         clearActive();
         let species, range;
         // Am I trying to unfilter?
@@ -2995,7 +3015,7 @@ function onChartData(args) {
         } else {
             //Clear any highlighted rows
             const tableRows = summary.querySelectorAll('tr');
-            tableRows.forEach(row => {row.classList.remove('text-warning');})
+            tableRows.forEach(row => row.classList.remove('text-warning'))
             // Add a highlight to the current row
             e.target.closest('tr').classList.add('text-warning');
             // Clicked on unfiltered species
@@ -3025,7 +3045,7 @@ function onChartData(args) {
         isFromDB = false,
         selection = false
     }) {
-        
+
         let tr = '';
         if (typeof (result) === 'string') {
             // const nocturnal = config.detect.nocmig ? '<b>during the night</b>' : '';
@@ -3038,18 +3058,20 @@ function onChartData(args) {
                 selectionTable.textContent = '';
             }
             else {
+                adjustSpecDims(true); 
+                if (isFromDB) PREDICTING = false;
                 
                 DOM.resultHeader.innerHTML =`
-                <tr class="bg-dark">
-                    <th id="sort-time" class="time-sort col text-start timeOfDay pointer" title="Sort results by detection time"><span class="text-muted material-symbols-outlined time-sort-icon">sort</span> Time</th>
-                    <th id="sort-position" class="time-sort text-start timestamp pointer" title="Sort results by detection time"><span class="text-muted material-symbols-outlined time-sort-icon">sort</span> Position</th>
-                    <th id="confidence-sort" class="text-start pointer" title="Sort results by detection confidence"><span class="text-muted material-symbols-outlined species-sort-icon">sort</span> Species</th>
+                <tr>
+                    <th id="sort-time" class="time-sort col text-start timeOfDay" title="Sort results by detection time"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> Time</th>
+                    <th id="sort-position" class="time-sort text-start timestamp" title="Sort results by detection time"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> Position</th>
+                    <th id="confidence-sort" class="text-start" title="Sort results by detection confidence"><span class="text-muted material-symbols-outlined species-sort-icon d-none">sort</span> Species</th>
                     <th class="text-end">Calls</th>
                     <th class="col">Label</th>
                     <th class="col text-end">Notes</th>
                 </tr>`;
                 setTimelinePreferences();
-                showSortIcon();
+                //showSortIcon();
                 showElement(['resultTableContainer', 'resultsHead'], false);
             }
         }  else if (!isFromDB && index % (config.limit + 1) === 0) {
@@ -3241,12 +3263,6 @@ function onChartData(args) {
         // Highlight the next row
         const newRow = table.rows[rowClicked]
         newRow?.click();
-    }
-    
-    const getSelectionRange = () => {
-        return STATE.selection ?
-        { start: (STATE.selection.start * 1000) + fileStart, end: (STATE.selection.end * 1000) + fileStart } :
-        undefined
     }
     
     function sendFile(mode, result) {
@@ -3579,7 +3595,7 @@ function onChartData(args) {
     
 
     
-    function showSortIcon() {
+    function activateResultFilters() {
         const timeHeadings = document.getElementsByClassName('time-sort-icon');
         const speciesHeadings = document.getElementsByClassName('species-sort-icon');
         
@@ -3587,10 +3603,12 @@ function onChartData(args) {
         
         [...timeHeadings].forEach(heading => {
             heading.classList.toggle('d-none', sortOrderScore);
+            heading.parentNode.classList.add('pointer');
         });
         
         [...speciesHeadings].forEach(heading => {
             heading.classList.toggle('d-none', !sortOrderScore);
+            heading.parentNode.classList.add('pointer');
             if (sortOrderScore && STATE.sortOrder.includes('ASC')){
                 // Flip the sort icon
                 heading.classList.add('flipped')
@@ -3598,6 +3616,14 @@ function onChartData(args) {
                 heading.classList.remove('flipped')
             }
         });
+        // Add pointer icon to species summaries
+        const summarySpecies = document.getElementById('summary').querySelectorAll('.cname');
+        summarySpecies.forEach(row => row.classList.add('pointer'))
+        // change results header to indicate activation
+        DOM.resultHeader.classList.remove('text-bg-secondary');
+        DOM.resultHeader.classList.add('text-bg-dark');
+        // Add a hover to summary to indicate activation
+        document.getElementById('resultSummary').classList.add('table-hover');
     }
     
     const setSortOrder = (order) => {
@@ -4076,12 +4102,23 @@ DOM.gain.addEventListener('input', () => {
             case 'usage': { (async () => await populateHelpModal('Help/usage.html', 'Usage Guide'))(); break }
             case 'bugs': { (async () => await populateHelpModal('Help/bugs.html', 'Issues, queries or bugs'))(); break }
             case 'species': { worker.postMessage({action: 'get-valid-species', file: currentFile}); break }
+            case 'startTour': { prepTour(); break }
             case 'eBird': { (async () => await populateHelpModal('Help/ebird.html', 'eBird Record FAQ'))(); break }
+
             case 'export-list': { exportSpeciesList(); break }
 
+            case 'sort-position':
+            case 'sort-time': {
+                if (! PREDICTING){
+                    setSortOrder('timestamp')
+                }
+                break;
+            }
             case 'confidence-sort': {
-                const sortBy = STATE.sortOrder === 'score DESC ' ? 'score ASC ' : 'score DESC ';
-                setSortOrder(sortBy);
+                if (! PREDICTING){
+                    const sortBy = STATE.sortOrder === 'score DESC ' ? 'score ASC ' : 'score DESC ';
+                    setSortOrder(sortBy);
+                }
                 break;
             }
             case 'speciesFilter': { speciesFilter(e); break}
@@ -4095,11 +4132,6 @@ DOM.gain.addEventListener('input', () => {
             case 'apply-location': {setDefaultLocation(); break }
             case 'cancel-location': {cancelDefaultLocation(); break }
 
-            case 'sort-position':
-            case 'sort-time': {
-                setSortOrder('timestamp')
-                break;
-            }
             case 'zoomIn':
             case 'zoomOut': {
                 zoomSpec(e)
@@ -4116,7 +4148,7 @@ DOM.gain.addEventListener('input', () => {
             }
             case 'clear-call-cache': {
                 const data = fs.rm(p.join(appPath, 'XCcache.json'), err =>{
-                    if (err) generateToast({message: 'No call cache was found.'}) && console.warn('No XC cache found', err);
+                    if (err) generateToast({message: 'No call cache was found.'}) && config.debug && console.log('No XC cache found', err);
                     else generateToast({message: 'The call cache was successfully cleared.'})
                 })
                 break;
@@ -4697,7 +4729,7 @@ function setListUIState(list){
         startTour();
     }
     
-    document.getElementById('startTour').addEventListener('click', prepTour);
+
     
     // Function to display update download progress
     const tracking = document.getElementById('update-progress');
@@ -4854,7 +4886,7 @@ async function getXCComparisons(){
         const data = await fs.promises.readFile(p.join(appPath, 'XCcache.json'), 'utf8');
         XCcache = JSON.parse(data);
     } catch (err) {
-        console.warn('No XC cache found', err);
+        config.debug && console.log('No XC cache found', err);
         XCcache = {}; // Set XCcache as an empty object
     }
     
@@ -5089,7 +5121,12 @@ function showCompareSpec() {
     if (ws) ws.destroy()
     const activeCarouselItem = document.querySelector('#recordings .tab-pane.active .carousel-item.active');
     const mediaContainer = activeCarouselItem.lastChild;
-    console.log("id is ", mediaContainer.id)
+    // need to prevent accumulation, and find event for show/hide loading
+    let loading = document.getElementById('loadingOverlay')
+    loading = loading.cloneNode(true);
+    loading.classList.remove('d-none', 'text-white');
+    mediaContainer.appendChild(loading);
+    //console.log("id is ", mediaContainer.id)
     const [specContainer, file] = mediaContainer.getAttribute('name').split('|');
     // Create an instance of WaveSurfer
     const audioCtx = new AudioContext({ latencyHint: 'interactive', sampleRate: sampleRate });
@@ -5135,6 +5172,8 @@ function showCompareSpec() {
     // prevent listener accumulation
     playButton.removeEventListener('click', playComparison)
     playButton.addEventListener('click', playComparison)
+    ws.on('load', loading.classList.remove('d-none'))
+    ws.on('canplay', loading.classList.add('d-none'))
 
 }
 

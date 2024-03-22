@@ -324,7 +324,8 @@ async function handleMessage(e) {
             args.updateSummary && await getSummary(args);
             const t2 = Date.now();
             args.included = await getIncludedIDs(args.file);
-            await getTotal(args);
+            const [total, offset, species] = await getTotal(args);
+            UI.postMessage({event: 'total-records', total: total, offset: offset, species: species})
             DEBUG && console.log("Filter took", (Date.now() - t0) / 1000, "seconds", "GetTotal took", (Date.now() - t2) / 1000, "seconds", "GetSummary took", (t2 - t1) / 1000, "seconds");
         }
         break;
@@ -583,7 +584,7 @@ const prepSummaryStatement = (included) => {
 }
     
 
-const getTotal = async ({species = undefined, offset = undefined, included = []}) => {
+const getTotal = async ({species = undefined, offset = undefined, included = [], file = undefined}= {}) => {
     let params = [];
     const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
     offset = offset ?? (species !== undefined ? STATE.filteredOffset[species] : STATE.globalOffset);
@@ -594,7 +595,10 @@ const getTotal = async ({species = undefined, offset = undefined, included = []}
         FROM records 
         JOIN files ON records.fileID = files.id 
         WHERE confidence >= ${STATE.detect.confidence} `;
-
+    if (file) {
+        params.push(file)
+        SQL += ' AND files.name = ? '
+    }
     if (species) {
         params.push(species);
         SQL += ' AND speciesID = (SELECT id from species WHERE cname = ?) '; 
@@ -616,7 +620,7 @@ const getTotal = async ({species = undefined, offset = undefined, included = []}
     SQL += `SELECT COUNT(confidence) AS total FROM MaxConfidencePerDateTime WHERE rank <= ${STATE.topRankin}`;
     
     const {total} = await STATE.db.getAsync(SQL, ...params)
-    UI.postMessage({event: 'total-records', total: total, offset: offset, species: species})
+    return [total, offset, species]
 }
 
 const prepResultsStatement = (species, noLimit, included, offset, topRankin) => {
@@ -663,10 +667,7 @@ const prepResultsStatement = (species, noLimit, included, offset, topRankin) => 
     if (useRange) {
         resultStatement += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
     }
-    if (species){
-        resultStatement+=  ` AND  cname = ? `;
-        params.push(species);
-    }
+
     else if (filtersApplied(included)) {
         resultStatement += ` AND speciesID IN (${prepParams(included)}) `;
         params.push(...included);
@@ -705,7 +706,10 @@ const prepResultsStatement = (species, noLimit, included, offset, topRankin) => 
     ranked_records 
     WHERE rank <= ? `;
     params.push(topRankin);
-
+    if (species){
+        resultStatement+=  ` AND  cname = ? `;
+        params.push(species);
+    }
     const limitClause = noLimit ? '' : 'LIMIT ?  OFFSET ?';
     noLimit || params.push(STATE.limit, offset);
 
@@ -1055,6 +1059,17 @@ async function setupCtx(audio, rate, destination) {
                     previousFilter ? previousFilter.connect(lowshelfFilter) : offlineSource.connect(lowshelfFilter);
                     previousFilter = lowshelfFilter;
                 }
+                const from = 2000;
+                const to = 8000;
+                const geometricMean = Math.sqrt(from * to);
+
+                const bandpassFilter = offlineCtx.createBiquadFilter();
+                bandpassFilter.type = 'bandpass';
+                bandpassFilter.frequency.value = geometricMean;
+                bandpassFilter.Q.value = geometricMean / (to - from);
+                bandpassFilter.channelCount = 1;
+                previousFilter ? previousFilter.connect(bandpassFilter) : offlineSource.connect(bandpassFilter);
+                previousFilter = bandpassFilter;
             }
         }
         if (STATE.audio.gain){
@@ -1068,7 +1083,7 @@ async function setupCtx(audio, rate, destination) {
         offlineSource.start();
         return offlineCtx;
     } )
-    .catch( (error) => console.log(error));
+    .catch( (error) => console.warn(error));
 
     
     // // Create a compressor node
@@ -1204,14 +1219,13 @@ async function processPredictQueue(){
                 const myArray = resampled.getChannelData(0);
                 workerInstance = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
                 worker = workerInstance;
-                console.log('ChunkStart', chunkStart, 'array length', myArray.length, 'file', file);
                 feedChunksToModel(myArray, chunkStart, file, end, worker);
                 //chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
                 processing = false; // Reset processing flag
                 processPredictQueue(); // Process next chunk in the queue
             }).catch((error) => {
                 console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
-                const fileIndex = filesBeingProcessed.indexOf(file);
+                updateFilesBeingProcessed(file);
                 processing = false; // Reset processing flag
                 processPredictQueue(); // Process next chunk in the queue
             });
@@ -1340,6 +1354,7 @@ const fetchAudioBuffer = async ({
 }) => {
     //if (end - start < 0.1) return  // prevents dataset creation barfing with  v. short buffer
     const stream = new PassThrough();
+    const data = [];
             // Use ffmpeg to extract the specified audio segment
     return new Promise((resolve, reject) => {
         let command = ffmpeg(file)
@@ -1350,6 +1365,7 @@ const fetchAudioBuffer = async ({
             .audioFrequency(24_000) // Set sample rate to 24000 Hz (always - this is for wavesurfer)
             .output(stream, { end:true });
         if (STATE.audio.normalise) command = command.audioFilter("loudnorm=I=-16:LRA=11:TP=-1.5");
+
         command.on('error', error => {
             updateFilesBeingProcessed(file)
             reject(new Error('Error extracting audio segment:', error));
@@ -1358,24 +1374,17 @@ const fetchAudioBuffer = async ({
             DEBUG && console.log('FFmpeg command: ' + commandLine);
         })
 
-        command.on('end', () => {
-            // End the stream to signify completion
-            stream.end();
-        });
-
-        const data = [];
         stream.on('data', chunk => {
-            if (chunk.byteLength > 1) data.push(chunk);
+            chunk.byteLength > 1 && data.push(chunk);
         });
 
         stream.on('end', async () => { 
-            if (data.length === 0) return
+            if (data.length === 0) return;
             //Add the audio header
             data.unshift(CHIRPITY_HEADER)
             // Concatenate the data chunks into a single Buffer
             const audio = Buffer.concat(data);
-
-            // Navtive CHIRPITY_HEADER (24kHz) here for UI
+            // Native CHIRPITY_HEADER (24kHz) here for UI
             const offlineCtx = await setupCtx(audio, sampleRate, 'UI').catch( (error) => {console.error(error.message)});
             if (offlineCtx){
                 offlineCtx.startRendering().then(resampled => {
@@ -1385,7 +1394,6 @@ const fetchAudioBuffer = async ({
                     resolve(resampled);
                 }).catch((error) => {
                     console.error(`FetchAudio rendering failed: ${error}`);
-                    // Note: The promise should reject when startRendering is called a second time on an OfflineAudioContext
                 });
             }
         });
@@ -1966,43 +1974,43 @@ const parsePredictions = async (response) => {
     if (! STATE.selection) await generateInsertQuery(latestResult, file).catch( (error) => console.log('Error generating insert query', error));
     let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
     for (let i = 0; i < keysArray.length; i++) {
-        let updateUI = false;
-        let key = parseFloat(keysArray[i]);
-        const timestamp = metadata[file].fileStart + key * 1000;
-        const confidenceArray = confidenceBatch[i];
-        const speciesIDArray = speciesIDBatch[i];
-        for (let j = 0; j < confidenceArray.length; j++) {
-            let confidence = confidenceArray[j];
-            if (confidence < 0.05) break;
-            confidence*=1000;
-            let speciesID = speciesIDArray[j];
-            updateUI = (confidence > STATE.detect.confidence && (! included.length || included.includes(speciesID)));
-            if (STATE.selection || updateUI) {
-                let end, confidenceRequired;
-                if (STATE.selection) {
-                    const duration = (STATE.selection.end - STATE.selection.start) / 1000;
-                    end = key + duration;
-                    confidenceRequired = STATE.userSettingsInSelection ?
-                    STATE.detect.confidence : 50;
-                } else {
-                    end = key + 3;
-                    confidenceRequired = STATE.detect.confidence;
-                }
+    let updateUI = false;
+    let key = parseFloat(keysArray[i]);
+    const timestamp = metadata[file].fileStart + key * 1000;
+    const confidenceArray = confidenceBatch[i];
+    const speciesIDArray = speciesIDBatch[i];
+    for (let j = 0; j < confidenceArray.length; j++) {
+    let confidence = confidenceArray[j];
+    if (confidence < 0.05) break;
+    confidence*=1000;
+    let speciesID = speciesIDArray[j];
+    updateUI = (confidence > STATE.detect.confidence && (! included.length || included.includes(speciesID)));
+    if (STATE.selection || updateUI) {
+    let end, confidenceRequired;
+    if (STATE.selection) {
+    const duration = (STATE.selection.end - STATE.selection.start) / 1000;
+    end = key + duration;
+    confidenceRequired = STATE.userSettingsInSelection ?
+    STATE.detect.confidence : 50;
+    } else {
+    end = key + 3;
+    confidenceRequired = STATE.detect.confidence;
+    }
                 if (confidence >= confidenceRequired) {
-                    const { cname, sname } = await memoryDB.getAsync(`SELECT cname, sname FROM species WHERE id = ${speciesID}`).catch( (error) => console.log('Error getting species name', error));
-                    const result = {
-                        timestamp: timestamp,
-                        position: key,
-                        end: end,
-                        file: file,
-                        cname: cname,
-                        sname: sname,
-                        score: confidence
-                    }
+    const { cname, sname } = await memoryDB.getAsync(`SELECT cname, sname FROM species WHERE id = ${speciesID}`).catch( (error) => console.log('Error getting species name', error));
+    const result = {
+    timestamp: timestamp,
+    position: key,
+    end: end,
+    file: file,
+    cname: cname,
+    sname: sname,
+    score: confidence
+    }
                     sendResult(++index, result, false);
-                    // Only show the highest confidence detection, unless it's a selection analysis
-                    if (! STATE.selection) break;
-                };
+    // Only show the highest confidence detection, unless it's a selection analysis
+    if (! STATE.selection) break;
+    };
             }
         }
     } 
@@ -2016,7 +2024,7 @@ const parsePredictions = async (response) => {
     if (fileProgress === 1) {
         if (index === 0 ) {
             const result = `No detections found in ${file}. Searched for records using the ${STATE.list} list and having a minimum confidence of ${STATE.detect.confidence/10}%`
-            UI.postMessage({
+                        UI.postMessage({
                 event: 'new-result',
                 file: file,
                 result: result,
@@ -2062,14 +2070,11 @@ async function parseMessage(e) {
                 const remaining = predictionsReceived[response.file] - predictionsRequested[response.file]
                 if (remaining === 0) {
                     if (filesBeingProcessed.length) {
-                        processNextFile({
-                            worker: worker
-                        });
+                        processNextFile({ worker: worker });
                     }  else if ( !STATE.selection) {
-                        getSummary();
-                        UI.postMessage({
-                            event: "analysis-complete"
-                        });
+                        getSummary().then(() => UI.postMessage({event: "analysis-complete"}));
+                    } else {
+                        UI.postMessage({event: "analysis-complete"});
                     }
                 }
             }
@@ -2337,7 +2342,8 @@ const getResults = async ({
         const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
         offset = Math.floor(position/limit) * limit;
         // update the pagination
-        await getTotal({species: species, offset: offset, included: included})
+        const [total, offset, species] = await getTotal({species: species, offset: offset, included: included})
+        UI.postMessage({event: 'total-records', total: total, offset: offset, species: species})
     }
     offset = offset ?? (species ? (STATE.filteredOffset[species] ?? 0) : STATE.globalOffset);
     if (species) STATE.filteredOffset[species] = offset;
@@ -2425,7 +2431,7 @@ const getResults = async ({
             } else {
                 sendResult(++index, r, true)
             }
-            if (i === result.length -1) UI.postMessage({event: 'processing-complete'})
+           if (i === result.length -1) UI.postMessage({event: 'processing-complete'})
         }
         if (!result.length) {
             if (STATE.selection) {

@@ -212,8 +212,6 @@ tbody tr:not(.table-active):hover {
 #resultSummary>th {
     position: sticky;
     top: 0;
-    color: white;
-    background-color: #1b1e21;
     z-index: 2;
 }
 
