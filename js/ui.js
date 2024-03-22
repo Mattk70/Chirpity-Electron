@@ -5125,6 +5125,7 @@ function showCompareSpec() {
     let loading = document.getElementById('loadingOverlay')
     loading = loading.cloneNode(true);
     loading.classList.remove('d-none', 'text-white');
+    loading.firstElementChild.textContent = 'Loading audio from Xeno-Canto...'
     mediaContainer.appendChild(loading);
     //console.log("id is ", mediaContainer.id)
     const [specContainer, file] = mediaContainer.getAttribute('name').split('|');
@@ -5167,13 +5168,18 @@ function showCompareSpec() {
         }),
     })).initPlugin('spectrogram')
 
+
+    ws.on('ready', function () {
+        console.log('ws ready');
+        mediaContainer.removeChild(loading);
+    })
+
+
     ws.load(file)
     const playButton = document.getElementById('playComparison')
     // prevent listener accumulation
     playButton.removeEventListener('click', playComparison)
     playButton.addEventListener('click', playComparison)
-    ws.on('load', loading.classList.remove('d-none'))
-    ws.on('canplay', loading.classList.add('d-none'))
 
 }
 

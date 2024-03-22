@@ -592,6 +592,7 @@ const getTotal = async ({species = undefined, offset = undefined, included = [],
     const useRange = range?.start;
     let SQL = ` WITH MaxConfidencePerDateTime AS (
         SELECT confidence,
+        speciesID,
         RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
         FROM records 
         JOIN files ON records.fileID = files.id 
@@ -600,10 +601,6 @@ const getTotal = async ({species = undefined, offset = undefined, included = [],
         params.push(file)
         SQL += ' AND files.name = ? '
     }
-    if (species) {
-        params.push(species);
-        SQL += ' AND speciesID = (SELECT id from species WHERE cname = ?) '; 
-    }// This will overcount as there may be a valid species ranked above it
     else if (filtersApplied(included)) SQL += ` AND speciesID IN (${included}) `;
     if (useRange) SQL += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
     if (STATE.detect.nocmig) SQL += ' AND COALESCE(isDaylight, 0) != 1 ';
@@ -620,6 +617,10 @@ const getTotal = async ({species = undefined, offset = undefined, included = [],
     SQL += ' ) '
     SQL += `SELECT COUNT(confidence) AS total FROM MaxConfidencePerDateTime WHERE rank <= ${STATE.topRankin}`;
     
+    if (species) {
+        params.push(species);
+        SQL += ' AND speciesID = (SELECT id from species WHERE cname = ?) '; 
+    }
     const {total} = await STATE.db.getAsync(SQL, ...params)
     return [total, offset, species]
 }
@@ -1060,17 +1061,17 @@ async function setupCtx(audio, rate, destination) {
                     previousFilter ? previousFilter.connect(lowshelfFilter) : offlineSource.connect(lowshelfFilter);
                     previousFilter = lowshelfFilter;
                 }
-                const from = 2000;
-                const to = 8000;
-                const geometricMean = Math.sqrt(from * to);
+                // const from = 2000;
+                // const to = 8000;
+                // const geometricMean = Math.sqrt(from * to);
 
-                const bandpassFilter = offlineCtx.createBiquadFilter();
-                bandpassFilter.type = 'bandpass';
-                bandpassFilter.frequency.value = geometricMean;
-                bandpassFilter.Q.value = geometricMean / (to - from);
-                bandpassFilter.channelCount = 1;
-                previousFilter ? previousFilter.connect(bandpassFilter) : offlineSource.connect(bandpassFilter);
-                previousFilter = bandpassFilter;
+                // const bandpassFilter = offlineCtx.createBiquadFilter();
+                // bandpassFilter.type = 'bandpass';
+                // bandpassFilter.frequency.value = geometricMean;
+                // bandpassFilter.Q.value = geometricMean / (to - from);
+                // bandpassFilter.channelCount = 1;
+                // previousFilter ? previousFilter.connect(bandpassFilter) : offlineSource.connect(bandpassFilter);
+                // previousFilter = bandpassFilter;
             }
         }
         if (STATE.audio.gain){
