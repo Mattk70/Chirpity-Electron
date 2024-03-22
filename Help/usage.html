@@ -8,12 +8,7 @@
 
 <body>
     <h4 class="text-center text-bg-light p-3">Suggested Workflow</h4>
-    <figure class="figure float-end m-3">
-        <img src="Help/amend file.png"
-            alt="The context menu accessed from the filename contains options to amend the file's start time and the recording location"
-            class="rounded figure-img float-end img-fluid">
-        <figcaption class="figure-caption text-muted text-end">File name context menu.</figcaption>
-    </figure>
+
     <ol>
         <li>Open an audio file, files or folder of audio. There are a three ways to do this:
             <ol>
@@ -28,7 +23,12 @@
             detected. If not, you can still display (and store) the correct time of day for the file and detections if
             you edit its start time.
             This can be edited by right-clicking the filename in the control bar.
-
+            <figure class="figure float-end m-3">
+                <img src="Help/amend file.png"
+                    alt="The context menu accessed from the filename contains options to amend the file's start time and the recording location"
+                    class="rounded figure-img float-end img-fluid">
+                <figcaption class="figure-caption text-muted text-end">File name context menu.</figcaption>
+            </figure>
         </li>
         <li>
             Select &quot;<i>Analyse file</i>&quot; from the
@@ -46,17 +46,18 @@
             the table will cause the playhead to jump to the start of that detection and highlight its location on the
             spectrogram.
             Right-clicking the row will bring up the detection context menu.
-            <figure class="figure float-end m-3">
-                <img src="Help/detection menu.png"
-                    alt="The context menu accessed from a detection contains options to inspect and amend the record"
-                    class="rounded figure-img float-end img-fluid">
-                <figcaption class="figure-caption text-muted text-end">Detection context menu.</figcaption>
-            </figure>
+
             This contains options specific to the currently highlighted detection.
             You may press the SpaceBar to play from the beginning of the selection and continue playing the
             audio until you press the SpaceBar again. Clicking the spectrogram will move the playhead to that position.
             If currently playing, playback will continue, so this allows you to replay a call repeatedly.
         </li>
+        <figure class="figure float-end m-3">
+            <img src="Help/detection menu.png"
+                alt="The context menu accessed from a detection contains options to inspect and amend the record"
+                class="rounded figure-img float-end img-fluid">
+            <figcaption class="figure-caption text-muted text-end">Detection context menu.</figcaption>
+        </figure>
         <li>
             If multiple detections apply for a given time period, a circle will be displayed next to the Species' name.
             Clicking this circle will display the other species detected in the region, and the confidence given to

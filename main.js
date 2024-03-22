@@ -328,6 +328,7 @@ app.whenReady().then(async () => {
     ipcMain.handle('getVersion', () => app.getVersion());
     ipcMain.handle('isMac', () => process.platform === 'darwin');
     ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
+    ipcMain.handle('exitApplication', () => app.quit());
     
     // Debug mode
     try {
@@ -351,10 +352,6 @@ app.whenReady().then(async () => {
         //const appIcon = new Tray('./img/icon/icon.png')
         app.dock.setIcon(__dirname + '/img/icon/icon.png');
         app.dock.bounce();
-        // Close app on Command+Q on OSX
-        globalShortcut.register('Command+Q', () => {
-            if (mainWindow.isFocused())app.quit();
-        })
     } else {
         // Quit when all windows are closed.
         app.setAppUserModelId('chirpity')

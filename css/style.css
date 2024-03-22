@@ -200,23 +200,19 @@ ul {
     color: whitesmoke; /* White color on hover */
 }
 
-/*
-tbody tr:not(.table-active):hover {
-    background-color: whitesmoke; 
-}
-*/
-
 #results>thead,
 #results>th,
 #resultSummary>thead,
 #resultSummary>th {
     position: sticky;
     top: 0;
-    color: white;
-    background-color: #1b1e21;
     z-index: 2;
 }
 
+/* Stop table-hover overriding the text colour */
+.table-hover tbody tr.text-warning:hover td {
+    color: #ffae42; /* Change to your desired text color */
+}
 
 #resultTableBody {
     scroll-margin-top: 120px;
