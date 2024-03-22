@@ -5,16 +5,16 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "prebuild": "node prebuild.js",
     "minify": "node minify.js",
     "export": "electron-builder build --win --x64",
-    "publish": "electron-builder --win --x64 -p always"
+    "build": "electron-builder --win --x64 -p always"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mattk70/Chirpity-Electron.git"
   },
   "build": {
-    "beforeBuild": "prebuild.js",
     "appId": "com.electron.chirpity",
     "publish": [
       {
@@ -182,8 +182,8 @@
   "homepage": "https://chirpity.mattkirkland.co.uk",
   "devDependencies": {
     "@playwright/test": "^1.39.0",
-    "electron": "^27.1.3",
-    "electron-builder": "24.6.4",
+    "electron": "^29.1.5",
+    "electron-builder": "^24.6.4",
     "electron-playwright-helpers": "^1.6.0",
     "jimp": "^0.22.10",
     "playwright": "^1.39.0",
