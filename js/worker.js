@@ -2074,7 +2074,7 @@ async function parseMessage(e) {
                     if (filesBeingProcessed.length) {
                         processNextFile({ worker: worker });
                     }  else if ( !STATE.selection) {
-                        getSummary().then(() => UI.postMessage({event: "analysis-complete"}));
+                        getSummary() //.then(() => UI.postMessage({event: "analysis-complete"}));
                     } else {
                         UI.postMessage({event: "analysis-complete"});
                     }
@@ -2101,7 +2101,7 @@ function updateFilesBeingProcessed(file) {
     if (!filesBeingProcessed.length) {
         if (!STATE.selection) getSummary();
         // Need this here in case last file is not sent for analysis (e.g. nocmig mode)
-        UI.postMessage({event: 'processing-complete'})
+        UI.postMessage({event: 'analysis-complete'})
     }
 }
         
@@ -2124,7 +2124,7 @@ async function processNextFile({
                     // Nothing to do for this file
                     
                     updateFilesBeingProcessed(file);
-                    const result = `No detections. ${file} has no period within it where predictions would be given. <b>Tip:</b> To see detections in this file, disable nocmig mode.`;
+                    const result = `No detections. ${file} has no period within it where predictions would be given. <b>Tip:</b> To see detections in this file, disable nocmig mode and run the analysis again.`;
                     
                     UI.postMessage({
                         event: 'new-result', file: file, result: result, index: index

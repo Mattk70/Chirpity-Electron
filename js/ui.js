@@ -3623,7 +3623,9 @@ function onChartData(args) {
         DOM.resultHeader.classList.remove('text-bg-secondary');
         DOM.resultHeader.classList.add('text-bg-dark');
         // Add a hover to summary to indicate activation
-        document.getElementById('resultSummary').classList.add('table-hover');
+        const summary = document.getElementById('resultSummary');
+        // If there were no results, there'll be no summary
+        summary?.classList.add('table-hover');
     }
     
     const setSortOrder = (order) => {
