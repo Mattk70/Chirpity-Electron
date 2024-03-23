@@ -85,7 +85,7 @@ let workerInstance = 0;
 // let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let TEMP, appPath, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let LIST_WORKER;
-const DEBUG = false;
+const DEBUG = true;
 
 const DATASET = false;
 const adding_chirpity_additions = false;
@@ -1136,7 +1136,6 @@ let processing = false;
 const getWavePredictBuffers = async ({
     file = '', start = 0, end = undefined
 }) => {
-    let chunkLength = STATE.model === 'birdnet' ? 144_000 : 72_000;
     // Ensure max and min are within range
     start = Math.max(0, start);
     end = Math.min(metadata[file].duration, end);
@@ -1232,7 +1231,8 @@ async function processPredictQueue(){
                 processPredictQueue(); // Process next chunk in the queue
             });
         } else {
-            console.log('Short chunk', chunk.length, 'padding');
+            console.log('Short chunk', audio.length, 'padding');
+            let chunkLength = STATE.model === 'birdnet' ? 144_000 : 72_000;
             workerInstance = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
             worker = workerInstance;
             const myArray = new Float32Array(Array.from({ length: chunkLength }).fill(0));
@@ -1245,7 +1245,6 @@ async function processPredictQueue(){
 const getPredictBuffers = async ({
     file = '', start = 0, end = undefined
 }) => {
-    let chunkLength = STATE.model === 'birdnet' ? 144_000 : 72_000;
     // Ensure max and min are within range
     start = Math.max(0, start);
     end = Math.min(metadata[file].duration, end);
@@ -1331,16 +1330,6 @@ const getPredictBuffers = async ({
             err.code === 'ENOENT' && notifyMissingFile(file);
         })
 
-        STREAM.on('end', async function () {
-            // // deal with part-full buffers
-            // if (concatenatedBuffer.length){
-            //     const audio = Buffer.concat([WAV_HEADER, concatenatedBuffer]);
-            //     await sendBuffer(audio, chunkStart, chunkLength, end, file)
-            // }
-            // DEBUG && console.log('All chunks sent for ', file)
-            // STREAM.destroy()
-            // resolve('finished')
-        })
         command.run();
     }).catch(error => console.log(error));
 }
@@ -2096,7 +2085,6 @@ function updateFilesBeingProcessed(file) {
     const fileIndex = filesBeingProcessed.indexOf(file);
     if (fileIndex !== -1) {
         filesBeingProcessed.splice(fileIndex, 1)
-        UI.postMessage({ event: 'progress', progress: 1, file: file })
     }
     if (!filesBeingProcessed.length) {
         if (!STATE.selection) getSummary();
