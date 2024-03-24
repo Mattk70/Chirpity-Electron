@@ -503,7 +503,7 @@ input[type="range"].vertical {
     width: 18px;
     margin: 3px;
     appearance: auto;
-    -webkit-appearance: slider-vertical;
+    writing-mode: vertical-lr;
     top: -160px;
     right: 15px;
 }

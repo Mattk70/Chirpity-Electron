@@ -1515,7 +1515,7 @@ window.onload = async () => {
         DOM.speciesThreshold.value = config.speciesThreshold;
         document.getElementById('species-week').checked = config.useWeek;
         DOM.customListFile.value = config.customListFile[config.model];
-
+        if (DOM.customListFile.value)  LIST_MAP.custom = 'Using a custom list';
         // And update the icon
         updateListIcon();
         // timeline
@@ -2275,8 +2275,7 @@ function onChartData(args) {
         location: 'Searching for birds in your region',
         nocturnal: 'Searching for nocturnal birds',
         birds: 'Searching for all birds',
-        everything: 'Searching for everything',
-        custom: 'Using a custom list'
+        everything: 'Searching for everything'
     };
 
     const updateListIcon = () => {
@@ -2307,6 +2306,7 @@ function onChartData(args) {
             config.customListFile[config.model] = customListFile;
             DOM.customListFile.value = customListFile;
             readLabels(config.customListFile[config.model], 'list');
+            LIST_MAP.custom = 'Using a custom list';
             updatePrefs('config.json', config)
         }
     })
@@ -3932,9 +3932,6 @@ function onChartData(args) {
     filterPanelRangeInput.addEventListener('click', (e) => {
         e.stopPropagation();
     })
-    filterPanelRangeInput.addEventListener('click', (e) => {
-        console.log('range input!')
-    })
 
     
     const hideConfidenceSlider = () => {
@@ -4300,6 +4297,7 @@ DOM.gain.addEventListener('input', () => {
                         SNRSlider.disabled = false;
                     }
                     DOM.customListFile.value = config.customListFile[config.model];
+                    DOM.customListFile.value ? LIST_MAP.custom = 'Using a custom list' : delete LIST_MAP.custom;
                     document.getElementById('locale').value = config[config.model].locale;
                     config.backend = 'tensorflow';
                     document.getElementById('tensorflow').checked = true;

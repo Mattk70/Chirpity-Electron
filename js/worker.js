@@ -1394,9 +1394,6 @@ const fetchAudioBuffer = async ({
             const offlineCtx = await setupCtx(audio, sampleRate, 'UI').catch( (error) => {console.error(error.message)});
             if (offlineCtx){
                 offlineCtx.startRendering().then(resampled => {
-                    // `resampled` contains an AudioBuffer resampled at 24000Hz.
-                    // use resampled.getChannelData(x) to get an Float32Array for channel x.
-                    // readStream.resume();
                     resolve(resampled);
                 }).catch((error) => {
                     console.error(`FetchAudio rendering failed: ${error}`);

@@ -1194,15 +1194,15 @@
         if (target === 'settingsMap'){
             const latEl = document.getElementById('latitude')
             const lonEl = document.getElementById('longitude')
-            latEl.value = lat.toFixed(2); 
-            lonEl.value = lng.toFixed(2);
+            latEl.value = lat.toFixed(4); 
+            lonEl.value = lng.toFixed(4);
             const placeEl = document.getElementById('place');
             placeEl.innerHTML = 'Getting location...'
         } else {
             const latEl = document.getElementById('customLat')
             const lonEl = document.getElementById('customLon')
-            latEl.value = lat.toFixed(2); 
-            lonEl.value = lng.toFixed(2);
+            latEl.value = lat.toFixed(4); 
+            lonEl.value = lng.toFixed(4);
             const customPlaceEl = document.getElementById('customPlace');
             customPlaceEl.value = 'Fetching...'
         }
