@@ -862,6 +862,7 @@ function resetDiagnostics() {
 
 // Worker listeners
 function analyseReset() {
+    clearActive();
     DOM.fileNumber.textContent = '';
     if (STATE.mode === 'analyse') PREDICTING = true;
     resetDiagnostics();
@@ -2921,14 +2922,16 @@ function onChartData(args) {
         // DIAGNOSTICS:
         t1_analysis = Date.now();
         const analysisTime = ((t1_analysis - t0_analysis) / 1000).toFixed(2);
-        DIAGNOSTICS['Analysis Duration'] = analysisTime + ' seconds';
-        const rate = (DIAGNOSTICS['Audio Duration'] / analysisTime);
-        DIAGNOSTICS['Analysis Rate'] = rate.toFixed(0) + 'x faster than real time performance.';
-        trackEvent(config.UUID, `${config.model}-${config.backend}`, 'Audio Duration', config.backend, Math.round(DIAGNOSTICS['Audio Duration']));
-        trackEvent(config.UUID, `${config.model}-${config.backend}`, 'Analysis Duration', config.backend, parseInt(analysisTime));
-        trackEvent(config.UUID, `${config.model}-${config.backend}`, 'Analysis Rate', config.backend, parseInt(rate));
-        STATE.selection || generateToast({ message:'Analysis complete.'})
-        activateResultFilters();
+        if (! STATE.selection){
+            DIAGNOSTICS['Analysis Duration'] = analysisTime + ' seconds';
+            const rate = (DIAGNOSTICS['Audio Duration'] / analysisTime);
+            DIAGNOSTICS['Analysis Rate'] = rate.toFixed(0) + 'x faster than real time performance.';
+            trackEvent(config.UUID, `${config.model}-${config.backend}`, 'Audio Duration', config.backend, Math.round(DIAGNOSTICS['Audio Duration']));
+            trackEvent(config.UUID, `${config.model}-${config.backend}`, 'Analysis Duration', config.backend, parseInt(analysisTime));
+            trackEvent(config.UUID, `${config.model}-${config.backend}`, 'Analysis Rate', config.backend, parseInt(rate));
+            generateToast({ message:'Analysis complete.'})
+            activateResultFilters();
+        }
     }
     
     /* 
