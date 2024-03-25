@@ -85,12 +85,12 @@ let workerInstance = 0;
 // let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let TEMP, appPath, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let LIST_WORKER;
-const DEBUG = true;
+const DEBUG = false;
 
-const DATASET = false;
+const DATASET = true;
 const adding_chirpity_additions = false;
 const dataset_database = DATASET;
-const DATASET_SAVE_LOCATION = "E:/DATASETS/BirdNET_pngs";
+const DATASET_SAVE_LOCATION = "/media/matt/36A5CC3B5FA24585/DATASETS/BirdNET_wavs";
 
 // Adapted from https://stackoverflow.com/questions/6117814/get-week-of-year-in-javascript-like-in-php
 Date.prototype.getWeekNumber = function(){
@@ -297,7 +297,7 @@ async function handleMessage(e) {
             break;
         }
         case "create-dataset": {
-            args.included = getIncludedIDs()
+            args.included = await getIncludedIDs()
             saveResults2DataSet(args);
             break;
         }
@@ -1515,9 +1515,9 @@ const saveResults2DataSet = ({species, included}) => {
     JOIN species
     ON species.id = records.speciesID
     JOIN files ON records.fileID = files.id
-    ${filtersApplied(included) ? `WHERE speciesID IN (${prepParams(STATE.included)}` : ''}) 
+    ${filtersApplied(included) ? `WHERE speciesID IN (${prepParams(included)}` : ''}) 
     AND confidence >= ${STATE.detect.confidence}`;
-    let params = filtersApplied(included) ? STATE.included : [];
+    let params = filtersApplied(included) ? included : [];
     if (species) {
         db2ResultSQL += ` AND species.cname = ?`;
         params.push(species)
@@ -1566,16 +1566,17 @@ const saveResults2DataSet = ({species, included}) => {
                         if (++workerInstance === NUM_WORKERS) {
                             workerInstance = 0;
                         }
-                        const buffer = AudioBuffer.getChannelData(0);
-                        predictWorkers[workerInstance].postMessage({
-                            message: 'get-spectrogram',
-                            filepath: filepath,
-                            file: file,
-                            buffer: buffer,
-                            height: height,
-                            width: width,
-                            worker: workerInstance
-                        }, [buffer.buffer]);
+                        saveAudio(result.file, start, end, file.replace('.png', '.wav'), {Artist: 'Chirpity'}, filepath)
+                        // const buffer = AudioBuffer.getChannelData(0);
+                        // predictWorkers[workerInstance].postMessage({
+                        //     message: 'get-spectrogram',
+                        //     filepath: filepath,
+                        //     file: file,
+                        //     buffer: buffer,
+                        //     height: height,
+                        //     width: width,
+                        //     worker: workerInstance
+                        // }, [buffer.buffer]);
                         count++;
                     }
                 }
@@ -1754,7 +1755,10 @@ async function saveAudio(file, start, end, filename, metadata, folder) {
     });
     if (folder) {
         const buffer = Buffer.from(await thisBlob.arrayBuffer());
-        fs.writeFile(p.join(folder, filename), buffer, () => { if (DEBUG) console.log('Audio file saved') });
+        if (! fs.existsSync(folder)) fs.mkdirSync(folder, {recursive: true});
+        fs.writeFile(p.join(folder, filename), buffer, {flag: 'w+'}, err => {
+            if (err) console.log(err) ;
+            else if (DEBUG) console.log('Audio file saved') });
     }
     else {
         UI.postMessage({event:'audio-file-to-save', file: thisBlob, filename: filename})

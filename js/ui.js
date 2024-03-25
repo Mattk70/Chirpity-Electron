@@ -2426,7 +2426,7 @@ function onChartData(args) {
             }
         },
         KeyD: function (e) {
-            if (( e.ctrlKey || e.metaKey) && e.shiftKey) worker.postMessage({ action: 'convert-dataset' });
+            if (( e.ctrlKey || e.metaKey) && e.shiftKey) worker.postMessage({ action: 'create-dataset' });
         },
         KeyE: function (e) {
             if (( e.ctrlKey || e.metaKey) && region) exportAudio();
