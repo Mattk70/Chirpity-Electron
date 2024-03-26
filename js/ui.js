@@ -2201,6 +2201,7 @@ function onChartData(args) {
     function handleKeyDown(e) {
         let action = e.code;
         if (action in GLOBAL_ACTIONS) {
+            contextMenu.classList.add("d-none");
             if (document === e.target || document.body === e.target || e.target.attributes["data-action"]) {}
             const modifier = e.shiftKey ? 'Shift' : e.ctrlKey ? 'Control' : e.metaKey ? 'Alt' : 'no';
             trackEvent(config.UUID, 'KeyPress', action, modifier );
@@ -2631,7 +2632,7 @@ function onChartData(args) {
         goToRegion = true,
         queued = false
     }) => {
-        fileLoaded = false
+        fileLoaded = false;
         worker.postMessage({
             action: 'update-buffer',
             file: file,

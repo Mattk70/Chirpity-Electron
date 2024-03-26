@@ -90,7 +90,7 @@ const DEBUG = false;
 const DATASET = true;
 const adding_chirpity_additions = false;
 const dataset_database = DATASET;
-const DATASET_SAVE_LOCATION = "/media/matt/36A5CC3B5FA24585/DATASETS/BirdNET_wavs";
+const DATASET_SAVE_LOCATION = "E:/DATASETS/BirdNET_wavs";
 
 // Adapted from https://stackoverflow.com/questions/6117814/get-week-of-year-in-javascript-like-in-php
 Date.prototype.getWeekNumber = function(){
@@ -1275,9 +1275,9 @@ const getPredictBuffers = async ({
             .seekInput(start)
             .duration(end - start)
             .format('wav')
-            //.outputOptions('-acodec pcm_s16le')
             .audioChannels(1) // Set to mono
             .audioFrequency(sampleRate) // Set sample rate 
+            .outputOptions([`-bufsize ${highWaterMark}`])
             .output(STREAM)
 
         command.on('error', error => {
@@ -1303,28 +1303,32 @@ const getPredictBuffers = async ({
                 STREAM.destroy()
                 return
             }
-            if (chunk === null  || chunk.byteLength <= 1) {
-
+            if (chunk.byteLength <= 1) {
+                return
             }
             else {
-                const bufferList = [concatenatedBuffer, chunk].filter(buf => buf.length > 0);
                 // try/catch may no longer be necessary
                 try {
-                    concatenatedBuffer = Buffer.concat(bufferList);
+                    concatenatedBuffer = Buffer.concat([concatenatedBuffer, chunk]);
                 } catch (error) {
                     console.warn(error)
+                    console.warn('concat bugger length', concatenatedBuffer.length, 'chunk.length', chunk.length, chunk.buffer.detached, concatenatedBuffer.buffer.detached)
                 }
                 
                 // if we have a full buffer
                 if (concatenatedBuffer.length >= highWaterMark) {
                     STREAM.pause();
                     chunk = concatenatedBuffer.subarray(0, highWaterMark);
-                    concatenatedBuffer = concatenatedBuffer.subarray(highWaterMark);
+                    const remainingBuffer = Buffer.from(concatenatedBuffer.subarray(highWaterMark));
                     const audio = Buffer.concat([WAV_HEADER, chunk])
                     predictQueue.push([audio, file, end, chunkStart]);
                     chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate
-                    //processPredictQueue().then((resolve, reject) => checkBacklog(STREAM) );
-                    processPredictQueue().then(() => STREAM.resume() );
+                    processPredictQueue().then((resolve, reject) =>{
+                        concatenatedBuffer = remainingBuffer;
+                        checkBacklog(STREAM) 
+                    }
+                    );
+                    
                 }
             }
         });
@@ -1337,6 +1341,7 @@ const getPredictBuffers = async ({
                 processPredictQueue();
             }
             DEBUG && console.log('All chunks sent for ', file);
+            STREAM.destroy();
             resolve('finished')
         })
 
