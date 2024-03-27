@@ -87,7 +87,7 @@ let LIST_WORKER;
 const DEBUG = false;
 
 const DATASET = true;
-const adding_chirpity_additions = false;
+const adding_chirpity_additions = true;
 const dataset_database = DATASET;
 const DATASET_SAVE_LOCATION = "E:/DATASETS/BirdNET_wavs";
 
@@ -443,7 +443,7 @@ async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backen
     STATE.update({ model: model });
     await loadDB(appPath); // load the diskdb
     await createDB(); // now make the memoryDB
-    spawnPredictWorkers(model, list, 4, threads);
+    spawnPredictWorkers(model, list, batchSize, threads);
 }
 
 
@@ -1379,8 +1379,28 @@ const fetchAudioBuffer = async ({
             .audioChannels(1) // Set to mono
             .audioFrequency(24_000) // Set sample rate to 24000 Hz (always - this is for wavesurfer)
             .output(stream, { end:true });
-        if (STATE.audio.normalise) command = command.audioFilter("loudnorm=I=-16:LRA=11:TP=-1.5:offset=" + STATE.audio.gain);
-
+            if (STATE.filters.active) {
+                if (STATE.filters.lowShelfAttenuation && STATE.filters.lowShelfFrequency){
+                    command.audioFilters({
+                        filter: 'lowshelf',
+                        options: `gain=${STATE.filters.lowShelfAttenuation}:f=${STATE.filters.lowShelfFrequency}`
+                    })
+                }
+                if (STATE.filters.highPassFrequency){
+                    command.audioFilters({
+                        filter: 'highpass',
+                        options: `f=${STATE.filters.highPassFrequency}:poles=1`
+                    })
+                }
+            if (STATE.audio.normalise){
+                command.audioFilters(
+                    {
+                        filter: 'loudnorm',
+                        options: "I=-16:LRA=11:TP=-1.5:offset=" + STATE.audio.gain
+                    }
+                )
+            }
+        }
         command.on('error', error => {
             UI.postMessage({event: 'generate-alert', message: error.message})
             reject(new Error('Error extracting audio segment:', error));
@@ -1503,6 +1523,7 @@ const convertSpecsFromExistingSpecs = async (path) => {
 }
             
 const saveResults2DataSet = ({species, included}) => {
+    const exportType = 'audio';
     const rootDirectory = DATASET_SAVE_LOCATION;
     sampleRate = STATE.model === 'birdnet' ? 48_000 : 24_000;
     const height = 256, width = 384;
@@ -1524,8 +1545,9 @@ const saveResults2DataSet = ({species, included}) => {
     JOIN species
     ON species.id = records.speciesID
     JOIN files ON records.fileID = files.id
-    ${filtersApplied(included) ? `WHERE speciesID IN (${prepParams(included)}` : ''}) 
-    AND confidence >= ${STATE.detect.confidence}`;
+    WHERE confidence >= ${STATE.detect.confidence}`;
+    db2ResultSQL += filtersApplied(included) ? ` AND speciesID IN (${prepParams(included)}` : '';
+    
     let params = filtersApplied(included) ? included : [];
     if (species) {
         db2ResultSQL += ` AND species.cname = ?`;
@@ -1546,7 +1568,8 @@ const saveResults2DataSet = ({species, included}) => {
             // species not matching the top prediction sets threshold to 2000, effectively limiting treatment to manual records
             threshold = speciesMatch(result.file, result.sname) ? value : 2000;
         } else {
-            threshold = result.sname === "Ambient_Noise" ? 0 : 2000;
+            //threshold = result.sname === "Ambient_Noise" ? 0 : 2000;
+            threshold = result.sname === "Ambient_Noise" ? 0 : 0;
         }
         promise = promise.then(async function () {
             let score = result.score;
@@ -1568,26 +1591,29 @@ const saveResults2DataSet = ({species, included}) => {
                     DEBUG && console.log("skipping file as it is already saved")
                 } else {
                     end = Math.min(end, result.duration);
-                    const AudioBuffer = await fetchAudioBuffer({
-                        start: start, end: end, file: result.file
-                    })
-                    if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
-                        if (++workerInstance === NUM_WORKERS) {
-                            workerInstance = 0;
+                    if (exportType === 'audio') saveAudio(result.file, start, end, file.replace('.png', '.wav'), {Artist: 'Chirpity'}, filepath)
+                    else {
+                        const AudioBuffer = await fetchAudioBuffer({
+                            start: start, end: end, file: result.file
+                        })
+                        if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
+                            if (++workerInstance === NUM_WORKERS) {
+                                workerInstance = 0;
+                            }
+                            
+                            const buffer = AudioBuffer.getChannelData(0);
+                            predictWorkers[workerInstance].postMessage({
+                                message: 'get-spectrogram',
+                                filepath: filepath,
+                                file: file,
+                                buffer: buffer,
+                                height: height,
+                                width: width,
+                                worker: workerInstance
+                            }, [buffer.buffer]);
                         }
-                        saveAudio(result.file, start, end, file.replace('.png', '.wav'), {Artist: 'Chirpity'}, filepath)
-                        // const buffer = AudioBuffer.getChannelData(0);
-                        // predictWorkers[workerInstance].postMessage({
-                        //     message: 'get-spectrogram',
-                        //     filepath: filepath,
-                        //     file: file,
-                        //     buffer: buffer,
-                        //     height: height,
-                        //     width: width,
-                        //     worker: workerInstance
-                        // }, [buffer.buffer]);
-                        count++;
                     }
+                    count++;
                 }
             }
             return new Promise(function (resolve) {
@@ -1713,13 +1739,6 @@ const bufferToAudio = async ({
                     }
                 )}
         }
-        if (STATE.audio.gain){
-            ffmpgCommand = ffmpgCommand.audioFilters(
-                {
-                    filter: `volume=${Math.pow(10, STATE.audio.gain / 20)}`
-                }
-            )
-        }
         if (STATE.filters.active) {
             ffmpgCommand = ffmpgCommand.audioFilters(
                 {
@@ -1732,7 +1751,14 @@ const bufferToAudio = async ({
                 }
             )
         }
-
+        if (STATE.audio.normalise){
+            ffmpgCommand = ffmpgCommand.audioFilters(
+                {
+                    filter: 'loudnorm',
+                    options: "I=-16:LRA=11:TP=-1.5:offset=" + STATE.audio.gain
+                }
+            )
+        }
         ffmpgCommand.on('start', function (commandLine) {
             DEBUG && console.log('FFmpeg command: ' + commandLine);
         })
