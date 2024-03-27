@@ -8,7 +8,6 @@ const SunCalc = require('suncalc');
 const ffmpeg = require('fluent-ffmpeg');
 const png = require('fast-png');
 const { utimesSync } = require('utimes');
-const staticFfmpeg = require('ffmpeg-static-electron');
 const {writeToPath} = require('@fast-csv/format');
 const merge = require('lodash.merge');
 import { State } from './state.js';
@@ -103,8 +102,9 @@ Date.prototype.getWeekNumber = function(){
 
 
 DEBUG && console.log(staticFfmpeg.path);
-ffmpeg.setFfmpegPath(staticFfmpeg.path.replace('app.asar', 'app.asar.unpacked'));
-
+const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path.replace('app.asar', 'app.asar.unpacked');
+//ffmpeg.setFfmpegPath(staticFfmpeg.path.replace('app.asar', 'app.asar.unpacked'));
+ffmpeg.setFfmpegPath(ffmpegPath);
 let predictionsRequested = {}, predictionsReceived = {}, filesBeingProcessed = [];
 let diskDB, memoryDB;
 
@@ -443,7 +443,7 @@ async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backen
     STATE.update({ model: model });
     await loadDB(appPath); // load the diskdb
     await createDB(); // now make the memoryDB
-    spawnPredictWorkers(model, list, batchSize, threads);
+    spawnPredictWorkers(model, list, 4, threads);
 }
 
 
@@ -730,7 +730,7 @@ async function onAnalyse({
     circleClicked = false
 }) {
     // Now we've asked for a new analysis, clear the aborted flag
-    aborted = false; STATE.incrementor = 1;
+    aborted = false; //STATE.incrementor = 1;
     predictionStart = new Date();
     // Set the appropraite selection range if this is a selection analysis
     STATE.update({ selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined });
@@ -1267,7 +1267,8 @@ const getPredictBuffers = async ({
     predictionsRequested[file] = 0;
     let concatenatedBuffer = Buffer.alloc(0);
     const highWaterMark = 2 * sampleRate * BATCH_SIZE * WINDOW_SIZE; 
-    const STREAM = new PassThrough({ highWaterMark: highWaterMark, end: true});
+    //const STREAM = new PassThrough({ highWaterMark: highWaterMark, end: true});
+    const STREAM = new PassThrough({end: false});
 
     let chunkStart = start * sampleRate;
     return new Promise((resolve, reject) => {
@@ -1278,7 +1279,7 @@ const getPredictBuffers = async ({
             .audioChannels(1) // Set to mono
             .audioFrequency(sampleRate) // Set sample rate 
             .outputOptions([`-bufsize ${highWaterMark}`])
-            .output(STREAM)
+            .writeToStream(STREAM)
 
         command.on('error', error => {
             updateFilesBeingProcessed(file)
@@ -1299,17 +1300,18 @@ const getPredictBuffers = async ({
         STREAM.on('data', chunk => {
            
             if (aborted) {
-                command.kill()
                 STREAM.destroy()
                 return
             }
             if (chunk.byteLength <= 1) {
-                return
+                STREAM.end();
+                STREAM.destroy();
+                console.log('STREAM ended, destroyed')
             }
             else {
                 // try/catch may no longer be necessary
                 try {
-                    concatenatedBuffer = Buffer.concat([concatenatedBuffer, chunk]);
+                    concatenatedBuffer = concatenatedBuffer.length ?  Buffer.concat([concatenatedBuffer, chunk]) : chunk;
                 } catch (error) {
                     console.warn(error)
                     console.warn('concat bugger length', concatenatedBuffer.length, 'chunk.length', chunk.length, chunk.buffer.detached, concatenatedBuffer.buffer.detached)
@@ -1319,19 +1321,21 @@ const getPredictBuffers = async ({
                 if (concatenatedBuffer.length >= highWaterMark) {
                     STREAM.pause();
                     chunk = concatenatedBuffer.subarray(0, highWaterMark);
-                    const remainingBuffer = Buffer.from(concatenatedBuffer.subarray(highWaterMark));
+                    concatenatedBuffer = concatenatedBuffer.subarray(highWaterMark);
                     const audio = Buffer.concat([WAV_HEADER, chunk])
                     predictQueue.push([audio, file, end, chunkStart]);
                     chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate
-                    processPredictQueue().then((resolve, reject) =>{
-                        concatenatedBuffer = remainingBuffer;
-                        checkBacklog(STREAM) 
-                    }
-                    );
-                    
+                    processPredictQueue().then((resolve, reject) => checkBacklog(STREAM) );
                 }
             }
         });
+
+        // STREAM.on('close', () => console.log('STREAM closed'))
+        // STREAM.on('pipe', () => console.log('STREAM piped'))
+        // STREAM.on('unpipe', () => console.log('STREAM unpiped'))
+        // STREAM.on('drain', () => console.log('STREAM drained'))
+        // STREAM.on('finish', () => console.log('STREAM resumed'))
+        // STREAM.on('resume', () => console.log('STREAM resumed'))
 
         STREAM.on('end', () => {
             // EOF: deal with part-full buffers
@@ -1350,7 +1354,7 @@ const getPredictBuffers = async ({
             err.code === 'ENOENT' && notifyMissingFile(file);
         })
 
-        command.run();
+        // command.run();
     }).catch(error => console.log(error));
 }
 
@@ -1375,7 +1379,7 @@ const fetchAudioBuffer = async ({
             .audioChannels(1) // Set to mono
             .audioFrequency(24_000) // Set sample rate to 24000 Hz (always - this is for wavesurfer)
             .output(stream, { end:true });
-        if (STATE.audio.normalise) command = command.audioFilter("loudnorm=I=-16:LRA=11:TP=-1.5");
+        if (STATE.audio.normalise) command = command.audioFilter("loudnorm=I=-16:LRA=11:TP=-1.5:offset=" + STATE.audio.gain);
 
         command.on('error', error => {
             UI.postMessage({event: 'generate-alert', message: error.message})

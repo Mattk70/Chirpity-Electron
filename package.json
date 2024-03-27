@@ -45,13 +45,7 @@
       "!README.md",
       "!saved_model$(/*)",
       "!**/*.*js.map",
-      "!**/*.*.md",
-      "node_modules/ffmpeg-static-electron/bin/${os}/${arch}/ffmpeg",
-      "node_modules/ffmpeg-static-electron/index.js",
-      "node_modules/ffmpeg-static-electron/package.json",
-      "node_modules/ffprobe-static-electron/bin/${os}/${arch}/ffmpeg",
-      "node_modules/ffprobe-static-electron/index.js",
-      "node_modules/ffprobe-static-electron/package.json"
+      "!**/*.*.md"
     ],
     "extraResources": [
       "./Help/example.mp3"
@@ -103,12 +97,7 @@
         "target": "pkg",
         "arch": "arm64"
       },
-      "files": [
-        "!node_modules/ffmpeg-static-electron/bin/win${/*}",
-        "!node_modules/ffmpeg-static-electron/bin/linux${/*}",
-        "!node_modules/ffprobe-static-electron/bin/win${/*}",
-        "!node_modules/ffprobe-static-electron/bin/linux${/*}"
-      ],
+
       "icon": "img/icon/icon.icns",
       "category": "public.app-category.utilities",
       "fileAssociations": [
@@ -133,14 +122,6 @@
       "icon": "./packages/img/icon/icon.icns",
       "target": [
         "AppImage"
-      ],
-      "files": [
-        "!node_modules/ffmpeg-static-electron/bin/linux/ia32${/*}",
-        "!node_modules/ffmpeg-static-electron/bin/win${/*}",
-        "!node_modules/ffmpeg-static-electron/bin/mac${/*}",
-        "!node_modules/ffprobe-static-electron/bin/linux/ia32${/*}",
-        "!node_modules/ffprobe-static-electron/bin/win${/*}",
-        "!node_modules/ffprobe-static-electron/bin/mac${/*}"
       ]
     },
     "nsis": {
@@ -153,17 +134,8 @@
       ],
       "verifyUpdateCodeSignature": false,
       "asar": true,
-      "icon": "./img/icon/icon.png",
-      "files": [
-        "node_modules/ffmpeg-static-electron/bin/win/${arch}/ffmpeg",
-        "!node_modules/ffmpeg-static-electron/bin/win/ia32${/*}",
-        "!node_modules/ffmpeg-static-electron/bin/linux${/*}",
-        "!node_modules/ffmpeg-static-electron/bin/mac${/*}",
-        "node_modules/ffprobe-static-electron/bin/win/${arch}/ffprobe",
-        "!node_modules/ffprobe-static-electron/bin/win/ia32${/*}",
-        "!node_modules/ffprobe-static-electron/bin/linux${/*}",
-        "!node_modules/ffprobe-static-electron/bin/mac${/*}"
-      ]
+      "icon": "./img/icon/icon.png"
+
     }
   },
   "keywords": [
@@ -203,7 +175,7 @@
     "electron-settings": "^4.0.2",
     "electron-updater": "6.1.4",
     "fast-png": "^6.1.0",
-    "ffmpeg-static-electron": "^2.0.3",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "fluent-ffmpeg": "^2.1.2",
     "lodash.merge": "^4.6.2",
     "sqlite3": "5.1.6",
