@@ -1394,7 +1394,7 @@ const fetchAudioBuffer = async ({
                 command.audioFilters(
                     {
                         filter: 'loudnorm',
-                        options: "I=-16:LRA=11:TP=-1.5:offset=" + STATE.audio.gain
+                        options: "I=-16:LRA=11:TP=-1.5"
                     }
                 )
             }
@@ -1427,7 +1427,7 @@ const fetchAudioBuffer = async ({
                 });
             }
         });
-
+        
         command.run();
     });
 }
@@ -1749,14 +1749,14 @@ const bufferToAudio = async ({
                 }
             )
         }
-        if (STATE.audio.normalise){
-            ffmpgCommand = ffmpgCommand.audioFilters(
-                {
-                    filter: 'loudnorm',
-                    options: "I=-16:LRA=11:TP=-1.5:offset=" + STATE.audio.gain
-                }
-            )
-        }
+        // if (STATE.audio.normalise){
+        //     ffmpgCommand = ffmpgCommand.audioFilters(
+        //         {
+        //             filter: 'loudnorm',
+        //             options: "I=-16:LRA=11:TP=-1.5:offset=" + STATE.audio.gain
+        //         }
+        //     )
+        // }
         ffmpgCommand.on('start', function (commandLine) {
             DEBUG && console.log('FFmpeg command: ' + commandLine);
         })

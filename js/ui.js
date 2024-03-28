@@ -4322,7 +4322,7 @@ DOM.gain.addEventListener('input', () => {
                 }
                 case 'colourmap': {
                     config.colormap = element.value;
-                    if (wavesurfer) {
+                    if (wavesurfer && currentFile) {
                         initSpectrogram();
                         // refresh caches
                         updateElementCache()
