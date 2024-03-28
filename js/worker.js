@@ -1287,7 +1287,7 @@ const getPredictBuffers = async ({
             else {
                 error.message = error.message + '|' + error.stack;
             }
-            reject(console.warn('Error in ffmpeg extracting audio segment:', error.message));
+            reject(console.warn('getPredictBuffers: Error in ffmpeg extracting audio segment:', error.message));
         });
         command.on('start', function (commandLine) {
             DEBUG && console.log('FFmpeg command: ' + commandLine);
@@ -1309,12 +1309,10 @@ const getPredictBuffers = async ({
                 console.log('STREAM ended, destroyed')
             }
             else {
-                // try/catch may no longer be necessary
                 try {
                     concatenatedBuffer = concatenatedBuffer.length ?  Buffer.concat([concatenatedBuffer, chunk]) : chunk;
                 } catch (error) {
                     console.warn(error)
-                    console.warn('concat bugger length', concatenatedBuffer.length, 'chunk.length', chunk.length, chunk.buffer.detached, concatenatedBuffer.buffer.detached)
                 }
                 
                 // if we have a full buffer
@@ -1383,7 +1381,7 @@ const fetchAudioBuffer = async ({
 
         command.on('error', error => {
             UI.postMessage({event: 'generate-alert', message: error.message})
-            reject(new Error('Error extracting audio segment:', error));
+            reject(new Error('fetchAudioBuffer: Error extracting audio segment:', error));
         });
         command.on('start', function (commandLine) {
             DEBUG && console.log('FFmpeg command: ' + commandLine);
@@ -2087,11 +2085,12 @@ async function parseMessage(e) {
                 if (remaining === 0) {
                     if (filesBeingProcessed.length) {
                         processNextFile({ worker: worker });
-                    }  else if ( !STATE.selection) {
-                        getSummary() //.then(() => UI.postMessage({event: "analysis-complete"}));
-                    } else {
-                        UI.postMessage({event: "analysis-complete"});
-                    }
+                    } 
+                    //  else if ( !STATE.selection) {
+                    //     getSummary() //.then(() => UI.postMessage({event: "analysis-complete"}));
+                    // } else {
+                    //     UI.postMessage({event: "analysis-complete"});
+                    // }
                 }
             }
         break;
