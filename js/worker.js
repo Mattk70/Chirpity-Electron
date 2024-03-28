@@ -1061,7 +1061,7 @@ async function setupCtx(audio, rate, destination) {
                     previousFilter ? previousFilter.connect(lowshelfFilter) : offlineSource.connect(lowshelfFilter);
                     previousFilter = lowshelfFilter;
                 }
-                // const from = 2000;
+                                // const from = 2000;
                 // const to = 8000;
                 // const geometricMean = Math.sqrt(from * to);
 
@@ -1072,8 +1072,8 @@ async function setupCtx(audio, rate, destination) {
                 // bandpassFilter.channelCount = 1;
                 // previousFilter ? previousFilter.connect(bandpassFilter) : offlineSource.connect(bandpassFilter);
                 // previousFilter = bandpassFilter;
-            }
-        }
+            }      
+}
         if (STATE.audio.gain){
             var gainNode = offlineCtx.createGain();
             gainNode.gain.value = Math.pow(10, STATE.audio.gain / 20);
@@ -1082,7 +1082,7 @@ async function setupCtx(audio, rate, destination) {
         } else {
             previousFilter ? previousFilter.connect(offlineCtx.destination) : offlineSource.connect(offlineCtx.destination);
         }
-        offlineSource.start();
+               offlineSource.start();
         return offlineCtx;
     } )
     .catch( (error) => console.warn(error));
@@ -1390,6 +1390,7 @@ const fetchAudioBuffer = async ({
                         options: `f=${STATE.filters.highPassFrequency}:poles=1`
                     })
                 }
+            }
             if (STATE.audio.normalise){
                 command.audioFilters(
                     {
@@ -1398,7 +1399,7 @@ const fetchAudioBuffer = async ({
                     }
                 )
             }
-        }
+        
         command.on('error', error => {
             UI.postMessage({event: 'generate-alert', message: error.message})
             reject(new Error('fetchAudioBuffer: Error extracting audio segment:', error));
@@ -1427,7 +1428,7 @@ const fetchAudioBuffer = async ({
                 });
             }
         });
-        
+
         command.run();
     });
 }

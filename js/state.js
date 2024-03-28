@@ -32,7 +32,7 @@ export class State {
             this.list = 'everything',
             this.customList = undefined,
             this.local = true,
-            this.incrementor = 1,
+            this.incrementor = 250,
             this.UUID = 0,
             this.track = true
     }
