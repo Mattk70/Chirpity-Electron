@@ -1366,8 +1366,8 @@ const fetchAudioBuffer = async ({
     file = '', start = 0, end = metadata[file].duration
 }) => {
     //if (end - start < 0.1) return  // prevents dataset creation barfing with  v. short buffer
-    const stream = new PassThrough();
-    const data = [];
+    const stream = new PassThrough({end: false});
+    let concatenatedBuffer = Buffer.alloc(0);
             // Use ffmpeg to extract the specified audio segment
     return new Promise((resolve, reject) => {
         let command = ffmpeg(file)
@@ -1409,16 +1409,17 @@ const fetchAudioBuffer = async ({
         })
 
         stream.on('data', chunk => {
-            chunk.byteLength > 1 && data.push(chunk);
+            try {
+                concatenatedBuffer = concatenatedBuffer.length ?  Buffer.concat([concatenatedBuffer, chunk]) : chunk;
+            } catch (error) {
+                console.warn(error)
+            }
         });
 
         stream.on('end', async () => { 
-            if (data.length === 0) return;
-            //Add the audio header
-            data.unshift(CHIRPITY_HEADER)
-            // Concatenate the data chunks into a single Buffer
-            const audio = Buffer.concat(data);
-            // Native CHIRPITY_HEADER (24kHz) here for UI
+            if (concatenatedBuffer.length <= 1) return;
+            //Add the audio header for the UI
+            const audio = Buffer.concat([CHIRPITY_HEADER, concatenatedBuffer]);
             const offlineCtx = await setupCtx(audio, sampleRate, 'UI').catch( (error) => {console.error(error.message)});
             if (offlineCtx){
                 offlineCtx.startRendering().then(resampled => {
@@ -1428,7 +1429,6 @@ const fetchAudioBuffer = async ({
                 });
             }
         });
-
         command.run();
     });
 }
