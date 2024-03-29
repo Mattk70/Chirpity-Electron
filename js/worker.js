@@ -1417,7 +1417,7 @@ async function doPrediction({
     start = 0,
     end = metadata[file].duration,
 }) {
-    if (file.endsWith('.wav')){
+    if (file.toLowerCase().endsWith('.wav')){
         await getWavePredictBuffers({ file: file, start: start, end: end }).catch( (error) => console.warn(error));
     } else {
         await getPredictBuffers({ file: file, start: start, end: end }).catch( (error) => console.warn(error));
