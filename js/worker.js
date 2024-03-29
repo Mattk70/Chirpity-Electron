@@ -47,7 +47,8 @@ console.error = function(message) {
 };
 // Implement error handling in the worker
 self.onerror = function(message, file, lineno, colno, error) {
-    STATE.track && trackEvent(STATE.UUID, 'Unhandled Worker Error', error.message, customURLEncode(error.stack));
+    STATE.track && trackEvent(STATE.UUID, 'Unhandled Worker Error', message, customURLEncode(error?.stack));
+    if (message.includes('dynamic link library')) UI.postMessage({event: 'generate-alert', message: 'There has been an error loading the model. This may be due to missing AVX support. Chirpity AI models require AVX instructions to run. If you have AVX enabled and still see this notice, please refer to <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">this issue</a> on Github.'})
     // Return false not to inhibit the default error handling
     return false;
     };
