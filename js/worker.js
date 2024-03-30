@@ -1124,8 +1124,8 @@ const getWavePredictBuffers = async ({
     predictionsRequested[file] = 0;
     let readStream;
 
-    // extract the header
-    const headerStream = fs.createReadStream(file, {start: 0, end: 4096});
+    // extract the header. With bext and iXML metadata, this can be up to 128k, hence 131072
+    const headerStream = fs.createReadStream(file, {start: 0, end: 131072, highWaterMark: 131072});
     headerStream.on('readable',  () => {
         let chunk = headerStream.read();
         let wav = new wavefileReader.WaveFileReader();
@@ -1138,12 +1138,12 @@ const getWavePredictBuffers = async ({
             return;
         }
         let headerEnd;
-        wav.signature.subChunks.forEach(el => {
-            if (el['chunkId'] === 'data') {
-                headerEnd = el.chunkData.start;
-            }
-        });
-        meta.header = chunk.subarray(0, headerEnd);
+            wav.signature.subChunks.forEach(el => {
+                if (el['chunkId'] === 'data') {
+                    headerEnd = el.chunkData.start;
+                }
+            });
+                meta.header = chunk.subarray(0, headerEnd);
         const byteRate = wav.fmt.byteRate;
         const sample_rate = wav.fmt.sampleRate;
         meta.byteStart = Math.round((start * byteRate) / sample_rate) * sample_rate;
@@ -1156,8 +1156,8 @@ const getWavePredictBuffers = async ({
         readStream = fs.createReadStream(file, {
             start: meta.byteStart, end: meta.byteEnd, highWaterMark: meta.highWaterMark
         });
-    
 
+    
         let chunkStart = start * sampleRate;
         // Changed on.('data') handler because of:  https://stackoverflow.com/questions/32978094/nodejs-streams-and-premature-end
         readStream.on('readable', () => {
@@ -1230,7 +1230,7 @@ const getPredictBuffers = async ({
     predictionsReceived[file] = 0;
     predictionsRequested[file] = 0;
     let concatenatedBuffer = Buffer.alloc(0);
-    const highWaterMark = 2 * sampleRate * BATCH_SIZE * WINDOW_SIZE; 
+    const highWaterMark =  2 * sampleRate * BATCH_SIZE * WINDOW_SIZE; 
     //const STREAM = new PassThrough({ highWaterMark: highWaterMark, end: true});
     const STREAM = new PassThrough({end: false});
 
@@ -1242,7 +1242,7 @@ const getPredictBuffers = async ({
             .format('wav')
             .audioChannels(1) // Set to mono
             .audioFrequency(sampleRate) // Set sample rate 
-            .outputOptions([`-bufsize ${highWaterMark}`])
+            //.outputOptions([`-bufsize ${highWaterMark}`])
             .writeToStream(STREAM)
 
         command.on('error', error => {
@@ -2010,6 +2010,7 @@ const parsePredictions = async (response) => {
     const total = sumObjectValues(batchChunksToSend);
     const progress = received / total;
     const fileProgress = predictionsReceived[file] / batchChunksToSend[file];
+    console.log('file', file, 'predictions', predictionsReceived[file], 'out of', batchChunksToSend[file])
     UI.postMessage({ event: 'progress', progress: progress, file: file });
     if (fileProgress === 1) {
         if (index === 0 ) {
