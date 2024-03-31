@@ -2010,7 +2010,6 @@ const parsePredictions = async (response) => {
     const total = sumObjectValues(batchChunksToSend);
     const progress = received / total;
     const fileProgress = predictionsReceived[file] / batchChunksToSend[file];
-    console.log('file', file, 'predictions', predictionsReceived[file], 'out of', batchChunksToSend[file])
     UI.postMessage({ event: 'progress', progress: progress, file: file });
     if (fileProgress === 1) {
         if (index === 0 ) {

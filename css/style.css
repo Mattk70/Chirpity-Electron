@@ -388,7 +388,7 @@ footer {
 /* ============ small devices ============ */
 @media (max-width: 767px) {
     .dropdown-menu:not(.dropdown-menu .dropdown-menu) {
-        max-height: 300px;
+        max-height: 320px;
         overflow: auto;
     }
 

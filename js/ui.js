@@ -2924,14 +2924,18 @@ function onChartData(args) {
         t1_analysis = Date.now();
         const analysisTime = ((t1_analysis - t0_analysis) / 1000).toFixed(2);
         const duration = STATE.selection ? STATE.selection.end - STATE.selection.start : DIAGNOSTICS['Audio Duration'];
-        DIAGNOSTICS['Analysis Duration'] = analysisTime + ' seconds';
         const rate = duration / analysisTime;
-        DIAGNOSTICS['Analysis Rate'] = rate.toFixed(0) + 'x faster than real time performance.';
+        
         trackEvent(config.UUID, `${config.model}-${config.backend}`, 'Audio Duration', config.backend, Math.round(duration));
         trackEvent(config.UUID, `${config.model}-${config.backend}`, 'Analysis Duration', config.backend, parseInt(analysisTime));
         trackEvent(config.UUID, `${config.model}-${config.backend}`, 'Analysis Rate', config.backend, parseInt(rate));
-        STATE.selection || generateToast({ message:'Analysis complete.'})
-        STATE.selection || activateResultFilters();
+        
+        if (! STATE.selection){
+            DIAGNOSTICS['Analysis Duration'] = analysisTime + ' seconds';
+            DIAGNOSTICS['Analysis Rate'] = rate.toFixed(0) + 'x faster than real time performance.';
+            generateToast({ message:'Analysis complete.'});
+            activateResultFilters();
+        }
     }
     
     /* 
