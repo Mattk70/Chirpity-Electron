@@ -1125,7 +1125,7 @@ const getWavePredictBuffers = async ({
     let readStream;
 
     // extract the header. With bext and iXML metadata, this can be up to 128k, hence 131072
-    const headerStream = fs.createReadStream(file, {start: 0, end: 131072, highWaterMark: 131072});
+    const headerStream = fs.createReadStream(file, {start: 0, end: 524288, highWaterMark: 524288});
     headerStream.on('readable',  () => {
         let chunk = headerStream.read();
         let wav = new wavefileReader.WaveFileReader();
