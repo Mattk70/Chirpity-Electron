@@ -162,6 +162,54 @@ const createDB = async (file) => {
     return db
 }
 
+
+async function runMigration(path, num_labels){
+    const dataset_file_path = p.join(path, `archive_dataset${num_labels}.sqlite`);
+    const archive_file_path = p.join(path, `archive${num_labels}.sqlite`);
+    //back-up the archive database
+    fs.copyFileSync(archive_file_path, archive_file_path + '.bak');
+    // Connect to the databases
+    let datasetDB = new sqlite3.Database(dataset_file_path);
+    const archiveDB = new sqlite3.Database(archive_file_path);
+
+    // Get a list of tables in the source database
+    const tables = await datasetDB.allAsync("SELECT name FROM sqlite_master WHERE type='table'").catch(err => console.log(err));
+    await archiveDB.runAsync('BEGIN');
+    // Loop through each table
+    for (const table of tables)  {
+        const tableName = table.name;
+        if (tableName === 'species') continue; // Species are the same
+        // Query the data from the current table
+        const rows = await datasetDB.allAsync(`SELECT * FROM ${tableName}`).catch(err => console.log(err));
+        // Insert the data into the destination database
+        for (const row of rows) {
+            const columns = Object.keys(row);
+            const values = columns.map(col => row[col]);
+            const placeholders = columns.map(() => '?').join(',');
+
+            await archiveDB.runAsync(`INSERT OR IGNORE INTO ${tableName} (${columns.join(',')}) VALUES (${placeholders})`, ...values)
+                .catch(err => console.log(err));
+        };
+    }
+    await archiveDB.runAsync('END');
+    // Close the database connections
+    datasetDB.close(function (err){
+        //back-up (rename) the dataset database file
+        fs.rename(dataset_file_path, dataset_file_path + '.bak', function (err) {
+            if (err){
+                console.log(err)
+            } else {
+                console.log('Backup successful');
+            }
+        });
+    });
+    archiveDB.close((err) => {
+        if (err) {
+            console.error(err.message);
+        }
+    });
+}
+
 async function loadDB(path) {
     // We need to get the default labels from the config file
     DEBUG && console.log("Loading db " + path)
@@ -186,6 +234,16 @@ async function loadDB(path) {
     const num_labels = modelLabels.length;
     LABELS = modelLabels; // these are the default english labels
     const file = dataset_database ? p.join(path, `archive_dataset${num_labels}.sqlite`) : p.join(path, `archive${num_labels}.sqlite`)
+    // Migrate records from 1.6.8 if archive_dataset exists
+    if (fs.existsSync(p.join(path, `archive_dataset${num_labels}.sqlite`) )){
+        if (!fs.existsSync(p.join(path, `archive${num_labels}.sqlite`)) ){
+            // there was only an archive_dataset database, so just rename it...
+            fs.renameSync(p.join(path, `archive_dataset${num_labels}.sqlite`), p.join(path, `archive${num_labels}.sqlite`))
+        } else {
+            // copy data from dataset database to archive database
+            await runMigration(path, num_labels)
+        }
+    }
     if (!fs.existsSync(file)) {
         await createDB(file);
     } else if (diskDB?.filename !== file) {
@@ -832,7 +890,7 @@ const getDuration = async (src) => {
     let audio;
     return new Promise(function (resolve) {
         audio = new Audio();
-        audio.src = src;
+        audio.src = src.replace(/#/g, '%23'); // allow hash in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
         audio.addEventListener("loadedmetadata", function () {
             const duration = audio.duration;
             audio = undefined;
