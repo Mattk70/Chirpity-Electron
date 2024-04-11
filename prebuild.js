@@ -33,7 +33,8 @@ function searchPatterns(directory, patterns) {
 // Define the patterns you want to search for
 const patterns = [
     /DEBUG\s*=\s*true/,
-    /ID_SITE\s*=\s*3/
+    /ID_SITE\s*=\s*3/,
+    /DATASET\s*=\s*true/
     // Add more patterns as needed
 ];
 

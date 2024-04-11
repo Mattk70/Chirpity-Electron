@@ -87,7 +87,7 @@ let TEMP, appPath, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let LIST_WORKER;
 const DEBUG = false;
 
-const DATASET = true;
+const DATASET = false;
 const adding_chirpity_additions = true;
 const dataset_database = DATASET;
 const DATASET_SAVE_LOCATION = "E:/DATASETS/BirdNET_wavs";
@@ -102,7 +102,6 @@ Date.prototype.getWeekNumber = function(){
 };
 
 
-DEBUG && console.log(staticFfmpeg.path);
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path.replace('app.asar', 'app.asar.unpacked');
 //ffmpeg.setFfmpegPath(staticFfmpeg.path.replace('app.asar', 'app.asar.unpacked'));
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -1688,16 +1687,22 @@ const bufferToAudio = async ({
                 )}
         }
         if (STATE.filters.active) {
-            ffmpgCommand = ffmpgCommand.audioFilters(
-                {
-                    filter: 'lowshelf',
-                    options: `gain=${STATE.filters.lowShelfAttenuation}:f=${STATE.filters.lowShelfFrequency}`
-                },
-                {
-                    filter: 'highpass',
-                    options: `f=${STATE.filters.highPassFrequency}:poles=1`
-                }
-            )
+            if (STATE.filters.lowShelfFrequency > 0){
+                ffmpgCommand = ffmpgCommand.audioFilters(
+                    {
+                        filter: 'lowshelf',
+                        options: `gain=${STATE.filters.lowShelfAttenuation}:f=${STATE.filters.lowShelfFrequency}`
+                    }
+                )
+            }
+            if (STATE.filters.highPassFrequency > 0){
+                ffmpgCommand = ffmpgCommand.audioFilters(
+                    {
+                        filter: 'highpass',
+                        options: `f=${STATE.filters.highPassFrequency}:poles=1`
+                    }
+                )
+            }
         }
         // if (STATE.audio.normalise){
         //     ffmpgCommand = ffmpgCommand.audioFilters(
