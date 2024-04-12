@@ -200,7 +200,6 @@ DOM.contentWrapperElement.style.height = (bodyElement.clientHeight - 80) + 'px';
 // Set default Options
 let config;
 let sampleRate = 24_000;
-let audioCtx;
 
 /** Collect DIAGNOSTICS Information
 DIAGNOSTICS keys:
