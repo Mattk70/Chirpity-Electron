@@ -2837,7 +2837,7 @@ function onChartData(args) {
         for (let i = 0; i < summary.length; i++) {
             const item = summary[i];
             const selected = item.cname === filterSpecies ? ' text-warning' : '';
-            summaryHTML += `<tr class="${selected}">
+            summaryHTML += `<tr tabindex="-1" class="${selected}">
             <td class="max">${iconizeScore(item.max)}</td>
             <td class="cname">
             <span class="cname">${item.cname}</span> <br><i>${item.sname}</i>
