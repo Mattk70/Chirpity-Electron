@@ -1,5 +1,5 @@
 const DEBUG = false;
-const ID_SITE = 2;
+const ID_SITE = 3;
 
 
 function trackEvent(uuid, event, action, name, value){
@@ -31,7 +31,8 @@ function trackVisit(config){
             &dimension7=${JSON.stringify(config.audio)}
             &dimension8=${JSON.stringify(config[config.backend])}
             &dimension9=${JSON.stringify(config.detect)}
-            &dimension11=${config.VERSION}`)
+            &dimension10=${config.VERSION}
+            &dimension12=${config.CPU}`)
         .then(response => {
             if (! response.ok) throw new Error('Network response was not ok', response);
         })

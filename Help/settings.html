@@ -119,13 +119,14 @@
         <th>Threads</th>
         <td>This setting allows you to select the number of threads to use for predictions.
             When using the CPU backend, the number of threads is automatically set to match the number of CPU cores available on the computer.
-            By default, the GPU backend uses one thread. Adjusting this setting, along with the batch size, can optimize the speed of predictions.
+            By default, the GPU backend uses one thread. Adjusting this setting, along with the batch size, can increase the speed of processing.
         </td>
     </tr>
     <tr>
         <th>Batch Size</th>
         <td>This setting determines the number of three-second audio chunks to process for each model request.
-            Larger values lead to faster processing, especially on long files.
+            Larger values may lead to faster processing, especially on long files, although too large a value will reduce the processing speed. 
+            The optimal value may also differ depending on the file format being analysed.
         </td>
     </tr>
     <tr>

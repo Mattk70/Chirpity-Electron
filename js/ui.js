@@ -1617,7 +1617,9 @@ window.onload = async () => {
         isMac && checkForMacUpdates();
         const doNotTrack = document.getElementById('do-not-track')
         doNotTrack.checked = !config.track;
-        if (config.track) trackVisit(config);
+        // Add cpu model to config
+        config.CPU = DIAGNOSTICS['CPU'];
+        config.track && trackVisit(config);
     })
 }
 
