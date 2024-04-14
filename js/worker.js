@@ -351,6 +351,10 @@ async function handleMessage(e) {
             await onChartRequest(args);
             break;
         }
+        case 'check-all-files-saved': {
+            savedFileCheck(args.files);
+            break;
+        }
         case "convert-dataset": {convertSpecsFromExistingSpecs();
             break;
         }
@@ -472,6 +476,25 @@ ipcRenderer.on('new-client', (event) => {
     [UI] = event.ports;
     UI.onmessage = handleMessage
 })
+
+function savedFileCheck(fileList) {
+    // Construct a parameterized query to count the matching files in the database
+    const query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${fileList.map(() => '?').join(',')})`;
+
+    // Execute the query with the file list as parameters
+    diskDB.get(query, fileList, (err, row) => {
+        if (err) {
+            console.error('Error querying database during savedFileCheck:', err);
+        } else {
+            const count = row.count;
+            if (count === fileList.length) {
+                UI.postMessage({event: 'all-files-saved-check-result', result: true});
+            } else {
+                UI.postMessage({event: 'all-files-saved-check-result', result: false});
+            }
+        }
+    });
+}
 
 async function onChangeMode(mode) {
     memoryDB || await createDB();
@@ -1047,7 +1070,7 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
     
     metadata[file].duration ??= savedMeta?.duration || await getDuration(file);
     
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         if (metadata[file].isComplete) {
             resolve(metadata[file])
         } else {
@@ -1081,7 +1104,7 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
             metadata[file].fileStart = fileStart;
             return resolve(metadata[file]);
         }
-    })
+    }).catch(error => console.warn(error.message))
 }
             
 function setupCtx(audio, rate, destination) {
@@ -1180,7 +1203,10 @@ const getWavePredictBuffers = async ({
     predictionsReceived[file] = 0;
     predictionsRequested[file] = 0;
     let readStream;
-
+    if (! fs.existsSync(file)) {
+        UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`})
+        return new Error('getWavePredictBuffers: Error extracting audio segment: File not found.');
+    }
     // extract the header. With bext and iXML metadata, this can be up to 128k, hence 131072
     const headerStream = fs.createReadStream(file, {start: 0, end: 524288, highWaterMark: 524288});
     headerStream.on('readable',  () => {
@@ -1293,6 +1319,10 @@ const getPredictBuffers = async ({
 
     let chunkStart = start * sampleRate;
     return new Promise((resolve, reject) => {
+        if (! fs.existsSync(file)) {
+            UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`})
+            return reject(new Error('getPredictBuffers: Error extracting audio segment: File not found.'));
+        }
         const command = ffmpeg(file)
             .seekInput(start)
             .duration(end - start)
@@ -1373,11 +1403,17 @@ const fetchAudioBuffer = async ({
     //if (end - start < 0.1) return  // prevents dataset creation barfing with  v. short buffer
     const stream = new PassThrough({end: false});
     let concatenatedBuffer = Buffer.alloc(0);
-            // Use ffmpeg to extract the specified audio segment
+    // Ensure start is a minimum 0.1 seconds from the end of the file, and >= 0
+    start = metadata[file].duration < 0.1 ? 0 : Math.min(metadata[file].duration - 0.1, start)
+    // Use ffmpeg to extract the specified audio segment
     return new Promise((resolve, reject) => {
+        if (! fs.existsSync(file)) {
+            UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`})
+            return reject(new Error('fetchAudioBuffer: Error extracting audio segment: File not found.'));
+        }
         let command = ffmpeg(file)
             .seekInput(start)
-            .duration(end - start)
+            .duration(Math.max(end - start, 0.1))
             .format('s16le')
             .audioChannels(1) // Set to mono
             .audioFrequency(24_000) // Set sample rate to 24000 Hz (always - this is for wavesurfer)
@@ -1711,8 +1747,12 @@ const bufferToAudio = async ({
         end = Math.min(end, metadata[file].duration);
     }
     
-    return new Promise(function (resolve) {
+    return new Promise(function (resolve, reject) {
         const bufferStream = new PassThrough();
+        if (! fs.existsSync(file)) {
+            UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`})
+            return reject(new Error('bufferToAudio: Error extracting audio segment: File not found.'));
+        }
         let ffmpgCommand = ffmpeg(file)
         .toFormat(soundFormat)
         .seekInput(start)
@@ -1728,21 +1768,6 @@ const bufferToAudio = async ({
             ffmpgCommand = ffmpgCommand.audioBitrate(bitrate)
         } else if (['flac'].includes(format)) {
             ffmpgCommand = ffmpgCommand.audioQuality(quality)
-        }
-        
-        if (fade && padding) {
-            const duration = end - start;
-            if (start >= 1 && end <= metadata[file].duration - 1) {
-                ffmpgCommand = ffmpgCommand.audioFilters(
-                    {
-                        filter: 'afade',
-                        options: `t=in:ss=${start}:d=1`
-                    },
-                    {
-                        filter: 'afade',
-                        options: `t=out:st=${duration - 1}:d=1`
-                    }
-                )}
         }
         if (STATE.filters.active) {
             if (STATE.filters.lowShelfFrequency > 0){
@@ -1761,15 +1786,31 @@ const bufferToAudio = async ({
                     }
                 )
             }
+            if (STATE.audio.normalise){
+                ffmpgCommand = ffmpgCommand.audioFilters(
+                    {
+                        filter: 'loudnorm',
+                        options: "I=-16:LRA=11:TP=-1.5" //:offset=" + STATE.audio.gain
+                    }
+                )
+            }
         }
-        // if (STATE.audio.normalise){
-        //     ffmpgCommand = ffmpgCommand.audioFilters(
-        //         {
-        //             filter: 'loudnorm',
-        //             options: "I=-16:LRA=11:TP=-1.5:offset=" + STATE.audio.gain
-        //         }
-        //     )
-        // }
+        if (fade && padding) {
+            const duration = end - start;
+            if (start >= 1 && end <= metadata[file].duration - 1) {
+                ffmpgCommand = ffmpgCommand.audioFilters(
+                    {
+                        filter: 'afade',
+                        options: `t=in:ss=${start}:d=1`
+                    },
+                    {
+                        filter: 'afade',
+                        options: `t=out:st=${duration - 1}:d=1`
+                    }
+                )}
+        }
+
+
         ffmpgCommand.on('start', function (commandLine) {
             DEBUG && console.log('FFmpeg command: ' + commandLine);
         })

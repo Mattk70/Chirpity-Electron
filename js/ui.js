@@ -615,16 +615,30 @@ function renderFilenamePanel() {
     customiseAnalysisMenu(isSaved === 'text-info');
 }
 
+
+function customAnalysisAllMenu(saved){
+    const analyseAllMenu = document.getElementById('analyseAll');
+    if (saved) {
+        analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> Get Results for All Open Files
+        <span class="shortcut float-end">Ctrl+A</span>`;
+        enableMenuItem(['reanalyseAll']);
+    } else {
+        analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> Analyse All Open Files
+        <span class="shortcut float-end">Ctrl+A</span>`;
+        disableMenuItem(['reanalyseAll']);
+    }   
+}
+
 function customiseAnalysisMenu(saved) {
     const analyseMenu = document.getElementById('analyse');
     if (saved) {
-        analyseMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> Retrieve Results
+        analyseMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> Get Results for Current File
         <span class="shortcut float-end">Ctrl+A</span>`;
-        enableMenuItem(['reanalyse', 'reanalyseAll']);
+        enableMenuItem(['reanalyse']);
     } else {
         analyseMenu.innerHTML = `<span class="material-symbols-outlined">search</span> Analyse File
         <span class="shortcut float-end">Ctrl+A</span>`;
-        disableMenuItem(['reanalyse', 'reanalyseAll']);
+        disableMenuItem(['reanalyse']);
     }
 }
 
@@ -661,7 +675,7 @@ const showLocation = async (fromSelect) => {
     const customPlaceEl = document.getElementById('customPlace');
     const locationSelect = document.getElementById('savedLocations');
     // Check if currentfile has a location id
-    const id = fromSelect ? locationSelect.value : FILE_LOCATION_MAP[currentFile];
+    const id = fromSelect ? parseInt(locationSelect.value) : FILE_LOCATION_MAP[currentFile];
     
     if (id) {
         newLocation = LOCATIONS.find(obj => obj.id === id);
@@ -816,6 +830,7 @@ async function onOpenFiles(args) {
     resetDiagnostics();
     // Store the file list and Load First audio file
     fileList = args.filePaths;
+    fileList.length > 1 && worker.postMessage({action: 'check-all-files-saved', files: fileList});
     STATE.openFiles = args.filePaths;
     // Sort file by time created (the oldest first):
     if (fileList.length > 1) {
@@ -1630,6 +1645,9 @@ const setUpWorkerMessaging = () => {
             const args = e.data;
             const event = args.event;
             switch (event) {
+                case 'all-files-saved-check-result': {
+                    customAnalysisAllMenu(args.result)
+                }
                 case "analysis-complete": {onAnalysisComplete();
                     break;
                 }
@@ -1639,112 +1657,119 @@ const setUpWorkerMessaging = () => {
                 case "chart-data": {onChartData(args);
                     break;
                 }
-                case "current-file-week": { STATE.week = args.week}
-                case "diskDB-has-records": {chartsLink.classList.remove("disabled");
-                exploreLink.classList.remove("disabled");
+                case "current-file-week": { 
+                    STATE.week = args.week
+                    break;
+                }
+                case "diskDB-has-records": {
+                    chartsLink.classList.remove("disabled");
+                    exploreLink.classList.remove("disabled");
+                    break;
+                }
+                case "file-location-id": {onFileLocationID(args);
+                    break;
+                }
+                case "files": {onOpenFiles(args);
+                    break;
+                }
+                case "generate-alert": {
+                    if (args.updateFilenamePanel) {
+                        renderFilenamePanel();
+                        window.electron.unsavedRecords(false);
+                        document.getElementById("unsaved-icon").classList.add("d-none");
+                    }
+                    if (args.missingFile){
+                        console.log('missing file');
+                    }
+                    generateToast({ message: args.message});
                 break;
-            }
-            case "file-location-id": {onFileLocationID(args);
-                break;
-            }
-            case "files": {onOpenFiles(args);
-                break;
-            }
-            case "generate-alert": {
-                if (args.updateFilenamePanel) {
+                }
+                // Called when last result is returned from a database query
+                case "database-results-complete": {onResultsComplete(args);
+                    break;
+                }
+                case "labels": { 
+                    LABELS = args.labels; 
+                    // Read a custom list if applicable
+                    config.list === 'custom' && setListUIState(config.list);
+                    break }
+                case "location-list": {LOCATIONS = args.locations;
+                    locationID = args.currentLocation;
+                    break;
+                }
+                case "model-ready": {onModelReady(args);
+                    break;
+                }
+                case "mode-changed": {
+                    const mode = args.mode;
+                    STATE.mode = mode;
                     renderFilenamePanel();
-                    window.electron.unsavedRecords(false);
-                    document.getElementById("unsaved-icon").classList.add("d-none");
+                    config.debug && console.log("Mode changed to: " + mode);
+                    if (mode === 'archive' || mode === 'explore') {
+                        enableMenuItem(['purge-file']);
+                        // change header to indicate activation
+                        DOM.resultHeader.classList.remove('text-bg-secondary');
+                        DOM.resultHeader.classList.add('text-bg-dark');
+                        // PREDICTING = false;
+                        // STATE.analysisDone = true;
+                    } else {
+                        disableMenuItem(['purge-file']);
+                        // change header to indicate deactivation
+                        DOM.resultHeader.classList.add('text-bg-secondary');
+                        DOM.resultHeader.classList.remove('text-bg-dark');   
+                    }
+                    break;
                 }
-                generateToast({ message: args.message});
-            break;
-            }
-            // Called when last result is returned from a database query
-            case "database-results-complete": {onResultsComplete(args);
-                break;
-            }
-            case "labels": { 
-                LABELS = args.labels; 
-                // Read a custom list if applicable
-                config.list === 'custom' && setListUIState(config.list);
-                break }
-            case "location-list": {LOCATIONS = args.locations;
-                locationID = args.currentLocation;
-                break;
-            }
-            case "model-ready": {onModelReady(args);
-                break;
-            }
-            case "mode-changed": {
-                const mode = args.mode;
-                STATE.mode = mode;
-                renderFilenamePanel();
-                config.debug && console.log("Mode changed to: " + mode);
-                if (mode === 'archive' || mode === 'explore') {
-                    enableMenuItem(['purge-file']);
-                    // change header to indicate activation
-                    DOM.resultHeader.classList.remove('text-bg-secondary');
-                    DOM.resultHeader.classList.add('text-bg-dark');
-                    // PREDICTING = false;
-                    // STATE.analysisDone = true;
-                } else {
-                    disableMenuItem(['purge-file']);
-                    // change header to indicate deactivation
-                    DOM.resultHeader.classList.add('text-bg-secondary');
-                    DOM.resultHeader.classList.remove('text-bg-dark');   
+                case "summary-complate": {onSummaryComplete(args);
+                    break;
                 }
-                break;
-            }
-            case "summary-complate": {onSummaryComplete(args);
-                break;
-            }
-            case "new-result": {renderResult(args);
-                break;
-            }
-            case "progress": {onProgress(args);
-                break;
-            }
-            // called when an analysis ends, or when the filesbeingprocessed list is empty
-            case "processing-complete": {
-                STATE.analysisDone = true;
-                //PREDICTING = false;
-                //DOM.progressDiv.classList.add('d-none');
-                break;
-            }
-            case 'ready-for-tour':{
-                // New users - show the tour
-                if (!config.seenTour) {
-                    setTimeout(prepTour, 1500);
+                case "new-result": {renderResult(args);
+                    break;
                 }
+                case "progress": {onProgress(args);
+                    break;
+                }
+                // called when an analysis ends, or when the filesbeingprocessed list is empty
+                case "processing-complete": {
+                    STATE.analysisDone = true;
+                    //PREDICTING = false;
+                    //DOM.progressDiv.classList.add('d-none');
+                    break;
+                }
+                case 'ready-for-tour':{
+                    // New users - show the tour
+                    if (!config.seenTour) {
+                        setTimeout(prepTour, 1500);
+                    }
+                    break;
+                }
+                case "seen-species-list": {generateBirdList("seenSpecies", args.list);
                 break;
+                }
+                case "valid-species-list": {populateSpeciesModal(args.included, args.excluded);
+                    break;
+                }
+                case "total-records": {updatePagination(args.total, args.offset);
+                    break;
+                }
+                case "unsaved-records": {window.electron.unsavedRecords(true);
+                    document.getElementById("unsaved-icon").classList.remove("d-none");
+                    break;
+                }
+                case "update-audio-duration": {DIAGNOSTICS["Audio Duration"] ??= 0;
+                    DIAGNOSTICS["Audio Duration"] += args.value;
+                    break;
+                }
+                case "update-summary": {updateSummary(args);
+                    break;
+                }
+                case "worker-loaded-audio": {
+                    onWorkerLoadedAudio(args);
+                    break;
+                }
+                default: {generateToast({ message:`Unrecognised message from worker:${args.event}`});
+                }
             }
-            case "seen-species-list": {generateBirdList("seenSpecies", args.list);
-            break;
-            }
-            case "valid-species-list": {populateSpeciesModal(args.included, args.excluded);
-                break;
-            }
-            case "total-records": {updatePagination(args.total, args.offset);
-                break;
-            }
-            case "unsaved-records": {window.electron.unsavedRecords(true);
-                document.getElementById("unsaved-icon").classList.remove("d-none");
-                break;
-            }
-            case "update-audio-duration": {DIAGNOSTICS["Audio Duration"] ??= 0;
-                DIAGNOSTICS["Audio Duration"] += args.value;
-                break;
-            }
-            case "update-summary": {updateSummary(args);
-                break;
-            }
-            case "worker-loaded-audio": {
-                onWorkerLoadedAudio(args);
-                break;
-            }
-            default: {generateToast({ message:`Unrecognised message from worker:${args.event}`});
-            }
-        }
         })
     })
 }
@@ -2455,6 +2480,14 @@ function onChartData(args) {
         },
         KeyT: function (e) {
             if ( e.ctrlKey || e.metaKey) timelineToggle(true);
+        },
+        KeyV: function(e) {
+            if (activeRow && (e.ctrlKey || e.metaKey)) {
+                const nameAttribute = activeRow.getAttribute('name');
+                const [file, start, end, sname, label] = nameAttribute.split('|');
+                const cname = label.replace('?', '');
+                insertManualRecord(cname, parseFloat(start), parseFloat(end), "", "", "", "Update", false, cname)
+            }
         },
         KeyZ: function (e) {
             if (( e.ctrlKey || e.metaKey) && DELETE_HISTORY.length) insertManualRecord(...DELETE_HISTORY.pop());
