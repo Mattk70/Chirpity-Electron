@@ -733,8 +733,8 @@ const cancelDefaultLocation = () => {
 }
 
 const setDefaultLocation = () => {
-    config.latitude = parseFloat(DOM.defaultLat.value).toFixed(2);
-    config.longitude = parseFloat(parseFloat(DOM.defaultLon.value)).toFixed(2);
+    config.latitude = parseFloat(DOM.defaultLat.value).toFixed(4);
+    config.longitude = parseFloat(parseFloat(DOM.defaultLon.value)).toFixed(4);
     config.location = document.getElementById('place').textContent.replace('fmd_good', '');
     updateMap(parseFloat(DOM.defaultLat.value), parseFloat(DOM.defaultLon.value));
     updatePrefs('config.json', config)
@@ -5224,5 +5224,5 @@ function showCompareSpec() {
 
 }
 
-// Make config and displayLocationAddress available to the map script in index.html
-export { config, displayLocationAddress, LOCATIONS };
+// Make config, LOCATIONS and displayLocationAddress and toasts available to the map script in index.html
+export { config, displayLocationAddress, LOCATIONS, generateToast };

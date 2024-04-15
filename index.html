@@ -1186,7 +1186,7 @@
 <script  src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.regions.min.js"></script>
 <script src="./js/ui.js" type="module"></script>
 <script type="module" defer>
-    import { config, displayLocationAddress, LOCATIONS } from './js/ui.js';
+    import { config, displayLocationAddress, LOCATIONS, generateToast } from './js/ui.js';
     let map, marker, clickTimer = 0;
     async function onMapClick(e) {
         const {lat, lng} = e.latlng;
@@ -1236,16 +1236,20 @@
                 onMapClick(e)
             });
         } else{
-            map.setView([config.latitude, config.longitude], 2);
-            const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 15,
-                minZoom: 3,
-                attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            }).addTo(map);
-            if (!marker) marker = L.marker([config.latitude, config.longitude]).addTo(map);
-            const firstMarkerEl = document.querySelector('.leaflet-marker-icon')
-            firstMarkerEl.classList.add('leaflet-marker-icon-default')
-            marker.on('click', onMapClick);
+            try {
+                map.setView([config.latitude, config.longitude], 2);
+                const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 15,
+                    minZoom: 3,
+                    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                }).addTo(map);
+                if (!marker) marker = L.marker([config.latitude, config.longitude]).addTo(map);
+                const firstMarkerEl = document.querySelector('.leaflet-marker-icon')
+                firstMarkerEl.classList.add('leaflet-marker-icon-default')
+                marker.on('click', onMapClick);
+            } catch (error) {
+                generateToast({message: 'There was an error showing the map: '  + error.message})
+            }
         }
     }
     const latLonElements = ['latitude', 'longitude', 'customLat', 'customLon'];
@@ -1257,13 +1261,19 @@
             displayLocationAddress(where);
         });
     })
+
     function updateMap(lat,lng){
-        // Update the marker's position
-        if (!marker) marker = L.marker([lat, lng]).addTo(map);
-        marker.setLatLng([lat, lng]);
-        // Center the map view on the new marker position
-        map.setView([lat, lng]);
+        try {
+            // Update the marker's position
+            if (!marker) marker = L.marker([lat, lng]).addTo(map);
+            marker.setLatLng([lat, lng]);
+            // Center the map view on the new marker position
+            map.setView([lat, lng]);
+        } catch (error) {
+            generateToast({message: 'There was an error updating the map: '  + error.message})
+        }
     }
+
     async function placeMap(divID){
         map?.remove(); marker = undefined;
         map = L.map(divID);
