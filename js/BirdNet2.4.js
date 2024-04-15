@@ -22,7 +22,7 @@ onmessage = async (e) => {
             case "load": {
                 const version = e.data.model;
                 DEBUG && console.log("load request to worker");
-                const { height: height, width: width, location: location } = JSON.parse(fs.readFileSync(path.join(__dirname, `../${version}_model_config.json`), "utf8"));
+                const { height, width, location } = JSON.parse(fs.readFileSync(path.join(__dirname, `../${version}_model_config.json`), "utf8"));
                 const appPath = "../" + location + "/";
                 const list = e.data.list;
                 const batch = e.data.batchSize;
@@ -69,7 +69,7 @@ onmessage = async (e) => {
             }
             case "predict": {
                 if (myModel.model_loaded) {
-                    const { chunks: chunks, start: start, fileStart: fileStart, file: file, snr: snr, confidence: confidence, worker: worker, context: context, resetResults: resetResults } = e.data;
+                    const { chunks, start, fileStart, file, snr, confidence, worker, context, resetResults } = e.data;
                     myModel.useContext = context;
                     myModel.selection =  !resetResults;
                     const [result,filename,startPosition] = await myModel.predictChunk(chunks, start, fileStart, file, snr, confidence / 1000);

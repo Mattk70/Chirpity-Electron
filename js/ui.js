@@ -2210,12 +2210,6 @@ function onChartData(args) {
     }
     
     const contextMenu = document.getElementById('context-menu')
-    // contextMenu.addEventListener('click', function (e) {
-    //     if (e.target.closest('.play')){
-    //         (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
-    //     }
-    // })
-    
     
     function handleKeyDownDeBounce(e) {
         e.preventDefault();
@@ -4166,8 +4160,10 @@ DOM.gain.addEventListener('input', () => {
                 break;
             }
             case 'speciesFilter': { speciesFilter(e); break}
-            case 'context-menu': { e.target.closest('.play') && typeof region !== 'undefined' ? region.play() : console.log('Region undefined') }
-
+            case 'context-menu': { 
+                e.target.closest('.play') && typeof region !== 'undefined' ? region.play() : console.log('Region undefined')
+                break;
+            }
             case 'audioFiltersIcon': { toggleFilters(); break }
             case 'context-mode': { toggleContextAwareMode(); break }
             case 'nocmigMode': { changeNocmigMode(); break }
