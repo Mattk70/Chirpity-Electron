@@ -3306,7 +3306,9 @@ async function setIncludedIDs(lat, lon, week) {
             localBirdsOnly: STATE.local,
             threshold: STATE.speciesThreshold
         });
-
+        // Add the index of "Unknown Sp." to all lists
+        STATE.list !== 'everything' && result.push(LABELS.length - 1)
+        
         let includedObject = {};
         if (STATE.list === 'location' || (STATE.list === 'nocturnal' && STATE.local)){
             const location = lat.toString() + lon.toString();
