@@ -76,10 +76,26 @@ const STATE = new State();
 
 
 let WINDOW_SIZE = 3;
-const CHIRPITY_HEADER = Buffer.from([82,73,70,70,90,36,253,31,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,192,93,0,0,128,187,0,0,2,0,16,0,76,73,83,84,46,0,0,0,73,78,70,79,73,67,82,68,11,0,0,0,50,48,50,49,45,49,48,45,49,51,0,0,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,100,97,116,97,0,36,253,31]);
-const  BIRDNET_HEADER = Buffer.from([82,73,70,70,92,247,162,69,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,128,187,0,0,0,119,1,0,2,0,16,0,76,73,83,84,84,0,0,0,73,78,70,79,73,67,82,68,11,0,0,0,50,48,50,52,45,48,50,45,49,50,0,0,73,83,70,84,14,0,0,0,76,97,118,102,54,48,46,49,54,46,49,48,48,0,73,84,67,72,29,0,0,0,84,65,83,67,65,77,32,80,67,77,32,82,101,99,111,100,101,114,32,68,82,45,49,48,48,109,107,51,0,0,100,97,116,97,220,246,162,69]);
 
-let WAV_HEADER;
+// Function to check if buffer has the header in it
+function isWavHeaderPresent(header, chunk) {
+    // Check if the length of header is less than or equal to the length of chunk buffer
+    if (header.length <= chunk.length) {
+        // Compare the first bytes of chunk with header
+        for (let i = 0; i < header.length; i++) {
+            if (header[i] !== chunk[i]) {
+                // If any byte doesn't match, header is not present at the beginning of chunk
+                return false;
+            }
+        }
+        // If all bytes match, header is present at the beginning of chunk
+        return true;
+    } else {
+        // If header is longer than chunk, it can't be at the beginning
+        return false;
+    }
+}
+
 let NUM_WORKERS;
 let workerInstance = 0;
 // let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
@@ -516,7 +532,6 @@ async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backen
     SEEN_MODEL_READY = false;
     LIST_CACHE = {}
     sampleRate = model === "birdnet" ? 48_000 : 24_000;
-    WAV_HEADER = model === 'birdnet' ? BIRDNET_HEADER : CHIRPITY_HEADER;
     setAudioContext(sampleRate);
     UI.postMessage({event:'ready-for-tour'});
     BACKEND = backend;
@@ -1221,16 +1236,16 @@ const getWavePredictBuffers = async ({
             return;
         }
         let headerEnd;
-            wav.signature.subChunks.forEach(el => {
-                if (el['chunkId'] === 'data') {
-                    headerEnd = el.chunkData.start;
-                }
-            });
-                meta.header = chunk.subarray(0, headerEnd);
+        wav.signature.subChunks.forEach(el => {
+            if (el['chunkId'] === 'data') {
+                headerEnd = el.chunkData.start;
+            }
+        });
+        meta.header = chunk.subarray(0, headerEnd);
         const byteRate = wav.fmt.byteRate;
         const sample_rate = wav.fmt.sampleRate;
-        meta.byteStart = Math.round((start * byteRate) / sample_rate) * sample_rate;
-        meta.byteEnd = Math.round((end * byteRate) / sample_rate) * sample_rate;
+        meta.byteStart = Math.round((start * byteRate) / sample_rate) * sample_rate + headerEnd;
+        meta.byteEnd = Math.round((end * byteRate) / sample_rate) * sample_rate + headerEnd;
         meta.highWaterMark = byteRate * BATCH_SIZE * WINDOW_SIZE;
         headerStream.destroy();
         DEBUG && console.log('Header extracted for ', file)
@@ -1308,7 +1323,7 @@ const getPredictBuffers = async ({
     if (start > metadata[file].duration) {
         return
     }
-
+    let header;
     batchChunksToSend[file] = Math.ceil((end - start) / (BATCH_SIZE * WINDOW_SIZE));
     predictionsReceived[file] = 0;
     predictionsRequested[file] = 0;
@@ -1343,10 +1358,6 @@ const getPredictBuffers = async ({
         command.on('start', function (commandLine) {
             DEBUG && console.log('FFmpeg command: ' + commandLine);
         })
-        command.on('end', () => {
-            // End the stream to signify completion
-            //STREAM.end();
-        });
 
         STREAM.on('readable', () => {           
             if (aborted) {
@@ -1357,7 +1368,8 @@ const getPredictBuffers = async ({
                 if (chunk === null || chunk.byteLength <= 1) {
                     // EOF: deal with part-full buffers
                     if (concatenatedBuffer.length){
-                        const audio = Buffer.concat([WAV_HEADER, concatenatedBuffer]);
+                        const audio = isWavHeaderPresent(header, concatenatedBuffer) 
+                            ? concatenatedBuffer: Buffer.concat([header, concatenatedBuffer])
                         predictQueue.push([audio, file, end, chunkStart]);
                         processPredictQueue();
                     }
@@ -1367,7 +1379,8 @@ const getPredictBuffers = async ({
                 }
                 else {
                     try {
-                        concatenatedBuffer = concatenatedBuffer.length ?  Buffer.concat([concatenatedBuffer, chunk]) : chunk;
+                        concatenatedBuffer = concatenatedBuffer.length ? Buffer.concat([concatenatedBuffer, chunk]) : chunk;
+                        header ??= lookForHeader(concatenatedBuffer);
                     } catch (e) {
                         console.log('Detached buffer?', e.message);
                     }
@@ -1375,7 +1388,7 @@ const getPredictBuffers = async ({
                     if (concatenatedBuffer.length >= highWaterMark) {
                         const chunk = concatenatedBuffer.subarray(0, highWaterMark);
                         concatenatedBuffer = concatenatedBuffer.subarray(highWaterMark);
-                        const audio = Buffer.concat([WAV_HEADER, chunk])
+                        const audio = isWavHeaderPresent(header, chunk) ? chunk: Buffer.concat([header, chunk])
                         predictQueue.push([audio, file, end, chunkStart]);
                         chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate
                         processPredictQueue();
@@ -1391,6 +1404,22 @@ const getPredictBuffers = async ({
     }).catch(error => console.log(error));
 }
 
+function lookForHeader(buffer){
+    try {
+        const wav = new wavefileReader.WaveFileReader();
+        wav.fromBuffer(buffer);
+        let headerEnd;
+        wav.signature.subChunks.forEach(el => {
+            if (el['chunkId'] === 'data') {
+                headerEnd = el.chunkData.start;
+            }
+        });
+        return buffer.subarray(0, headerEnd);
+    } catch (e) {
+        DEBUG && console.log(e)
+        return undefined
+    }
+}
 
 /**
 *  Called when file first loaded, when result clicked and when saving or sending file snippets
@@ -1403,6 +1432,7 @@ const fetchAudioBuffer = async ({
     //if (end - start < 0.1) return  // prevents dataset creation barfing with  v. short buffer
     const stream = new PassThrough({end: false});
     let concatenatedBuffer = Buffer.alloc(0);
+    let header;
     // Ensure start is a minimum 0.1 seconds from the end of the file, and >= 0
     start = metadata[file].duration < 0.1 ? 0 : Math.min(metadata[file].duration - 0.1, start)
     // Use ffmpeg to extract the specified audio segment
@@ -1414,7 +1444,7 @@ const fetchAudioBuffer = async ({
         let command = ffmpeg(file)
             .seekInput(start)
             .duration(Math.max(end - start, 0.1))
-            .format('s16le')
+            .format('wav')
             .audioChannels(1) // Set to mono
             .audioFrequency(24_000) // Set sample rate to 24000 Hz (always - this is for wavesurfer)
             if (STATE.filters.active) {
@@ -1453,12 +1483,12 @@ const fetchAudioBuffer = async ({
             const chunk = stream.read();
             if (chunk === null || chunk.byteLength <= 1) {
                 // Last chunk
-                const audio = Buffer.concat([CHIRPITY_HEADER, concatenatedBuffer]);
+                const audio = isWavHeaderPresent(header, concatenatedBuffer) ? concatenatedBuffer : Buffer.concat([header, concatenatedBuffer]);
                 setupCtx(audio, sampleRate, 'UI').then(offlineCtx => {
                     offlineCtx.startRendering().then(resampled => {
-                        resolve(resampled);
                         stream.end();
                         stream.destroy();
+                        resolve(resampled);
                     }).catch((error) => {
                         console.error(`FetchAudio rendering failed: ${error}`);
                     });
@@ -1469,6 +1499,7 @@ const fetchAudioBuffer = async ({
                 
             } else  {
                 // other chunks
+                header ??= lookForHeader(chunk)
                 concatenatedBuffer = concatenatedBuffer.length ?  Buffer.concat([concatenatedBuffer, chunk]) : chunk;
             }
         });

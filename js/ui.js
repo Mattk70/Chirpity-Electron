@@ -1647,6 +1647,7 @@ const setUpWorkerMessaging = () => {
             switch (event) {
                 case 'all-files-saved-check-result': {
                     customAnalysisAllMenu(args.result)
+                    break;
                 }
                 case "analysis-complete": {onAnalysisComplete();
                     break;
