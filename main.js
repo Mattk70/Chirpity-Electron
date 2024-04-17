@@ -6,7 +6,6 @@ const fs = require("node:fs");
 const path = require('node:path');
 const settings = require('electron-settings');
 process.env['TF_ENABLE_ONEDNN_OPTS'] = "1";
-process.env['TF_ENABLE_ZENDNN_OPTS'] = "1";
 
 //require('update-electron-app')();
 let files = [];
