@@ -926,7 +926,7 @@ function onAbort({
 
 const getDuration = async (src) => {
     let audio;
-    return new Promise(function (resolve) {
+    return new Promise(function (resolve, reject) {
         audio = new Audio();
         audio.src = src.replace(/#/g, '%23'); // allow hash in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
         audio.addEventListener("loadedmetadata", function () {
@@ -939,6 +939,10 @@ const getDuration = async (src) => {
             
             resolve(duration);
         });
+        audio.addEventListener('error', (error) => {
+            UI.postMessage({event: 'generate-alert', message: 'Unable to decode file metatada'})
+            reject(error)
+        })
     });
 }
 

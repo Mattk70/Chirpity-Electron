@@ -436,7 +436,7 @@ function zoomSpec(direction) {
             }
         }
         // Keep playhead at same time in file
-        position = (timeNow - bufferBegin) / windowLength;
+        position = clamp((timeNow - bufferBegin) / windowLength, 0, 1);
         // adjust region start time to new window start time
         let region = getRegion();
         if (region) {
@@ -623,7 +623,7 @@ function customAnalysisAllMenu(saved){
         <span class="shortcut float-end">Ctrl+A</span>`;
         enableMenuItem(['reanalyseAll']);
     } else {
-        analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> Analyse All Open Files
+        analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">search</span> Analyse All Open Files
         <span class="shortcut float-end">Ctrl+A</span>`;
         disableMenuItem(['reanalyseAll']);
     }   
@@ -830,7 +830,7 @@ async function onOpenFiles(args) {
     resetDiagnostics();
     // Store the file list and Load First audio file
     fileList = args.filePaths;
-    fileList.length > 1 && worker.postMessage({action: 'check-all-files-saved', files: fileList});
+    fileList.length > 1 && fileList.length < 25_000 && worker.postMessage({action: 'check-all-files-saved', files: fileList});
     STATE.openFiles = args.filePaths;
     // Sort file by time created (the oldest first):
     if (fileList.length > 1) {
@@ -1186,6 +1186,9 @@ async function resultClick(e) {
     }
 }
 
+function clamp(value, min, max){
+    return Math.min(Math.max(value, min), max);
+}
 
 const loadResultRegion = ({ file = '', start = 0, end = 3, label = '' } = {}) => {
     start = parseFloat(start);
@@ -1194,7 +1197,7 @@ const loadResultRegion = ({ file = '', start = 0, end = 3, label = '' } = {}) =>
     if (windowLength <= 3.5) windowLength = 6;
     bufferBegin = Math.max(0, start - (windowLength / 2) + 1.5)
     const region = { start: Math.max(start - bufferBegin, 0), end: end - bufferBegin, label: label };
-    const position = wavesurfer.getCurrentTime() / windowLength;
+    const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({ file: file, begin: bufferBegin, position: position, region: region })
 }
 
@@ -2410,7 +2413,7 @@ function onChartData(args) {
         setTimelinePreferences();
         if (fileLoaded) {
             // Reload wavesurfer with the new timeline
-            const position = wavesurfer.getCurrentTime() / windowLength;
+            const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
             postBufferUpdate({ begin: bufferBegin, position: position })
         }
         updatePrefs('config.json', config)
@@ -2516,7 +2519,7 @@ function onChartData(args) {
         },
         PageUp: function () {
             if (currentBuffer) {
-                const position = wavesurfer.getCurrentTime() / windowLength;
+                const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                 bufferBegin = Math.max(0, bufferBegin - windowLength);
                 postBufferUpdate({ begin: bufferBegin, position: position })
             }
@@ -2532,7 +2535,7 @@ function onChartData(args) {
         },
         PageDown: function () {
             if (currentBuffer) {
-                const position = wavesurfer.getCurrentTime() / windowLength;
+                const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                 bufferBegin = Math.min(bufferBegin + windowLength, currentFileDuration - windowLength);
                 postBufferUpdate({ begin: bufferBegin, position: position })
             }
@@ -2550,7 +2553,7 @@ function onChartData(args) {
             const skip = windowLength / 100;
             if (currentBuffer) {
                 wavesurfer.skipBackward(skip);
-                const position = wavesurfer.getCurrentTime() / windowLength;
+                const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                 if (wavesurfer.getCurrentTime() < skip && bufferBegin > 0) {
                     bufferBegin -= skip;
                     postBufferUpdate({ begin: bufferBegin, position: position })
@@ -2561,7 +2564,7 @@ function onChartData(args) {
             const skip = windowLength / 100;
             if (wavesurfer) {
                 wavesurfer.skipForward(skip);
-                const position = Math.max(wavesurfer.getCurrentTime() / windowLength, 1);
+                const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                 if (wavesurfer.getCurrentTime() > windowLength - skip) {
                     bufferBegin = Math.min(currentFileDuration - windowLength, bufferBegin += skip)
                     postBufferUpdate({ begin: bufferBegin, position: position })
@@ -2572,7 +2575,7 @@ function onChartData(args) {
             if (e.shiftKey) {
                 if (wavesurfer.spectrogram.fftSamples > 64) {
                     wavesurfer.spectrogram.fftSamples /= 2;
-                    const position = wavesurfer.getCurrentTime() / windowLength;
+                    const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                     postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
                     console.log(wavesurfer.spectrogram.fftSamples);
                 }
@@ -2584,7 +2587,7 @@ function onChartData(args) {
             if (e.shiftKey) {
                 if (wavesurfer.spectrogram.fftSamples > 64) {
                     wavesurfer.spectrogram.fftSamples /= 2;
-                    const position = wavesurfer.getCurrentTime() / windowLength;
+                    const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                     postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
                     console.log(wavesurfer.spectrogram.fftSamples);
                 }
@@ -2596,7 +2599,7 @@ function onChartData(args) {
             if (e.shiftKey) {
                 if (wavesurfer.spectrogram.fftSamples <= 2048) {
                     wavesurfer.spectrogram.fftSamples *= 2;
-                    const position = wavesurfer.getCurrentTime() / windowLength;
+                    const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                     postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
                     console.log(wavesurfer.spectrogram.fftSamples);
                 }
@@ -2608,7 +2611,7 @@ function onChartData(args) {
             if (e.shiftKey) {
                 if (wavesurfer.spectrogram.fftSamples <= 2048) {
                     wavesurfer.spectrogram.fftSamples *= 2;
-                    const position = wavesurfer.getCurrentTime() / windowLength;
+                    const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                     postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
                     console.log(wavesurfer.spectrogram.fftSamples);
                 }
@@ -4014,7 +4017,7 @@ function onChartData(args) {
     // High pass threshold
     const showFilterEffect = () => {
         if (fileLoaded) {
-            const position = wavesurfer.getCurrentTime() / windowLength;
+            const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
             postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion() })
         }
     }
@@ -4369,7 +4372,7 @@ DOM.gain.addEventListener('input', () => {
                     DOM.gainAdjustment.textContent = element.value + 'dB'; //.toString();
                     config.audio.gain = element.value;   
                     worker.postMessage({action:'update-state', audio: config.audio})
-                    const position = wavesurfer.getCurrentTime() / windowLength;
+                    const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                     fileLoaded &&
                         postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
                     break;
@@ -4377,7 +4380,7 @@ DOM.gain.addEventListener('input', () => {
                 case 'normalise': {
                     config.audio.normalise = element.checked;
                     worker.postMessage({action:'update-state', audio: config.audio})
-                    const position = wavesurfer.getCurrentTime() / windowLength;
+                    const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                     fileLoaded &&
                         postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
                     break;
