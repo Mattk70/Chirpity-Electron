@@ -41,7 +41,7 @@ Accipiter trivirgatus_Хохлатый ястреб
 Accipiter virgatus_Индийский перепелятник
 Aceros nipalensis_Непальский калао
 Achaetops pycnopygius_Дамарский скалолаз
-Acridotheres burmannicus_Бирманская майна (burmannicus)
+Acridotheres burmannicus_Бирманская майна "burmannicus"
 Acridotheres cristatellus_Хохлатая майна
 Acridotheres fuscus_Джунглевая майна
 Acridotheres ginginianus_Береговая майна
@@ -311,7 +311,7 @@ Anser caerulescens_Белый гусь
 Anser canagicus_Гусь-белошей
 Anser cygnoides_Сухонос
 Anser erythropus_Пискулька
-Anser fabalis_Гуменник (Лесной)
+Anser fabalis_Гуменник "Лесной"
 Anser indicus_Горный гусь
 Anser rossii_Гусь Росса
 Anser serrirostris_Тундровый гуменник
@@ -494,7 +494,7 @@ Argya striata_Джунглевая дроздовка
 Argya subrufa_Малабарская дроздовка
 Arizelocichla masukuensis_Рифтовый бюльбюль
 Arizelocichla milanjensis_Пестроухий бюльбюль
-Arizelocichla nigriceps_Рифтовый бюльбюль (nigriceps)
+Arizelocichla nigriceps_Рифтовый бюльбюль "nigriceps"
 Arremon abeillei_Черношапочный тохи
 Arremon assimilis_Серобровый тохи
 Arremon atricapillus_Черноголовый тохи
@@ -714,7 +714,7 @@ Brachypteryx cruralis_Гималайский короткокрыл
 Brachypteryx goodfellowi_Тайваньский короткокрыл
 Brachypteryx hyperythra_Рыжебрюхий короткокрыл
 Brachypteryx leucophris_Малый короткокрыл
-Brachypteryx montana_Белобровый короткокрыл (montana)
+Brachypteryx montana_Белобровый короткокрыл "montana"
 Brachyramphus marmoratus_Пёстрый пыжик
 Bradornis microrhynchus_Африканская мухоловка
 Bradypterus baboecala_Болотная бурогрудка
@@ -1771,7 +1771,7 @@ Cyanoderma melanothorax_Ошейниковая тимелия
 Cyanoderma pyrrhops_Масковая тимелия
 Cyanoderma ruficeps_Рыжешапочная тимелия
 Cyanoderma rufifrons_Краснолобая тимелия
-Cyanolanius madagascarinus_Голубая ванга (madagascarinus)
+Cyanolanius madagascarinus_Голубая ванга "madagascarinus"
 Cyanoliseus patagonus_Скальный попугай
 Cyanoloxia brissonii_Ультрамариновая гуирака
 Cyanoloxia cyanoides_Синяя гуирака
@@ -2251,7 +2251,7 @@ Euphonia trinitatis_Тринидадская эуфония
 Euphonia violacea_Фиолетовая эуфония
 Euphonia xanthogaster_Оранжевобрюхая эуфония
 Euplectes afer_Золотистый ткачик
-Euplectes ardens_Красногорлый ткачик (ardens)
+Euplectes ardens_Красногорлый ткачик "ardens"
 Euplectes capensis_Желтоспинный ткачик
 Euplectes franciscanus_Бархатный ткачик
 Euplectes hordeaceus_Чернокрылый ткачик
@@ -2300,7 +2300,7 @@ Falco subbuteo_Чеглок
 Falco tinnunculus_Пустельга
 Falco vespertinus_Кобчик
 Falculea palliata_Серпоклювая ванга
-Falcunculus frontatus_Синицевая толстоголовка (frontatus)
+Falcunculus frontatus_Синицевая толстоголовка "frontatus"
 Ferminia cerverai_Кубинский крапивник
 Ficedula albicilla_Восточная малая мухоловка
 Ficedula albicollis_Мухоловка-белошейка
@@ -2477,7 +2477,7 @@ Geositta rufipennis_Краснохвостый землекоп
 Geositta tenuirostris_Тонкоклювый землекоп
 Geospizopsis plebejus_Пепельногрудый овсяночник
 Geospizopsis unicolor_Свинцово-серый овсяночник
-Geothlypis aequinoctialis_Серошапочная желтогрудка (aequinoctialis)
+Geothlypis aequinoctialis_Серошапочная желтогрудка "aequinoctialis"
 Geothlypis beldingi_Камышовая желтогрудка
 Geothlypis formosa_Златобровая желтогрудка
 Geothlypis nelsoni_Капюшоновая желтогрудка
@@ -2608,7 +2608,7 @@ Gubernatrix cristata_Кардиналовая танагра
 Gubernetes yetapa_Тиранн-лентохвост
 Guira guira_Гуира
 Gun_Gun
-Guttera pucherani_Чубатая цесарка (pucherani)
+Guttera pucherani_Чубатая цесарка "pucherani"
 Gygis alba_Белая крачка
 Gymnasio nudipes_Пуэрториканская совка
 Gymnobucco bonapartei_Серогорлая либия
@@ -3106,10 +3106,10 @@ Larus marinus_Морская чайка
 Larus michahellis_Средиземноморская чайка
 Larus occidentalis_Западная чайка
 Larus schistisagus_Тихоокеанская чайка
-Larvivora akahige_Японская зарянка (akahige/rishirensis)
+Larvivora akahige_Японская зарянка "akahige/rishirensis"
 Larvivora brunnea_Индийский соловей
 Larvivora cyane_Синий соловей
-Larvivora komadori_Рюкюйская зарянка (komadori/subrufus)
+Larvivora komadori_Рюкюйская зарянка "komadori/subrufus"
 Larvivora sibilans_Соловей-свистун
 Laterallus albigularis_Белозобый коростелёк
 Laterallus exilis_Серогрудый коростелёк
@@ -3599,7 +3599,7 @@ Mino kreffti_Длиннохвостый мино
 Miogryllus saussurei_Miogryllus saussurei
 Mionectes macconnelli_Зеленокрылый тираннчик
 Mionectes oleagineus_Охристобрюхий тираннчик
-Mionectes olivaceus_Оливковый тираннчик (olivaceus)
+Mionectes olivaceus_Оливковый тираннчик "olivaceus"
 Mionectes rufiventris_Рыжебрюхий тираннчик
 Mionectes striaticollis_Пестрогрудый тираннчик
 Mirafra affinis_Деканский жаворонок
@@ -3752,7 +3752,7 @@ Myiodynastes hemichrysus_Златобрюхий бентеви
 Myiodynastes luteiventris_Мексиканский бентеви
 Myiodynastes maculatus_Пёстрый бентеви
 Myiomela leucura_Белохвостая индига
-Myiopagis caniceps_Серая эления (caniceps)
+Myiopagis caniceps_Серая эления "caniceps"
 Myiopagis flavivertex_Желтохохлая эления
 Myiopagis gaimardii_Лесная эления
 Myiopagis olallai_Седоголовая эления
@@ -3773,7 +3773,7 @@ Myiotheretes pernix_Сантамартийская гевара
 Myiotheretes striaticollis_Пестрогорлая гевара
 Myiothlypis basilica_Сантамартийский певун
 Myiothlypis bivittata_Двухполосый певун
-Myiothlypis chrysogaster_Златобрюхий певун (chrysogaster)
+Myiothlypis chrysogaster_Златобрюхий певун "chrysogaster"
 Myiothlypis cinereicollis_Серогрудый певун
 Myiothlypis conspicillata_Уздечковый певун
 Myiothlypis coronata_Корольковый певун
@@ -3911,7 +3911,7 @@ Nilaus afer_Брубру
 Niltava grandis_Большая нильтава
 Niltava macgrigoriae_Малая нильтава
 Niltava sundara_Рыжебрюхая нильтава
-Niltava vivida_Тайваньская нильтава (vivida)
+Niltava vivida_Тайваньская нильтава "vivida"
 Ninox boobook_Австралийская иглоногая сова
 Ninox connivens_Лающая иглоногая сова
 Ninox ios_Сулавесская иглоногая сова
@@ -3987,7 +3987,7 @@ Ochetorhynchus andaecola_Скальная чилия
 Ochetorhynchus melanurus_Чернохвостая чилия
 Ochetorhynchus phoenicurus_Горихвостковая чилия
 Ochetorhynchus ruficaudus_Рыжехвостая чилия
-Ochthoeca cinnamomeiventris_Каштановая тираннита (cinnamomeiventris)
+Ochthoeca cinnamomeiventris_Каштановая тираннита "cinnamomeiventris"
 Ochthoeca diadema_Yellow-bellied Chat-Tyrant
 Ochthoeca frontalis_Crowned Chat-Tyrant
 Ochthoeca fumicolor_Буроспинная тираннита
@@ -4500,7 +4500,7 @@ Phyllastrephus terrestris_Земляной бюльбюль
 Phyllergates cucullatus_Горная долгоклювка
 Phyllergates heterolaemus_Рыжеголовая долгоклювка
 Phyllolais pulchella_Акациевый апалис
-Phyllomyias burmeisteri_Пестрощёкий москитеро (burmeisteri)
+Phyllomyias burmeisteri_Пестрощёкий москитеро "burmeisteri"
 Phyllomyias cinereiceps_Черноухий москитеро
 Phyllomyias fasciatus_Оливковый москитеро
 Phyllomyias griseiceps_Темношапочный москитеро
@@ -4574,7 +4574,7 @@ Phylloscopus proregulus_Корольковая пеночка
 Phylloscopus pulcher_Рыжеполосая зарничка
 Phylloscopus reguloides_Корольковидная пеночка
 Phylloscopus ruficapilla_Рыжешапочная пеночка
-Phylloscopus sarasinorum_Сулавесская пеночка (sarasinorum)
+Phylloscopus sarasinorum_Сулавесская пеночка "sarasinorum"
 Phylloscopus schwarzi_Толстоклювая пеночка
 Phylloscopus sibilatrix_Пеночка-трещотка
 Phylloscopus sindianus_Горная теньковка
@@ -4652,7 +4652,7 @@ Pionus senilis_Белоголовый амазонет
 Pionus sordidus_Красноклювый амазонет
 Pionus tumultuosus_Сливоголовый амазонет
 Pipile cujubi_Красногорлый гуан
-Pipile cumanensis_Синегорлый гуан (cumanensis)
+Pipile cumanensis_Синегорлый гуан "cumanensis"
 Pipilo chlorurus_Зелёнохвостый тохи
 Pipilo erythrophthalmus_Красноглазый тохи
 Pipilo maculatus_Пятнистый тохи
@@ -4739,8 +4739,8 @@ Ploceus luteolus_Малый ткач
 Ploceus manyar_Желтоголовый ткач
 Ploceus melanocephalus_Черноголовый ткач
 Ploceus nelicourvi_Серобрюхий ткач
-Ploceus nigerrimus_Болотный ткач (nigerrimus)
-Ploceus nigricollis_Черношейный ткач (nigricollis/melanoxanthus)
+Ploceus nigerrimus_Болотный ткач "nigerrimus"
+Ploceus nigricollis_Черношейный ткач "nigricollis/melanoxanthus"
 Ploceus ocularis_Очковый ткач
 Ploceus philippinus_Ткач-байя
 Ploceus sakalava_Мадагаскарский ткач
@@ -4834,10 +4834,10 @@ Polytelis anthopeplus_Солнечный попугай
 Polytelis swainsonii_Роскошный попугай
 Polytmus guainumbi_Бронзовоспинный колибри
 Polytmus theresiae_Зелёнохвостый колибри
-Pomatorhinus ferruginosus_Рыжегрудый саблеклюв (ferruginosus)
+Pomatorhinus ferruginosus_Рыжегрудый саблеклюв "ferruginosus"
 Pomatorhinus horsfieldii_Желтоклювый саблеклюв
 Pomatorhinus melanurus_Ланкийский саблеклюв
-Pomatorhinus montanus_Каштановоспинный саблеклюв (montanus/ottolanderi)
+Pomatorhinus montanus_Каштановоспинный саблеклюв "montanus/ottolanderi"
 Pomatorhinus musicus_Тайваньский саблеклюв
 Pomatorhinus ochraceiceps_Красноклювый саблеклюв
 Pomatorhinus ruficollis_Красношейный саблеклюв

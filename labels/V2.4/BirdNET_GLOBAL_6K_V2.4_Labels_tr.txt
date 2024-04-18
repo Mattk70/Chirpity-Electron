@@ -4500,7 +4500,7 @@ Phyllastrephus terrestris_Yer Yaprakbülbülü
 Phyllergates cucullatus_Dağ Terzikuşu
 Phyllergates heterolaemus_Kızıl Başlı Terzikuşu
 Phyllolais pulchella_Akasya Prinyası
-Phyllomyias burmeisteri_Burmeister Tiranuleti (burmeisteri)
+Phyllomyias burmeisteri_Burmeister Tiranuleti "burmeisteri"
 Phyllomyias cinereiceps_Gri Başlı Tiranulet
 Phyllomyias fasciatus_Planalto Tiranuleti
 Phyllomyias griseiceps_Koyu Başlı Tiranulet

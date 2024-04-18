@@ -311,10 +311,10 @@ Anser caerulescens_Snežna gos
 Anser canagicus_Cesarska gos
 Anser cygnoides_Labodja gos
 Anser erythropus_Mala gos
-Anser fabalis_Njivska gos (fabalis)
+Anser fabalis_Njivska gos "fabalis"
 Anser indicus_Tibetanska gos
 Anser rossii_Mala snežna gos
-Anser serrirostris_Njivska gos (serrirostris)
+Anser serrirostris_Njivska gos "serrirostris"
 Anseranas semipalmata_Magpie Goose
 Anthipes monileger_White-gorgeted Flycatcher
 Anthipes solitaris_Rufous-browed Flycatcher

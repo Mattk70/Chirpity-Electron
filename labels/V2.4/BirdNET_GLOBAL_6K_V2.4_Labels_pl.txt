@@ -41,7 +41,7 @@ Accipiter trivirgatus_Krogulec czubaty
 Accipiter virgatus_Krogulec orientalny
 Aceros nipalensis_Dzioborożec rudy
 Achaetops pycnopygius_Skalnik
-Acridotheres burmannicus_Majna birmańska (burmannicus)
+Acridotheres burmannicus_Majna birmańska "burmannicus"
 Acridotheres cristatellus_Majna czubata
 Acridotheres fuscus_Majna szara
 Acridotheres ginginianus_Majna norowa
@@ -324,7 +324,7 @@ Anthochaera chrysoptera_Koralicowiec kosmaty
 Anthochaera lunulata_Koralicowiec mały
 Anthochaera paradoxa_Koralicowiec żółty
 Anthochaera phrygia_Koralicowiec królewski
-Anthornis melanura_Szmaragdowiec (zwyczajny)
+Anthornis melanura_Szmaragdowiec "zwyczajny"
 Anthoscopus minutus_Remizek żółtobrzuchy
 Anthoscopus musculus_Remizek blady
 Anthracoceros albirostris_Dzioborożec białobrzuchy
@@ -714,7 +714,7 @@ Brachypteryx cruralis_Kusochwostka białobrewa
 Brachypteryx goodfellowi_Kusochwostka brązowa
 Brachypteryx hyperythra_Kusochwostka rudobrzucha
 Brachypteryx leucophris_Kusochwostka mała
-Brachypteryx montana_Kusochwostka górska (montana)
+Brachypteryx montana_Kusochwostka górska "montana"
 Brachyramphus marmoratus_Morzyk marmurkowy
 Bradornis microrhynchus_Mucharka szara
 Bradypterus baboecala_Krótkolotka bagienna
@@ -1191,7 +1191,7 @@ Chauna chavaria_Skrzydłoszpon czarnoszyi
 Chauna torquata_Skrzydłoszpon obrożny
 Chelidoptera tenebrosa_Drzym jaskółczy
 Chelidorhynx hypoxanthus_żółtobrewka
-Chenonetta jubata_Grzywienka (zwyczajna)
+Chenonetta jubata_Grzywienka "zwyczajna"
 Chersomanes albofasciata_Skowron białolicy
 Chersophilus duponti_Skowrończyk sierpodzioby
 Chionomesa fimbriata_Szafirek lśniący
@@ -1393,7 +1393,7 @@ Cisticola exilis_Chwastówka złotogłowa
 Cisticola fulvicapilla_Chwastówka piskliwa
 Cisticola haematocephalus_Chwastówka nadbrzeżna
 Cisticola hunteri_Chwastówka górska
-Cisticola juncidis_Chwastówka (zwyczajna)
+Cisticola juncidis_Chwastówka "zwyczajna"
 Cisticola lais_Chwastówka płaczliwa
 Cisticola lateralis_Chwastówka grubodzioba
 Cisticola marginatus_Chwastówka równikowa
@@ -1771,7 +1771,7 @@ Cyanoderma melanothorax_Cierniodziób czarnopręgi
 Cyanoderma pyrrhops_Cierniodziób czarnobrody
 Cyanoderma ruficeps_Cierniodziób rdzawołbisty
 Cyanoderma rufifrons_Cierniodziób rdzawoczelny
-Cyanolanius madagascarinus_Wanga błękitna (madagascarinus)
+Cyanolanius madagascarinus_Wanga błękitna "madagascarinus"
 Cyanoliseus patagonus_Patagonka
 Cyanoloxia brissonii_łuszczyk niebieski
 Cyanoloxia cyanoides_Indygówka stalowa
@@ -2040,7 +2040,7 @@ Dysithamnus puncticeps_Krępomrowiec perlisty
 Dysithamnus stictothorax_Krępomrowiec piegowaty
 Dysithamnus striaticeps_Krępomrowiec smugogłowy
 Dysithamnus xanthopterus_Krępomrowiec rdzawogrzbiety
-Eclectus roratus_Barwnica (zwyczajna)
+Eclectus roratus_Barwnica "zwyczajna"
 Edolisoma montanum_Gąsienicojad czarnobrzuchy
 Edolisoma tenuirostre_Gąsienicojad cienkodzioby
 Egretta caerulea_Czapla śniada
@@ -2111,7 +2111,7 @@ Emberiza pusilla_Trznadelek
 Emberiza rustica_Trznadel czubaty
 Emberiza sahari_Trznadel saharyjski
 Emberiza schoeniclus_Potrzos
-Emberiza spodocephala_Trznadel szarogłowy (spodocephala/sordida)
+Emberiza spodocephala_Trznadel szarogłowy "spodocephala/sordida"
 Emberiza stewarti_Trznadel srebrnogłowy
 Emberiza striolata_Trznadel smużkowany
 Emberiza sulphurata_Trznadel żółty
@@ -2149,7 +2149,7 @@ Enicurus maculatus_Widłogon plamisty
 Enicurus schistaceus_Widłogon maskowy
 Entomodestes coracinus_Białoliczka czarna
 Entomodestes leucotis_Białoliczka rdzawa
-Entomyzon cyanotis_Słodnik (modrolicy)
+Entomyzon cyanotis_Słodnik "modrolicy"
 Environmental_Environmental
 Eolophus roseicapilla_Kakadu różowa
 Eophona migratoria_Grubodziób chiński
@@ -2251,7 +2251,7 @@ Euphonia trinitatis_Organka żółtobrzucha
 Euphonia violacea_Organka fioletowa
 Euphonia xanthogaster_Organka złotoczelna
 Euplectes afer_Wikłacz słoneczny
-Euplectes ardens_Wikłacz półobrożny (ardens)
+Euplectes ardens_Wikłacz półobrożny "ardens"
 Euplectes capensis_Wikłacz przylądkowy
 Euplectes franciscanus_Wikłacz płomienisty
 Euplectes hordeaceus_Wikłacz czarnoskrzydły
@@ -2300,7 +2300,7 @@ Falco subbuteo_Kobuz
 Falco tinnunculus_Pustułka
 Falco vespertinus_Kobczyk
 Falculea palliata_Wanga sierpodzioba
-Falcunculus frontatus_Czubiec żółtobrzuchy (frontatus)
+Falcunculus frontatus_Czubiec żółtobrzuchy "frontatus"
 Ferminia cerverai_Strzyżyk kubański
 Ficedula albicilla_Muchołówka rdzawogardła
 Ficedula albicollis_Muchołówka białoszyja
@@ -2399,7 +2399,7 @@ Galbula leucogastra_Złotopiór białobrzuchy
 Galbula pastazae_Złotopiór lśniący
 Galbula ruficauda_Złotopiór rudosterny
 Galbula tombacea_Złotopiór białobrody
-Galerida cristata_Dzierlatka zwyczajna/długodzioba
+Galerida cristata_Dzierlatka zwyczajna/Długodzioba
 Galerida deva_Dzierlatka dekańska
 Galerida magnirostris_Dzierlatka wielkodzioba
 Galerida malabarica_Dzierlatka malabarska
@@ -2477,7 +2477,7 @@ Geositta rufipennis_Dróżniczek rdzawosterny
 Geositta tenuirostris_Dróżniczek cienkodzioby
 Geospizopsis plebejus_Chruściak skromny
 Geospizopsis unicolor_Chruściak jednobarwny
-Geothlypis aequinoctialis_Cytrynka szarogłowa (aequinoctialis)
+Geothlypis aequinoctialis_Cytrynka szarogłowa "aequinoctialis"
 Geothlypis beldingi_Cytrynka maskowa
 Geothlypis formosa_Cytrynka czarnouzda
 Geothlypis nelsoni_Cytrynka szarobrewa
@@ -2608,7 +2608,7 @@ Gubernatrix cristata_Kardynałka
 Gubernetes yetapa_Tyranol
 Guira guira_Guira
 Gun_Gun
-Guttera pucherani_Perlica czubata (pucherani)
+Guttera pucherani_Perlica czubata "pucherani"
 Gygis alba_Atolówka
 Gymnasio nudipes_Syczoń portorykański
 Gymnobucco bonapartei_łysoń siwogłowy
@@ -2948,7 +2948,7 @@ Incaspiza ortizi_Ineczka szaroskrzydła
 Incaspiza personata_Ineczka maskowa
 Incilius valliceps_Gulf Coast Toad
 Indicator indicator_Miodowód duży
-Indicator minor_Miodowód grubodzioby/szarogłowy
+Indicator minor_Miodowód grubodzioby/Szarogłowy
 Indicator variegatus_Miodowód łuskogardły
 Inezia caudata_Pręgówek gujański
 Inezia inornata_Pręgówek ubogi
@@ -3008,7 +3008,7 @@ Knipolegus hudsoni_Wdowik argentyński
 Knipolegus orenocensis_Wdowik szary
 Knipolegus poecilurus_Wdowik rdzawosterny
 Kurochkinegramma hypogrammicum_Nektarzyn
-Lacedo pulchella_łowik (rdzawolicy)
+Lacedo pulchella_łowik "rdzawolicy"
 Lafresnaya lafresnayi_Nimfik
 Lagonosticta rhodopareia_Amarantka skromna
 Lagonosticta rubricata_Amarantka zmienna
@@ -3106,10 +3106,10 @@ Larus marinus_Mewa siodłata
 Larus michahellis_Mewa romańska
 Larus occidentalis_Mewa zachodnia
 Larus schistisagus_Mewa ochocka
-Larvivora akahige_Słowik rudzikowy (akahige/rishirensis)
+Larvivora akahige_Słowik rudzikowy "akahige/rishirensis"
 Larvivora brunnea_Słowik himalajski
 Larvivora cyane_Słowik modry
-Larvivora komadori_Słowik czarnolicy (komadori/subrufus)
+Larvivora komadori_Słowik czarnolicy "komadori/subrufus"
 Larvivora sibilans_Słowik syberyjski
 Laterallus albigularis_Derkaczyk białogardły
 Laterallus exilis_Derkaczyk amazoński
@@ -3312,7 +3312,7 @@ Lybius bidentatus_Wąsal szkarłatny
 Lybius guifsobalito_Wąsal czerwonogardły
 Lybius torquatus_Wąsal obrożny
 Lybius vieilloti_Wąsal zbroczony
-Lycocorax pyrrhopterus_Grabiec (brązowoskrzydły)
+Lycocorax pyrrhopterus_Grabiec "brązowoskrzydły"
 Lymnocryptes minimus_Bekasik
 Lyncornis macrotis_Rogatnik duży
 Lyncornis temminckii_Rogatnik uszaty
@@ -3489,7 +3489,7 @@ Melanorectes nigrescens_Fletownik czarny
 Melanospiza bicolor_Kubanik ciemnolicy
 Melanotis caerulescens_Przedrzeźniacz błękitny
 Melanotis hypoleucus_Przedrzeźniacz białobrzuchy
-Meleagris gallopavo_Indyk (zwyczajny)
+Meleagris gallopavo_Indyk "zwyczajny"
 Meleagris ocellata_Indyk pawi
 Meliarchus sclateri_Miodzik
 Melidectes belfordi_Dziwook modrolicy
@@ -3599,7 +3599,7 @@ Mino kreffti_Gwarek białorzytny
 Miogryllus saussurei_Miogryllus saussurei
 Mionectes macconnelli_Muchotyranik rdzawy
 Mionectes oleagineus_Muchotyranik ochrowy
-Mionectes olivaceus_Muchotyranik oliwkowy (olivaceus)
+Mionectes olivaceus_Muchotyranik oliwkowy "olivaceus"
 Mionectes rufiventris_Muchotyranik szarogłowy
 Mionectes striaticollis_Muchotyranik cętkowany
 Mirafra affinis_Skowroniec indyjski
@@ -3752,7 +3752,7 @@ Myiodynastes hemichrysus_Bentewi maskowy
 Myiodynastes luteiventris_Bentewi żółtobrzuchy
 Myiodynastes maculatus_Bentewi kreskowany
 Myiomela leucura_Pluszanka białosterna
-Myiopagis caniceps_Tyranik popielaty (caniceps)
+Myiopagis caniceps_Tyranik popielaty "caniceps"
 Myiopagis flavivertex_Tyranik żółtociemieniowy
 Myiopagis gaimardii_Tyranik leśny
 Myiopagis olallai_Tyranik jasnolicy
@@ -3773,7 +3773,7 @@ Myiotheretes pernix_Kopciuch kolumbijski
 Myiotheretes striaticollis_Kopciuch smugoszyi
 Myiothlypis basilica_Koronówka białobrewa
 Myiothlypis bivittata_Koronówka zniczkowata
-Myiothlypis chrysogaster_Koronówka złotobrzucha (chrysogaster)
+Myiothlypis chrysogaster_Koronówka złotobrzucha "chrysogaster"
 Myiothlypis cinereicollis_Koronówka szarogardła
 Myiothlypis conspicillata_Koronówka kolumbijska
 Myiothlypis coronata_Koronówka szarolica
@@ -3819,7 +3819,7 @@ Myrmoderus ruficauda_Mrowik czarnolicy
 Myrmoderus squamosus_Mrowik łuskowany
 Myrmophylax atrothorax_ściółkowczyk czarnogardły
 Myrmorchilus strigilatus_Posuszek
-Myrmornis torquata_Mrówczak (amazoński)
+Myrmornis torquata_Mrówczak "amazoński"
 Myrmothera berlepschi_Kusaczek amazoński
 Myrmothera campanisona_Kusaczek krzykliwy
 Myrmothera dives_Kusaczek północny
@@ -3907,11 +3907,11 @@ Nicator chloris_Nikator żółtobrzuchy
 Nicator gularis_Nikator żółtorzytny
 Nicator vireo_Nikator żółtogardły
 Nigrita canicapillus_Nigrita czarnoczelna
-Nilaus afer_Dzierzbowik (zwyczajny)
+Nilaus afer_Dzierzbowik "zwyczajny"
 Niltava grandis_Niltawa wielka
 Niltava macgrigoriae_Niltawa mała
 Niltava sundara_Niltawa rudobrzucha
-Niltava vivida_Niltawa ognista (vivida)
+Niltava vivida_Niltawa ognista "vivida"
 Ninox boobook_Sowica australijska
 Ninox connivens_Sowica szczekliwa
 Ninox ios_Sowica cynobrowa
@@ -3958,7 +3958,7 @@ Numenius madagascariensis_Kulik syberyjski
 Numenius minutus_Kulik krótkodzioby
 Numenius phaeopus_Kulik mniejszy
 Numenius tahitiensis_Kulik alaskański
-Numida meleagris_Perlica (zwyczajna)
+Numida meleagris_Perlica "zwyczajna"
 Nyctanassa violacea_ślepowron żółtoczelny
 Nyctibius aethereus_Nocolot wielkosterny
 Nyctibius bracteatus_Rufous Potoo
@@ -3987,7 +3987,7 @@ Ochetorhynchus andaecola_Turniówek skalny
 Ochetorhynchus melanurus_Turniówek rdzaworzytny
 Ochetorhynchus phoenicurus_Turniówek patagoński
 Ochetorhynchus ruficaudus_Turniówek rudosterny
-Ochthoeca cinnamomeiventris_Kląszczyk ciemnogrzbiety (cinnamomeiventris)
+Ochthoeca cinnamomeiventris_Kląszczyk ciemnogrzbiety "cinnamomeiventris"
 Ochthoeca diadema_Yellow-bellied Chat-Tyrant
 Ochthoeca frontalis_Crowned Chat-Tyrant
 Ochthoeca fumicolor_Kląszczyk rdzawy
@@ -4133,7 +4133,7 @@ Orthotomus nigriceps_Krawczyk czarnogłowy
 Orthotomus ruficeps_Krawczyk rdzawolicy
 Orthotomus sepium_Krawczyk jawajski
 Orthotomus sericeus_Krawczyk rdzawosterny
-Orthotomus sutorius_Krawczyk (zwyczajny)
+Orthotomus sutorius_Krawczyk "zwyczajny"
 Ortygornis pondicerianus_Frankolin indyjski
 Ortygornis sephaena_Frankolin czubaty
 Ortygospiza atricollis_Trawinek zmienny
@@ -4500,7 +4500,7 @@ Phyllastrephus terrestris_Jasnobrzuch ziemny
 Phyllergates cucullatus_Krawczynek długodzioby
 Phyllergates heterolaemus_Krawczynek żółtobrzuchy
 Phyllolais pulchella_Akacjówek
-Phyllomyias burmeisteri_Pręgotyranik włochaty (burmeisteri)
+Phyllomyias burmeisteri_Pręgotyranik włochaty "burmeisteri"
 Phyllomyias cinereiceps_Pręgotyranik siwogłowy
 Phyllomyias fasciatus_Oliwiarek jasnogardły
 Phyllomyias griseiceps_Oliwiarek okopcony
@@ -4574,7 +4574,7 @@ Phylloscopus proregulus_świstunka złotawa
 Phylloscopus pulcher_świstunka rdzawopręga
 Phylloscopus reguloides_świstunka rododendronowa
 Phylloscopus ruficapilla_świstunka żółtogardła
-Phylloscopus sarasinorum_świstunka celebeska (sarasinorum)
+Phylloscopus sarasinorum_świstunka celebeska "sarasinorum"
 Phylloscopus schwarzi_świstunka grubodzioba
 Phylloscopus sibilatrix_świstunka leśna
 Phylloscopus sindianus_świstunka szarawa
@@ -4652,7 +4652,7 @@ Pionus senilis_Piona białoczelna
 Pionus sordidus_Piona koralodzioba
 Pionus tumultuosus_Piona śliwogłowa
 Pipile cujubi_Grdacz czerwonogardły
-Pipile cumanensis_Grdacz modrogardły (cumanensis)
+Pipile cumanensis_Grdacz modrogardły "cumanensis"
 Pipilo chlorurus_Pipil rudogłowy
 Pipilo erythrophthalmus_Pipil rudoboczny
 Pipilo maculatus_Pipil czarnogrzbiety
@@ -4713,7 +4713,7 @@ Platyrinchus leucoryphus_Szerokodziobek rdzawoskrzydły
 Platyrinchus mystaceus_Szerokodziobek żółtogłowy
 Platyrinchus platyrhynchos_Szerokodziobek białogłowy
 Platyrinchus saturatus_Szerokodziobek rdzawogłowy
-Platysmurus leucopterus_Srokowiec (białoskrzydły)
+Platysmurus leucopterus_Srokowiec "białoskrzydły"
 Platysteira blissetti_Krępaczek modrooki
 Platysteira castanea_Krępaczek białoszyi
 Platysteira concreta_Krępaczek złotobrzuchy
@@ -4739,8 +4739,8 @@ Ploceus luteolus_Wikłacz mały
 Ploceus manyar_Wikłacz kreskowany
 Ploceus melanocephalus_Wikłacz czarnogłowy
 Ploceus nelicourvi_Wikłacz potokowy
-Ploceus nigerrimus_Wikłacz czarny (nigerrimus)
-Ploceus nigricollis_Wikłacz czarnogardły (nigricollis/melanoxanthus)
+Ploceus nigerrimus_Wikłacz czarny "nigerrimus"
+Ploceus nigricollis_Wikłacz czarnogardły "nigricollis/melanoxanthus"
 Ploceus ocularis_Wikłacz okularowy
 Ploceus philippinus_Wikłacz złotogłowy
 Ploceus sakalava_Wikłacz nizinny
@@ -4808,7 +4808,7 @@ Poicephalus meyeri_Afrykanka złotoplama
 Poicephalus robustus_Afrykanka zielonorzytna
 Poicephalus rufiventris_Afrykanka krasnopierśna
 Poicephalus senegalus_Afrykanka żółtobrzucha
-Poliocrania exsul_Gołoliczek (kasztanowaty)
+Poliocrania exsul_Gołoliczek "kasztanowaty"
 Poliolimnas cinereus_Kureczka białobrewa
 Polioptila albiloris_Siwuszka białolica
 Polioptila bilineata_Siwuszka białobrewa
@@ -4837,7 +4837,7 @@ Polytmus theresiae_Kolibrzyk zielonosterny
 Pomatorhinus ferruginosus_łączniak maskowy
 Pomatorhinus horsfieldii_łączniak żółtodzioby
 Pomatorhinus melanurus_łączniak cejloński
-Pomatorhinus montanus_łączniak kasztanowaty (montanus/ottolanderi)
+Pomatorhinus montanus_łączniak kasztanowaty "montanus/ottolanderi"
 Pomatorhinus musicus_łączniak plamisty
 Pomatorhinus ochraceiceps_łączniak złotodzioby
 Pomatorhinus ruficollis_łączniak rudoszyi
@@ -4855,7 +4855,7 @@ Porphyrio madagascariensis_Modrzyk afrykański
 Porphyrio martinica_Sułtanka amerykańska
 Porphyrio melanotus_Modrzyk ciemny
 Porphyrio poliocephalus_Modrzyk siwogłowy
-Porphyrio porphyrio_Modrzyk (zwyczajny)
+Porphyrio porphyrio_Modrzyk "zwyczajny"
 Porphyriops melanops_Kureczka kropkowana
 Porzana carolina_Kureczka karolińska
 Porzana porzana_Kropiatka
@@ -5017,7 +5017,7 @@ Psittacula himalayana_Aleksandretta himalajska
 Psittacula krameri_Aleksandretta obrożna
 Psittacula longicauda_Aleksandretta długosterna
 Psittacus erithacus_żako
-Psittinus cyanurus_Modrorzytka (czarnogrzbieta)
+Psittinus cyanurus_Modrorzytka "czarnogrzbieta"
 Psittiparus gularis_Ogoniatka czarnobroda
 Psophia crepitans_Gruchacz siwoskrzydły
 Psophia leucoptera_Gruchacz białoskrzydły
@@ -5412,7 +5412,7 @@ Sclateria naevia_Potoczak
 Scleroptila afra_Frankolin szaroskrzydły
 Scleroptila gutturalis_Frankolin akacjowy
 Scleroptila levaillantii_Frankolin rudoskrzydły
-Scleroptila shelleyi_Frankolin rdzawoboczny (shelleyi)
+Scleroptila shelleyi_Frankolin rdzawoboczny "shelleyi"
 Sclerurus albigularis_Liściarek siwawy
 Sclerurus caudacutus_Liściarek białogardły
 Sclerurus guatemalensis_Liściarek łuskowany
@@ -5508,7 +5508,7 @@ Serpophaga griseicapilla_Tyranek popielaty
 Serpophaga hypoleuca_Tyranek rzeczny
 Serpophaga munda_White-bellied Tyrannulet
 Serpophaga nigricans_Tyranek ciemny
-Serpophaga subcristata_Tyranek szarogłowy/białobrzuchy
+Serpophaga subcristata_Tyranek szarogłowy/Białobrzuchy
 Setopagis parvula_Lelkowiec szarawy
 Setophaga adelaidae_Lasówka żółtobrzucha
 Setophaga americana_Lasówka obrożna
@@ -5582,7 +5582,7 @@ Sittasomus griseicapillus_Kowal
 Sittiparus castaneoventris_Sikora kasztanowata
 Sittiparus owstoni_Sikora rdzawolica
 Sittiparus varius_Sikora rdzawa
-Smicrornis brevirostris_Krótkodziobek (brązowawy)
+Smicrornis brevirostris_Krótkodziobek "brązowawy"
 Smithornis capensis_Czapecznik ubogi
 Smithornis rufolateralis_Czapecznik rdzawoboczny
 Snowornis subalaris_Andobławatnik szarosterny
@@ -5916,7 +5916,7 @@ Tanygnathus sumatranus_Papuga zielona
 Tanysiptera galatea_Sterowik duży
 Tanysiptera sylvia_Sterowik białogrzbiety
 Tapera naevia_Klinochwostka paskowana
-Taraba major_Taraba (południowa)
+Taraba major_Taraba "południowa"
 Tarphonomus certhioides_Bromeliowczyk rdzawobrewy
 Tarphonomus harterti_Bromeliowczyk jasnobrewy
 Tarsiger chrysaeus_Modraczek złotawy
@@ -6157,7 +6157,7 @@ Tringa incana_Brodziec alaskański
 Tringa melanoleuca_Brodziec piegowaty
 Tringa nebularia_Kwokacz
 Tringa ochropus_Samotnik
-Tringa semipalmata_Błotowiec (nadmorski)
+Tringa semipalmata_Błotowiec "nadmorski"
 Tringa solitaria_Brodziec ciemnorzytny
 Tringa stagnatilis_Brodziec pławny
 Tringa totanus_Krwawodziób
@@ -6293,7 +6293,7 @@ Turtur afer_Turkaweczka modroplamkowa
 Turtur brehmeri_Turkaweczka modrogłowa
 Turtur chalcospilos_Turkaweczka zielonoplamkowa
 Turtur tympanistria_Turkaweczka białoczelna
-Tylas eduardi_Tylas (czarnogardły)
+Tylas eduardi_Tylas "czarnogardły"
 Tympanuchus cupido_Preriokur dwuczuby
 Tympanuchus pallidicinctus_Preriokur mały
 Tympanuchus phasianellus_Preriokur bażanci

@@ -41,7 +41,7 @@ Accipiter trivirgatus_Topphauk
 Accipiter virgatus_Besrahauk
 Aceros nipalensis_Rødhalshornfugl
 Achaetops pycnopygius_Steinhopper
-Acridotheres burmannicus_Vinstær (burmannicus)
+Acridotheres burmannicus_Vinstær "burmannicus"
 Acridotheres cristatellus_Krøllstær
 Acridotheres fuscus_Krattstær
 Acridotheres ginginianus_Landsbystær
@@ -352,7 +352,7 @@ Anthus leucophrys_Brannpiplerke
 Anthus lineiventris_Stripepiplerke
 Anthus lutescens_Gresspiplerke
 Anthus nattereri_Okerpiplerke
-Anthus novaeseelandiae_Australpiplerke (novaeseelandiae gr.)
+Anthus novaeseelandiae_Australpiplerke "novaeseelandiae gr."
 Anthus peruvianus_Perupiplerke
 Anthus petrosus_Skjærpiplerke
 Anthus pratensis_Heipiplerke
@@ -652,7 +652,7 @@ Baryphthengus martii_Kanelmotmot
 Baryphthengus ruficapillus_Brunkronemotmot
 Basileuterus belli_Gulbrynparula
 Basileuterus culicivorus_Gyllenkroneparula
-Basileuterus delattrii_Brunkroneparula (delattrii gr.)
+Basileuterus delattrii_Brunkroneparula "delattrii gr."
 Basileuterus lachrymosus_Vifteparula
 Basileuterus melanogenys_Svartkinnparula
 Basileuterus melanotis_Costaricaparula
@@ -714,7 +714,7 @@ Brachypteryx cruralis_Himalayakortvinge
 Brachypteryx goodfellowi_Taiwankortvinge
 Brachypteryx hyperythra_Rustkortvinge
 Brachypteryx leucophris_Alvekortvinge
-Brachypteryx montana_White-browed Shortwing (Javan)
+Brachypteryx montana_White-browed Shortwing "Javan"
 Brachyramphus marmoratus_Marmordvergteist
 Bradornis microrhynchus_Tornfluesnapper
 Bradypterus baboecala_Bantusanger
@@ -1031,7 +1031,7 @@ Catharus fuscater_Sotskogtrost
 Catharus fuscescens_Viriskogtrost
 Catharus gracilirostris_Svartnebbskogtrost
 Catharus guttatus_Eremittskogtrost
-Catharus maculatus_Svarthetteskogtrost (maculatus/blakei)
+Catharus maculatus_Svarthetteskogtrost "maculatus/blakei"
 Catharus mexicanus_Svartkroneskogtrost
 Catharus minimus_Gråkinnskogtrost
 Catharus occidentalis_Rustskogtrost
@@ -1477,8 +1477,8 @@ Colius striatus_Brunmusfugl
 Collocalia affinis_Dunfotsalangan
 Colluricincla boweri_Kanelplystrer
 Colluricincla harmonica_Hvittøyleplystrer
-Colluricincla megarhyncha_Løvplystrer (megarhyncha gr.)
-Colluricincla rufogaster_Løvplystrer (rufogaster)
+Colluricincla megarhyncha_Løvplystrer "megarhyncha gr."
+Colluricincla rufogaster_Løvplystrer "rufogaster"
 Colonia colonus_Pendeltyrann
 Colorhamphus parvirostris_Patagoniatyrann
 Columba arquatrix_Gulbrilledue
@@ -1531,7 +1531,7 @@ Conopophila albogularis_Brunbeltehonningeter
 Conostoma aemodium_Storbuttnebb
 Conothraupis speculigera_Gråsidetanagar
 Contopus caribaeus_Karibpivi
-Contopus cinereus_Tropepivi (cinereus gr.)
+Contopus cinereus_Tropepivi "cinereus gr."
 Contopus cooperi_Jakkepivi
 Contopus fumigatus_Røykpivi
 Contopus lugubris_Sotpivi
@@ -1771,7 +1771,7 @@ Cyanoderma melanothorax_Halvmånetimal
 Cyanoderma pyrrhops_Svarthaketimal
 Cyanoderma ruficeps_Rustkronetimal
 Cyanoderma rufifrons_Rustpannetimal
-Cyanolanius madagascarinus_Blåvanga (madagascarinus)
+Cyanolanius madagascarinus_Blåvanga "madagascarinus"
 Cyanoliseus patagonus_Graveparakitt
 Cyanoloxia brissonii_Ultramarintykknebb
 Cyanoloxia cyanoides_Indigotykknebb
@@ -2281,8 +2281,8 @@ Eurylaimus ochromalus_Guløyebrednebb
 Eurypyga helias_Solrikse
 Eurystomus glaucurus_Brednebbråke
 Eurystomus orientalis_Orientråke
-Euscarthmus fulviceps_Blekpygmétyrann (fulviceps)
-Euscarthmus meloryphus_Blekpygmétyrann (meloryphus/paulus)
+Euscarthmus fulviceps_Blekpygmétyrann "fulviceps"
+Euscarthmus meloryphus_Blekpygmétyrann "meloryphus/paulus"
 Euscarthmus rufomarginatus_Rustpygmétyrann
 Eutoxeres aquila_Grønnsigderemitt
 Falco amurensis_Amurfalk
@@ -2300,7 +2300,7 @@ Falco subbuteo_Lerkefalk
 Falco tinnunculus_Tårnfalk
 Falco vespertinus_Aftenfalk
 Falculea palliata_Sigdnebbvanga
-Falcunculus frontatus_Barkplystrer (frontatus)
+Falcunculus frontatus_Barkplystrer "frontatus"
 Ferminia cerverai_Zapatasmett
 Ficedula albicilla_Taigafluesnapper
 Ficedula albicollis_Halsbåndfluesnapper
@@ -2348,7 +2348,7 @@ Forpus conspicillatus_Blåbrillet spurvepapegøye
 Forpus cyanopygius_Sinaloaspurvepapegøye
 Forpus modestus_Amazonspurvepapegøye
 Forpus passerinus_Grønngumpet spurvepapegøye
-Forpus xanthopterygius_Grønnbrillet spurvepapegøye (xanthopterygius)
+Forpus xanthopterygius_Grønnbrillet spurvepapegøye "xanthopterygius"
 Foudia madagascariensis_Rødvever
 Foudia rubra_Mauritiusvever
 Foulehaio carunculatus_Polynesiahonningeter
@@ -2411,7 +2411,7 @@ Gallinago gallinago_Enkeltbekkasin
 Gallinago hardwickii_Japanbekkasin
 Gallinago imperialis_Keiserbekkasin
 Gallinago jamesoni_Nordandesbekkasin
-Gallinago magellanica_Søramerikabekkasin (magellanica)
+Gallinago magellanica_Søramerikabekkasin "magellanica"
 Gallinago media_Dobbeltbekkasin
 Gallinago megala_Bajkalbekkasin
 Gallinago nobilis_Edelbekkasin
@@ -2550,7 +2550,7 @@ Grallaria alleni_Skjeggmaurpitta
 Grallaria andicolus_Stripehodemaurpitta
 Grallaria bangsi_Santamartamaurpitta
 Grallaria blakei_Nøttemaurpitta
-Grallaria cajamarcae_Rustmaurpitta (cajamarcae)
+Grallaria cajamarcae_Rustmaurpitta "cajamarcae"
 Grallaria capitalis_Brunmaurpitta
 Grallaria carrikeri_Bleknebbmaurpitta
 Grallaria dignissima_Oransjebrystmaurpitta
@@ -2566,13 +2566,13 @@ Grallaria hypoleuca_Kalkbrystmaurpitta
 Grallaria kaestneri_Cundinamarcamaurpitta
 Grallaria milleri_Umbramaurpitta
 Grallaria nuchalis_Rustnakkemaurpitta
-Grallaria occabambae_Rustmaurpitta (occabambae)
+Grallaria occabambae_Rustmaurpitta "occabambae"
 Grallaria przewalskii_Ruststenkmaurpitta
 Grallaria quitensis_Okermaurpitta
 Grallaria ridgelyi_Jocotocomaurpitta
 Grallaria ruficapilla_Brunhodemaurpitta
 Grallaria rufocinerea_Jernmaurpitta
-Grallaria rufula_Rustmaurpitta (rufula)
+Grallaria rufula_Rustmaurpitta "rufula"
 Grallaria saturata_Equatorial Antpitta
 Grallaria squamigera_Skjellmaurpitta
 Grallaria urraoensis_Urraomaurpitta
@@ -2608,7 +2608,7 @@ Gubernatrix cristata_Grønnkardinal
 Gubernetes yetapa_Strimmelhaletyrann
 Guira guira_Guiragjøk
 Gun_Gun
-Guttera pucherani_Parykkperlehøne (pucherani)
+Guttera pucherani_Parykkperlehøne "pucherani"
 Gygis alba_Silketerne
 Gymnasio nudipes_Puertoricougle
 Gymnobucco bonapartei_Gråstrupeskjeggfugl
@@ -2753,7 +2753,7 @@ Herpsilochmus atricapillus_Svartkronemaursmett
 Herpsilochmus axillaris_Gulbrystmaursmett
 Herpsilochmus dorsimaculatus_Flekkryggmaursmett
 Herpsilochmus dugandi_Loretomaursmett
-Herpsilochmus frater_Rødvingemaursmett (scapularis gr.)
+Herpsilochmus frater_Rødvingemaursmett "scapularis gr."
 Herpsilochmus gentryi_Napomaursmett
 Herpsilochmus longirostris_Stornebbmaursmett
 Herpsilochmus motacilloides_Krembukmaursmett
@@ -2761,7 +2761,7 @@ Herpsilochmus parkeri_Askestrupemaursmett
 Herpsilochmus pectoralis_Halvmånemaursmett
 Herpsilochmus pileatus_Bahiamaursmett
 Herpsilochmus roraimae_Tepuimaursmett
-Herpsilochmus rufimarginatus_Rødvingemaursmett (rufimarginatus)
+Herpsilochmus rufimarginatus_Rødvingemaursmett "rufimarginatus"
 Herpsilochmus sellowi_Caatinga Antwren
 Herpsilochmus stictocephalus_Kajennemaursmett
 Herpsilochmus sticturus_Flekkhalemaursmett
@@ -3089,7 +3089,7 @@ Lanius vittatus_Indiavarsler
 Larosterna inca_Inkaterne
 Larus argentatus_Gråmåke
 Larus belcheri_Skarvmåke
-Larus brachyrhynchus_Fiskemåke (brachyrhynchus)
+Larus brachyrhynchus_Fiskemåke "brachyrhynchus"
 Larus cachinnans_Kaspimåke
 Larus californicus_Præriegråmåke
 Larus canus_Fiskemåke
@@ -3533,7 +3533,7 @@ Merops bulocki_Rødstrupebieter
 Merops hirundineus_Svalebieter
 Merops leschenaulti_Bengalbieter
 Merops oreobates_Bergbieter
-Merops orientalis_Beryllbieter (orientalis gr.)
+Merops orientalis_Beryllbieter "orientalis gr."
 Merops ornatus_Regnbuebieter
 Merops persicus_Blåkinnbieter
 Merops philippinus_Blåhalebieter
@@ -3599,7 +3599,7 @@ Mino kreffti_Gullmaskestær
 Miogryllus saussurei_Miogryllus saussurei
 Mionectes macconnelli_Leiktyrann
 Mionectes oleagineus_Okerbuktyrann
-Mionectes olivaceus_Oliventyrann (olivaceus)
+Mionectes olivaceus_Oliventyrann "olivaceus"
 Mionectes rufiventris_Gråhodetyrann
 Mionectes striaticollis_Stripebrysttyrann
 Mirafra affinis_Ghatslerke
@@ -3752,7 +3752,7 @@ Myiodynastes hemichrysus_Gyllenbuktyrann
 Myiodynastes luteiventris_Svovelbuktyrann
 Myiodynastes maculatus_Stripetyrann
 Myiomela leucura_Hvithaleskvett
-Myiopagis caniceps_Gråelenia (caniceps)
+Myiopagis caniceps_Gråelenia "caniceps"
 Myiopagis flavivertex_Varzeaelenia
 Myiopagis gaimardii_Skogelenia
 Myiopagis olallai_Fjellfotelenia
@@ -3773,7 +3773,7 @@ Myiotheretes pernix_Santamartatyrann
 Myiotheretes striaticollis_Stripestrupetyrann
 Myiothlypis basilica_Bambusparula
 Myiothlypis bivittata_Ildkroneparula
-Myiothlypis chrysogaster_Inkaparula (chrysogaster)
+Myiothlypis chrysogaster_Inkaparula "chrysogaster"
 Myiothlypis cinereicollis_Gråstrupeparula
 Myiothlypis conspicillata_Brilleparula
 Myiothlypis coronata_Rustkroneparula
@@ -3987,7 +3987,7 @@ Ochetorhynchus andaecola_Steinmarkløper
 Ochetorhynchus melanurus_Klippeløper
 Ochetorhynchus phoenicurus_Mørkhalemarkløper
 Ochetorhynchus ruficaudus_Ravinemarkløper
-Ochthoeca cinnamomeiventris_Skiferryggtyrann (cinnamomeiventris)
+Ochthoeca cinnamomeiventris_Skiferryggtyrann "cinnamomeiventris"
 Ochthoeca diadema_Yellow-bellied Chat-Tyrant
 Ochthoeca frontalis_Crowned Chat-Tyrant
 Ochthoeca fumicolor_Paramotyrann
@@ -3997,7 +3997,7 @@ Ochthoeca oenanthoides_Punatyrann
 Ochthoeca pulchella_Golden-browed Chat-Tyrant
 Ochthoeca rufipectoralis_Rødbrysttyrann
 Ochthornis littoralis_Elvetyrann
-Ocreatus underwoodii_Vimpelkolibri (underwoodii gr.)
+Ocreatus underwoodii_Vimpelkolibri "underwoodii gr."
 Ocyceros birostris_Indiahornfugl
 Ocyceros gingalensis_Singaleserhornfugl
 Ocyceros griseus_Malabarhornfugl
@@ -4500,7 +4500,7 @@ Phyllastrephus terrestris_Markbylbyl
 Phyllergates cucullatus_Gulbuksanger
 Phyllergates heterolaemus_Mindanaosanger
 Phyllolais pulchella_Akasiesanger
-Phyllomyias burmeisteri_Panløvtyrann (burmeisteri)
+Phyllomyias burmeisteri_Panløvtyrann "burmeisteri"
 Phyllomyias cinereiceps_Sigdløvtyrann
 Phyllomyias fasciatus_Brasilløvtyrann
 Phyllomyias griseiceps_Sotkroneløvtyrann
@@ -4574,7 +4574,7 @@ Phylloscopus proregulus_Fuglekongesanger
 Phylloscopus pulcher_Rododendronsanger
 Phylloscopus reguloides_Gulbåndsanger
 Phylloscopus ruficapilla_Gulstrupesanger
-Phylloscopus sarasinorum_Sulawesisanger (sarasinorum)
+Phylloscopus sarasinorum_Sulawesisanger "sarasinorum"
 Phylloscopus schwarzi_Viersanger
 Phylloscopus sibilatrix_Bøksanger
 Phylloscopus sindianus_Fjellgransanger
@@ -4739,7 +4739,7 @@ Ploceus luteolus_Dvergvever
 Ploceus manyar_Stripevever
 Ploceus melanocephalus_Svarthodevever
 Ploceus nelicourvi_Halsbåndvever
-Ploceus nigerrimus_Svartvever (nigerrimus)
+Ploceus nigerrimus_Svartvever "nigerrimus"
 Ploceus nigricollis_Svartnakkevever
 Ploceus ocularis_Brillevever
 Ploceus philippinus_Bayavever
@@ -4811,7 +4811,7 @@ Poicephalus senegalus_Senegalpapegøye
 Poliocrania exsul_Kastanjeryggmaurfugl
 Poliolimnas cinereus_Bladrikse
 Polioptila albiloris_Mayamyggsmett
-Polioptila bilineata_Krattmyggsmett (bilineata gr.)
+Polioptila bilineata_Krattmyggsmett "bilineata gr."
 Polioptila caerulea_Nordmyggsmett
 Polioptila californica_Kaliforniamyggsmett
 Polioptila dumicola_Maskemyggsmett
@@ -4837,7 +4837,7 @@ Polytmus theresiae_Grønnkolibri
 Pomatorhinus ferruginosus_Korallnebbsigdtimal
 Pomatorhinus horsfieldii_Indiasigdtimal
 Pomatorhinus melanurus_Veddasigdtimal
-Pomatorhinus montanus_Kastanjeryggsigdtimal (montanus/ottolanderi)
+Pomatorhinus montanus_Kastanjeryggsigdtimal "montanus/ottolanderi"
 Pomatorhinus musicus_Taiwansigdtimal
 Pomatorhinus ochraceiceps_Rødnebbsigdtimal
 Pomatorhinus ruficollis_Strekbrystsigdtimal
@@ -5444,7 +5444,7 @@ Scytalopus femoralis_Perutapakulo
 Scytalopus frankeae_Jalca Tapaculo
 Scytalopus fuscus_Kokstapakulo
 Scytalopus griseicollis_Matorraltapakulo
-Scytalopus intermedius_Bektapakulo (intermedius)
+Scytalopus intermedius_Bektapakulo "intermedius"
 Scytalopus iraiensis_Sumptapakulo
 Scytalopus latebricola_Brungumptapakulo
 Scytalopus latrans_Bektapakulo
@@ -6093,7 +6093,7 @@ Todus multicolor_Kubatodi
 Todus subulatus_Brednebbtodi
 Todus todus_Jamaicatodi
 Tolmomyias assimilis_Gulbremtyrann
-Tolmomyias flaviventris_Gulbrysttyrann (flaviventris gr.)
+Tolmomyias flaviventris_Gulbrysttyrann "flaviventris gr."
 Tolmomyias poliocephalus_Askekronetyrann
 Tolmomyias sulphurescens_Bladtyrann
 Tolmomyias traylori_Oransjeøyetyrann
@@ -6495,7 +6495,7 @@ Zoothera heinei_Rusthaletrost
 Zoothera lunulata_Eukalyptustrost
 Zoothera major_Amamitrost
 Zosterops abyssinicus_Sitronbrillefugl
-Zosterops anderssoni_Gulbrillefugl (anderssoni/stierlingi)
+Zosterops anderssoni_Gulbrillefugl "anderssoni/stierlingi"
 Zosterops atricapilla_Maskebrillefugl
 Zosterops atriceps_Mørkhodebrillefugl
 Zosterops atrifrons_Svartpannebrillefugl
@@ -6517,6 +6517,6 @@ Zosterops metcalfii_Gulstrupebrillefugl
 Zosterops meyeni_Lavlandsbrillefugl
 Zosterops pallidus_Namabrillefugl
 Zosterops palpebrosus_Lundbrillefugl
-Zosterops senegalensis_Gulbrillefugl (senegalensis gr.)
+Zosterops senegalensis_Gulbrillefugl "senegalensis gr."
 Zosterops simplex_Orientbrillefugl
 Zosterops virens_Kappbrillefugl

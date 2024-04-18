@@ -41,7 +41,7 @@ Accipiter trivirgatus_Azor Moñudo
 Accipiter virgatus_Gavilán Besra
 Aceros nipalensis_Cálao del Nepal
 Achaetops pycnopygius_Saltarrocas de Damara
-Acridotheres burmannicus_Miná Birmano (burmannicus)
+Acridotheres burmannicus_Miná Birmano "burmannicus"
 Acridotheres cristatellus_Miná Crestado
 Acridotheres fuscus_Miná de la Jungla
 Acridotheres ginginianus_Miná Ribereño
@@ -352,7 +352,7 @@ Anthus leucophrys_Bisbita Liso
 Anthus lineiventris_Bisbita Rayado
 Anthus lutescens_Bisbita Amarillento
 Anthus nattereri_Bisbita Ocre
-Anthus novaeseelandiae_Bisbita Neozelandés (grupo novaeseelandiae)
+Anthus novaeseelandiae_Bisbita Neozelandés "grupo novaeseelandiae"
 Anthus peruvianus_Bisbita Peruano
 Anthus petrosus_Bisbita Costero
 Anthus pratensis_Bisbita Pratense
@@ -1531,7 +1531,7 @@ Conopophila albogularis_Mielero Pechirrufo
 Conostoma aemodium_Picoloro Grande
 Conothraupis speculigera_Tangara Albinegra
 Contopus caribaeus_Pibí Cubano
-Contopus cinereus_Pibí Tropical (grupo cinereus)
+Contopus cinereus_Pibí Tropical "grupo cinereus"
 Contopus cooperi_Pibí Boreal
 Contopus fumigatus_Pibí Ahumado
 Contopus lugubris_Pibí Oscuro
@@ -1771,7 +1771,7 @@ Cyanoderma melanothorax_Timalí Perlado
 Cyanoderma pyrrhops_Timalí Barbinegro
 Cyanoderma ruficeps_Timalí Coronirrojo
 Cyanoderma rufifrons_Timalí Frentirrufo Rojizo
-Cyanolanius madagascarinus_Vanga Azul (madagascarinus)
+Cyanolanius madagascarinus_Vanga Azul "madagascarinus"
 Cyanoliseus patagonus_Loro Barranquero
 Cyanoloxia brissonii_Picogrueso de Brisson
 Cyanoloxia cyanoides_Picogrueso Negriazul
@@ -2111,7 +2111,7 @@ Emberiza pusilla_Escribano Pigmeo
 Emberiza rustica_Escribano Rústico
 Emberiza sahari_Escribano Sahariano
 Emberiza schoeniclus_Escribano Palustre
-Emberiza spodocephala_Escribano Enmascarado (spodocephala/sordida)
+Emberiza spodocephala_Escribano Enmascarado "spodocephala/sordida"
 Emberiza stewarti_Escribano de Stewart
 Emberiza striolata_Escribano Estriado
 Emberiza sulphurata_Escribano Japonés
@@ -2251,7 +2251,7 @@ Euphonia trinitatis_Eufonia de Trinidad
 Euphonia violacea_Eufonia Violácea
 Euphonia xanthogaster_Eufonia Ventrinaranja
 Euplectes afer_Obispo Coronigualdo
-Euplectes ardens_Obispo Acollarado (ardens)
+Euplectes ardens_Obispo Acollarado "ardens"
 Euplectes capensis_Obispo Culigualdo
 Euplectes franciscanus_Obispo Anaranjado
 Euplectes hordeaceus_Obispo Alinegro
@@ -2477,7 +2477,7 @@ Geositta rufipennis_Minero Rojizo
 Geositta tenuirostris_Minero Picudo
 Geospizopsis plebejus_Yal Plebeyo
 Geospizopsis unicolor_Yal Plomizo
-Geothlypis aequinoctialis_Mascarita Equinoccial (aequinoctialis)
+Geothlypis aequinoctialis_Mascarita Equinoccial "aequinoctialis"
 Geothlypis beldingi_Mascarita de Belding
 Geothlypis formosa_Reinita de Kentucky
 Geothlypis nelsoni_Mascarita Matorralera
@@ -2608,7 +2608,7 @@ Gubernatrix cristata_Gobernador Crestado
 Gubernetes yetapa_Yetapá Grande
 Guira guira_Pirincho
 Gun_Gun
-Guttera pucherani_Pintada Moñuda Oriental (pucherani)
+Guttera pucherani_Pintada Moñuda Oriental "pucherani"
 Gygis alba_Charrán Blanco
 Gymnasio nudipes_Autillo Puertorriqueño
 Gymnobucco bonapartei_Barbudo Gorjigrís
@@ -2692,7 +2692,7 @@ Harpyopsis novaeguineae_Arpía Papú
 Hedydipna collaris_Suimanga Acollarado
 Hedydipna metallica_Suimanga del Nilo
 Hedydipna platura_Suimanga Pigmeo
-Heliangelus amethysticollis_Colibrí Gorjiamatista (grupo amethysticollis)
+Heliangelus amethysticollis_Colibrí Gorjiamatista "grupo amethysticollis"
 Heliangelus exortis_Colibrí Turmalina
 Heliangelus viola_Colibrí Violeta
 Helicolestes hamatus_Caracolero Plomizo
@@ -3106,10 +3106,10 @@ Larus marinus_Gavión Atlántico
 Larus michahellis_Gaviota Patiamarilla
 Larus occidentalis_Gaviota Occidental
 Larus schistisagus_Gaviota de Kamchatka
-Larvivora akahige_Ruiseñor Japonés (akahige/rishirensis)
+Larvivora akahige_Ruiseñor Japonés "akahige/rishirensis"
 Larvivora brunnea_Ruiseñor Indio
 Larvivora cyane_Ruiseñor Azul
-Larvivora komadori_Ruiseñor de Okinawa (komadori/subrufus)
+Larvivora komadori_Ruiseñor de Okinawa "komadori/subrufus"
 Larvivora sibilans_Ruiseñor Silbador
 Laterallus albigularis_Polluela Carrasqueadora
 Laterallus exilis_Polluela Pechigrís
@@ -3599,7 +3599,7 @@ Mino kreffti_Miná de las Bismarck
 Miogryllus saussurei_Miogryllus saussurei
 Mionectes macconnelli_Mosquero de Mcconnell
 Mionectes oleagineus_Mosquero Aceitunado
-Mionectes olivaceus_Mosquero Oliváceo (olivaceus)
+Mionectes olivaceus_Mosquero Oliváceo "olivaceus"
 Mionectes rufiventris_Mosquero Ladrillito
 Mionectes striaticollis_Mosquero Gorjiestriado
 Mirafra affinis_Alondra de Jerdon
@@ -3752,7 +3752,7 @@ Myiodynastes hemichrysus_Bienteveo Ventridorado
 Myiodynastes luteiventris_Bienteveo Ventriazufrado
 Myiodynastes maculatus_Bienteveo Rayado
 Myiomela leucura_Ruiseñor Coliblanco
-Myiopagis caniceps_Fiofío Gris (caniceps)
+Myiopagis caniceps_Fiofío Gris "caniceps"
 Myiopagis flavivertex_Fiofío Coroniamarillo
 Myiopagis gaimardii_Fiofío Selvático
 Myiopagis olallai_Fiofío Submontano
@@ -3773,7 +3773,7 @@ Myiotheretes pernix_Birro de Santa Marta
 Myiotheretes striaticollis_Birro Grande
 Myiothlypis basilica_Reinita de Santa Marta
 Myiothlypis bivittata_Reinita Bandeada
-Myiothlypis chrysogaster_Reinita Ventridorada (chrysogaster)
+Myiothlypis chrysogaster_Reinita Ventridorada "chrysogaster"
 Myiothlypis cinereicollis_Reinita Gorjigrís
 Myiothlypis conspicillata_Reinita Embridada
 Myiothlypis coronata_Reinita Coronirroja
@@ -3911,7 +3911,7 @@ Nilaus afer_Brubrú
 Niltava grandis_Papamoscas Grande
 Niltava macgrigoriae_Papamoscas de Mcgrigor
 Niltava sundara_Papamoscas Sundara
-Niltava vivida_Papamoscas Vívido (vivida)
+Niltava vivida_Papamoscas Vívido "vivida"
 Ninox boobook_Nínox Australiano
 Ninox connivens_Nínox Ladrador
 Ninox ios_Nínox Bermejo
@@ -3987,7 +3987,7 @@ Ochetorhynchus andaecola_Bandurrita Roquera
 Ochetorhynchus melanurus_Chiricoca
 Ochetorhynchus phoenicurus_Bandurrita Patagona
 Ochetorhynchus ruficaudus_Bandurrita Piquirrecta
-Ochthoeca cinnamomeiventris_Pitajo Negro (cinnamomeiventris)
+Ochthoeca cinnamomeiventris_Pitajo Negro "cinnamomeiventris"
 Ochthoeca diadema_Yellow-bellied Chat-Tyrant
 Ochthoeca frontalis_Crowned Chat-Tyrant
 Ochthoeca fumicolor_Pitajo Dorsipardo
@@ -4500,7 +4500,7 @@ Phyllastrephus terrestris_Bulbul Terrestre
 Phyllergates cucullatus_Sastrecillo Montano
 Phyllergates heterolaemus_Sastrecillo Encapuchado
 Phyllolais pulchella_Prinia Ventripálida
-Phyllomyias burmeisteri_Mosquerito de Burmeister (burmeisteri)
+Phyllomyias burmeisteri_Mosquerito de Burmeister "burmeisteri"
 Phyllomyias cinereiceps_Mosquerito Cenizo
 Phyllomyias fasciatus_Mosquerito Oliváceo
 Phyllomyias griseiceps_Mosquerito Cabecigrís
@@ -4574,7 +4574,7 @@ Phylloscopus proregulus_Mosquitero de Pallas
 Phylloscopus pulcher_Mosquitero Elegante
 Phylloscopus reguloides_Mosquitero de Blyth
 Phylloscopus ruficapilla_Mosquitero Gorjigualdo
-Phylloscopus sarasinorum_Mosquitero de Célebes (sarasinorum)
+Phylloscopus sarasinorum_Mosquitero de Célebes "sarasinorum"
 Phylloscopus schwarzi_Mosquitero de Schwarz
 Phylloscopus sibilatrix_Mosquitero Silbador
 Phylloscopus sindianus_Mosquitero Montano
@@ -4652,7 +4652,7 @@ Pionus senilis_Loro Senil
 Pionus sordidus_Loro Piquirrojo
 Pionus tumultuosus_Loro Tumultuoso
 Pipile cujubi_Pava Cuyubí
-Pipile cumanensis_Pava Goliazul (cumanensis)
+Pipile cumanensis_Pava Goliazul "cumanensis"
 Pipilo chlorurus_Toquí Coliverde
 Pipilo erythrophthalmus_Toquí Flanquirrufo
 Pipilo maculatus_Toquí Moteado
@@ -4739,8 +4739,8 @@ Ploceus luteolus_Tejedor Chico
 Ploceus manyar_Tejedor Estriado
 Ploceus melanocephalus_Tejedor Cabecinegro
 Ploceus nelicourvi_Tejedor Malgache
-Ploceus nigerrimus_Tejedor de Vieillot (nigerrimus)
-Ploceus nigricollis_Tejedor Cuellinegro (nigricollis/melanoxanthus)
+Ploceus nigerrimus_Tejedor de Vieillot "nigerrimus"
+Ploceus nigricollis_Tejedor Cuellinegro "nigricollis/melanoxanthus"
 Ploceus ocularis_Tejedor de Anteojos
 Ploceus philippinus_Tejedor Baya
 Ploceus sakalava_Tejedor Sakalava
@@ -4837,7 +4837,7 @@ Polytmus theresiae_Colibrí de Teresa
 Pomatorhinus ferruginosus_Cimitarra Coralina
 Pomatorhinus horsfieldii_Cimitarra India
 Pomatorhinus melanurus_Cimitarra Cingalesa
-Pomatorhinus montanus_Cimitarra Dorsicastaña (montanus/ottolanderi)
+Pomatorhinus montanus_Cimitarra Dorsicastaña "montanus/ottolanderi"
 Pomatorhinus musicus_Cimitarra de Formosa
 Pomatorhinus ochraceiceps_Cimitarra Piquirroja
 Pomatorhinus ruficollis_Cimitarra Cuellirrufa
@@ -5094,7 +5094,7 @@ Ptilinopus pelewensis_Tilopo de las Palau
 Ptilinopus porphyraceus_Tilopo Coronipúrpura
 Ptilinopus regina_Tilopo Reina
 Ptilinopus rivoli_Tilopo de Rivoli
-Ptilinopus solomonensis_Tilopo de las Salomón (grupo solomonensis)
+Ptilinopus solomonensis_Tilopo de las Salomón "grupo solomonensis"
 Ptilinopus superbus_Tilopo Soberbio
 Ptilinopus viridis_Tilopo Pechirrojo
 Ptiliogonys caudatus_Capulinero Colilargo
@@ -5412,7 +5412,7 @@ Sclateria naevia_Hormiguero Plateado
 Scleroptila afra_Francolín Aligrís
 Scleroptila gutturalis_Francolín del Orange
 Scleroptila levaillantii_Francolín Alirrojo
-Scleroptila shelleyi_Francolín de Shelley (shelleyi)
+Scleroptila shelleyi_Francolín de Shelley "shelleyi"
 Sclerurus albigularis_Tirahojas Gorjigrís
 Sclerurus caudacutus_Tirahojas Colinegro
 Sclerurus guatemalensis_Tirahojas Guatemalteco
@@ -6093,7 +6093,7 @@ Todus multicolor_Barrancolí Cubano
 Todus subulatus_Barrancolí Picogrueso
 Todus todus_Barrancolí Jamaicano
 Tolmomyias assimilis_Picoplano Aliamarillo
-Tolmomyias flaviventris_Picoplano Pechiamarillo (grupo flaviventris)
+Tolmomyias flaviventris_Picoplano Pechiamarillo "grupo flaviventris"
 Tolmomyias poliocephalus_Picoplano Cabecigrís
 Tolmomyias sulphurescens_Picoplano Sulfuroso
 Tolmomyias traylori_Picoplano Ojinaranja

@@ -702,7 +702,7 @@ Bonasa umbellus_Ruffed Grouse
 Bostrychia carunculata_Wattled Ibis
 Bostrychia hagedash_Hadeda
 Botaurus lentiginosus_American Bittern
-Botaurus stellaris_Grootrietreier (Roerdomp)
+Botaurus stellaris_Grootrietreier "Roerdomp"
 Brachygalba albogularis_White-throated Jacamar
 Brachygalba lugubris_Brown Jacamar
 Brachypodius eutilotus_Puff-backed Bulbul
@@ -748,7 +748,7 @@ Bubo nipalensis_Spot-bellied Eagle-Owl
 Bubo scandiacus_Snowy Owl
 Bubo sumatranus_Barred Eagle-Owl
 Bubo virginianus_Great Horned Owl
-Bubulcus ibis_Veereier (Bosluisvoël)
+Bubulcus ibis_Veereier "Bosluisvoël"
 Bucanetes githagineus_Trumpeter Finch
 Buccanodon duchaillui_Yellow-spotted Barbet
 Bucco capensis_Collared Puffbird
@@ -1365,14 +1365,14 @@ Cinnyris sovimanga_Souimanga Sunbird
 Cinnyris talatala_Witpenssuikerbekkie
 Cinnyris venustus_Geelpenssuikerbekkie
 Circaetus gallicus_Short-toed Snake Eagle
-Circus aeruginosus_Europese Vleivalk (Paddavreter)
+Circus aeruginosus_Europese Vleivalk "Paddavreter"
 Circus approximans_Swamp Harrier
 Circus buffoni_Long-winged Harrier
 Circus cyaneus_Hen Harrier
 Circus hudsonius_Northern Harrier
-Circus macrourus_Witborsvleivalk (-paddavreter)
+Circus macrourus_Witborsvleivalk "-paddavreter"
 Circus melanoleucos_Pied Harrier
-Circus pygargus_Blouvleivalk (-paddavreter)
+Circus pygargus_Blouvleivalk "-paddavreter"
 Circus spilonotus_Eastern Marsh-Harrier
 Cissa chinensis_Common Green-Magpie
 Cissa hypoleuca_Indochinese Green-Magpie
@@ -1942,7 +1942,7 @@ Dinemellia dinemelli_White-headed Buffalo-Weaver
 Dinopium benghalense_Black-rumped Flameback
 Dinopium javanense_Common Flameback
 Dinopium rafflesii_Olive-backed Woodpecker
-Diomedea exulans_Grootalbatros (-malmok)
+Diomedea exulans_Grootalbatros "-malmok"
 Diopsittaca nobilis_Red-shouldered Macaw
 Diuca diuca_Diuca Finch
 Dives dives_Melodious Blackbird
@@ -2975,7 +2975,7 @@ Ixobrychus eurhythmus_Schrenck's Bittern
 Ixobrychus exilis_Least Bittern
 Ixobrychus flavicollis_Black Bittern
 Ixobrychus involucris_Stripe-backed Bittern
-Ixobrychus minutus_Kleinrietreier (Woudapie)
+Ixobrychus minutus_Kleinrietreier "Woudapie"
 Ixobrychus sinensis_Yellow Bittern
 Ixonotus guttatus_Spotted Greenbul
 Ixoreus naevius_Varied Thrush
@@ -3569,7 +3569,7 @@ Microeca fascinans_Jacky-winter
 Microeca flavigaster_Lemon-bellied Flycatcher
 Microhierax fringillarius_Black-thighed Falconet
 Micromonacha lanceolata_Lanceolated Monklet
-Micronisus gabar_Witkruissperwer (Kleinsingvalk)
+Micronisus gabar_Witkruissperwer "Kleinsingvalk"
 Micropsitta finschii_Finsch's Pygmy-Parrot
 Micropternus brachyurus_Rufous Woodpecker
 Micropygia schomburgkii_Ocellated Crake
@@ -4462,7 +4462,7 @@ Phleocryptes melanops_Wren-like Rushbird
 Phlogophilus hemileucurus_Ecuadorian Piedtail
 Phodilus assimilis_Sri Lanka Bay-Owl
 Phodilus badius_Oriental Bay-Owl
-Phoebastria immutabilis_Swartwangalbatros (-malmok)
+Phoebastria immutabilis_Swartwangalbatros "-malmok"
 Phoebastria nigripes_Black-footed Albatross
 Phoenicircus carnifex_Guianan Red-Cotinga
 Phoenicircus nigricollis_Black-necked Red-Cotinga
@@ -5973,7 +5973,7 @@ Tetraogallus caucasicus_Caucasian Snowcock
 Tetraogallus tibetanus_Tibetan Snowcock
 Tetrastes bonasia_Hazel Grouse
 Tetrax tetrax_Little Bustard
-Thalassarche melanophris_Swartrugalbatros (-malmok)
+Thalassarche melanophris_Swartrugalbatros "-malmok"
 Thalasseus bengalensis_Kuifkopsterretjie
 Thalasseus bergii_Geelbeksterretjie
 Thalasseus elegans_Elegante Sterretjie

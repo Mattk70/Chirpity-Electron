@@ -2297,7 +2297,7 @@ Falco rufigularis_Sokol netopierí
 Falco rusticolus_Sokol poľovnícky
 Falco sparverius_Sokol pestrý
 Falco subbuteo_Sokol lastovičiar
-Falco tinnunculus_Sokol myšiar (pustovka)
+Falco tinnunculus_Sokol myšiar "pustovka"
 Falco vespertinus_Sokol kobcovitý
 Falculea palliata_Vanga srpozobá
 Falcunculus frontatus_Pruhohlávok lesný
@@ -2369,7 +2369,7 @@ Fregata ariel_Fregata bieloboká
 Fregata magnificens_Fregata vznešená
 Fregata minor_Fregata ebenová
 Fringilla coelebs_Pinka obyčajná
-Fringilla montifringilla_Pinka severská (ikavec)
+Fringilla montifringilla_Pinka severská "ikavec"
 Fulica alai_Lyska bridlicová
 Fulica americana_Lyska popolavá
 Fulica ardesiaca_Lyska horská
@@ -3507,7 +3507,7 @@ Melithreptus validirostris_Medárik kôrový
 Mellisuga helenae_čmeľovec kubánsky
 Mellisuga minima_čmeľovec medosavý
 Melocichla mentalis_Lužnica potočná
-Melopsittacus undulatus_Papagájec vlnkovaný (andulka)
+Melopsittacus undulatus_Papagájec vlnkovaný "andulka"
 Melopyrrha portoricensis_Ostrovčan portorický
 Melopyrrha violacea_Ostrovčan obočnatý
 Melospiza georgiana_Strnádlik močiarny
@@ -5016,7 +5016,7 @@ Psittacula finschii_Alexander sivokuklý
 Psittacula himalayana_Alexander himalájsky
 Psittacula krameri_Alexander malý
 Psittacula longicauda_Alexander dlhochvostý
-Psittacus erithacus_Papagáj sivý (žako)
+Psittacus erithacus_Papagáj sivý "žako"
 Psittinus cyanurus_Ladniak červenozobý
 Psittiparus gularis_Sutora sivohlavá
 Psophia crepitans_Trubač agami

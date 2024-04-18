@@ -41,7 +41,7 @@ Accipiter trivirgatus_Crested Goshawk
 Accipiter virgatus_Besra
 Aceros nipalensis_Rufous-necked Hornbill
 Achaetops pycnopygius_Rockrunner
-Acridotheres burmannicus_Vinous-breasted Starling (Burmese)
+Acridotheres burmannicus_Vinous-breasted Starling "Burmese"
 Acridotheres cristatellus_Crested Myna
 Acridotheres fuscus_Jungle Myna
 Acridotheres ginginianus_Bank Myna
@@ -352,7 +352,7 @@ Anthus leucophrys_Plain-backed Pipit
 Anthus lineiventris_Striped Pipit
 Anthus lutescens_Yellowish Pipit
 Anthus nattereri_Ochre-breasted Pipit
-Anthus novaeseelandiae_Australasian Pipit (New Zealand)
+Anthus novaeseelandiae_Australasian Pipit "New Zealand"
 Anthus peruvianus_Peruvian Pipit
 Anthus petrosus_Spioncello marino
 Anthus pratensis_Pispola
@@ -714,7 +714,7 @@ Brachypteryx cruralis_Himalayan Shortwing
 Brachypteryx goodfellowi_Taiwan Shortwing
 Brachypteryx hyperythra_Rusty-bellied Shortwing
 Brachypteryx leucophris_Lesser Shortwing
-Brachypteryx montana_White-browed Shortwing (Javan)
+Brachypteryx montana_White-browed Shortwing "Javan"
 Brachyramphus marmoratus_Marbled Murrelet
 Bradornis microrhynchus_African Gray Flycatcher
 Bradypterus baboecala_Little Rush Warbler
@@ -1531,7 +1531,7 @@ Conopophila albogularis_Rufous-banded Honeyeater
 Conostoma aemodium_Great Parrotbill
 Conothraupis speculigera_Black-and-white Tanager
 Contopus caribaeus_Cuban Pewee
-Contopus cinereus_Tropical Pewee (Tropical)
+Contopus cinereus_Tropical Pewee "Tropical"
 Contopus cooperi_Olive-sided Flycatcher
 Contopus fumigatus_Smoke-colored Pewee
 Contopus lugubris_Dark Pewee
@@ -1771,7 +1771,7 @@ Cyanoderma melanothorax_Crescent-chested Babbler
 Cyanoderma pyrrhops_Black-chinned Babbler
 Cyanoderma ruficeps_Rufous-capped Babbler
 Cyanoderma rufifrons_Rufous-fronted Babbler
-Cyanolanius madagascarinus_Blue Vanga (Madagascar)
+Cyanolanius madagascarinus_Blue Vanga "Madagascar"
 Cyanoliseus patagonus_Burrowing Parakeet
 Cyanoloxia brissonii_Ultramarine Grosbeak
 Cyanoloxia cyanoides_Blue-black Grosbeak
@@ -2111,7 +2111,7 @@ Emberiza pusilla_Zigolo minore
 Emberiza rustica_Zigolo boschereccio
 Emberiza sahari_House Bunting
 Emberiza schoeniclus_Migliarino di palude
-Emberiza spodocephala_Black-faced Bunting (spodocephala/sordida)
+Emberiza spodocephala_Black-faced Bunting "spodocephala/sordida"
 Emberiza stewarti_White-capped Bunting
 Emberiza striolata_Striolated Bunting
 Emberiza sulphurata_Yellow Bunting
@@ -2251,7 +2251,7 @@ Euphonia trinitatis_Trinidad Euphonia
 Euphonia violacea_Violaceous Euphonia
 Euphonia xanthogaster_Orange-bellied Euphonia
 Euplectes afer_Yellow-crowned Bishop
-Euplectes ardens_Red-collared Widowbird (Red-collared)
+Euplectes ardens_Red-collared Widowbird "Red-collared"
 Euplectes capensis_Yellow Bishop
 Euplectes franciscanus_Northern Red Bishop
 Euplectes hordeaceus_Black-winged Bishop
@@ -2477,7 +2477,7 @@ Geositta rufipennis_Rufous-banded Miner
 Geositta tenuirostris_Slender-billed Miner
 Geospizopsis plebejus_Ash-breasted Sierra Finch
 Geospizopsis unicolor_Plumbeous Sierra Finch
-Geothlypis aequinoctialis_Masked Yellowthroat (Masked)
+Geothlypis aequinoctialis_Masked Yellowthroat "Masked"
 Geothlypis beldingi_Belding's Yellowthroat
 Geothlypis formosa_Kentucky Warbler
 Geothlypis nelsoni_Hooded Yellowthroat
@@ -2608,7 +2608,7 @@ Gubernatrix cristata_Yellow Cardinal
 Gubernetes yetapa_Streamer-tailed Tyrant
 Guira guira_Guira Cuckoo
 Gun_Gun
-Guttera pucherani_Crested Guineafowl (Kenya)
+Guttera pucherani_Crested Guineafowl "Kenya"
 Gygis alba_White Tern
 Gymnasio nudipes_Puerto Rican Owl
 Gymnobucco bonapartei_Gray-throated Barbet
@@ -2692,7 +2692,7 @@ Harpyopsis novaeguineae_New Guinea Eagle
 Hedydipna collaris_Collared Sunbird
 Hedydipna metallica_Nile Valley Sunbird
 Hedydipna platura_Pygmy Sunbird
-Heliangelus amethysticollis_Amethyst-throated Sunangel (Amethyst-throated)
+Heliangelus amethysticollis_Amethyst-throated Sunangel "Amethyst-throated"
 Heliangelus exortis_Tourmaline Sunangel
 Heliangelus viola_Purple-throated Sunangel
 Helicolestes hamatus_Slender-billed Kite
@@ -3106,10 +3106,10 @@ Larus marinus_Mugnaiaccio
 Larus michahellis_Gabbiano reale
 Larus occidentalis_Western Gull
 Larus schistisagus_Slaty-backed Gull
-Larvivora akahige_Japanese Robin (Japanese)
+Larvivora akahige_Japanese Robin "Japanese"
 Larvivora brunnea_Indian Blue Robin
 Larvivora cyane_Siberian Blue Robin
-Larvivora komadori_Ryukyu Robin (Ryukyu)
+Larvivora komadori_Ryukyu Robin "Ryukyu"
 Larvivora sibilans_Rufous-tailed Robin
 Laterallus albigularis_White-throated Crake
 Laterallus exilis_Gray-breasted Crake
@@ -3533,7 +3533,7 @@ Merops bulocki_Red-throated Bee-eater
 Merops hirundineus_Swallow-tailed Bee-eater
 Merops leschenaulti_Chestnut-headed Bee-eater
 Merops oreobates_Cinnamon-chested Bee-eater
-Merops orientalis_Green Bee-eater (Russet-crowned)
+Merops orientalis_Green Bee-eater "Russet-crowned"
 Merops ornatus_Rainbow Bee-eater
 Merops persicus_Gruccione egiziano
 Merops philippinus_Blue-tailed Bee-eater
@@ -3599,7 +3599,7 @@ Mino kreffti_Long-tailed Myna
 Miogryllus saussurei_Miogryllus saussurei
 Mionectes macconnelli_McConnell's Flycatcher
 Mionectes oleagineus_Ochre-bellied Flycatcher
-Mionectes olivaceus_Olive-striped Flycatcher (Olive-streaked)
+Mionectes olivaceus_Olive-striped Flycatcher "Olive-streaked"
 Mionectes rufiventris_Gray-hooded Flycatcher
 Mionectes striaticollis_Streak-necked Flycatcher
 Mirafra affinis_Jerdon's Bushlark
@@ -3752,7 +3752,7 @@ Myiodynastes hemichrysus_Golden-bellied Flycatcher
 Myiodynastes luteiventris_Sulphur-bellied Flycatcher
 Myiodynastes maculatus_Streaked Flycatcher
 Myiomela leucura_White-tailed Robin
-Myiopagis caniceps_Gray Elaenia (Gray-headed)
+Myiopagis caniceps_Gray Elaenia "Gray-headed"
 Myiopagis flavivertex_Yellow-crowned Elaenia
 Myiopagis gaimardii_Forest Elaenia
 Myiopagis olallai_Foothill Elaenia
@@ -3773,7 +3773,7 @@ Myiotheretes pernix_Santa Marta Bush-Tyrant
 Myiotheretes striaticollis_Streak-throated Bush-Tyrant
 Myiothlypis basilica_Santa Marta Warbler
 Myiothlypis bivittata_Two-banded Warbler
-Myiothlypis chrysogaster_Golden-bellied Warbler (Golden-bellied)
+Myiothlypis chrysogaster_Golden-bellied Warbler "Golden-bellied"
 Myiothlypis cinereicollis_Gray-throated Warbler
 Myiothlypis conspicillata_White-lored Warbler
 Myiothlypis coronata_Russet-crowned Warbler
@@ -3911,7 +3911,7 @@ Nilaus afer_Brubru
 Niltava grandis_Large Niltava
 Niltava macgrigoriae_Small Niltava
 Niltava sundara_Rufous-bellied Niltava
-Niltava vivida_Vivid Niltava (Taiwan)
+Niltava vivida_Vivid Niltava "Taiwan"
 Ninox boobook_Southern Boobook
 Ninox connivens_Barking Owl
 Ninox ios_Cinnabar Boobook
@@ -3987,7 +3987,7 @@ Ochetorhynchus andaecola_Rock Earthcreeper
 Ochetorhynchus melanurus_Crag Chilia
 Ochetorhynchus phoenicurus_Band-tailed Earthcreeper
 Ochetorhynchus ruficaudus_Straight-billed Earthcreeper
-Ochthoeca cinnamomeiventris_Slaty-backed Chat-Tyrant (Slaty-backed)
+Ochthoeca cinnamomeiventris_Slaty-backed Chat-Tyrant "Slaty-backed"
 Ochthoeca diadema_Yellow-bellied Chat-Tyrant
 Ochthoeca frontalis_Crowned Chat-Tyrant
 Ochthoeca fumicolor_Brown-backed Chat-Tyrant
@@ -3997,7 +3997,7 @@ Ochthoeca oenanthoides_d'Orbigny's Chat-Tyrant
 Ochthoeca pulchella_Golden-browed Chat-Tyrant
 Ochthoeca rufipectoralis_Rufous-breasted Chat-Tyrant
 Ochthornis littoralis_Drab Water Tyrant
-Ocreatus underwoodii_Booted Racket-tail (White-booted)
+Ocreatus underwoodii_Booted Racket-tail "White-booted"
 Ocyceros birostris_Indian Gray Hornbill
 Ocyceros gingalensis_Sri Lanka Gray Hornbill
 Ocyceros griseus_Malabar Gray Hornbill
@@ -4500,7 +4500,7 @@ Phyllastrephus terrestris_Terrestrial Brownbul
 Phyllergates cucullatus_Mountain Tailorbird
 Phyllergates heterolaemus_Rufous-headed Tailorbird
 Phyllolais pulchella_Buff-bellied Warbler
-Phyllomyias burmeisteri_Rough-legged Tyrannulet (Burmeister's)
+Phyllomyias burmeisteri_Rough-legged Tyrannulet "Burmeister's"
 Phyllomyias cinereiceps_Ashy-headed Tyrannulet
 Phyllomyias fasciatus_Planalto Tyrannulet
 Phyllomyias griseiceps_Sooty-headed Tyrannulet
@@ -4574,7 +4574,7 @@ Phylloscopus proregulus_Luì di Pallas
 Phylloscopus pulcher_Buff-barred Warbler
 Phylloscopus reguloides_Blyth's Leaf Warbler
 Phylloscopus ruficapilla_Yellow-throated Woodland-Warbler
-Phylloscopus sarasinorum_Sulawesi Leaf Warbler (Lompobattang)
+Phylloscopus sarasinorum_Sulawesi Leaf Warbler "Lompobattang"
 Phylloscopus schwarzi_Luì di Radde
 Phylloscopus sibilatrix_Luì verde
 Phylloscopus sindianus_Mountain Chiffchaff
@@ -4652,7 +4652,7 @@ Pionus senilis_White-crowned Parrot
 Pionus sordidus_Red-billed Parrot
 Pionus tumultuosus_Speckle-faced Parrot
 Pipile cujubi_Red-throated Piping-Guan
-Pipile cumanensis_Blue-throated Piping-Guan (Blue-throated)
+Pipile cumanensis_Blue-throated Piping-Guan "Blue-throated"
 Pipilo chlorurus_Green-tailed Towhee
 Pipilo erythrophthalmus_Eastern Towhee
 Pipilo maculatus_Spotted Towhee
@@ -4739,8 +4739,8 @@ Ploceus luteolus_Little Weaver
 Ploceus manyar_Streaked Weaver
 Ploceus melanocephalus_Black-headed Weaver
 Ploceus nelicourvi_Nelicourvi Weaver
-Ploceus nigerrimus_Vieillot's Weaver (Black)
-Ploceus nigricollis_Black-necked Weaver (Black-backed)
+Ploceus nigerrimus_Vieillot's Weaver "Black"
+Ploceus nigricollis_Black-necked Weaver "Black-backed"
 Ploceus ocularis_Spectacled Weaver
 Ploceus philippinus_Baya Weaver
 Ploceus sakalava_Sakalava Weaver
@@ -4834,10 +4834,10 @@ Polytelis anthopeplus_Regent Parrot
 Polytelis swainsonii_Superb Parrot
 Polytmus guainumbi_White-tailed Goldenthroat
 Polytmus theresiae_Green-tailed Goldenthroat
-Pomatorhinus ferruginosus_Coral-billed Scimitar-Babbler (Black-crowned)
+Pomatorhinus ferruginosus_Coral-billed Scimitar-Babbler "Black-crowned"
 Pomatorhinus horsfieldii_Indian Scimitar-Babbler
 Pomatorhinus melanurus_Sri Lanka Scimitar-Babbler
-Pomatorhinus montanus_Chestnut-backed Scimitar-Babbler (Javan)
+Pomatorhinus montanus_Chestnut-backed Scimitar-Babbler "Javan"
 Pomatorhinus musicus_Taiwan Scimitar-Babbler
 Pomatorhinus ochraceiceps_Red-billed Scimitar-Babbler
 Pomatorhinus ruficollis_Streak-breasted Scimitar-Babbler
@@ -5094,7 +5094,7 @@ Ptilinopus pelewensis_Palau Fruit-Dove
 Ptilinopus porphyraceus_Crimson-crowned Fruit-Dove
 Ptilinopus regina_Rose-crowned Fruit-Dove
 Ptilinopus rivoli_White-breasted Fruit-Dove
-Ptilinopus solomonensis_Yellow-bibbed Fruit-Dove (Yellow-banded)
+Ptilinopus solomonensis_Yellow-bibbed Fruit-Dove "Yellow-banded"
 Ptilinopus superbus_Superb Fruit-Dove
 Ptilinopus viridis_Claret-breasted Fruit-Dove
 Ptiliogonys caudatus_Long-tailed Silky-flycatcher
@@ -5412,7 +5412,7 @@ Sclateria naevia_Silvered Antbird
 Scleroptila afra_Gray-winged Francolin
 Scleroptila gutturalis_Orange River Francolin
 Scleroptila levaillantii_Red-winged Francolin
-Scleroptila shelleyi_Shelley's Francolin (Shelley's)
+Scleroptila shelleyi_Shelley's Francolin "Shelley's"
 Sclerurus albigularis_Gray-throated Leaftosser
 Sclerurus caudacutus_Black-tailed Leaftosser
 Sclerurus guatemalensis_Scaly-throated Leaftosser
@@ -6093,7 +6093,7 @@ Todus multicolor_Cuban Tody
 Todus subulatus_Broad-billed Tody
 Todus todus_Jamaican Tody
 Tolmomyias assimilis_Yellow-margined Flycatcher
-Tolmomyias flaviventris_Yellow-breasted Flycatcher (Ochre-lored)
+Tolmomyias flaviventris_Yellow-breasted Flycatcher "Ochre-lored"
 Tolmomyias poliocephalus_Gray-crowned Flycatcher
 Tolmomyias sulphurescens_Yellow-olive Flycatcher
 Tolmomyias traylori_Orange-eyed Flycatcher
