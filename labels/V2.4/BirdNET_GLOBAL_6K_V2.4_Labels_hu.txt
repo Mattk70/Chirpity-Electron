@@ -2220,8 +2220,8 @@ Eumyias panayensis_Turquoise Flycatcher
 Eumyias thalassinus_Verditer Flycatcher
 Eunemobius carolinus_Carolina Ground Cricket
 Eunemobius confusus_Confused Ground Cricket
-Euodice cantans_ezüstcsőrű pinty
-Euodice malabarica_malabári pinty
+Euodice cantans_Ezüstcsőrű pinty
+Euodice malabarica_Malabári pinty
 Eupetes macrocerus_Malaysian Rail-babbler
 Eupetomena cirrochloris_Sombre Hummingbird
 Eupetomena macroura_Swallow-tailed Hummingbird
@@ -3255,7 +3255,7 @@ Locustella montis_Javan Bush Warbler
 Locustella naevia_Réti tücsökmadár
 Locustella tacsanowskia_Chinese Bush Warbler
 Locustella thoracica_Spotted Bush Warbler
-Lonchura atricapilla_feketefejű apácapinty
+Lonchura atricapilla_Feketefejű apácapinty
 Lonchura castaneothorax_Chestnut-breasted Munia
 Lonchura kelaarti_Black-throated Munia
 Lonchura leucogastroides_Javan Munia
@@ -3993,7 +3993,7 @@ Ochthoeca frontalis_Crowned Chat-Tyrant
 Ochthoeca fumicolor_Brown-backed Chat-Tyrant
 Ochthoeca jelskii_Jelski's Chat-Tyrant
 Ochthoeca leucophrys_White-browed Chat-Tyrant
-Ochthoeca oenanthoides_d'Orbigny's Chat-Tyrant
+Ochthoeca oenanthoides_D'Orbigny's Chat-Tyrant
 Ochthoeca pulchella_Golden-browed Chat-Tyrant
 Ochthoeca rufipectoralis_Rufous-breasted Chat-Tyrant
 Ochthornis littoralis_Drab Water Tyrant
