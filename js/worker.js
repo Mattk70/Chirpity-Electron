@@ -1126,7 +1126,7 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
     }).catch(error => console.warn(error.message))
 }
             
-function setupCtx(audio, rate, destination) {
+function setupCtx(audio, rate, destination, file) {
     rate ??= sampleRate;
     // Deal with detached arraybuffer issue
     const useFilters = (STATE.filters.sendToModel && STATE.filters.active) || destination === 'UI';
@@ -1175,7 +1175,7 @@ function setupCtx(audio, rate, destination) {
         offlineSource.start();
         return offlineCtx;
     })
-    .catch(error => console.warn(error));    
+    .catch(error => console.warn(error, file));    
 };
 
 
@@ -1184,7 +1184,7 @@ function checkBacklog(stream) {
         const backlog = sumObjectValues(predictionsRequested) - sumObjectValues(predictionsReceived);
         DEBUG && console.log('backlog:', backlog);
         
-        if (backlog > 100) {
+        if (backlog > 200) {
             // If queued value is above 100, wait and check again
             setTimeout(() => {
                 checkBacklog(stream)
@@ -1288,34 +1288,30 @@ const getWavePredictBuffers = async ({
     })    
 }
 
-async function processPredictQueue(){
-    return new Promise((resolve, reject) => {
-        const [audio, file, end, chunkStart]  = predictQueue.shift(); // Dequeue chunk
-        setupCtx(audio, undefined, 'model').then(offlineCtx => {
-            let worker;
-            if (offlineCtx) {
-                offlineCtx.startRendering().then((resampled) => {
-                    const myArray = resampled.getChannelData(0);
-                    workerInstance = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-                    worker = workerInstance;
-                    feedChunksToModel(myArray, chunkStart, file, end, worker);
-                    return resolve('done');
-                }).catch((error) => {
-                    console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
-                    updateFilesBeingProcessed(file);
-                    return reject(error)
-                });
-            } else {
-                console.log('Short chunk', audio.length, 'padding');
-                let chunkLength = STATE.model === 'birdnet' ? 144_000 : 72_000;
+function processPredictQueue(){
+    const [audio, file, end, chunkStart]  = predictQueue.shift(); // Dequeue chunk
+    setupCtx(audio, undefined, 'model', file).then(offlineCtx => {
+        let worker;
+        if (offlineCtx) {
+            offlineCtx.startRendering().then((resampled) => {
+                const myArray = resampled.getChannelData(0);
                 workerInstance = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
                 worker = workerInstance;
-                const myArray = new Float32Array(Array.from({ length: chunkLength }).fill(0));
-                feedChunksToModel(myArray, chunkStart, file, end);
-            }}).catch(error => {
-            console.warn(file, error);
-        })
-    })
+                feedChunksToModel(myArray, chunkStart, file, end, worker);
+                return
+            }).catch((error) => {
+                console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
+                updateFilesBeingProcessed(file);
+                return
+            });
+        } else {
+            console.log('Short chunk', audio.length, 'padding');
+            let chunkLength = STATE.model === 'birdnet' ? 144_000 : 72_000;
+            workerInstance = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+            worker = workerInstance;
+            const myArray = new Float32Array(Array.from({ length: chunkLength }).fill(0));
+            feedChunksToModel(myArray, chunkStart, file, end);
+        }}).catch(error => { console.warn(file, error) })
 }
 
 const getPredictBuffers = async ({
@@ -1348,12 +1344,11 @@ const getPredictBuffers = async ({
             .format('wav')
             .audioChannels(1) // Set to mono
             .audioFrequency(sampleRate) // Set sample rate 
-            //.outputOptions([`-bufsize ${highWaterMark}`])
             .writeToStream(STREAM)
 
         command.on('error', error => {
             updateFilesBeingProcessed(file)
-            if (error.message.includes('SIGKILL')) DEBUG && console.log('FFMPEG process shut down')
+            if (error.message.includes('SIGKILL')) console.log('FFMPEG process shut down at user request')
             else {
                 error.message = error.message + '|' + error.stack;
             }
@@ -1372,18 +1367,21 @@ const getPredictBuffers = async ({
                 if (chunk === null || chunk.byteLength <= 1) {
                     // EOF: deal with part-full buffers
                     if (concatenatedBuffer.length){
+                        header || console.warn('no header for ' + file)
                         const audio = isWavHeaderPresent(header, concatenatedBuffer) 
                             ? concatenatedBuffer: Buffer.concat([header, concatenatedBuffer])
                         predictQueue.push([audio, file, end, chunkStart]);
                         processPredictQueue();
+                    } else {
+                        updateFilesBeingProcessed(file)
                     }
                     DEBUG && console.log('All chunks sent for ', file);
-                    STREAM.destroy();
+                    //STREAM.end();
                     resolve('finished')
                 }
                 else {
                     try {
-                        concatenatedBuffer = concatenatedBuffer.length ? Buffer.concat([concatenatedBuffer, chunk]) : chunk;
+                        concatenatedBuffer = concatenatedBuffer.byteLength ? Buffer.concat([concatenatedBuffer, chunk]) : chunk;
                         header ??= lookForHeader(concatenatedBuffer);
                     } catch (e) {
                         console.log('Detached buffer?', e.message);
@@ -1409,6 +1407,7 @@ const getPredictBuffers = async ({
 }
 
 function lookForHeader(buffer){
+    //if (buffer.length < 4096) return undefined
     try {
         const wav = new wavefileReader.WaveFileReader();
         wav.fromBuffer(buffer);
@@ -1487,11 +1486,9 @@ const fetchAudioBuffer = async ({
             const chunk = stream.read();
             if (chunk === null || chunk.byteLength <= 1) {
                 // Last chunk
-                const audio = isWavHeaderPresent(header, concatenatedBuffer) ? concatenatedBuffer : Buffer.concat([header, concatenatedBuffer]);
+                const audio = concatenatedBuffer;
                 setupCtx(audio, sampleRate, 'UI').then(offlineCtx => {
                     offlineCtx.startRendering().then(resampled => {
-                        stream.end();
-                        stream.destroy();
                         resolve(resampled);
                     }).catch((error) => {
                         console.error(`FetchAudio rendering failed: ${error}`);
@@ -1499,11 +1496,9 @@ const fetchAudioBuffer = async ({
                 }).catch( (error) => {
                     reject(error.message)
                     stream.destroy();
-                });
-                
+                });  
             } else  {
                 // other chunks
-                header ??= lookForHeader(chunk)
                 concatenatedBuffer = concatenatedBuffer.length ?  Buffer.concat([concatenatedBuffer, chunk]) : chunk;
             }
         });

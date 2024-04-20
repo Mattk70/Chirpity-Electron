@@ -368,6 +368,7 @@
                     <div class="pe-3 input-group rounded p-2 mb-1">
                         <label for="colourmap" class="input-group-text col-5">Colourmap:</label>
                         <select class="form-select mb-0" id="colourmap">
+                            <option value="custom">Custom</option>
                             <option value="greys">Greyscale</option>
                             <option value="bone">Bone</option>
                             <option value="turbidity">Turbidity</option>
@@ -375,23 +376,46 @@
                             <option value="viridis">Viridis</option>
                             <option value="cdom">CDom</option>
                             <option value="temperature">Temperature</option>
-                            <!-- <option value="density">Density</option>-->
-                            <!-- <option value="oxygen">Oxygen</option>-->
-                            <!-- <option value="copper">Copper</option>-->
-                            <!-- <option value="earth">Earth</option>-->
+                            <option value="salinity">Salinity</option>
                             <option value="inferno">Inferno</option>
                             <option value="magma">Magma</option>
                             <option value="plasma">Plasma</option>
                             <option value="hot">Hot</option>
-                            <!-- <option value="cubehelix">CubeHelix</option>-->
-                            <!-- <option value="phase">Phase</option>-->
-                            <!-- <option value="YlOrRd">Yellow/red</option>-->
-                            <!-- <option value="picnic">Picnic</option>-->
-                            <!-- <option value="electric">Electric</option>-->
-                            <!-- <option value="bluered">BlueRed</option>-->
                             <option value="blackbody">Blackbody</option>
-                            <!-- <option value="rainbow">Rainbow</option>-->
-                            <!-- <option value="rainbow-soft">Rainbow</option>-->
+                        </select>
+                    </div>
+                    <fieldset class="border border-secondary rounded m-2 mb-0 p-2 w-100 d-none" id="colormap-fieldset">
+                        <div class="mt-2">
+                            <input class="form-input pointer" type="color" id="loud-color" value="#cc00ff">
+                            <label class="form-label pointer" for="loud-color">Peak colour</label><br>
+                            <input class="form-input pointer" type="color" id="mid-color" value="#000000">
+                            <label class="form-label pointer" for="mid-color">Mid colour</label><br>
+                            <input class="form-input pointer" type="color" id="quiet-color" value="#000000">
+                            <label class="form-label pointer" for="quiet-color">Quiet colour</label>
+                        </div>
+                        <label for="color-threshold-slider" class="form-label">
+                            Mid Position:
+                        </label>
+                        <div class="input-group">
+                            <input type="range" class="form-control-range w-75" min="0" max="1" step="0.01" id="color-threshold-slider">
+                            <div class="input-group-append">
+                                <span class="input-group-text" id="color-threshold">0.5</span>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <div class="pe-3 input-group rounded p-2 mb-1">
+                        <label for="window-function" class="input-group-text col-5">Window function:</label>
+                        <select class="form-select mb-0" id="window-function">
+                            <option value="bartlett">Bartlett</option>
+                            <option value="bartlettHann">BartlettHann</option>
+                            <option value="blackman">Blackman</option>
+                            <option value="cosine">Cosine</option>
+                            <option value="gauss">Gauss</option>
+                            <option value="hamming">Hamming</option>
+                            <option value="hann">Hann</option>
+                            <option value="lanczoz">Lanczoz</option>
+                            <option value="rectangular">Rectangular</option>
+                            <option value="triangular">Triangular</option>
                         </select>
                     </div>
                     <div class="pe-3 input-group rounded p-2 mb-1">

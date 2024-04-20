@@ -82,6 +82,28 @@ const SunCalc = window.module.SunCalc;
 const uuidv4 = window.module.uuidv4;
 const os = window.module.os;
 
+function hexToRgb(hex) {
+    // Remove the '#' character if present
+    hex = hex.replace(/^#/, '');
+
+    // Parse the hex string into individual RGB components
+    var r = parseInt(hex.substring(0, 2), 16);
+    var g = parseInt(hex.substring(2, 4), 16);
+    var b = parseInt(hex.substring(4, 6), 16);
+
+    // Return the RGB components as an array
+    return [r, g, b];
+}
+function createColormap(){
+    const map = config.colormap === 'custom' ? [
+        {index: 0, rgb: hexToRgb(config.customColormap.quiet)},
+        {index: config.customColormap.threshold, rgb: hexToRgb(config.customColormap.mid)},
+        {index: 1, rgb: hexToRgb(config.customColormap.loud)}
+    ] : config.colormap;
+    return colormap({ colormap: map, nshades:256, format: 'float' });
+}
+
+
 let worker;
 
 /// Set up communication channel between UI and worker window
@@ -332,7 +354,7 @@ const initWavesurfer = ({
         waveColor: 'rgba(109,41,164,0)',
         progressColor: 'rgba(109,41,16,0)',
         // but keep the playhead
-        cursorColor: '#fff',
+        cursorColor: config.colormap === 'custom' ? config.customColormap.loud : '#fff',
         cursorWidth: 2,
         skipLength: 0.1,
         partialRender: true,
@@ -1210,15 +1232,17 @@ const footerHeight = document.getElementById('footer').offsetHeight;
 const navHeight = document.getElementById('navPadding').offsetHeight;
 function adjustSpecDims(redraw, fftSamples) {
     //Contentwrapper starts below navbar (66px) and ends above footer (30px). Hence - 96
-    DOM.contentWrapperElement.style.height = (bodyElement.clientHeight - footerHeight - navHeight) + 'px';
-    const contentHeight = DOM.contentWrapperElement.offsetHeight;
+    const contentWrapper = document.getElementById('contentWrapper');
+    contentWrapper.style.height = (bodyElement.clientHeight - footerHeight - navHeight) + 'px';
+    const contentHeight = contentWrapper.offsetHeight;
     // + 2 for padding
     const formOffset = document.getElementById('exploreWrapper').offsetHeight;
     let specOffset;
-    if (!DOM.spectrogramWrapper.classList.contains('d-none')) {
+    const spectrogramWrapper = document.getElementById('spectrogramWrapper')
+    if (!spectrogramWrapper.classList.contains('d-none')) {
         // Expand up to 512px unless fullscreen
         const controlsHeight = document.getElementById('controlsWrapper').offsetHeight;
-        const timelineHeight = document.getElementById('timeline').offsetHeight;
+        const timelineHeight = 22 ; //document.getElementById('timeline').offsetHeight; // This is unset when there is no wavesurfer, so hard-coding
         const specHeight = config.fullscreen ? contentHeight - timelineHeight - formOffset - controlsHeight : Math.min(contentHeight * 0.4, 512);
         if (currentFile) {
             // give the wrapper space for the transport controls and element padding/margins
@@ -1239,12 +1263,13 @@ function adjustSpecDims(redraw, fftSamples) {
             document.querySelector('.spec-labels').style.width = '55px';
         }
         if (wavesurfer && redraw) {
-            specOffset = DOM.spectrogramWrapper.offsetHeight;
+            specOffset = spectrogramWrapper.offsetHeight;
         }
             } else {
         specOffset = 0
     }
-    DOM.resultTableElement.style.height = (contentHeight - specOffset - formOffset) + 'px';
+    const resultTableElement = document.getElementById('resultTableContainer');
+    resultTableElement.style.height = (contentHeight - specOffset - formOffset) + 'px';
 }
 
 
@@ -1444,6 +1469,7 @@ window.onload = async () => {
         lastUpdateCheck: 0,
         UUID: uuidv4(),
         colormap: 'inferno',
+        customColormap: {'loud': "#00f5d8", 'mid': "#000000", 'quiet': "#000000", 'threshold': 0.5, 'windowFn': 'hann'},
         timeOfDay: true,
         list: 'birds',
         customListFile: {birdnet: '', chirpity: ''},
@@ -1539,8 +1565,15 @@ window.onload = async () => {
         DOM.timelineSetting.value = config.timeOfDay ? 'timeOfDay' : 'timecode';
         // Spectrogram colour
         DOM.colourmap.value = config.colormap;
-        // Nocmig mode state
-        console.log('nocmig mode is ' + config.detect.nocmig);
+        // Window function & colormap
+        document.getElementById('window-function').value = config.customColormap.windowFn;
+        config.colormap === 'custom' && document.getElementById('colormap-fieldset').classList.remove('d-none');
+        document.getElementById('color-threshold').textContent = config.customColormap.threshold;
+        document.getElementById('loud-color').value = config.customColormap.loud;
+        document.getElementById('mid-color').value = config.customColormap.mid;
+        document.getElementById('quiet-color').value = config.customColormap.quiet;
+        document.getElementById('color-threshold-slider').value = config.customColormap.threshold;
+
         // Audio preferences:
         DOM.gain.value = config.audio.gain;
         DOM.gainAdjustment.textContent = config.audio.gain + 'dB';
@@ -2275,13 +2308,15 @@ function onChartData(args) {
             height = fftSamples / 2
         }
         if (wavesurfer.spectrogram) wavesurfer.destroyPlugin('spectrogram');
+        // set colormap
+        const colors = createColormap() ;
         wavesurfer.addPlugin(WaveSurfer.spectrogram.create({
             //deferInit: false,
             wavesurfer: wavesurfer,
             container: "#spectrogram",
             scrollParent: false,
             fillParent: true,
-            windowFunc: 'hamming',
+            windowFunc: config.customColormap.windowFn,
             frequencyMin: 0,
             frequencyMax: 11_950,
             normalize: false,
@@ -2289,9 +2324,7 @@ function onChartData(args) {
             labels: true,
             height: height,
             fftSamples: fftSamples,
-            colorMap: colormap({
-                colormap: config.colormap, nshades: 256, format: 'float'
-            }),
+            colorMap: colors
         })).initPlugin('spectrogram')
         updateElementCache();
     }
@@ -2597,7 +2630,7 @@ function onChartData(args) {
         },
         Minus: function (e) {
             if (e.shiftKey) {
-                if (wavesurfer.spectrogram.fftSamples <= 2048) {
+                if (wavesurfer.spectrogram.fftSamples <= 4096) {
                     wavesurfer.spectrogram.fftSamples *= 2;
                     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                     postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
@@ -2609,7 +2642,7 @@ function onChartData(args) {
         },
         NumpadSubtract: function (e) {
             if (e.shiftKey) {
-                if (wavesurfer.spectrogram.fftSamples <= 2048) {
+                if (wavesurfer.spectrogram.fftSamples <= 4096) {
                     wavesurfer.spectrogram.fftSamples *= 2;
                     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                     postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
@@ -4042,6 +4075,12 @@ function onChartData(args) {
     SNRSlider.addEventListener('input', () => {
         SNRThreshold.textContent = SNRSlider.value;
     });
+
+    const colorMapThreshhold = document.getElementById('color-threshold');
+    const colorMapSlider = document.getElementById('color-threshold-slider');
+    colorMapSlider.addEventListener('input', () => {
+        colorMapThreshhold.textContent = colorMapSlider.value;
+    });
     
     const handleHPchange = () => {
         config.filters.highPassFrequency = HPSlider.valueAsNumber;
@@ -4360,11 +4399,42 @@ DOM.gain.addEventListener('input', () => {
                 }
                 case 'colourmap': {
                     config.colormap = element.value;
+                    const colorMapFieldset = document.getElementById('colormap-fieldset')
+                    if (config.colormap === 'custom'){
+                        colorMapFieldset.classList.remove('d-none')
+                    } else {
+                        colorMapFieldset.classList.add('d-none')
+                    }
                     if (wavesurfer && currentFile) {
-                        initSpectrogram();
+
                         // refresh caches
                         updateElementCache()
-                        adjustSpecDims(true)
+                        const fftSamples = wavesurfer.spectrogram.fftSamples;
+                        wavesurfer.destroy();
+                        wavesurfer = undefined;
+                        adjustSpecDims(true, fftSamples)
+                    }
+                    break;
+                }
+                case 'window-function':
+                case 'loud-color':
+                case 'mid-color':
+                case 'quiet-color':
+                case 'color-threshold-slider': {
+                    const windowFn = document.getElementById('window-function').value;
+                    const loud = document.getElementById('loud-color').value;
+                    const mid = document.getElementById('mid-color').value;
+                    const quiet = document.getElementById('quiet-color').value;
+                    const threshold = document.getElementById('color-threshold-slider').valueAsNumber;
+                    document.getElementById('color-threshold').textContent = threshold;
+                    config.customColormap = {'loud': loud, 'mid': mid, 'quiet': quiet, 'threshold': threshold, 'windowFn': windowFn};
+                    if (wavesurfer && currentFile) {
+                        // refresh caches
+                        updateElementCache()
+                        const fftSamples = wavesurfer.spectrogram.fftSamples;
+                        wavesurfer.destroy();
+                        wavesurfer = undefined;
+                        adjustSpecDims(true, fftSamples)
                     }
                     break;
                 }
@@ -5201,7 +5271,7 @@ function showCompareSpec() {
         //deferInit: false,
         wavesurfer: ws,
         container: "#" + specContainer,
-        windowFunc: 'hamming',
+        windowFunc: 'hann',
         frequencyMin: 0,
         frequencyMax: 11_950,
         hideScrollbar: false,
