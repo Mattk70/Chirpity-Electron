@@ -1290,6 +1290,7 @@ const getWavePredictBuffers = async ({
 
 function processPredictQueue(){
     const [audio, file, end, chunkStart]  = predictQueue.shift(); // Dequeue chunk
+    audio.length === 0 && console.warn('Shifted zero length audio from predict queue')
     setupCtx(audio, undefined, 'model', file).then(offlineCtx => {
         let worker;
         if (offlineCtx) {
@@ -1327,10 +1328,8 @@ const getPredictBuffers = async ({
     batchChunksToSend[file] = Math.ceil((end - start) / (BATCH_SIZE * WINDOW_SIZE));
     predictionsReceived[file] = 0;
     predictionsRequested[file] = 0;
-    let concatenatedBuffer = Buffer.alloc(0);
     const highWaterMark =  2 * sampleRate * BATCH_SIZE * WINDOW_SIZE; 
     //const STREAM = new PassThrough({ highWaterMark: highWaterMark, end: true});
-    const STREAM = new PassThrough({end: false});
 
     let chunkStart = start * sampleRate;
     return new Promise((resolve, reject) => {
@@ -1338,6 +1337,8 @@ const getPredictBuffers = async ({
             UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`})
             return reject(new Error('getPredictBuffers: Error extracting audio segment: File not found.'));
         }
+        const STREAM = new PassThrough({end: false});
+        let concatenatedBuffer = Buffer.alloc(0);
         const command = ffmpeg(file)
             .seekInput(start)
             .duration(end - start)
@@ -1358,20 +1359,19 @@ const getPredictBuffers = async ({
         command.on('start', function (commandLine) {
             DEBUG && console.log('FFmpeg command: ' + commandLine);
         })
-        if (DEBUG){
-            command.on('end', function(err, stdout, stderr) {
+        command.on('end', function(err, stdout, stderr) {
                 console.log('Finished processing', file, err, stdout, stderr);
-            })
-        }
+        })
+
         STREAM.on('readable', () => {           
             if (aborted) {
                 STREAM.destroy();
                 return
             }
-            checkBacklog(STREAM).then(chunk => {
+            const chunk = STREAM.read();
                 if (chunk === null || chunk.byteLength <= 1) {
                     // EOF: deal with part-full buffers
-                    if (concatenatedBuffer.length){
+                    if (concatenatedBuffer.byteLength){
                         header || console.warn('no header for ' + file)
                         const audio = isWavHeaderPresent(header, concatenatedBuffer) 
                             ? concatenatedBuffer: Buffer.concat([header, concatenatedBuffer])
@@ -1396,12 +1396,13 @@ const getPredictBuffers = async ({
                         const chunk = concatenatedBuffer.subarray(0, highWaterMark);
                         concatenatedBuffer = concatenatedBuffer.subarray(highWaterMark);
                         const audio = isWavHeaderPresent(header, chunk) ? chunk: Buffer.concat([header, chunk])
+                        audio.length === 0 && console.warn('Pushing zero length audio to predict queue')
                         predictQueue.push([audio, file, end, chunkStart]);
                         chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate
                         processPredictQueue();
                     }
                 }
-            });
+
         });
         STREAM.on('error', err => {
             console.log('stream error: ', err);
@@ -3295,7 +3296,7 @@ async function getIncludedIDs(file){
             const list = await setIncludedIDs(lat,lon,week)
             hitOrMiss = 'miss';
         } 
-        DEBUG && console.log(`Cache ${hitOrMiss}: setting the ${STATE.list} list took ${Date.now() -t0}ms`)
+        //DEBUG && console.log(`Cache ${hitOrMiss}: setting the ${STATE.list} list took ${Date.now() -t0}ms`)
         return STATE.included[STATE.model][STATE.list][week][location];
         
     } else {
