@@ -101,7 +101,7 @@ let workerInstance = 0;
 // let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let TEMP, appPath, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let LIST_WORKER;
-const DEBUG = false;
+const DEBUG = true;
 
 const DATASET = false;
 const adding_chirpity_additions = true;
@@ -1346,18 +1346,23 @@ const getPredictBuffers = async ({
             .audioFrequency(sampleRate) // Set sample rate 
             .writeToStream(STREAM)
 
-        command.on('error', error => {
+        command.on('error', (error, stdout, stderr) => {
             updateFilesBeingProcessed(file)
             if (error.message.includes('SIGKILL')) console.log('FFMPEG process shut down at user request')
             else {
                 error.message = error.message + '|' + error.stack;
             }
+            console.log('Ffmpeg error in file:\n', file, 'stderr:\n', stderr)
             reject(console.warn('getPredictBuffers: Error in ffmpeg extracting audio segment:', error.message));
         });
         command.on('start', function (commandLine) {
             DEBUG && console.log('FFmpeg command: ' + commandLine);
         })
-
+        if (DEBUG){
+            command.on('end', function(err, stdout, stderr) {
+                console.log('Finished processing', file, err, stdout, stderr);
+            })
+        }
         STREAM.on('readable', () => {           
             if (aborted) {
                 STREAM.destroy();
