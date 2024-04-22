@@ -1296,9 +1296,9 @@ function formatRegionTooltip(start, end) {
     const length = end - start;
     if (length === 3) {
         return `${formatTimeCallback(start)} -  ${formatTimeCallback(end)}`;
-    } else if (length < 1) return `Region length: ${(length * 1000).toFixed(0)} ms`
+    } else if (length < 1) return `Region length: ${(length * 1000).toFixed(0)}ms`
     else {
-        return `Region length: ${length.toFixed(3)} seconds`
+        return `Region length: ${length.toFixed(3)}s`
     }
 }
 
