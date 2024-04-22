@@ -72,7 +72,7 @@ const STATE = {
 }
 
 // Batch size map for slider
-const BATCH_SIZE_LIST = [4, 8, 16, 32, 48, 64, 128];
+const BATCH_SIZE_LIST = [16, 32, 48, 64, 128];
 
 // Get the modules loaded in preload.js
 const fs = window.module.fs;
@@ -205,6 +205,7 @@ const DOM = {
      progressBar: document.getElementById('progress-bar'),
      resultTableElement: document.getElementById('resultTableContainer'),
      spectrogramWrapper: document.getElementById('spectrogramWrapper'),
+     spectrogram: document.getElementById('spectrogram'),
      summaryTable: document.getElementById('summaryTable'),
      resultHeader: document.getElementById('resultsHead'),
      threadSlider: document.getElementById('thread-slider'),
@@ -2283,7 +2284,7 @@ function onChartData(args) {
     function initRegion() {
         if (wavesurfer.regions) wavesurfer.destroyPlugin('regions');
         wavesurfer.addPlugin(WaveSurfer.regions.create({
-            formatTimeCallback: formatRegionTooltip,
+            formatTimeCallback: () => '',
             dragSelection: true,
             // Region length bug (likely mine) means I don't trust leangths > 60 seconds
             maxLength: config[config.backend].batchSize * 3,
@@ -2327,6 +2328,25 @@ function onChartData(args) {
             colorMap: colors
         })).initPlugin('spectrogram')
         updateElementCache();
+
+        const tooltip = document.createElement('div');
+        tooltip.id = 'tooltip';
+        document.body.appendChild(tooltip);
+    
+        // Show tooltip on mousemove event
+        waveElement.addEventListener('mousemove', function (event) {
+            const yPosition = Math.round((waveElement.getBoundingClientRect().bottom - event.clientY) * (11950 / waveElement.getBoundingClientRect().height));
+            tooltip.innerHTML = `Frequency: ${yPosition}Hz`;
+            if (region) tooltip.innerHTML += "<br>" + formatRegionTooltip(region.start, region.end)
+            tooltip.style.top = `${event.clientY}px`;
+            tooltip.style.left = `${event.clientX + 15}px`; // Adjust tooltip position
+            tooltip.style.display = 'block';
+        });
+    
+        // Hide tooltip on mouseout event
+        waveElement.addEventListener('mouseout', function () {
+            tooltip.style.display = 'none';
+        });
     }
     
     const LIST_MAP = {

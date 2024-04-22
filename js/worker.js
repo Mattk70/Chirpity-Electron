@@ -2196,7 +2196,7 @@ async function parseMessage(e) {
             if ( !aborted) {
                 predictWorkers[response.worker].isAvailable = true;
                 let worker = await parsePredictions(response).catch( (error) =>  console.log('Error parsing predictions', error));
-                DEBUG && console.log('predictions left for', response.file, predictionsReceived[response.file] - batchChunksToSend[response.file])
+                DEBUG && console.log('predictions left for', response.file, batchChunksToSend[response.file - predictionsReceived[response.file]])
                 const remaining = predictionsReceived[response.file] - batchChunksToSend[response.file]
                 if (remaining === 0) {
                     if (filesBeingProcessed.length) {

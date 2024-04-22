@@ -382,7 +382,15 @@ footer {
 
 }
 
-
+#tooltip {
+    position: absolute;
+    background-color: #000;
+    color: #fff;
+    padding: 5px;
+    border-radius: 5px;
+    z-index: 3;
+    display: none;
+}
 /* ============ desktop view .end// ============ */
 
 /* ============ small devices ============ */
