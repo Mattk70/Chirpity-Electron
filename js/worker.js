@@ -101,7 +101,7 @@ let workerInstance = 0;
 // let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let TEMP, appPath, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let LIST_WORKER;
-const DEBUG = true;
+const DEBUG = false;
 
 const DATASET = false;
 const adding_chirpity_additions = true;
