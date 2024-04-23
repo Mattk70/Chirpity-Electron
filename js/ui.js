@@ -2328,6 +2328,9 @@ function onChartData(args) {
             colorMap: colors
         })).initPlugin('spectrogram')
         updateElementCache();
+        // remove the tooltip
+        const oldTip = document.getElementById('tooltip')
+        oldTip && oldTip.parentNode.removeChild(oldTip);
 
         const tooltip = document.createElement('div');
         tooltip.id = 'tooltip';
@@ -2335,7 +2338,7 @@ function onChartData(args) {
     
         // Show tooltip on mousemove event
         waveElement.addEventListener('mousemove', function (event) {
-            const yPosition = Math.round((waveElement.getBoundingClientRect().bottom - event.clientY) * (11950 / waveElement.getBoundingClientRect().height));
+            const yPosition = Math.round(((waveElement.getBoundingClientRect().bottom - event.clientY) * (11950 / waveElement.getBoundingClientRect().height))/10) * 10;
             tooltip.innerHTML = `Frequency: ${yPosition}Hz`;
             if (region) tooltip.innerHTML += "<br>" + formatRegionTooltip(region.start, region.end)
             tooltip.style.top = `${event.clientY}px`;

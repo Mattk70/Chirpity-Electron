@@ -384,7 +384,7 @@ footer {
 
 #tooltip {
     position: absolute;
-    background-color: #000;
+    background-color: rgba(0,0,0,0.5);
     font-size: small;
     color: #fff;
     padding: 5px;
