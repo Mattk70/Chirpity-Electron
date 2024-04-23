@@ -2095,13 +2095,13 @@ const generateInsertQuery = async (latestResult, file) => {
     await db.runAsync('END');
     return fileID
 }
-                        
+
 const parsePredictions = async (response) => {
     let file = response.file;
     const included = await getIncludedIDs(file).catch( (error) => console.log('Error getting included IDs', error));
     const latestResult = response.result, db = STATE.db;
     DEBUG && console.log('worker being used:', response.worker);
-    if (! STATE.selection) await generateInsertQuery(latestResult, file).catch( (error) => console.log('Error generating insert query', error));
+    if (! STATE.selection) await generateInsertQuery(latestResult, file).catch( (error) => console.warn('Error generating insert query', error));
     let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
     for (let i = 0; i < keysArray.length; i++) {
         let updateUI = false;
@@ -2127,7 +2127,7 @@ const parsePredictions = async (response) => {
                     confidenceRequired = STATE.detect.confidence;
                 }
                 if (confidence >= confidenceRequired) {
-                    const { cname, sname } = await memoryDB.getAsync(`SELECT cname, sname FROM species WHERE id = ${speciesID}`).catch( (error) => console.log('Error getting species name', error));
+                    const { cname, sname } = await memoryDB.getAsync(`SELECT cname, sname FROM species WHERE id = ${speciesID}`).catch( (error) => console.warn('Error getting species name', error));
                     const result = {
                         timestamp: timestamp,
                         position: key,

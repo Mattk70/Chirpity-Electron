@@ -53,6 +53,9 @@ onmessage = async (e) => {
                     myModel.lon = parseFloat(e.data.lon);
                     myModel.week = parseInt(e.data.week);
                     myModel.speciesThreshold = parseFloat(e.data.threshold);
+                    // Create a mask tensor where the specified indexes are set to 0 and others to 1
+                    const indexesToZero = [25, 30, 110, 319, 378, 403, 404, 405, 406];
+                    myModel.mask = tf.tensor2d(Array.from({ length: 408 }, (_, i) => indexesToZero.includes(i) ? 0 : 1), [1, 408]);
                     myModel.labels = labels;
                     await myModel.loadModel();
                     myModel.warmUp(batch);
@@ -290,15 +293,16 @@ class Model {
         if (paddedTensorBatch) paddedTensorBatch.dispose();
         if (maskedTensorBatch) maskedTensorBatch.dispose();
 
-        const finalPrediction = newPrediction || prediction;
+        const finalRawPrediction = newPrediction || prediction;
+        const finalPrediction = finalRawPrediction.mul(this.mask);
+        finalRawPrediction.dispose();
         const { indices, values } = tf.topk(finalPrediction, 5, true)
-
+            
         const [topIndices, topValues] = await Promise.all([indices.array(), values.array()]).catch(err => console.log('Data transfer error:',err));
         indices.dispose();
         values.dispose();
-
         finalPrediction.dispose();
-        if (newPrediction) newPrediction.dispose();
+        newPrediction &&  newPrediction.dispose();
         keys = keys.map(key => (key / CONFIG.sampleRate).toFixed(3));
         return [keys, topIndices, topValues];
     }

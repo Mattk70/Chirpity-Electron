@@ -1261,7 +1261,7 @@ function adjustSpecDims(redraw, fftSamples) {
             initSpectrogram(specHeight, fftSamples);
             specCanvasElement.style.width = '100%';
             specElement.style.zIndex = 0;
-            document.querySelector('.spec-labels').style.width = '55px';
+            //document.querySelector('.spec-labels').style.width = '55px';
         }
         if (wavesurfer && redraw) {
             specOffset = spectrogramWrapper.offsetHeight;
@@ -2322,9 +2322,9 @@ function onChartData(args) {
             frequencyMax: 11_950,
             normalize: false,
             hideScrollbar: true,
-            labels: true,
+            labels: false,
             height: height,
-            fftSamples: fftSamples,
+            fftSamples: fftSamples, 
             colorMap: colors
         })).initPlugin('spectrogram')
         updateElementCache();
@@ -5289,7 +5289,8 @@ function showCompareSpec() {
         height: 250,
         minPxPerSec: 195
     });
-    
+    // set colormap
+    const colors = createColormap() ;
     ws.addPlugin(WaveSurfer.spectrogram.create({
         //deferInit: false,
         wavesurfer: ws,
@@ -5301,9 +5302,7 @@ function showCompareSpec() {
         labels: true,
         fftSamples: 512,
         height: 250,
-        colorMap: colormap({
-            colormap: config.colormap, nshades: 256, format: 'float'
-        }),
+        colorMap: colors
     })).initPlugin('spectrogram')
 
 
