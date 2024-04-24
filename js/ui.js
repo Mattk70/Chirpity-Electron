@@ -2335,17 +2335,20 @@ function onChartData(args) {
         const tooltip = document.createElement('div');
         tooltip.id = 'tooltip';
         document.body.appendChild(tooltip);
+        waveElement.removeEventListener('mousemove', specTooltip);
+        waveElement.removeEventListener('mouseout', hideTooltip)
     
         //const toolTipListener = debounce(specTooltip, 10)
         // Show tooltip on mousemove event
         waveElement.addEventListener('mousemove', specTooltip);
     
         // Hide tooltip on mouseout event
-        waveElement.addEventListener('mouseout', function () {
-            tooltip.style.display = 'none';
-        });
+        waveElement.addEventListener('mouseout', hideTooltip)
     }
     
+    function hideTooltip() {
+        tooltip.style.display = 'none';
+    };
     function specTooltip(event) {
         const yPosition = Math.round(((waveElement.getBoundingClientRect().bottom - event.clientY) * (11950 / waveElement.getBoundingClientRect().height))/10) * 10;
         tooltip.innerHTML = `Frequency: ${yPosition}Hz`;
