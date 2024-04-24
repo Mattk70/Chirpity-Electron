@@ -1359,9 +1359,6 @@ const getPredictBuffers = async ({
         command.on('start', function (commandLine) {
             DEBUG && console.log('FFmpeg command: ' + commandLine);
         })
-        command.on('end', function(err, stdout, stderr) {
-                console.log('Finished processing', file, err, stdout, stderr);
-        })
 
         STREAM.on('readable', () => {           
             if (aborted) {
