@@ -2336,15 +2336,9 @@ function onChartData(args) {
         tooltip.id = 'tooltip';
         document.body.appendChild(tooltip);
     
+        //const toolTipListener = debounce(specTooltip, 10)
         // Show tooltip on mousemove event
-        waveElement.addEventListener('mousemove', function (event) {
-            const yPosition = Math.round(((waveElement.getBoundingClientRect().bottom - event.clientY) * (11950 / waveElement.getBoundingClientRect().height))/10) * 10;
-            tooltip.innerHTML = `Frequency: ${yPosition}Hz`;
-            if (region) tooltip.innerHTML += "<br>" + formatRegionTooltip(region.start, region.end)
-            tooltip.style.top = `${event.clientY}px`;
-            tooltip.style.left = `${event.clientX + 15}px`; // Adjust tooltip position
-            tooltip.style.display = 'block';
-        });
+        waveElement.addEventListener('mousemove', specTooltip);
     
         // Hide tooltip on mouseout event
         waveElement.addEventListener('mouseout', function () {
@@ -2352,6 +2346,16 @@ function onChartData(args) {
         });
     }
     
+    function specTooltip(event) {
+        const yPosition = Math.round(((waveElement.getBoundingClientRect().bottom - event.clientY) * (11950 / waveElement.getBoundingClientRect().height))/10) * 10;
+        tooltip.innerHTML = `Frequency: ${yPosition}Hz`;
+        if (region) tooltip.innerHTML += "<br>" + formatRegionTooltip(region.start, region.end)
+        tooltip.style.top = `${event.clientY}px`;
+        tooltip.style.left = `${event.clientX + 15}px`; // Adjust tooltip position
+        tooltip.style.display = 'block';
+    }
+
+
     const LIST_MAP = {
         location: 'Searching for birds in your region',
         nocturnal: 'Searching for nocturnal birds',
