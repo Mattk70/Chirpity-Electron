@@ -1,3 +1,4 @@
+
 const { ipcRenderer } = require('electron');
 const fs = require('node:fs');
 const p = require('node:path');
@@ -1329,7 +1330,7 @@ const getPredictBuffers = async ({
     predictionsReceived[file] = 0;
     predictionsRequested[file] = 0;
     const highWaterMark =  2 * sampleRate * BATCH_SIZE * WINDOW_SIZE; 
-    //const STREAM = new PassThrough({ highWaterMark: highWaterMark, end: true});
+
 
     let chunkStart = start * sampleRate;
     return new Promise((resolve, reject) => {
@@ -1337,7 +1338,6 @@ const getPredictBuffers = async ({
             UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`})
             return reject(new Error('getPredictBuffers: Error extracting audio segment: File not found.'));
         }
-        const STREAM = new PassThrough({end: false});
         let concatenatedBuffer = Buffer.alloc(0);
         const command = ffmpeg(file)
             .seekInput(start)
@@ -1345,7 +1345,6 @@ const getPredictBuffers = async ({
             .format('wav')
             .audioChannels(1) // Set to mono
             .audioFrequency(sampleRate) // Set sample rate 
-            .writeToStream(STREAM)
 
         command.on('error', (error, stdout, stderr) => {
             updateFilesBeingProcessed(file)
@@ -1354,18 +1353,19 @@ const getPredictBuffers = async ({
                 error.message = error.message + '|' + error.stack;
             }
             console.log('Ffmpeg error in file:\n', file, 'stderr:\n', stderr)
-            reject(console.warn('getPredictBuffers: Error in ffmpeg extracting audio segment:', error.message));
+            reject(console.warn('getPredictBuffers: Error in ffmpeg extracting audio segment:', error));
         });
         command.on('start', function (commandLine) {
             DEBUG && console.log('FFmpeg command: ' + commandLine);
         })
 
+        const STREAM = command.pipe();
         STREAM.on('readable', () => {           
             if (aborted) {
                 STREAM.destroy();
                 return
             }
-            const chunk = STREAM.read();
+            checkBacklog(STREAM).then(chunk => {
                 if (chunk === null || chunk.byteLength <= 1) {
                     // EOF: deal with part-full buffers
                     if (concatenatedBuffer.byteLength){
@@ -1399,6 +1399,7 @@ const getPredictBuffers = async ({
                         processPredictQueue();
                     }
                 }
+            }).catch(err => console.warn('Error in checkBacklog: ', err))
 
         });
 
@@ -1436,8 +1437,7 @@ function lookForHeader(buffer){
 const fetchAudioBuffer = async ({
     file = '', start = 0, end = metadata[file].duration
 }) => {
-    //if (end - start < 0.1) return  // prevents dataset creation barfing with  v. short buffer
-    const stream = new PassThrough({end: false});
+
     let concatenatedBuffer = Buffer.alloc(0);
     let header;
     // Ensure start is a minimum 0.1 seconds from the end of the file, and >= 0
@@ -1445,7 +1445,8 @@ const fetchAudioBuffer = async ({
     // Use ffmpeg to extract the specified audio segment
     return new Promise((resolve, reject) => {
         if (! fs.existsSync(file)) {
-            UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`})
+            const missingFile = STATE.mode === 'archive' ? file : undefined;
+            UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`, file: missingFile})
             return reject(new Error('fetchAudioBuffer: Error extracting audio segment: File not found.'));
         }
         let command = ffmpeg(file)
@@ -1476,10 +1477,10 @@ const fetchAudioBuffer = async ({
                     }
                 )
             }
-            command.writeToStream(stream);
+        const stream = command.pipe();
         
         command.on('error', error => {
-            UI.postMessage({event: 'generate-alert', message: error.message})
+            UI.postMessage({event: 'generate-alert', message: error})
             reject(new Error('fetchAudioBuffer: Error extracting audio segment:', error));
         });
         command.on('start', function (commandLine) {
@@ -3152,7 +3153,7 @@ async function onChartRequest(args) {
 const onFileDelete = async (fileName) => {
     const result = await diskDB.runAsync('DELETE FROM files WHERE name = ?', fileName);
     if (result.changes) {
-        await onChangeMode('analyse');
+        //await onChangeMode('analyse');
         getDetectedSpecies();
         UI.postMessage({
             event: 'generate-alert',

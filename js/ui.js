@@ -1691,6 +1691,7 @@ window.onload = async () => {
 }
 
 
+let MISSING_FILE;
 
 const setUpWorkerMessaging = () => {
     establishMessageChannel.then(() => {
@@ -1732,8 +1733,9 @@ const setUpWorkerMessaging = () => {
                         window.electron.unsavedRecords(false);
                         document.getElementById("unsaved-icon").classList.add("d-none");
                     }
-                    if (args.missingFile){
-                        console.log('missing file');
+                    if (args.file){
+                        MISSING_FILE = args.file;
+                        args.message += `<p><b>Would you like to <a href="#" id="purge-from-toast">remove this file from the archive</b></p>`
                     }
                     generateToast({ message: args.message});
                 break;
@@ -4207,6 +4209,9 @@ DOM.gain.addEventListener('input', () => {
             case 'analyseAll': {postAnalyseMessage({ filesInScope: fileList }); break }
             case 'reanalyse': {postAnalyseMessage({ filesInScope: [currentFile], reanalyse: true }); break }
             case 'reanalyseAll': {postAnalyseMessage({ filesInScope: fileList, reanalyse: true }); break }
+            
+            case 'purge-from-toast': { deleteFile(MISSING_FILE); break }
+            case 'purge-file': { deleteFile(currentFile); break }
 
             case 'keyboardHelp': { (async () => await populateHelpModal('Help/keyboard.html', 'Keyboard shortcuts'))(); break }
             case 'settingsHelp': { (async () => await populateHelpModal('Help/settings.html', 'Settings Help'))(); break }
@@ -4292,7 +4297,6 @@ DOM.gain.addEventListener('input', () => {
             const target = element.id;
             config.debug && console.log('Change target:', target)
             switch (target) {
-                
                 case 'species-frequency-threshold' : {
                     if (isNaN(element.value) || element.value === '') {
                         generateToast({ message:'The threshold must be a number between 0.001 and 1'});
@@ -4763,11 +4767,7 @@ function setListUIState(list){
         })
         resetResults({clearPagination: false})
     }
-    
-    
-    const purgeFile = document.getElementById('purge-file');
-    purgeFile.addEventListener('click', deleteFile)
-    
+        
     function deleteFile(file) {
         // EventHandler caller 
         if (typeof file === 'object' && file instanceof Event) {
