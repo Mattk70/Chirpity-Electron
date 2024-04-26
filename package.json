@@ -1,6 +1,6 @@
 {
   "name": "chirpity",
-  "version": "1.8.1",
+  "version": "1.9.0",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
@@ -125,17 +125,17 @@
       ]
     },
     "nsis": {
-      "deleteAppDataOnUninstall": true,
+      "oneClick": true,
       "perMachine": true
     },
     "win": {
       "publish": [
         "github"
       ],
+      "target": ["nsis", "portable"],
       "verifyUpdateCodeSignature": false,
       "asar": true,
       "icon": "./img/icon/icon.png"
-
     }
   },
   "keywords": [

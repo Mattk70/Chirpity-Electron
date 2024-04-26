@@ -420,6 +420,22 @@ const initWavesurfer = ({
     updateElementCache();
     // Resize canvas of spec and labels
     adjustSpecDims(false);
+    // remove the tooltip
+    const oldTip = document.getElementById('tooltip')
+    oldTip && oldTip.parentNode.removeChild(oldTip);
+
+    const tooltip = document.createElement('div');
+    tooltip.id = 'tooltip';
+    document.body.appendChild(tooltip);
+    waveElement.removeEventListener('mousemove', specTooltip);
+    waveElement.removeEventListener('mouseout', hideTooltip)
+
+    //const toolTipListener = debounce(specTooltip, 10)
+    // Show tooltip on mousemove event
+    waveElement.addEventListener('mousemove', specTooltip);
+
+    // Hide tooltip on mouseout event
+    waveElement.addEventListener('mouseout', hideTooltip)
 }
 
 function updateElementCache() {
@@ -1677,6 +1693,7 @@ window.onload = async () => {
 }
 
 
+let MISSING_FILE;
 
 const setUpWorkerMessaging = () => {
     establishMessageChannel.then(() => {
@@ -1718,8 +1735,9 @@ const setUpWorkerMessaging = () => {
                         window.electron.unsavedRecords(false);
                         document.getElementById("unsaved-icon").classList.add("d-none");
                     }
-                    if (args.missingFile){
-                        console.log('missing file');
+                    if (args.file){
+                        MISSING_FILE = args.file;
+                        args.message += `<p><b>Would you like to <a href="#" id="purge-from-toast">remove this file from the archive</b></p>`
                     }
                     generateToast({ message: args.message});
                 break;
@@ -2330,22 +2348,6 @@ function onChartData(args) {
             colorMap: colors
         })).initPlugin('spectrogram')
         updateElementCache();
-        // remove the tooltip
-        const oldTip = document.getElementById('tooltip')
-        oldTip && oldTip.parentNode.removeChild(oldTip);
-
-        const tooltip = document.createElement('div');
-        tooltip.id = 'tooltip';
-        document.body.appendChild(tooltip);
-        waveElement.removeEventListener('mousemove', specTooltip);
-        waveElement.removeEventListener('mouseout', hideTooltip)
-    
-        //const toolTipListener = debounce(specTooltip, 10)
-        // Show tooltip on mousemove event
-        waveElement.addEventListener('mousemove', specTooltip);
-    
-        // Hide tooltip on mouseout event
-        waveElement.addEventListener('mouseout', hideTooltip)
     }
     
     function hideTooltip() {
@@ -4209,11 +4211,14 @@ DOM.gain.addEventListener('input', () => {
             case 'analyseAll': {postAnalyseMessage({ filesInScope: fileList }); break }
             case 'reanalyse': {postAnalyseMessage({ filesInScope: [currentFile], reanalyse: true }); break }
             case 'reanalyseAll': {postAnalyseMessage({ filesInScope: fileList, reanalyse: true }); break }
+            
+            case 'purge-from-toast': { deleteFile(MISSING_FILE); break }
+            case 'purge-file': { deleteFile(currentFile); break }
 
             case 'keyboardHelp': { (async () => await populateHelpModal('Help/keyboard.html', 'Keyboard shortcuts'))(); break }
             case 'settingsHelp': { (async () => await populateHelpModal('Help/settings.html', 'Settings Help'))(); break }
             case 'usage': { (async () => await populateHelpModal('Help/usage.html', 'Usage Guide'))(); break }
-            case 'bugs': { (async () => await populateHelpModal('Help/bugs.html', 'Issues, queries or bugs'))(); break }
+            case 'bugs': { (async () => await populateHelpModal('Help/bugs.html', 'Join the Chirpity Users community'))(); break }
             case 'species': { worker.postMessage({action: 'get-valid-species', file: currentFile}); break }
             case 'startTour': { prepTour(); break }
             case 'eBird': { (async () => await populateHelpModal('Help/ebird.html', 'eBird Record FAQ'))(); break }
@@ -4294,7 +4299,6 @@ DOM.gain.addEventListener('input', () => {
             const target = element.id;
             config.debug && console.log('Change target:', target)
             switch (target) {
-                
                 case 'species-frequency-threshold' : {
                     if (isNaN(element.value) || element.value === '') {
                         generateToast({ message:'The threshold must be a number between 0.001 and 1'});
@@ -4765,11 +4769,7 @@ function setListUIState(list){
         })
         resetResults({clearPagination: false})
     }
-    
-    
-    const purgeFile = document.getElementById('purge-file');
-    purgeFile.addEventListener('click', deleteFile)
-    
+        
     function deleteFile(file) {
         // EventHandler caller 
         if (typeof file === 'object' && file instanceof Event) {
