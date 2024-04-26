@@ -420,6 +420,22 @@ const initWavesurfer = ({
     updateElementCache();
     // Resize canvas of spec and labels
     adjustSpecDims(false);
+    // remove the tooltip
+    const oldTip = document.getElementById('tooltip')
+    oldTip && oldTip.parentNode.removeChild(oldTip);
+
+    const tooltip = document.createElement('div');
+    tooltip.id = 'tooltip';
+    document.body.appendChild(tooltip);
+    waveElement.removeEventListener('mousemove', specTooltip);
+    waveElement.removeEventListener('mouseout', hideTooltip)
+
+    //const toolTipListener = debounce(specTooltip, 10)
+    // Show tooltip on mousemove event
+    waveElement.addEventListener('mousemove', specTooltip);
+
+    // Hide tooltip on mouseout event
+    waveElement.addEventListener('mouseout', hideTooltip)
 }
 
 function updateElementCache() {
@@ -2328,22 +2344,6 @@ function onChartData(args) {
             colorMap: colors
         })).initPlugin('spectrogram')
         updateElementCache();
-        // remove the tooltip
-        const oldTip = document.getElementById('tooltip')
-        oldTip && oldTip.parentNode.removeChild(oldTip);
-
-        const tooltip = document.createElement('div');
-        tooltip.id = 'tooltip';
-        document.body.appendChild(tooltip);
-        waveElement.removeEventListener('mousemove', specTooltip);
-        waveElement.removeEventListener('mouseout', hideTooltip)
-    
-        //const toolTipListener = debounce(specTooltip, 10)
-        // Show tooltip on mousemove event
-        waveElement.addEventListener('mousemove', specTooltip);
-    
-        // Hide tooltip on mouseout event
-        waveElement.addEventListener('mouseout', hideTooltip)
     }
     
     function hideTooltip() {
@@ -4211,7 +4211,7 @@ DOM.gain.addEventListener('input', () => {
             case 'keyboardHelp': { (async () => await populateHelpModal('Help/keyboard.html', 'Keyboard shortcuts'))(); break }
             case 'settingsHelp': { (async () => await populateHelpModal('Help/settings.html', 'Settings Help'))(); break }
             case 'usage': { (async () => await populateHelpModal('Help/usage.html', 'Usage Guide'))(); break }
-            case 'bugs': { (async () => await populateHelpModal('Help/bugs.html', 'Issues, queries or bugs'))(); break }
+            case 'bugs': { (async () => await populateHelpModal('Help/bugs.html', 'Join the Chirpity Users community'))(); break }
             case 'species': { worker.postMessage({action: 'get-valid-species', file: currentFile}); break }
             case 'startTour': { prepTour(); break }
             case 'eBird': { (async () => await populateHelpModal('Help/ebird.html', 'eBird Record FAQ'))(); break }

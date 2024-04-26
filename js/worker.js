@@ -1123,7 +1123,7 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
             metadata[file].fileStart = fileStart;
             return resolve(metadata[file]);
         }
-    }).catch(error => console.warn(error.message))
+    }).catch(error => console.warn(error))
 }
             
 function setupCtx(audio, rate, destination, file) {
@@ -1401,6 +1401,7 @@ const getPredictBuffers = async ({
                 }
 
         });
+
         STREAM.on('error', err => {
             console.log('stream error: ', err);
             err.code === 'ENOENT' && notifyMissingFile(file);
@@ -2238,11 +2239,11 @@ async function processNextFile({
 } = {}) { 
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
-        const found = await getWorkingFile(file).catch( (error) => console.warn('Error in getWorkingFile', error.message));
+        const found = await getWorkingFile(file).catch( (error) => console.warn('Error in getWorkingFile', error));
         if (found) {
             if (end) {}
             let boundaries = [];
-            if (!start) boundaries = await setStartEnd(file).catch( (error) => console.warn('Error in setStartEnd', error.message));
+            if (!start) boundaries = await setStartEnd(file).catch( (error) => console.warn('Error in setStartEnd', error));
             else boundaries.push({ start: start, end: end });
             for (let i = 0; i < boundaries.length; i++) {
                 const { start, end } = boundaries[i];
@@ -2257,7 +2258,7 @@ async function processNextFile({
                     });
                     
                     DEBUG && console.log('Recursion: start = end')
-                    await processNextFile(arguments[0]).catch( (error) => console.warn('Error in processNextFile call', error.message));
+                    await processNextFile(arguments[0]).catch( (error) => console.warn('Error in processNextFile call', error));
                     
                 } else {
                     if (!sumObjectValues(predictionsReceived)) {
@@ -2274,7 +2275,7 @@ async function processNextFile({
             }
         } else {
             DEBUG && console.log('Recursion: file not found')
-            await processNextFile(arguments[0]).catch( (error) => console.warn('Error in recursive processNextFile call', error.message));
+            await processNextFile(arguments[0]).catch( (error) => console.warn('Error in recursive processNextFile call', error));
         }
     }
 }
