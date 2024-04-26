@@ -901,10 +901,7 @@ async function onAnalyse({
     
     filesBeingProcessed = [...FILE_QUEUE];
     
-    // for (let i = 0; i < filesBeingProcessed.length; i++) {
-    for (let i = 0; i < NUM_WORKERS; i++) {
-        processNextFile({ start: start, end: end, worker: i });
-    }
+    processNextFile({ start: start, end: end, worker: 0 });
 }
 
 function onAbort({
@@ -1185,7 +1182,7 @@ function checkBacklog(stream) {
         const backlog = sumObjectValues(predictionsRequested) - sumObjectValues(predictionsReceived);
         DEBUG && console.log('backlog:', backlog);
         
-        if (backlog > 200) {
+        if (backlog > 50) {
             // If queued value is above 100, wait and check again
             setTimeout(() => {
                 checkBacklog(stream)
@@ -1289,8 +1286,9 @@ const getWavePredictBuffers = async ({
     })    
 }
 
-function processPredictQueue(){
-    const [audio, file, end, chunkStart]  = predictQueue.shift(); // Dequeue chunk
+function processPredictQueue(audio, file, end, chunkStart){
+
+    if (! audio) [audio, file, end, chunkStart]  = predictQueue.shift(); // Dequeue chunk
     audio.length === 0 && console.warn('Shifted zero length audio from predict queue')
     setupCtx(audio, undefined, 'model', file).then(offlineCtx => {
         let worker;
@@ -1352,7 +1350,7 @@ const getPredictBuffers = async ({
             else {
                 error.message = error.message + '|' + error.stack;
             }
-            console.log('Ffmpeg error in file:\n', file, 'stderr:\n', stderr)
+            console.log('Ffmpeg error in file:\n', file, 'stderr:\n', error)
             reject(console.warn('getPredictBuffers: Error in ffmpeg extracting audio segment:', error));
         });
         command.on('start', function (commandLine) {
@@ -1362,45 +1360,43 @@ const getPredictBuffers = async ({
         const STREAM = command.pipe();
         STREAM.on('readable', () => {           
             if (aborted) {
-                STREAM.destroy();
+                STREAM.end();
                 return
             }
-            checkBacklog(STREAM).then(chunk => {
-                if (chunk === null || chunk.byteLength <= 1) {
-                    // EOF: deal with part-full buffers
-                    if (concatenatedBuffer.byteLength){
-                        header || console.warn('no header for ' + file)
-                        const audio = isWavHeaderPresent(header, concatenatedBuffer) 
-                            ? concatenatedBuffer: Buffer.concat([header, concatenatedBuffer])
-                        predictQueue.push([audio, file, end, chunkStart]);
-                        processPredictQueue();
-                    } else {
-                        updateFilesBeingProcessed(file)
-                    }
-                    DEBUG && console.log('All chunks sent for ', file);
-                    //STREAM.end();
-                    resolve('finished')
+            const chunk = STREAM.read();
+            if (chunk === null || chunk.byteLength <= 1) {
+                // EOF: deal with part-full buffers
+                if (concatenatedBuffer.byteLength){
+                    header || console.warn('no header for ' + file)
+                    const audio = isWavHeaderPresent(header, concatenatedBuffer) 
+                        ? concatenatedBuffer: Buffer.concat([header, concatenatedBuffer])
+                    //predictQueue.push([audio, file, end, chunkStart]);
+                    processPredictQueue(audio, file, end, chunkStart);
+                } else {
+                    updateFilesBeingProcessed(file)
                 }
-                else {
-                    try {
-                        concatenatedBuffer = concatenatedBuffer.byteLength ? Buffer.concat([concatenatedBuffer, chunk]) : chunk;
-                        header ??= lookForHeader(concatenatedBuffer);
-                    } catch (e) {
-                        console.log('Detached buffer?', e.message);
-                    }
-                    // if we have a full buffer
-                    if (concatenatedBuffer.length >= highWaterMark) {
-                        const chunk = concatenatedBuffer.subarray(0, highWaterMark);
-                        concatenatedBuffer = concatenatedBuffer.subarray(highWaterMark);
-                        const audio = isWavHeaderPresent(header, chunk) ? chunk: Buffer.concat([header, chunk])
-                        audio.length === 0 && console.warn('Pushing zero length audio to predict queue')
-                        predictQueue.push([audio, file, end, chunkStart]);
-                        chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate
-                        processPredictQueue();
-                    }
+                DEBUG && console.log('All chunks sent for ', file);
+                //STREAM.end();
+                resolve('finished')
+            }
+            else {
+                try {
+                    concatenatedBuffer = concatenatedBuffer.byteLength ? Buffer.concat([concatenatedBuffer, chunk]) : chunk;
+                    header ??= lookForHeader(concatenatedBuffer);
+                } catch (e) {
+                    console.log('Detached buffer?', e.message);
                 }
-            }).catch(err => console.warn('Error in checkBacklog: ', err))
-
+                // if we have a full buffer
+                if (concatenatedBuffer.length >= highWaterMark) {
+                    const chunk = concatenatedBuffer.subarray(0, highWaterMark);
+                    concatenatedBuffer = concatenatedBuffer.subarray(highWaterMark);
+                    const audio = isWavHeaderPresent(header, chunk) ? chunk: Buffer.concat([header, chunk])
+                    audio.length === 0 && console.warn('Pushing zero length audio to predict queue')
+                    predictQueue.push([audio, file, end, chunkStart]);
+                    chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate
+                    processPredictQueue();
+                }
+            }
         });
 
         STREAM.on('error', err => {
