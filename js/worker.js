@@ -1330,7 +1330,6 @@ const getPredictBuffers = async ({
     predictionsRequested[file] = 0;
     const highWaterMark =  2 * sampleRate * BATCH_SIZE * WINDOW_SIZE; 
     //const STREAM = new PassThrough({ highWaterMark: highWaterMark, end: true});
-
     let chunkStart = start * sampleRate;
     return new Promise((resolve, reject) => {
         if (! fs.existsSync(file)) {

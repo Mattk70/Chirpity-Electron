@@ -641,26 +641,28 @@ function renderFilenamePanel() {
 
 function customAnalysisAllMenu(saved){
     const analyseAllMenu = document.getElementById('analyseAll');
+    const modifier = isMac ? '⌘' : 'Ctrl';
     if (saved) {
         analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> Get Results for All Open Files
-        <span class="shortcut float-end">Ctrl+A</span>`;
+        <span class="shortcut float-end">${modifier}+Shift+A</span>`;
         enableMenuItem(['reanalyseAll']);
     } else {
         analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">search</span> Analyse All Open Files
-        <span class="shortcut float-end">Ctrl+A</span>`;
+        <span class="shortcut float-end">${modifier}+Shift+A</span>`;
         disableMenuItem(['reanalyseAll']);
     }   
 }
 
 function customiseAnalysisMenu(saved) {
+    const modifier = isMac ? '⌘' : 'Ctrl';
     const analyseMenu = document.getElementById('analyse');
     if (saved) {
         analyseMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> Get Results for Current File
-        <span class="shortcut float-end">Ctrl+A</span>`;
+        <span class="shortcut float-end">${modifier}+A</span>`;
         enableMenuItem(['reanalyse']);
     } else {
         analyseMenu.innerHTML = `<span class="material-symbols-outlined">search</span> Analyse File
-        <span class="shortcut float-end">Ctrl+A</span>`;
+        <span class="shortcut float-end">${modifier}+A</span>`;
         disableMenuItem(['reanalyse']);
     }
 }
