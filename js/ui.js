@@ -72,7 +72,7 @@ const STATE = {
 }
 
 // Batch size map for slider
-const BATCH_SIZE_LIST = [16, 32, 48, 64, 128];
+const BATCH_SIZE_LIST = [4, 8, 16, 32, 48, 64, 128];
 
 // Get the modules loaded in preload.js
 const fs = window.module.fs;
@@ -1544,7 +1544,7 @@ window.onload = async () => {
             if (config.model === 'birdnet') config.backend = 'tensorflow';
             // Rename migrants list from old versions to new name: nocturnal
             if (config.list === 'migrants') config.list = 'nocturnal';
-            if (config.tensorflow.batchSize < 16) config.tensorflow.batchSize = 16;
+            //if (config.tensorflow.batchSize < 16) config.tensorflow.batchSize = 16;
 
         // switch off fullscreen mode - we don't want to persist that setting
         config.fullscreen = false;
@@ -1658,7 +1658,7 @@ window.onload = async () => {
         worker.postMessage({
             action: 'update-state',
             path: appPath,
-            temp: tempPath,
+            temp: tempPath, 
             lat: config.latitude,
             lon: config.longitude,
             place: config.location,
@@ -1671,7 +1671,8 @@ window.onload = async () => {
             list: config.list,
             useWeek: config.useWeek,
             local: config.local,
-            UUID: config.UUID
+            UUID: config.UUID,
+            track: config.track
         });
         const {model, backend, list} = config;
         t0_warmup = Date.now();

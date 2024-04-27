@@ -102,7 +102,7 @@ let workerInstance = 0;
 // let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let TEMP, appPath, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let LIST_WORKER;
-const DEBUG = false;
+const DEBUG = true;
 
 const DATASET = false;
 const adding_chirpity_additions = true;
@@ -1368,9 +1368,10 @@ const getPredictBuffers = async ({
                 // EOF: deal with part-full buffers
                 if (concatenatedBuffer.byteLength){
                     header || console.warn('no header for ' + file)
-                    const audio = isWavHeaderPresent(header, concatenatedBuffer) 
-                        ? concatenatedBuffer: Buffer.concat([header, concatenatedBuffer])
-                    //predictQueue.push([audio, file, end, chunkStart]);
+                    let noHeader;
+                    if (concatenatedBuffer.length < header.length) noHeader = true;
+                    else noHeader = concatenatedBuffer.compare(header, 0, header.length, 0, header.length)
+                    const audio = noHeader ? Buffer.concat([header, concatenatedBuffer]) : concatenatedBuffer;
                     processPredictQueue(audio, file, end, chunkStart);
                 } else {
                     updateFilesBeingProcessed(file)
@@ -1387,14 +1388,17 @@ const getPredictBuffers = async ({
                     console.log('Detached buffer?', e.message);
                 }
                 // if we have a full buffer
-                if (concatenatedBuffer.length >= highWaterMark) {
-                    const chunk = concatenatedBuffer.subarray(0, highWaterMark);
-                    concatenatedBuffer = concatenatedBuffer.subarray(highWaterMark);
-                    const audio = isWavHeaderPresent(header, chunk) ? chunk: Buffer.concat([header, chunk])
-                    audio.length === 0 && console.warn('Pushing zero length audio to predict queue')
-                    predictQueue.push([audio, file, end, chunkStart]);
+                if (concatenatedBuffer.length > highWaterMark) {        
+                    const audio_chunk = Buffer.allocUnsafe(highWaterMark);
+                    concatenatedBuffer.copy(audio_chunk, 0, 0, highWaterMark);
+                    const remainder = Buffer.allocUnsafe(concatenatedBuffer.length - highWaterMark);
+                    concatenatedBuffer.copy(remainder, 0, highWaterMark);
+                    const noHeader = audio_chunk.compare(header, 0, header.length, 0, header.length)
+                    const audio = noHeader ? Buffer.concat([header, audio_chunk]) : audio_chunk;
+                    processPredictQueue(audio, file, end, chunkStart);
                     chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate
-                    processPredictQueue();
+                    concatenatedBuffer = remainder;
+
                 }
             }
         });
@@ -1438,6 +1442,7 @@ const fetchAudioBuffer = async ({
     let header;
     // Ensure start is a minimum 0.1 seconds from the end of the file, and >= 0
     start = metadata[file].duration < 0.1 ? 0 : Math.min(metadata[file].duration - 0.1, start)
+    end = Math.min(end, metadata[file].duration);
     // Use ffmpeg to extract the specified audio segment
     return new Promise((resolve, reject) => {
         if (! fs.existsSync(file)) {
@@ -1447,7 +1452,7 @@ const fetchAudioBuffer = async ({
         }
         let command = ffmpeg(file)
             .seekInput(start)
-            .duration(Math.max(end - start, 0.1))
+            .duration(end - start)
             .format('wav')
             .audioChannels(1) // Set to mono
             .audioFrequency(24_000) // Set sample rate to 24000 Hz (always - this is for wavesurfer)
@@ -1483,26 +1488,24 @@ const fetchAudioBuffer = async ({
             DEBUG && console.log('FFmpeg command: ' + commandLine);
         })
 
-        stream.on('readable', () => {
-            const chunk = stream.read();
-            if (chunk === null || chunk.byteLength <= 1) {
-                // Last chunk
-                const audio = concatenatedBuffer;
-                setupCtx(audio, sampleRate, 'UI').then(offlineCtx => {
-                    offlineCtx.startRendering().then(resampled => {
-                        resolve(resampled);
-                    }).catch((error) => {
-                        console.error(`FetchAudio rendering failed: ${error}`);
-                    });
-                }).catch( (error) => {
-                    reject(error.message)
-                    stream.destroy();
-                });  
-            } else  {
-                // other chunks
-                concatenatedBuffer = concatenatedBuffer.length ?  Buffer.concat([concatenatedBuffer, chunk]) : chunk;
-            }
+        stream.on('data', (chunk) => {
+            concatenatedBuffer = concatenatedBuffer.length ?  Buffer.concat([concatenatedBuffer, chunk]) : chunk;
         });
+
+        stream.on('end', () => {
+            // Last chunk
+            const audio = concatenatedBuffer;
+            setupCtx(audio, sampleRate, 'UI').then(offlineCtx => {
+                offlineCtx.startRendering().then(resampled => {
+                    resolve(resampled);
+                }).catch((error) => {
+                    console.error(`FetchAudio rendering failed: ${error}`);
+                });
+            }).catch( (error) => {
+                reject(error.message)
+            });  
+            stream.destroy();
+        })
     });
 }
 
@@ -2197,11 +2200,6 @@ async function parseMessage(e) {
                     if (filesBeingProcessed.length) {
                         processNextFile({ worker: worker });
                     } 
-                    //  else if ( !STATE.selection) {
-                    //     getSummary() //.then(() => UI.postMessage({event: "analysis-complete"}));
-                    // } else {
-                    //     UI.postMessage({event: "analysis-complete"});
-                    // }
                 }
             }
         break;
