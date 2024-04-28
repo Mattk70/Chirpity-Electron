@@ -16,6 +16,19 @@ import { sqlite3 } from './database.js';
 import {trackEvent} from './tracking.js';
 
 
+// Function to join Buffers and not use Buffer.concat() which leads to detached ArrayBuffers
+function joinBuffers(buffer1, buffer2) {
+    // Create a new buffer with the combined length
+    const combinedBuffer = Buffer.alloc(buffer1.length + buffer2.length);
+
+    // Copy buffer1 into the new buffer
+    buffer1.copy(combinedBuffer, 0);
+
+    // Copy buffer2 into the new buffer, starting from the end of buffer1
+    buffer2.copy(combinedBuffer, buffer1.length);
+    return combinedBuffer;
+}
+
 // Save console.warn and console.error functions
 const originalWarn = console.warn;
 const originalError = console.error;
@@ -1182,7 +1195,7 @@ function checkBacklog(stream) {
         const backlog = sumObjectValues(predictionsRequested) - sumObjectValues(predictionsReceived);
         DEBUG && console.log('backlog:', backlog);
         
-        if (backlog > 50) {
+        if (backlog > 200) {
             // If queued value is above 100, wait and check again
             setTimeout(() => {
                 checkBacklog(stream)
@@ -1272,7 +1285,7 @@ const getWavePredictBuffers = async ({
                     chunk?.byteLength && predictionsReceived[file]++;
                     readStream.destroy();
                 } else {
-                    const audio = Buffer.concat([meta.header, chunk]);
+                    const audio = joinBuffers(meta.header, chunk);
                     predictQueue.push([audio, file, end, chunkStart]);
                     chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
                     processPredictQueue();
@@ -1327,7 +1340,7 @@ const getPredictBuffers = async ({
     batchChunksToSend[file] = Math.ceil((end - start) / (BATCH_SIZE * WINDOW_SIZE));
     predictionsReceived[file] = 0;
     predictionsRequested[file] = 0;
-    const highWaterMark =  2 * sampleRate * BATCH_SIZE * WINDOW_SIZE; 
+    let highWaterMark =  2 * sampleRate * BATCH_SIZE * WINDOW_SIZE; 
 
 
     let chunkStart = start * sampleRate;
@@ -1364,14 +1377,19 @@ const getPredictBuffers = async ({
                 return
             }
             const chunk = STREAM.read();
-            if (chunk === null || chunk.byteLength <= 1) {
-                // EOF: deal with part-full buffers
+            if (chunk === null) {
+                //EOF: deal with part-full buffers
+                
+                // // Deal with tiny fractions 
+                console.log("remainder", highWaterMark - concatenatedBuffer.length)
+                if (highWaterMark - concatenatedBuffer.length - (2* header.length) < 0) 
+                    batchChunksToSend[file]--;
                 if (concatenatedBuffer.byteLength){
                     header || console.warn('no header for ' + file)
                     let noHeader;
                     if (concatenatedBuffer.length < header.length) noHeader = true;
                     else noHeader = concatenatedBuffer.compare(header, 0, header.length, 0, header.length)
-                    const audio = noHeader ? Buffer.concat([header, concatenatedBuffer]) : concatenatedBuffer;
+                    const audio = noHeader ? joinBuffers(header, concatenatedBuffer) : concatenatedBuffer;
                     processPredictQueue(audio, file, end, chunkStart);
                 } else {
                     updateFilesBeingProcessed(file)
@@ -1381,20 +1399,26 @@ const getPredictBuffers = async ({
                 resolve('finished')
             }
             else {
-                try {
-                    concatenatedBuffer = concatenatedBuffer.byteLength ? Buffer.concat([concatenatedBuffer, chunk]) : chunk;
-                    header ??= lookForHeader(concatenatedBuffer);
-                } catch (e) {
-                    console.log('Detached buffer?', e.message);
+                concatenatedBuffer = concatenatedBuffer.length ? joinBuffers(concatenatedBuffer, chunk) : chunk;
+                if (!header) {
+                    header = lookForHeader(concatenatedBuffer);
+                    // First chunk sent to model is short because it contains the header
+                    // Highwatermark is the length of audio alone
+                    // Initally, the highwatermark needs to add the header length to get the correct length of audio
+                    if (header) highWaterMark += header.length;
                 }
+                
+
                 // if we have a full buffer
-                if (concatenatedBuffer.length > highWaterMark) {        
-                    const audio_chunk = Buffer.allocUnsafe(highWaterMark);
+                if (concatenatedBuffer.length > highWaterMark) {     
+                    const audio_chunk = Buffer.allocUnsafeSlow(highWaterMark);
                     concatenatedBuffer.copy(audio_chunk, 0, 0, highWaterMark);
-                    const remainder = Buffer.allocUnsafe(concatenatedBuffer.length - highWaterMark);
+                    const remainder = Buffer.allocUnsafeSlow(concatenatedBuffer.length - highWaterMark);
                     concatenatedBuffer.copy(remainder, 0, highWaterMark);
                     const noHeader = audio_chunk.compare(header, 0, header.length, 0, header.length)
-                    const audio = noHeader ? Buffer.concat([header, audio_chunk]) : audio_chunk;
+                    const audio = noHeader ? joinBuffers(header, audio_chunk) : audio_chunk;
+                    // If we *do* have a header, we need to reset highwatermark because subsequent chunks *won't* have it
+                    if (! noHeader) highWaterMark -= header.length;
                     processPredictQueue(audio, file, end, chunkStart);
                     chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate
                     concatenatedBuffer = remainder;
@@ -1489,7 +1513,7 @@ const fetchAudioBuffer = async ({
         })
 
         stream.on('data', (chunk) => {
-            concatenatedBuffer = concatenatedBuffer.length ?  Buffer.concat([concatenatedBuffer, chunk]) : chunk;
+            concatenatedBuffer = concatenatedBuffer.length ?  joinBuffers(concatenatedBuffer, chunk) : chunk;
         });
 
         stream.on('end', () => {
