@@ -115,7 +115,7 @@ let workerInstance = 0;
 // let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let TEMP, appPath, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
 let LIST_WORKER;
-const DEBUG = true;
+const DEBUG = false;
 
 const DATASET = false;
 const adding_chirpity_additions = true;
@@ -1381,7 +1381,7 @@ const getPredictBuffers = async ({
                 //EOF: deal with part-full buffers
                 
                 // // Deal with tiny fractions 
-                console.log("remainder", highWaterMark - concatenatedBuffer.length)
+                //console.log("remainder", highWaterMark - concatenatedBuffer.length)
                 if (highWaterMark - concatenatedBuffer.length - (2* header.length) < 0) 
                     batchChunksToSend[file]--;
                 if (concatenatedBuffer.byteLength){
