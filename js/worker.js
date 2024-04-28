@@ -1336,12 +1336,13 @@ const getPredictBuffers = async ({
     if (start > metadata[file].duration) {
         return
     }
-    let header;
-    batchChunksToSend[file] = Math.ceil((end - start) / (BATCH_SIZE * WINDOW_SIZE));
+    let header, shortFile = true;
+    const MINIMUM_AUDIO_LENGTH = 0.05; // below this value doesn't generate another chunk
+    batchChunksToSend[file] = Math.ceil((end - start - MINIMUM_AUDIO_LENGTH) / (BATCH_SIZE * WINDOW_SIZE));
     predictionsReceived[file] = 0;
     predictionsRequested[file] = 0;
     let highWaterMark =  2 * sampleRate * BATCH_SIZE * WINDOW_SIZE; 
-
+    
 
     let chunkStart = start * sampleRate;
     return new Promise((resolve, reject) => {
@@ -1379,11 +1380,7 @@ const getPredictBuffers = async ({
             const chunk = STREAM.read();
             if (chunk === null) {
                 //EOF: deal with part-full buffers
-                
-                // // Deal with tiny fractions 
-                //console.log("remainder", highWaterMark - concatenatedBuffer.length)
-                if (highWaterMark - concatenatedBuffer.length - (2* header.length) < 0) 
-                    batchChunksToSend[file]--;
+                if (shortFile) highWaterMark -= header.length;
                 if (concatenatedBuffer.byteLength){
                     header || console.warn('no header for ' + file)
                     let noHeader;
@@ -1418,7 +1415,10 @@ const getPredictBuffers = async ({
                     const noHeader = audio_chunk.compare(header, 0, header.length, 0, header.length)
                     const audio = noHeader ? joinBuffers(header, audio_chunk) : audio_chunk;
                     // If we *do* have a header, we need to reset highwatermark because subsequent chunks *won't* have it
-                    if (! noHeader) highWaterMark -= header.length;
+                    if (! noHeader) {
+                        highWaterMark -= header.length;
+                        shortFile = false;
+                    }
                     processPredictQueue(audio, file, end, chunkStart);
                     chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate
                     concatenatedBuffer = remainder;
