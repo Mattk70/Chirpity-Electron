@@ -1,5 +1,6 @@
 const { app, Menu, dialog, ipcMain, MessageChannelMain, BrowserWindow, globalShortcut } = require('electron');
-const { autoUpdater } = require("electron-updater")
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+const { autoUpdater } = require("electron-updater");
 const log = require('electron-log');
 
 const fs = require("node:fs");
