@@ -913,8 +913,9 @@ async function onAnalyse({
     STATE.selection || onChangeMode('analyse');
     
     filesBeingProcessed = [...FILE_QUEUE];
-    
-    processNextFile({ start: start, end: end, worker: 0 });
+    for (let i=0;i<NUM_WORKERS;i++){
+        processNextFile({ start: start, end: end, worker: i });
+    }
 }
 
 function onAbort({

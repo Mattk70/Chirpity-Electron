@@ -70,10 +70,27 @@ log.info('App starting...');
 
 autoUpdater.on('checking-for-update', function () {
     logUpdateStatus('Checking for update...');
+    if (process.env.PORTABLE_EXECUTABLE_DIR){
+        logUpdateStatus('This is a portable exe')
+    } 
 });
 
 autoUpdater.on('update-available', async function (info) {
-    autoUpdater.downloadUpdate();
+    if (!process.env.PORTABLE_EXECUTABLE_DIR){
+        autoUpdater.downloadUpdate();
+    } else {
+        
+        // Fetch release notes from GitHub API
+        const releaseNotes = await fetchReleaseNotes(info.version);
+        dialog.showMessageBox({
+            type: 'info',
+            title: 'Update Available',
+            message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}`,
+            buttons: ['OK'],
+            defaultId: 1,
+            noLink: true
+        })
+    }
 });
 
 autoUpdater.on('update-not-available', function (info) {
