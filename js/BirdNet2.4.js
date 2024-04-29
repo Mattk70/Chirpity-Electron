@@ -47,7 +47,7 @@ onmessage = async (e) => {
                 })
                 DEBUG && console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
                 
-                tf.setBackend('tensorflow').then(async () => {
+                tf.setBackend(backend).then(async () => {
                     //tf.enableProdMode();
                     if (DEBUG) {
                         console.log(tf.env());
