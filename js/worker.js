@@ -62,7 +62,7 @@ console.error = function(message) {
 // Implement error handling in the worker
 self.onerror = function(message, file, lineno, colno, error) {
     STATE.track && trackEvent(STATE.UUID, 'Unhandled Worker Error', message, customURLEncode(error?.stack));
-    if (message.includes('dynamic link library')) UI.postMessage({event: 'generate-alert', message: 'There has been an error loading the model. This may be due to missing AVX support. Chirpity AI models require AVX instructions to run. If you have AVX enabled and still see this notice, please refer to <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">this issue</a> on Github.'})
+    if (message.includes('dynamic link library')) UI.postMessage({event: 'generate-alert', message: 'There has been an error loading the model. This may be due to missing AVX support. Chirpity AI models require the AVX2 instructions set to run. If you have AVX2 enabled and still see this notice, please refer to <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">this issue</a> on Github.'})
     // Return false not to inhibit the default error handling
     return false;
     };
@@ -502,7 +502,7 @@ async function handleMessage(e) {
     }
 }
 
-ipcRenderer.on('new-client', (event) => {
+ipcRenderer.on('new-client', async (event) => {
     [UI] = event.ports;
     UI.onmessage = handleMessage
 })
@@ -574,7 +574,7 @@ async function spawnListWorker() {
 
         // Start the worker
         worker.postMessage('start');
-    });
+    })
     return function listWorker(message_1) {
         return new Promise((resolve_1, reject_1) => {
             worker_1.onmessage = function (event_1) {
@@ -1527,7 +1527,7 @@ const fetchAudioBuffer = async ({
                     console.error(`FetchAudio rendering failed: ${error}`);
                 });
             }).catch( (error) => {
-                reject(error.message)
+                reject(error)
             });  
             stream.destroy();
         })
