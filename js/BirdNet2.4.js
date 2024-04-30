@@ -1,6 +1,7 @@
 let tf, BACKEND;
 try {
     tf = require('@tensorflow/tfjs-node');
+    require('@tensorflow/tfjs-backend-webgpu');
     BACKEND = 'tensorflow';
 } catch {
     tf = require('@tensorflow/tfjs');
@@ -34,7 +35,7 @@ onmessage = async (e) => {
                 const appPath = "../" + location + "/";
                 const list = e.data.list;
                 const batch = e.data.batchSize;
-                const backend = BACKEND === 'webgpu' ? BACKEND : e.data.backend;
+                const backend = e.data.backend;
                 let labels;
                 const labelFile = `../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`; 
                 await fetch(labelFile).then(response => {

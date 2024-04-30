@@ -1,13 +1,11 @@
-let tf;
-let BACKEND;
+let tf, BACKEND;
 try {
     tf = require('@tensorflow/tfjs-node');
     BACKEND = 'tensorflow';
 } catch {
     tf = require('@tensorflow/tfjs');
     require('@tensorflow/tfjs-backend-webgpu');
-    BACKEND = 'webgpu';
-
+    BACKEND = 'webgpu'
 }
 const fs = require('node:fs');
 const path = require('node:path');

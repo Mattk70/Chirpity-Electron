@@ -1,7 +1,7 @@
 let tf, BACKEND;
 try {
     tf = require('@tensorflow/tfjs-node');
-    BACKEND = 'tensorflow';
+    require('@tensorflow/tfjs-backend-webgpu');
 } catch {
     tf = require('@tensorflow/tfjs');
     require('@tensorflow/tfjs-backend-webgpu');
@@ -35,7 +35,7 @@ onmessage = async (e) => {
                 const appPath = "../" + location + "/";
                 const list = e.data.list;
                 const batch = e.data.batchSize;
-                const backend = BACKEND === 'webgpu' ? BACKEND : e.data.backend;
+                const backend = BACKEND || e.data.backend;
                 if (DEBUG) {
                     console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
                 }
