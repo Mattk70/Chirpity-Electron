@@ -4557,10 +4557,17 @@ function setListUIState(list){
     } 
 }
 
-    async function readLabels(labelFile, updating){
+async function readLabels(labelFile, updating){
     fetch(labelFile).then(response => {
         if (! response.ok) throw new Error('Network response was not ok');
         return response.text();
+    }).catch(error =>{
+        if (error.message === 'Failed to fetch') {
+            generateToast({message: 'The custom list could not be found, <b class="text-danger">no detections will be shown</b>.'})
+            DOM.customListSelector.classList.add('btn-outline-danger')
+            return
+        }
+        else {console.error('There was a problem reading the label file:', error)}
     }).then(filecontents => {
         LABELS = filecontents.trim().split(/\r?\n/);
         // Add unknown species
@@ -4574,11 +4581,7 @@ function setListUIState(list){
         }
 
     }).catch(error =>{
-        if (error.message === 'Failed to fetch') {
-            generateToast({message: 'The custom list could not be found, <b class="text-danger">no filters will be applied</b>.'})
-            DOM.customListSelector.classList.add('btn-outline-danger')
-        }
-        else {console.error('There was a problem reading the label file:', error);}
+        console.error('There was a problem reading the label file:', error)
     })
 }
 

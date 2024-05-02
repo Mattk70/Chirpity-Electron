@@ -1,12 +1,9 @@
 let tf, BACKEND;
 try {
     tf = require('@tensorflow/tfjs-node');
-    require('@tensorflow/tfjs-backend-webgpu');
-    BACKEND = 'tensorflow';
 } catch {
     tf = require('@tensorflow/tfjs');
-    require('@tensorflow/tfjs-backend-webgpu');
-    BACKEND = 'webgpu'
+    BACKEND = 'webgpu';
 }
 const fs = require('node:fs');
 const path = require('node:path');
@@ -35,7 +32,8 @@ onmessage = async (e) => {
                 const appPath = "../" + location + "/";
                 const list = e.data.list;
                 const batch = e.data.batchSize;
-                const backend = e.data.backend;
+                const backend = BACKEND || e.data.backend;
+                backend === 'webgpu' &&  require('@tensorflow/tfjs-backend-webgpu');
                 let labels;
                 const labelFile = `../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`; 
                 await fetch(labelFile).then(response => {
@@ -49,7 +47,7 @@ onmessage = async (e) => {
                 DEBUG && console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
                 
                 tf.setBackend(backend).then(async () => {
-                    //tf.enableProdMode();
+                    tf.enableProdMode();
                     if (DEBUG) {
                         console.log(tf.env());
                         console.log(tf.env().getFlags());
