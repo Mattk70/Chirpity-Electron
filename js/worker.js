@@ -451,8 +451,8 @@ async function handleMessage(e) {
             break;
         }
         case "save": {DEBUG && console.log("file save requested");
-        await saveAudio(args.file, args.start, args.end, args.filename, args.metadata);
-        break;
+            await saveAudio(args.file, args.start, args.end, args.filename, args.metadata);
+            break;
         }
         case "save2db": {await onSave2DiskDB(args);
             break;
@@ -2765,7 +2765,8 @@ const onSave2DiskDB = async ({file}) => {
         return // nothing to do. Also will crash if trying to update disk from disk.
     }
     const included = await getIncludedIDs(file);
-    const filterClause = filtersApplied(included) ? `AND speciesID IN (${included} )` : ''
+    let filterClause = filtersApplied(included) ? `AND speciesID IN (${included} )` : '';
+    if (STATE.detect.nocmig) filterClause += ' AND isDaylight = TRUE ';
     await memoryDB.runAsync('BEGIN');
     await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.files SELECT * FROM files`);
     await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.locations SELECT * FROM locations`);
