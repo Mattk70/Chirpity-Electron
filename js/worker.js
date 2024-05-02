@@ -1513,23 +1513,24 @@ const fetchAudioBuffer = async ({
             DEBUG && console.log('FFmpeg command: ' + commandLine);
         })
 
-        stream.on('data', (chunk) => {
-            concatenatedBuffer = concatenatedBuffer.length ?  joinBuffers(concatenatedBuffer, chunk) : chunk;
-        });
-
-        stream.on('end', () => {
-            // Last chunk
-            const audio = concatenatedBuffer;
-            setupCtx(audio, sampleRate, 'UI').then(offlineCtx => {
-                offlineCtx.startRendering().then(resampled => {
-                    resolve(resampled);
-                }).catch((error) => {
-                    console.error(`FetchAudio rendering failed: ${error}`);
-                });
-            }).catch( (error) => {
-                reject(error.message)
-            });  
-            stream.destroy();
+        stream.on('readable', () => {
+            const chunk = stream.read();
+            if (chunk === null){
+                // Last chunk
+                const audio = concatenatedBuffer;
+                setupCtx(audio, sampleRate, 'UI').then(offlineCtx => {
+                    offlineCtx.startRendering().then(resampled => {
+                        resolve(resampled);
+                    }).catch((error) => {
+                        console.error(`FetchAudio rendering failed: ${error}`);
+                    });
+                }).catch( (error) => {
+                    reject(error.message)
+                });  
+                stream.destroy();
+            } else {
+                concatenatedBuffer = concatenatedBuffer.length ?  joinBuffers(concatenatedBuffer, chunk) : chunk;
+            }
         })
     });
 }
