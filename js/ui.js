@@ -72,7 +72,7 @@ const STATE = {
 }
 
 // Batch size map for slider
-const BATCH_SIZE_LIST = [4, 8, 16, 32, 48, 64, 128];
+const BATCH_SIZE_LIST = [2, 3, 4, 5, 6, 8, 16, 32, 48, 64, 128];
 
 // Get the modules loaded in preload.js
 const fs = window.module.fs;
@@ -1506,7 +1506,7 @@ window.onload = async () => {
         warmup: true,
         backend: 'tensorflow',
         tensorflow: { threads: DIAGNOSTICS['Cores'], batchSize: 32 },
-        webgpu: { threads: 2, batchSize: 32 },
+        webgpu: { threads: 2, batchSize: 4 },
         webgl: { threads: 2, batchSize: 32 },
         audio: { gain: 0, format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false, notification: true, normalise: false },
         limit: 500,
@@ -1539,12 +1539,9 @@ window.onload = async () => {
             };
         //fill in defaults - after updates add new items
         fillDefaults(config, defaultConfig);
-
-            // force backend to 'tensorflow' for Birdnet
-            if (config.model === 'birdnet') config.backend = 'tensorflow';
-            // Rename migrants list from old versions to new name: nocturnal
-            if (config.list === 'migrants') config.list = 'nocturnal';
-            //if (config.tensorflow.batchSize < 16) config.tensorflow.batchSize = 16;
+        // Reset defaults for webgpu
+            if (config.webgpu.batchSize === 32 && config.webgpu.threads === 2) 
+                config.webgpu = {threads: 2, batchSize: 4};
 
         // switch off fullscreen mode - we don't want to persist that setting
         config.fullscreen = false;
