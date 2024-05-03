@@ -40,6 +40,7 @@ onmessage = async (e) => {
                     console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
                 }
                 tf.setBackend(backend).then(async () => {
+                    console.log(tf.env().getFlags());
                     if (backend === "webgl") {
                         tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
                         tf.env().set("WEBGL_PACK", true);
