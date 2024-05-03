@@ -53,14 +53,10 @@ onmessage = async (e) => {
                         console.log(tf.env());
                         console.log(tf.env().getFlags());
                     }
-                    myModel = new Model(appPath, list, version);
+                    myModel = new Model(appPath, version);
                     myModel.height = height;
                     myModel.width = width;
-                    myModel.list = e.data.list;
-                    myModel.lat = parseFloat(e.data.lat);
-                    myModel.lon = parseFloat(e.data.lon);
-                    myModel.week = parseInt(e.data.week);
-                    myModel.speciesThreshold = parseFloat(e.data.threshold);
+
                     // Create a mask tensor where the specified indexes are set to 0 and others to 1
                     const indexesToZero = [25, 30, 110, 319, 378, 403, 404, 405, 406];
                     myModel.mask = tf.tensor2d(Array.from({ length: 408 }, (_, i) => indexesToZero.includes(i) ? 0 : 1), [1, 408]);
@@ -142,7 +138,7 @@ onmessage = async (e) => {
 };
 
 class Model {
-    constructor(appPath, list, version) {
+    constructor(appPath, version) {
         this.model = undefined;
         this.labels = undefined;
         this.height = undefined;

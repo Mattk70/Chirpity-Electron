@@ -10,14 +10,14 @@ function searchPatterns(directory, patterns) {
 
     files.forEach(file => {
         const filePath = path.join(directory, file);
-        console.log(filePath)
         const stats = fs.statSync(filePath);
         if (stats.isDirectory() || file.endsWith('.js')){
             if (stats.isDirectory()) {
-                if (! filePath.includes('node_modules')) {
+                if (filePath.includes('node_modules')) {
                     searchPatterns(filePath, patterns);
                 }
             } else if (stats.isFile()) {
+                console.log(filePath)
                 const content = fs.readFileSync(filePath, 'utf8');
                 patterns.forEach(pattern => {
                     if (content.match(pattern)) {
@@ -41,6 +41,7 @@ const patterns = [
 // Search for the patterns in the source directory
 try {
     searchPatterns(SOURCE_DIR, patterns);
+    searchPatterns(SOURCE_DIR + "/node_modules/fluent-ffmpeg/lib",[/ffmpegProc.kill\(\);?\s+\},\s*\d\d\s*\);?/]);
     console.log("No patterns found. Proceeding with the build...");
 } catch (error) {
     console.error("An error occurred while searching for the patterns:", error.message);

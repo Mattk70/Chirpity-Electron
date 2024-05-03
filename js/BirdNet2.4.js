@@ -52,14 +52,10 @@ onmessage = async (e) => {
                         console.log(tf.env());
                         console.log(tf.env().getFlags());
                     }
-                    myModel = new Model(appPath, list, version);
+                    myModel = new Model(appPath, version);
                     myModel.height = height;
                     myModel.width = width;
                     myModel.labels = labels;
-                    myModel.lat = parseFloat(e.data.lat);
-                    myModel.lon = parseFloat(e.data.lon);
-                    myModel.week = parseInt(e.data.week);
-                    myModel.speciesThreshold = parseFloat(e.data.threshold);
                     await myModel.loadModel();
                     myModel.warmUp(batch);
                     BACKEND = tf.getBackend();
@@ -139,7 +135,7 @@ onmessage = async (e) => {
 };
 
 class Model {
-    constructor(appPath, list, version) {
+    constructor(appPath, version) {
         this.model = undefined;
         this.labels = undefined;
         this.height = undefined;
