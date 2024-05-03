@@ -47,7 +47,10 @@ onmessage = async (e) => {
                         tf.env().set("WEBGL_EXP_CONV", true);
                         tf.env().set("TOPK_K_CPU_HANDOFF_THRESHOLD", 128);
                         tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 0);
+                    } else if (backend === "webgpu") {
+                        tf.env().set("WEBGPU_DEFERRED_SUBMIT_BATCH_SIZE", 129);
                     }
+                    console.log(tf.env().getFlags());
                     tf.enableProdMode();
                     //tf.enableDebugMode();
                     if (DEBUG) {
