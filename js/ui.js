@@ -1539,7 +1539,7 @@ window.onload = async () => {
             };
         //fill in defaults - after updates add new items
         fillDefaults(config, defaultConfig);
-
+            if (config.model === 'v2') config.model = 'chirpity';
             // force backend to 'tensorflow' for Birdnet
             if (config.model === 'birdnet') config.backend = 'tensorflow';
             // Rename migrants list from old versions to new name: nocturnal
