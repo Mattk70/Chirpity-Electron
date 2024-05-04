@@ -360,23 +360,25 @@ class Model {
             return signal.sub(sigMin).divNoNan(range).mul(tf.scalar(2)).sub(tf.scalar(1))
         })
     };
+
+    padAudio = (audio, length) => {
+        // Create a new array with the desired length
+        const paddedAudio = new Float32Array(length);
+        // Copy the existing values into the new array
+        paddedAudio.set(audio);
+        return paddedAudio;
+    };
+
     async predictChunk(audioBuffer, start, fileStart, file, threshold, confidence) {
         if (DEBUG) console.log('predictCunk begin', tf.memory().numTensors);
-        audioBuffer = tf.tensor1d(audioBuffer);
-
-        // check if we need to pad
-        const remainder = audioBuffer.shape % this.chunkLength;
-        let paddedBuffer;
-        if (remainder !== 0) {
-            // Pad to the nearest full sample
-            paddedBuffer = audioBuffer.pad([[0, this.chunkLength - remainder]]);
-            audioBuffer.dispose();
-            if (DEBUG) console.log('Received final chunks')
+        const desiredLlength = this.chunkLength * this.batchSize;
+        if (audioBuffer.length < desiredLlength) {
+            audioBuffer = this.padAudio(audioBuffer, desiredLlength) 
         }
-        const buffer = paddedBuffer || audioBuffer;
-        const numSamples = buffer.shape / this.chunkLength;
-        let buffers = tf.reshape(buffer, [numSamples, this.chunkLength]);
-        buffer.dispose();
+        audioBuffer = tf.tensor1d(audioBuffer);
+        const numSamples = audioBuffer.shape / this.chunkLength;
+        let buffers = tf.reshape(audioBuffer, [numSamples, this.chunkLength]);
+        audioBuffer.dispose();
         const bufferList = this.version !== 'v4' ? this.normalise_audio_batch(buffers) : buffers;
         const specBatch = tf.tidy(() => {
             const bufferArray = tf.unstack(bufferList);
