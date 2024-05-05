@@ -48,7 +48,8 @@ onmessage = async (e) => {
                         tf.env().set("TOPK_K_CPU_HANDOFF_THRESHOLD", 128);
                         tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 0);
                     } else if (backend === "webgpu") {
-                        tf.env().set("WEBGPU_DEFERRED_SUBMIT_BATCH_SIZE", 129);
+                        tf.env().set("WEBGPU_DEFERRED_SUBMIT_BATCH_SIZE", 64); // Affects GPU RAM at expense of speed
+                        tf.env().set("WEBGPU_MATMUL_PROGRAM_TYPE", 3); // MatMulPackedProgram
                     }
                     console.log(tf.env().getFlags());
                     tf.enableProdMode();
