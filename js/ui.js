@@ -1504,7 +1504,7 @@ window.onload = async () => {
         detect: { nocmig: false, contextAware: false, confidence: 45 },
         filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0, sendToModel: false },
         warmup: true,
-        backend: 'tensorflow',
+        backend: isMac ? 'webgpu' : 'tensorflow',
         tensorflow: { threads: DIAGNOSTICS['Cores'], batchSize: 32 },
         webgpu: { threads: 2, batchSize: 4 },
         webgl: { threads: 2, batchSize: 32 },

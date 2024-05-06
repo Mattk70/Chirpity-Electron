@@ -2250,6 +2250,11 @@ function updateFilesBeingProcessed(file) {
         if (!STATE.selection) getSummary();
         // Need this here in case last file is not sent for analysis (e.g. nocmig mode)
         UI.postMessage({event: 'analysis-complete'})
+        // // refresh the webgpu backend
+        // if (BACKEND === 'webgpu' ) {
+        //     terminateWorkers();
+        //     spawnPredictWorkers(STATE.model, STATE.list, BATCH_SIZE, NUM_WORKERS)
+        // }
     }
 }
         
