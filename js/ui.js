@@ -1153,6 +1153,15 @@ exploreLink.addEventListener('click', async () => {
     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
 });
 
+const restoreLink = document.getElementById('restore');
+restoreLink.addEventListener('click', async () => {
+    // Todo: Placeholder for results restore
+    worker.postMessage({ action: 'change-mode', mode: 'analyse' });
+    hideAll();
+    showElement(['spectrogramWrapper', 'resultTableContainer', 'fullscreen']);
+    worker.postMessage({ action: 'filter', updateSummary: true });
+});
+
 // const datasetLink = document.getElementById('dataset');
 // datasetLink.addEventListener('click', async () => {
 //     worker.postMessage({ action: 'create-dataset', species: isSpeciesViewFiltered(true) });
@@ -1603,28 +1612,7 @@ window.onload = async () => {
         DOM.audioFade.disabled = !DOM.audioPadding.checked;
         DOM.audioDownmix.checked = config.audio.downmix;
         setNocmig(config.detect.nocmig);
-        const chirpityOnly = document.querySelectorAll('.chirpity-only');
-        const noMac = document.querySelectorAll('.no-mac');
-        if (config.model === 'birdnet'){
-            // hide chirpity-only features
-            chirpityOnly.forEach(element => element.classList.add('d-none'));
-            if (config.list === 'nocturnal')  {
-                DOM.localSwitchContainer.classList.remove('d-none');
-            }
-            DOM.contextAware.checked = false;
-            DOM.contextAware.disabed = true;
-            config.detect.contextAware = false;
-            SNRSlider.disabled = true;
-            config.filters.SNR = 0;
-        } else {
-            // show chirpity-only features
-            chirpityOnly.forEach(element => element.classList.remove('d-none'));
-            // Remove GPU option on Mac
-            isMac && noMac.forEach(element => element.classList.add('d-none'));
-            DOM.contextAware.checked = config.detect.contextAware;
-            DOM.localSwitchContainer.classList.add('d-none');
-            SNRSlider.disabled = false;
-        }
+        modelSettingsDisplay();
         contextAwareIconDisplay();
         DOM.debugMode.checked = config.debug;
         showThreshold(config.detect.confidence);
@@ -3599,7 +3587,31 @@ function onChartData(args) {
             range: range
         })
     }
-    
+    const modelSettingsDisplay = () => {
+        const chirpityOnly = document.querySelectorAll('.chirpity-only');
+        const noMac = document.querySelectorAll('.no-mac');
+        if (config.model === 'birdnet'){
+            // hide chirpity-only features
+            chirpityOnly.forEach(element => element.classList.add('d-none'));
+            if (config.list === 'nocturnal')  {
+                DOM.localSwitchContainer.classList.remove('d-none');
+            }
+            DOM.contextAware.checked = false;
+            DOM.contextAware.disabed = true;
+            config.detect.contextAware = false;
+            SNRSlider.disabled = true;
+            config.filters.SNR = 0;
+        } else {
+            // show chirpity-only features
+            chirpityOnly.forEach(element => element.classList.remove('d-none'));
+            // Remove GPU option on Mac
+            isMac && noMac.forEach(element => element.classList.add('d-none'));
+            DOM.contextAware.checked = config.detect.contextAware;
+            DOM.localSwitchContainer.classList.add('d-none');
+            SNRSlider.disabled = false;
+        }
+    }
+
     const contextAwareIconDisplay = () => {
         if (config.detect.contextAware) {
             DOM.contextAwareIcon.classList.add('text-warning');
@@ -4389,24 +4401,7 @@ DOM.gain.addEventListener('input', () => {
                 }
                 case 'model-to-use': {
                     config.model = element.value;
-                    const chirpityOnly = document.querySelectorAll('.chirpity-only');
-                    if (config.model === 'birdnet') { 
-                        DOM.contextAware.checked = false;
-                        if (config.list === 'nocturnal') document.getElementById('use-location-container').classList.remove('d-none')
-                        // hide chirpity-only features
-                        chirpityOnly.forEach(element => element.classList.add('d-none'));
-                        DOM.contextAware.disabed = true;
-                        config.detect.contextAware = false;
-                        SNRSlider.disabled = true;
-                        config.filters.SNR = 0;
-                        
-                    } else {
-                        // show chirpity-only features
-                        chirpityOnly.forEach(element => element.classList.remove('d-none'));
-                        document.getElementById('use-location-container').classList.add('d-none');
-                        DOM.contextAware.disabed = false;
-                        SNRSlider.disabled = false;
-                    }
+                    modelSettingsDisplay();
                     DOM.customListFile.value = config.customListFile[config.model];
                     DOM.customListFile.value ? LIST_MAP.custom = 'Using a custom list' : delete LIST_MAP.custom;
                     document.getElementById('locale').value = config[config.model].locale;
