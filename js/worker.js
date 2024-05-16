@@ -1873,16 +1873,17 @@ const bufferToAudio = async ({
         })
         ffmpgCommand.writeToStream(bufferStream);
         
-        const buffers = [];
-        bufferStream.on('data', (buf) => {
-            buffers.push(buf);
-        });
-        bufferStream.on('end', function () {
-            const outputBuffer = Buffer.concat(buffers);
-            let audio = [];
-            audio.push(new Int8Array(outputBuffer))
-            const blob = new Blob(audio, { type: mimeType });
-            resolve(blob);
+        let concatenatedBuffer = Buffer.alloc(0);
+        bufferStream.on('readable', () => {
+            const chunk = bufferStream.read();
+            if (chunk === null){
+                let audio = [];
+                audio.push(new Int8Array(concatenatedBuffer))
+                const blob = new Blob(audio, { type: mimeType });
+                resolve(blob);    
+            } else {
+                concatenatedBuffer = concatenatedBuffer.length ?  joinBuffers(concatenatedBuffer, chunk) : chunk;
+            }
         });
     })
 };
