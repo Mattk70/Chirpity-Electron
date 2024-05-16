@@ -188,18 +188,22 @@
                             </select>
                         </div>
                     </div>
-                    <div class="p-0 chirpity-only no-mac">
+                    <div class="p-0 chirpity-only node-only d-none">
                         <div class="form-group rounded p-2 pe-0 mb-2">
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Backend" data-bs-content="The GPU backend can improve performance if you have a dedicated graphics card.">?</a>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Backend" data-bs-content="The webGL/webGPU backends can improve performance and reduce power consumption on some systems.">?</a>
                             <div>
-                                <label class="ps-0 pe-1 fs-6 text-start">Backend:</label>
+                                <label class="ps-0 fs-6 text-start">Backend:</label>
                                 <div class="form-check form-check-inline">
                                     <label class="form-check-label" for="tensorflow">CPU</label>
                                     <input class="form-check-input" type="radio" name="backend" id="tensorflow" value="tensorflow" checked="">
                                 </div>
-                                <div class="form-check form-check-inline">
+                                <div class="form-check form-check-inline  no-mac">
                                     <input class="form-check-input" type="radio" name="backend" id="webgl" value="webgl">
-                                    <label class="form-check-label" for="webgl">GPU</label>
+                                    <label class="form-check-label" for="webgl">WebGL</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="backend" id="webgpu" value="webgpu">
+                                    <label class="form-check-label" for="webgpu">WebGPU</label>
                                 </div>
                             </div>
                         </div>
@@ -526,7 +530,7 @@
                             <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chiprity Nocmig">
                             <div class="text-center pb-4">
                                 <h5>Quick access settings panel</h5>
-                                <p>The icons here allow you to qucikly toggle some frequently used settings.</p>
+                                <p>The icons here allow you to quickly toggle some frequently used settings.</p>
                                 These include:
                                 <div class="w-75 ms-5">
                                     <ol class="text-start ps-5"> 
@@ -560,7 +564,7 @@
                                     also find the Chart and Explore
                                     sections of the Application. These allow you to revisit the detections you have
                                     saved and view charts of species'
-                                    occurance over time </p>
+                                    occurence over time </p>
                                 </div>
                             </div>
                             <!-- Add more carousel items as needed -->
@@ -643,6 +647,9 @@
                             <li class="dropdown-item disabled" id="explore">
                                 <span class="material-symbols-outlined">explore</span> Explore Archive
                             </li>
+                            <li class="dropdown-item d-none" id="restore">
+                                <span class="material-symbols-outlined">youtube_searched_for</span> Restore Latest Analysis
+                            </li>
                             <li class="dropdown-divider"></li>
                             <li class="dropdown-item disabled" id="purge-file">
                                 <span class="material-symbols-outlined">unarchive</span> Remove Current File From
@@ -707,7 +714,7 @@
                             </li>
                             <li>
                                 <a class="dropdown-item" id="bugs" href="#">
-                                    <span class="material-symbols-outlined">forum</span> Join the community?
+                                    <span class="material-symbols-outlined">forum</span> Join the community
                                 </a>
                             </li>
                             <div class="dropdown-divider"></div>

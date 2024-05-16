@@ -1,8 +1,14 @@
-const tf = require('@tensorflow/tfjs-node');
+let tf, BACKEND;
+try {
+    tf = require('@tensorflow/tfjs-node');
+} catch {
+    tf = require('@tensorflow/tfjs');
+    BACKEND = 'webgpu';
+}
 const fs = require('node:fs');
 const path = require('node:path');
 let DEBUG = false;
-let BACKEND;
+
 
 //GLOBALS
 let myModel;
@@ -26,7 +32,8 @@ onmessage = async (e) => {
                 const appPath = "../" + location + "/";
                 const list = e.data.list;
                 const batch = e.data.batchSize;
-                const backend = e.data.backend;
+                const backend = BACKEND || e.data.backend;
+                backend === 'webgpu' &&  require('@tensorflow/tfjs-backend-webgpu');
                 let labels;
                 const labelFile = `../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`; 
                 await fetch(labelFile).then(response => {
@@ -39,28 +46,24 @@ onmessage = async (e) => {
                 })
                 DEBUG && console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
                 
-                tf.setBackend('tensorflow').then(async () => {
-                    //tf.enableProdMode();
+                tf.setBackend(backend).then(async () => {
+                    tf.enableProdMode();
                     if (DEBUG) {
                         console.log(tf.env());
                         console.log(tf.env().getFlags());
                     }
-                    myModel = new Model(appPath, list, version);
+                    myModel = new Model(appPath, version);
                     myModel.height = height;
                     myModel.width = width;
                     myModel.labels = labels;
-                    myModel.lat = parseFloat(e.data.lat);
-                    myModel.lon = parseFloat(e.data.lon);
-                    myModel.week = parseInt(e.data.week);
-                    myModel.speciesThreshold = parseFloat(e.data.threshold);
                     await myModel.loadModel();
-                    myModel.warmUp(batch);
+                    await myModel.warmUp(batch);
                     BACKEND = tf.getBackend();
                     postMessage({
                         message: "model-ready",
                         sampleRate: myModel.config.sampleRate,
                         chunkLength: myModel.chunkLength,
-                        backend: tf.getBackend(),
+                        backend: BACKEND,
                         labels: labels,
                         worker: worker
                     });
@@ -132,7 +135,7 @@ onmessage = async (e) => {
 };
 
 class Model {
-    constructor(appPath, list, version) {
+    constructor(appPath, version) {
         this.model = undefined;
         this.labels = undefined;
         this.height = undefined;
@@ -158,18 +161,30 @@ class Model {
         }
     }
 
-    warmUp(batchSize) {
+    async warmUp(batchSize) {
         this.batchSize = parseInt(batchSize);
         this.inputShape[0] = this.batchSize;
+        DEBUG && console.log('WarmUp begin', tf.memory().numTensors);
+        const input = tf.zeros(this.inputShape);
+        
+        // Parallel compilation for faster warmup
+        // https://github.com/tensorflow/tfjs/pull/7755/files#diff-a70aa640d286e39c922aa79fc636e610cae6e3a50dd75b3960d0acbe543c3a49R316
         if (tf.getBackend() === 'webgl') {
-            tf.tidy(() => {
-                //const warmupResult = this.model.predict(tf.zeros(this.inputShape), { batchSize: this.batchSize });
-                const warmupResult = this.model.predict(tf.zeros([1,144_000]), { batchSize: this.batchSize });
-                warmupResult.arraySync();
-                // see if we can get padding compiled at this point
-                //this.padBatch(tf.zeros([1, this.inputShape[1], this.inputShape[2], this.inputShape[3]]), { batchSize: this.batchSize })
-            })
+            tf.env().set('ENGINE_COMPILE_ONLY', true);
+            const compileRes = this.model.predict(input, { batchSize: this.batchSize });
+            tf.env().set('ENGINE_COMPILE_ONLY', false);
+            await tf.backend().checkCompileCompletionAsync();
+            tf.backend().getUniformLocations();
+            tf.dispose(compileRes);
+            input.dispose();
+        } else if (tf.getBackend() === 'webgpu') {
+            tf.env().set('WEBGPU_ENGINE_COMPILE_ONLY', true);
+            const compileRes = this.model.predict(input, { batchSize: this.batchSize });
+            tf.env().set('WEBGPU_ENGINE_COMPILE_ONLY', false);
+            await tf.backend().checkCompileCompletionAsync();
+            tf.dispose(compileRes);
         }
+        input.dispose()
         DEBUG && console.log('WarmUp end', tf.memory().numTensors)
         return true;
     }
@@ -230,35 +245,6 @@ class Model {
         })
     }
 
-    addContext(prediction, tensor, confidence) {
-        // Create a set of images from the batch, offset by half the width of the original images
-        const [_, height, width, channel] = tensor.shape;
-        return tf.tidy(() => {
-            const firstHalf = tensor.slice([0, 0, 0, 0], [-1, -1, width / 2, -1]);
-            const secondHalf = tensor.slice([0, 0, width / 2, 0], [-1, -1, width / 2, -1]);
-            const paddedSecondHalf = tf.concat([tf.zeros([1, height, width / 2, channel]), secondHalf], 0);
-            secondHalf.dispose();
-            // prepend padding tensor
-            const [droppedSecondHalf, _] = paddedSecondHalf.split([paddedSecondHalf.shape[0] - 1, 1]);  // pop last tensor
-            paddedSecondHalf.dispose();
-            const combined = tf.concat([droppedSecondHalf, firstHalf], 2);  // concatenate adjacent pairs along the width dimension
-            firstHalf.dispose();
-            droppedSecondHalf.dispose();
-            const rshiftPrediction = this.model.predict(combined, { batchSize: this.batchSize });
-            combined.dispose();
-            // now we have predictions for both the original and rolled images
-            const [padding, remainder] = tf.split(rshiftPrediction, [1, -1]);
-            const lshiftPrediction = tf.concat([remainder, padding]);
-            // Get the highest predictions from the overlapping images
-            const surround = tf.maximum(rshiftPrediction, lshiftPrediction);
-            lshiftPrediction.dispose();
-            rshiftPrediction.dispose();
-            // Mask out where these are below the threshold
-            const indices = tf.greater(surround, confidence);
-            return prediction.where(indices, 0);
-        })
-    }
-
     async predictBatch(audio, keys, threshold, confidence) {
         const TensorBatch = audio; //this.fixUpSpecBatch(audio); // + 1 tensor
         
@@ -266,41 +252,8 @@ class Model {
         if (BACKEND === 'webgl' && TensorBatch.shape[0] < this.batchSize) {
             // WebGL works best when all batches are the same size
             paddedTensorBatch = this.padBatch(TensorBatch)  // + 1 tensor
-        } else if (threshold) {
-            if (this.version !== 'v1') threshold *= 4;
-            const keysTensor = tf.stack(keys); // + 1 tensor
-            const snr = this.getSNR(TensorBatch)
-            const condition = tf.greaterEqual(snr, threshold); // + 1 tensor
-            DEBUG && console.log('SNR is:', snr.dataSync())
-            snr.dispose();
-            // Avoid mask cannot be scalar error at end of predictions
-            let newCondition;
-            if (condition.rankType === "0") {
-                newCondition = tf.expandDims(condition) // + 1 tensor
-                condition.dispose() // - 1 tensor
-            }
-            const c = newCondition || condition;
-            let maskedKeysTensor;
-            [maskedTensorBatch, maskedKeysTensor] = await Promise.all([
-                tf.booleanMaskAsync(TensorBatch, c),
-                tf.booleanMaskAsync(keysTensor, c)]) // + 2 tensor
-            c.dispose(); // - 1 tensor
-            keysTensor.dispose(); // - 1 tensor
-
-            if (!maskedTensorBatch.size) {
-                maskedTensorBatch.dispose(); // - 1 tensor
-                maskedKeysTensor.dispose(); // - 1 tensor
-                TensorBatch.dispose(); // - 1 tensor
-                DEBUG && console.log("No surviving tensors in batch", maskedTensorBatch.shape[0])
-                return []
-            } else {
-                keys = maskedKeysTensor.dataSync();
-                maskedKeysTensor.dispose(); // - 1 tensor
-                DEBUG && console.log("surviving tensors in batch", maskedTensorBatch.shape[0])
-            }
-        }
-
-        const tb = paddedTensorBatch || maskedTensorBatch || TensorBatch;
+        } 
+        const tb = paddedTensorBatch || TensorBatch;
         const prediction = this.model.predict(tb, { batchSize: this.batchSize })
         
         let newPrediction;
@@ -309,10 +262,6 @@ class Model {
             prediction.dispose();
             keys = keys.splice(0, 1);
         }
-        else if (this.useContext && this.batchSize > 1 && threshold === 0) {
-            newPrediction = this.addContext(prediction, tb, confidence);
-            prediction.dispose();
-        }
         TensorBatch.dispose();
         if (paddedTensorBatch) paddedTensorBatch.dispose();
         if (maskedTensorBatch) maskedTensorBatch.dispose();
@@ -320,11 +269,13 @@ class Model {
         const finalPrediction = newPrediction || prediction;
         
         const { indices, values } = tf.topk(finalPrediction, 5, true);
-        const [topIndices, topValues] = await Promise.all([indices.array(), values.array()]).catch(err => console.log('Data transfer error:',err));
+        
+        // The GPU backend is *so* slow with BirdNET, let's not queue up predictions
+        const [topIndices, topValues] = 
+            await Promise.all([indices.array(), values.array()]).catch(err => console.log('Data transfer error:',err));
         indices.dispose();
         values.dispose();
-        // end new
-        // const array_of_predictions = finalPrediction.arraySync()
+
         finalPrediction.dispose();
         if (newPrediction) newPrediction.dispose();
         keys = keys.map(key => (key / CONFIG.sampleRate).toFixed(3));
@@ -351,33 +302,28 @@ class Model {
         })
     };
 
+    padAudio = (audio) => {
+        const remainder = audio.length % this.chunkLength;
+        if (remainder){ 
+            // Create a new array with the desired length
+            const paddedAudio = new Float32Array(audio.length + (this.chunkLength -remainder));
+            // Copy the existing values into the new array
+            paddedAudio.set(audio);
+            return paddedAudio;
+        } else return audio
+    };
+
     async predictChunk(audioBuffer, start, fileStart, file, threshold, confidence) {
         DEBUG && console.log('predictCunk begin', tf.memory());
+        audioBuffer = this.padAudio(audioBuffer);
         audioBuffer = tf.tensor1d(audioBuffer);
-
-        // check if we need to pad
-        const remainder = audioBuffer.shape % this.chunkLength;
-        let paddedBuffer;
-        if (remainder !== 0) {
-            // Pad to the nearest full sample
-            paddedBuffer = audioBuffer.pad([[0, this.chunkLength - remainder]]);
-            audioBuffer.dispose();
-            DEBUG && console.log('Received final chunks')
-        }
-        const buffer = paddedBuffer || audioBuffer;
-        const numSamples = buffer.shape / this.chunkLength;
-        let bufferList = tf.split(buffer, numSamples);
-        buffer.dispose();
-        const specBatch = tf.stack(bufferList);
+        const numSamples = audioBuffer.shape / this.chunkLength;
+        const audioBatch = audioBuffer.reshape([numSamples, this.chunkLength]);
+        audioBuffer.dispose();
         const batchKeys = [...Array(numSamples).keys()].map(i => start + this.chunkLength * i);
-        const result = await this.predictBatch(specBatch, batchKeys, threshold, confidence);
-        this.clearTensorArray(bufferList);
+        const result = await this.predictBatch(audioBatch, batchKeys, threshold, confidence);
+        DEBUG && console.log('predictCunk end', tf.memory());
         return [result, file, fileStart];
-    }
-
-    async clearTensorArray(tensorObj) {
-        // Dispose of accumulated kept tensors in model tensor array
-        tensorObj.forEach(tensor => tensor.dispose());
     }
 }
 

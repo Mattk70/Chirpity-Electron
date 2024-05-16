@@ -1,8 +1,18 @@
-const tf = require('@tensorflow/tfjs-node');
+let tf, BACKEND;
+try {
+    tf = require('@tensorflow/tfjs-node');
+    BACKEND = 'tensorflow';
+    postMessage({message: 'tfjs-node', available: true});
+} catch (e) {
+    tf = require('@tensorflow/tfjs');
+    require('@tensorflow/tfjs-backend-webgpu');
+    BACKEND = 'webgpu';
+    postMessage({message: 'tfjs-node', available: false});
+}
 const fs = require('node:fs');
 const path = require('node:path');
 let DEBUG = false;
-let BACKEND;
+
 
 //GLOBALS
 let listModel;
@@ -331,7 +341,7 @@ async function _init_(){
     DEBUG && console.log("load loading metadata_model");
     // const appPath = "../" + location + "/";
     DEBUG && console.log(`List generating model received load instruction.`);
-    tf.setBackend('tensorflow').then(async () => {
+    tf.setBackend(BACKEND).then(async () => {
         tf.enableProdMode();
         if (DEBUG) {
             console.log(tf.env());

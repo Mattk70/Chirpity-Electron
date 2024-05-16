@@ -91,29 +91,9 @@ const STATE = new State();
 
 let WINDOW_SIZE = 3;
 
-// Function to check if buffer has the header in it
-function isWavHeaderPresent(header, chunk) {
-    // Check if the length of header is less than or equal to the length of chunk buffer
-    if (header.length <= chunk.length) {
-        // Compare the first bytes of chunk with header
-        for (let i = 0; i < header.length; i++) {
-            if (header[i] !== chunk[i]) {
-                // If any byte doesn't match, header is not present at the beginning of chunk
-                return false;
-            }
-        }
-        // If all bytes match, header is present at the beginning of chunk
-        return true;
-    } else {
-        // If header is longer than chunk, it can't be at the beginning
-        return false;
-    }
-}
-
 let NUM_WORKERS;
 let workerInstance = 0;
-// let TEMP, appPath, CACHE_LOCATION, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
-let TEMP, appPath, BATCH_SIZE, LABELS, BACKEND, batchChunksToSend = {};
+let appPath, BATCH_SIZE, LABELS, batchChunksToSend = {};
 let LIST_WORKER;
 const DEBUG = false;
 
@@ -356,11 +336,12 @@ async function handleMessage(e) {
     DEBUG && console.log('message received', action)
     switch (action) {
         case "_init_": {
-            const {model, batchSize, threads, backend, list} = args;
+            let {model, batchSize, threads, backend, list} = args;
             const t0 = Date.now();
-            LIST_WORKER = await spawnListWorker();
+            STATE.detect.backend = backend;
+            LIST_WORKER = await spawnListWorker(); // this can change the backend if tfjs-node isn't avaialble
             DEBUG && console.log('List worker took', Date.now() - t0, 'ms to load');
-            await onLaunch({model: model, batchSize: batchSize, threads: threads, backend: backend, list: list});
+            await onLaunch({model: model, batchSize: batchSize, threads: threads, backend: STATE.detect.backend, list: list});
             break;
         }
         case "abort": {
@@ -439,8 +420,12 @@ async function handleMessage(e) {
             break;
         }
         case "load-model": {
-            if (filesBeingProcessed.length) onAbort(args);
-            else predictWorkers.length && terminateWorkers();
+            if (filesBeingProcessed.length) {
+                onAbort(args);
+            }
+            else {
+                predictWorkers.length && terminateWorkers()
+            };
             await onLaunch(args);
             break;
         }
@@ -451,8 +436,8 @@ async function handleMessage(e) {
             break;
         }
         case "save": {DEBUG && console.log("file save requested");
-        await saveAudio(args.file, args.start, args.end, args.filename, args.metadata);
-        break;
+            await saveAudio(args.file, args.start, args.end, args.filename, args.metadata);
+            break;
         }
         case "save2db": {await onSave2DiskDB(args);
             break;
@@ -478,12 +463,10 @@ async function handleMessage(e) {
             break;
         }
         case 'update-locale': {
-
             await onUpdateLocale(args.locale, args.labels, args.refreshResults)
             break;
         }
         case "update-state": {
-            TEMP = args.temp || TEMP;
             appPath = args.path || appPath;
             // If we change the speciesThreshold, we need to invalidate any location caches
             if (args.speciesThreshold) {
@@ -508,22 +491,24 @@ ipcRenderer.on('new-client', async (event) => {
 })
 
 function savedFileCheck(fileList) {
-    // Construct a parameterized query to count the matching files in the database
-    const query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${fileList.map(() => '?').join(',')})`;
+    if (diskDB){
+        // Construct a parameterized query to count the matching files in the database
+        const query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${fileList.map(() => '?').join(',')})`;
 
-    // Execute the query with the file list as parameters
-    diskDB.get(query, fileList, (err, row) => {
-        if (err) {
-            console.error('Error querying database during savedFileCheck:', err);
-        } else {
-            const count = row.count;
-            if (count === fileList.length) {
-                UI.postMessage({event: 'all-files-saved-check-result', result: true});
+        // Execute the query with the file list as parameters
+        diskDB.get(query, fileList, (err, row) => {
+            if (err) {
+                console.error('Error querying database during savedFileCheck:', err);
             } else {
-                UI.postMessage({event: 'all-files-saved-check-result', result: false});
+                const count = row.count;
+                const result = count === fileList.length;
+                UI.postMessage({event: 'all-files-saved-check-result', result: result});
             }
-        }
-    });
+        });
+    } else {
+        UI.postMessage({event: 'generate-alert', message: 'The database has not finished loading. The saved file check was skipped'})
+        return undefined
+    }
 }
 
 async function onChangeMode(mode) {
@@ -548,7 +533,7 @@ async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backen
     sampleRate = model === "birdnet" ? 48_000 : 24_000;
     setAudioContext(sampleRate);
     UI.postMessage({event:'ready-for-tour'});
-    BACKEND = backend;
+    STATE.detect.backend = backend;
     BATCH_SIZE = batchSize;
     STATE.update({ model: model });
     await loadDB(appPath); // load the diskdb
@@ -560,11 +545,16 @@ async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backen
 async function spawnListWorker() {
     const worker_1 = await new Promise((resolve, reject) => {
         const worker = new Worker('./js/listWorker.js', { type: 'module' });
-
+        let backend = 'tensorflow';
         worker.onmessage = function (event) {
             // Resolve the promise once the worker sends a message indicating it's ready
-            if (event.data.message === 'list-model-ready') {
-                resolve(worker);
+            const message = event.data.message;
+            
+            if (message === 'list-model-ready') {
+                return resolve(worker);
+            } else if (message === "tfjs-node") {
+                event.data.available || (STATE.detect.backend = 'webgpu');
+                UI.postMessage({event: 'tfjs-node', hasNode: event.data.available})
             }
         };
 
@@ -869,7 +859,6 @@ async function onAnalyse({
             if (result && result.name !== FILE_QUEUE[0]) {
                 DEBUG && console.log(`Skipping ${file}, already analysed`)
                 FILE_QUEUE.splice(i, 1)
-                //filesBeingProcessed.splice(i, 1)
                 count++
                 continue;
             }
@@ -927,10 +916,11 @@ function onAbort({
     index = 0;
     DEBUG && console.log("abort received")
     if (filesBeingProcessed.length) {
-        //restart the worker
+        //restart the workers
         terminateWorkers();
         spawnPredictWorkers(model, list, BATCH_SIZE, NUM_WORKERS)
     }
+    predictQueue = [];
     filesBeingProcessed = [];
     predictionsReceived = {};
     predictionsRequested = {};
@@ -1460,9 +1450,10 @@ function lookForHeader(buffer){
 * @returns {Promise<unknown>}
 */
 const fetchAudioBuffer = async ({
-    file = '', start = 0, end = metadata[file].duration
+    file = '', start = 0, end = undefined
 }) => {
-
+    metadata[file].duration || await setMetadata({file:file});
+    end ??= metadata[file].duration; 
     let concatenatedBuffer = Buffer.alloc(0);
     let header;
     // Ensure start is a minimum 0.1 seconds from the end of the file, and >= 0
@@ -1513,23 +1504,24 @@ const fetchAudioBuffer = async ({
             DEBUG && console.log('FFmpeg command: ' + commandLine);
         })
 
-        stream.on('data', (chunk) => {
-            concatenatedBuffer = concatenatedBuffer.length ?  joinBuffers(concatenatedBuffer, chunk) : chunk;
-        });
-
-        stream.on('end', () => {
-            // Last chunk
-            const audio = concatenatedBuffer;
-            setupCtx(audio, sampleRate, 'UI').then(offlineCtx => {
-                offlineCtx.startRendering().then(resampled => {
-                    resolve(resampled);
-                }).catch((error) => {
-                    console.error(`FetchAudio rendering failed: ${error}`);
-                });
-            }).catch( (error) => {
-                reject(error)
-            });  
-            stream.destroy();
+        stream.on('readable', () => {
+            const chunk = stream.read();
+            if (chunk === null){
+                // Last chunk
+                const audio = concatenatedBuffer;
+                setupCtx(audio, sampleRate, 'UI', file).then(offlineCtx => {
+                    offlineCtx.startRendering().then(resampled => {
+                        resolve(resampled);
+                    }).catch((error) => {
+                        console.error(`FetchAudio rendering failed: ${error}`);
+                    });
+                }).catch( (error) => {
+                    reject(error.message)
+                });  
+                stream.destroy();
+            } else {
+                concatenatedBuffer = concatenatedBuffer.length ?  joinBuffers(concatenatedBuffer, chunk) : chunk;
+            }
         })
     });
 }
@@ -1962,7 +1954,7 @@ function spawnPredictWorkers(model, list, batchSize, threads) {
             model: model,
             list: list,
             batchSize: batchSize,
-            backend: BACKEND,
+            backend: STATE.detect.backend,
             lat: STATE.lat,
             lon: STATE.lon,
             week: STATE.week,
@@ -2124,7 +2116,7 @@ const parsePredictions = async (response) => {
     const included = await getIncludedIDs(file).catch( (error) => console.log('Error getting included IDs', error));
     const latestResult = response.result, db = STATE.db;
     DEBUG && console.log('worker being used:', response.worker);
-    if (! STATE.selection) await generateInsertQuery(latestResult, file).catch( (error) => console.warn('Error generating insert query', error));
+    if (! STATE.selection) await generateInsertQuery(latestResult, file).catch(error => console.warn('Error generating insert query', error));
     let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
     for (let i = 0; i < keysArray.length; i++) {
         let updateUI = false;
@@ -2150,7 +2142,7 @@ const parsePredictions = async (response) => {
                     confidenceRequired = STATE.detect.confidence;
                 }
                 if (confidence >= confidenceRequired) {
-                    const { cname, sname } = await memoryDB.getAsync(`SELECT cname, sname FROM species WHERE id = ${speciesID}`).catch( (error) => console.warn('Error getting species name', error));
+                    const { cname, sname } = await memoryDB.getAsync(`SELECT cname, sname FROM species WHERE id = ${speciesID}`).catch(error => console.warn('Error getting species name', error));
                     const result = {
                         timestamp: timestamp,
                         position: key,
@@ -2249,6 +2241,11 @@ function updateFilesBeingProcessed(file) {
         if (!STATE.selection) getSummary();
         // Need this here in case last file is not sent for analysis (e.g. nocmig mode)
         UI.postMessage({event: 'analysis-complete'})
+        // // refresh the webgpu backend
+        // if (STATE.detect.backend === 'webgpu' ) {
+        //     terminateWorkers();
+        //     spawnPredictWorkers(STATE.model, STATE.list, BATCH_SIZE, NUM_WORKERS)
+        // }
     }
 }
         
@@ -2259,7 +2256,7 @@ async function processNextFile({
 } = {}) { 
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
-        const found = await getWorkingFile(file).catch( (error) => console.warn('Error in getWorkingFile', error));
+        const found = await getWorkingFile(file).catch( (error) => console.warn('Error in getWorkingFile', JSON.stringify(error)));
         if (found) {
             if (end) {}
             let boundaries = [];
@@ -2278,7 +2275,7 @@ async function processNextFile({
                     });
                     
                     DEBUG && console.log('Recursion: start = end')
-                    await processNextFile(arguments[0]).catch( (error) => console.warn('Error in processNextFile call', error));
+                    await processNextFile(arguments[0]).catch(error => console.warn('Error in processNextFile call', error));
                     
                 } else {
                     if (!sumObjectValues(predictionsReceived)) {
@@ -2295,7 +2292,7 @@ async function processNextFile({
             }
         } else {
             DEBUG && console.log('Recursion: file not found')
-            await processNextFile(arguments[0]).catch( (error) => console.warn('Error in recursive processNextFile call', error));
+            await processNextFile(arguments[0]).catch(error => console.warn('Error in recursive processNextFile call', error));
         }
     }
 }
@@ -2765,7 +2762,8 @@ const onSave2DiskDB = async ({file}) => {
         return // nothing to do. Also will crash if trying to update disk from disk.
     }
     const included = await getIncludedIDs(file);
-    const filterClause = filtersApplied(included) ? `AND speciesID IN (${included} )` : ''
+    let filterClause = filtersApplied(included) ? `AND speciesID IN (${included} )` : '';
+    if (STATE.detect.nocmig) filterClause += ' AND isDaylight = TRUE ';
     await memoryDB.runAsync('BEGIN');
     await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.files SELECT * FROM files`);
     await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.locations SELECT * FROM locations`);
@@ -3392,4 +3390,3 @@ async function setIncludedIDs(lat, lon, week) {
     // Await the promise
     return await LIST_CACHE[key];
 }
-

@@ -1,8 +1,15 @@
-const tf = require('@tensorflow/tfjs-node');
+let tf, BACKEND;
+try {
+    tf = require('@tensorflow/tfjs-node');
+} catch {
+    tf = require('@tensorflow/tfjs');
+    require('@tensorflow/tfjs-backend-webgpu');
+    BACKEND = 'webgpu';
+}
 const fs = require('node:fs');
 const path = require('node:path');
 let DEBUG = false;
-let BACKEND;
+
 
 //GLOBALS
 let myModel;
@@ -11,7 +18,58 @@ const CONFIG = {
     sampleRate: 24_000, specLength: 3, sigmoid: 1,
 };
 
+function loadModel(params){
+    const version = params.model;
+    if (DEBUG) {
+        console.log("load request to worker");
+    }
+    const { height, width, labels, location } = JSON.parse(fs.readFileSync(path.join(__dirname, `../${version}_model_config.json`), "utf8"));
+    const appPath = "../" + location + "/";
+    const list = params.list;
+    const batch = params.batchSize;
+    const backend = BACKEND || params.backend;
+    backend === 'webgpu' &&  require('@tensorflow/tfjs-backend-webgpu');
+    if (DEBUG) {
+        console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
+    }
+    tf.setBackend(backend).then(async () => {
+        if (backend === "webgl") {
+            tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
+            tf.env().set("WEBGL_PACK", true);
+            tf.env().set("WEBGL_EXP_CONV", true);
+            tf.env().set("TOPK_K_CPU_HANDOFF_THRESHOLD", 128);
+            tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 0);
+        } else if (backend === "webgpu") {
+            tf.env().set("WEBGPU_DEFERRED_SUBMIT_BATCH_SIZE", 64); // Affects GPU RAM at expense of speed
+            //tf.env().set("WEBGPU_MATMUL_PROGRAM_TYPE", 3); // MatMulPackedProgram 
+        }
+        tf.enableProdMode();
+        //tf.enableDebugMode();
+        if (DEBUG) {
+            console.log(tf.env());
+            console.log(tf.env().getFlags());
+        }
+        myModel = new Model(appPath, version);
+        myModel.height = height;
+        myModel.width = width;
 
+        // Create a mask tensor where the specified indexes are set to 0 and others to 1
+        const indexesToZero = [25, 30, 110, 319, 378, 403, 404, 405, 406];
+        myModel.mask = tf.tensor2d(Array.from({ length: 408 }, (_, i) => indexesToZero.includes(i) ? 0 : 1), [1, 408]);
+        myModel.labels = labels;
+        await myModel.loadModel();
+        myModel.warmUp(batch);
+        BACKEND = tf.getBackend();
+        postMessage({
+            message: "model-ready",
+            sampleRate: myModel.config.sampleRate,
+            chunkLength: myModel.chunkLength,
+            backend: tf.getBackend(),
+            labels: labels,
+            worker: params.worker
+        });
+    });
+}
 onmessage = async (e) => {
     const modelRequest = e.data.message;
     const worker = e.data.worker;
@@ -19,56 +77,7 @@ onmessage = async (e) => {
     try {
         switch (modelRequest) {
             case "load": {
-                const version = e.data.model;
-                if (DEBUG) {
-                    console.log("load request to worker");
-                }
-                const { height, width, labels, location } = JSON.parse(fs.readFileSync(path.join(__dirname, `../${version}_model_config.json`), "utf8"));
-                const appPath = "../" + location + "/";
-                const list = e.data.list;
-                const batch = e.data.batchSize;
-                const backend = e.data.backend;
-                if (DEBUG) {
-                    console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
-                }
-                tf.setBackend(backend).then(async () => {
-                    if (backend === "webgl") {
-                        tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
-                        tf.env().set("WEBGL_PACK", true);
-                        tf.env().set("WEBGL_EXP_CONV", true);
-                        tf.env().set("TOPK_K_CPU_HANDOFF_THRESHOLD", 128);
-                        tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 0);
-                    }
-                    tf.enableProdMode();
-                    //tf.enableDebugMode();
-                    if (DEBUG) {
-                        console.log(tf.env());
-                        console.log(tf.env().getFlags());
-                    }
-                    myModel = new Model(appPath, list, version);
-                    myModel.height = height;
-                    myModel.width = width;
-                    myModel.list = e.data.list;
-                    myModel.lat = parseFloat(e.data.lat);
-                    myModel.lon = parseFloat(e.data.lon);
-                    myModel.week = parseInt(e.data.week);
-                    myModel.speciesThreshold = parseFloat(e.data.threshold);
-                    // Create a mask tensor where the specified indexes are set to 0 and others to 1
-                    const indexesToZero = [25, 30, 110, 319, 378, 403, 404, 405, 406];
-                    myModel.mask = tf.tensor2d(Array.from({ length: 408 }, (_, i) => indexesToZero.includes(i) ? 0 : 1), [1, 408]);
-                    myModel.labels = labels;
-                    await myModel.loadModel();
-                    myModel.warmUp(batch);
-                    BACKEND = tf.getBackend();
-                    postMessage({
-                        message: "model-ready",
-                        sampleRate: myModel.config.sampleRate,
-                        chunkLength: myModel.chunkLength,
-                        backend: tf.getBackend(),
-                        labels: labels,
-                        worker: worker
-                    });
-                });
+                loadModel(e.data)
                 break;
                 }
             case "predict": {
@@ -124,7 +133,7 @@ onmessage = async (e) => {
                 };
                 postMessage(response);
                 break;
-                }
+            }
         }
     }
     // If worker was respawned
@@ -134,7 +143,7 @@ onmessage = async (e) => {
 };
 
 class Model {
-    constructor(appPath, list, version) {
+    constructor(appPath, version) {
         this.model = undefined;
         this.labels = undefined;
         this.height = undefined;
@@ -164,13 +173,28 @@ class Model {
     async warmUp(batchSize) {
         this.batchSize = parseInt(batchSize);
         this.inputShape[0] = this.batchSize;
+        DEBUG && console.log('WarmUp begin', tf.memory().numTensors)
+        const input = tf.zeros(this.inputShape);
+        
+        // Parallel compilation for faster warmup
+        // https://github.com/tensorflow/tfjs/pull/7755/files#diff-a70aa640d286e39c922aa79fc636e610cae6e3a50dd75b3960d0acbe543c3a49R316
         if (tf.getBackend() === 'webgl') {
-            tf.tidy(() => {
-                const warmupResult = this.model.predict(tf.zeros(this.inputShape), { batchSize: this.batchSize });
-                const synced = warmupResult.arraySync();
-            })
+            tf.env().set('ENGINE_COMPILE_ONLY', true);
+            const compileRes = this.model.predict(input, { batchSize: this.batchSize });
+            tf.env().set('ENGINE_COMPILE_ONLY', false);
+            await tf.backend().checkCompileCompletionAsync();
+            tf.backend().getUniformLocations();
+            tf.dispose(compileRes);
+            input.dispose();
+        } else if (tf.getBackend() === 'webgpu') {
+            tf.env().set('WEBGPU_ENGINE_COMPILE_ONLY', true);
+            const compileRes = this.model.predict(input, { batchSize: this.batchSize });
+            tf.env().set('WEBGPU_ENGINE_COMPILE_ONLY', false);
+            await tf.backend().checkCompileCompletionAsync();
+            tf.dispose(compileRes);
         }
-        if (DEBUG) console.log('WarmUp end', tf.memory().numTensors)
+        input.dispose()
+        DEBUG && console.log('WarmUp end', tf.memory().numTensors)
         return true;
     }
 
@@ -241,7 +265,7 @@ class Model {
         // specs.dispose(); // - 1 tensor
         let paddedTensorBatch, maskedTensorBatch;
         if (BACKEND === 'webgl' && TensorBatch.shape[0] < this.batchSize) {
-            // WebGL works best when all batches are the same size
+            // GPU backends work best when all batches are the same size
             paddedTensorBatch = this.padBatch(TensorBatch)  // + 1 tensor
         } else if (threshold) {
             if (this.version !== 'v1') threshold *= 4;
@@ -352,23 +376,25 @@ class Model {
             return signal.sub(sigMin).divNoNan(range).mul(tf.scalar(2)).sub(tf.scalar(1))
         })
     };
+
+    padAudio = (audio) => {
+        const remainder = audio.length % this.chunkLength;
+        if (remainder){ 
+            // Create a new array with the desired length
+            const paddedAudio = new Float32Array(audio.length + (this.chunkLength -remainder));
+            // Copy the existing values into the new array
+            paddedAudio.set(audio);
+            return paddedAudio;
+        } else return audio
+    };
+
     async predictChunk(audioBuffer, start, fileStart, file, threshold, confidence) {
         if (DEBUG) console.log('predictCunk begin', tf.memory().numTensors);
+        audioBuffer = this.padAudio(audioBuffer);
         audioBuffer = tf.tensor1d(audioBuffer);
-
-        // check if we need to pad
-        const remainder = audioBuffer.shape % this.chunkLength;
-        let paddedBuffer;
-        if (remainder !== 0) {
-            // Pad to the nearest full sample
-            paddedBuffer = audioBuffer.pad([[0, this.chunkLength - remainder]]);
-            audioBuffer.dispose();
-            if (DEBUG) console.log('Received final chunks')
-        }
-        const buffer = paddedBuffer || audioBuffer;
-        const numSamples = buffer.shape / this.chunkLength;
-        let buffers = tf.reshape(buffer, [numSamples, this.chunkLength]);
-        buffer.dispose();
+        const numSamples = audioBuffer.shape / this.chunkLength;
+        let buffers = tf.reshape(audioBuffer, [numSamples, this.chunkLength]);
+        audioBuffer.dispose();
         const bufferList = this.version !== 'v4' ? this.normalise_audio_batch(buffers) : buffers;
         const specBatch = tf.tidy(() => {
             const bufferArray = tf.unstack(bufferList);
