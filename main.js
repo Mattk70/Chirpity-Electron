@@ -343,13 +343,15 @@ async function createWorker() {
 
 // This method will be called when Electron has finished loading
 app.whenReady().then(async () => {
-
+    // Update the userData path for portable app
+    if (process.env.PORTABLE_EXECUTABLE_DIR)
+        app.setPath ('userData', path.join(process.env.PORTABLE_EXECUTABLE_DIR, "chirpity-data"));
     ipcMain.handle('getPath', () => app.getPath('userData'));
     ipcMain.handle('getTemp', () => app.getPath('temp'));
     ipcMain.handle('getVersion', () => app.getVersion());
     ipcMain.handle('isMac', () => process.platform === 'darwin');
     ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
-    ipcMain.handle('exitApplication', () => app.quit());
+    ipcMain.handle('exitApplication', () => app.quit()); 
     
     // Debug mode
     try {

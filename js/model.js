@@ -4,7 +4,7 @@ try {
 } catch {
     tf = require('@tensorflow/tfjs');
     require('@tensorflow/tfjs-backend-webgpu');
-    BACKEND = 'webgpu'
+    BACKEND = 'webgpu';
 }
 const fs = require('node:fs');
 const path = require('node:path');
@@ -41,7 +41,7 @@ function loadModel(params){
             tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 0);
         } else if (backend === "webgpu") {
             tf.env().set("WEBGPU_DEFERRED_SUBMIT_BATCH_SIZE", 64); // Affects GPU RAM at expense of speed
-            tf.env().set("WEBGPU_MATMUL_PROGRAM_TYPE", 3); // MatMulPackedProgram
+            //tf.env().set("WEBGPU_MATMUL_PROGRAM_TYPE", 3); // MatMulPackedProgram 
         }
         tf.enableProdMode();
         //tf.enableDebugMode();
@@ -176,7 +176,7 @@ class Model {
         DEBUG && console.log('WarmUp begin', tf.memory().numTensors)
         const input = tf.zeros(this.inputShape);
         
-        // Parallel compilation for warmup speedup
+        // Parallel compilation for faster warmup
         // https://github.com/tensorflow/tfjs/pull/7755/files#diff-a70aa640d286e39c922aa79fc636e610cae6e3a50dd75b3960d0acbe543c3a49R316
         if (tf.getBackend() === 'webgl') {
             tf.env().set('ENGINE_COMPILE_ONLY', true);

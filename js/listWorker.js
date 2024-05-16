@@ -2,10 +2,12 @@ let tf, BACKEND;
 try {
     tf = require('@tensorflow/tfjs-node');
     BACKEND = 'tensorflow';
-} catch {
+    postMessage({message: 'tfjs-node', available: true});
+} catch (e) {
     tf = require('@tensorflow/tfjs');
     require('@tensorflow/tfjs-backend-webgpu');
-    BACKEND = 'webgpu'
+    BACKEND = 'webgpu';
+    postMessage({message: 'tfjs-node', available: false});
 }
 const fs = require('node:fs');
 const path = require('node:path');
