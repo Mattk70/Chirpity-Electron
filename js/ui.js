@@ -3226,10 +3226,6 @@ function onChartData(args) {
             const commentHTML = comment ?
             `<span title="${comment.replaceAll('"', '&quot;')}" class='material-symbols-outlined pointer'>comment</span>` : '';
             const isUncertain = score < 65 ? '&#63;' : '';
-            // result.filename  and result.date used for feedback
-            result.date = timestamp;
-            // this may need revision now we have custom lists
-            result.filename = cname.replace(/'/g, "\\'") + `_${timestamp}`;
             // store result for feedback function to use
             predictions[index] = result;
             // Format date and position for  UI
@@ -3384,7 +3380,8 @@ function onChartData(args) {
         if (result) {
             start = result.position;
             end = result.end || start + 3;
-            filename = result.filename + `.${config.audio.format}`;
+            const datetime = new Date(result.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
+            filename = `${result.cname}_${datetime}_export.${config.audio.format}`;
         } else if (start === undefined) {
             if (region.start) {
                 start = region.start + bufferBegin;
