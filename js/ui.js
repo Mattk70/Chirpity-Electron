@@ -1619,7 +1619,7 @@ window.onload = async () => {
         showThreshold(config.detect.confidence);
         SNRSlider.value = config.filters.SNR;
         SNRThreshold.textContent = config.filters.SNR;
-        if (config.backend === 'webgl') {
+        if (config.backend === 'webgl' || config.backend === 'webgpu') {
             SNRSlider.disabled = true;
         };
         
@@ -2424,6 +2424,8 @@ function onChartData(args) {
     
     const handleBackendChange = (backend) => {
         config.backend = backend instanceof Event ? backend.target.value : backend;
+        const backendEL = document.getElementById(config.backend);
+        backendEL.checked = true;
         if (config.backend === 'webgl' || config.backend === 'webgpu') {
             //powerSave(true)
             SNRSlider.disabled = true;
