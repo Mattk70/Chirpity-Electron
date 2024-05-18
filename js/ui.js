@@ -1516,7 +1516,7 @@ window.onload = async () => {
         backend: 'webgpu',
         hasNode: false,
         tensorflow: { threads: DIAGNOSTICS['Cores'], batchSize: 32 },
-        webgpu: { threads: 2, batchSize: 4 },
+        webgpu: { threads: 2, batchSize: 8 },
         webgl: { threads: 2, batchSize: 32 },
         audio: { gain: 0, format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false, notification: true, normalise: false },
         limit: 500,
@@ -3381,7 +3381,7 @@ function onChartData(args) {
             start = result.position;
             end = result.end || start + 3;
             const datetime = new Date(result.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
-            filename = `${result.cname}_${datetime}_export.${config.audio.format}`;
+            filename = `${result.cname}_${datetime}GMT_export.${config.audio.format}`;
         } else if (start === undefined) {
             if (region.start) {
                 start = region.start + bufferBegin;
@@ -3391,7 +3391,7 @@ function onChartData(args) {
                 end = currentBuffer.duration;
             }
             const dateString = new Date(fileStart + (start * 1000)).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
-            filename = dateString + '_export.' + config.audio.format;
+            filename = dateString + 'GMT_export.' + config.audio.format;
         }
         
         let metadata = {
