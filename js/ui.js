@@ -372,7 +372,7 @@ const initWavesurfer = ({
     DOM.colourmap.value = config.colormap;
     // Set click event that removes all regions
     
-    waveElement.addEventListener('mousedown', resetRegions);
+
     // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
         region = e;
@@ -427,6 +427,8 @@ const initWavesurfer = ({
     const tooltip = document.createElement('div');
     tooltip.id = 'tooltip';
     document.body.appendChild(tooltip);
+    waveElement.removeEventListener('mousedown', resetRegions);
+    waveElement.addEventListener('mousedown', resetRegions);
     waveElement.removeEventListener('mousemove', specTooltip);
     waveElement.removeEventListener('mouseout', hideTooltip)
 
