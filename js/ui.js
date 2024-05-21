@@ -434,7 +434,7 @@ const initWavesurfer = ({
 
     //const toolTipListener = debounce(specTooltip, 10)
     // Show tooltip on mousemove event
-    waveElement.addEventListener('mousemove', specTooltip);
+    waveElement.addEventListener('mousemove', specTooltip); 
 
     // Hide tooltip on mouseout event
     waveElement.addEventListener('mouseout', hideTooltip)
@@ -1642,7 +1642,7 @@ window.onload = async () => {
         DOM.defaultLat.value = config.latitude;
         DOM.defaultLon.value = config.longitude;
         place.innerHTML = '<span class="material-symbols-outlined">fmd_good</span>' + config.location;
-        setListUIState(config.list);
+        //setListUIState(config.list);
         worker.postMessage({
             action: 'update-state',
             path: appPath,
@@ -4585,7 +4585,9 @@ async function readLabels(labelFile, updating){
     }).catch(error =>{
         if (error.message === 'Failed to fetch') {
             generateToast({message: 'The custom list could not be found, <b class="text-danger">no detections will be shown</b>.'})
-            DOM.customListSelector.classList.add('btn-outline-danger')
+            DOM.customListSelector.classList.add('btn-outline-danger');
+            document.getElementById('navbarSettings').click();
+            document.getElementById('list-file-selector').focus();
             return
         }
         else {console.error('There was a problem reading the label file:', error)}

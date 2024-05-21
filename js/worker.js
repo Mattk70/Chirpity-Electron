@@ -3319,7 +3319,7 @@ async function getIncludedIDs(file){
     } else {
         if (STATE.included?.[STATE.model]?.[STATE.list] === undefined) {
             // The object lacks the week / location
-            await setIncludedIDs();
+            LIST_WORKER && await setIncludedIDs();
             hitOrMiss = 'miss';
         }
         //DEBUG && console.log(`Cache ${hitOrMiss}: setting the ${STATE.list} list took ${Date.now() -t0}ms`)
