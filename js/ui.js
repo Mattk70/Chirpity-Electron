@@ -4805,6 +4805,7 @@ async function readLabels(labelFile, updating){
                     action: 'purge-file',
                     fileName: file
                 })
+                resetResults();
             }
             renderFilenamePanel()
         }
