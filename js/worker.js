@@ -2257,7 +2257,7 @@ async function processNextFile({
 } = {}) { 
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
-        const found = await getWorkingFile(file).catch( (error) => console.warn('Error in getWorkingFile', JSON.stringify(error)));
+        const found = await getWorkingFile(file).catch(error => console.warn('Error in getWorkingFile', JSON.stringify(error)));
         if (found) {
             if (end) {}
             let boundaries = [];
