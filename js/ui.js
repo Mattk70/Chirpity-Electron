@@ -3384,8 +3384,9 @@ function onChartData(args) {
         if (result) {
             start = result.position;
             end = result.end || start + 3;
-            const datetime = new Date(result.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
-            filename = `${result.cname}_${datetime}GMT_export.${config.audio.format}`;
+            const dateArray = new Date(result.timestamp).toString().split(' ');
+            const datetime = dateArray.slice(0, 5).join(' ');
+            filename = `${result.cname}_${datetime}.${config.audio.format}`;
         } else if (start === undefined) {
             if (region.start) {
                 start = region.start + bufferBegin;
@@ -3394,8 +3395,9 @@ function onChartData(args) {
                 start = 0;
                 end = currentBuffer.duration;
             }
-            const dateString = new Date(fileStart + (start * 1000)).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
-            filename = dateString + 'GMT_export.' + config.audio.format;
+            const dateArray = new Date(fileStart + (start * 1000)).toString().split(' ');
+            const dateString = dateArray.slice(0, 5).join(' ');
+            filename = dateString + '.' + config.audio.format;
         }
         
         let metadata = {
