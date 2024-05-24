@@ -13,7 +13,7 @@ function searchPatterns(directory, patterns) {
         const stats = fs.statSync(filePath);
         if (stats.isDirectory() || file.endsWith('.js')){
             if (stats.isDirectory()) {
-                if (filePath.includes('node_modules')) {
+                if (! filePath.includes('node_modules')) {
                     searchPatterns(filePath, patterns);
                 }
             } else if (stats.isFile()) {

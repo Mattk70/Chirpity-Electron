@@ -1078,7 +1078,7 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
     metadata[file] ??= { proxy: proxy };
     metadata[file].proxy ??= proxy;
     // CHeck the database first, so we honour any manual updates.
-    const savedMeta = await getSavedFileInfo(file);
+    const savedMeta = await getSavedFileInfo(file).catch(error => console.warn('getSavedFileInfo error', error));
     // If we have stored imfo about the file, set the saved flag;
     metadata[file].isSaved = !!savedMeta;
     // Latitude only provided when updating location
@@ -1089,7 +1089,7 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
     // using the nullish coalescing operator
     metadata[file].locationID ??= savedMeta?.locationID;
     
-    metadata[file].duration ??= savedMeta?.duration || await getDuration(file);
+    metadata[file].duration ??= savedMeta?.duration || await getDuration(file).catch(error => console.warn('getDuration error', error));
     
     return new Promise((resolve, reject) => {
         if (metadata[file].isComplete) {
