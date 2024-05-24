@@ -154,7 +154,7 @@
                     <div>
                         <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Language" data-bs-content="Select your preferred language for birds' common names">?</a>
                         <div class="pe-3 input-group rounded p-2 mb-1">
-                            <label class="input-group-text col-5" for="list-to-use">Language:</label>
+                            <label class="input-group-text col-5" for="locale">Language:</label>
                             <select class="form-select mb-0" id="locale">
                                 <option value="en_uk">English (UK)</option>
                                 <option value="en">English (US)</option>
@@ -481,6 +481,14 @@
                                 <input class="form-check-input" type="checkbox" role="switch" id="do-not-track">
                                 <label class="form-check-label me-2" for="do-not-track">Opt out of usage analytics</label><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Disable Tracking" data-bs-content="Chirpity collects anonymous system data to enhance user experience and aid bug tracking. If you do not want to share this information, you can disable it here.">?</a>
                             </div>        
+                        </div>
+                    </div>
+                    <div class="col-auto form-group rounded p-2 mb-2">
+                        <div class="text-nowrap">
+                            <div class="form-check form-switch">
+                                <button class="btn btn-warning" id="reset-defaults" onclick="return false">Reset to default settings</button>
+                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Default Settings" data-bs-content="Reset the configuration settings to their default values. N.B. Relaunch Chirpity to see changes, also, language settings will need to be re-set manually">?</a>
+                            </div>
                         </div>
                     </div>
                 </fieldset>

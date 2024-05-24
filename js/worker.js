@@ -2613,8 +2613,7 @@ async function formatCSVValues(obj) {
     
     // Step 3: Convert 'timestamp' and 'end' to a formatted string
     modifiedObj.timestamp = formatDate(modifiedObj.timestamp)
-    const end = new Date(modifiedObj.end);
-    modifiedObj.end = end.toISOString().slice(0, 19).replace('T', ' ');
+    modifiedObj.end = formatDate(modifiedObj.end);
     // Create a new object with the right headers
     const newObj = {};
     newObj['File'] = modifiedObj.file

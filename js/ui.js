@@ -324,6 +324,9 @@ function createTimeline() {
 const resetRegions = () => {
     if (wavesurfer) wavesurfer.clearRegions();
     region = undefined;
+    const orphanedRegions = document.querySelectorAll('wave>region');
+    // Sometimes, there is a region that is not attached the the wavesurfer regions list
+    orphanedRegions?.length && orphanedRegions.forEach(region => region.remove());
     disableMenuItem(['analyseSelection', 'export-audio']);
     if (fileLoaded) enableMenuItem(['analyse']);
 }
@@ -428,16 +431,12 @@ const initWavesurfer = ({
     tooltip.id = 'tooltip';
     document.body.appendChild(tooltip);
     waveElement.removeEventListener('mousedown', resetRegions);
-    waveElement.addEventListener('mousedown', resetRegions);
     waveElement.removeEventListener('mousemove', specTooltip);
     waveElement.removeEventListener('mouseout', hideTooltip)
 
-    //const toolTipListener = debounce(specTooltip, 10)
-    // Show tooltip on mousemove event
     waveElement.addEventListener('mousemove', specTooltip); 
-
-    // Hide tooltip on mouseout event
-    waveElement.addEventListener('mouseout', hideTooltip)
+    waveElement.addEventListener('mousedown', resetRegions);
+    waveElement.addEventListener('mouseout', hideTooltip);
 }
 
 function updateElementCache() {
@@ -1486,46 +1485,46 @@ function fillDefaults(config, defaultConfig) {
     });
 }
 /////////////////////////  Window Handlers ////////////////////////////
-
+// Set config defaults
+const defaultConfig = {
+    seenTour: false,
+    lastUpdateCheck: 0,
+    UUID: uuidv4(),
+    colormap: 'inferno',
+    customColormap: {'loud': "#00f5d8", 'mid': "#000000", 'quiet': "#000000", 'threshold': 0.5, 'windowFn': 'hann'},
+    timeOfDay: true,
+    list: 'birds',
+    customListFile: {birdnet: '', chirpity: ''},
+    local: true,
+    speciesThreshold: 0.03,
+    useWeek: false,
+    model: 'chirpity',
+    chirpity: {locale: 'en_uk'},
+    birdnet: {locale: 'en'},
+    latitude: 52.87,
+    longitude: 0.89, 
+    location: 'Great Snoring, North Norfolk',
+    detect: { nocmig: false, contextAware: false, confidence: 45 },
+    filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0, sendToModel: false },
+    warmup: true,
+    backend: 'webgpu',
+    hasNode: false,
+    tensorflow: { threads: DIAGNOSTICS['Cores'], batchSize: 32 },
+    webgpu: { threads: 2, batchSize: 8 },
+    webgl: { threads: 2, batchSize: 32 },
+    audio: { gain: 0, format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false, notification: true, normalise: false },
+    limit: 500,
+    track: true,
+    debug: false,
+    VERSION: VERSION
+};
 let appPath, tempPath, isMac;
 window.onload = async () => {
     window.electron.requestWorkerChannel();
     isMac = await window.electron.isMac();
     replaceCtrlWithCommand()
     DOM.contentWrapperElement.classList.add('loaded');
-    // Set config defaults
-    const defaultConfig = {
-        seenTour: false,
-        lastUpdateCheck: 0,
-        UUID: uuidv4(),
-        colormap: 'inferno',
-        customColormap: {'loud': "#00f5d8", 'mid': "#000000", 'quiet': "#000000", 'threshold': 0.5, 'windowFn': 'hann'},
-        timeOfDay: true,
-        list: 'birds',
-        customListFile: {birdnet: '', chirpity: ''},
-        local: true,
-        speciesThreshold: 0.03,
-        useWeek: false,
-        model: 'chirpity',
-        chirpity: {locale: 'en_uk'},
-        birdnet: {locale: 'en'},
-        latitude: 52.87,
-        longitude: 0.89, 
-        location: 'Great Snoring, North Norfolk',
-        detect: { nocmig: false, contextAware: false, confidence: 45 },
-        filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0, sendToModel: false },
-        warmup: true,
-        backend: 'webgpu',
-        hasNode: false,
-        tensorflow: { threads: DIAGNOSTICS['Cores'], batchSize: 32 },
-        webgpu: { threads: 2, batchSize: 8 },
-        webgl: { threads: 2, batchSize: 32 },
-        audio: { gain: 0, format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false, notification: true, normalise: false },
-        limit: 500,
-        track: true,
-        debug: false,
-        VERSION: VERSION
-    };
+    
     // Load preferences and override defaults
     [appPath, tempPath] = await getPaths();
     // establish the message channel
@@ -2313,9 +2312,10 @@ function onChartData(args) {
         wavesurfer.addPlugin(WaveSurfer.regions.create({
             formatTimeCallback: () => '',
             dragSelection: true,
+            maxRegions: 1,
             // Region length bug (likely mine) means I don't trust leangths > 60 seconds
             maxLength: config[config.backend].batchSize * 3,
-            slop: 5,
+            slop: null,
             color: "rgba(255, 255, 255, 0.2)"
         })
         ).initPlugin('regions')
@@ -2358,15 +2358,17 @@ function onChartData(args) {
     }
     
     function hideTooltip() {
-        tooltip.style.display = 'none';
+        tooltip.style.visibility = 'hidden';
     };
     function specTooltip(event) {
+        const waveElement = event.target;
         const yPosition = Math.round(((waveElement.getBoundingClientRect().bottom - event.clientY) * (11950 / waveElement.getBoundingClientRect().height))/10) * 10;
-        tooltip.innerHTML = `Frequency: ${yPosition}Hz`;
+        tooltip.textContent = `Frequency: ${yPosition}Hz`;
         if (region) tooltip.innerHTML += "<br>" + formatRegionTooltip(region.start, region.end)
         tooltip.style.top = `${event.clientY}px`;
         tooltip.style.left = `${event.clientX + 15}px`; // Adjust tooltip position
         tooltip.style.display = 'block';
+        tooltip.style.visibility = 'visible';
     }
 
 
@@ -3780,7 +3782,7 @@ function onChartData(args) {
         STATE.sortOrder = order;
         worker.postMessage({ action: 'update-state', sortOrder: order })
         resetResults({clearSummary: false, clearPagination: false, clearResults: true});
-        filterResults()
+        filterResults();
     }
     // Drag file to app window to open
     document.addEventListener('dragover', (event) => {
@@ -4274,6 +4276,13 @@ DOM.gain.addEventListener('input', () => {
                 if (! PREDICTING){
                     const sortBy = STATE.sortOrder === 'score DESC ' ? 'score ASC ' : 'score DESC ';
                     setSortOrder(sortBy);
+                }
+                break;
+            }
+            case 'reset-defaults': {
+                if (confirm('Are you sure you want to revert to the default settings? You will need to relaunch Chirpity to see the changes.')){
+                    config = defaultConfig;
+                    updatePrefs('config.json', config);
                 }
                 break;
             }
@@ -4895,7 +4904,7 @@ async function readLabels(labelFile, updating){
     // Event handler for starting the tour
     const prepTour = async () => {
         if (!fileLoaded) {
-            const example_file = await window.electron.getAudio();;
+            const example_file = await window.electron.getAudio();
             // create a canvas for the audio spec
             showElement(['spectrogramWrapper'], false);
             await loadAudioFile({ filePath: example_file });
