@@ -430,6 +430,10 @@ const initWavesurfer = ({
     const tooltip = document.createElement('div');
     tooltip.id = 'tooltip';
     document.body.appendChild(tooltip);
+    // Add event listener for the gesture events
+    waveElement.removeEventListener('wheel', handleGesture);
+    waveElement.addEventListener('wheel', handleGesture, false);
+
     waveElement.removeEventListener('mousedown', resetRegions);
     waveElement.removeEventListener('mousemove', specTooltip);
     waveElement.removeEventListener('mouseout', hideTooltip)
@@ -1918,6 +1922,24 @@ function getSpecies(target) {
 
 
 const getDetectionContext = (target) => target.closest('table').id;
+
+
+function handleGesture(event) {
+    waitForFinalEvent( () => {
+        const key = event.deltaX > 0 ? 'PageDown'  : 'PageUp';
+        const pageEvent = new KeyboardEvent('keydown', {
+            code: key,
+            bubbles: true,
+            cancelable: true // The event is cancelable
+        });
+
+        // Dispatch the event on the document or a specific element
+        document.dispatchEvent(pageEvent);
+    }, 10, 'id2');
+    
+}
+
+
 
 
 document.addEventListener('change', function (e) {

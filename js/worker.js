@@ -2562,7 +2562,9 @@ const getResults = async ({
             if (format === 'audio') {
                 if (limit){
                     // Audio export. Format date to YYYY-MM-DD-HH-MM-ss
-                    const dateString = new Date(r.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
+                    const dateArray = new Date(r.timestamp).toString().split(' ');
+                    const dateString = dateArray.slice(0, 5).join(' ');
+                    //const dateString = new Date(r.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
                     const filename = `${r.cname}-${dateString}.${STATE.audio.format}`
                     DEBUG && console.log(`Exporting from ${r.file}, position ${r.position}, into folder ${directory}`)
                     saveAudio(r.file, r.position, r.position + 3, filename, metadata, directory)
