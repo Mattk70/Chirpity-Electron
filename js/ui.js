@@ -4821,10 +4821,16 @@ async function readLabels(labelFile, updating){
             DBaction: action,
             batch: batch,
             confidence: confidence,
-            active: activeRow?.rowIndex - 1, //  have to account for the header row
+            position: {row: activeRow?.rowIndex - 1, page: getCurrentPage()}, //  have to account for the header row
             speciesFiltered: isSpeciesViewFiltered(true)
         })
         resetResults({clearPagination: false})
+    }
+
+    function getCurrentPage(){
+        let currentPage = pagination[0].querySelector('.active');
+        currentPage = currentPage ? parseInt(currentPage.textContent) : 1;
+        return currentPage;
     }
         
     function deleteFile(file) {

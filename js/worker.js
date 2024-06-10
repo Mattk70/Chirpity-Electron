@@ -764,7 +764,7 @@ const prepResultsStatement = (species, noLimit, included, offset, topRankin) => 
     }
     // Prioritise selection ranges
     const range = STATE.selection?.start ? STATE.selection :
-    STATE.mode === 'explore' ? STATE.explore.range : false;
+        STATE.mode === 'explore' ? STATE.explore.range : false;
     const useRange = range?.start;  
     if (useRange) {
         resultStatement += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
@@ -1895,7 +1895,7 @@ async function saveAudio(file, start, end, filename, metadata, folder) {
     if (folder) {
         const buffer = Buffer.from(await thisBlob.arrayBuffer());
         if (! fs.existsSync(folder)) fs.mkdirSync(folder, {recursive: true});
-        fs.writeFile(p.join(folder, filename), buffer, {flag: 'w+'}, err => {
+        fs.writeFile(p.join(folder, filename), buffer, {flag: 'w'}, err => {
             if (err) console.log(err) ;
             else if (DEBUG) console.log('Audio file saved') });
     }
@@ -2024,7 +2024,7 @@ async function batchInsertRecords(cname, label, files, originalCname) {
     DEBUG && console.log(`Batch record update took ${(Date.now() - t0) / 1000} seconds`)
 }
                         
-const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label, batch, originalCname, confidence, speciesFiltered, updateResults = true }) => {
+const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label, batch, originalCname, confidence, position, speciesFiltered, updateResults = true }) => {
     if (batch) return batchInsertRecords(cname, label, file, originalCname)
     start = parseFloat(start), end = parseFloat(end);
     const startMilliseconds = Math.round(start * 1000);
@@ -2061,8 +2061,8 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
         STATE.db === diskDB ? UI.postMessage({ event: 'diskDB-has-records' }) : UI.postMessage({event: 'unsaved-records'});
     }
     if (updateResults){
-        const select =  {start: start, dateTime: dateTime};
-        await getResults({species:speciesFiltered, select: select});
+        position.start = start;
+        await getResults({species:speciesFiltered, position: position});
         await getSummary({species: speciesFiltered});
     }
     return changes;
@@ -2404,62 +2404,62 @@ const getSummary = async ({
 };
 
 
-const getPosition = async ({species = undefined, dateTime = undefined, included = []} = {}) => {
-    const params = [STATE.detect.confidence];
-    let positionStmt = `      
-    WITH ranked_records AS (
-        SELECT 
-        dateTime,
-        cname,
-        RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
-        FROM records 
-        JOIN species ON records.speciesID = species.id 
-        JOIN files ON records.fileID = files.id 
-        WHERE confidence >= ?
-        `;
-    // If you're using the memory db, you're either anlaysing one,  or all of the files
-    if (['analyse'].includes(STATE.mode) && STATE.filesToAnalyse.length === 1) {
-        positionStmt += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
-        params.push(...STATE.filesToAnalyse);
-    }
-    else if (['archive'].includes(STATE.mode)) {
-        positionStmt += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
-        params.push(...STATE.filesToAnalyse);
-    }
-        // Prioritise selection ranges
-        const range = STATE.selection?.start ? STATE.selection :
-        STATE.mode === 'explore' ? STATE.explore.range : false;
-        const useRange = range?.start;  
-        if (useRange) {
-            positionStmt += ' AND dateTime BETWEEN ? AND ? ';
-            params.push(range.start,range.end)
-        }    
-        if (filtersApplied(included)){
-                const included = await getIncludedIDs();
-                positionStmt += ` AND speciesID IN (${prepParams(included)}) `;
-                params.push(...included)
-        }
-        if (STATE.locationID) {
-            positionStmt += ` AND locationID = ? `;
-            params.push(STATE.locationID)
-        }
-        if (STATE.detect.nocmig){
-            positionStmt += ' AND COALESCE(isDaylight, 0) != 1 '; // Backward compatibility for < v0.9.
-        }
+// const getPosition = async ({species = undefined, dateTime = undefined, included = []} = {}) => {
+//     const params = [STATE.detect.confidence];
+//     let positionStmt = `      
+//     WITH ranked_records AS (
+//         SELECT 
+//         dateTime,
+//         cname,
+//         RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
+//         FROM records 
+//         JOIN species ON records.speciesID = species.id 
+//         JOIN files ON records.fileID = files.id 
+//         WHERE confidence >= ?
+//         `;
+//     // If you're using the memory db, you're either anlaysing one,  or all of the files
+//     if (['analyse'].includes(STATE.mode) && STATE.filesToAnalyse.length === 1) {
+//         positionStmt += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+//         params.push(...STATE.filesToAnalyse);
+//     }
+//     else if (['archive'].includes(STATE.mode)) {
+//         positionStmt += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+//         params.push(...STATE.filesToAnalyse);
+//     }
+//         // Prioritise selection ranges
+//         const range = STATE.selection?.start ? STATE.selection :
+//         STATE.mode === 'explore' ? STATE.explore.range : false;
+//         const useRange = range?.start;  
+//         if (useRange) {
+//             positionStmt += ' AND dateTime BETWEEN ? AND ? ';
+//             params.push(range.start,range.end)
+//         }    
+//         if (filtersApplied(included)){
+//                 const included = await getIncludedIDs();
+//                 positionStmt += ` AND speciesID IN (${prepParams(included)}) `;
+//                 params.push(...included)
+//         }
+//         if (STATE.locationID) {
+//             positionStmt += ` AND locationID = ? `;
+//             params.push(STATE.locationID)
+//         }
+//         if (STATE.detect.nocmig){
+//             positionStmt += ' AND COALESCE(isDaylight, 0) != 1 '; // Backward compatibility for < v0.9.
+//         }
         
-        positionStmt += `)
-        SELECT 
-        count(*) as count, dateTime
-        FROM ranked_records
-        WHERE rank <= ? AND dateTime < ?`;
-        params.push(STATE.topRankin, dateTime);
-        if (species) {
-            positionStmt+=  ` AND  cname = ? `;
-            params.push(species)
-        };
-    const {count} = await STATE.db.getAsync(positionStmt, ...params);
-    return count
-}
+//         positionStmt += `)
+//         SELECT 
+//         count(*) as count, dateTime
+//         FROM ranked_records
+//         WHERE rank <= ? AND dateTime < ?`;
+//         params.push(STATE.topRankin, dateTime);
+//         if (species) {
+//             positionStmt+=  ` AND  cname = ? `;
+//             params.push(species)
+//         };
+//     const {count} = await STATE.db.getAsync(positionStmt, ...params);
+//     return count
+// }
 
 /**
 *
@@ -2481,13 +2481,14 @@ const getResults = async ({
     directory = undefined,
     format = undefined,
     active = undefined,
-    select = undefined
+    position = undefined
 } = {}) => {
     let confidence = STATE.detect.confidence;
     const included = STATE.selection ? [] : await getIncludedIDs();
-    if (select) {
-        const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
-        offset = Math.floor(position/limit) * limit;
+    if (position) {
+        //const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
+        offset = (position.page - 1) * limit;
+        active = position.row;
         // update the pagination
         const [total, , ] = await getTotal({species: species, offset: offset, included: included})
         UI.postMessage({event: 'total-records', total: total, offset: offset, species: species})
@@ -2563,11 +2564,11 @@ const getResults = async ({
                 if (limit){
                     // Audio export. Format date to YYYY-MM-DD-HH-MM-ss
                     const dateArray = new Date(r.timestamp).toString().split(' ');
-                    const dateString = dateArray.slice(0, 5).join(' ');
+                    const dateString = dateArray.slice(0, 5).join(' ').replaceAll(':', ' ');
                     //const dateString = new Date(r.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
                     const filename = `${r.cname}-${dateString}.${STATE.audio.format}`
                     DEBUG && console.log(`Exporting from ${r.file}, position ${r.position}, into folder ${directory}`)
-                    saveAudio(r.file, r.position, r.position + 3, filename, metadata, directory)
+                    saveAudio(r.file, r.position, r.end, filename, metadata, directory)
                     i === result.length - 1 && UI.postMessage({ event: 'generate-alert', message: `${result.length} files saved` })
                 } 
             }
@@ -2593,7 +2594,7 @@ const getResults = async ({
             }
         }
     }
-    STATE.selection || UI.postMessage({event: 'database-results-complete', active: active, select: select?.start});
+    STATE.selection || UI.postMessage({event: 'database-results-complete', active: active, select: position?.start});
 };
 
 // Function to format the CSV export
