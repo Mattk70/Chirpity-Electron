@@ -34,7 +34,8 @@ export class State {
             this.local = true,
             this.incrementor = 1,
             this.UUID = 0,
-            this.track = true
+            this.track = true,
+            this.powerSaveBlocker = false
     }
 
 

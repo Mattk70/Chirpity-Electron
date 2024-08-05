@@ -1,4 +1,4 @@
-const {contextBridge, ipcRenderer} = require("electron");
+const {contextBridge, ipcRenderer } = require("electron");
 const fs = require('node:fs');
 const colormap = require("colormap");
 const p = require('node:path');
@@ -53,7 +53,8 @@ contextBridge.exposeInMainWorld('electron', {
     getVersion: () => ipcRenderer.invoke('getVersion'),
     getAudio: () => ipcRenderer.invoke('getAudio'),
     isMac: () => ipcRenderer.invoke('isMac'),
-    exitApplication: () => ipcRenderer.invoke('exitApplication')
+    exitApplication: () => ipcRenderer.invoke('exitApplication'),
+    powerSaveBlocker: (onOff) => ipcRenderer.invoke('powerSaveControl', onOff)
 });
 
 contextBridge.exposeInMainWorld('module', {

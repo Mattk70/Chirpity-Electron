@@ -1,4 +1,4 @@
-const { app, Menu, dialog, ipcMain, MessageChannelMain, BrowserWindow, globalShortcut } = require('electron');
+const { app, Menu, dialog, ipcMain, MessageChannelMain, BrowserWindow, globalShortcut, powerSaveBlocker } = require('electron');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 // WebGPU flags needed for Linux
 app.commandLine.appendSwitch('enable-unsafe-webgpu');
@@ -16,6 +16,7 @@ process.env['TF_ENABLE_ONEDNN_OPTS'] = "1";
 let files = [];
 let DEBUG = false;
 let unsavedRecords = false;
+
 
 //-------------------------------------------------------------------
 // Logging
@@ -436,6 +437,8 @@ app.whenReady().then(async () => {
             properties: ['openDirectory']
         });
     })
+
+
     
     mainWindow.webContents.setWindowOpenHandler(({ url, frameName }) => {
         require('electron').shell.openExternal(url);
@@ -526,3 +529,15 @@ ipcMain.handle('saveFile', (event, arg) => {
     mainWindow.webContents.send('saveFile', { message: 'file saved!' });
 });
 
+
+let powerSaveID = powerSaveBlocker.start('prevent-app-suspension');
+powerSaveBlocker.stop(powerSaveID);
+ipcMain.handle('powerSaveControl', (e, on) => {
+    if (on){
+        powerSaveID = powerSaveBlocker.start('prevent-app-suspension')
+        //console.log(powerSaveBlocker.isStarted(powerSaveID), powerSaveID)
+    } else {
+        powerSaveBlocker.stop(powerSaveID)
+        //console.log(powerSaveBlocker.isStarted(powerSaveID), powerSaveID)
+    }
+})

@@ -506,9 +506,9 @@ async function showOpenDialog(fileOrFolder) {
     }
 }
 
-// function powerSave(on) {
-//     return window.electron.powerSaveBlocker(on);
-// }
+function powerSave(on) {
+    return window.electron.powerSaveBlocker(on);
+}
 
 const openFileInList = async (e) => {
     if (!PREDICTING && e.target.tagName === 'A') {
@@ -1520,7 +1520,8 @@ const defaultConfig = {
     limit: 500,
     track: true,
     debug: false,
-    VERSION: VERSION
+    VERSION: VERSION,
+    powerSaveBlocker: false
 };
 let appPath, tempPath, isMac;
 window.onload = async () => {
@@ -1604,7 +1605,6 @@ window.onload = async () => {
         document.getElementById('mid-color').value = config.customColormap.mid;
         document.getElementById('quiet-color').value = config.customColormap.quiet;
         document.getElementById('color-threshold-slider').value = config.customColormap.threshold;
-
         // Audio preferences:
         DOM.gain.value = config.audio.gain;
         DOM.gainAdjustment.textContent = config.audio.gain + 'dB';
@@ -1619,6 +1619,10 @@ window.onload = async () => {
         DOM.audioDownmix.checked = config.audio.downmix;
         setNocmig(config.detect.nocmig);
         modelSettingsDisplay();
+        // Block powersave? 
+        document.getElementById('power-save-block').checked = config.powerSaveBlocker;
+        powerSave(config.powerSaveBlocker);
+
         contextAwareIconDisplay();
         DOM.debugMode.checked = config.debug;
         showThreshold(config.detect.confidence);
@@ -2453,11 +2457,9 @@ function onChartData(args) {
         const backendEL = document.getElementById(config.backend);
         backendEL.checked = true;
         if (config.backend === 'webgl' || config.backend === 'webgpu') {
-            //powerSave(true)
             SNRSlider.disabled = true;
             config.filters.SNR = 0;
         } else {
-            // powerSave(false)
             DOM.contextAware.disabled = false;
             if (DOM.contextAware.checked) {
                 config.detect.contextAware = true;
@@ -3661,7 +3663,6 @@ function onChartData(args) {
                 nodeOnly.forEach(element => element.classList.add('d-none'));
             }
         }
-
     }
 
     const contextAwareIconDisplay = () => {
@@ -4418,6 +4419,11 @@ DOM.gain.addEventListener('input', () => {
                 }
                 case 'audio-notification': {
                     config.audio.notification = element.checked;
+                    break;
+                }
+                case 'power-save-block': {
+                    config.powerSaveBlocker = element.checked;
+                    powerSave(config.powerSaveBlocker);
                     break;
                 }
                 case 'species-week': {
