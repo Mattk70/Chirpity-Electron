@@ -2061,7 +2061,7 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
         STATE.db === diskDB ? UI.postMessage({ event: 'diskDB-has-records' }) : UI.postMessage({event: 'unsaved-records'});
     }
     if (updateResults){
-        position.start = start;
+        if (position)  position.start = start;
         await getResults({species:speciesFiltered, position: position});
         await getSummary({species: speciesFiltered});
     }
