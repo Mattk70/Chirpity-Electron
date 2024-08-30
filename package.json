@@ -176,7 +176,7 @@
 		"colormap": "^2.3.2",
 		"electron-log": "4.4.8",
 		"electron-settings": "^4.0.2",
-		"electron-updater": "6.1.4",
+		"electron-updater": "6.3.0",
 		"fast-png": "^6.1.0",
 		"@ffmpeg-installer/ffmpeg": "^1.1.0",
 		"fluent-ffmpeg": "^2.1.2",
