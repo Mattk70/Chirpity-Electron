@@ -2766,7 +2766,7 @@ const onSave2DiskDB = async ({file}) => {
     }
     const included = await getIncludedIDs(file);
     let filterClause = filtersApplied(included) ? `AND speciesID IN (${included} )` : '';
-    if (STATE.detect.nocmig) filterClause += ' AND isDaylight = TRUE ';
+    if (STATE.detect.nocmig) filterClause += ' AND isDaylight = FALSE ';
     await memoryDB.runAsync('BEGIN');
     await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.files SELECT * FROM files`);
     await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.locations SELECT * FROM locations`);
