@@ -2067,7 +2067,7 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     }
     return changes;
 }
-                        
+
 const generateInsertQuery = async (latestResult, file) => {
     const db = STATE.db;              
     await db.runAsync('BEGIN');              
