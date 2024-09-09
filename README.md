@@ -1,4 +1,6 @@
-# Chirpity ![GitHub release (latest by date)](https://img.shields.io/github/v/release/Mattk70/Chirpity-Electron)
+# Chirpity ![GitHub release (latest by date)](https://img.shields.io/github/v/release/Mattk70/Chirpity-Electron) ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/Mattk70/Chirpity-Electron/latest/total?style=plastic&label=Downloads)
+
+
 
 
 Desktop application to identify bird vocalisations in lengthy audio files. Uses either <a href="https://github.com/kahst/BirdNET-Analyzer">BirdNET</a> or a native AI model tuned for the calls of nocturnal migrants.
