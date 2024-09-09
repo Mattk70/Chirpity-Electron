@@ -496,7 +496,7 @@ function zoomSpec(direction) {
 }
 
 async function showOpenDialog(fileOrFolder) {
-    const files = await window.electron.openDialog('showOpenDialog', {type: 'audio', fileOrFolder: fileOrFolder});
+    const files = await window.electron.openDialog('showOpenDialog', {type: 'audio', fileOrFolder: fileOrFolder, multi: 'multiSelections'});
     if (!files.canceled) {
         if (fileOrFolder === 'openFiles'){
             await onOpenFiles({ filePaths: files.filePaths });
@@ -1733,7 +1733,16 @@ const setUpWorkerMessaging = () => {
                     }
                     if (args.file){
                         MISSING_FILE = args.file;
-                        args.message += `<p><b>Would you like to <a href="#" id="purge-from-toast">remove this file from the archive</b></p>`
+                        args.message += `
+                            <div class="d-flex justify-content-center mt-2">
+                                <button id="locate-missing-file" class="btn btn-secondary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
+                                    Locate File
+                                </button>
+                                <button id="purge-from-toast" class="ms-3 btn btn-danger text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
+                                    Delete File
+                                </button>
+                            </div>
+                            `
                     }
                     generateToast({ message: args.message});
                 break;
@@ -4276,6 +4285,9 @@ DOM.gain.addEventListener('input', () => {
             case 'reanalyseAll': {postAnalyseMessage({ filesInScope: fileList, reanalyse: true }); break }
             
             case 'purge-from-toast': { deleteFile(MISSING_FILE); break }
+            case 'locate-missing-file': {
+                (async () => await locateFile(MISSING_FILE))(); 
+                break }
             case 'purge-file': { deleteFile(currentFile); break }
 
             case 'keyboardHelp': { (async () => await populateHelpModal('Help/keyboard.html', 'Keyboard shortcuts'))(); break }
@@ -4838,7 +4850,23 @@ async function readLabels(labelFile, updating){
         currentPage = currentPage ? parseInt(currentPage.textContent) : 1;
         return currentPage;
     }
-        
+
+    async function locateFile(file) {       
+        const files = await window.electron.openDialog('showOpenDialog', 
+            {type: 'audio', 
+                fileOrFolder: 'openFile', 
+                buttonLabel: 'Select File', 
+                title: `Select the file to replace ${file}`});
+        if (!files.canceled) {
+            worker.postMessage({
+                action: 'relocated-file',
+                originalFile: file,
+                updatedFile: files.filePaths[0]
+            })
+            renderFilenamePanel();
+        }
+}
+
     function deleteFile(file) {
         // EventHandler caller 
         if (typeof file === 'object' && file instanceof Event) {

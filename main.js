@@ -405,14 +405,16 @@ app.whenReady().then(async () => {
     });
     
     ipcMain.handle('openFiles', async (_event, _method, config) => {
-        const {type, fileOrFolder} = config;
+        const {type, fileOrFolder, multi, buttonLabel, title} = config;
         let options;
         if (type === 'audio') {
              options = {
                 filters: [
                     { name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus'] } 
                 ],
-                properties: [fileOrFolder, 'multiSelections'] 
+                properties: [fileOrFolder, multi] ,
+                buttonLabel: buttonLabel,
+                title: title
             }
         } else {
             options = {

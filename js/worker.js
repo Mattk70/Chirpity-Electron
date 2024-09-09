@@ -435,6 +435,9 @@ async function handleMessage(e) {
         case "purge-file": {onFileDelete(args.fileName);
             break;
         }
+        case "relocated-file": {onFileUpdated(args.originalFile, args.updatedFile);
+            break;
+        }
         case "save": {DEBUG && console.log("file save requested");
             await saveAudio(args.file, args.start, args.end, args.filename, args.metadata);
             break;
@@ -3168,6 +3171,18 @@ async function onChartRequest(args) {
         pointStart: pointStart,
         aggregation: aggregation
     })
+}
+async function onFileUpdated(oldName, newName){
+    const result = await STATE.db.runAsync(`UPDATE files SET name = ? WHERE name = ?`, newName, oldName);
+    if (result.changes){
+        UI.postMessage({
+            event: 'generate-alert', message: 'File name updated in the database'
+        });
+    } else {
+        UI.postMessage({
+            event: 'generate-alert', message: 'File not found in the database'
+        });
+    }
 }
 
 const onFileDelete = async (fileName) => {
