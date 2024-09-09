@@ -6,7 +6,7 @@ const sqlite3 = DEBUG ? require('sqlite3').verbose() : require('sqlite3');
 sqlite3.Database.prototype.runAsync = function (sql, ...params) {
     return new Promise((resolve, reject) => {
         this.run(sql, params, function (err) {
-            if (err) return reject(console.log(err, sql));
+            if (err) return reject(err, console.log(err, sql));
             resolve(this);
         });
     });
@@ -15,7 +15,7 @@ sqlite3.Database.prototype.runAsync = function (sql, ...params) {
 sqlite3.Database.prototype.allAsync = function (sql, ...params) {
     return new Promise((resolve, reject) => {
         this.all(sql, params, (err, rows) => {
-            if (err) return reject(console.log(err, sql));
+            if (err) return reject(err, console.log(err, sql));
             resolve(rows);
         });
     });
@@ -25,7 +25,7 @@ sqlite3.Statement.prototype.allAsync = function (...params) {
     if (DEBUG) console.log('SQL\n', this.sql, '\nParams\n', params)
     return new Promise((resolve, reject) => {
         this.all(params, (err, rows) => {
-            if (err) return reject(console.log(err, this.sql));
+            if (err) return reject(err, console.log(err, this.sql));
             if (DEBUG) console.log('\nRows:', rows)
             resolve(rows);
         });
@@ -35,7 +35,7 @@ sqlite3.Statement.prototype.allAsync = function (...params) {
 sqlite3.Database.prototype.getAsync = function (sql, ...params) {
     return new Promise((resolve, reject) => {
         this.get(sql, params, (err, row) => {
-            if (err) return reject(console.log(err, sql));
+            if (err) return reject(err, console.log(err, sql));
             resolve(row);
         });
     });

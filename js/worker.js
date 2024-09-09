@@ -3174,15 +3174,31 @@ async function onChartRequest(args) {
 }
 async function onFileUpdated(oldName, newName){
     const newDuration = Math.round(await getDuration(newName));
-    const result = await STATE.db.runAsync(`UPDATE files SET name = ? WHERE name = ? AND duration BETWEEN ? - 1 and ? + 1`, newName, oldName, newDuration, newDuration);
-    if (result.changes){
-        UI.postMessage({
-            event: 'generate-alert', message: 'The file location was successfully updated in the database. Refresh the results to see the records.'
-        });
-    } else {
-        UI.postMessage({
-            event: 'generate-alert', message: '<span class="text-danger">No changes made</span>. The selected file has a different duration to the original file.'
-        });
+    try {
+        const result = await STATE.db.runAsync(`UPDATE files SET name = ? WHERE name = ? AND duration BETWEEN ? - 1 and ? + 1`, newName, oldName, newDuration, newDuration);
+        if (result.changes){
+            UI.postMessage({
+                event: 'generate-alert', message: 'The file location was successfully updated in the database. Refresh the results to see the records.'
+            });
+        } else {
+            UI.postMessage({
+                event: 'generate-alert', message: '<span class="text-danger">No changes made</span>. The selected file has a different duration to the original file.'
+            });
+        }
+    } catch (err) {
+        if (err.code === 'SQLITE_CONSTRAINT' && err.message.includes('UNIQUE')) {
+            // Unique constraint violation, show specific error message
+            UI.postMessage({
+                event: 'generate-alert', 
+                message: '<span class="text-danger">No changes made</span>. The selected file already exists in the database.'
+            });
+        } else {
+            // Other types of errors
+            UI.postMessage({
+                event: 'generate-alert', 
+                message: `<span class="text-danger">An error occurred while updating the file: ${err.message}</span>`
+            });
+        }
     }
 }
 
