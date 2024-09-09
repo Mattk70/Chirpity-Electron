@@ -1228,7 +1228,7 @@ const getWavePredictBuffers = async ({
     predictionsRequested[file] = 0;
     let readStream;
     if (! fs.existsSync(file)) {
-        UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`})
+        UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`, file: file})
         return new Error('getWavePredictBuffers: Error extracting audio segment: File not found.');
     }
     // extract the header. With bext and iXML metadata, this can be up to 128k, hence 131072
@@ -1341,7 +1341,7 @@ const getPredictBuffers = async ({
     let chunkStart = start * sampleRate;
     return new Promise((resolve, reject) => {
         if (! fs.existsSync(file)) {
-            UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`})
+            UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`, file: file})
             return reject(new Error('getPredictBuffers: Error extracting audio segment: File not found.'));
         }
         let concatenatedBuffer = Buffer.alloc(0);
@@ -1804,7 +1804,7 @@ const bufferToAudio = async ({
     return new Promise(function (resolve, reject) {
         const bufferStream = new PassThrough();
         if (! fs.existsSync(file)) {
-            UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`})
+            UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`, file: file})
             return reject(new Error('bufferToAudio: Error extracting audio segment: File not found.'));
         }
         let ffmpgCommand = ffmpeg(file)
