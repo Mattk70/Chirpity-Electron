@@ -2503,17 +2503,35 @@ const getResults = async ({
     
     let index = offset;
     AUDACITY = {};
-    //const params = getResultsParams(species, confidence, offset, limit, topRankin, included);
+
     const [sql, params] = prepResultsStatement(species, limit === Infinity, included, offset, topRankin);
     
     const result = await STATE.db.allAsync(sql, ...params);
     let formattedValues;
-    if (format === 'text' || format === 'eBird'){
-        // CSV export. Format the values
-        formattedValues = await Promise.all(result.map(async (item) => {
-            return format === 'text' ? await formatCSVValues(item) : await formateBirdValues(item) 
+    let previousFile = null, cumulativeOffset = 0; 
 
+    const formatFunctions = {
+        text: formatCSVValues,
+        eBird: formateBirdValues,
+        Raven: formatRavenValues
+    };
+    
+    if (format in formatFunctions) {
+        // CSV export. Format the values
+        formattedValues = await Promise.all(result.map(async (item, index) => {
+            if (format === 'Raven') {
+                item = { ...item, selection: index + 1 } // Add a selection number for Raven
+                 if (item.file !== previousFile){ // Positions need to be cumulative across files in Raven
+                    if (previousFile !== null){
+                        cumulativeOffset += result.find(r => r.file === previousFile).duration;
+                    }
+                    previousFile = item.file;
+                }
+                item.offset = cumulativeOffset;
+            }
+            return await formatFunctions[format](item);
         }));
+    
         if (format === 'eBird'){
             // Group the data by "Start Time", "Common name", and "Species" and calculate total species count for each group
             const summary = formattedValues.reduce((acc, curr) => {
@@ -2552,9 +2570,9 @@ const getResults = async ({
         }
         // Create a write stream for the CSV file
         let filename = species || 'All';
-        filename += '_detections.csv';
+        filename += format == 'Raven' ? `_selections.txt` : '_detections.csv';
         const filePath = p.join(directory, filename);
-        writeToPath(filePath, formattedValues, {headers: true})
+        writeToPath(filePath, formattedValues, {headers: true, delimiter: format === 'Raven' ? '\t' : ','})
         .on('error', err => UI.postMessage({event: 'generate-alert', message: `Cannot save file ${filePath}\nbecause it is open in another application`}))
         .on('finish', () => {
             UI.postMessage({event: 'generate-alert', message: filePath + ' has been written successfully.'});
@@ -2687,6 +2705,34 @@ async function formateBirdValues(obj) {
     newObj['Distance covered'] = '';
     newObj['Area covered'] = '';
     newObj['Submission Comments'] = 'Submission initially generated from Chirpity';
+    return newObj;
+}
+
+function formatRavenValues(obj) {
+    // Create a copy of the original object to avoid modifying it directly
+    const modifiedObj = { ...obj };
+
+    if (STATE.model === 'chirpity'){
+        // Regular expression to match the words inside parentheses
+        const regex = /\(([^)]+)\)/;
+        const matches = modifiedObj.cname.match(regex);
+        // Splitting the input string based on the regular expression match
+        const [name, calltype] = modifiedObj.cname.split(regex);
+        modifiedObj.cname = name.trim(); // Output: "words words"
+    }
+    // Create a new object with the right keys
+    const newObj = {};
+    newObj['Selection'] = modifiedObj.selection;
+    newObj['View'] = 'Spectrogram 1';
+    newObj['Channel'] = 1;
+    newObj['Begin Time (s)'] = modifiedObj.position + modifiedObj.offset;
+    newObj['End Time (s)'] = modifiedObj.end  + modifiedObj.offset;
+    newObj['Low Freq (Hz)'] = 0;
+    newObj['High Freq (Hz)'] = 15000;
+    newObj['Common Name'] = modifiedObj.cname;
+    newObj['Confidence'] = modifiedObj.score / 1000;
+    newObj['Begin Path'] = modifiedObj.file ;
+    newObj['File Offset (s)'] = modifiedObj.position;
     return newObj;
 }
 

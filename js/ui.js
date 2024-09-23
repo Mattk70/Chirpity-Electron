@@ -1099,6 +1099,7 @@ async function batchExportAudio() {
 
 const export2CSV = ()  => exportData('text', isSpeciesViewFiltered(true), Infinity);
 const exporteBird = ()  => exportData('eBird', isSpeciesViewFiltered(true), Infinity);
+const exportRaven = ()  => exportData('Raven', isSpeciesViewFiltered(true), Infinity);
 
 async function exportData(format, species, limit, duration){
     const response = await window.electron.selectDirectory('selectDirectory');
@@ -1150,7 +1151,7 @@ exploreLink.addEventListener('click', async () => {
     locationFilter.addEventListener('change', handleLocationFilterChange);
     hideAll();
     showElement(['exploreWrapper'], false);
-    enableMenuItem(['saveCSV', 'save-eBird']);
+    enableMenuItem(['saveCSV', 'save-eBird', 'save-Raven']);
     worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
     // Analysis is done
     STATE.analysisDone = true;
@@ -3094,9 +3095,9 @@ function onChartData(args) {
         // Why do we do audacity labels here?
         AUDACITY_LABELS = audacityLabels;
         if (! isEmptyObject(AUDACITY_LABELS)) {
-            enableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save2db', 'export2audio']);
+            enableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven', 'save2db', 'export2audio']);
         } else {
-            disableMenuItem(['saveLabels', 'saveCSV', 'save-eBird']);
+            disableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven']);
         }
         if (currentFile) enableMenuItem(['analyse'])
     }
@@ -4271,6 +4272,7 @@ DOM.gain.addEventListener('input', () => {
             case 'saveLabels': { showSaveDialog(); break }
             case 'saveCSV': { export2CSV(); break }
             case 'save-eBird': { exporteBird(); break }
+            case 'save-Raven': { exportRaven(); break }
             case 'export-audio': { exportAudio(); break }
             case 'exit': { exitApplication(); break }
 
