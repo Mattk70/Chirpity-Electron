@@ -5141,7 +5141,7 @@ async function getXCComparisons(){
     else {
         const loading = document.getElementById('loadingOverlay')
         loading.classList.remove('d-none');
-        const quality = ''; //+q:%22>C%22';
+        const quality = '+q:%22>C%22';
         const length = '+len:3-15';
         fetch(`https://xeno-canto.org/api/2/recordings?query=${sname}${quality}${length}`)
         .then(response =>{
