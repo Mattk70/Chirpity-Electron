@@ -378,6 +378,14 @@
                 </fieldset>
                 <fieldset class="border border-secondary rounded m-2 mb-0 p-2">
                     <legend style="font-size: large;font-weight:bold">Spectrogram Preferences</legend>
+                    <div class="form-group rounded p-2 mb-2">
+                        <div class="col form-check form-switch">
+                            <label class="form-check-label" for="spec-labels">Display frequency labels:
+                                <input class="form-check-input" type="checkbox" role="switch" id="spec-labels">
+                            </label>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Show frequency labels" data-bs-content="When enabled, the spectrogram will display the frequency on the left side.">?</a>
+                        </div>
+                    </div>
                     <div class="pe-3 input-group rounded p-2 mb-1">
                         <label for="colourmap" class="input-group-text col-5">Colourmap:</label>
                         <select class="form-select mb-0" id="colourmap">

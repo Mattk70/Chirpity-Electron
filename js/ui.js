@@ -206,6 +206,7 @@ const DOM = {
      resultTableElement: document.getElementById('resultTableContainer'),
      spectrogramWrapper: document.getElementById('spectrogramWrapper'),
      spectrogram: document.getElementById('spectrogram'),
+     specLabels: document.getElementById('spec-labels'),
      summaryTable: document.getElementById('summaryTable'),
      resultHeader: document.getElementById('resultsHead'),
      threadSlider: document.getElementById('thread-slider'),
@@ -1496,6 +1497,7 @@ const defaultConfig = {
     lastUpdateCheck: 0,
     UUID: uuidv4(),
     colormap: 'inferno',
+    specLabels: true,
     customColormap: {'loud': "#00f5d8", 'mid': "#000000", 'quiet': "#000000", 'threshold': 0.5, 'windowFn': 'hann'},
     timeOfDay: true,
     list: 'birds',
@@ -1598,6 +1600,8 @@ window.onload = async () => {
         DOM.timelineSetting.value = config.timeOfDay ? 'timeOfDay' : 'timecode';
         // Spectrogram colour
         DOM.colourmap.value = config.colormap;
+        // Spectrogram labels
+        DOM.specLabels.checked = config.specLabels;
         // Window function & colormap
         document.getElementById('window-function').value = config.customColormap.windowFn;
         config.colormap === 'custom' && document.getElementById('colormap-fieldset').classList.remove('d-none');
@@ -2385,7 +2389,7 @@ function onChartData(args) {
             frequencyMax: 11_950,
             normalize: false,
             hideScrollbar: true,
-            labels: false,
+            labels: config.specLabels,
             height: height,
             fftSamples: fftSamples, 
             colorMap: colors
@@ -4553,6 +4557,18 @@ DOM.gain.addEventListener('input', () => {
                     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                     fileLoaded &&
                         postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
+                    break;
+                }
+                case 'spec-labels': {
+                    config.specLabels = element.checked;                    
+                    if (wavesurfer && currentFile) {
+                        // refresh caches
+                        updateElementCache()
+                        const fftSamples = wavesurfer.spectrogram.fftSamples;
+                        wavesurfer.destroy();
+                        wavesurfer = undefined;
+                        adjustSpecDims(true, fftSamples)
+                    }
                     break;
                 }
                 case 'normalise': {
