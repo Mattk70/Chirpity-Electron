@@ -2889,11 +2889,11 @@ const getMostCalls = (species) => {
         FROM records 
         JOIN species on species.id = records.speciesID
         JOIN files ON files.id = records.fileID
-        WHERE species.cname = '${prepSQL(species)}' ${locationFilter}
+        WHERE species.cname = ? ${locationFilter}
         GROUP BY STRFTIME('%Y', DATETIME(dateTime/1000, 'unixepoch', 'localtime')),
         STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')),
         STRFTIME('%d', DATETIME(dateTime/1000, 'unixepoch', 'localtime'))
-        ORDER BY count DESC LIMIT 1`, (err, row) => {
+        ORDER BY count DESC LIMIT 1`, species, (err, row) => {
             if (err) {
                 reject(err)
             } else {
@@ -2946,9 +2946,9 @@ const getChartTotals = ({
         FROM records
         JOIN species ON species.id = speciesID
         JOIN files ON files.id = fileID
-        WHERE species.cname = '${species}' ${dateFilter} ${locationFilter}
+        WHERE species.cname = ? ${dateFilter} ${locationFilter}
         GROUP BY ${groupBy}
-        ORDER BY ${orderBy};`, (err, rows) => {
+        ORDER BY ${orderBy}`, species, (err, rows) => {
             if (err) {
                 reject(err)
             } else {
@@ -2969,8 +2969,8 @@ const getRate = (species) => {
         from records
         JOIN species ON species.id = records.speciesID
         JOIN files ON files.id = records.fileID
-        WHERE species.cname = '${species}' ${locationFilter}
-        group by week;`, (err, rows) => {
+        WHERE species.cname = ? ${locationFilter}
+        group by week;`, species, (err, rows) => {
             for (let i = 0; i < rows.length; i++) {
                 calls[parseInt(rows[i].week) - 1] = rows[i].calls;
             }
@@ -3097,7 +3097,6 @@ const onUpdateFileStart = async (args) => {
                 lat = STATE.lat;
                 lon = STATE.lon;
             }
-            let changes = 0
             db.each(`
                 SELECT rowid, dateTime, fileID, speciesID, confidence, isDaylight from records WHERE fileID = ${id}
                 `, async (err, row) => {
@@ -3124,9 +3123,6 @@ const onUpdateFileStart = async (args) => {
         }
     }
 };
-
-
-const prepSQL = (string) => string.replaceAll("''", "'").replaceAll("'", "''");
 
 
 async function onDelete({
@@ -3231,7 +3227,6 @@ async function onChartRequest(args) {
         
         DEBUG && console.log(`Most calls  chart generation took ${(Date.now() - t0) / 1000} seconds`)
         t0 = Date.now();
-        args.species = prepSQL(args.species);
     }
     const [dataPoints, aggregation] = await getChartTotals(args)
     .then(([rows, dataPoints, aggregation, startDay]) => {
