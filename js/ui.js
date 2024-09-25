@@ -3189,10 +3189,10 @@ function onChartData(args) {
     }
     
     
-    const checkDayNight = (timestamp) => {
-        let astro = SunCalc.getTimes(timestamp, config.latitude, config.longitude);
-        return (astro.dawn.setMilliseconds(0) < timestamp && astro.dusk.setMilliseconds(0) > timestamp) ? 'daytime' : 'nighttime';
-    }
+    // const checkDayNight = (timestamp) => {
+    //     let astro = SunCalc.getTimes(timestamp, config.latitude, config.longitude);
+    //     return (astro.dawn.setMilliseconds(0) < timestamp && astro.dusk.setMilliseconds(0) > timestamp) ? 'daytime' : 'nighttime';
+    // }
     
     // TODO: show every detection in the spec window as a region on the spectrogram
     
@@ -3249,9 +3249,10 @@ function onChartData(args) {
                 comment,
                 end,
                 count,
-                callCount
+                callCount,
+                isDaylight
             } = result;
-            const dayNight = checkDayNight(timestamp);
+            const dayNight = isDaylight ? 'daytime' : 'nighttime'; // checkDayNight(timestamp);
             if (dayNight === 'nighttime') seenTheDarkness = true;
             // Todo: move this logic so pre dark sections of file are not even analysed
             if (config.detect.nocmig && !selection && dayNight === 'daytime') return

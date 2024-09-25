@@ -806,6 +806,7 @@ const prepResultsStatement = (species, noLimit, included, offset, topRankin) => 
     comment,
     end,
     callCount,
+    isDaylight,
     rank
     FROM 
     ranked_records 
@@ -3047,8 +3048,10 @@ const onUpdateFileStart = async (args) => {
     utimesSync(file, newfileMtime);
     metadata[file].fileStart = args.start;
     let db = STATE.db;
-    let row = await db.getAsync('SELECT id from files where name = ?', file);
-    let result;
+    let row = await db.getAsync(`
+        SELECT id, filestart, duration, locationID FROM files 
+        WHERE name = ?`, file);
+
     if (!row) {
         DEBUG && console.log('File not found in database, adding.');
         await db.runAsync('INSERT INTO files (id, name, duration, filestart) values (?, ?, ?, ?)', undefined, file, metadata[file].duration, args.start);
@@ -3059,7 +3062,66 @@ const onUpdateFileStart = async (args) => {
         const { changes } = await db.runAsync('UPDATE files SET filestart = ? where id = ?', args.start, id);
         DEBUG && console.log(changes ? `Changed ${file}` : `No changes made`);
         // Fill with new values
-        result = await db.runAsync('UPDATE records set dateTime = (position * 1000) + ? WHERE fileID = ?', args.start, id);
+
+        try {
+            // Begin transaction
+            await db.runAsync('BEGIN TRANSACTION');
+    
+            // Create a temporary table with the same structure as the records table
+            await db.runAsync(`
+                CREATE TEMPORARY TABLE temp_records AS
+                SELECT * FROM records;
+            `);
+    
+            // Update the temp_records table with the new filestart values
+            await db.runAsync('UPDATE temp_records SET dateTime = (position * 1000) + ? WHERE fileID = ?', args.start, id);
+                
+            // Drop the original records table
+            await db.runAsync('DROP TABLE records;');
+    
+            // Rename the temp_records table to replace the original records table
+            await db.runAsync('ALTER TABLE temp_records RENAME TO records;');
+    
+            // Recreate the UNIQUE constraint on the new records table
+            await db.runAsync(`
+                CREATE UNIQUE INDEX idx_unique_record ON records (dateTime, fileID, speciesID);
+            `);
+            
+            // Update the daylight flag if necessary
+            let lat, lon;
+            if (row.locationID){
+                const location = await db.getAsync('SELECT lat, lon FROM locations WHERE locationID = ?', row.locationID)
+                lat = location.lat;
+                lon = location.lon;
+            } else {
+                lat = STATE.lat;
+                lon = STATE.lon;
+            }
+            let changes = 0
+            db.each(`
+                SELECT rowid, dateTime, fileID, speciesID, confidence, isDaylight from records WHERE fileID = ${id}
+                `, async (err, row) => {
+                    if (err) {
+                        throw err;
+                    }
+                    const isDaylight = isDuringDaylight(row.dateTime, lat, lon) ? 1 : 0;
+                    // Update the isDaylight column for this record
+                    const result = await db.runAsync('UPDATE records SET isDaylight = ? WHERE isDaylight != ? AND rowid = ?', isDaylight, isDaylight, row.rowid);
+                    changes += result.changes
+                }, async (err, count) => {
+                    if (err) {
+                        throw err;
+                    }
+                    // Commit transaction once all rows are processed
+                    await db.run('COMMIT');
+                    DEBUG && console.log(`File ${file} updated successfully.`);
+                    await Promise.all([getResults(), getSummary()] );
+                });
+        } catch (error) {
+            // Rollback in case of error
+            await db.runAsync('ROLLBACK');
+            console.error(`Transaction failed: ${error.message}`);
+        }
     }
 };
 
