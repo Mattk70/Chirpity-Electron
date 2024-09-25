@@ -10,7 +10,7 @@ Author: Matthew Kirkland
 ![image](https://github.com/Mattk70/Chirpity-Electron/assets/61826357/96b0af44-3893-4288-8291-cf0f6db89a38)
 
 ## Application setup
-Visit https://chirpity.mattkirkland.co.uk for platform specific installation instructions - Chirpity binaries are available for both Windows and Mac platforms. Linux users will need to run the applicatino from source, as described below.
+Visit https://chirpity.mattkirkland.co.uk for platform specific installation instructions - Chirpity binaries are available for both Windows and Mac platforms. Linux users will need to run the application from source, as described below.
 
 ## Running the application from source
 
