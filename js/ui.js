@@ -587,6 +587,7 @@ function showDatePicker() {
         
         // Send the data to the worker
         worker.postMessage({ action: 'update-file-start', file: currentFile, start: timestamp });
+        resetResults();
         fileStart = timestamp;
         // update the timeline
         postBufferUpdate({ file: currentFile, begin: bufferBegin })
