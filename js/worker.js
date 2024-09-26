@@ -8,7 +8,6 @@ const wavefileReader = require('wavefile-reader');
 const SunCalc = require('suncalc');
 const ffmpeg = require('fluent-ffmpeg');
 const png = require('fast-png');
-const { utimesSync } = require('utimes');
 const {writeToPath} = require('@fast-csv/format');
 const merge = require('lodash.merge');
 import { State } from './state.js';
@@ -3045,7 +3044,7 @@ const getValidSpecies = async (file) => {
 const onUpdateFileStart = async (args) => {
     let file = args.file;
     const newfileMtime = Math.round(args.start + (metadata[file].duration * 1000));
-    utimesSync(file, newfileMtime);
+    fs.utimesSync(file, newfileMtime, newfileMtime);
     metadata[file].fileStart = args.start;
     let db = STATE.db;
     let row = await db.getAsync(`
