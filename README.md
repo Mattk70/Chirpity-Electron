@@ -1,13 +1,18 @@
 # Chirpity ![GitHub release (latest by date)](https://img.shields.io/github/v/release/Mattk70/Chirpity-Electron) ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/Mattk70/Chirpity-Electron/latest/total?style=plastic&label=Downloads)
 
-
-
-
 Desktop application to identify bird vocalisations in lengthy audio files. Uses either <a href="https://github.com/kahst/BirdNET-Analyzer">BirdNET</a> or a native AI model tuned for the calls of nocturnal migrants.
 
 Author: Matthew Kirkland
 
 ![image](https://github.com/Mattk70/Chirpity-Electron/assets/61826357/96b0af44-3893-4288-8291-cf0f6db89a38)
+
+## Key Features
+- Uses two Machine Learning models to identify audio files based on the user's needs: BirdNET and the Chirpity model
+- Supports audio input files such as WAV, MP3, MP4/M4A, ACC, Opus, Ogg, and FLAC
+- Audio analysis can run in the background while exploring the application
+- Tailor species detection based on the season, time of day, or a custom list of species 
+- Program can reduce background noise to make avian sounds more audible
+- ...and <a href="https://chirpity.mattkirkland.co.uk/">more</a>
 
 ## Application setup
 Visit https://chirpity.mattkirkland.co.uk for platform specific installation instructions - Chirpity binaries are available for both Windows and Mac platforms. Linux users will need to run the application from source, as described below.
