@@ -3104,8 +3104,7 @@ const onUpdateFileStart = async (args) => {
                     }
                     const isDaylight = isDuringDaylight(row.dateTime, lat, lon) ? 1 : 0;
                     // Update the isDaylight column for this record
-                    const result = await db.runAsync('UPDATE records SET isDaylight = ? WHERE isDaylight != ? AND rowid = ?', isDaylight, isDaylight, row.rowid);
-                    changes += result.changes
+                    await db.runAsync('UPDATE records SET isDaylight = ? WHERE isDaylight != ? AND rowid = ?', isDaylight, isDaylight, row.rowid);
                 }, async (err, count) => {
                     if (err) {
                         throw err;
