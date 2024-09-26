@@ -1,6 +1,6 @@
 {
 	"name": "chirpity",
-	"version": "1.12.0",
+	"version": "1.12.1",
 	"description": "Chirpity Nocmig",
 	"main": "main.js",
 	"scripts": {
@@ -160,6 +160,7 @@
 		"@playwright/test": "^1.39.0",
 		"electron": "^32.1.2",
 		"electron-builder": "^25.0.5",
+		"electron-builder-squirrel-windows": "^25.0.5",
 		"electron-playwright-helpers": "^1.6.0",
 		"playwright": "^1.39.0",
 		"terser": "5.22.0"
