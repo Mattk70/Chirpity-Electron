@@ -2719,7 +2719,7 @@ function onChartData(args) {
         '=': function (e) {e.metaKey || e.altKey ? reduceFFT() : zoomSpec('zoomIn')},
         '+': function (e) {e.metaKey || e.altKey ? reduceFFT() : zoomSpec('zoomIn')},
         '-': function (e) {e.metaKey || e.altKey ? increaseFFT() : zoomSpec('zoomOut')},
-        Space: function () { wavesurfer && wavesurfer.playPause() },
+        ' ': function () { wavesurfer && wavesurfer.playPause() },
         Tab: function (e) {
             if (activeRow) {
                 if (e.shiftKey) {
