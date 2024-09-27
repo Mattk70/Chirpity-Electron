@@ -2595,9 +2595,9 @@ function onChartData(args) {
                 postBufferUpdate({ begin: bufferBegin, position: 0.5, region: region, goToRegion: false})
             }
         },
-        d: function (e) {
-            if (( e.ctrlKey || e.metaKey) && e.shiftKey) worker.postMessage({ action: 'create-dataset' });
-        },
+        // D: function (e) {
+        //     if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
+        // },
         e: function (e) {
             if (( e.ctrlKey || e.metaKey) && region) exportAudio();
         },
