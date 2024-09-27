@@ -655,7 +655,7 @@ function renderFilenamePanel() {
         <span class="filename ${isSaved}">${label}</span>
         </button>
         <button class="btn btn-dark dropdown-toggle dropdown-toggle-split" type="button" 
-        data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">+${files.length -1}
         <span class="visually-hidden">Toggle Dropdown</span>
         </button>
         <div class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton">`;
