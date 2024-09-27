@@ -164,6 +164,10 @@ const bodyElement = document.body;
 let specElement, waveElement, specCanvasElement, specWaveElement;
 let waveCanvasElement, waveWaveElement;
 const DOM = {
+    fromSlider: document.getElementById('fromSlider'),
+    toSlider: document.getElementById('toSlider'),
+    fromInput: document.getElementById('fromInput'),
+    toInput: document.getElementById('toInput'),
      audioBitrate: document.getElementById('bitrate'),
      audioBitrateContainer: document.getElementById('bitrate-container'),
      audioDownmix: document.getElementById('downmix'),
@@ -1624,10 +1628,11 @@ window.onload = async () => {
         // Spectrogram labels
         DOM.specLabels.checked = config.specLabels;
         // Spectrogram frequencies
-        document.getElementById('fromInput').value = config.minFrequency;
-        document.getElementById('fromSlider').value = config.minFrequency;
-        document.getElementById('toInput').value = config.maxFrequency;
-        document.getElementById('toSlider').value = config.maxFrequency;
+        DOM.fromInput.value = config.minFrequency;
+        DOM.fromSlider.value = config.minFrequency;
+        DOM.toInput.value = config.maxFrequency;
+        DOM.toSlider.value = config.maxFrequency;
+        fillSlider(DOM.fromInput, DOM.toInput,  '#C6C6C6', '#0d6efd', DOM.toSlider)
         if (config.minFrequency > 0 || config.maxFrequency < 11950) {
             document.getElementById('frequency-range').classList.add('text-warning');
         }
@@ -4317,10 +4322,11 @@ DOM.gain.addEventListener('input', () => {
             case 'reset-spec-frequency': {
                 config.minFrequency = 0;
                 config.maxFrequency = 11950;
-                document.getElementById('fromInput').value = config.minFrequency;
-                document.getElementById('fromSlider').value = config.minFrequency;
-                document.getElementById('toInput').value = config.maxFrequency;
-                document.getElementById('toSlider').value = config.maxFrequency;
+                DOM.fromInput.value = config.minFrequency;
+                DOM.fromSlider.value = config.minFrequency;
+                DOM.toInput.value = config.maxFrequency;
+                DOM.toSlider.value = config.maxFrequency;
+                fillSlider(DOM.fromInput, DOM.toInput,  '#C6C6C6', '#0d6efd', DOM.toSlider)
                 const fftSamples = wavesurfer.spectrogram.fftSamples;
                 wavesurfer.destroy();
                 wavesurfer = undefined;
@@ -4583,8 +4589,8 @@ DOM.gain.addEventListener('input', () => {
                 case 'fromInput':
                 case 'fromSlider': {
                     config.minFrequency = Math.max(element.valueAsNumber, 0);
-                    document.getElementById('fromInput').value = config.minFrequency;
-                    document.getElementById('fromSlider').value = config.minFrequency;
+                    DOM.fromInput.value = config.minFrequency;
+                    DOM.fromSlider.value = config.minFrequency;
                     const fftSamples = wavesurfer.spectrogram.fftSamples;
                     wavesurfer.destroy();
                     wavesurfer = undefined;
@@ -4599,8 +4605,8 @@ DOM.gain.addEventListener('input', () => {
                 case 'toInput':
                 case 'toSlider': {
                     config.maxFrequency = Math.min(element.valueAsNumber, 11950);
-                    document.getElementById('toInput').value = config.maxFrequency;
-                    document.getElementById('toSlider').value = config.maxFrequency;
+                    DOM.toInput.value = config.maxFrequency;
+                    DOM.toSlider.value = config.maxFrequency;
                     const fftSamples = wavesurfer.spectrogram.fftSamples;
                     wavesurfer.destroy();
                     wavesurfer = undefined;
