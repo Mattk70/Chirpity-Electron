@@ -4377,6 +4377,10 @@ DOM.gain.addEventListener('input', () => {
             case 'context-xc': { getXCComparisons(); break}
         }
         contextMenu.classList.add("d-none");
+        if (target !=  'frequency-range' && !e.target.closest('#frequency-range-panel')){
+            document.getElementById('frequency-range-panel').classList.add('d-none');
+            document.getElementById('frequency-range').classList.remove('active');
+        } 
         hideConfidenceSlider();
         config.debug && console.log('clicked', target);
         target && target !== 'result1' && trackEvent(config.UUID, 'UI', 'Click', target);
