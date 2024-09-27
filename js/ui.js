@@ -455,6 +455,24 @@ function updateElementCache() {
     specWaveElement = document.querySelector('#spectrogram wave');
 }
 
+function increaseFFT(){
+    if (wavesurfer.spectrogram.fftSamples <= 4096) {
+        wavesurfer.spectrogram.fftSamples *= 2;
+        const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+        postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
+        console.log(wavesurfer.spectrogram.fftSamples);
+    }
+}
+
+function reduceFFT(){
+    if (wavesurfer.spectrogram.fftSamples > 64) {
+        wavesurfer.spectrogram.fftSamples /= 2;
+        const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+        postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
+        console.log(wavesurfer.spectrogram.fftSamples);
+    }
+}
+
 function zoomSpec(direction) {
     if (fileLoaded) {
         if (typeof direction !== 'string') { // then it's an event
@@ -2324,24 +2342,34 @@ function onChartData(args) {
     }
     
     function handleKeyDown(e) {
-        let action = e.code;
-        if (action in GLOBAL_ACTIONS) {
-            contextMenu.classList.add("d-none");
-            if (document === e.target || document.body === e.target || e.target.attributes["data-action"]) {}
-            const modifier = e.shiftKey ? 'Shift' : e.ctrlKey ? 'Control' : e.metaKey ? 'Alt' : 'no';
-            trackEvent(config.UUID, 'KeyPress', action, modifier );
-            GLOBAL_ACTIONS[action](e);
-        }
-        
-        [].forEach.call(document.querySelectorAll('[data-action]'), function (el) {
-            el.addEventListener('click', function (e) {
-                let action = e.currentTarget.dataset.action;
-                if (action in GLOBAL_ACTIONS) {
-                    e.preventDefault();
-                    GLOBAL_ACTIONS[action](e);
-                }
+        let action = e.key//, button = e.key; 
+        // navigator.keyboard.getLayoutMap().then((keyboardLayoutMap) => {
+        //     for (let [key, val] of keyboardLayoutMap.entries()) {
+        //         if (val === button) {
+        //             action =  key;
+        //         }
+        //     }
+        //     // Not found? Use e.code
+        //     action ??= e.code;
+            console.log(`${action} key pressed`);
+            if (action in GLOBAL_ACTIONS) {
+                contextMenu.classList.add("d-none");
+                if (document === e.target || document.body === e.target || e.target.attributes["data-action"]) {}
+                const modifier = e.shiftKey ? 'Shift' : e.ctrlKey ? 'Control' : e.metaKey ? 'Alt' : 'no';
+                trackEvent(config.UUID, 'KeyPress', action, modifier );
+                GLOBAL_ACTIONS[action](e);
+            }
+            
+            [].forEach.call(document.querySelectorAll('[data-action]'), function (el) {
+                el.addEventListener('click', function (e) {
+                    let action = e.currentTarget.dataset.action;
+                    if (action in GLOBAL_ACTIONS) {
+                        e.preventDefault();
+                        GLOBAL_ACTIONS[action](e);
+                    }
+                });
             });
-        });
+        //   });   
     }
     
     
@@ -2540,7 +2568,7 @@ function onChartData(args) {
     /////////// Keyboard Shortcuts  ////////////
       
     const GLOBAL_ACTIONS = { // eslint-disable-line
-        KeyA: async function (e) {
+        a: function (e) {
             if ( e.ctrlKey || e.metaKey) {
                 if (currentFile) {
                     if (e.shiftKey) document.getElementById('analyseAll').click();
@@ -2548,7 +2576,7 @@ function onChartData(args) {
                 }
             }
         },
-        KeyC: function (e) {
+        c: function (e) {
             // Center window on playhead
             if (( e.ctrlKey || e.metaKey) && currentBuffer) {
                 const saveBufferBegin = bufferBegin;
@@ -2567,36 +2595,36 @@ function onChartData(args) {
                 postBufferUpdate({ begin: bufferBegin, position: 0.5, region: region, goToRegion: false})
             }
         },
-        KeyD: function (e) {
+        d: function (e) {
             if (( e.ctrlKey || e.metaKey) && e.shiftKey) worker.postMessage({ action: 'create-dataset' });
         },
-        KeyE: function (e) {
+        e: function (e) {
             if (( e.ctrlKey || e.metaKey) && region) exportAudio();
         },
-        KeyF: function (e) {
+        f: function (e) {
             if ( e.ctrlKey || e.metaKey) toggleFullscreen();
         },
-        KeyG: function (e) {
+        g: function (e) {
             if ( e.ctrlKey || e.metaKey) showGoToPosition();
         },
-        KeyO: async function (e) {
+        o: async function (e) {
             if ( e.ctrlKey || e.metaKey) await showOpenDialog('openFile');
         },
-        KeyP: function () {
+        p: function () {
             (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
         },
-        KeyQ: function (e) {
+        q: function (e) {
             e.metaKey && isMac && window.electron.exitApplication()
         },
-        KeyS: function (e) {
+        s: function (e) {
             if ( e.ctrlKey || e.metaKey) {
                 worker.postMessage({ action: 'save2db', file: currentFile});
             }
         },
-        KeyT: function (e) {
+        t: function (e) {
             if ( e.ctrlKey || e.metaKey) timelineToggle(true);
         },
-        KeyV: function(e) {
+        v: function(e) {
             if (activeRow && (e.ctrlKey || e.metaKey)) {
                 const nameAttribute = activeRow.getAttribute('name');
                 const [file, start, end, sname, label] = nameAttribute.split('|');
@@ -2604,7 +2632,7 @@ function onChartData(args) {
                 insertManualRecord(cname, parseFloat(start), parseFloat(end), "", "", "", "Update", false, cname)
             }
         },
-        KeyZ: function (e) {
+        z: function (e) {
             if (( e.ctrlKey || e.metaKey) && DELETE_HISTORY.length) insertManualRecord(...DELETE_HISTORY.pop());
         },
         Escape: function (e) {
@@ -2688,57 +2716,10 @@ function onChartData(args) {
                 }
             }
         },
-        Equal: function (e) {
-            if (e.shiftKey) {
-                if (wavesurfer.spectrogram.fftSamples > 64) {
-                    wavesurfer.spectrogram.fftSamples /= 2;
-                    const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
-                    postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
-                    console.log(wavesurfer.spectrogram.fftSamples);
-                }
-            } else {
-                zoomSpec('zoomIn')
-            }
-        },
-        NumpadAdd: function (e) {
-            if (e.shiftKey) {
-                if (wavesurfer.spectrogram.fftSamples > 64) {
-                    wavesurfer.spectrogram.fftSamples /= 2;
-                    const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
-                    postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
-                    console.log(wavesurfer.spectrogram.fftSamples);
-                }
-            } else {
-                zoomSpec('zoomIn')
-            }
-        },
-        Minus: function (e) {
-            if (e.shiftKey) {
-                if (wavesurfer.spectrogram.fftSamples <= 4096) {
-                    wavesurfer.spectrogram.fftSamples *= 2;
-                    const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
-                    postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
-                    console.log(wavesurfer.spectrogram.fftSamples);
-                }
-            } else {
-                zoomSpec('zoomOut')
-            }
-        },
-        NumpadSubtract: function (e) {
-            if (e.shiftKey) {
-                if (wavesurfer.spectrogram.fftSamples <= 4096) {
-                    wavesurfer.spectrogram.fftSamples *= 2;
-                    const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
-                    postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
-                    console.log(wavesurfer.spectrogram.fftSamples);
-                }
-            } else {
-                zoomSpec('zoomOut')
-            }
-        },
-        Space: function () {
-            if (wavesurfer) wavesurfer.playPause();
-        },
+        '=': function (e) {e.metaKey || e.altKey ? reduceFFT() : zoomSpec('zoomIn')},
+        '+': function (e) {e.metaKey || e.altKey ? reduceFFT() : zoomSpec('zoomIn')},
+        '-': function (e) {e.metaKey || e.altKey ? increaseFFT() : zoomSpec('zoomOut')},
+        Space: function () { wavesurfer && wavesurfer.playPause() },
         Tab: function (e) {
             if (activeRow) {
                 if (e.shiftKey) {
@@ -2754,12 +2735,8 @@ function onChartData(args) {
                 if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
             }
         },
-        Delete: function () {
-            if (activeRow) deleteRecord(activeRow);
-        },
-        Backspace: function () {
-            if (activeRow) deleteRecord(activeRow);
-        },
+        Delete: function () {activeRow && deleteRecord(activeRow)},
+        Backspace: function () {activeRow && deleteRecord(activeRow)}
     };
     
     //returns a region object with the start and end of the region supplied
