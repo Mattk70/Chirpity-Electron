@@ -12,6 +12,7 @@
     <!-- Additional JavaScript & CSS -->
     <link rel="stylesheet" href="css/style.css" />
     <script defer src="./node_modules/@easepick/bundle/dist/index.umd.js"></script>
+    <script defer src="js/slider.js"></script>
     <script defer src="./node_modules/chart.js/dist/chart.umd.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
@@ -42,7 +43,30 @@
             </div>
           </div>
     </div>
-
+        <!-- DIV to Hold the spec frequency controls -->
+        <div class="range_container d-none" id="frequency-range-panel">
+            <fieldset class="border border-secondary rounded m-2 p-2">
+                <legend class="pb-2 text-bg-dark h6">Spectrogram Frequency Range</legend>
+                <div class="sliders_control">
+                    <input id="fromSlider" type="range" value="0" min="0" max="11950" step="50"/>
+                    <input id="toSlider" type="range" value="12000" min="0" max="11950" step="50"/>
+                </div>
+                <div class="form_control">
+                    <div class="form_control_container">
+                        <div class="form_control_container__time">Min</div>
+                        <input class="rounded" type="number" id="fromInput" value="0" min="0" max="11950" step="50"/>
+                    </div>
+                    <div class="form_control_container">
+                        <div class="form_control_container__time">Max</div>
+                        <input class="rounded" type="number" id="toInput" value="11950" min="0" max="11950" step="50"/>
+                    </div>
+                    <div class="form_control_container d-flex">
+                        <div class="form_control_container__time"></div>
+                        <button class="btn btn-warning align-self-end pt-0 pb-0" id="reset-spec-frequency" onclick="return false">Reset</button>
+                    </div>
+                </div>
+            </fieldset>
+        </div>
     <div class="offcanvas offcanvas-start text-bg-dark" tabindex="-1" id="settings" aria-labelledby="offcanvasExampleLabel">
         <div class="offcanvas-header pb-2">
             <h5 class="offcanvas-title" id="offcanvasExampleLabel">Settings</h5>
@@ -50,7 +74,6 @@
         </div>
         <div class="offcanvas-body pt-1">
             <!-- Offcanvas -->
-            <form id="settingsForm" class="fs-6">
                 <fieldset class="border border-secondary rounded m-2 mt-0 mb-0 p-2">
                     <legend style="font-size: large;font-weight:bold">Detections</legend>
                     <div>
@@ -1068,6 +1091,8 @@
             <div id="complete" class="col-2 pe-2" style="display:none">
             </div>
             <div class="col pe-1">
+                <form id="settingsForm" class="fs-6">
+
                 <div class="btn-group float-end" id="filter-panel">
                     <span style="max-width: 70px" title="Nocmig mode on" id="nocmigMode"
                     class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">nights_stay</span>
@@ -1075,6 +1100,8 @@
                     class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">blur_on</span>
                     <span style="max-width: 70px" id="context-mode" title="Context Aware mode enabled"
                     class="chirpity-only material-symbols-outlined btn btn-outline-secondary p-1 pt-2 text-warning">swap_horiz</span>
+                    <span title="Adjust spectrogram frequency range" id="frequency-range"
+                    class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">vertical_align_center</span>
                     <span title="Toggle Fullscreen mode (Ctrl+F)" id="fullscreen"
                     class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">fullscreen</span>
                     <span style="max-width: 70px" id="list-icon" class="btn btn-outline-secondary p-1"><img

@@ -1310,8 +1310,8 @@ function adjustSpecDims(redraw, fftSamples) {
                 });
             } else {
                 wavesurfer.setHeight(specHeight);
+                initSpectrogram(specHeight, fftSamples);
             }
-            initSpectrogram(specHeight, fftSamples);
             specCanvasElement.style.width = '100%';
             specElement.style.zIndex = 0;
             //document.querySelector('.spec-labels').style.width = '55px';
@@ -1517,6 +1517,8 @@ const defaultConfig = {
     UUID: uuidv4(),
     colormap: 'inferno',
     specLabels: true,
+    minFrequency: 0,
+    maxFrequency: 11950,
     customColormap: {'loud': "#00f5d8", 'mid': "#000000", 'quiet': "#000000", 'threshold': 0.5, 'windowFn': 'hann'},
     timeOfDay: true,
     list: 'birds',
@@ -1621,6 +1623,14 @@ window.onload = async () => {
         DOM.colourmap.value = config.colormap;
         // Spectrogram labels
         DOM.specLabels.checked = config.specLabels;
+        // Spectrogram frequencies
+        document.getElementById('fromInput').value = config.minFrequency;
+        document.getElementById('fromSlider').value = config.minFrequency;
+        document.getElementById('toInput').value = config.maxFrequency;
+        document.getElementById('toSlider').value = config.maxFrequency;
+        if (config.minFrequency > 0 || config.maxFrequency < 11950) {
+            document.getElementById('frequency-range').classList.add('text-warning');
+        }
         // Window function & colormap
         document.getElementById('window-function').value = config.customColormap.windowFn;
         config.colormap === 'custom' && document.getElementById('colormap-fieldset').classList.remove('d-none');
@@ -1955,10 +1965,6 @@ function getSpecies(target) {
     const species = speciesCell.textContent.split('\n')[0];
     return species;
 }
-
-
-
-const getDetectionContext = (target) => target.closest('table').id;
 
 
 function handleGesture(event) {
@@ -2414,8 +2420,8 @@ function onChartData(args) {
             scrollParent: false,
             fillParent: true,
             windowFunc: config.customColormap.windowFn,
-            frequencyMin: 0,
-            frequencyMax: 11_950,
+            frequencyMin: config.minFrequency,
+            frequencyMax: config.maxFrequency,
             normalize: false,
             hideScrollbar: true,
             labels: config.specLabels,
@@ -2431,7 +2437,9 @@ function onChartData(args) {
     };
     function specTooltip(event) {
         const waveElement = event.target;
-        const yPosition = Math.round(((waveElement.getBoundingClientRect().bottom - event.clientY) * (11950 / waveElement.getBoundingClientRect().height))/10) * 10;
+        const specDimensions = waveElement.getBoundingClientRect();
+        const frequencyRange = Number(config.maxFrequency) - Number(config.minFrequency);
+        const yPosition = Math.round((specDimensions.bottom - event.clientY) * (frequencyRange / specDimensions.height)) + Number(config.minFrequency);
         tooltip.textContent = `Frequency: ${yPosition}Hz`;
         if (region) tooltip.innerHTML += "<br>" + formatRegionTooltip(region.start, region.end)
         tooltip.style.top = `${event.clientY}px`;
@@ -4306,6 +4314,20 @@ DOM.gain.addEventListener('input', () => {
                 }
                 break;
             }
+            case 'reset-spec-frequency': {
+                config.minFrequency = 0;
+                config.maxFrequency = 11950;
+                document.getElementById('fromInput').value = config.minFrequency;
+                document.getElementById('fromSlider').value = config.minFrequency;
+                document.getElementById('toInput').value = config.maxFrequency;
+                document.getElementById('toSlider').value = config.maxFrequency;
+                const fftSamples = wavesurfer.spectrogram.fftSamples;
+                wavesurfer.destroy();
+                wavesurfer = undefined;
+                adjustSpecDims(true, fftSamples);
+                document.getElementById('frequency-range').classList.remove('text-warning');
+                break;
+            }
             case 'speciesFilter': { speciesFilter(e); break}
             case 'context-menu': { 
                 e.target.closest('.play') && typeof region !== 'undefined' ? region.play() : console.log('Region undefined')
@@ -4313,6 +4335,10 @@ DOM.gain.addEventListener('input', () => {
             }
             case 'audioFiltersIcon': { toggleFilters(); break }
             case 'context-mode': { toggleContextAwareMode(); break }
+            case 'frequency-range': { 
+                document.getElementById('frequency-range-panel').classList.toggle('d-none');
+                document.getElementById('frequency-range').classList.toggle('active');
+                break }
             case 'nocmigMode': { changeNocmigMode(); break }
             case 'fullscreen': { toggleFullscreen(); break}
 
@@ -4547,6 +4573,38 @@ DOM.gain.addEventListener('input', () => {
                         wavesurfer.destroy();
                         wavesurfer = undefined;
                         adjustSpecDims(true, fftSamples)
+                    }
+                    break;
+                }
+                case 'fromInput':
+                case 'fromSlider': {
+                    config.minFrequency = Math.max(element.valueAsNumber, 0);
+                    document.getElementById('fromInput').value = config.minFrequency;
+                    document.getElementById('fromSlider').value = config.minFrequency;
+                    const fftSamples = wavesurfer.spectrogram.fftSamples;
+                    wavesurfer.destroy();
+                    wavesurfer = undefined;
+                    adjustSpecDims(true, fftSamples);
+                    if (config.minFrequency > 0 || config.maxFrequency < 11950) {
+                        document.getElementById('frequency-range').classList.add('text-warning');
+                    } else {
+                       document.getElementById('frequency-range').classList.remove('text-warning');
+                    }
+                    break;
+                }
+                case 'toInput':
+                case 'toSlider': {
+                    config.maxFrequency = Math.min(element.valueAsNumber, 11950);
+                    document.getElementById('toInput').value = config.maxFrequency;
+                    document.getElementById('toSlider').value = config.maxFrequency;
+                    const fftSamples = wavesurfer.spectrogram.fftSamples;
+                    wavesurfer.destroy();
+                    wavesurfer = undefined;
+                    adjustSpecDims(true, fftSamples);
+                    if (config.minFrequency > 0 || config.maxFrequency < 11950) {
+                        document.getElementById('frequency-range').classList.add('text-warning');
+                    } else {
+                        document.getElementById('frequency-range').classList.remove('text-warning');
                     }
                     break;
                 }

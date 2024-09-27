@@ -654,6 +654,93 @@ input[type="range"].vertical {
 
   /* Style the filled-in part for WebKit browsers (Chrome, Safari) */
   #update-progress-bar::-webkit-progress-value {
-    background-color: #4CAF50; /* Set the color for WebKit browsers */
+    background-color: #0d6efd; /* Set the color for WebKit browsers */
   }
 
+
+  /* Two handled range slider*/
+  .range_container {
+    position: absolute;
+    top: 85px;
+    left: 60px;
+    z-index:4;
+    background-color: #212529;
+    display:flex;
+    flex-direction: column;
+    width: 300px;
+    border-radius: 5px;
+    box-shadow: inset 0 0 3px #212529, 0 0 9px #212529;
+}
+  
+  .sliders_control {
+    position: relative;
+    min-height: 25px;
+  }
+  
+  .form_control {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    font-size: 16px;
+    color: #ffffff;
+  }
+  
+  .range_container input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    pointer-events: all;
+    width: 12px;
+    height: 12px;
+    background-color: #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px #C6C6C6;
+    cursor: pointer;
+  }
+  
+/*  .range_container input[type=range]::-moz-range-thumb {
+    -webkit-appearance: none;
+    pointer-events: all;
+    width: 24px;
+    height: 24px;
+    background-color: #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px #C6C6C6;
+    cursor: pointer;  
+  }
+    */
+  
+  .range_container input[type=range]::-webkit-slider-thumb:hover {
+    background: #f7f7f7;
+  }
+  
+  .range_container input[type=range]::-webkit-slider-thumb:active {
+    box-shadow: inset 0 0 3px #387bbe, 0 0 9px #387bbe;
+    -webkit-box-shadow: inset 0 0 3px #387bbe, 0 0 9px #387bbe;
+  }
+  
+  .range_container input[type="number"] {
+    color: #929292;
+    width: 80px;
+    height: 24px;
+    font-size: 20px;
+    border: none;
+  }
+  
+  .range_container input[type=number]::-webkit-inner-spin-button, 
+  .range_container input[type=number]::-webkit-outer-spin-button {  
+     opacity: 1;
+  }
+  
+  .range_container input[type="range"] {
+    -webkit-appearance: none; 
+    appearance: none;
+    height: 8px;
+    width: 100%;
+    position: absolute;
+    background-color: #C6C6C6;
+    pointer-events: none;
+  }
+  
+  #fromSlider {
+    height: 0;
+    z-index: 1;
+  }
