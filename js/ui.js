@@ -2724,9 +2724,9 @@ function onChartData(args) {
                 }
             }
         },
-        '=': function (e) {e.metaKey || e.altKey ? reduceFFT() : zoomSpec('zoomIn')},
-        '+': function (e) {e.metaKey || e.altKey ? reduceFFT() : zoomSpec('zoomIn')},
-        '-': function (e) {e.metaKey || e.altKey ? increaseFFT() : zoomSpec('zoomOut')},
+        '=': function (e) {e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec('zoomIn')},
+        '+': function (e) {e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec('zoomIn')},
+        '-': function (e) {e.metaKey || e.ctrlKey ? increaseFFT() : zoomSpec('zoomOut')},
         ' ': function () { wavesurfer && wavesurfer.playPause() },
         Tab: function (e) {
             if (activeRow) {
