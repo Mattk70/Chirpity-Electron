@@ -2353,34 +2353,25 @@ function onChartData(args) {
     }
     
     function handleKeyDown(e) {
-        let action = e.key//, button = e.key; 
-        // navigator.keyboard.getLayoutMap().then((keyboardLayoutMap) => {
-        //     for (let [key, val] of keyboardLayoutMap.entries()) {
-        //         if (val === button) {
-        //             action =  key;
-        //         }
-        //     }
-        //     // Not found? Use e.code
-        //     action ??= e.code;
-            console.log(`${action} key pressed`);
-            if (action in GLOBAL_ACTIONS) {
-                contextMenu.classList.add("d-none");
-                if (document === e.target || document.body === e.target || e.target.attributes["data-action"]) {}
-                const modifier = e.shiftKey ? 'Shift' : e.ctrlKey ? 'Control' : e.metaKey ? 'Alt' : 'no';
-                trackEvent(config.UUID, 'KeyPress', action, modifier );
-                GLOBAL_ACTIONS[action](e);
-            }
-            
-            [].forEach.call(document.querySelectorAll('[data-action]'), function (el) {
-                el.addEventListener('click', function (e) {
-                    let action = e.currentTarget.dataset.action;
-                    if (action in GLOBAL_ACTIONS) {
-                        e.preventDefault();
-                        GLOBAL_ACTIONS[action](e);
-                    }
-                });
+        let action = e.key;
+        config.debug && console.log(`${action} key pressed`);
+        if (action in GLOBAL_ACTIONS) {
+            contextMenu.classList.add("d-none");
+            if (document === e.target || document.body === e.target || e.target.attributes["data-action"]) {}
+            const modifier = e.shiftKey ? 'Shift' : e.ctrlKey ? 'Control' : e.metaKey ? 'Alt' : 'no';
+            trackEvent(config.UUID, 'KeyPress', action, modifier );
+            GLOBAL_ACTIONS[action](e);
+        }
+        
+        [].forEach.call(document.querySelectorAll('[data-action]'), function (el) {
+            el.addEventListener('click', function (e) {
+                let action = e.currentTarget.dataset.action;
+                if (action in GLOBAL_ACTIONS) {
+                    e.preventDefault();
+                    GLOBAL_ACTIONS[action](e);
+                }
             });
-        //   });   
+        });
     }
     
     
@@ -2581,14 +2572,8 @@ function onChartData(args) {
     /////////// Keyboard Shortcuts  ////////////
       
     const GLOBAL_ACTIONS = { // eslint-disable-line
-        a: function (e) {
-            if ( e.ctrlKey || e.metaKey) {
-                if (currentFile) {
-                    if (e.shiftKey) document.getElementById('analyseAll').click();
-                    else document.getElementById('analyse').click()
-                }
-            }
-        },
+        a: function (e) { ( e.ctrlKey || e.metaKey) && currentFile && document.getElementById('analyse').click()},
+        A: function (e) { ( e.ctrlKey || e.metaKey) && currentFile && document.getElementById('analyseAll').click()},
         c: function (e) {
             // Center window on playhead
             if (( e.ctrlKey || e.metaKey) && currentBuffer) {
