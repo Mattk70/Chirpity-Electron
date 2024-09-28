@@ -1,4 +1,4 @@
-# Chirpity ![GitHub release (latest by date)](https://img.shields.io/github/v/release/Mattk70/Chirpity-Electron) ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/Mattk70/Chirpity-Electron/latest/total?style=plastic&label=Downloads)
+# Chirpity ![GitHub release (latest by date)](https://img.shields.io/github/v/release/Mattk70/Chirpity-Electron) ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/Mattk70/Chirpity-Electron/latest/total?style=plastic&label=Latest%20Release%20Downloads)
 
 
 
