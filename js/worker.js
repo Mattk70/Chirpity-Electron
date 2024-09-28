@@ -593,12 +593,14 @@ async function spawnListWorker() {
 const getFiles = async (files, image) => {
     let file_list = [];
     for (let i = 0; i < files.length; i++) {
-        const stats = fs.lstatSync(files[i])
+        const path = files[i];
+        const stats = fs.lstatSync(path)
         if (stats.isDirectory()) {
-            const dirFiles = await getFilesInDirectory(files[i])
+            const dirFiles = await getFilesInDirectory(path)
             file_list = [...file_list,...dirFiles]
         } else {
-            file_list.push(files[i])
+            const filename = p.basename(path)
+            filename.startsWith('._') || file_list.push(path)
         }
     }
     // filter out unsupported files
@@ -626,7 +628,8 @@ const getFilesInDirectory = async (dir) => {
             if (dirent.isDirectory()) {
                 stack.push(path);
             } else {
-                files.push(path);
+                const filename = p.basename(path)
+                filename.startsWith('._') || files.push(path)
             }
         }
     }
@@ -1093,7 +1096,9 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
     // using the nullish coalescing operator
     metadata[file].locationID ??= savedMeta?.locationID;
     
-    metadata[file].duration ??= savedMeta?.duration || await getDuration(file).catch(error => console.warn('getDuration error', error));
+    metadata[file].duration ??= savedMeta?.duration || await getDuration(file).catch(error => {
+        console.warn('getDuration error', error)}
+    );
     
     return new Promise((resolve, reject) => {
         if (metadata[file].isComplete) {
