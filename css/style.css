@@ -662,7 +662,7 @@ input[type="range"].vertical {
   .range_container {
     position: absolute;
     top: 85px;
-    left: 60px;
+    right: 10px;
     z-index:4;
     background-color: #212529;
     display:flex;
