@@ -8,6 +8,7 @@ const wavefileReader = require('wavefile-reader');
 const SunCalc = require('suncalc');
 const ffmpeg = require('fluent-ffmpeg');
 const png = require('fast-png');
+const {utimesSync} = require('utimes');
 const {writeToPath} = require('@fast-csv/format');
 const merge = require('lodash.merge');
 import { State } from './state.js';
@@ -3043,8 +3044,8 @@ const getValidSpecies = async (file) => {
 
 const onUpdateFileStart = async (args) => {
     let file = args.file;
-    const newfileMtime = Math.round(args.start + (metadata[file].duration * 1000));
-    fs.utimesSync(file, newfileMtime, newfileMtime);
+    const newfileMtime = new Date(Math.round(args.start + (metadata[file].duration * 1000)));
+    utimesSync(file, {atime: Date.now(), mtime: newfileMtime});
     metadata[file].fileStart = args.start;
     let db = STATE.db;
     let row = await db.getAsync(`
@@ -3060,60 +3061,70 @@ const onUpdateFileStart = async (args) => {
         const id = row.id;
         const { changes } = await db.runAsync('UPDATE files SET filestart = ? where id = ?', args.start, id);
         DEBUG && console.log(changes ? `Changed ${file}` : `No changes made`);
-        // Fill with new values
 
         try {
             // Begin transaction
             await db.runAsync('BEGIN TRANSACTION');
-    
+
             // Create a temporary table with the same structure as the records table
             await db.runAsync(`
-                CREATE TEMPORARY TABLE temp_records AS
+                CREATE TABLE temp_records AS
                 SELECT * FROM records;
             `);
-    
+
             // Update the temp_records table with the new filestart values
             await db.runAsync('UPDATE temp_records SET dateTime = (position * 1000) + ? WHERE fileID = ?', args.start, id);
-                
-            // Drop the original records table
-            await db.runAsync('DROP TABLE records;');
-    
+
+            // Check if temp_records exists and drop the original records table
+            const tempExists = await db.getAsync(`SELECT name FROM sqlite_master WHERE type='table' AND name='temp_records';`);
+
+            if (tempExists) {
+                // Drop the original records table
+                await db.runAsync('DROP TABLE records;');
+            }
+
             // Rename the temp_records table to replace the original records table
             await db.runAsync('ALTER TABLE temp_records RENAME TO records;');
-    
+
             // Recreate the UNIQUE constraint on the new records table
             await db.runAsync(`
                 CREATE UNIQUE INDEX idx_unique_record ON records (dateTime, fileID, speciesID);
             `);
-            
+
             // Update the daylight flag if necessary
             let lat, lon;
-            if (row.locationID){
-                const location = await db.getAsync('SELECT lat, lon FROM locations WHERE locationID = ?', row.locationID)
+            if (row.locationID) {
+                const location = await db.getAsync('SELECT lat, lon FROM locations WHERE locationID = ?', row.locationID);
                 lat = location.lat;
                 lon = location.lon;
             } else {
                 lat = STATE.lat;
                 lon = STATE.lon;
             }
+
+            // Collect updates to be performed on each record
+            const updatePromises = [];
+
             db.each(`
-                SELECT rowid, dateTime, fileID, speciesID, confidence, isDaylight from records WHERE fileID = ${id}
-                `, async (err, row) => {
-                    if (err) {
-                        throw err;
-                    }
-                    const isDaylight = isDuringDaylight(row.dateTime, lat, lon) ? 1 : 0;
-                    // Update the isDaylight column for this record
-                    await db.runAsync('UPDATE records SET isDaylight = ? WHERE isDaylight != ? AND rowid = ?', isDaylight, isDaylight, row.rowid);
-                }, async (err, count) => {
-                    if (err) {
-                        throw err;
-                    }
-                    // Commit transaction once all rows are processed
-                    await db.run('COMMIT');
-                    DEBUG && console.log(`File ${file} updated successfully.`);
-                    await Promise.all([getResults(), getSummary()] );
-                });
+                SELECT rowid, dateTime, fileID, speciesID, confidence, isDaylight FROM records WHERE fileID = ${id}
+            `, async (err, row) => {
+                if (err) {
+                    throw err; // This will trigger rollback
+                }
+                const isDaylight = isDuringDaylight(row.dateTime, lat, lon) ? 1 : 0;
+                // Update the isDaylight column for this record
+                updatePromises.push(db.runAsync('UPDATE records SET isDaylight = ? WHERE isDaylight != ? AND rowid = ?', isDaylight, isDaylight, row.rowid));
+            }, async (err, count) => {
+                if (err) {
+                    throw err; // This will trigger rollback
+                }
+                // Wait for all updates to finish
+                await Promise.all(updatePromises);
+                // Commit transaction once all rows are processed
+                await db.runAsync('COMMIT');
+                DEBUG && console.log(`File ${file} updated successfully.`);
+                await Promise.all([getResults(), getSummary()]);
+            });
         } catch (error) {
             // Rollback in case of error
             await db.runAsync('ROLLBACK');
@@ -3121,7 +3132,6 @@ const onUpdateFileStart = async (args) => {
         }
     }
 };
-
 
 async function onDelete({
     file,

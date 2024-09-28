@@ -4317,6 +4317,7 @@ DOM.gain.addEventListener('input', () => {
                 wavesurfer = undefined;
                 adjustSpecDims(true, fftSamples);
                 document.getElementById('frequency-range').classList.remove('text-warning');
+                updatePrefs('config.json', config);
                 break;
             }
             case 'speciesFilter': { speciesFilter(e); break}
