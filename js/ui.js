@@ -1307,10 +1307,7 @@ function adjustSpecDims(redraw, fftSamples) {
             if (!wavesurfer) {
                 initWavesurfer({
                     audio: currentBuffer,
-                    backend: 'WebAudio',
-                    alpha: 0,
                     height: specHeight,
-                    reset: false
                 });
             } else {
                 wavesurfer.setHeight(specHeight);
@@ -1633,9 +1630,7 @@ window.onload = async () => {
         DOM.toInput.value = config.maxFrequency;
         DOM.toSlider.value = config.maxFrequency;
         fillSlider(DOM.fromInput, DOM.toInput,  '#C6C6C6', '#0d6efd', DOM.toSlider)
-        if (config.minFrequency > 0 || config.maxFrequency < 11950) {
-            document.getElementById('frequency-range').classList.add('text-warning');
-        }
+        checkFilteredFrequency();
         // Window function & colormap
         document.getElementById('window-function').value = config.customColormap.windowFn;
         config.colormap === 'custom' && document.getElementById('colormap-fieldset').classList.remove('d-none');
@@ -4312,6 +4307,7 @@ DOM.gain.addEventListener('input', () => {
                 DOM.toInput.value = config.maxFrequency;
                 DOM.toSlider.value = config.maxFrequency;
                 fillSlider(DOM.fromInput, DOM.toInput,  '#C6C6C6', '#0d6efd', DOM.toSlider)
+                checkFilteredFrequency();
                 const fftSamples = wavesurfer.spectrogram.fftSamples;
                 wavesurfer.destroy();
                 wavesurfer = undefined;
@@ -4581,11 +4577,7 @@ DOM.gain.addEventListener('input', () => {
                     wavesurfer.destroy();
                     wavesurfer = undefined;
                     adjustSpecDims(true, fftSamples);
-                    if (config.minFrequency > 0 || config.maxFrequency < 11950) {
-                        document.getElementById('frequency-range').classList.add('text-warning');
-                    } else {
-                       document.getElementById('frequency-range').classList.remove('text-warning');
-                    }
+                    checkFilteredFrequency();
                     break;
                 }
                 case 'toInput':
@@ -4597,11 +4589,7 @@ DOM.gain.addEventListener('input', () => {
                     wavesurfer.destroy();
                     wavesurfer = undefined;
                     adjustSpecDims(true, fftSamples);
-                    if (config.minFrequency > 0 || config.maxFrequency < 11950) {
-                        document.getElementById('frequency-range').classList.add('text-warning');
-                    } else {
-                        document.getElementById('frequency-range').classList.remove('text-warning');
-                    }
+                    checkFilteredFrequency();
                     break;
                 }
                 case 'normalise': {
@@ -4894,6 +4882,19 @@ async function readLabels(labelFile, updating){
             speciesFiltered: isSpeciesViewFiltered(true)
         })
         resetResults({clearPagination: false})
+    }
+
+    function checkFilteredFrequency(){
+        const resetButton = document.getElementById('reset-spec-frequency');
+        if (config.minFrequency > 0 || config.maxFrequency < 11950) {
+            document.getElementById('frequency-range').classList.add('text-warning');
+            resetButton.classList.add('btn-warning');
+            resetButton.classList.remove('btn-secondary', 'disabled');
+        } else {
+            document.getElementById('frequency-range').classList.remove('text-warning');
+            resetButton.classList.remove('btn-warning');
+            resetButton.classList.add('btn-secondary', 'disabled');
+        }
     }
 
     function getCurrentPage(){
