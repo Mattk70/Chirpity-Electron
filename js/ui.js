@@ -1518,8 +1518,6 @@ const defaultConfig = {
     UUID: uuidv4(),
     colormap: 'inferno',
     specLabels: true,
-    minFrequency: 0,
-    maxFrequency: 11950,
     customColormap: {'loud': "#00f5d8", 'mid': "#000000", 'quiet': "#000000", 'threshold': 0.5, 'windowFn': 'hann'},
     timeOfDay: true,
     list: 'birds',
@@ -1541,7 +1539,8 @@ const defaultConfig = {
     tensorflow: { threads: DIAGNOSTICS['Cores'], batchSize: 32 },
     webgpu: { threads: 2, batchSize: 8 },
     webgl: { threads: 2, batchSize: 32 },
-    audio: { gain: 0, format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, fade: false, notification: true, normalise: false },
+    audio: { gain: 0, format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, 
+        fade: false, notification: true, normalise: false, minFrequency: 0, maxFrequency: 11950 },
     limit: 500,
     track: true,
     debug: false,
@@ -1625,10 +1624,10 @@ window.onload = async () => {
         // Spectrogram labels
         DOM.specLabels.checked = config.specLabels;
         // Spectrogram frequencies
-        DOM.fromInput.value = config.minFrequency;
-        DOM.fromSlider.value = config.minFrequency;
-        DOM.toInput.value = config.maxFrequency;
-        DOM.toSlider.value = config.maxFrequency;
+        DOM.fromInput.value = config.audio.minFrequency;
+        DOM.fromSlider.value = config.audio.minFrequency;
+        DOM.toInput.value = config.audio.maxFrequency;
+        DOM.toSlider.value = config.audio.maxFrequency;
         fillSlider(DOM.fromInput, DOM.toInput,  '#C6C6C6', '#0d6efd', DOM.toSlider)
         checkFilteredFrequency();
         // Window function & colormap
@@ -2411,8 +2410,8 @@ function onChartData(args) {
             scrollParent: false,
             fillParent: true,
             windowFunc: config.customColormap.windowFn,
-            frequencyMin: config.minFrequency,
-            frequencyMax: config.maxFrequency,
+            frequencyMin: config.audio.minFrequency,
+            frequencyMax: config.audio.maxFrequency,
             normalize: false,
             hideScrollbar: true,
             labels: config.specLabels,
@@ -2429,8 +2428,8 @@ function onChartData(args) {
     function specTooltip(event) {
         const waveElement = event.target;
         const specDimensions = waveElement.getBoundingClientRect();
-        const frequencyRange = Number(config.maxFrequency) - Number(config.minFrequency);
-        const yPosition = Math.round((specDimensions.bottom - event.clientY) * (frequencyRange / specDimensions.height)) + Number(config.minFrequency);
+        const frequencyRange = Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
+        const yPosition = Math.round((specDimensions.bottom - event.clientY) * (frequencyRange / specDimensions.height)) + Number(config.audio.minFrequency);
         tooltip.textContent = `Frequency: ${yPosition}Hz`;
         if (region) tooltip.innerHTML += "<br>" + formatRegionTooltip(region.start, region.end)
         tooltip.style.top = `${event.clientY}px`;
@@ -4300,14 +4299,15 @@ DOM.gain.addEventListener('input', () => {
                 break;
             }
             case 'reset-spec-frequency': {
-                config.minFrequency = 0;
-                config.maxFrequency = 11950;
-                DOM.fromInput.value = config.minFrequency;
-                DOM.fromSlider.value = config.minFrequency;
-                DOM.toInput.value = config.maxFrequency;
-                DOM.toSlider.value = config.maxFrequency;
+                config.audio.minFrequency = 0;
+                config.audio.maxFrequency = 11950;
+                DOM.fromInput.value = config.audio.minFrequency;
+                DOM.fromSlider.value = config.audio.minFrequency;
+                DOM.toInput.value = config.audio.maxFrequency;
+                DOM.toSlider.value = config.audio.maxFrequency;
                 fillSlider(DOM.fromInput, DOM.toInput,  '#C6C6C6', '#0d6efd', DOM.toSlider)
                 checkFilteredFrequency();
+                worker.postMessage({action: 'update-state', audio: config.audio});
                 const fftSamples = wavesurfer.spectrogram.fftSamples;
                 wavesurfer.destroy();
                 wavesurfer = undefined;
@@ -4570,26 +4570,28 @@ DOM.gain.addEventListener('input', () => {
                 }
                 case 'fromInput':
                 case 'fromSlider': {
-                    config.minFrequency = Math.max(element.valueAsNumber, 0);
-                    DOM.fromInput.value = config.minFrequency;
-                    DOM.fromSlider.value = config.minFrequency;
+                    config.audio.minFrequency = Math.max(element.valueAsNumber, 0);
+                    DOM.fromInput.value = config.audio.minFrequency;
+                    DOM.fromSlider.value = config.audio.minFrequency;
                     const fftSamples = wavesurfer.spectrogram.fftSamples;
                     wavesurfer.destroy();
                     wavesurfer = undefined;
                     adjustSpecDims(true, fftSamples);
                     checkFilteredFrequency();
+                    worker.postMessage({action: 'update-state', audio: config.audio});
                     break;
                 }
                 case 'toInput':
                 case 'toSlider': {
-                    config.maxFrequency = Math.min(element.valueAsNumber, 11950);
-                    DOM.toInput.value = config.maxFrequency;
-                    DOM.toSlider.value = config.maxFrequency;
+                    config.audio.maxFrequency = Math.min(element.valueAsNumber, 11950);
+                    DOM.toInput.value = config.audio.maxFrequency;
+                    DOM.toSlider.value = config.audio.maxFrequency;
                     const fftSamples = wavesurfer.spectrogram.fftSamples;
                     wavesurfer.destroy();
                     wavesurfer = undefined;
                     adjustSpecDims(true, fftSamples);
                     checkFilteredFrequency();
+                    worker.postMessage({action: 'update-state', audio: config.audio});
                     break;
                 }
                 case 'normalise': {
@@ -4886,7 +4888,7 @@ async function readLabels(labelFile, updating){
 
     function checkFilteredFrequency(){
         const resetButton = document.getElementById('reset-spec-frequency');
-        if (config.minFrequency > 0 || config.maxFrequency < 11950) {
+        if (config.audio.minFrequency > 0 || config.audio.maxFrequency < 11950) {
             document.getElementById('frequency-range').classList.add('text-warning');
             resetButton.classList.add('btn-warning');
             resetButton.classList.remove('btn-secondary', 'disabled');
