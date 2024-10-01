@@ -45,7 +45,7 @@ body {
   'GRAD' 0,
   'opsz' 24;
   font-display: block;
-  font-size: x-large;
+  font-size: calc(24px * var(--font-size-scale));;
   display: inline-block;
   line-height: 1;
   white-space: nowrap;
@@ -128,7 +128,7 @@ div#contentWrapper.loaded {
 }
 
 .zoom {
-    font-size: xx-large;
+    font-size: calc(32px * var(--font-size-scale));;
 }
 
 .species-selector {
