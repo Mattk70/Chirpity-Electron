@@ -3343,33 +3343,35 @@ function onChartData(args) {
         // prepare the undelete record
         const [file, start, end,] = unpackNameAttr(target);
         const setting = target.closest('table');
-        const row = target.closest('tr');
-        let cname = target.querySelector('.cname').innerText;
-        let [species, confidence] = cname.split('\n');
-        // confirmed records don't have a confidence bar
-        if (!confidence) {
-            species =  species.slice(0, -9); // remove ' verified'
-            confidence = 2000;
-        } else { confidence = parseInt(confidence.replace('%', '')) * 10 }
-        const comment = target.querySelector('.comment').innerText;
-        const label = target.querySelector('.label').innerText;
-        let callCount = target.querySelector('.call-count').innerText;
-        callCount = callCount.replace('Present', '');
-        DELETE_HISTORY.push([species, start, end, comment, callCount, label, undefined, undefined, undefined, confidence])
-        
-        worker.postMessage({
-            action: 'delete',
-            file: file,
-            start: start,
-            end: end,
-            species: getSpecies(target),
-            speciesFiltered: isSpeciesViewFiltered()
-        })
-        // Clear the record in the UI
-        const index = row.rowIndex
-        // there may be no records remaining (no index)
-        index && setting.deleteRow(index);
-        setting.rows[index]?.click()
+        if (setting){
+            const row = target.closest('tr');
+            let cname = target.querySelector('.cname').innerText;
+            let [species, confidence] = cname.split('\n');
+            // confirmed records don't have a confidence bar
+            if (!confidence) {
+                species =  species.slice(0, -9); // remove ' verified'
+                confidence = 2000;
+            } else { confidence = parseInt(confidence.replace('%', '')) * 10 }
+            const comment = target.querySelector('.comment').innerText;
+            const label = target.querySelector('.label').innerText;
+            let callCount = target.querySelector('.call-count').innerText;
+            callCount = callCount.replace('Present', '');
+            DELETE_HISTORY.push([species, start, end, comment, callCount, label, undefined, undefined, undefined, confidence])
+            
+            worker.postMessage({
+                action: 'delete',
+                file: file,
+                start: start,
+                end: end,
+                species: getSpecies(target),
+                speciesFiltered: isSpeciesViewFiltered()
+            })
+            // Clear the record in the UI
+            const index = row.rowIndex
+            // there may be no records remaining (no index)
+            index > -1 && setting.deleteRow(index);
+            setting.rows[index]?.click()
+        }
     }
     
     const deleteSpecies = (target) => {
@@ -4549,7 +4551,7 @@ DOM.gain.addEventListener('input', () => {
                 }
                 case 'gain': {
                     DOM.gainAdjustment.textContent = element.value + 'dB'; //.toString();
-                    config.audio.gain = element.value;   
+                    config.audio.gain = element.value;
                     worker.postMessage({action:'update-state', audio: config.audio})
                     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                     fileLoaded &&
