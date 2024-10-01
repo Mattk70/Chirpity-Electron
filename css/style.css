@@ -71,15 +71,27 @@ body {
     width: 55px !important;
 }
 
+#primaryLogo {
+    max-height: calc(40px * var(--font-size-scale));
+    max-width: auto;
+}
+
 .icon {
-    max-height: 30px;
-    max-width: 30px;
+    max-height: calc(30px * var(--font-size-scale));
+    max-width: calc(30px * var(--font-size-scale));
     filter: invert(45%);
 
 }
 
 #list-icon:hover>img {
     filter: invert(100%);
+}
+
+img {
+    img {
+        width: calc(100 * var(--font-size-scale)); /* Scale width */
+        height: auto; /* Maintain aspect ratio */
+    }
 }
 
 span[id^="filename_"] {
