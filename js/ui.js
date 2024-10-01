@@ -1315,9 +1315,10 @@ const loadResultRegion = ({ file = '', start = 0, end = 3, label = '' } = {}) =>
 * @param redraw boolean, whether to re-render the spectrogram
 * @param fftSamples: Optional, the number of fftsamples to use for rendering. Must be a factor of 2
 */
-const footerHeight = document.getElementById('footer').offsetHeight;
-const navHeight = document.getElementById('navPadding').offsetHeight;
+
 function adjustSpecDims(redraw, fftSamples, newHeight) {
+    const footerHeight = document.getElementById('footer').offsetHeight;
+    const navHeight = document.getElementById('navPadding').clientHeight;
     newHeight ??= 0;
     //Contentwrapper starts below navbar (66px) and ends above footer (30px). Hence - 96
     const contentWrapper = document.getElementById('contentWrapper');
@@ -1365,6 +1366,12 @@ function adjustSpecDims(redraw, fftSamples, newHeight) {
     // Function to set the font size scale
     function setFontSizeScale() {
         document.documentElement.style.setProperty('--font-size-scale', config.fontScale);
+        const decreaseBtn = document.getElementById('decreaseFont');
+        const increaseBtn = document.getElementById('increaseFont');
+        
+        decreaseBtn.classList.toggle('disabled', config.fontScale === 0.7);
+        increaseBtn.classList.toggle('disabled', config.fontScale === 1.1);
+
         updatePrefs('config.json', config)
     }
 
@@ -4366,13 +4373,13 @@ DOM.gain.addEventListener('input', () => {
                 break;
             }
             case 'increaseFont': {
-                const fontScale = parseFloat((config.fontScale + 0.1).toFixed(1));
+                const fontScale = parseFloat(Math.min(1.1, config.fontScale + 0.1).toFixed(1)); // Don't let it go above 1.1
                 config.fontScale = fontScale;
                 setFontSizeScale();
                 break;
             }
             case 'decreaseFont': {
-                const fontScale = parseFloat(Math.max(0.5, config.fontScale - 0.1).toFixed(1)); // Don't let it go below 0.5
+                const fontScale = parseFloat(Math.max(0.7, config.fontScale - 0.1).toFixed(1)); // Don't let it go below 0.7
                 config.fontScale = fontScale;
                 setFontSizeScale();
                 break
