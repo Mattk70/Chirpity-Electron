@@ -183,6 +183,7 @@ const DOM = {
      batchSizeValue: document.getElementById('batch-size-value'),
      colourmap: document.getElementById('colourmap'),
      contentWrapperElement: document.getElementById('contentWrapper'),
+     controlsWrapper: document.getElementById('controlsWrapper'),
      contextAware: document.getElementById('context'),
      contextAwareIcon: document.getElementById('context-mode'),
      debugMode: document.getElementById('debug-mode'),
@@ -223,6 +224,34 @@ clickedIndex, currentFileDuration;
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
 // Set content container height
 DOM.contentWrapperElement.style.height = (bodyElement.clientHeight - 80) + 'px';
+
+// Mouse down event to start dragging
+DOM.controlsWrapper.addEventListener('mousedown', (e) => {
+    if (e.target.tagName !== 'DIV' ) return
+    const startY = e.clientY;
+    const initialHeight = DOM.spectrogram.offsetHeight;
+    let debounceTimer;
+    const onMouseMove = (e) => {
+        clearTimeout(debounceTimer);
+        // Calculate the delta y (drag distance)
+        const newHeight = initialHeight + e.clientY - startY;
+    
+        // Adjust the spectrogram dimensions accordingly
+        debounceTimer = setTimeout(() => {
+            adjustSpecDims(true,  wavesurfer.spectrogram.fftSamples, newHeight);
+        }, 5);
+    }
+    
+    // Remove event listeners on mouseup
+    const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+    };
+    // Attach event listeners for mousemove and mouseup
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+});
+
 
 
 // Set default Options
@@ -1288,7 +1317,8 @@ const loadResultRegion = ({ file = '', start = 0, end = 3, label = '' } = {}) =>
 */
 const footerHeight = document.getElementById('footer').offsetHeight;
 const navHeight = document.getElementById('navPadding').offsetHeight;
-function adjustSpecDims(redraw, fftSamples) {
+function adjustSpecDims(redraw, fftSamples, newHeight) {
+    newHeight ??= 0;
     //Contentwrapper starts below navbar (66px) and ends above footer (30px). Hence - 96
     const contentWrapper = document.getElementById('contentWrapper');
     contentWrapper.style.height = (bodyElement.clientHeight - footerHeight - navHeight) + 'px';
@@ -1299,9 +1329,13 @@ function adjustSpecDims(redraw, fftSamples) {
     const spectrogramWrapper = document.getElementById('spectrogramWrapper')
     if (!spectrogramWrapper.classList.contains('d-none')) {
         // Expand up to 512px unless fullscreen
-        const controlsHeight = document.getElementById('controlsWrapper').offsetHeight;
+        const controlsHeight = DOM.controlsWrapper.offsetHeight;
         const timelineHeight = 22 ; //document.getElementById('timeline').offsetHeight; // This is unset when there is no wavesurfer, so hard-coding
-        const specHeight = config.fullscreen ? contentHeight - timelineHeight - formOffset - controlsHeight : Math.min(contentHeight * 0.4, 512);
+        const specHeight = config.fullscreen ? contentHeight - timelineHeight - formOffset - controlsHeight : newHeight || config.specMaxHeight;
+        if (newHeight !== 0) {
+            config.specMaxHeight = specHeight;
+            scheduler.postTask(() => updatePrefs('config.json', config), {priority: 'background'});
+        }
         if (currentFile) {
             // give the wrapper space for the transport controls and element padding/margins
             if (!wavesurfer) {
@@ -1326,6 +1360,15 @@ function adjustSpecDims(redraw, fftSamples) {
     const resultTableElement = document.getElementById('resultTableContainer');
     resultTableElement.style.height = (contentHeight - specOffset - formOffset) + 'px';
 }
+
+///////////////// Font functions ////////////////
+    // Function to set the font size scale
+    function setFontSizeScale() {
+        document.documentElement.style.setProperty('--font-size-scale', config.fontScale);
+    }
+
+
+
 
 
 ///////////////////////// Timeline Callbacks /////////////////////////
@@ -1513,10 +1556,12 @@ function fillDefaults(config, defaultConfig) {
 /////////////////////////  Window Handlers ////////////////////////////
 // Set config defaults
 const defaultConfig = {
+    fontScale: 1,
     seenTour: false,
     lastUpdateCheck: 0,
     UUID: uuidv4(),
     colormap: 'inferno',
+    specMaxHeight: 512,
     specLabels: true,
     customColormap: {'loud': "#00f5d8", 'mid': "#000000", 'quiet': "#000000", 'threshold': 0.5, 'windowFn': 'hann'},
     timeOfDay: true,
@@ -1591,7 +1636,8 @@ window.onload = async () => {
         // Initialize Spectrogram
         initWavesurfer({});
         // Set UI option state
-        
+        // Fontsize
+        setFontSizeScale();
         // Map slider value to batch size
         DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
         DOM.batchSizeSlider.max = (BATCH_SIZE_LIST.length - 1).toString();
@@ -4317,6 +4363,16 @@ DOM.gain.addEventListener('input', () => {
                 document.getElementById('frequency-range').classList.remove('text-warning');
                 updatePrefs('config.json', config);
                 break;
+            }
+            case 'increaseFont': {
+                config.fontScale += 0.1;
+                setFontSizeScale();
+                break;
+            }
+            case 'decreaseFont': {
+                config.fontScale = Math.max(0.5, config.fontScale - 0.1); // Don't let it go below 0.5
+                setFontSizeScale();
+                break
             }
             case 'speciesFilter': { speciesFilter(e); break}
             case 'context-menu': { 

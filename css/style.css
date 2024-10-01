@@ -1,3 +1,8 @@
+:root {
+    --font-size-scale: 1; /* Default scale */
+}
+
+
 html,
 body {
     height: 100%;
@@ -6,6 +11,7 @@ body {
     min-width: 700px;
     overflow: hidden;
     background: #f8f9fa;
+    font-size: calc(16px * var(--font-size-scale));
 }
 
 .overlay {
@@ -91,6 +97,10 @@ span[id^="filename_"] {
 
 .pointer {
     cursor: pointer;
+}
+
+#controlsWrapper {
+    cursor: move;
 }
 
 #controlsWrapper .row,
