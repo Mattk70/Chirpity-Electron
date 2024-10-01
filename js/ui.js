@@ -1365,6 +1365,7 @@ function adjustSpecDims(redraw, fftSamples, newHeight) {
     // Function to set the font size scale
     function setFontSizeScale() {
         document.documentElement.style.setProperty('--font-size-scale', config.fontScale);
+        updatePrefs('config.json', config)
     }
 
 
@@ -1637,7 +1638,7 @@ window.onload = async () => {
         initWavesurfer({});
         // Set UI option state
         // Fontsize
-        setFontSizeScale();
+        config.fontScale === 1 || setFontSizeScale();
         // Map slider value to batch size
         DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
         DOM.batchSizeSlider.max = (BATCH_SIZE_LIST.length - 1).toString();
@@ -4365,12 +4366,14 @@ DOM.gain.addEventListener('input', () => {
                 break;
             }
             case 'increaseFont': {
-                config.fontScale += 0.1;
+                const fontScale = parseFloat((config.fontScale + 0.1).toFixed(1));
+                config.fontScale = fontScale;
                 setFontSizeScale();
                 break;
             }
             case 'decreaseFont': {
-                config.fontScale = Math.max(0.5, config.fontScale - 0.1); // Don't let it go below 0.5
+                const fontScale = parseFloat(Math.max(0.5, config.fontScale - 0.1).toFixed(1)); // Don't let it go below 0.5
+                config.fontScale = fontScale;
                 setFontSizeScale();
                 break
             }
