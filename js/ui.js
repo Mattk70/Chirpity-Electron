@@ -2767,14 +2767,11 @@ function onChartData(args) {
         ' ': function () { wavesurfer && wavesurfer.playPause() },
         Tab: function (e) {
             if (activeRow) {
+                activeRow.classList.remove('table-active')
                 if (e.shiftKey) {
-                    activeRow.classList.remove('table-active')
                     activeRow = activeRow.previousSibling || activeRow;
-                    activeRow.classList.add('table-active')
                 } else {
-                    activeRow.classList.remove('table-active')
                     activeRow = activeRow.nextSibling || activeRow;
-                    activeRow.classList.add('table-active')
                 }
                 activeRow.focus();
                 if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
@@ -2817,10 +2814,12 @@ function onChartData(args) {
             queued: queued
         });
         // In case it takes a while:
-        loadingTimeout = setTimeout(() => {
-            const loading = document.getElementById('loadingOverlay');
-            loading.querySelector('#loadingText').textContent = 'Loading file...';
-            loading.classList.remove('d-none')}, 500)
+        if (!queued){
+            loadingTimeout = setTimeout(() => {
+                const loading = document.getElementById('loadingOverlay');
+                loading.querySelector('#loadingText').textContent = 'Loading file...';
+                loading.classList.remove('d-none')}, 500)
+        }
     }
     
     // Go to position
