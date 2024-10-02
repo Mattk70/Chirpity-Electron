@@ -1579,15 +1579,14 @@ const defaultConfig = {
     speciesThreshold: 0.03,
     useWeek: false,
     model: 'chirpity',
-    chirpity: {locale: 'en_uk'},
-    birdnet: {locale: 'en'},
+    chirpity: {locale: 'en_uk', backend: 'tensorflow'},
+    birdnet: {locale: 'en', backend: 'tensorflow'},
     latitude: 52.87,
     longitude: 0.89, 
     location: 'Great Snoring, North Norfolk',
     detect: { nocmig: false, contextAware: false, confidence: 45 },
     filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0, sendToModel: false },
     warmup: true,
-    backend: 'webgpu',
     hasNode: false,
     tensorflow: { threads: DIAGNOSTICS['Cores'], batchSize: 32 },
     webgpu: { threads: 2, batchSize: 8 },
@@ -1647,11 +1646,11 @@ window.onload = async () => {
         // Fontsize
         config.fontScale === 1 || setFontSizeScale();
         // Map slider value to batch size
-        DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
+        DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config[config.model].backend].batchSize);
         DOM.batchSizeSlider.max = (BATCH_SIZE_LIST.length - 1).toString();
-        DOM.batchSizeValue.textContent = config[config.backend].batchSize;
+        DOM.batchSizeValue.textContent = config[config[config.model].backend].batchSize;
         DOM.modelToUse.value = config.model;
-        const backendEL = document.getElementById(config.backend);
+        const backendEL = document.getElementById(config[config.model].backend);
         backendEL.checked = true;
         // Show time of day in results?
         setTimelinePreferences();
@@ -1715,7 +1714,7 @@ window.onload = async () => {
         showThreshold(config.detect.confidence);
         SNRSlider.value = config.filters.SNR;
         SNRThreshold.textContent = config.filters.SNR;
-        if (config.backend === 'webgl' || config.backend === 'webgpu') {
+        if (config[config.model].backend === 'webgl' || config[config.model].backend === 'webgpu') {
             SNRSlider.disabled = true;
         };
         
@@ -1731,8 +1730,8 @@ window.onload = async () => {
         filterIconDisplay();
         
         DOM.threadSlider.max = DIAGNOSTICS['Cores'];
-        DOM.threadSlider.value = config[config.backend].threads;
-        DOM.numberOfThreads.textContent = config[config.backend].threads;
+        DOM.threadSlider.value = config[config[config.model].backend].threads;
+        DOM.numberOfThreads.textContent = config[config[config.model].backend].threads;
         DOM.defaultLat.value = config.latitude;
         DOM.defaultLon.value = config.longitude;
         place.innerHTML = '<span class="material-symbols-outlined">fmd_good</span>' + config.location;
@@ -1905,7 +1904,7 @@ const setUpWorkerMessaging = () => {
                         handleBackendChange('tensorflow');
                     }
                     config.hasNode = args.hasNode;
-                    if (!config.hasNode && config.backend !== 'webgpu'){
+                    if (!config.hasNode && config[config.model].backend !== 'webgpu'){
                         // No node? Not using webgpu? Force webgpu
                         handleBackendChange('webgpu');
                         generateToast({ message: 'The standard backend could not be loaded on this machine. An experimental backend (webGPU) has been used instead.'});
@@ -2433,7 +2432,7 @@ function onChartData(args) {
             dragSelection: true,
             maxRegions: 1,
             // Region length bug (likely mine) means I don't trust leangths > 60 seconds
-            maxLength: config[config.backend].batchSize * 3,
+            maxLength: config[config[config.model].backend].batchSize * 3,
             slop: null,
             color: "rgba(255, 255, 255, 0.2)"
         })
@@ -2539,19 +2538,19 @@ function onChartData(args) {
             action: 'load-model',
             model: config.model,
             list: config.list,
-            batchSize: config[config.backend].batchSize,
+            batchSize: config[config[config.model].backend].batchSize,
             warmup: config.warmup,
-            threads: config[config.backend].threads,
-            backend: config.backend
+            threads: config[config[config.model].backend].threads,
+            backend: config[config.model].backend
         });
         
     }
     
     const handleBackendChange = (backend) => {
-        config.backend = backend instanceof Event ? backend.target.value : backend;
-        const backendEL = document.getElementById(config.backend);
+        config[config.model].backend = backend instanceof Event ? backend.target.value : backend;
+        const backendEL = document.getElementById(config[config.model].backend);
         backendEL.checked = true;
-        if (config.backend === 'webgl' || config.backend === 'webgpu') {
+        if (config[config.model].backend === 'webgl' || config[config.model].backend === 'webgpu') {
             SNRSlider.disabled = true;
             config.filters.SNR = 0;
         } else {
@@ -2573,9 +2572,9 @@ function onChartData(args) {
             STATE.analysisDone = true;
         }
         // Update threads and batch Size in UI
-        DOM.threadSlider.value = config[config.backend].threads;
-        DOM.numberOfThreads.textContent = config[config.backend].threads;
-        DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config.backend].batchSize);
+        DOM.threadSlider.value = config[config[config.model].backend].threads;
+        DOM.numberOfThreads.textContent = config[config[config.model].backend].threads;
+        DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config[config.model].backend].batchSize);
         DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
         updatePrefs('config.json', config)
         // restart wavesurfer regions to set new maxLength
@@ -2689,7 +2688,7 @@ function onChartData(args) {
                 worker.postMessage({
                     action: 'abort',
                     model: config.model,
-                    threads: config[config.backend].threads,
+                    threads: config[config[config.model].backend].threads,
                     list: config.list
                 });
                 generateToast({ message:'Operation cancelled'});
@@ -3097,9 +3096,9 @@ function onChartData(args) {
         const duration = STATE.selection ? STATE.selection.end - STATE.selection.start : DIAGNOSTICS['Audio Duration'];
         const rate = duration / analysisTime;
         
-        trackEvent(config.UUID, `${config.model}-${config.backend}`, 'Audio Duration', config.backend, Math.round(duration));
-        trackEvent(config.UUID, `${config.model}-${config.backend}`, 'Analysis Duration', config.backend, parseInt(analysisTime));
-        trackEvent(config.UUID, `${config.model}-${config.backend}`, 'Analysis Rate', config.backend, parseInt(rate));
+        trackEvent(config.UUID, `${config.model}-${config[config.model].backend}`, 'Audio Duration', config[config.model].backend, Math.round(duration));
+        trackEvent(config.UUID, `${config.model}-${config[config.model].backend}`, 'Analysis Duration', config[config.model].backend, parseInt(analysisTime));
+        trackEvent(config.UUID, `${config.model}-${config[config.model].backend}`, 'Analysis Rate', config[config.model].backend, parseInt(rate));
         
         if (! STATE.selection){
             DIAGNOSTICS['Analysis Duration'] = analysisTime + ' seconds';
@@ -3736,7 +3735,7 @@ function onChartData(args) {
         if (config.detect.contextAware) {
             SNRSlider.disabled = true;
             config.filters.SNR = 0;
-        } else if (config.backend !== 'webgl'  && config.model !== 'birdnet') {
+        } else if (config[config.model].backend !== 'webgl'  && config.model !== 'birdnet') {
             SNRSlider.disabled = false;
             config.filters.SNR = parseFloat(SNRSlider.value);
         }
@@ -3776,9 +3775,9 @@ function onChartData(args) {
     const diagnosticMenu = document.getElementById('diagnostics');
     diagnosticMenu.addEventListener('click', async function () {
         DIAGNOSTICS['Model'] = DOM.modelToUse.options[DOM.modelToUse.selectedIndex].text;
-        DIAGNOSTICS['Backend'] = config.backend;
-        DIAGNOSTICS['Batch size'] = config[config.backend].batchSize;
-        DIAGNOSTICS['Threads'] = config[config.backend].threads;
+        DIAGNOSTICS['Backend'] = config[config.model].backend;
+        DIAGNOSTICS['Batch size'] = config[config[config.model].backend].batchSize;
+        DIAGNOSTICS['Threads'] = config[config[config.model].backend].threads;
         DIAGNOSTICS['Context'] = config.detect.contextAware;
         DIAGNOSTICS['SNR'] = config.filters.SNR;
         DIAGNOSTICS['List'] = config.list;
@@ -4553,22 +4552,22 @@ DOM.gain.addEventListener('input', () => {
                     DOM.customListFile.value = config.customListFile[config.model];
                     DOM.customListFile.value ? LIST_MAP.custom = 'Using a custom list' : delete LIST_MAP.custom;
                     document.getElementById('locale').value = config[config.model].locale;
-                    config.backend = config.hasNode ? 'tensorflow' : 'webgpu';
-                    document.getElementById(config.backend).checked = true;
-                    handleBackendChange(config.backend);
+                    //config[config.model].backend = config.hasNode ? 'tensorflow' : 'webgpu';
+                    document.getElementById(config[config.model].backend).checked = true;
+                    handleBackendChange(config[config.model].backend);
                     setListUIState(config.list)
                     break;
                 }
                 case 'thread-slider': {
                         // number of threads
                     DOM.numberOfThreads.textContent = DOM.threadSlider.value;
-                    config[config.backend].threads = DOM.threadSlider.valueAsNumber;
+                    config[config[config.model].backend].threads = DOM.threadSlider.valueAsNumber;
                     loadModel();
                     break;
                 }
                 case 'batch-size': {
                     DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
-                    config[config.backend].batchSize = BATCH_SIZE_LIST[element.value];
+                    config[config[config.model].backend].batchSize = BATCH_SIZE_LIST[element.value];
                     loadModel();
                     // Reset region maxLength
                     initRegion();
