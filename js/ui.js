@@ -1,6 +1,6 @@
 import {trackVisit, trackEvent} from './tracking.js';
 
-let seenTheDarkness = false, shownDaylightBanner = false, LOCATIONS, locationID = undefined;
+let seenTheDarkness = false, shownDaylightBanner = false, LOCATIONS, locationID = undefined, loadingTimeout;
 const startTime = performance.now();
 let LABELS = [], DELETE_HISTORY = [];
 // Save console.warn and console.error functions
@@ -1274,8 +1274,8 @@ selectionTable.addEventListener('click', resultClick);
 
 async function resultClick(e) {
     let row = e.target.closest('tr');
-    let classList = e.target.classList;
-    if (!row || row.classList.length === 0) { // 1. clicked and dragged, 2 no detections in file row
+    if (!row || row.classList.length === 0 || row.classList.contains('table-active')) { 
+        // 1. clicked and dragged, 2 no detections in file row, 3. already selected this row
         return
     }
     // Search for results rows
@@ -2817,8 +2817,10 @@ function onChartData(args) {
             queued: queued
         });
         // In case it takes a while:
-        const loading = document.getElementById('loadingOverlay')
-        loading.classList.remove('d-none');
+        loadingTimeout = setTimeout(() => {
+            const loading = document.getElementById('loadingOverlay');
+            loading.querySelector('#loadingText').textContent = 'Loading file...';
+            loading.classList.remove('d-none')}, 500)
     }
     
     // Go to position
@@ -2924,9 +2926,9 @@ function onChartData(args) {
         goToRegion = true
     }) {
         fileLoaded = true, locationID = location;
+        clearTimeout(loadingTimeout)
         // Clear the loading animation
         const loading = document.getElementById('loadingOverlay')
-        loading.querySelector('#loadingText').textContent = 'Loading file...';
         loading.classList.add('d-none');
         const resetSpec = !currentFile;
         currentFileDuration = sourceDuration;
@@ -3063,8 +3065,6 @@ function onChartData(args) {
             if (!activeRow) {
                 // Select the first row
                 activeRow = table.querySelector('tr:first-child');
-                activeRow?.classList.add('table-active');
-                //document.getElementById('resultsDiv').scrollTo({ top: 0, left: 0, behavior: "smooth" });
             }
         }
         

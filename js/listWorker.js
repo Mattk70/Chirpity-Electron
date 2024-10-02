@@ -3,7 +3,7 @@ try {
     tf = require('@tensorflow/tfjs-node');
     BACKEND = 'tensorflow';
     postMessage({message: 'tfjs-node', available: true});
-} catch (e) {
+} catch {
     tf = require('@tensorflow/tfjs');
     require('@tensorflow/tfjs-backend-webgpu');
     BACKEND = 'webgpu';
@@ -123,9 +123,6 @@ const BIRDNET_NOT_BIRDS = [
 "Noise_Noise"
 ];
 
-const MYSTERIES = ['Unknown Sp._Unknown Sp.'];
-
-
 const birdnetlabelFile = `../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`; 
 const BIRDNET_LABELS = await fetch(birdnetlabelFile).then(response => {
     if (! response.ok) throw new Error('Network response was not ok');
@@ -149,7 +146,7 @@ listWorker.postMessage({message: 'get-list', model: 'chirpity', listType: 'locat
 onmessage = async (e) => {
     DEBUG && console.log('got a message', e.data)
     const {message} = e.data;
-    let response;
+
     try {
         switch (message) {
 
