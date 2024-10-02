@@ -435,6 +435,10 @@ async function handleMessage(e) {
         case "purge-file": {onFileDelete(args.fileName);
             break;
         }
+        case "compress-and-organise": { 
+            convertAndOrganiseFiles();
+            break;
+        }
         case "relocated-file": {onFileUpdated(args.originalFile, args.updatedFile);
             break;
         }
@@ -1098,6 +1102,7 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
     
     metadata[file].duration ??= savedMeta?.duration || await getDuration(file).catch(error => {
         console.warn('getDuration error', error)}
+        
     );
     
     return new Promise((resolve, reject) => {
@@ -3540,4 +3545,68 @@ async function setIncludedIDs(lat, lon, week) {
 
     // Await the promise
     return await LIST_CACHE[key];
+}
+
+///////// Database compression and archive ////
+
+async function convertAndOrganiseFiles(outputPath) {
+    outputPath = '//nas/Public/BirdSounds/Chirpity';
+    const db = diskDB;
+    let count = 0;
+    const {totalToConvert} = await db.getAsync('SELECT COUNT(*) from files');
+    // Query the files table to get the necessary data
+    db.each("SELECT f.id, f.name, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id", function(err, row) {
+        if (err) {
+            console.error("Error querying the database:", err);
+            return;
+        }
+        row.place ??= STATE.place;
+        // Create the output directory structure based on place and file date
+        const fileDate = new Date(row.filestart);
+        const year = String(fileDate.getFullYear());
+        const month = fileDate.toLocaleString('default', { month: 'long' }); // Get full month name
+        const day = String(fileDate.getDate()).padStart(2, '0');
+        const place = row.place?.replace(/[\/\\?%*:|"<>]/g, '_').trim(); // Sanitize the place name
+
+        const inputFilePath = row.name;
+        const outputDir = p.join(outputPath, place, year, month, day);
+        const outputFilePath = p.join(outputDir, p.basename(inputFilePath, p.extname(inputFilePath)) + '.ogg');
+        // Check if the file already exists
+        if (fs.existsSync(outputFilePath)) {
+            console.log(`File ${outputFilePath} already exists. Skipping conversion.`);
+            return;
+        }
+
+        if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
+        }
+    
+        // Convert the file using fluent-ffmpeg
+        ffmpeg(inputFilePath)
+            .audioChannels(1) // Set to mono
+            .audioFrequency(26_000) // Set sample rate 
+            .output(outputFilePath)
+            .on('end', () => {
+            console.log(`Converted ${inputFilePath} to ${outputFilePath}`);
+            
+            // Update the database with the new file path
+            db.run("UPDATE files SET name = ? WHERE id = ?", [outputFilePath, row.id], (err) => {
+                if (err) {
+                console.error("Error updating the database:", err);
+                } else {
+                console.log(`Updated database for file: ${outputFilePath}`);
+                }
+                count++;
+                UI.postMessage({event: 'generate-alert', message: `Finished conversion for ${outputFilePath}<br>
+                    ${count} of ${totalToConvert} completed`})
+            });
+            })
+            .on('error', (err) => {
+                count++;
+                console.error(`Error converting file ${inputFilePath}:`, err);
+                UI.postMessage({event: 'generate-alert', message: `File not found: ${inputFilePath}`, file: inputFilePath})
+            })
+            .run();
+        }
+    );
 }

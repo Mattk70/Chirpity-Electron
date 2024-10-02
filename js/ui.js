@@ -1803,6 +1803,7 @@ const setUpWorkerMessaging = () => {
                 case "diskDB-has-records": {
                     chartsLink.classList.remove("disabled");
                     exploreLink.classList.remove("disabled");
+                    document.getElementById('compress-and-organise').classList.remove('disabled');
                     break;
                 }
                 case "file-location-id": {onFileLocationID(args);
@@ -4326,6 +4327,7 @@ DOM.gain.addEventListener('input', () => {
             case 'locate-missing-file': {
                 (async () => await locateFile(MISSING_FILE))(); 
                 break }
+            case 'compress-and-organise': {compressAndOrganise(); break}
             case 'purge-file': { deleteFile(currentFile); break }
 
             case 'keyboardHelp': { (async () => await populateHelpModal('Help/keyboard.html', 'Keyboard shortcuts'))(); break }
@@ -5010,6 +5012,13 @@ async function readLabels(labelFile, updating){
             renderFilenamePanel()
         }
     }
+
+    function compressAndOrganise(){
+        worker.postMessage({
+            action: 'compress-and-organise'
+        })
+    }
+
     // Utility functions to wait for file to load
     function delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
