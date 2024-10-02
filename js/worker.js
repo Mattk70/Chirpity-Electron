@@ -1471,7 +1471,7 @@ const fetchAudioBuffer = async ({
     // Use ffmpeg to extract the specified audio segment
     return new Promise((resolve, reject) => {
         if (! fs.existsSync(file)) {
-            const missingFile = STATE.mode === 'archive' ? file : undefined;
+            const missingFile = ['archive', 'explore'].includes(STATE.mode) ? file : undefined;
             UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`, file: missingFile})
             return reject(new Error('fetchAudioBuffer: Error extracting audio segment: File not found.'));
         }
