@@ -2816,6 +2816,9 @@ function onChartData(args) {
             goToRegion: goToRegion,
             queued: queued
         });
+        // In case it takes a while:
+        const loading = document.getElementById('loadingOverlay')
+        loading.classList.remove('d-none');
     }
     
     // Go to position
@@ -2921,6 +2924,10 @@ function onChartData(args) {
         goToRegion = true
     }) {
         fileLoaded = true, locationID = location;
+        // Clear the loading animation
+        const loading = document.getElementById('loadingOverlay')
+        loading.querySelector('#loadingText').textContent = 'Loading file...';
+        loading.classList.add('d-none');
         const resetSpec = !currentFile;
         currentFileDuration = sourceDuration;
         //if (preserveResults) completeDiv.hide();
@@ -5259,6 +5266,7 @@ async function getXCComparisons(){
     if (XCcache[sname]) renderComparisons(XCcache[sname], cname);
     else {
         const loading = document.getElementById('loadingOverlay')
+        loading.querySelector('#loadingText').textContent = 'Loading Xeno-Canto data...';
         loading.classList.remove('d-none');
         const quality = '+q:%22>C%22';
         const length = '+len:3-15';
