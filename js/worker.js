@@ -43,7 +43,7 @@ function customURLEncode(str) {
   }
 
 // Override console.warn to intercept and track warnings
-console.warn = function(message) {
+console.warn = function() {
     // Call the original console.warn to maintain default behavior
     originalWarn.apply(console, arguments);
     
@@ -52,7 +52,7 @@ console.warn = function(message) {
 };
 
 // Override console.error to intercept and track errors
-console.error = function(message) {
+console.error = function() {
     // Call the original console.error to maintain default behavior
     originalError.apply(console, arguments);
     
@@ -203,7 +203,7 @@ async function runMigration(path, num_labels){
     }
     await archiveDB.runAsync('END');
     // Close the database connections
-    datasetDB.close(function (err){
+    datasetDB.close(function (){
         //back-up (rename) the dataset database file
         fs.rename(dataset_file_path, dataset_file_path + '.bak', function (err) {
             if (err){
@@ -290,7 +290,7 @@ let sampleRate; // Should really make this a property of the model
 let predictWorkers = [], aborted = false;
 let audioCtx;
 // Set up the audio context:
-function setAudioContext(rate) {
+function setAudioContext() {
     audioCtx = new AudioContext({ latencyHint: 'interactive', sampleRate: sampleRate });
 }
 
@@ -552,7 +552,6 @@ async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backen
 async function spawnListWorker() {
     const worker_1 = await new Promise((resolve, reject) => {
         const worker = new Worker('./js/listWorker.js', { type: 'module' });
-        let backend = 'tensorflow';
         worker.onmessage = function (event) {
             // Resolve the promise once the worker sends a message indicating it's ready
             const message = event.data.message;
@@ -641,7 +640,7 @@ const getFilesInDirectory = async (dir) => {
     return files;
 };
 
-const prepParams = (list) => list.map(item => '?').join(',');
+const prepParams = (list) => list.map(_ => '?').join(',');
 
 
 const prepSummaryStatement = (included) => {
@@ -1251,6 +1250,7 @@ const getWavePredictBuffers = async ({
             wav.fromBuffer(chunk);
         } catch (e) {
             UI.postMessage({event: 'generate-alert', message: `Cannot parse ${file}, it has an invalid wav header.`});
+            console.warn('GetWavePredictBuffers failed: ', e)
             headerStream.close();
             updateFilesBeingProcessed(file);
             return;
@@ -1363,7 +1363,7 @@ const getPredictBuffers = async ({
             .audioChannels(1) // Set to mono
             .audioFrequency(sampleRate) // Set sample rate 
 
-        command.on('error', (error, stdout, stderr) => {
+        command.on('error', (error) => {
             updateFilesBeingProcessed(file)
             if (error.message.includes('SIGKILL')) console.log('FFMPEG process shut down at user request')
             else {
@@ -1469,7 +1469,7 @@ const fetchAudioBuffer = async ({
     metadata[file].duration || await setMetadata({file:file});
     end ??= metadata[file].duration; 
     let concatenatedBuffer = Buffer.alloc(0);
-    let header;
+
     // Ensure start is a minimum 0.1 seconds from the end of the file, and >= 0
     start = metadata[file].duration < 0.1 ? 0 : Math.min(metadata[file].duration - 0.1, start)
     end = Math.min(end, metadata[file].duration);
@@ -1664,12 +1664,12 @@ const saveResults2DataSet = ({species, included}) => {
         let ambient, threshold, value = STATE.detect.confidence;
         // adding_chirpity_additions is a flag for curated files, if true we assume every detection is correct
         if (!adding_chirpity_additions) {
-            //     ambient = (result.sname2 === 'Ambient Noise' ? result.score2 : result.sname3 === 'Ambient Noise' ? result.score3 : false)
-            //     console.log('Ambient', ambient)
-            //     // If we have a high level of ambient noise activation, insist on a high threshold for species detection
-            //     if (ambient && ambient > 0.2) {
-            //         value = 0.7
-            //     }
+                ambient = (result.sname2 === 'Ambient Noise' ? result.score2 : result.sname3 === 'Ambient Noise' ? result.score3 : false)
+                console.log('Ambient', ambient)
+                // If we have a high level of ambient noise activation, insist on a high threshold for species detection
+                if (ambient && ambient > 0.2) {
+                    value = 0.7
+                }
             // Check whether top predicted species matches folder (i.e. the searched for species)
             // species not matching the top prediction sets threshold to 2000, effectively limiting treatment to manual records
             threshold = speciesMatch(result.file, result.sname) ? value : 2000;
@@ -1680,7 +1680,7 @@ const saveResults2DataSet = ({species, included}) => {
         promise = promise.then(async function () {
             let score = result.score;
             if (score >= threshold) {
-                const folders = p.dirname(result.file).split(p.sep);
+                //const folders = p.dirname(result.file).split(p.sep);
                 species = result.cname.replaceAll(' ', '_');
                 const sname = result.sname.replaceAll(' ', '_');
                 // score 2000 when manual id. if manual ID when doing  additions put it in the species folder
@@ -2050,8 +2050,8 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     if (!res) { 
         // Manual records can be added off the bat, so there may be no record of the file in either db
         fileStart = metadata[file].fileStart;
-        res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,? )',
-        fileID, file, metadata[file].duration, fileStart, undefined);
+        res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,?,? )',
+        fileID, file, metadata[file].duration, fileStart, undefined, undefined);
         fileID = res.lastID;
         changes = 1;
         let durationSQL = Object.entries(metadata[file].dateDuration)
@@ -2089,8 +2089,8 @@ const generateInsertQuery = async (latestResult, file) => {
     let fileID, changes;
     let res = await db.getAsync('SELECT id FROM files WHERE name = ?', file);
     if (!res) {
-        res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,? )',
-        undefined, file, metadata[file].duration, metadata[file].fileStart, undefined);
+        res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,?,? )',
+        undefined, file, metadata[file].duration, metadata[file].fileStart, null, null);
         fileID = res.lastID;
         changes = 1;
     } else {
@@ -3553,8 +3553,8 @@ async function convertAndOrganiseFiles(outputPath) {
     outputPath = '//nas/Public/BirdSounds/Chirpity';
     const db = diskDB;
     let count = 0;
-    const {totalToConvert} = await db.getAsync('SELECT COUNT(*) as totalToConvert from files');
-
+    let {totalToConvert} = await db.getAsync('SELECT COUNT(*) as totalToConvert from files');
+    const fileProgressMap = {};
     // Ensure 'archiveName' column exists in the files table
     await db.runAsync("ALTER TABLE files ADD COLUMN archiveName TEXT")
         .catch(err => {
@@ -3565,7 +3565,7 @@ async function convertAndOrganiseFiles(outputPath) {
             }
     });
     // Query the files table to get the necessary data
-    db.each("SELECT f.id, f.name, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id", function(err, row) {
+    db.each("SELECT f.id, f.name, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id", async function(err, row) {
         if (err) {
             console.error("Error querying the database:", err);
             return;
@@ -3581,9 +3581,11 @@ async function convertAndOrganiseFiles(outputPath) {
         const inputFilePath = row.name;
         const outputDir = p.join(outputPath, place, year, month, day);
         const outputFilePath = p.join(outputDir, p.basename(inputFilePath, p.extname(inputFilePath)) + '.ogg');
-        // Check if the file already exists
-        if (fs.existsSync(outputFilePath)) {
-            console.log(`File ${outputFilePath} already exists. Skipping conversion.`);
+        // Check if the file already exists, as is complete
+        const {archiveName} = await db.getAsync('SELECT archiveName FROM files WHERE name = ?', inputFilePath);
+        if (archiveName === outputFilePath && fs.existsSync(outputFilePath)) {
+            totalToConvert--;
+            DEBUG && console.log(`File ${outputFilePath} already converted. Skipping conversion.`);
             return;
         }
 
@@ -3595,7 +3597,7 @@ async function convertAndOrganiseFiles(outputPath) {
         ffmpeg(inputFilePath)
             .audioChannels(1) // Set to mono
             .audioFrequency(26_000) // Set sample rate 
-            .audioBitrate('160k')
+            .audioBitrate('128k')
             .output(outputFilePath)
             .on('end', () => {
             console.log(`Converted ${inputFilePath} to ${outputFilePath}`);
@@ -3621,8 +3623,21 @@ async function convertAndOrganiseFiles(outputPath) {
                 DEBUG && console.log('FFmpeg command: ' + commandLine);
             })
             .on('progress', (progress) => {
-                console.log(`Progress: ${progress.percent}%`);
-              })
+                // Calculate the cumulative progress
+                fileProgressMap[inputFilePath] = progress.percent;
+                const values = Object.values(fileProgressMap);
+                // Calculate the sum of the values
+                const sum = values.reduce((accumulator, currentValue) => accumulator + currentValue, 0);
+                
+                // Calculate the average
+                const average = sum / values.length;
+                
+                UI.postMessage({
+                    event: `conversion-progress`,
+                    progress: { percent: average }, // Use cumulative progress for smooth transition
+                    text: `Archive file conversion progress: ${average.toFixed(1)}% `
+                });
+            })
             .run();
         }
     );

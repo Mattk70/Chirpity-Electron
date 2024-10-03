@@ -666,7 +666,7 @@ input[type="range"].vertical {
 }
 
 #update-progress-bar {
-    width: 100%;
+    width: 100px;
     height: calc(10px * var(--font-size-scale));
     border: 1px solid #ccc;
     border-radius: 5px;
@@ -676,7 +676,7 @@ input[type="range"].vertical {
 
   /* Style the filled-in part for WebKit browsers (Chrome, Safari) */
   #update-progress-bar::-webkit-progress-value {
-    background-color: #0d6efd; /* Set the color for WebKit browsers */
+    background-color: #15fd0d; /* Set the color for WebKit browsers */
   }
 
 

@@ -1796,6 +1796,10 @@ const setUpWorkerMessaging = () => {
                 case "chart-data": {onChartData(args);
                     break;
                 }
+                case "conversion-progress": { 
+                    displayProgress(args.progress, args.text)
+                    break;
+                }
                 case "current-file-week": { 
                     STATE.week = args.week
                     break;
@@ -5114,12 +5118,14 @@ async function readLabels(labelFile, updating){
     // Function to display update download progress
     const tracking = document.getElementById('update-progress');
     const updateProgressBar = document.getElementById('update-progress-bar');
-    window.electron.onDownloadProgress((_event, progressObj) => {
+    const displayProgress = (progressObj, text) => {
+        tracking.firstChild.nodeValue = text;
         tracking.classList.remove('d-none')
         // Update your UI with the progress information
         updateProgressBar.value = progressObj.percent;
         if (progressObj.percent > 99) tracking.classList.add('d-none')
-    });
+    }
+    window.electron.onDownloadProgress((_event, progressObj) => displayProgress(progressObj, 'Downloading the latest update: '));
     
     // CI functions
     const getFileLoaded = () => fileLoaded;
@@ -5393,7 +5399,7 @@ function renderComparisons(lists, cname){
         </div>
     `;
     compareDiv.innerHTML = compareHTML;
-    const indicatorList = compareDiv.querySelector('.carousel-indicators');
+    //const indicatorList = compareDiv.querySelector('.carousel-indicators');
     const callTypeHeader = compareDiv.querySelector('#callTypeHeader');
     const recordings = compareDiv.querySelector('#recordings');
     let count = 0;
