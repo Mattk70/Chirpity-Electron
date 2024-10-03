@@ -2722,6 +2722,7 @@ function onChartData(args) {
             if (activeRow) {
                 activeRow.classList.remove('table-active')
                 activeRow = activeRow.previousSibling || activeRow;
+                activeRow.classList.add('table-active')
                 activeRow.focus();
                 if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
             }
@@ -2737,6 +2738,7 @@ function onChartData(args) {
             if (activeRow) {
                 activeRow.classList.remove('table-active')
                 activeRow = activeRow.nextSibling || activeRow;
+                activeRow.classList.add('table-active')
                 activeRow.focus();
                 if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
             }

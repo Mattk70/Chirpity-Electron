@@ -663,6 +663,9 @@ const prepSummaryStatement = (included) => {
     else if (['archive'].includes(STATE.mode)) {
         summaryStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
         params.push(...STATE.filesToAnalyse);
+        
+        summaryStatement += ` OR archiveName IN  (${prepParams(STATE.filesToAnalyse)}) `;
+        params.push(...STATE.filesToAnalyse);
     }
     else if (useRange) {
         summaryStatement += ' AND dateTime BETWEEN ? AND ? ';
@@ -722,6 +725,9 @@ const getTotal = async ({species = undefined, offset = undefined, included = [],
     else if (['archive'].includes(STATE.mode)) {
         SQL += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
         params.push(...STATE.filesToAnalyse);
+        
+        SQL += ` OR archiveName IN  (${prepParams(STATE.filesToAnalyse)}) `;
+        params.push(...STATE.filesToAnalyse);
     }
     SQL += ' ) '
     SQL += `SELECT COUNT(confidence) AS total FROM MaxConfidencePerDateTime WHERE rank <= ${STATE.topRankin}`;
@@ -769,6 +775,8 @@ const prepResultsStatement = (species, noLimit, included, offset, topRankin) => 
     }
     else if (['archive'].includes(STATE.mode)) {
         resultStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
+        params.push(...STATE.filesToAnalyse);
+        resultStatement += ` OR archiveName IN  (${prepParams(STATE.filesToAnalyse)}) `;
         params.push(...STATE.filesToAnalyse);
     }
     // Prioritise selection ranges
@@ -974,6 +982,7 @@ async function getWorkingFile(file) {
     
     if (!metadata.file?.isComplete) {
         await setMetadata({ file: file, proxy: proxy, source_file: source_file });
+        metadata[proxy] = metadata[file];
     }
     return proxy;
 }
@@ -1003,8 +1012,16 @@ async function locateFile(file) {
         return filesInFolder.some(matching)
     })
     if (!matchingFileExt) {
-        notifyMissingFile(file)
-        return false;
+        // Check if the file has been archived
+        const row = await STATE.db.getAsync('SELECT archiveName from files WHERE name = ?', file);
+        if (row.archiveName && fs.existsSync(row.archiveName)) {
+            //metadata[row.archiveName] = metadata[file];
+            return row.archiveName;
+        }
+        else {
+            notifyMissingFile(file)
+            return false;
+        }
     }
     return matchingFileExt;
 }
@@ -1033,8 +1050,8 @@ async function loadAudioFile({
     goToRegion = true
 }) {
     
-    const found = metadata[file]?.proxy || await getWorkingFile(file);
-    if (found) {
+    file = metadata[file]?.proxy || await getWorkingFile(file);
+    if (file) {
         await fetchAudioBuffer({ file, start, end })
         .then((buffer) => {
             let audioArray = buffer.getChannelData(0);
@@ -1226,6 +1243,11 @@ let predictQueue = [];
 const getWavePredictBuffers = async ({
     file = '', start = 0, end = undefined
 }) => {
+    if (! fs.existsSync(file)) {
+        const found = await getWorkingFile(file);
+        if (!found) return
+        return await getPredictBuffers({file, start, end})
+    }
     // Ensure max and min are within range
     start = Math.max(0, start);
     end = Math.min(metadata[file].duration, end);
@@ -1237,10 +1259,6 @@ const getWavePredictBuffers = async ({
     predictionsReceived[file] = 0;
     predictionsRequested[file] = 0;
     let readStream;
-    if (! fs.existsSync(file)) {
-        UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`, file: file})
-        return new Error('getWavePredictBuffers: Error extracting audio segment: File not found.');
-    }
     // extract the header. With bext and iXML metadata, this can be up to 128k, hence 131072
     const headerStream = fs.createReadStream(file, {start: 0, end: 524288, highWaterMark: 524288});
     headerStream.on('readable',  () => {
@@ -1335,6 +1353,10 @@ function processPredictQueue(audio, file, end, chunkStart){
 const getPredictBuffers = async ({
     file = '', start = 0, end = undefined
 }) => {
+    if (! fs.existsSync(file)) { 
+        const found = await getWorkingFile(file);
+        if (!found) return
+    }
     // Ensure max and min are within range
     start = Math.max(0, start);
     end = Math.min(metadata[file].duration, end);
@@ -1351,10 +1373,6 @@ const getPredictBuffers = async ({
 
     let chunkStart = start * sampleRate;
     return new Promise((resolve, reject) => {
-        if (! fs.existsSync(file)) {
-            UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`, file: file})
-            return reject(new Error('getPredictBuffers: Error extracting audio segment: File not found.'));
-        }
         let concatenatedBuffer = Buffer.alloc(0);
         const command = ffmpeg(file)
             .seekInput(start)
@@ -1466,6 +1484,10 @@ function lookForHeader(buffer){
 const fetchAudioBuffer = async ({
     file = '', start = 0, end = undefined
 }) => {
+    if (! fs.existsSync(file)) {
+        file = await getWorkingFile(file);
+        if (!file) return;
+    }
     metadata[file].duration || await setMetadata({file:file});
     end ??= metadata[file].duration; 
     let concatenatedBuffer = Buffer.alloc(0);
@@ -1475,11 +1497,6 @@ const fetchAudioBuffer = async ({
     end = Math.min(end, metadata[file].duration);
     // Use ffmpeg to extract the specified audio segment
     return new Promise((resolve, reject) => {
-        if (! fs.existsSync(file)) {
-            const missingFile = ['archive', 'explore'].includes(STATE.mode) ? file : undefined;
-            UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`, file: missingFile})
-            return reject(new Error('fetchAudioBuffer: Error extracting audio segment: File not found.'));
-        }
         let command = ffmpeg(file)
             .seekInput(start)
             .duration(end - start)
@@ -1765,6 +1782,10 @@ async function uploadOpus({ file, start, end, defaultName, metadata, mode }) {
 const bufferToAudio = async ({
     file = '', start = 0, end = 3, meta = {}, format = undefined
 }) => {
+    if (! fs.existsSync(file)) {
+        const found = await getWorkingFile(file);
+        if (!found) return
+    }
     let audioCodec, mimeType, soundFormat;
     let padding = STATE.audio.padding;
     let fade = STATE.audio.fade;
@@ -1814,10 +1835,6 @@ const bufferToAudio = async ({
     
     return new Promise(function (resolve, reject) {
         const bufferStream = new PassThrough();
-        if (! fs.existsSync(file)) {
-            UI.postMessage({event: 'generate-alert', message: `The requested audio file cannot be found: ${file}`, file: file})
-            return reject(new Error('bufferToAudio: Error extracting audio segment: File not found.'));
-        }
         let ffmpgCommand = ffmpeg(file)
         .toFormat(soundFormat)
         .seekInput(start)
@@ -2418,63 +2435,6 @@ const getSummary = async ({
 };
 
 
-// const getPosition = async ({species = undefined, dateTime = undefined, included = []} = {}) => {
-//     const params = [STATE.detect.confidence];
-//     let positionStmt = `      
-//     WITH ranked_records AS (
-//         SELECT 
-//         dateTime,
-//         cname,
-//         RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
-//         FROM records 
-//         JOIN species ON records.speciesID = species.id 
-//         JOIN files ON records.fileID = files.id 
-//         WHERE confidence >= ?
-//         `;
-//     // If you're using the memory db, you're either anlaysing one,  or all of the files
-//     if (['analyse'].includes(STATE.mode) && STATE.filesToAnalyse.length === 1) {
-//         positionStmt += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
-//         params.push(...STATE.filesToAnalyse);
-//     }
-//     else if (['archive'].includes(STATE.mode)) {
-//         positionStmt += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
-//         params.push(...STATE.filesToAnalyse);
-//     }
-//         // Prioritise selection ranges
-//         const range = STATE.selection?.start ? STATE.selection :
-//         STATE.mode === 'explore' ? STATE.explore.range : false;
-//         const useRange = range?.start;  
-//         if (useRange) {
-//             positionStmt += ' AND dateTime BETWEEN ? AND ? ';
-//             params.push(range.start,range.end)
-//         }    
-//         if (filtersApplied(included)){
-//                 const included = await getIncludedIDs();
-//                 positionStmt += ` AND speciesID IN (${prepParams(included)}) `;
-//                 params.push(...included)
-//         }
-//         if (STATE.locationID) {
-//             positionStmt += ` AND locationID = ? `;
-//             params.push(STATE.locationID)
-//         }
-//         if (STATE.detect.nocmig){
-//             positionStmt += ' AND COALESCE(isDaylight, 0) != 1 '; // Backward compatibility for < v0.9.
-//         }
-        
-//         positionStmt += `)
-//         SELECT 
-//         count(*) as count, dateTime
-//         FROM ranked_records
-//         WHERE rank <= ? AND dateTime < ?`;
-//         params.push(STATE.topRankin, dateTime);
-//         if (species) {
-//             positionStmt+=  ` AND  cname = ? `;
-//             params.push(species)
-//         };
-//     const {count} = await STATE.db.getAsync(positionStmt, ...params);
-//     return count
-// }
-
 /**
 *
 * @param files: files to query for detections
@@ -2797,8 +2757,8 @@ const sendResult = (index, result, fromDBQuery) => {
 
 const getSavedFileInfo = async (file) => {
     if (diskDB){
-        // look for file in the disk DB, ignore extension        
-        let row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name = ?',file);
+        // look for file in the disk DB, ignore extension
+        let row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name = ? OR archiveName = ?',file, file);
         if (!row) {
             const baseName = file.replace(/^(.*)\..*$/g, '$1%');
             row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)',baseName);
@@ -3600,19 +3560,20 @@ async function convertAndOrganiseFiles(outputPath) {
             .audioBitrate('128k')
             .output(outputFilePath)
             .on('end', () => {
-            console.log(`Converted ${inputFilePath} to ${outputFilePath}`);
-            
-            // Update the database with the new file path
-            db.run("UPDATE files SET archiveName = ? WHERE id = ?", [outputFilePath, row.id], (err) => {
-                if (err) {
-                console.error("Error updating the database:", err);
-                } else {
-                console.log(`Updated database for file: ${outputFilePath}`);
-                }
-                count++;
-                UI.postMessage({event: 'generate-alert', message: `Finished conversion for ${outputFilePath}<br>
-                    ${count} of ${totalToConvert} completed`})
-            });
+                console.log(`Converted ${inputFilePath} to ${outputFilePath}`);
+                const newfileMtime = new Date(Math.round(row.filestart + (row.duration * 1000)));
+                utimesSync(outputFilePath, {atime: Date.now(), mtime: newfileMtime});
+                // Update the database with the new file path
+                db.run("UPDATE files SET archiveName = ? WHERE id = ?", [outputFilePath, row.id], (err) => {
+                    if (err) {
+                    console.error("Error updating the database:", err);
+                    } else {
+                    console.log(`Updated database for file: ${outputFilePath}`);
+                    }
+                    count++;
+                    UI.postMessage({event: 'generate-alert', message: `Finished conversion for ${outputFilePath}<br>
+                        ${count} of ${totalToConvert} completed`})
+                });
             })
             .on('error', (err) => {
                 count++;
