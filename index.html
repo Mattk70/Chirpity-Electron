@@ -437,7 +437,7 @@
                             <option value="blackbody">Blackbody</option>
                         </select>
                     </div>
-                    <fieldset class="border border-secondary rounded m-2 mb-0 p-2 w-100 d-none" id="colormap-fieldset">
+                    <fieldset class="border border-secondary rounded m-2 p-2 d-none" id="colormap-fieldset">
                         <div class="mt-2">
                             <input class="form-input pointer" type="color" id="loud-color" value="#cc00ff">
                             <label class="form-label pointer" for="loud-color">Peak colour</label><br>
@@ -478,7 +478,27 @@
                             <option value="timeOfDay">Time of day</option>
                         </select>
                     </div>
-                </fieldset>                                                        
+                </fieldset>
+                <fieldset class="border border-secondary rounded m-2 mb-0 p-2">
+                    <legend style="font-size: large;font-weight:bold">Archive Preferences <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Archive Preferences" 
+                        data-bs-html="true" data-bs-content="Select the location, structure and format for archive files. An OGG archive uses about 1GB of storage for 24 hours of archived audio. FLAC is lossless, but requires approximately double the storage space space<p><b>N.B.</b> Archive files are resampled to 26KHz and downmixed to mono.</p>">?</a></legend>
+                    <div class="row p-2" id="choose-archive-location">
+                        <div class="col">
+                            <div class="input-group">
+                                <button class="btn btn-outline-secondary" type="button" id="archive-location-select"> Archive location:</button>
+                                <input type="text" class="form-control" id="archive-location" aria-describedby="archive-location-select" placeholder="No location set" readonly>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-group rounded p-2 mb-1">
+                        <label for="archive-format" class="input-group-text col-5">Audio Format:</label>
+                        <select class="form-select mb-0" id="archive-format">
+                            <option value="ogg">OGG</option>
+                            <option value="flac">FLAC</option>
+                        </select>
+                        
+                    </div>
+                </fieldset>
                 <fieldset class="border border-secondary rounded m-2 p-2">
                     <legend class="pb-2" style="font-size: large;font-weight:bold;">Advanced</legend>
                     <div class="form-group rounded p-2 mb-2">
@@ -1269,7 +1289,7 @@
 <!-- Footer -->
 <footer class="p-1 text-bg-primary" id="footer">
     <div class="d-none text-sm-start" id="update-progress">Downloading update: 
-        <progress value="0" id="update-progress-bar" max="100"></progress>
+        <progress value="0" id="update-progress-bar" max="100" style="width:100px"></progress>
     </div>
     <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span><br></small>
 </footer>

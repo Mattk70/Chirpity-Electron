@@ -35,7 +35,8 @@ export class State {
             this.incrementor = 1,
             this.UUID = 0,
             this.track = true,
-            this.powerSaveBlocker = false
+            this.powerSaveBlocker = false,
+            this.archive = {location: undefined, format: 'ogg'}
     }
 
 

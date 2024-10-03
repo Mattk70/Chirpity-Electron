@@ -3510,7 +3510,7 @@ async function setIncludedIDs(lat, lon, week) {
 ///////// Database compression and archive ////
 
 async function convertAndOrganiseFiles(outputPath) {
-    outputPath = '//nas/Public/BirdSounds/Chirpity';
+    outputPath = STATE.archive.location;
     const db = diskDB;
     let count = 0;
     let {totalToConvert} = await db.getAsync('SELECT COUNT(*) as totalToConvert from files');
@@ -3540,7 +3540,7 @@ async function convertAndOrganiseFiles(outputPath) {
 
         const inputFilePath = row.name;
         const outputDir = p.join(outputPath, place, year, month, day);
-        const outputFilePath = p.join(outputDir, p.basename(inputFilePath, p.extname(inputFilePath)) + '.ogg');
+        const outputFilePath = p.join(outputDir, p.basename(inputFilePath, p.extname(inputFilePath)) + '.' + STATE.archive.format);
         // Check if the file already exists, as is complete
         const {archiveName} = await db.getAsync('SELECT archiveName FROM files WHERE name = ?', inputFilePath);
         if (archiveName === outputFilePath && fs.existsSync(outputFilePath)) {
@@ -3554,11 +3554,11 @@ async function convertAndOrganiseFiles(outputPath) {
         }
     
         // Convert the file using fluent-ffmpeg
-        ffmpeg(inputFilePath)
+        let command = ffmpeg(inputFilePath)
             .audioChannels(1) // Set to mono
             .audioFrequency(26_000) // Set sample rate 
-            .audioBitrate('128k')
-            .output(outputFilePath)
+            STATE.archive.format === 'ogg' &&  command.audioBitrate('128k')
+            command.output(outputFilePath)
             .on('end', () => {
                 console.log(`Converted ${inputFilePath} to ${outputFilePath}`);
                 const newfileMtime = new Date(Math.round(row.filestart + (row.duration * 1000)));

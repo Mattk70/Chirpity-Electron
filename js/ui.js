@@ -164,6 +164,7 @@ const bodyElement = document.body;
 let specElement, waveElement, specCanvasElement, specWaveElement;
 let waveCanvasElement, waveWaveElement;
 const DOM = {
+    archiveLocation: document.getElementById('archive-location-select'),
     fromSlider: document.getElementById('fromSlider'),
     toSlider: document.getElementById('toSlider'),
     fromInput: document.getElementById('fromInput'),
@@ -1564,6 +1565,7 @@ function fillDefaults(config, defaultConfig) {
 /////////////////////////  Window Handlers ////////////////////////////
 // Set config defaults
 const defaultConfig = {
+    archive: {location: undefined, format: 'ogg'},
     fontScale: 1,
     seenTour: false,
     lastUpdateCheck: 0,
@@ -1735,9 +1737,14 @@ window.onload = async () => {
         DOM.defaultLat.value = config.latitude;
         DOM.defaultLon.value = config.longitude;
         place.innerHTML = '<span class="material-symbols-outlined">fmd_good</span>' + config.location;
+        if (config.archive.location) {
+            document.getElementById('archive-location').value = config.archive.location;
+            document.getElementById('archive-format').value = config.archive.format;
+        }
         //setListUIState(config.list);
         worker.postMessage({
             action: 'update-state',
+            archive: config.archive,
             path: appPath,
             temp: tempPath, 
             lat: config.latitude,
@@ -1807,7 +1814,7 @@ const setUpWorkerMessaging = () => {
                 case "diskDB-has-records": {
                     chartsLink.classList.remove("disabled");
                     exploreLink.classList.remove("disabled");
-                    document.getElementById('compress-and-organise').classList.remove('disabled');
+                    config.archive.location && document.getElementById('compress-and-organise').classList.remove('disabled');
                     break;
                 }
                 case "file-location-id": {onFileLocationID(args);
@@ -2535,7 +2542,8 @@ function onChartData(args) {
             updatePrefs('config.json', config)
         }
     })
-    
+
+   
     const loadModel = ()  => {
         t0_warmup = Date.now();
         worker.postMessage({
@@ -2722,7 +2730,6 @@ function onChartData(args) {
             if (activeRow) {
                 activeRow.classList.remove('table-active')
                 activeRow = activeRow.previousSibling || activeRow;
-                activeRow.classList.add('table-active')
                 activeRow.focus();
                 if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
             }
@@ -2738,7 +2745,6 @@ function onChartData(args) {
             if (activeRow) {
                 activeRow.classList.remove('table-active')
                 activeRow = activeRow.nextSibling || activeRow;
-                activeRow.classList.add('table-active')
                 activeRow.focus();
                 if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
             }
@@ -4341,6 +4347,22 @@ DOM.gain.addEventListener('input', () => {
             case 'startTour': { prepTour(); break }
             case 'eBird': { (async () => await populateHelpModal('Help/ebird.html', 'eBird Record FAQ'))(); break }
 
+
+            case 'archive-location-select': {
+                (async () =>{
+                    const files = await window.electron.selectDirectory()
+                    if (! files.canceled) {
+                        const archiveFolder = files.filePaths[0];
+                        config.archive.location = archiveFolder;
+                        exploreLink.classList.contains('disabled') || 
+                            document.getElementById('compress-and-organise').classList.remove('disabled');
+                        document.getElementById('archive-location').value = archiveFolder;
+                        updatePrefs('config.json', config);
+                        worker.postMessage({action: 'update-state', archive: config.archive})
+                    }
+                })();
+                break;
+            }
             case 'export-list': { exportSpeciesList(); break }
 
             case 'sort-position':
@@ -4480,6 +4502,13 @@ DOM.gain.addEventListener('input', () => {
                     changeNocmigMode(e);
                     break;
                 }
+
+                case 'archive-format': {
+                    config.archive.format = document.getElementById('archive-location').value;
+                    worker.postMessage({action: 'update-state', archive: config.archive})
+                    break;
+                }
+
                 case 'confidenceValue':
                 case 'confidence': {
                     handleThresholdChange(e);
