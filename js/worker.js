@@ -600,7 +600,7 @@ const getFiles = async (files, image) => {
             file_list = [...file_list,...dirFiles]
         } else {
             const filename = p.basename(path)
-            filename.startsWith('._') || file_list.push(path)
+            filename.startsWith('.') || file_list.push(path) // Exclude hidden files
         }
     }
     // filter out unsupported files
