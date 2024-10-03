@@ -1860,8 +1860,7 @@ const setUpWorkerMessaging = () => {
                         // change header to indicate activation
                         DOM.resultHeader.classList.remove('text-bg-secondary');
                         DOM.resultHeader.classList.add('text-bg-dark');
-                        // PREDICTING = false;
-                        // STATE.analysisDone = true;
+                        adjustSpecDims(true)
                     } else {
                         disableMenuItem(['purge-file']);
                         // change header to indicate deactivation
