@@ -1755,9 +1755,9 @@ window.onload = async () => {
             UUID: config.UUID,
             track: config.track
         });
-        const {model, backend, list} = config;
+        const {model, list} = config;
         t0_warmup = Date.now();
-        worker.postMessage({action: '_init_', model: model, batchSize: config[backend].batchSize, threads: config[backend].threads, backend: backend, list: list})
+        worker.postMessage({action: '_init_', model: model, batchSize: config[config[model].backend].batchSize, threads: config[config[model].backend].threads, backend: config[model].backend, list: list})
         // Enable popovers
         const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]')
         const popoverList = [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl))

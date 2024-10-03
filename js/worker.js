@@ -95,7 +95,7 @@ let NUM_WORKERS;
 let workerInstance = 0;
 let appPath, BATCH_SIZE, LABELS, batchChunksToSend = {};
 let LIST_WORKER;
-const DEBUG = false;
+const DEBUG = true;
 
 const DATASET = false;
 const adding_chirpity_additions = true;
@@ -139,7 +139,7 @@ const createDB = async (file) => {
     const db = archiveMode ? diskDB : memoryDB;
     await db.runAsync('BEGIN');
     await db.runAsync('CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL)');
-    await db.runAsync(`CREATE TABLE files(id INTEGER PRIMARY KEY, name TEXT,duration  REAL,filestart INTEGER, locationID INTEGER, UNIQUE (name))`);
+    await db.runAsync(`CREATE TABLE files(id INTEGER PRIMARY KEY, name TEXT NOT NULL, duration REAL,filestart INTEGER, locationID INTEGER, archiveName TEXT, UNIQUE (name))`);
     await db.runAsync(`CREATE TABLE locations( id INTEGER PRIMARY KEY, lat REAL NOT NULL, lon  REAL NOT NULL, place TEXT NOT NULL, UNIQUE (lat, lon))`);
     // Ensure place names are unique too
     await db.runAsync('CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)');
@@ -269,13 +269,13 @@ async function loadDB(path) {
         DEBUG && console.log("Getting labels from disk db " + path)
         const res = await diskDB.allAsync("SELECT sname || '_' || cname AS labels FROM species ORDER BY id")
         LABELS = res.map(obj => obj.labels); // these are the labels in the preferred locale
-        const sql = 'PRAGMA table_info(records)';
+        const sql = 'PRAGMA table_info(files)';
         const result = await  diskDB.allAsync(sql);
         // Update legacy tables
-        const columnExists = result.some((column) => column.name === 'isDaylight');
+        const columnExists = result.some((column) => column.name === 'archiveName');
         if (!columnExists) {
-            await diskDB.runAsync('ALTER TABLE records ADD COLUMN isDaylight INTEGER')
-            console.log('Added isDaylight column to records table')
+            await diskDB.runAsync('ALTER TABLE files ADD COLUMN archiveName TEXT')
+            console.log('Added archiveName column to files table')
         }
         DEBUG && console.log("Opened and cleaned disk db " + file)
     }
@@ -3553,7 +3553,17 @@ async function convertAndOrganiseFiles(outputPath) {
     outputPath = '//nas/Public/BirdSounds/Chirpity';
     const db = diskDB;
     let count = 0;
-    const {totalToConvert} = await db.getAsync('SELECT COUNT(*) from files');
+    const {totalToConvert} = await db.getAsync('SELECT COUNT(*) as totalToConvert from files');
+
+    // Ensure 'archiveName' column exists in the files table
+    await db.runAsync("ALTER TABLE files ADD COLUMN archiveName TEXT")
+        .catch(err => {
+            if (err.message.includes("duplicate column")) {
+                console.log("Column 'archiveName' already exists");
+            } else {
+                console.error("Error adding 'archiveName' column:", err);
+            }
+    });
     // Query the files table to get the necessary data
     db.each("SELECT f.id, f.name, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id", function(err, row) {
         if (err) {
@@ -3565,7 +3575,7 @@ async function convertAndOrganiseFiles(outputPath) {
         const fileDate = new Date(row.filestart);
         const year = String(fileDate.getFullYear());
         const month = fileDate.toLocaleString('default', { month: 'long' }); // Get full month name
-        const day = String(fileDate.getDate()).padStart(2, '0');
+        const day = ''; //String(fileDate.getDate()).padStart(2, '0');
         const place = row.place?.replace(/[\/\\?%*:|"<>]/g, '_').trim(); // Sanitize the place name
 
         const inputFilePath = row.name;
@@ -3585,12 +3595,13 @@ async function convertAndOrganiseFiles(outputPath) {
         ffmpeg(inputFilePath)
             .audioChannels(1) // Set to mono
             .audioFrequency(26_000) // Set sample rate 
+            .audioBitrate('160k')
             .output(outputFilePath)
             .on('end', () => {
             console.log(`Converted ${inputFilePath} to ${outputFilePath}`);
             
             // Update the database with the new file path
-            db.run("UPDATE files SET name = ? WHERE id = ?", [outputFilePath, row.id], (err) => {
+            db.run("UPDATE files SET archiveName = ? WHERE id = ?", [outputFilePath, row.id], (err) => {
                 if (err) {
                 console.error("Error updating the database:", err);
                 } else {
@@ -3606,6 +3617,12 @@ async function convertAndOrganiseFiles(outputPath) {
                 console.error(`Error converting file ${inputFilePath}:`, err);
                 UI.postMessage({event: 'generate-alert', message: `File not found: ${inputFilePath}`, file: inputFilePath})
             })
+            .on('start', function (commandLine) {
+                DEBUG && console.log('FFmpeg command: ' + commandLine);
+            })
+            .on('progress', (progress) => {
+                console.log(`Progress: ${progress.percent}%`);
+              })
             .run();
         }
     );
