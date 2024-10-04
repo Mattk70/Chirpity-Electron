@@ -32,7 +32,8 @@ function trackVisit(config){
             &dimension8=${JSON.stringify(config[config.backend])}
             &dimension9=${JSON.stringify(config.detect)}
             &dimension11=${config.VERSION}
-            &dimension12=${config.CPU}`)
+            &dimension12=${config.CPU}
+            &dimension13=${config.RAM}`)
         .then(response => {
             if (! response.ok) throw new Error('Network response was not ok', response);
         })

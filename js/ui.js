@@ -480,10 +480,6 @@ const initWavesurfer = ({
     waveElement.addEventListener('dblclick', centreSpec);
 }
 
-function centerSpec(){
-
-}
-
 function updateElementCache() {
     t0 = Date.now();
     // Update element caches
@@ -1791,8 +1787,9 @@ window.onload = async () => {
         isMac && checkForMacUpdates();
         const doNotTrack = document.getElementById('do-not-track')
         doNotTrack.checked = !config.track;
-        // Add cpu model to config
+        // Add cpu model & memory to config
         config.CPU = DIAGNOSTICS['CPU'];
+        config.RAM = DIAGNOSTICS['System Memory'];
         config.track && trackVisit(config);
     })
 }
