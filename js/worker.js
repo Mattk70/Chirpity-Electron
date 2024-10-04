@@ -3523,7 +3523,7 @@ async function convertAndOrganiseFiles() {
     await db.runAsync("ALTER TABLE files ADD COLUMN archiveName TEXT")
         .catch(err => {
             if (err.message.includes("duplicate column")) {
-                console.log("Column 'archiveName' already exists");
+                DEBUG && console.log("Column 'archiveName' already exists");
             } else {
                 console.error("Error adding 'archiveName' column:", err);
             }
@@ -3562,9 +3562,11 @@ async function convertAndOrganiseFiles() {
         
         // Convert the file using fluent-ffmpeg
         let command = ffmpeg(inputFilePath)
-            .audioChannels(1) // Set to mono
-            .audioFrequency(26_000) // Set sample rate 
-            STATE.archive.format === 'ogg' &&  command.audioBitrate('128k')
+            if (STATE.archive.format === 'ogg') {
+                command.audioBitrate('128k')
+                .audioChannels(1) // Set to mono
+                .audioFrequency(26_000) // Set sample rate for BirdNET
+            }
             let scaleFactor = 1; // When ffmpeg reports progress, it does so against the full length of the file
             if (STATE.detect.nocmig){
                 METADATA[inputFilePath] || await setMetadata({file: inputFilePath});

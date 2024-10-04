@@ -472,7 +472,7 @@ const initWavesurfer = ({
     waveElement.removeEventListener('mousemove', specTooltip);
     waveElement.removeEventListener('mouseout', hideTooltip)
 
-    waveElement.addEventListener('mousemove', specTooltip); 
+    waveElement.addEventListener('mousemove', specTooltip, {passive: true}); 
     waveElement.addEventListener('mousedown', resetRegions);
     waveElement.addEventListener('mouseout', hideTooltip);
 }
@@ -516,7 +516,7 @@ function zoomSpec(direction) {
         let timeNow = bufferBegin + offsetSeconds;
         const oldBufferBegin = bufferBegin;
         if (direction === 'zoomIn') {
-            if (windowLength < 1.5) return;
+            //if (windowLength < 1.5) return;
             windowLength /= 2;
             bufferBegin += windowLength * position;
         } else {
@@ -2498,17 +2498,26 @@ function onChartData(args) {
     function hideTooltip() {
         tooltip.style.visibility = 'hidden';
     };
-    function specTooltip(event) {
+
+    async function specTooltip(event) {
         const waveElement = event.target;
         const specDimensions = waveElement.getBoundingClientRect();
         const frequencyRange = Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
         const yPosition = Math.round((specDimensions.bottom - event.clientY) * (frequencyRange / specDimensions.height)) + Number(config.audio.minFrequency);
         tooltip.textContent = `Frequency: ${yPosition}Hz`;
-        if (region) tooltip.innerHTML += "<br>" + formatRegionTooltip(region.start, region.end)
-        tooltip.style.top = `${event.clientY}px`;
-        tooltip.style.left = `${event.clientX + 15}px`; // Adjust tooltip position
-        tooltip.style.display = 'block';
-        tooltip.style.visibility = 'visible';
+        if (region) {
+            const lineBreak = document.createElement('br');
+            const textNode = document.createTextNode(formatRegionTooltip(region.start, region.end));
+            
+            tooltip.appendChild(lineBreak);  // Add the line break
+            tooltip.appendChild(textNode);   // Add the text node
+        }
+        Object.assign(tooltip.style, {
+            top: `${event.clientY}px`,
+            left: `${event.clientX + 15}px`,
+            display: 'block',
+            visibility: 'visible'
+        });
     }
 
 
@@ -4513,7 +4522,7 @@ DOM.gain.addEventListener('input', () => {
 
                 case 'auto-archive': { config.archive.auto = element.checked; break }
                 case 'archive-format': {
-                    config.archive.format = document.getElementById('archive-location').value;
+                    config.archive.format = document.getElementById('archive-format').value;
                     worker.postMessage({action: 'update-state', archive: config.archive})
                     break;
                 }
