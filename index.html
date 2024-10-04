@@ -482,6 +482,14 @@
                 <fieldset class="border border-secondary rounded m-2 mb-0 p-2">
                     <legend style="font-size: large;font-weight:bold">Archive Preferences <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Archive Preferences" 
                         data-bs-html="true" data-bs-content="Select the location, structure and format for archive files. An OGG archive uses about 1GB of storage for 24 hours of archived audio. FLAC is lossless, but requires approximately double the storage space space<p><b>N.B.</b> Archive files are resampled to 26KHz and downmixed to mono.</p>">?</a></legend>
+                    <div class="form-group rounded p-2 mb-2">
+                        <div class="col form-check form-switch">
+                            <label class="form-check-label" for="auto-archive">Automatically archive audio files 
+                                <input class="form-check-input" type="checkbox" role="switch" id="auto-archive">
+                            </label>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Archive Automatically" data-bs-content="When enabled, files are converted to the specified format and added to the archive location whenever detections are saved to the archive.">?</a>
+                        </div>
+                    </div>
                     <div class="row p-2" id="choose-archive-location">
                         <div class="col">
                             <div class="input-group">

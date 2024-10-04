@@ -17,7 +17,7 @@ function customURLEncode(str) {
   }
 
 // Override console.warn to intercept and track warnings
-console.warn = function(message) {
+console.warn = function() {
     // Call the original console.warn to maintain default behavior
     originalWarn.apply(console, arguments);
     
@@ -26,7 +26,7 @@ console.warn = function(message) {
 };
 
 // Override console.error to intercept and track errors
-console.error = function(message) {
+console.error = function() {
     // Call the original console.error to maintain default behavior
     originalError.apply(console, arguments);
     
@@ -164,7 +164,6 @@ const bodyElement = document.body;
 let specElement, waveElement, specCanvasElement, specWaveElement;
 let waveCanvasElement, waveWaveElement;
 const DOM = {
-    archiveLocation: document.getElementById('archive-location-select'),
     fromSlider: document.getElementById('fromSlider'),
     toSlider: document.getElementById('toSlider'),
     fromInput: document.getElementById('fromInput'),
@@ -1275,10 +1274,18 @@ selectionTable.addEventListener('click', resultClick);
 
 async function resultClick(e) {
     let row = e.target.closest('tr');
-    if (!row || row.classList.length === 0 || row.classList.contains('table-active')) { 
+    if (!row || row.classList.length === 0) { 
         // 1. clicked and dragged, 2 no detections in file row, 3. already selected this row
         return
     }
+    
+    const [file, start, end, sname, label] = row.getAttribute('name').split('|');
+    if (row.classList.contains('table-active')){
+        e.target.classList.contains('circle') && getSelectionResults(true);
+        createRegion(start - bufferBegin, end - bufferBegin, label, true)
+        return;
+    }
+    
     // Search for results rows
     while (!(row.classList.contains('nighttime') ||
     row.classList.contains('daytime'))) {
@@ -1288,7 +1295,6 @@ async function resultClick(e) {
     if (activeRow) activeRow.classList.remove('table-active');
     row.classList.add('table-active');
     activeRow = row;
-    const [file, start, end, sname, label] = row.getAttribute('name').split('|');
     loadResultRegion({ file, start, end, label });
     if (e.target.classList.contains('circle')) {
         await waitForFileLoad();
@@ -1565,7 +1571,7 @@ function fillDefaults(config, defaultConfig) {
 /////////////////////////  Window Handlers ////////////////////////////
 // Set config defaults
 const defaultConfig = {
-    archive: {location: undefined, format: 'ogg'},
+    archive: {location: undefined, format: 'ogg', auto: false},
     fontScale: 1,
     seenTour: false,
     lastUpdateCheck: 0,
@@ -1740,6 +1746,9 @@ window.onload = async () => {
         if (config.archive.location) {
             document.getElementById('archive-location').value = config.archive.location;
             document.getElementById('archive-format').value = config.archive.format;
+            const autoArchive = document.getElementById('auto-archive');
+            autoArchive.checked = config.archive.auto;
+
         }
         //setListUIState(config.list);
         worker.postMessage({
@@ -2676,6 +2685,7 @@ function onChartData(args) {
         s: function (e) {
             if ( e.ctrlKey || e.metaKey) {
                 worker.postMessage({ action: 'save2db', file: currentFile});
+                if (config.archive.auto) document.getElementById('compress-and-organise').click();
             }
         },
         t: function (e) {
@@ -3742,7 +3752,7 @@ function onChartData(args) {
         filterIconDisplay();
     }
     
-    // DOM.audioFiltersIcon.addEventListener('click', toggleFilters);
+
     
     const toggleContextAwareMode = () => {
         if (config.model !== 'birdnet') config.detect.contextAware = !config.detect.contextAware;
@@ -3762,7 +3772,7 @@ function onChartData(args) {
         });
         updatePrefs('config.json', config)
     }
-    //DOM.contextAwareIcon.addEventListener('click', toggleContextAwareMode)
+
     
     DOM.debugMode.addEventListener('click', () =>{
         config.debug = !config.debug;
@@ -3770,6 +3780,11 @@ function onChartData(args) {
         updatePrefs('config.json', config)
     })
     
+    
+    //DOM.nocmigButton.addEventListener('click', changeNocmigMode);
+    //const fullscreen = document.getElementById('fullscreen');
+    
+
     //DOM.nocmigButton.addEventListener('click', changeNocmigMode);
     //const fullscreen = document.getElementById('fullscreen');
     
@@ -3784,8 +3799,6 @@ function onChartData(args) {
         updatePrefs('config.json', config)
         adjustSpecDims(true, 512);
     }
-    
-    //fullscreen.addEventListener('click', toggleFullscreen);
     
     
     const diagnosticMenu = document.getElementById('diagnostics');
@@ -4322,7 +4335,10 @@ DOM.gain.addEventListener('input', () => {
             case 'export-audio': { exportAudio(); break }
             case 'exit': { exitApplication(); break }
 
-            case 'save2db': { worker.postMessage({ action: 'save2db', file: currentFile }); break }
+            case 'save2db': { 
+                worker.postMessage({ action: 'save2db', file: currentFile }); 
+                if (config.archive.auto) document.getElementById('compress-and-organise').click();
+                break }
             case 'export2audio': { batchExportAudio(); break }
             case 'dataset': { worker.postMessage({ action: 'create-dataset', species: isSpeciesViewFiltered(true) }); break }
 
@@ -4346,8 +4362,6 @@ DOM.gain.addEventListener('input', () => {
             case 'species': { worker.postMessage({action: 'get-valid-species', file: currentFile}); break }
             case 'startTour': { prepTour(); break }
             case 'eBird': { (async () => await populateHelpModal('Help/ebird.html', 'eBird Record FAQ'))(); break }
-
-
             case 'archive-location-select': {
                 (async () =>{
                     const files = await window.electron.selectDirectory()
@@ -4494,55 +4508,27 @@ DOM.gain.addEventListener('input', () => {
                     worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone});
                     break;
                 }
-                case 'timelineSetting': {
-                    timelineToggle(e);
-                    break;
-                }
-                case 'nocmig': {
-                    changeNocmigMode(e);
-                    break;
-                }
+                case 'timelineSetting': { timelineToggle(e); break }
+                case 'nocmig': { changeNocmigMode(e); break }
 
+                case 'auto-archive': { config.archive.auto = element.checked; break }
                 case 'archive-format': {
                     config.archive.format = document.getElementById('archive-location').value;
                     worker.postMessage({action: 'update-state', archive: config.archive})
                     break;
                 }
-
-                case 'confidenceValue':
-                case 'confidence': {
-                    handleThresholdChange(e);
-                    break;
-                }
-                case 'context' : {
-                    toggleContextAwareMode(e);
-                    break;
-                }
-                case 'attenuation': {
-                    handleAttenuationchange(e);
-                    break;
-                }
+                case 'confidenceValue': case 'confidence': { handleThresholdChange(e); break }
+                case 'context' : { toggleContextAwareMode(e); break }
+                case 'attenuation': { handleAttenuationchange(e); break }
                 case 'do-not-track': {
                     config.track = !element.checked;
                     worker.postMessage({ action: 'update-state', track: config.track })
                     break;
                 }
-                case 'lowShelfFrequency': {
-                    handleLowShelfchange(e);
-                    break;
-                }
-                case 'HighPassFrequency' : {
-                    handleHPchange(e);
-                    break;
-                }
-                case 'snrValue' : {
-                    handleSNRchange(e);
-                    break;
-                }
-                case 'audio-notification': {
-                    config.audio.notification = element.checked;
-                    break;
-                }
+                case 'lowShelfFrequency': { handleLowShelfchange(e); break }
+                case 'HighPassFrequency' : { handleHPchange(e); break }
+                case 'snrValue' : { handleSNRchange(e); break }
+                case 'audio-notification': { config.audio.notification = element.checked; break }
                 case 'power-save-block': {
                     config.powerSaveBlocker = element.checked;
                     powerSave(config.powerSaveBlocker);
@@ -4632,11 +4618,7 @@ DOM.gain.addEventListener('input', () => {
                     }
                     break;
                 }
-                case 'window-function':
-                case 'loud-color':
-                case 'mid-color':
-                case 'quiet-color':
-                case 'color-threshold-slider': {
+                case 'window-function': case 'loud-color': case 'mid-color': case 'quiet-color': case 'color-threshold-slider': {
                     const windowFn = document.getElementById('window-function').value;
                     const loud = document.getElementById('loud-color').value;
                     const mid = document.getElementById('mid-color').value;
@@ -4675,8 +4657,7 @@ DOM.gain.addEventListener('input', () => {
                     }
                     break;
                 }
-                case 'fromInput':
-                case 'fromSlider': {
+                case 'fromInput': case 'fromSlider': {
                     config.audio.minFrequency = Math.max(element.valueAsNumber, 0);
                     DOM.fromInput.value = config.audio.minFrequency;
                     DOM.fromSlider.value = config.audio.minFrequency;
@@ -4688,8 +4669,7 @@ DOM.gain.addEventListener('input', () => {
                     worker.postMessage({action: 'update-state', audio: config.audio});
                     break;
                 }
-                case 'toInput':
-                case 'toSlider': {
+                case 'toInput': case 'toSlider': {
                     config.audio.maxFrequency = Math.min(element.valueAsNumber, 11950);
                     DOM.toInput.value = config.audio.maxFrequency;
                     DOM.toSlider.value = config.audio.maxFrequency;
@@ -5152,7 +5132,7 @@ async function readLabels(labelFile, updating){
         tracking.classList.remove('d-none')
         // Update your UI with the progress information
         updateProgressBar.value = progressObj.percent;
-        if (progressObj.percent > 99) tracking.classList.add('d-none')
+        if (progressObj.percent > 99.9) tracking.classList.add('d-none')
     }
     window.electron.onDownloadProgress((_event, progressObj) => displayProgress(progressObj, 'Downloading the latest update: '));
     

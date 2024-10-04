@@ -124,7 +124,7 @@ let t0; // Application profiler
 
 
 const getSelectionRange = (file, start, end) => {
-    return { start: (start * 1000) + metadata[file].fileStart, end: (end * 1000) + metadata[file].fileStart }
+    return { start: (start * 1000) + METADATA[file].fileStart, end: (end * 1000) + METADATA[file].fileStart }
 }
 const createDB = async (file) => {
     const archiveMode = !!file;
@@ -284,7 +284,7 @@ async function loadDB(path) {
 }
 
 
-let metadata = {};
+let METADATA = {};
 let index = 0, AUDACITY = {}, predictionStart;
 let sampleRate; // Should really make this a property of the model
 let predictWorkers = [], aborted = false;
@@ -387,7 +387,7 @@ async function handleMessage(e) {
             filesBeingProcessed.length && onAbort(args);
             DEBUG && console.log("Worker received audio " + args.file);
             await loadAudioFile(args);
-            metadata[args.file]?.isSaved ? await onChangeMode("archive") : await onChangeMode("analyse");
+            METADATA[args.file]?.isSaved ? await onChangeMode("archive") : await onChangeMode("analyse");
             break;
         }
         case "filter": {
@@ -641,37 +641,43 @@ const getFilesInDirectory = async (dir) => {
 };
 
 const prepParams = (list) => list.map(_ => '?').join(',');
-
+function getFileSQLAndParams(range){
+    const fileParams = prepParams(STATE.filesToAnalyse)
+    const params = [];
+    let SQL = '';
+    // If you're using the memory db, you're either anlaysing one,  or all of the files
+    if (['analyse'].includes(STATE.mode)) {
+        SQL += ` AND name IN  (${fileParams}) `;
+        params.push(...STATE.filesToAnalyse);
+    } else if (['archive'].includes(STATE.mode)) {
+        SQL += ` AND name IN  (${fileParams}) `;
+        params.push(...STATE.filesToAnalyse);
+        SQL += ` OR archiveName IN  (${fileParams}) `;
+        const archivePath = STATE.archive.location + p.sep;
+        const archive_names = STATE.filesToAnalyse.map(item => item.replace(archivePath, ''))
+        params.push(...archive_names);
+    } else if (range?.start) {
+        SQL += ' AND dateTime BETWEEN ? AND ? ';
+        params.push(range.start, range.end);
+    }
+    return [SQL, params]
+}
 
 const prepSummaryStatement = (included) => {
     const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
-    const useRange = range?.start;
     const params = [STATE.detect.confidence];
     let summaryStatement = `
     WITH ranked_records AS (
-        SELECT records.dateTime, records.confidence, files.name, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight,
+        SELECT records.dateTime, records.confidence, files.name, files.archiveName, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight,
         RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
         FROM records
         JOIN files ON files.id = records.fileID
         JOIN species ON species.id = records.speciesID
         WHERE confidence >=  ? `;
-    // If you're using the memory db, you're either anlaysing one,  or all of the files
-    if (['analyse'].includes(STATE.mode) && STATE.filesToAnalyse.length === 1) {
-        summaryStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
-        params.push(...STATE.filesToAnalyse);
-    }
-    else if (['archive'].includes(STATE.mode)) {
-        summaryStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
-        params.push(...STATE.filesToAnalyse);
-        
-        summaryStatement += ` OR archiveName IN  (${prepParams(STATE.filesToAnalyse)}) `;
-        params.push(...STATE.filesToAnalyse);
-    }
-    else if (useRange) {
-        summaryStatement += ' AND dateTime BETWEEN ? AND ? ';
-        params.push(range.start, range.end);
-    }
-    
+
+    const [SQLtext, fileParams] = getFileSQLAndParams(range);
+    summaryStatement += SQLtext, params.push(...fileParams);
+
     if (filtersApplied(included)) {
         const includedParams = prepParams(included);
         summaryStatement += ` AND speciesID IN (${includedParams}) `;
@@ -701,7 +707,6 @@ const getTotal = async ({species = undefined, offset = undefined, included = [],
     let params = [];
     const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
     offset = offset ?? (species !== undefined ? STATE.filteredOffset[species] : STATE.globalOffset);
-    const useRange = range?.start;
     let SQL = ` WITH MaxConfidencePerDateTime AS (
         SELECT confidence,
         speciesID,
@@ -714,21 +719,10 @@ const getTotal = async ({species = undefined, offset = undefined, included = [],
         SQL += ' AND files.name = ? '
     }
     else if (filtersApplied(included)) SQL += ` AND speciesID IN (${included}) `;
-    if (useRange) SQL += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
     if (STATE.detect.nocmig) SQL += ' AND COALESCE(isDaylight, 0) != 1 ';
     if (STATE.locationID) SQL += ` AND locationID =  ${STATE.locationID}`;
-    // If you're using the memory db, you're either anlaysing one,  or all of the files
-    if (['analyse'].includes(STATE.mode) && STATE.filesToAnalyse.length === 1) {
-        SQL += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
-        params.push(...STATE.filesToAnalyse);
-    }
-    else if (['archive'].includes(STATE.mode)) {
-        SQL += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
-        params.push(...STATE.filesToAnalyse);
-        
-        SQL += ` OR archiveName IN  (${prepParams(STATE.filesToAnalyse)}) `;
-        params.push(...STATE.filesToAnalyse);
-    }
+    const [SQLtext, fileParams] = getFileSQLAndParams(range);
+    SQL += SQLtext, params.push(...fileParams);
     SQL += ' ) '
     SQL += `SELECT COUNT(confidence) AS total FROM MaxConfidencePerDateTime WHERE rank <= ${STATE.topRankin}`;
     
@@ -750,6 +744,7 @@ const prepResultsStatement = (species, noLimit, included, offset, topRankin) => 
         files.filestart, 
         fileID,
         files.name,
+        files.archiveName,
         files.locationID,
         records.position, 
         records.speciesID,
@@ -767,27 +762,15 @@ const prepResultsStatement = (species, noLimit, included, offset, topRankin) => 
         JOIN files ON records.fileID = files.id 
         WHERE confidence >= ?
         `;
-        
-    // If you're using the memory db, you're either anlaysing one,  or all of the files
-    if (['analyse'].includes(STATE.mode) && STATE.filesToAnalyse.length === 1) {
-        resultStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
-        params.push(...STATE.filesToAnalyse);
-    }
-    else if (['archive'].includes(STATE.mode)) {
-        resultStatement += ` AND name IN  (${prepParams(STATE.filesToAnalyse)}) `;
-        params.push(...STATE.filesToAnalyse);
-        resultStatement += ` OR archiveName IN  (${prepParams(STATE.filesToAnalyse)}) `;
-        params.push(...STATE.filesToAnalyse);
-    }
-    // Prioritise selection ranges
+    // // Prioritise selection ranges
     const range = STATE.selection?.start ? STATE.selection :
         STATE.mode === 'explore' ? STATE.explore.range : false;
-    const useRange = range?.start;  
-    if (useRange) {
-        resultStatement += ` AND dateTime BETWEEN ${range.start} AND ${range.end} `;
-    }
+    
+    // If you're using the memory db, you're either anlaysing one,  or all of the files
+    const [SQLtext, fileParams] = getFileSQLAndParams(range);
+    resultStatement += SQLtext, params.push(...fileParams);
 
-    else if (filtersApplied(included)) {
+    if (filtersApplied(included)) {
         resultStatement += ` AND speciesID IN (${prepParams(included)}) `;
         params.push(...included);
     }
@@ -810,6 +793,7 @@ const prepResultsStatement = (species, noLimit, included, offset, topRankin) => 
     duration, 
     filestart, 
     name as file, 
+    archiveName,
     fileID,
     position, 
     speciesID,
@@ -906,7 +890,7 @@ async function onAnalyse({
                 await getResults({ topRankin: 5 });
             } else {
                 await onChangeMode('archive');
-                FILE_QUEUE.forEach(file => UI.postMessage({ event: 'update-audio-duration', value: metadata[file].duration }));
+                FILE_QUEUE.forEach(file => UI.postMessage({ event: 'update-audio-duration', value: METADATA[file].duration }));
                 // Wierdness with promise all - list worker called 2x and no results returned
                 //await Promise.all([getResults(), getSummary()] );
                 await getResults();
@@ -974,15 +958,15 @@ const getDuration = async (src) => {
 */
 async function getWorkingFile(file) {
     
-    if (metadata[file]?.isComplete && metadata[file]?.proxy) return metadata[file].proxy;
+    if (METADATA[file]?.isComplete && METADATA[file]?.proxy) return METADATA[file].proxy;
     // find the file
     const source_file = fs.existsSync(file) ? file : await locateFile(file);
     if (!source_file) return false;
     let proxy = source_file;
     
-    if (!metadata.file?.isComplete) {
+    if (!METADATA.file?.isComplete) {
         await setMetadata({ file: file, proxy: proxy, source_file: source_file });
-        metadata[proxy] = metadata[file];
+        METADATA[proxy] = METADATA[file];
     }
     return proxy;
 }
@@ -1014,9 +998,10 @@ async function locateFile(file) {
     if (!matchingFileExt) {
         // Check if the file has been archived
         const row = await STATE.db.getAsync('SELECT archiveName from files WHERE name = ?', file);
-        if (row.archiveName && fs.existsSync(row.archiveName)) {
-            //metadata[row.archiveName] = metadata[file];
-            return row.archiveName;
+        const fullPathToFile = p.join(STATE.archive.location, row.archiveName)
+        if (row.archiveName && fs.existsSync(fullPathToFile)) {
+            //METADATA[row.archiveName] = METADATA[file];
+            return fullPathToFile;
         }
         else {
             notifyMissingFile(file)
@@ -1050,16 +1035,16 @@ async function loadAudioFile({
     goToRegion = true
 }) {
     
-    file = metadata[file]?.proxy || await getWorkingFile(file);
+    file = METADATA[file]?.proxy || await getWorkingFile(file);
     if (file) {
         await fetchAudioBuffer({ file, start, end })
         .then((buffer) => {
             let audioArray = buffer.getChannelData(0);
             UI.postMessage({
                 event: 'worker-loaded-audio',
-                location: metadata[file].locationID,
-                start: metadata[file].fileStart,
-                sourceDuration: metadata[file].duration,
+                location: METADATA[file].locationID,
+                start: METADATA[file].fileStart,
+                sourceDuration: METADATA[file].duration,
                 bufferBegin: start,
                 file: file,
                 position: position,
@@ -1076,7 +1061,7 @@ async function loadAudioFile({
         })
         let week;
         if (STATE.list === 'location'){
-            week = STATE.useWeek ? new Date(metadata[file].fileStart).getWeekNumber() : -1
+            week = STATE.useWeek ? new Date(METADATA[file].fileStart).getWeekNumber() : -1
             // Send the week number of the surrent file
             UI.postMessage({event: 'current-file-week', week: week})
         } else { UI.postMessage({event: 'current-file-week', week: undefined}) }
@@ -1102,58 +1087,58 @@ function addDays(date, days) {
 * @returns {Promise<unknown>}
 */
 const setMetadata = async ({ file, proxy = file, source_file = file }) => {
-    metadata[file] ??= { proxy: proxy };
-    metadata[file].proxy ??= proxy;
+    METADATA[file] ??= { proxy: proxy };
+    METADATA[file].proxy ??= proxy;
     // CHeck the database first, so we honour any manual updates.
     const savedMeta = await getSavedFileInfo(file).catch(error => console.warn('getSavedFileInfo error', error));
     // If we have stored imfo about the file, set the saved flag;
-    metadata[file].isSaved = !!savedMeta;
+    METADATA[file].isSaved = !!savedMeta;
     // Latitude only provided when updating location
     // const latitude = savedMeta?.lat || STATE.lat;
     // const longitude = savedMeta?.lon || STATE.lon;
     // const row = await STATE.db.getAsync('SELECT id FROM locations WHERE lat = ? and lon = ?', latitude, longitude);
     
     // using the nullish coalescing operator
-    metadata[file].locationID ??= savedMeta?.locationID;
+    METADATA[file].locationID ??= savedMeta?.locationID;
     
-    metadata[file].duration ??= savedMeta?.duration || await getDuration(file).catch(error => {
+    METADATA[file].duration ??= savedMeta?.duration || await getDuration(file).catch(error => {
         console.warn('getDuration error', error)}
         
     );
     
     return new Promise((resolve, reject) => {
-        if (metadata[file].isComplete) {
-            resolve(metadata[file])
+        if (METADATA[file].isComplete) {
+            resolve(METADATA[file])
         } else {
             let fileStart, fileEnd;
             
             if (savedMeta?.fileStart) {
                 fileStart = new Date(savedMeta.fileStart);
-                fileEnd = new Date(fileStart.getTime() + (metadata[file].duration * 1000));
+                fileEnd = new Date(fileStart.getTime() + (METADATA[file].duration * 1000));
             } else {
-                metadata[file].stat = fs.statSync(source_file);
-                fileEnd = new Date(metadata[file].stat.mtime);
-                fileStart = new Date(metadata[file].stat.mtime - (metadata[file].duration * 1000));
+                METADATA[file].stat = fs.statSync(source_file);
+                fileEnd = new Date(METADATA[file].stat.mtime);
+                fileStart = new Date(METADATA[file].stat.mtime - (METADATA[file].duration * 1000));
             }
             
             // split  the duration of this file across any dates it spans
-            metadata[file].dateDuration = {};
+            METADATA[file].dateDuration = {};
             const key = new Date(fileStart);
             key.setHours(0, 0, 0, 0);
             const keyCopy = addDays(key, 0).getTime();
             if (fileStart.getDate() === fileEnd.getDate()) {
-                metadata[file].dateDuration[keyCopy] = metadata[file].duration;
+                METADATA[file].dateDuration[keyCopy] = METADATA[file].duration;
             } else {
                 const key2 = addDays(key, 1);
                 
                 const key2Copy = addDays(key2, 0).getTime();
-                metadata[file].dateDuration[keyCopy] = (key2Copy - fileStart) / 1000;
-                metadata[file].dateDuration[key2Copy] = metadata[file].duration - metadata[file].dateDuration[keyCopy];
+                METADATA[file].dateDuration[keyCopy] = (key2Copy - fileStart) / 1000;
+                METADATA[file].dateDuration[key2Copy] = METADATA[file].duration - METADATA[file].dateDuration[keyCopy];
             }
             // Now we have completed the date comparison above, we convert fileStart to millis
             fileStart = fileStart.getTime();
-            metadata[file].fileStart = fileStart;
-            return resolve(metadata[file]);
+            METADATA[file].fileStart = fileStart;
+            return resolve(METADATA[file]);
         }
     }).catch(error => console.warn(error))
 }
@@ -1250,8 +1235,8 @@ const getWavePredictBuffers = async ({
     }
     // Ensure max and min are within range
     start = Math.max(0, start);
-    end = Math.min(metadata[file].duration, end);
-    if (start > metadata[file].duration) {
+    end = Math.min(METADATA[file].duration, end);
+    if (start > METADATA[file].duration) {
         return
     }
     let meta = {};
@@ -1316,7 +1301,7 @@ const getWavePredictBuffers = async ({
             })
         })
         readStream.on('error', err => {
-            console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${metadata[file].duration}`);
+            console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${METADATA[file].duration}`);
             err.code === 'ENOENT' && notifyMissingFile(file);
         })
     })    
@@ -1359,8 +1344,8 @@ const getPredictBuffers = async ({
     }
     // Ensure max and min are within range
     start = Math.max(0, start);
-    end = Math.min(metadata[file].duration, end);
-    if (start > metadata[file].duration) {
+    end = Math.min(METADATA[file].duration, end);
+    if (start > METADATA[file].duration) {
         return
     }
     let header, shortFile = true;
@@ -1488,13 +1473,13 @@ const fetchAudioBuffer = async ({
         file = await getWorkingFile(file);
         if (!file) return;
     }
-    metadata[file].duration || await setMetadata({file:file});
-    end ??= metadata[file].duration; 
+    METADATA[file].duration || await setMetadata({file:file});
+    end ??= METADATA[file].duration; 
     let concatenatedBuffer = Buffer.alloc(0);
 
     // Ensure start is a minimum 0.1 seconds from the end of the file, and >= 0
-    start = metadata[file].duration < 0.1 ? 0 : Math.min(metadata[file].duration - 0.1, start)
-    end = Math.min(end, metadata[file].duration);
+    start = METADATA[file].duration < 0.1 ? 0 : Math.min(METADATA[file].duration - 0.1, start)
+    end = Math.min(end, METADATA[file].duration);
     // Use ffmpeg to extract the specified audio segment
     return new Promise((resolve, reject) => {
         let command = ffmpeg(file)
@@ -1573,7 +1558,7 @@ async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
     const objData = {
         message: 'predict',
         worker: worker,
-        fileStart: metadata[file].fileStart,
+        fileStart: METADATA[file].fileStart,
         file: file,
         start: chunkStart,
         duration: end,
@@ -1590,7 +1575,7 @@ async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
 async function doPrediction({
     file = '',
     start = 0,
-    end = metadata[file].duration,
+    end = METADATA[file].duration,
 }) {
     if (file.toLowerCase().endsWith('.wav')){
         await getWavePredictBuffers({ file: file, start: start, end: end }).catch( (error) => console.warn(error));
@@ -1598,7 +1583,7 @@ async function doPrediction({
         await getPredictBuffers({ file: file, start: start, end: end }).catch( (error) => console.warn(error));
     }
     
-    UI.postMessage({ event: 'update-audio-duration', value: metadata[file].duration });
+    UI.postMessage({ event: 'update-audio-duration', value: METADATA[file].duration });
 }
 
 const speciesMatch = (path, sname) => {
@@ -1825,12 +1810,12 @@ const bufferToAudio = async ({
         optionList.push('-metadata');
         optionList.push(`${k}=${v}`);
     }
-    metadata[file] || await getWorkingFile(file);
+    METADATA[file] || await getWorkingFile(file);
     if (padding) {
         start -= padding;
         end += padding;
         start = Math.max(0, start);
-        end = Math.min(end, metadata[file].duration);
+        end = Math.min(end, METADATA[file].duration);
     }
     
     return new Promise(function (resolve, reject) {
@@ -1841,7 +1826,7 @@ const bufferToAudio = async ({
         .duration(end - start)
         .audioChannels(downmix ? 1 : -1)
         // I can't get this to work with Opus
-        // .audioFrequency(metadata[file].sampleRate)
+        // .audioFrequency(METADATA[file].sampleRate)
         .audioCodec(audioCodec)
         .addOutputOptions(...optionList)
         
@@ -1879,7 +1864,7 @@ const bufferToAudio = async ({
         }
         if (fade && padding) {
             const duration = end - start;
-            if (start >= 1 && end <= metadata[file].duration - 1) {
+            if (start >= 1 && end <= METADATA[file].duration - 1) {
                 ffmpgCommand = ffmpgCommand.audioFilters(
                     {
                         filter: 'afade',
@@ -2066,12 +2051,12 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
 
     if (!res) { 
         // Manual records can be added off the bat, so there may be no record of the file in either db
-        fileStart = metadata[file].fileStart;
+        fileStart = METADATA[file].fileStart;
         res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,?,? )',
-        fileID, file, metadata[file].duration, fileStart, undefined, undefined);
+        fileID, file, METADATA[file].duration, fileStart, undefined, undefined);
         fileID = res.lastID;
         changes = 1;
-        let durationSQL = Object.entries(metadata[file].dateDuration)
+        let durationSQL = Object.entries(METADATA[file].dateDuration)
         .map(entry => `(${entry.toString()},${fileID})`).join(',');
         await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
     } else {
@@ -2107,14 +2092,14 @@ const generateInsertQuery = async (latestResult, file) => {
     let res = await db.getAsync('SELECT id FROM files WHERE name = ?', file);
     if (!res) {
         res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,?,? )',
-        undefined, file, metadata[file].duration, metadata[file].fileStart, null, null);
+        undefined, file, METADATA[file].duration, METADATA[file].fileStart, null, null);
         fileID = res.lastID;
         changes = 1;
     } else {
         fileID = res.id;
     }
     if (changes) {
-        const durationSQL = Object.entries(metadata[file].dateDuration)
+        const durationSQL = Object.entries(METADATA[file].dateDuration)
         .map(entry => `(${entry.toString()},${fileID})`).join(',');
         // No "OR IGNORE" in this statement because it should only run when the file is new
         await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
@@ -2122,7 +2107,7 @@ const generateInsertQuery = async (latestResult, file) => {
     let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
     for (let i = 0; i < keysArray.length; i++) {
         const key = parseFloat(keysArray[i]);
-        const timestamp = metadata[file].fileStart + key * 1000;
+        const timestamp = METADATA[file].fileStart + key * 1000;
         const isDaylight = isDuringDaylight(timestamp, STATE.lat, STATE.lon);
         const confidenceArray = confidenceBatch[i];
         const speciesIDArray = speciesIDBatch[i];
@@ -2153,7 +2138,7 @@ const parsePredictions = async (response) => {
     for (let i = 0; i < keysArray.length; i++) {
         let updateUI = false;
         let key = parseFloat(keysArray[i]);
-        const timestamp = metadata[file].fileStart + key * 1000;
+        const timestamp = METADATA[file].fileStart + key * 1000;
         const confidenceArray = confidenceBatch[i];
         const speciesIDArray = speciesIDBatch[i];
         for (let j = 0; j < confidenceArray.length; j++) {
@@ -2393,7 +2378,7 @@ function calculateNighttimeBoundaries(fileStart, fileEnd, latitude, longitude) {
 }
 
 async function setStartEnd(file) {
-    const meta = metadata[file];
+    const meta = METADATA[file];
     let boundaries;
     //let start, end;
     if (STATE.detect.nocmig) {
@@ -2754,11 +2739,31 @@ const sendResult = (index, result, fromDBQuery) => {
     });
 };
 
+// Check if the drop path is from the saved location
+function isFromSavedLocation(file) {
+    try {
+        // Resolve both paths to their actual UNC forms
+        const realDropPath = fs.realpathSync(file);
+        const realSavedPath = fs.realpathSync(STATE.archive.location);
+        
+        // Compare both normalised paths
+        if (realDropPath.startsWith(realSavedPath)){
+            return p.relative(realSavedPath, realDropPath)
+        } else {
+            return false
+        }
+    } catch (error) {
+        console.error('Error resolving paths:', error);
+        return false;
+    }
+}
 
 const getSavedFileInfo = async (file) => {
     if (diskDB){
         // look for file in the disk DB, ignore extension
-        let row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name = ? OR archiveName = ?',file, file);
+        const archiveFile = isFromSavedLocation(file);
+        //if (!archiveFile) return undefined;
+        let row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name = ? OR archiveName = ?',file, archiveFile);
         if (!row) {
             const baseName = file.replace(/^(.*)\..*$/g, '$1%');
             row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)',baseName);
@@ -2790,9 +2795,9 @@ const onSave2DiskDB = async ({file}) => {
     await memoryDB.runAsync('BEGIN');
     await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.files SELECT * FROM files`);
     await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.locations SELECT * FROM locations`);
-    // Set the saved flag on files' metadata
-    for (let file in metadata) {
-        metadata[file].isSaved = true
+    // Set the saved flag on files' METADATA
+    for (let file in METADATA) {
+        METADATA[file].isSaved = true
     }
     // Update the duration table
     let response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.duration SELECT * FROM duration');
@@ -3014,9 +3019,9 @@ const getValidSpecies = async (file) => {
 
 const onUpdateFileStart = async (args) => {
     let file = args.file;
-    const newfileMtime = new Date(Math.round(args.start + (metadata[file].duration * 1000)));
+    const newfileMtime = new Date(Math.round(args.start + (METADATA[file].duration * 1000)));
     utimesSync(file, {atime: Date.now(), mtime: newfileMtime});
-    metadata[file].fileStart = args.start;
+    METADATA[file].fileStart = args.start;
     let db = STATE.db;
     let row = await db.getAsync(`
         SELECT id, filestart, duration, locationID FROM files 
@@ -3024,7 +3029,7 @@ const onUpdateFileStart = async (args) => {
 
     if (!row) {
         DEBUG && console.log('File not found in database, adding.');
-        await db.runAsync('INSERT INTO files (id, name, duration, filestart) values (?, ?, ?, ?)', undefined, file, metadata[file].duration, args.start);
+        await db.runAsync('INSERT INTO files (id, name, duration, filestart) values (?, ?, ?, ?)', undefined, file, METADATA[file].duration, args.start);
         // If no file, no records, so we're done.
     }
     else {
@@ -3372,13 +3377,13 @@ async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
         const { id } = await db.getAsync(`SELECT ID FROM locations WHERE lat = ? AND lon = ?`, lat, lon);
         for (const file of files) {
             await db.runAsync('UPDATE files SET locationID = ? WHERE name = ?', id, file);
-            // we may not have set the metadata for the file
-            if (metadata[file]) {
-                metadata[file].locationID = id; 
+            // we may not have set the METADATA for the file
+            if (METADATA[file]) {
+                METADATA[file].locationID = id; 
             } else {
-                metadata[file] = {}
-                metadata[file].locationID = id;
-                metadata[file].isComplete = false;
+                METADATA[file] = {}
+                METADATA[file].locationID = id;
+                METADATA[file].isComplete = false;
             }
             // tell the UI the file has a location id
             UI.postMessage({ event: 'file-location-id', file: file, id: id });
@@ -3396,7 +3401,7 @@ async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
     
 async function getLocations({ db = STATE.db, file }) {
     const locations = await db.allAsync('SELECT * FROM locations ORDER BY place')
-    UI.postMessage({ event: 'location-list', locations: locations, currentLocation: metadata[file]?.locationID })
+    UI.postMessage({ event: 'location-list', locations: locations, currentLocation: METADATA[file]?.locationID })
 }
     
 /**
@@ -3412,7 +3417,7 @@ async function getIncludedIDs(file){
     let lat, lon, week, hitOrMiss = 'hit';
     if (STATE.list === 'location' || (STATE.list === 'nocturnal' && STATE.local)){
         if (file){
-            file = metadata[file];
+            file = METADATA[file];
             week = STATE.useWeek ? new Date(file.fileStart).getWeekNumber() : "-1";
             lat = file.lat || STATE.lat;
             lon = file.lon || STATE.lon;
@@ -3509,8 +3514,7 @@ async function setIncludedIDs(lat, lon, week) {
 
 ///////// Database compression and archive ////
 
-async function convertAndOrganiseFiles(outputPath) {
-    outputPath = STATE.archive.location;
+async function convertAndOrganiseFiles() {
     const db = diskDB;
     let count = 0;
     let {totalToConvert} = await db.getAsync('SELECT COUNT(*) as totalToConvert from files');
@@ -3535,49 +3539,68 @@ async function convertAndOrganiseFiles(outputPath) {
         const fileDate = new Date(row.filestart);
         const year = String(fileDate.getFullYear());
         const month = fileDate.toLocaleString('default', { month: 'long' }); // Get full month name
-        const day = ''; //String(fileDate.getDate()).padStart(2, '0');
+        //const day = ''; //String(fileDate.getDate()).padStart(2, '0');
         const place = row.place?.replace(/[\/\\?%*:|"<>]/g, '_').trim(); // Sanitize the place name
 
         const inputFilePath = row.name;
-        const outputDir = p.join(outputPath, place, year, month, day);
-        const outputFilePath = p.join(outputDir, p.basename(inputFilePath, p.extname(inputFilePath)) + '.' + STATE.archive.format);
+        const outputDir = p.join(place, year, month);
+        const outputFileName = p.basename(inputFilePath, p.extname(inputFilePath)) + '.' + STATE.archive.format;
         // Check if the file already exists, as is complete
         const {archiveName} = await db.getAsync('SELECT archiveName FROM files WHERE name = ?', inputFilePath);
-        if (archiveName === outputFilePath && fs.existsSync(outputFilePath)) {
+        const fullPath = p.join(STATE.archive.location, outputDir)
+        const fullFilePath = p.join(fullPath, outputFileName)
+        const dbArchiveName = p.join(outputDir, outputFileName)
+        if (archiveName === dbArchiveName && fs.existsSync(fullFilePath)) {
             totalToConvert--;
-            DEBUG && console.log(`File ${outputFilePath} already converted. Skipping conversion.`);
+            DEBUG && console.log(`File ${inputFilePath} already converted. Skipping conversion.`);
             return;
         }
 
-        if (!fs.existsSync(outputDir)) {
-            fs.mkdirSync(outputDir, { recursive: true });
+        if (!fs.existsSync(fullPath)) {
+            fs.mkdirSync(fullPath, { recursive: true });
         }
-    
+        
         // Convert the file using fluent-ffmpeg
         let command = ffmpeg(inputFilePath)
             .audioChannels(1) // Set to mono
             .audioFrequency(26_000) // Set sample rate 
             STATE.archive.format === 'ogg' &&  command.audioBitrate('128k')
-            command.output(outputFilePath)
+            let scaleFactor = 1; // When ffmpeg reports progress, it does so against the full length of the file
+            if (STATE.detect.nocmig){
+                METADATA[inputFilePath] || await setMetadata({file: inputFilePath});
+                const boundaries = await setStartEnd(inputFilePath);
+                if (boundaries.length > 1) { 
+                    UI.postMessage({event: 'generate-alert', message: `Multi-day operations are not yet supported: ${inputFilePath} will not be trimmed`});
+                } else {
+                    const {start, end} = boundaries[0];
+                    if (start === end) return
+                    command.seekInput(start).duration(end - start)
+                    scaleFactor = row.duration / (end-start);
+                    // Now update the duration for the truncated file to ensure accurate mtimes are set
+                    row.duration = end - start;
+                }
+
+            }
+            command.output(fullFilePath)
             .on('end', () => {
-                console.log(`Converted ${inputFilePath} to ${outputFilePath}`);
+                console.log(`Converted ${inputFilePath} to ${fullFilePath}`);
                 const newfileMtime = new Date(Math.round(row.filestart + (row.duration * 1000)));
-                utimesSync(outputFilePath, {atime: Date.now(), mtime: newfileMtime});
+                utimesSync(fullFilePath, {atime: Date.now(), mtime: newfileMtime});
                 // Update the database with the new file path
-                db.run("UPDATE files SET archiveName = ? WHERE id = ?", [outputFilePath, row.id], (err) => {
+                db.run("UPDATE files SET archiveName = ? WHERE id = ?", [dbArchiveName, row.id], (err) => {
                     if (err) {
                     console.error("Error updating the database:", err);
                     } else {
-                    console.log(`Updated database for file: ${outputFilePath}`);
+                    console.log(`Updated database for file: ${inputFilePath}`);
                     }
                     count++;
-                    UI.postMessage({event: 'generate-alert', message: `Finished conversion for ${outputFilePath}<br>
+                    UI.postMessage({event: 'generate-alert', message: `Finished conversion for ${inputFilePath}<br>
                         ${count} of ${totalToConvert} completed`})
                 });
             })
             .on('error', (err) => {
                 count++;
-                console.error(`Error converting file ${inputFilePath}:`, err);
+                DEBUG && console.error(`Error converting file ${inputFilePath}:`, err);
                 UI.postMessage({event: 'generate-alert', message: `File not found: ${inputFilePath}`, file: inputFilePath})
             })
             .on('start', function (commandLine) {
@@ -3585,7 +3608,8 @@ async function convertAndOrganiseFiles(outputPath) {
             })
             .on('progress', (progress) => {
                 // Calculate the cumulative progress
-                fileProgressMap[inputFilePath] = progress.percent;
+                fileProgressMap[inputFilePath] = progress.percent * scaleFactor;
+                console.log(`${inputFilePath} progress: ${fileProgressMap[inputFilePath].toFixed(1)}%`)
                 const values = Object.values(fileProgressMap);
                 // Calculate the sum of the values
                 const sum = values.reduce((accumulator, currentValue) => accumulator + currentValue, 0);
