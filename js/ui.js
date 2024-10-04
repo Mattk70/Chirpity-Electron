@@ -470,11 +470,18 @@ const initWavesurfer = ({
 
     waveElement.removeEventListener('mousedown', resetRegions);
     waveElement.removeEventListener('mousemove', specTooltip);
-    waveElement.removeEventListener('mouseout', hideTooltip)
+    waveElement.removeEventListener('mouseout', hideTooltip);
+    waveElement.removeEventListener('dblclick', centreSpec);
+    
 
     waveElement.addEventListener('mousemove', specTooltip, {passive: true}); 
     waveElement.addEventListener('mousedown', resetRegions);
     waveElement.addEventListener('mouseout', hideTooltip);
+    waveElement.addEventListener('dblclick', centreSpec);
+}
+
+function centerSpec(){
+
 }
 
 function updateElementCache() {
@@ -2646,28 +2653,32 @@ function onChartData(args) {
     };
     //document.getElementById('timelineSetting').addEventListener('change', timelineToggle);
     
+function centreSpec(){
+    const saveBufferBegin = bufferBegin;
+    const middle = bufferBegin + wavesurfer.getCurrentTime();
+    bufferBegin = middle - windowLength / 2;
+    bufferBegin = Math.max(0, bufferBegin);
+    bufferBegin = Math.min(bufferBegin, currentFileDuration - windowLength)
+    // Move the region if needed
+    let region = getRegion();
+    if (region){
+        const shift = saveBufferBegin - bufferBegin;
+        region.start += shift;
+        region.end += shift;
+        if (region.start < 0 || region.end > windowLength) region = undefined;
+    }
+    postBufferUpdate({ begin: bufferBegin, position: 0.5, region: region, goToRegion: false})
+}
+
     /////////// Keyboard Shortcuts  ////////////
       
     const GLOBAL_ACTIONS = { // eslint-disable-line
         a: function (e) { ( e.ctrlKey || e.metaKey) && currentFile && document.getElementById('analyse').click()},
         A: function (e) { ( e.ctrlKey || e.metaKey) && currentFile && document.getElementById('analyseAll').click()},
-        c: function (e) {
+        c: function (e) { 
             // Center window on playhead
             if (( e.ctrlKey || e.metaKey) && currentBuffer) {
-                const saveBufferBegin = bufferBegin;
-                const middle = bufferBegin + wavesurfer.getCurrentTime();
-                bufferBegin = middle - windowLength / 2;
-                bufferBegin = Math.max(0, bufferBegin);
-                bufferBegin = Math.min(bufferBegin, currentFileDuration - windowLength)
-                // Move the region if needed
-                let region = getRegion();
-                if (region){
-                    const shift = saveBufferBegin - bufferBegin;
-                    region.start += shift;
-                    region.end += shift;
-                    if (region.start < 0 || region.end > windowLength) region = undefined;
-                }
-                postBufferUpdate({ begin: bufferBegin, position: 0.5, region: region, goToRegion: false})
+                centreSpec();
             }
         },
         // D: function (e) {
