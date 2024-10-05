@@ -2819,7 +2819,8 @@ const onSave2DiskDB = async ({file}) => {
             UI.postMessage({
                 event: 'generate-alert',
                 message: `Database update complete, ${response.changes} records added to the archive in ${((Date.now() - t0) / 1000)} seconds`,
-                updateFilenamePanel: true
+                updateFilenamePanel: true,
+                database: true
             })
         }
     }

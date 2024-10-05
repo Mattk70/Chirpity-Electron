@@ -230,11 +230,12 @@ DOM.controlsWrapper.addEventListener('mousedown', (e) => {
     if (e.target.tagName !== 'DIV' ) return
     const startY = e.clientY;
     const initialHeight = DOM.spectrogram.offsetHeight;
+    let newHeight;
     let debounceTimer;
     const onMouseMove = (e) => {
         clearTimeout(debounceTimer);
         // Calculate the delta y (drag distance)
-        const newHeight = initialHeight + e.clientY - startY;
+        newHeight = initialHeight + e.clientY - startY;
     
         // Adjust the spectrogram dimensions accordingly
         debounceTimer = setTimeout(() => {
@@ -246,6 +247,7 @@ DOM.controlsWrapper.addEventListener('mousedown', (e) => {
     const onMouseUp = () => {
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
+        trackEvent(config.UUID, 'Drag', 'Spec Resize', newHeight );
     };
     // Attach event listeners for mousemove and mouseup
     document.addEventListener('mousemove', onMouseMove);
@@ -804,14 +806,14 @@ const displayLocationAddress = async (where) => {
         latEl = document.getElementById('customLat');
         lonEl = document.getElementById('customLon');
         placeEl = document.getElementById('customPlace');
-        address = await fetchLocationAddress(latEl.value, lonEl.value, false);
+        address = await fetchLocationAddress(latEl.value, lonEl.value, false).catch(error => console.warn(error));
         if (address === false) return
         placeEl.value = address || 'Location not available';
     } else {
         latEl = document.getElementById('latitude');
         lonEl = document.getElementById('longitude');
         placeEl = document.getElementById('place');
-        address = await fetchLocationAddress(latEl.value, lonEl.value, false);
+        address = await fetchLocationAddress(latEl.value, lonEl.value, false).catch(error => console.warn(error));;
         if (address === false) return
         const content = '<span class="material-symbols-outlined">fmd_good</span> ' + address;
         placeEl.innerHTML = content;
@@ -1054,45 +1056,49 @@ function postAnalyseMessage(args) {
     }
 }
 
-
+let openStreetMapTimer;
 function fetchLocationAddress(lat, lon) {
-    if (isNaN(lat) || isNaN(lon)  || !lat || !lon){
-        generateToast({ message:'Both lat and lon values need to be numbers between 180 and -180'})
-        return false
-    }
-    return new Promise((resolve, reject) => {
-        if (!LOCATIONS) {
-            worker.postMessage({ action: 'get-locations', file: currentFile });
-            waitForLocations();
+    
+        if (isNaN(lat) || isNaN(lon)  || !lat || !lon){
+            generateToast({ message:'Both lat and lon values need to be numbers between 180 and -180'})
+            return false
         }
-        const storedLocation = LOCATIONS?.find(obj => obj.lat === lat && obj.lon === lon);
-        if (storedLocation) return resolve(storedLocation.place);
-        
-        fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`)
-        .then(response => {
-            if (!response.ok) {
-                console.warn('Network error: ', response.status, response.url );
-                
+        return new Promise((resolve, reject) => {
+            clearTimeout(openStreetMapTimer)
+            openStreetMapTimer = setTimeout(() => {
+            if (!LOCATIONS) {
+                worker.postMessage({ action: 'get-locations', file: currentFile });
+                waitForLocations();
             }
-            return response.json()
-        })
-        .then(data => {
-            let address;
-            if (data.error) {
-                address = "No location found for this map point";
-            } else {
-                // Just take the first two elements of the address
-                address = data.display_name.split(',').slice(0,2).join(", ");
-                
-                LOCATIONS.push({ id: LOCATIONS.length + 1, lat: lat, lon: lon, place: address })
-            }
-            resolve(address);
-        })
-        .catch(error => {
-            console.log("A location for this point could not be retrieved from OpenStreetMap")
-            reject(error);
-        })
+            const storedLocation = LOCATIONS?.find(obj => obj.lat === lat && obj.lon === lon);
+            if (storedLocation) return resolve(storedLocation.place);
+            
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`)
+            .then(response => {
+                if (!response.ok) {
+                    return reject(`Network error: code ${response.status} fetching Location from OpenStreetmap.` );
+                }
+                return response.json()
+            })
+            .then(data => {
+                let address;
+                if (data.error) {
+                    address = "No location found for this map point";
+                } else {
+                    // Just take the first two elements of the address
+                    address = data.display_name.split(',').slice(0,2).join(",").trim();
+                    
+                    LOCATIONS.push({ id: LOCATIONS.length + 1, lat: lat, lon: lon, place: address })
+                }
+                resolve(address);
+            })
+            .catch(error => {
+                console.warn("A location for this point could not be retrieved from OpenStreetMap")
+                reject(error);
+            })
+        }, 1000) // 1 second delay
     })
+    
 }
 
 
@@ -1856,6 +1862,8 @@ const setUpWorkerMessaging = () => {
                             `
                     }
                     generateToast({ message: args.message});
+                    // This is how we know the database update has completed
+                    if (args.database && config.archive.auto) document.getElementById('compress-and-organise').click();
                 break;
                 }
                 // Called when last result is returned from a database query
@@ -2702,7 +2710,6 @@ function centreSpec(){
         s: function (e) {
             if ( e.ctrlKey || e.metaKey) {
                 worker.postMessage({ action: 'save2db', file: currentFile});
-                if (config.archive.auto) document.getElementById('compress-and-organise').click();
             }
         },
         t: function (e) {

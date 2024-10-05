@@ -6,7 +6,7 @@ function trackEvent(uuid, event, action, name, value){
     DEBUG && event === 'Error' && console.log(action, name);
     // Squash result numbers
     name = typeof name == 'string' ? name.replace(/result\d+/, 'result') : name;
-    if (action === ' ') action = 'Space';
+    if (action === ' ') action = 'Spacebar';
     const t = new Date()
     name = name ? `&e_n=${name}` : '';
     value = value ? `&e_v=${value}` : '';
@@ -30,7 +30,7 @@ function trackVisit(config){
             &dimension5=${config.speciesThreshold}
             &dimension6=${JSON.stringify(config.filters)}
             &dimension7=${JSON.stringify(config.audio)}
-            &dimension8=${JSON.stringify(config[config.backend])}
+            &dimension8=${JSON.stringify(config[config[config.model].backend])}
             &dimension9=${JSON.stringify(config.detect)}
             &dimension11=${config.VERSION}
             &dimension12=${config.CPU}
