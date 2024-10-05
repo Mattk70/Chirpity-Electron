@@ -1284,8 +1284,8 @@ async function resultClick(e) {
     
     const [file, start, end, sname, label] = row.getAttribute('name').split('|');
     if (row.classList.contains('table-active')){
+        createRegion(start - bufferBegin, end - bufferBegin, label, true);
         e.target.classList.contains('circle') && getSelectionResults(true);
-        createRegion(start - bufferBegin, end - bufferBegin, label, true)
         return;
     }
     

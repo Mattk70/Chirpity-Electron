@@ -645,20 +645,19 @@ function getFileSQLAndParams(range){
     const fileParams = prepParams(STATE.filesToAnalyse)
     const params = [];
     let SQL = '';
-    // If you're using the memory db, you're either anlaysing one,  or all of the files
-    if (['analyse'].includes(STATE.mode)) {
+    if (range?.start) { // Prioritise range queries
+        SQL += ' AND dateTime BETWEEN ? AND ? ';
+        params.push(range.start, range.end);
+    } else if (['analyse'].includes(STATE.mode)) {
         SQL += ` AND name IN  (${fileParams}) `;
         params.push(...STATE.filesToAnalyse);
     } else if (['archive'].includes(STATE.mode)) {
-        SQL += ` AND name IN  (${fileParams}) `;
+        SQL += ` AND ( name IN  (${fileParams}) `;
         params.push(...STATE.filesToAnalyse);
-        SQL += ` OR archiveName IN  (${fileParams}) `;
+        SQL += ` OR archiveName IN  (${fileParams}) ) `;
         const archivePath = STATE.archive.location + p.sep;
         const archive_names = STATE.filesToAnalyse.map(item => item.replace(archivePath, ''))
         params.push(...archive_names);
-    } else if (range?.start) {
-        SQL += ' AND dateTime BETWEEN ? AND ? ';
-        params.push(range.start, range.end);
     }
     return [SQL, params]
 }
