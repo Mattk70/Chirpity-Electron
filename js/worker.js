@@ -764,7 +764,7 @@ const prepResultsStatement = (species, noLimit, included, offset, topRankin) => 
         FROM records 
         JOIN species ON records.speciesID = species.id 
         JOIN files ON records.fileID = files.id 
-        WHERE confidence >= ?
+        WHERE confidence >= ? 
         `;
     // // Prioritise selection ranges
     const range = STATE.selection?.start ? STATE.selection :
@@ -790,7 +790,7 @@ const prepResultsStatement = (species, noLimit, included, offset, topRankin) => 
         resultStatement += ' AND COALESCE(isDaylight, 0) != 1 '; // Backward compatibility for < v0.9.
     }
     
-    resultStatement += `)
+    resultStatement += ` )
     SELECT 
     dateTime as timestamp, 
     score,
@@ -2761,6 +2761,7 @@ const sendResult = (index, result, fromDBQuery) => {
 
 // Check if the drop path is from the saved location
 function isFromSavedLocation(file) {
+    if (!STATE.archive.location) return false;
     try {
         // Resolve both paths to their actual UNC forms
         const realDropPath = fs.realpathSync(file);
