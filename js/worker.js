@@ -3631,21 +3631,23 @@ async function convertAndOrganiseFiles() {
                 DEBUG && console.log('FFmpeg command: ' + commandLine);
             })
             .on('progress', (progress) => {
-                // Calculate the cumulative progress
-                fileProgressMap[inputFilePath] = progress.percent * scaleFactor;
-                console.log(`${inputFilePath} progress: ${fileProgressMap[inputFilePath].toFixed(1)}%`)
-                const values = Object.values(fileProgressMap);
-                // Calculate the sum of the values
-                const sum = values.reduce((accumulator, currentValue) => accumulator + currentValue, 0);
-                
-                // Calculate the average
-                const average = sum / values.length;
-                
-                UI.postMessage({
-                    event: `conversion-progress`,
-                    progress: { percent: average }, // Use cumulative progress for smooth transition
-                    text: `Archive file conversion progress: ${average.toFixed(1)}% `
-                });
+                if (!isNaN(progress.percent)){
+                    // Calculate the cumulative progress
+                    fileProgressMap[inputFilePath] = progress.percent * scaleFactor;
+                    console.log(`${inputFilePath} progress: ${fileProgressMap[inputFilePath].toFixed(1)}%`)
+                    const values = Object.values(fileProgressMap);
+                    // Calculate the sum of the values
+                    const sum = values.reduce((accumulator, currentValue) => accumulator + currentValue, 0);
+                    
+                    // Calculate the average
+                    const average = sum / values.length;
+                    
+                    UI.postMessage({
+                        event: `conversion-progress`,
+                        progress: { percent: average }, // Use cumulative progress for smooth transition
+                        text: `Archive file conversion progress: ${average.toFixed(1)}% `
+                    });
+                }
             })
             .run();
         }
