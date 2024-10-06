@@ -139,9 +139,9 @@ const createDB = async (file) => {
     const db = archiveMode ? diskDB : memoryDB;
     await db.runAsync('BEGIN');
     await db.runAsync('CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL)');
-    await db.runAsync(`CREATE TABLE files(id INTEGER PRIMARY KEY, name TEXT NOT NULL, duration REAL,filestart INTEGER, locationID INTEGER, archiveName TEXT, metadata TEXT, UNIQUE (name),
-        CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL`);
     await db.runAsync(`CREATE TABLE locations( id INTEGER PRIMARY KEY, lat REAL NOT NULL, lon  REAL NOT NULL, place TEXT NOT NULL, UNIQUE (lat, lon))`);
+    await db.runAsync(`CREATE TABLE files(id INTEGER PRIMARY KEY, name TEXT NOT NULL, duration REAL,filestart INTEGER, locationID INTEGER, archiveName TEXT, metadata TEXT, UNIQUE (name),
+        CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL)`);
     // Ensure place names are unique too
     await db.runAsync('CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)');
     await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT,  comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, UNIQUE (dateTime, fileID, speciesID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,  FOREIGN KEY (speciesID) REFERENCES species(id))`);
@@ -1127,31 +1127,36 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
                 fileStart = new Date(METADATA[file].stat.mtime - (METADATA[file].duration * 1000));
             }
             if (STATE.useGUANO && file.toLowerCase().endsWith('wav')){
-                const t0 = Date.now();
-                extractGuanoMetadata(file).then(guano =>{
-                    if (guano){
-                        const location = guano['Loc Position'];
-                        if (location){
-                            const [lat, lon] = location.split(' ');
-                            onSetCustomLocation({ lat: parseFloat(lat), lon: parseFloat(lon), place: location, files: [file] }) 
-                            // db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ?', parseFloat(lat), parseFloat(lon))
-                            // .then(row =>{
-                            //     if (row) METADATA[file].locationID = row.id;
-                            //     else {
-                            //         db.runAsync(`
-                            //             INSERT INTO locations VALUES (?, ?, ?, ?)
-                            //             ON CONFLICT(lat,lon) DO UPDATE SET place = excluded.place`, 
-                            //             undefined, parseFloat(lat), parseFloat(lon), place)
-                            //             .then( result => METADATA[file].locationID = result.lastID)
-                            //             .catch(error => console.log(error))
-                            //     }
-                            // })
+                import('./guano.js')
+                .then(({ extractGuanoMetadata }) => {
+                    const t0 = Date.now();
+                    extractGuanoMetadata(file).then(guano =>{
+                        if (guano){
+                            const location = guano['Loc Position'];
+                            if (location){
+                                const [lat, lon] = location.split(' ');
+                                onSetCustomLocation({ lat: parseFloat(lat), lon: parseFloat(lon), place: location, files: [file] }) 
+                                // db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ?', parseFloat(lat), parseFloat(lon))
+                                // .then(row =>{
+                                //     if (row) METADATA[file].locationID = row.id;
+                                //     else {
+                                //         db.runAsync(`
+                                //             INSERT INTO locations VALUES (?, ?, ?, ?)
+                                //             ON CONFLICT(lat,lon) DO UPDATE SET place = excluded.place`, 
+                                //             undefined, parseFloat(lat), parseFloat(lon), place)
+                                //             .then( result => METADATA[file].locationID = result.lastID)
+                                //             .catch(error => console.log(error))
+                                //     }
+                                // })
+                            }
+                            METADATA[file].guano = JSON.stringify(guano);
+                            console.log(`GUANO extraction took: ${(Date.now() - t0)/1000} seconds`);
                         }
-                        METADATA[file].guano = JSON.stringify(guano);
-                        console.log(`GUANO extraction took: ${(Date.now() - t0)/1000} seconds`);
-                    }
+                    })
+                    .catch(error => reject(error))
                 })
                 .catch(error => reject(error))
+
             }
             
             // split  the duration of this file across any dates it spans
@@ -3670,114 +3675,3 @@ async function convertAndOrganiseFiles() {
         }
     );
 }
-
-
-////////// GUANO Support /////////////
-
-/**
- * Extract GUANO metadata from a WAV file, without reading the entire file into memory.
- * @param {string} filePath - Path to the WAV file.
- * @returns {Promise<object|null>} - The extracted GUANO metadata or null if not found.
- */
-function extractGuanoMetadata(filePath) {
-    return new Promise((resolve, reject) => {
-        // Open the file
-        fs.open(filePath, 'r', (err, fd) => {
-            if (err) return reject(err);
-
-            const buffer = Buffer.alloc(12); // Initial buffer for RIFF header and first chunk header
-
-            // Read the RIFF header (12 bytes)
-            fs.read(fd, buffer, 0, 12, 0, (err) => {
-                if (err) return reject(err);
-
-                const chunkId = buffer.toString('utf-8', 0, 4); // Should be "RIFF"
-                const format = buffer.toString('utf-8', 8, 12); // Should be "WAVE"
-
-                if (chunkId !== 'RIFF' || format !== 'WAVE') {
-                    return reject(new Error('Invalid WAV file'));
-                }
-
-                let currentOffset = 12; // Start after the RIFF header
-
-                // Function to read the next chunk header
-                function readNextChunk() {
-                    const chunkHeaderBuffer = Buffer.alloc(8); // 8 bytes for chunk ID and size
-                    fs.read(fd, chunkHeaderBuffer, 0, 8, currentOffset, (err) => {
-                        if (err) return reject(err);
-
-                        const chunkId = chunkHeaderBuffer.toString('utf-8', 0, 4); // Chunk ID
-                        const chunkSize = chunkHeaderBuffer.readUInt32LE(4); // Chunk size
-                        if (chunkSize === 0) return resolve(null) // No GUANO found
-
-                        currentOffset += 8; // Move past the chunk header
-
-                        if (chunkId === 'guan') {
-                            // GUANO chunk found, read its content
-                            const guanoBuffer = Buffer.alloc(chunkSize);
-                            fs.read(fd, guanoBuffer, 0, chunkSize, currentOffset, (err) => {
-                                if (err) return reject(err);
-
-                                // GUANO data is UTF-8 encoded
-                                const guanoText = guanoBuffer.toString('utf-8');
-                                const guanoMetadata = parseGuanoText(guanoText);
-                                resolve(guanoMetadata);
-
-                                fs.close(fd, () => {}); // Close the file descriptor
-                            });
-                        } else if (chunkId === 'data') {
-                            // Skip over the data chunk (just move the offset)
-                            currentOffset += chunkSize;
-                            // Handle padding if chunkSize is odd
-                            if (chunkSize % 2 !== 0) currentOffset += 1;
-                            readNextChunk(); // Continue reading after skipping the data chunk
-                        } else {
-                            // Skip over any other chunk
-                            currentOffset += chunkSize;
-                            // Handle padding if chunkSize is odd
-                            if (chunkSize % 2 !== 0) currentOffset += 1;
-                            readNextChunk(); // Continue reading
-                        }
-                    });
-                }
-
-                // Start reading chunks after the RIFF header
-                readNextChunk();
-            });
-        });
-    });
-}
-
-
-/**
- * Helper function to parse GUANO text into key-value pairs
- * @param {string} guanoText - GUANO text data
- * @returns {object} Parsed GUANO metadata
- */
-function parseGuanoText(guanoText) {
-    const guanoMetadata = {};
-    const lines = guanoText.split('\n');
-
-    lines.forEach(line => {
-        const colonIndex = line.indexOf(':');
-        if (colonIndex !== -1) {
-            const key = line.slice(0, colonIndex).trim();
-            const value = line.slice(colonIndex + 1).trim();
-            
-            try {
-                // Attempt to parse JSON-like values
-                if ((value.startsWith('[') && value.endsWith(']')) ||
-                    (value.startsWith('{') && value.endsWith('}'))) {
-                    guanoMetadata[key] = JSON.parse(value);
-                } else {
-                    guanoMetadata[key] = value;
-                }
-            } catch {
-                guanoMetadata[key] = value;
-            }
-        }
-    });
-
-    return guanoMetadata;
-}
-
