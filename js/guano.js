@@ -1,6 +1,6 @@
 ////////// GUANO Support /////////////
 
-
+const fs = require('node:fs');
 
 /**
  * Extract GUANO metadata from a WAV file, without reading the entire file into memory.
