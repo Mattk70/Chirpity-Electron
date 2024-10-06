@@ -5208,7 +5208,7 @@ async function readLabels(labelFile, updating){
         tracking.classList.remove('d-none')
         // Update your UI with the progress information
         updateProgressBar.value = progressObj.percent;
-        if (progressObj.percent > 99.9) tracking.classList.add('d-none')
+        if (progressObj.percent > 99.8) tracking.classList.add('d-none')
     }
     window.electron.onDownloadProgress((_event, progressObj) => displayProgress(progressObj, 'Downloading the latest update: '));
     
