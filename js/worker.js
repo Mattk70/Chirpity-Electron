@@ -1124,9 +1124,10 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
             }
             if (STATE.useGUANO && file.toLowerCase().endsWith('wav')){
                 const t0 = Date.now();
-                const guano = extractGuanoMetadata(file)
-                if (guano) METADATA[file].guano = JSON.stringify(guano);
-                console.log(`GUANO extraction took: ${(Date.now() - t0)/1000} seconds`);
+                extractGuanoMetadata(file).then(guano =>{
+                    if (guano) METADATA[file].guano = JSON.stringify(guano);
+                    console.log(`GUANO extraction took: ${(Date.now() - t0)/1000} seconds`);
+                })
             }
             
             // split  the duration of this file across any dates it spans
@@ -2104,6 +2105,7 @@ const generateInsertQuery = async (latestResult, file) => {
             const metadata = JSON.parse(METADATA[file].guano);
             if (metadata['Loc Position']){
                 const [lat, lon] = metadata['Loc Position'].split(' ');
+                const place = metadata['Site Name'] || metadata['Loc Position'];
                 const row = await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ?', parseFloat(lat), parseFloat(lon))
                 if (!row) {
                     const result = await db.runAsync('INSERT OR IGNORE INTO locations VALUES ( ?, ?,?,? )',
@@ -2774,7 +2776,8 @@ function isFromSavedLocation(file) {
             return false
         }
     } catch (error) {
-        console.error('Error resolving paths:', error);
+        console.warn('Error resolving paths:', error);
+        UI.postMessage({event: 'generate-alert', message: 'Error resolving paths:', error})
         return false;
     }
 }
@@ -3658,126 +3661,78 @@ async function convertAndOrganiseFiles() {
 ////////// GUANO Support /////////////
 
 /**
- * Extracts GUANO metadata from a WAV file.
- * @param {string} filePath - Path to the WAV file.
- * @returns {object|null} - The extracted GUANO metadata or null if not found.
- */
-function extractGuanoMetadata(filePath) {
-    // Read the WAV file
-    const buffer = fs.readFileSync(filePath);
-    const wav = new wavefileReader.WaveFileReader();
-    // Decode the WAV file
-    wav.fromBuffer(buffer);
-    const guanoChunk = wav.signature.subChunks.find(chunk => chunk.chunkId === 'guan');
-    if (guanoChunk) {
-        // Extract the start and end positions of the GUANO data
-        const { start, end } = guanoChunk.chunkData;
-
-        const guanoBuffer = buffer.slice(start, end);
-        // GUANO data is stored as a UTF-8 encoded string
-        const guanoText = guanoBuffer.toString('utf-8');
-        // Parse the GUANO data into an object (assuming it's key-value pairs)
-        const guanoMetadata = {};
-        const lines = guanoText.split('\n');
-        lines.forEach(line => {
-            // Split the line at the first colon
-            const colonIndex = line.indexOf(':');
-            if (colonIndex !== -1) {
-                const key = line.slice(0, colonIndex).trim();
-                const value = line.slice(colonIndex + 1).trim(); // The value part starts after the first colon
-
-                try {
-                    // If the value looks like a JSON array or object, try parsing it
-                    if ((value.startsWith('[') && value.endsWith(']')) || 
-                        (value.startsWith('{') && value.endsWith('}'))) {
-                        guanoMetadata[key] = JSON.parse(value);
-                    } else {
-                        guanoMetadata[key] = value; // Otherwise, treat it as a string
-                    }
-                } catch {
-                    guanoMetadata[key] = value; // If parsing fails, store it as a string
-                }
-            }
-        });
-
-        return guanoMetadata;
-        
-    }
-
-    return null; // Return null if no GUANO metadata is found
-}
-
-/**
  * Extract GUANO metadata from a WAV file, without reading the entire file into memory.
  * @param {string} filePath - Path to the WAV file.
  * @returns {Promise<object|null>} - The extracted GUANO metadata or null if not found.
  */
-// function extractGuanoMetadata(filePath) {
-//     return new Promise((resolve, reject) => {
-//         // Open the file
-//         fs.open(filePath, 'r', (err, fd) => {
-//             if (err) return reject(err);
+function extractGuanoMetadata(filePath) {
+    return new Promise((resolve, reject) => {
+        // Open the file
+        fs.open(filePath, 'r', (err, fd) => {
+            if (err) return reject(err);
 
-//             const buffer = Buffer.alloc(12); // Initial buffer for RIFF header and first chunk header
+            const buffer = Buffer.alloc(12); // Initial buffer for RIFF header and first chunk header
 
-//             // Read the RIFF header (12 bytes)
-//             fs.read(fd, buffer, 0, 12, 0, (err) => {
-//                 if (err) return reject(err);
+            // Read the RIFF header (12 bytes)
+            fs.read(fd, buffer, 0, 12, 0, (err) => {
+                if (err) return reject(err);
 
-//                 const chunkId = buffer.toString('utf-8', 0, 4); // Should be "RIFF"
-//                 const format = buffer.toString('utf-8', 8, 12); // Should be "WAVE"
+                const chunkId = buffer.toString('utf-8', 0, 4); // Should be "RIFF"
+                const format = buffer.toString('utf-8', 8, 12); // Should be "WAVE"
 
-//                 if (chunkId !== 'RIFF' || format !== 'WAVE') {
-//                     return reject(new Error('Invalid WAV file'));
-//                 }
+                if (chunkId !== 'RIFF' || format !== 'WAVE') {
+                    return reject(new Error('Invalid WAV file'));
+                }
 
-//                 let currentOffset = 12; // Start after the RIFF header
+                let currentOffset = 12; // Start after the RIFF header
 
-//                 // Function to read the next chunk header
-//                 function readNextChunk() {
-//                     const chunkHeaderBuffer = Buffer.alloc(8); // 8 bytes for chunk ID and size
-//                     fs.read(fd, chunkHeaderBuffer, 0, 8, currentOffset, (err) => {
-//                         if (err) return reject(err);
+                // Function to read the next chunk header
+                function readNextChunk() {
+                    const chunkHeaderBuffer = Buffer.alloc(8); // 8 bytes for chunk ID and size
+                    fs.read(fd, chunkHeaderBuffer, 0, 8, currentOffset, (err) => {
+                        if (err) return reject(err);
 
-//                         const chunkId = chunkHeaderBuffer.toString('utf-8', 0, 4); // Chunk ID
-//                         const chunkSize = chunkHeaderBuffer.readUInt32LE(4); // Chunk size
-//                         currentOffset += 8; // Move past the chunk header
+                        const chunkId = chunkHeaderBuffer.toString('utf-8', 0, 4); // Chunk ID
+                        const chunkSize = chunkHeaderBuffer.readUInt32LE(4); // Chunk size
+                        if (chunkSize === 0) return resolve(null) // No GUANO found
 
-//                         if (chunkId === 'guan') {
-//                             // GUANO chunk found, read its content
-//                             const guanoBuffer = Buffer.alloc(chunkSize);
-//                             fs.read(fd, guanoBuffer, 0, chunkSize, currentOffset, (err) => {
-//                                 if (err) return reject(err);
+                        currentOffset += 8; // Move past the chunk header
 
-//                                 // GUANO data is UTF-8 encoded
-//                                 const guanoText = guanoBuffer.toString('utf-8');
-//                                 const guanoMetadata = parseGuanoText(guanoText);
-//                                 resolve(guanoMetadata);
+                        if (chunkId === 'guan') {
+                            // GUANO chunk found, read its content
+                            const guanoBuffer = Buffer.alloc(chunkSize);
+                            fs.read(fd, guanoBuffer, 0, chunkSize, currentOffset, (err) => {
+                                if (err) return reject(err);
 
-//                                 fs.close(fd, () => {}); // Close the file descriptor
-//                             });
-//                         } else if (chunkId === 'data') {
-//                             // Skip over the data chunk (just move the offset)
-//                             currentOffset += chunkSize;
-//                             // Handle padding if chunkSize is odd
-//                             if (chunkSize % 2 !== 0) currentOffset += 1;
-//                             readNextChunk(); // Continue reading after skipping the data chunk
-//                         } else {
-//                             // Skip over any other chunk
-//                             currentOffset += chunkSize;
-//                             // Handle padding if chunkSize is odd
-//                             if (chunkSize % 2 !== 0) currentOffset += 1;
-//                             readNextChunk(); // Continue reading
-//                         }
-//                     });
-//                 }
+                                // GUANO data is UTF-8 encoded
+                                const guanoText = guanoBuffer.toString('utf-8');
+                                const guanoMetadata = parseGuanoText(guanoText);
+                                resolve(guanoMetadata);
 
-//                 // Start reading chunks after the RIFF header
-//                 readNextChunk();
-//             });
-//         });
-//     });
-// }
+                                fs.close(fd, () => {}); // Close the file descriptor
+                            });
+                        } else if (chunkId === 'data') {
+                            // Skip over the data chunk (just move the offset)
+                            currentOffset += chunkSize;
+                            // Handle padding if chunkSize is odd
+                            if (chunkSize % 2 !== 0) currentOffset += 1;
+                            readNextChunk(); // Continue reading after skipping the data chunk
+                        } else {
+                            // Skip over any other chunk
+                            currentOffset += chunkSize;
+                            // Handle padding if chunkSize is odd
+                            if (chunkSize % 2 !== 0) currentOffset += 1;
+                            readNextChunk(); // Continue reading
+                        }
+                    });
+                }
+
+                // Start reading chunks after the RIFF header
+                readNextChunk();
+            });
+        });
+    });
+}
 
 
 /**
@@ -3785,30 +3740,30 @@ function extractGuanoMetadata(filePath) {
  * @param {string} guanoText - GUANO text data
  * @returns {object} Parsed GUANO metadata
  */
-// function parseGuanoText(guanoText) {
-//     const guanoMetadata = {};
-//     const lines = guanoText.split('\n');
+function parseGuanoText(guanoText) {
+    const guanoMetadata = {};
+    const lines = guanoText.split('\n');
 
-//     lines.forEach(line => {
-//         const colonIndex = line.indexOf(':');
-//         if (colonIndex !== -1) {
-//             const key = line.slice(0, colonIndex).trim();
-//             const value = line.slice(colonIndex + 1).trim();
+    lines.forEach(line => {
+        const colonIndex = line.indexOf(':');
+        if (colonIndex !== -1) {
+            const key = line.slice(0, colonIndex).trim();
+            const value = line.slice(colonIndex + 1).trim();
             
-//             try {
-//                 // Attempt to parse JSON-like values
-//                 if ((value.startsWith('[') && value.endsWith(']')) ||
-//                     (value.startsWith('{') && value.endsWith('}'))) {
-//                     guanoMetadata[key] = JSON.parse(value);
-//                 } else {
-//                     guanoMetadata[key] = value;
-//                 }
-//             } catch {
-//                 guanoMetadata[key] = value;
-//             }
-//         }
-//     });
+            try {
+                // Attempt to parse JSON-like values
+                if ((value.startsWith('[') && value.endsWith(']')) ||
+                    (value.startsWith('{') && value.endsWith('}'))) {
+                    guanoMetadata[key] = JSON.parse(value);
+                } else {
+                    guanoMetadata[key] = value;
+                }
+            } catch {
+                guanoMetadata[key] = value;
+            }
+        }
+    });
 
-//     return guanoMetadata;
-// }
+    return guanoMetadata;
+}
 
