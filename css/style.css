@@ -766,3 +766,12 @@ input[type="range"].vertical {
     height: 0;
     z-index: 1;
   }
+
+  .guano-popover {
+    --bs-popover-max-width: 500px;
+    --bs-popover-border-color: var(--bs-primary);
+    --bs-popover-header-bg: var(--bs-primary);
+    --bs-popover-header-color: var(--bs-white);
+    --bs-popover-body-padding-x: 1rem;
+    --bs-popover-body-padding-y: .5rem;
+  }

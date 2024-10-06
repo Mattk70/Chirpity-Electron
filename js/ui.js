@@ -677,10 +677,53 @@ function extractFileNameAndFolder(path) {
     }
 }
 
+/**
+ * Formats a JSON object as a Bootstrap table
+ * @param {object} jsonData - The JSON object to format
+ * @returns {string} - HTML string of the formatted Bootstrap table
+ */
+function formatAsBootstrapTable(jsonData) {
+    let tableHtml = "<table class='table table-striped table-bordered'><thead class='text-bg-light'><tr><th>Key</th><th>Value</th></tr></thead><tbody>";
+
+    // Iterate over the key-value pairs in the JSON object
+    for (const [key, value] of Object.entries(JSON.parse(jsonData))) {
+        tableHtml += '<tr>';
+        tableHtml += `<td><strong>${key}</strong></td>`;
+
+        // Check if the value is an object or array, if so, stringify it
+        if (typeof value === 'object') {
+            tableHtml += `<td>${JSON.stringify(value, null, 2)}</td>`;
+        } else {
+            tableHtml += `<td>${value}</td>`;
+        }
+
+        tableHtml += '</tr>';
+    }
+
+    tableHtml += '</tbody></table>';
+    return tableHtml;
+}
+function showGUANO(){
+    const icon = document.getElementById('guano');
+    if (STATE.guano){
+        icon.classList.remove('d-none');
+        icon.setAttribute('data-bs-content', 'New content for the popover');
+        // Reinitialize the popover to reflect the updated content
+        const popover = bootstrap.Popover.getInstance(icon);
+        popover.setContent({
+            '.popover-header': 'Guano metadata',
+            '.popover-body': formatAsBootstrapTable(STATE.guano)
+          });
+    } else {
+        icon.classList.add('d-none');
+    }
+}
+
 function renderFilenamePanel() {
     if (!currentFile) return;
     const openfile = currentFile;
     const files = fileList;
+    showGUANO();
     let filenameElement = document.getElementById('filename');
     filenameElement.innerHTML = '';
     //let label = openfile.replace(/^.*[\\\/]/, "");
@@ -785,9 +828,9 @@ const showLocation = async (fromSelect) => {
         newLocation = LOCATIONS.find(obj => obj.id === id);
         //locationSelect.value = id;
         if (newLocation){
-            latEl.value = newLocation.lat, lonEl.value = newLocation.lon, customPlaceEl.value = newLocation.place;
+            latEl.value = newLocation.lat, lonEl.value = newLocation.lon, customPlaceEl.value = newLocation.place, locationSelect.value = id;
         } else {
-            latEl.value = config.latitude, lonEl.value = config.longitude, customPlaceEl.value = config.location;
+            latEl.value = config.latitude, lonEl.value = config.longitude, customPlaceEl.value = config.location, locationSelect.value = '';
         }
     }
     else {  //Default location
@@ -1784,8 +1827,15 @@ window.onload = async () => {
         t0_warmup = Date.now();
         worker.postMessage({action: '_init_', model: model, batchSize: config[config[model].backend].batchSize, threads: config[config[model].backend].threads, backend: config[model].backend, list: list})
         // Enable popovers
+        const myAllowList = bootstrap.Tooltip.Default.allowList;
+        myAllowList.table = [];  // Allow <table> element with no attributes
+        myAllowList.thead = [];
+        myAllowList.tbody = [];
+        myAllowList.tr = [];
+        myAllowList.td = [];
+        myAllowList.th = [];
         const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]')
-        const popoverList = [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl))
+        const popoverList = [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl, {allowList: myAllowList}))
         
 
         // check for new version on mac platform. pkg containers are not an auto-updatable target
@@ -2966,7 +3016,8 @@ function centreSpec(){
         fileRegion = undefined,
         play = false,
         queued = false,
-        goToRegion = true
+        goToRegion = true,
+        guano = undefined
     }) {
         fileLoaded = true, locationID = location;
         clearTimeout(loadingTimeout)
@@ -2993,6 +3044,7 @@ function centreSpec(){
             NEXT_BUFFER = undefined;
             if (currentFile !== file) {
                 currentFile = file;
+                STATE.guano = guano;
                 renderFilenamePanel();
                 fileStart = start;
                 fileEnd = new Date(fileStart + (currentFileDuration * 1000));
@@ -4881,7 +4933,7 @@ async function readLabels(labelFile, updating){
                 }
             })
         }
-        if (activeRow && (region?.attributes.label || hideInSummary)) {}
+        if (inSummary || activeRow && (region?.attributes.label || hideInSummary)) {}
         else {
             const xc = document.getElementById('context-xc');
             xc.classList.add('d-none');

@@ -454,7 +454,8 @@ async function handleMessage(e) {
         case "save2db": {await onSave2DiskDB(args);
             break;
         }
-        case "set-custom-file-location": {onSetCustomLocation(args);
+        case "set-custom-file-location": {
+            onSetCustomLocation(args);
             break;
         }
         case "update-buffer": {await loadAudioFile(args);
@@ -550,6 +551,7 @@ async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backen
     STATE.update({ model: model });
     await loadDB(appPath); // load the diskdb
     await createDB(); // now make the memoryDB
+    STATE.update({ db: memoryDB })
     spawnPredictWorkers(model, list, batchSize, threads);
 }
 
@@ -1056,7 +1058,8 @@ async function loadAudioFile({
                 preserveResults: preserveResults,
                 play: play,
                 queued: queued,
-                goToRegion
+                goToRegion,
+                guano: METADATA[file].guano
             }, [audioArray.buffer]);
         })
         .catch( (error) => {
@@ -1125,9 +1128,29 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
             if (STATE.useGUANO && file.toLowerCase().endsWith('wav')){
                 const t0 = Date.now();
                 extractGuanoMetadata(file).then(guano =>{
-                    if (guano) METADATA[file].guano = JSON.stringify(guano);
-                    console.log(`GUANO extraction took: ${(Date.now() - t0)/1000} seconds`);
+                    if (guano){
+                        const location = guano['Loc Position'];
+                        if (location){
+                            const [lat, lon] = location.split(' ');
+                            onSetCustomLocation({ lat: parseFloat(lat), lon: parseFloat(lon), place: location, files: [file] }) 
+                            // db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ?', parseFloat(lat), parseFloat(lon))
+                            // .then(row =>{
+                            //     if (row) METADATA[file].locationID = row.id;
+                            //     else {
+                            //         db.runAsync(`
+                            //             INSERT INTO locations VALUES (?, ?, ?, ?)
+                            //             ON CONFLICT(lat,lon) DO UPDATE SET place = excluded.place`, 
+                            //             undefined, parseFloat(lat), parseFloat(lon), place)
+                            //             .then( result => METADATA[file].locationID = result.lastID)
+                            //             .catch(error => console.log(error))
+                            //     }
+                            // })
+                        }
+                        METADATA[file].guano = JSON.stringify(guano);
+                        console.log(`GUANO extraction took: ${(Date.now() - t0)/1000} seconds`);
+                    }
                 })
+                .catch(error => reject(error))
             }
             
             // split  the duration of this file across any dates it spans
@@ -2102,14 +2125,14 @@ const generateInsertQuery = async (latestResult, file) => {
     if (!res) {
         let id = null;
         if (METADATA[file].guano){
-            const metadata = JSON.parse(METADATA[file].guano);
-            if (metadata['Loc Position']){
-                const [lat, lon] = metadata['Loc Position'].split(' ');
-                const place = metadata['Site Name'] || metadata['Loc Position'];
+            const guano = JSON.parse(METADATA[file].guano);
+            if (guano['Loc Position']){
+                const [lat, lon] = guano['Loc Position'].split(' ');
+                const place = guano['Site Name'] || guano['Loc Position'];
                 const row = await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ?', parseFloat(lat), parseFloat(lon))
                 if (!row) {
                     const result = await db.runAsync('INSERT OR IGNORE INTO locations VALUES ( ?, ?,?,? )',
-                     undefined, parseFloat(lat), parseFloat(lon), "undefined");
+                     undefined, parseFloat(lat), parseFloat(lon), place);
                     id = result.lastID;
                 }
             }
@@ -2777,7 +2800,7 @@ function isFromSavedLocation(file) {
         }
     } catch (error) {
         console.warn('Error resolving paths:', error);
-        UI.postMessage({event: 'generate-alert', message: 'Error resolving paths:', error})
+        // UI.postMessage({event: 'generate-alert', message: 'Error resolving paths:', error})
         return false;
     }
 }
@@ -3392,9 +3415,6 @@ async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
         if (result.changes) {
             await db.runAsync(`UPDATE files SET locationID = null WHERE locationID = ?`, id);
         }
-        if (db === memoryDB) {
-            onSetCustomLocation({lat: lat, lon: lon, place: undefined, files: undefined, db: diskDB})
-        }
     } else {
         const result = await db.runAsync(`
         INSERT INTO locations VALUES (?, ?, ?, ?)
@@ -3412,13 +3432,6 @@ async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
             }
             // tell the UI the file has a location id
             UI.postMessage({ event: 'file-location-id', file: file, id: id });
-            // state.db is set onAnalyse, so check if the file is saved
-            if (db === memoryDB) {
-                const fileSaved = await getSavedFileInfo(file)
-                if (fileSaved) {
-                    onSetCustomLocation({lat: lat, lon: lon, place: place, files: [file], db: diskDB})
-                }
-            }
         }
     }
     await getLocations({ db: db, file: files[0] });
@@ -3587,7 +3600,7 @@ async function convertAndOrganiseFiles() {
         
         // Convert the file using fluent-ffmpeg
         let command = ffmpeg(inputFilePath)
-            if (STATE.archive.format === 'ogg') {
+            if (STATE.archive.format === 'opus') {
                 command.audioBitrate('128k')
                 .audioChannels(1) // Set to mono
                 .audioFrequency(26_000) // Set sample rate for BirdNET
