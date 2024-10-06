@@ -139,7 +139,8 @@ const createDB = async (file) => {
     const db = archiveMode ? diskDB : memoryDB;
     await db.runAsync('BEGIN');
     await db.runAsync('CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL)');
-    await db.runAsync(`CREATE TABLE files(id INTEGER PRIMARY KEY, name TEXT NOT NULL, duration REAL,filestart INTEGER, locationID INTEGER, archiveName TEXT, metadata TEXT, UNIQUE (name))`);
+    await db.runAsync(`CREATE TABLE files(id INTEGER PRIMARY KEY, name TEXT NOT NULL, duration REAL,filestart INTEGER, locationID INTEGER, archiveName TEXT, metadata TEXT, UNIQUE (name),
+        CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL`);
     await db.runAsync(`CREATE TABLE locations( id INTEGER PRIMARY KEY, lat REAL NOT NULL, lon  REAL NOT NULL, place TEXT NOT NULL, UNIQUE (lat, lon))`);
     // Ensure place names are unique too
     await db.runAsync('CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)');

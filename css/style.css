@@ -769,9 +769,21 @@ input[type="range"].vertical {
 
   .guano-popover {
     --bs-popover-max-width: 500px;
+    max-height: 500px;
     --bs-popover-border-color: var(--bs-primary);
     --bs-popover-header-bg: var(--bs-primary);
     --bs-popover-header-color: var(--bs-white);
     --bs-popover-body-padding-x: 1rem;
     --bs-popover-body-padding-y: .5rem;
+    overflow: hidden;
   }
+
+  .guano {
+    max-height: 450px;
+    overflow-y: scroll;
+  }
+
+  .guano table {
+    width: 100%;  /* Ensure the table takes full width */
+    table-layout: auto;
+}

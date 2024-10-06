@@ -683,7 +683,7 @@ function extractFileNameAndFolder(path) {
  * @returns {string} - HTML string of the formatted Bootstrap table
  */
 function formatAsBootstrapTable(jsonData) {
-    let tableHtml = "<table class='table table-striped table-bordered'><thead class='text-bg-light'><tr><th>Key</th><th>Value</th></tr></thead><tbody>";
+    let tableHtml = "<div class='guano'><table class='table table-striped table-bordered'><thead class='text-bg-light'><tr><th>Key</th><th>Value</th></tr></thead><tbody>";
 
     // Iterate over the key-value pairs in the JSON object
     for (const [key, value] of Object.entries(JSON.parse(jsonData))) {
@@ -700,7 +700,7 @@ function formatAsBootstrapTable(jsonData) {
         tableHtml += '</tr>';
     }
 
-    tableHtml += '</tbody></table>';
+    tableHtml += '</tbody></table></div>';
     return tableHtml;
 }
 function showGUANO(){
@@ -711,7 +711,7 @@ function showGUANO(){
         // Reinitialize the popover to reflect the updated content
         const popover = bootstrap.Popover.getInstance(icon);
         popover.setContent({
-            '.popover-header': 'Guano metadata',
+            '.popover-header': 'GUANO Metadata',
             '.popover-body': formatAsBootstrapTable(STATE.guano)
           });
     } else {
