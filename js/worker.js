@@ -15,6 +15,7 @@ import { State } from './state.js';
 import { sqlite3 } from './database.js';
 import {trackEvent} from './tracking.js';
 
+const DEBUG = false;
 
 // Function to join Buffers and not use Buffer.concat() which leads to detached ArrayBuffers
 function joinBuffers(buffer1, buffer2) {
@@ -95,7 +96,6 @@ let NUM_WORKERS;
 let workerInstance = 0;
 let appPath, BATCH_SIZE, LABELS, batchChunksToSend = {};
 let LIST_WORKER;
-const DEBUG = true;
 
 const DATASET = false;
 const adding_chirpity_additions = true;
@@ -1150,8 +1150,8 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
                                 // })
                             }
                             METADATA[file].guano = JSON.stringify(guano);
-                            console.log(`GUANO extraction took: ${(Date.now() - t0)/1000} seconds`);
                         }
+                        DEBUG && console.log(`GUANO search took: ${(Date.now() - t0)/1000} seconds`);
                     })
                     .catch(error => reject(error))
                 })
@@ -1309,7 +1309,7 @@ const getWavePredictBuffers = async ({
         meta.byteEnd = Math.round((end * byteRate) / sample_rate) * sample_rate + headerEnd;
         meta.highWaterMark = byteRate * BATCH_SIZE * WINDOW_SIZE;
         headerStream.destroy();
-        DEBUG && console.log('Header extracted for ', file)
+        DEBUG && console.log('Header extracted for ', file);
 
 
         readStream = fs.createReadStream(file, {

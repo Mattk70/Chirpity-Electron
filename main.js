@@ -1,4 +1,4 @@
-const { app, Menu, dialog, ipcMain, MessageChannelMain, BrowserWindow, globalShortcut, powerSaveBlocker } = require('electron');
+const { app, Menu, dialog, ipcMain, MessageChannelMain, BrowserWindow, powerSaveBlocker } = require('electron');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 // WebGPU flags needed for Linux
 app.commandLine.appendSwitch('enable-unsafe-webgpu');
