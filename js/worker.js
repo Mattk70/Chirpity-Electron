@@ -1136,18 +1136,6 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
                             if (location){
                                 const [lat, lon] = location.split(' ');
                                 onSetCustomLocation({ lat: parseFloat(lat), lon: parseFloat(lon), place: location, files: [file] }) 
-                                // db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ?', parseFloat(lat), parseFloat(lon))
-                                // .then(row =>{
-                                //     if (row) METADATA[file].locationID = row.id;
-                                //     else {
-                                //         db.runAsync(`
-                                //             INSERT INTO locations VALUES (?, ?, ?, ?)
-                                //             ON CONFLICT(lat,lon) DO UPDATE SET place = excluded.place`, 
-                                //             undefined, parseFloat(lat), parseFloat(lon), place)
-                                //             .then( result => METADATA[file].locationID = result.lastID)
-                                //             .catch(error => console.log(error))
-                                //     }
-                                // })
                             }
                             METADATA[file].guano = JSON.stringify(guano);
                         }
@@ -3655,10 +3643,11 @@ async function setIncludedIDs(lat, lon, week) {
 // }
 
 
-const pLimit = require('p-limit'); // You can install p-limit with `npm install p-limit`
+const pLimit = require('p-limit');
 
 async function convertAndOrganiseFiles(threadLimit) {
     threadLimit ??= 4; // Set a default
+    let mkkDirFailed = false;
     const db = diskDB;
     let count = 0;
     let {totalToConvert} = await db.getAsync('SELECT COUNT(*) as totalToConvert from files');
@@ -3677,12 +3666,8 @@ async function convertAndOrganiseFiles(threadLimit) {
         });
 
     // Query the files table to get the necessary data
-    db.each("SELECT f.id, f.name, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id", async function(err, row) {
-        if (err) {
-            console.error("Error querying the database:", err);
-            return;
-        }
-
+    const rows = await db.allAsync("SELECT f.id, f.name, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id");
+    for (const row of rows){
         row.place ??= STATE.place;
         const fileDate = new Date(row.filestart);
         const year = String(fileDate.getFullYear());
@@ -3700,21 +3685,70 @@ async function convertAndOrganiseFiles(threadLimit) {
         if (archiveName === dbArchiveName && fs.existsSync(fullFilePath)) {
             totalToConvert--;
             DEBUG && console.log(`File ${inputFilePath} already converted. Skipping conversion.`);
-            return;
+            continue;
         }
 
         if (!fs.existsSync(fullPath)) {
-            fs.mkdirSync(fullPath, { recursive: true });
+            try {
+                fs.mkdirSync(fullPath, { recursive: true });
+            } catch (err) {
+                if (!mkkDirFailed){
+                    mkkDirFailed = true;
+                    UI.postMessage({
+                        event: 'generate-alert',
+                        message: `Failed to create directory: ${fullPath}<br>Error: ${err.message}`
+                    });
+                }
+                totalToConvert--;
+                continue;
+            }
         }
 
         // Add the file conversion to the pool
         fileProgressMap[inputFilePath] = 0;
         conversions.push(limit(() => convertFile(inputFilePath, fullFilePath, row, db, dbArchiveName, fileProgressMap, totalToConvert, count++)));
-    });
+        console.log(conversions)
+    }
+    
+    Promise.allSettled(conversions).then((results) => {
+        // Oftentimes, the final percent.progress reported is < 100. So when finished, send 100 so the progress panel can be hidden
+        UI.postMessage({
+            event: 'conversion-progress',
+            progress: { percent: 100 },
+            text: ''
+        });
+        // Summarise the results
+        let successfulConversions = 0;
+        let failedConversions = 0;
+        let failureReasons = [];
 
-    // Wait for all conversions to finish
-    await Promise.all(conversions);
-}
+        results.forEach((result) => {
+            if (result.status === 'fulfilled') {
+                successfulConversions++;
+            } else {
+                failedConversions++;
+                failureReasons.push(result.reason);  // Collect the reason for the failure
+            }
+        });
+
+        // Create a summary message
+        let summaryMessage = `Conversion complete: ${successfulConversions} successful, ${failedConversions} failed.`;
+
+        if (failedConversions > 0) {
+            summaryMessage += `<br>Failed conversion reasons:<br><ul>`;
+            failureReasons.forEach(reason => {
+                summaryMessage += `<li>${reason}</li>`;
+            });
+            summaryMessage += `</ul>`;
+        }
+
+        // Post the summary message
+        UI.postMessage({
+            event: `generate-alert`,
+            message: summaryMessage
+        });
+    })
+};
 
 async function convertFile(inputFilePath, fullFilePath, row, db, dbArchiveName, fileProgressMap, totalToConvert, count) {
     METADATA[inputFilePath] || await setMetadata({file: inputFilePath});
