@@ -2790,33 +2790,11 @@ const sendResult = (index, result, fromDBQuery) => {
     });
 };
 
-// Check if the drop path is from the saved location
-function isFromSavedLocation(file) {
-    if (!STATE.archive.location) return false;
-    try {
-        // Resolve both paths to their actual UNC forms
-        const realDropPath = fs.realpathSync(file);
-        const realSavedPath = fs.realpathSync(STATE.archive.location);
-        
-        // Compare both normalised paths
-        if (realDropPath.startsWith(realSavedPath)){
-            return p.relative(realSavedPath, realDropPath)
-        } else {
-            return false
-        }
-    } catch (error) {
-        console.warn('Error resolving paths:', error);
-        // UI.postMessage({event: 'generate-alert', message: 'Error resolving paths:', error})
-        return false;
-    }
-}
 
 const getSavedFileInfo = async (file) => {
     if (diskDB){
-        // look for file in the disk DB, ignore extension
-        const archiveFile = isFromSavedLocation(file);
         //if (!archiveFile) return undefined;
-        let row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name = ? OR archiveName = ?',file, archiveFile);
+        let row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name = ? OR archiveName = ?',file, file);
         if (!row) {
             const baseName = file.replace(/^(.*)\..*$/g, '$1%');
             row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)',baseName);
@@ -3680,7 +3658,7 @@ async function setIncludedIDs(lat, lon, week) {
 const pLimit = require('p-limit'); // You can install p-limit with `npm install p-limit`
 
 async function convertAndOrganiseFiles(threadLimit) {
-    threadLimit ??= 1; // Set a default
+    threadLimit ??= 4; // Set a default
     const db = diskDB;
     let count = 0;
     let {totalToConvert} = await db.getAsync('SELECT COUNT(*) as totalToConvert from files');
