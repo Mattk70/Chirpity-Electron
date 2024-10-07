@@ -1112,61 +1112,55 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
         console.warn('getDuration error', error)}
     );
     
-    return new Promise((resolve, reject) => {
-        if (METADATA[file].isComplete) {
-            resolve(METADATA[file])
+    if (METADATA[file].isComplete) {
+        return METADATA[file]
+    } else {
+        let fileStart, fileEnd;
+        
+        if (savedMeta?.fileStart) {
+            fileStart = new Date(savedMeta.fileStart);
+            fileEnd = new Date(fileStart.getTime() + (METADATA[file].duration * 1000));
         } else {
-            let fileStart, fileEnd;
-            
-            if (savedMeta?.fileStart) {
-                fileStart = new Date(savedMeta.fileStart);
-                fileEnd = new Date(fileStart.getTime() + (METADATA[file].duration * 1000));
-            } else {
-                METADATA[file].stat = fs.statSync(source_file);
-                fileEnd = new Date(METADATA[file].stat.mtime);
-                fileStart = new Date(METADATA[file].stat.mtime - (METADATA[file].duration * 1000));
-            }
-            if (STATE.useGUANO && file.toLowerCase().endsWith('wav')){
-                import('./guano.js')
-                .then(({ extractGuanoMetadata }) => {
-                    const t0 = Date.now();
-                    extractGuanoMetadata(file).then(guano =>{
-                        if (guano){
-                            const location = guano['Loc Position'];
-                            if (location){
-                                const [lat, lon] = location.split(' ');
-                                onSetCustomLocation({ lat: parseFloat(lat), lon: parseFloat(lon), place: location, files: [file] }) 
-                            }
-                            METADATA[file].guano = JSON.stringify(guano);
-                        }
-                        DEBUG && console.log(`GUANO search took: ${(Date.now() - t0)/1000} seconds`);
-                    })
-                    .catch(error => reject(error))
-                })
-                .catch(error => reject(error))
-
-            }
-            
-            // split  the duration of this file across any dates it spans
-            METADATA[file].dateDuration = {};
-            const key = new Date(fileStart);
-            key.setHours(0, 0, 0, 0);
-            const keyCopy = addDays(key, 0).getTime();
-            if (fileStart.getDate() === fileEnd.getDate()) {
-                METADATA[file].dateDuration[keyCopy] = METADATA[file].duration;
-            } else {
-                const key2 = addDays(key, 1);
-                
-                const key2Copy = addDays(key2, 0).getTime();
-                METADATA[file].dateDuration[keyCopy] = (key2Copy - fileStart) / 1000;
-                METADATA[file].dateDuration[key2Copy] = METADATA[file].duration - METADATA[file].dateDuration[keyCopy];
-            }
-            // Now we have completed the date comparison above, we convert fileStart to millis
-            fileStart = fileStart.getTime();
-            METADATA[file].fileStart = fileStart;
-            resolve(METADATA[file]);
+            METADATA[file].stat = fs.statSync(source_file);
+            fileEnd = new Date(METADATA[file].stat.mtime);
+            fileStart = new Date(METADATA[file].stat.mtime - (METADATA[file].duration * 1000));
         }
-    }).catch(error => console.warn(error))
+        if (STATE.useGUANO && file.toLowerCase().endsWith('wav')){
+            const {extractGuanoMetadata} = await import('./guano.js').catch(error => {
+                console.warn('Error loading guano.js', error)}
+            );
+            const t0 = Date.now();
+            const guano = await extractGuanoMetadata(file);
+            if (guano){
+                const location = guano['Loc Position'];
+                if (location){
+                    const [lat, lon] = location.split(' ');
+                    const roundedFloat = (string) => Math.round(parseFloat(string) * 10000) / 10000;
+                    onSetCustomLocation({ lat: roundedFloat(lat), lon: roundedFloat(lon), place: location, files: [file] }) 
+                }
+                METADATA[file].guano = JSON.stringify(guano);
+            }
+            DEBUG && console.log(`GUANO search took: ${(Date.now() - t0)/1000} seconds`);
+        }
+        
+        // split  the duration of this file across any dates it spans
+        METADATA[file].dateDuration = {};
+        const key = new Date(fileStart);
+        key.setHours(0, 0, 0, 0);
+        const keyCopy = addDays(key, 0).getTime();
+        if (fileStart.getDate() === fileEnd.getDate()) {
+            METADATA[file].dateDuration[keyCopy] = METADATA[file].duration;
+        } else {
+            const key2 = addDays(key, 1);
+            const key2Copy = addDays(key2, 0).getTime();
+            METADATA[file].dateDuration[keyCopy] = (key2Copy - fileStart) / 1000;
+            METADATA[file].dateDuration[key2Copy] = METADATA[file].duration - METADATA[file].dateDuration[keyCopy];
+        }
+        // Now we have completed the date comparison above, we convert fileStart to millis
+        fileStart = fileStart.getTime();
+        METADATA[file].fileStart = fileStart;
+        return METADATA[file];
+    }
 }
             
 function setupCtx(audio, rate, destination, file) {
