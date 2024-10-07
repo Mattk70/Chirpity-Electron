@@ -994,7 +994,7 @@ async function onOpenFiles(args) {
     // Reset analysis status
     STATE.analysisDone = false;
     await loadAudioFile({ filePath: fileList[0] });
-    disableMenuItem(['analyseSelection', 'analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'export2audio', 'save2db'])
+    disableMenuItem(['analyseSelection', 'analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'save2db'])
     // Clear unsaved records warning
     window.electron.unsavedRecords(false);
     document.getElementById('unsaved-icon').classList.add('d-none');
@@ -2969,13 +2969,6 @@ function centreSpec(){
     const gotoForm = document.getElementById('gotoForm')
     gotoForm.addEventListener('submit', gotoTime)
     
-    // Electron Message handling
-    //const warmupText = document.getElementById('warmup');
-    
-    // function displayWarmUpMessage() {
-    //     disableMenuItem(['analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'analyseSelection', 'export2audio', 'save2db']);
-    //     warmupText.classList.remove('d-none');
-    // }
     
     function onModelReady(args) {
         modelReady = true;
@@ -3224,7 +3217,7 @@ function centreSpec(){
         // Why do we do audacity labels here?
         AUDACITY_LABELS = audacityLabels;
         if (! isEmptyObject(AUDACITY_LABELS)) {
-            enableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven', 'save2db', 'export2audio']);
+            enableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven', 'save2db']);
         } else {
             disableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven']);
         }
@@ -4415,7 +4408,6 @@ DOM.gain.addEventListener('input', () => {
                 worker.postMessage({ action: 'save2db', file: currentFile }); 
                 if (config.archive.auto) document.getElementById('compress-and-organise').click();
                 break }
-            case 'export2audio': { batchExportAudio(); break }
             case 'dataset': { worker.postMessage({ action: 'create-dataset', species: isSpeciesViewFiltered(true) }); break }
 
             case 'analyse': {postAnalyseMessage({ filesInScope: [currentFile] }); break }
@@ -5483,7 +5475,7 @@ function renderComparisons(lists, cname){
     compareDiv.tabIndex = -1;
     compareDiv.setAttribute('aria-labelledby', "compareModalLabel");
     compareDiv.setAttribute('aria-hidden', "true");
-    compareDiv.setAttribute( "data-bs-backdrop", "static")
+    compareDiv.setAttribute( "data-bs-backdrop", "static");
     const compareHTML = `
         <div class="modal-dialog modal-lg modal-dialog-bottom w-100">
             <div class="modal-content">
