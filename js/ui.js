@@ -849,14 +849,14 @@ const displayLocationAddress = async (where) => {
         latEl = document.getElementById('customLat');
         lonEl = document.getElementById('customLon');
         placeEl = document.getElementById('customPlace');
-        address = await fetchLocationAddress(latEl.value, lonEl.value, false).catch(error => console.warn(error));
+        address = await fetchLocationAddress(latEl.value, lonEl.value, false);
         if (address === false) return
         placeEl.value = address || 'Location not available';
     } else {
         latEl = document.getElementById('latitude');
         lonEl = document.getElementById('longitude');
         placeEl = document.getElementById('place');
-        address = await fetchLocationAddress(latEl.value, lonEl.value, false).catch(error => console.warn(error));;
+        address = await fetchLocationAddress(latEl.value, lonEl.value, false);
         if (address === false) return
         const content = '<span class="material-symbols-outlined">fmd_good</span> ' + address;
         placeEl.innerHTML = content;
@@ -1095,7 +1095,7 @@ function postAnalyseMessage(args) {
             circleClicked: args.fromDB
         });
     } else {
-        generateToast({message: 'An analysis is underway. Press <b>Esc</b> to cancel it before running a new analysis.'})
+        generateToast({type: 'warning', message: 'An analysis is underway. Press <b>Esc</b> to cancel it before running a new analysis.'})
     }
 }
 
@@ -1103,7 +1103,7 @@ let openStreetMapTimer;
 function fetchLocationAddress(lat, lon) {
     
         if (isNaN(lat) || isNaN(lon)  || !lat || !lon){
-            generateToast({ message:'Both lat and lon values need to be numbers between 180 and -180'})
+            generateToast({type: 'warning',  message:'Both lat and lon values need to be numbers between 180 and -180'})
             return false
         }
         return new Promise((resolve, reject) => {
@@ -1199,7 +1199,7 @@ function hideAll() {
 
 async function batchExportAudio() {
     const species = isSpeciesViewFiltered(true); 
-    species ? exportData('audio', species, 1000) : generateToast({message: "Filter results by species to export audio files"});
+    species ? exportData('audio', species, 1000) : generateToast({type: 'warning', message: "Filter results by species to export audio files"});
 }
 
 const export2CSV = ()  => exportData('text', isSpeciesViewFiltered(true), Infinity);
@@ -1911,7 +1911,7 @@ const setUpWorkerMessaging = () => {
                             </div>
                             `
                     }
-                    generateToast({ message: args.message});
+                    generateToast({ type: args.type, message: args.message});
                     // This is how we know the database update has completed
                     if (args.database && config.archive.auto) document.getElementById('compress-and-organise').click();
                 break;
@@ -1989,7 +1989,7 @@ const setUpWorkerMessaging = () => {
                     if (!config.hasNode && config[config.model].backend !== 'webgpu'){
                         // No node? Not using webgpu? Force webgpu
                         handleBackendChange('webgpu');
-                        generateToast({ message: 'The standard backend could not be loaded on this machine. An experimental backend (webGPU) has been used instead.'});
+                        generateToast({type: 'warning',  message: 'The standard backend could not be loaded on this machine. An experimental backend (webGPU) has been used instead.'});
                         console.warn('tfjs-node could not be loaded, webGPU backend forced. CPU is', DIAGNOSTICS['CPU'])
                     }
                     modelSettingsDisplay();
@@ -2016,7 +2016,7 @@ const setUpWorkerMessaging = () => {
                     onWorkerLoadedAudio(args);
                     break;
                 }
-                default: {generateToast({ message:`Unrecognised message from worker:${args.event}`});
+                default: {generateToast({type: 'error', message:`Unrecognised message from worker:${args.event}`});
                 }
             }
         })
@@ -2953,7 +2953,7 @@ function centreSpec(){
                 seconds = Math.min(parseFloat(timeArray[2]), 59.999);
             } else {
                 // Invalid input
-                generateToast({ message:'Invalid time format. Please enter time in one of the following formats: \n1. Float (for seconds) \n2. Two numbers separated by a colon (for minutes and seconds) \n3. Three numbers separated by colons (for hours, minutes, and seconds)'});
+                generateToast({type: 'warning',  message:'Invalid time format. Please enter time in one of the following formats: \n1. Float (for seconds) \n2. Two numbers separated by a colon (for minutes and seconds) \n3. Three numbers separated by colons (for hours, minutes, and seconds)'});
                 return;
             }
             let start = hours * 3600 + minutes * 60 + seconds;
@@ -4539,7 +4539,7 @@ DOM.gain.addEventListener('input', () => {
             }
             case 'clear-call-cache': {
                 const data = fs.rm(p.join(appPath, 'XCcache.json'), err =>{
-                    if (err) generateToast({message: 'No call cache was found.'}) && config.debug && console.log('No XC cache found', err);
+                    if (err) generateToast({type: 'error', message: 'No call cache was found.'}) && config.debug && console.log('No XC cache found', err);
                     else generateToast({message: 'The call cache was successfully cleared.'})
                 })
                 break;
@@ -4576,7 +4576,7 @@ DOM.gain.addEventListener('input', () => {
             switch (target) {
                 case 'species-frequency-threshold' : {
                     if (isNaN(element.value) || element.value === '') {
-                        generateToast({ message:'The threshold must be a number between 0.001 and 1'});
+                        generateToast({type: 'warning',  message:'The threshold must be a number between 0.001 and 1'});
                         return false
                     }
                     config.speciesThreshold = element.value;
@@ -4631,7 +4631,7 @@ DOM.gain.addEventListener('input', () => {
                     if (element.value === 'custom'){
                         labelFile = config.customListFile[config.model];
                         if (! labelFile) {
-                             generateToast({message: 'You must select a label file in the list settings to use the custom language option.'});
+                             generateToast({type: 'warning', message: 'You must select a label file in the list settings to use the custom language option.'});
                             return;
                         }
                     } else {
@@ -4826,7 +4826,7 @@ function setListUIState(list){
     } else if (list === 'custom') {
         DOM.customListContainer.classList.remove('d-none');  
         if (!config.customListFile[config.model]) {
-            generateToast({message: 'You need to upload a custom list for the model before using the custom list option.'})
+            generateToast({type: 'warning', message: 'You need to upload a custom list for the model before using the custom list option.'})
             return
         }
         readLabels(config.customListFile[config.model], 'list');
@@ -4839,7 +4839,7 @@ async function readLabels(labelFile, updating){
         return response.text();
     }).catch(error =>{
         if (error.message === 'Failed to fetch') {
-            generateToast({message: 'The custom list could not be found, <b class="text-danger">no detections will be shown</b>.'})
+            generateToast({type: 'error', message: 'The custom list could not be found, <b class="text-danger">no detections will be shown</b>.'})
             DOM.customListSelector.classList.add('btn-outline-danger');
             document.getElementById('navbarSettings').click();
             document.getElementById('list-file-selector').focus();
@@ -5258,7 +5258,8 @@ async function readLabels(labelFile, updating){
         }
     }
     
-    function generateToast({message}) {
+
+    function generateToast({message = '', type = 'info'} ={}) {
         const domEl = document.getElementById('toastContainer');
         
         const wrapper = document.createElement('div');
@@ -5268,16 +5269,45 @@ async function readLabels(labelFile, updating){
         wrapper.setAttribute("aria-live", "assertive");
         wrapper.setAttribute("aria-atomic", "true");
         
-        wrapper.innerHTML = `
-            <div class="toast-header">
-                <svg class="bi flex-shrink-0 me-2 text-primary" width="20" height="20" role="img" aria-label="Info:"><use xlink:href="#info-fill"/></svg>
-                <strong class="me-auto">Notice</strong>
-                <small class="text-muted">just now</small>
-                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-            <div class="toast-body">
-                ${message}
-            </div>`
+        // Create elements
+        const toastHeader = document.createElement('div');
+        toastHeader.className = 'toast-header';
+
+        const iconSpan = document.createElement('span');
+        iconSpan.classList.add('material-symbols-outlined', 'pe-2');
+        iconSpan.textContent = type; // The icon name
+        const typeColours = { info: 'text-primary', warning: 'text-warning', error: 'text-danger'};
+        const typeText = { info: 'Notice', warning: 'Warning', error: 'Error'};
+        iconSpan.classList.add(typeColours[type]);
+        const strong = document.createElement('strong');
+        strong.className = 'me-auto';
+        strong.textContent = typeText[type];
+
+        const small = document.createElement('small');
+        small.className = 'text-muted';
+        small.textContent = 'just now';
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn-close';
+        button.setAttribute('data-bs-dismiss', 'toast');
+        button.setAttribute('aria-label', 'Close');
+
+        // Append elements to toastHeader
+        toastHeader.appendChild(iconSpan);
+        toastHeader.appendChild(strong);
+        toastHeader.appendChild(small);
+        toastHeader.appendChild(button);
+
+        // Create toast body
+        const toastBody = document.createElement('div');
+        toastBody.className = 'toast-body';
+        toastBody.textContent = message; // Assuming message is defined
+
+        // Append header and body to the wrapper
+        wrapper.appendChild(toastHeader);
+        wrapper.appendChild(toastBody);
+
         
         domEl.appendChild(wrapper)
         const toast = new bootstrap.Toast(wrapper)
@@ -5372,7 +5402,7 @@ async function getXCComparisons(){
         .then(response =>{
             if (! response.ok) {
                 loading.classList.add('d-none');
-                return generateToast({message: 'The Xeno-canto API is not responding'})
+                return generateToast({type: 'error', message: 'The Xeno-canto API is not responding'})
             }
             return response.json()
         })
@@ -5423,7 +5453,7 @@ async function getXCComparisons(){
               }
             });
             if (songCount === 0 && callCount === 0 && flightCallCount === 0 && nocturnalFlightCallCount === 0) {
-                generateToast({message: 'The Xeno-canto site has no comparisons available'})
+                generateToast({type: 'warning', message: 'The Xeno-canto site has no comparisons available'})
                 return
               } else {
                 // Let's cache the result, 'cos the XC API is quite slow

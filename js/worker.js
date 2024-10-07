@@ -63,7 +63,7 @@ console.error = function() {
 // Implement error handling in the worker
 self.onerror = function(message, file, lineno, colno, error) {
     STATE.track && trackEvent(STATE.UUID, 'Unhandled Worker Error', message, customURLEncode(error?.stack));
-    if (message.includes('dynamic link library')) UI.postMessage({event: 'generate-alert', message: 'There has been an error loading the model. This may be due to missing AVX support. Chirpity AI models require the AVX2 instructions set to run. If you have AVX2 enabled and still see this notice, please refer to <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">this issue</a> on Github.'})
+    if (message.includes('dynamic link library')) UI.postMessage({event: 'generate-alert', type: 'error',  message: 'There has been an error loading the model. This may be due to missing AVX support. Chirpity AI models require the AVX2 instructions set to run. If you have AVX2 enabled and still see this notice, please refer to <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">this issue</a> on Github.'})
     // Return false not to inhibit the default error handling
     return false;
     };
@@ -520,7 +520,7 @@ function savedFileCheck(fileList) {
             }
         });
     } else {
-        UI.postMessage({event: 'generate-alert', message: 'The database has not finished loading. The saved file check was skipped'})
+        UI.postMessage({event: 'generate-alert', type: 'error',  message: 'The database has not finished loading. The saved file check was skipped'})
         return undefined
     }
 }
@@ -951,7 +951,7 @@ const getDuration = async (src) => {
             resolve(duration);
         });
         audio.addEventListener('error', (error) => {
-            UI.postMessage({event: 'generate-alert', message: 'Unable to decode file metatada'})
+            UI.postMessage({event: 'generate-alert', type: 'error',  message: 'Unable to decode file metatada'})
             reject(error)
         })
     });
@@ -1024,7 +1024,7 @@ async function notifyMissingFile(file) {
     const row = await diskDB.getAsync('SELECT * FROM FILES WHERE name = ?', file);
     if (row?.id) missingFile = file
     UI.postMessage({
-        event: 'generate-alert',
+        event: 'generate-alert', type: 'error', 
         message: `Unable to locate source file with any supported file extension: ${file}`,
         file: missingFile
     })
@@ -1272,7 +1272,7 @@ const getWavePredictBuffers = async ({
         try {
             wav.fromBuffer(chunk);
         } catch (e) {
-            UI.postMessage({event: 'generate-alert', message: `Cannot parse ${file}, it has an invalid wav header.`});
+            UI.postMessage({event: 'generate-alert', type: 'error',  message: `Cannot parse ${file}, it has an invalid wav header.`});
             console.warn('GetWavePredictBuffers failed: ', e)
             headerStream.close();
             updateFilesBeingProcessed(file);
@@ -1533,7 +1533,7 @@ const fetchAudioBuffer = async ({
         const stream = command.pipe();
         
         command.on('error', error => {
-            UI.postMessage({event: 'generate-alert', message: error})
+            UI.postMessage({event: 'generate-alert', type: 'error',  message: error})
             reject(new Error('fetchAudioBuffer: Error extracting audio segment:', error));
         });
         command.on('start', function (commandLine) {
@@ -2562,7 +2562,7 @@ const getResults = async ({
         filename += format == 'Raven' ? `_selections.txt` : '_detections.csv';
         const filePath = p.join(directory, filename);
         writeToPath(filePath, formattedValues, {headers: true, delimiter: format === 'Raven' ? '\t' : ','})
-        .on('error', err => UI.postMessage({event: 'generate-alert', message: `Cannot save file ${filePath}\nbecause it is open in another application`}))
+        .on('error', err => UI.postMessage({event: 'generate-alert', type: 'warning',  message: `Cannot save file ${filePath}\nbecause it is open in another application`}))
         .on('finish', () => {
             UI.postMessage({event: 'generate-alert', message: filePath + ' has been written successfully.'});
         });
@@ -2783,7 +2783,7 @@ const getSavedFileInfo = async (file) => {
         } 
         return row
     } else {
-        UI.postMessage({event: 'generate-alert', message: 'The database has not finished loading. The check for the presence of the file in the archive has been skipped'})
+        UI.postMessage({event: 'generate-alert', type: 'error',  message: 'The database has not finished loading. The check for the presence of the file in the archive has been skipped'})
         return undefined
     }
 };
@@ -3282,20 +3282,20 @@ async function onFileUpdated(oldName, newName){
             });
         } else {
             UI.postMessage({
-                event: 'generate-alert', message: '<span class="text-danger">No changes made</span>. The selected file has a different duration to the original file.'
+                event: 'generate-alert', type: 'error',  message: '<span class="text-danger">No changes made</span>. The selected file has a different duration to the original file.'
             });
         }
     } catch (err) {
         if (err.code === 'SQLITE_CONSTRAINT' && err.message.includes('UNIQUE')) {
             // Unique constraint violation, show specific error message
             UI.postMessage({
-                event: 'generate-alert', 
+                event: 'generate-alert', type: 'warning',  
                 message: '<span class="text-danger">No changes made</span>. The selected file already exists in the database.'
             });
         } else {
             // Other types of errors
             UI.postMessage({
-                event: 'generate-alert', 
+                event: 'generate-alert', type: 'error',  
                 message: `<span class="text-danger">An error occurred while updating the file: ${err.message}</span>`
             });
         }
@@ -3508,7 +3508,7 @@ async function setIncludedIDs(lat, lon, week) {
 
         if (STATE.included === undefined) STATE.included = {}
         STATE.included = merge(STATE.included, includedObject);
-        messages.forEach(message => UI.postMessage({event: 'generate-alert', message: message} ))
+        messages.forEach(message => UI.postMessage({event: 'generate-alert', type: 'warning',  message: message} ))
         return STATE.included;
     })();
 
@@ -3689,7 +3689,7 @@ async function convertAndOrganiseFiles(threadLimit) {
                 if (!mkkDirFailed){
                     mkkDirFailed = true;
                     UI.postMessage({
-                        event: 'generate-alert',
+                        event: 'generate-alert', type: 'error', 
                         message: `Failed to create directory: ${fullPath}<br>Error: ${err.message}`
                     });
                 }
@@ -3760,7 +3760,7 @@ async function convertFile(inputFilePath, fullFilePath, row, db, dbArchiveName, 
         let scaleFactor = 1;
         if (STATE.detect.nocmig) {
             if (boundaries.length > 1) { 
-                UI.postMessage({event: 'generate-alert', message: `Multi-day operations are not yet supported: ${inputFilePath} will not be trimmed`});
+                UI.postMessage({event: 'generate-alert', type: 'warning',  message: `Multi-day operations are not yet supported: ${inputFilePath} will not be trimmed`});
             } else {
                 const {start, end} = boundaries[0];
                 if (start === end) return;
@@ -3788,7 +3788,7 @@ async function convertFile(inputFilePath, fullFilePath, row, db, dbArchiveName, 
             })
             .on('error', (err) => {
                 DEBUG && console.error(`Error converting file ${inputFilePath}:`, err);
-                UI.postMessage({event: 'generate-alert', message: `File not found: ${inputFilePath}`, file: inputFilePath});
+                UI.postMessage({event: 'generate-alert', type: 'error',  message: `File not found: ${inputFilePath}`, file: inputFilePath});
                 reject(err);
             })
             .on('progress', (progress) => {
