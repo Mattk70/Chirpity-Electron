@@ -407,6 +407,43 @@
                             </div>
                         </div>
                     </div>
+                    <hr>
+                    <h6 class="fs-6">Audio Library:<a class="circle new-circle me-2" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Audio Library" 
+                        data-bs-html="true" date-bs-html="true" date-bs-sanitize="false" data-bs-content="Chirpity can organise your audio into a permanent library at a location of your choice, such as a data disk or network drive. Once saved, you can remove the original files, and all records will be viewable in the application.
+
+                        To save audio to the library, you can either go to the Records menu and choose 'Save Audio from Archive Results to Library', or enable the 'Add to Library on Save' option below.
+                        
+                        Files will be stored in the following structure:
+                        
+                        <p><code>Location / Year / Month / Filename</code></p>
+                        'Lossy' audio requires about 1GB of storage per 24 hours, while 'Lossless' converts files to FLAC format, preserving original fidelity, bitrate, and channels, but roughly halving the file size. Note that for both options, <b class='text-danger'>all metadata will be removed.</b>">?</a></h6>
+                    
+                        
+                        <div class="form-group rounded p-2 mb-2">
+                            <div class="col form-check form-switch">
+                                <label class="form-check-label" for="auto-archive">Add to Library on Save
+                                    <input class="form-check-input" type="checkbox" role="switch" id="auto-archive">
+                                </label>
+                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Add to Library on Save" data-bs-content="When enabled, audio files are added to the library location whenever detections are saved to the archive.">?</a>
+                            </div>
+                        </div>
+                        <div class="row p-2" id="choose-archive-location">
+                            <div class="col">
+                                <div class="input-group">
+                                    <button class="btn btn-outline-secondary" type="button" id="archive-location-select">Library Location:</button>
+                                    <input type="text" class="form-control" id="archive-location" aria-describedby="archive-location-select" placeholder="No location set" readonly>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="input-group rounded p-2 mb-1">
+                            <label for="archive-format" class="input-group-text col-5">Library Format:</label>
+                            <select class="form-select mb-0" id="archive-format">
+                                <option value="ogg">Lossy</option>
+                                <option value="flac">Lossless</option>
+                            </select>
+                            
+                        </div>
+                    
                 </fieldset>
                 <fieldset class="border border-secondary rounded m-2 mb-0 p-2">
                     <legend style="font-size: large;font-weight:bold">Spectrogram Preferences</legend>
@@ -479,34 +516,7 @@
                         </select>
                     </div>
                 </fieldset>
-                <fieldset class="border border-secondary rounded m-2 mb-0 p-2">
-                    <legend style="font-size: large;font-weight:bold">Archive Preferences <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Archive Preferences" 
-                        data-bs-html="true" data-bs-content="Select the location and format for archive files. A Lossy archive uses about 1GB of storage for 24 hours of archived audio. FLAC is lossless, but requires significantly more storage space.<p><b>N.B.</b> Lossy files are resampled to 26KHz and downmixed to mono.</p>">?</a></legend>
-                    <div class="form-group rounded p-2 mb-2">
-                        <div class="col form-check form-switch">
-                            <label class="form-check-label" for="auto-archive">Automatically archive audio files
-                                <input class="form-check-input" type="checkbox" role="switch" id="auto-archive">
-                            </label>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Archive Automatically" data-bs-content="When enabled, files are converted to the specified format and added to the archive location whenever detections are saved to the archive.">?</a>
-                        </div>
-                    </div>
-                    <div class="row p-2" id="choose-archive-location">
-                        <div class="col">
-                            <div class="input-group">
-                                <button class="btn btn-outline-secondary" type="button" id="archive-location-select"> Archive location:</button>
-                                <input type="text" class="form-control" id="archive-location" aria-describedby="archive-location-select" placeholder="No location set" readonly>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="input-group rounded p-2 mb-1">
-                        <label for="archive-format" class="input-group-text col-5">Archive Format:</label>
-                        <select class="form-select mb-0" id="archive-format">
-                            <option value="ogg">Lossy</option>
-                            <option value="flac">Lossless</option>
-                        </select>
-                        
-                    </div>
-                </fieldset>
+
                 <fieldset class="border border-secondary rounded m-2 p-2">
                     <legend class="pb-2" style="font-size: large;font-weight:bold;">Advanced</legend>
                     <div class="form-group rounded p-2 mb-2">
@@ -737,7 +747,7 @@
                             </li>
                             <li class="dropdown-divider"></li>
                             <li class="dropdown-item disabled" id="compress-and-organise">
-                                <span class="material-symbols-outlined">compress</span> Compress and Organise Archive
+                                <span class="material-symbols-outlined">compress</span> Save Audio from Archive Results to Library
                             </li>
                             <li class="dropdown-item disabled" id="purge-file">
                                 <span class="material-symbols-outlined">unarchive</span> Remove Current File From

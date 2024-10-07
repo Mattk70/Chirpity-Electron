@@ -1,5 +1,6 @@
 :root {
     --font-size-scale: 1; /* Default scale */
+    --bs-popover-max-width: 300px;
 }
 
 
@@ -594,6 +595,10 @@ input[type="range"].vertical {
     float: right;
     text-decoration: none; /* Remove underline from <a> tags */
     transition: transform 0.2s; /* Add transition for smooth scaling */
+}
+
+.new-circle {
+    background-color: orange; /* Change background to orange */
 }
 
 .circle a {
