@@ -3518,137 +3518,28 @@ async function setIncludedIDs(lat, lon, week) {
 
 ///////// Database compression and archive ////
 
-// async function convertAndOrganiseFiles() {
-//     const db = diskDB;
-//     let count = 0;
-//     let {totalToConvert} = await db.getAsync('SELECT COUNT(*) as totalToConvert from files');
-//     const fileProgressMap = {};
-//     // Ensure 'archiveName' column exists in the files table
-//     await db.runAsync("ALTER TABLE files ADD COLUMN archiveName TEXT")
-//         .catch(err => {
-//             if (err.message.includes("duplicate column")) {
-//                 DEBUG && console.log("Column 'archiveName' already exists");
-//             } else {
-//                 console.error("Error adding 'archiveName' column:", err);
-//             }
-//     });
-//     // Query the files table to get the necessary data
-//     db.each("SELECT f.id, f.name, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id", async function(err, row) {
-//         if (err) {
-//             console.error("Error querying the database:", err);
-//             return;
-//         }
-//         row.place ??= STATE.place;
-//         // Create the output directory structure based on place and file date
-//         const fileDate = new Date(row.filestart);
-//         const year = String(fileDate.getFullYear());
-//         const month = fileDate.toLocaleString('default', { month: 'long' }); // Get full month name
-//         //const day = ''; //String(fileDate.getDate()).padStart(2, '0');
-//         const place = row.place?.replace(/[\/\\?%*:|"<>]/g, '_').trim(); // Sanitize the place name
-
-//         const inputFilePath = row.name;
-//         const outputDir = p.join(place, year, month);
-//         const outputFileName = p.basename(inputFilePath, p.extname(inputFilePath)) + '.' + STATE.archive.format;
-//         // Check if the file already exists, as is complete
-//         const {archiveName} = await db.getAsync('SELECT archiveName FROM files WHERE name = ?', inputFilePath);
-//         const fullPath = p.join(STATE.archive.location, outputDir)
-//         const fullFilePath = p.join(fullPath, outputFileName)
-//         const dbArchiveName = p.join(outputDir, outputFileName)
-//         if (archiveName === dbArchiveName && fs.existsSync(fullFilePath)) {
-//             totalToConvert--;
-//             DEBUG && console.log(`File ${inputFilePath} already converted. Skipping conversion.`);
-//             return;
-//         }
-
-//         if (!fs.existsSync(fullPath)) {
-//             fs.mkdirSync(fullPath, { recursive: true });
-//         }
-        
-//         // Convert the file using fluent-ffmpeg
-//         let command = ffmpeg(inputFilePath)
-//             if (STATE.archive.format === 'opus') {
-//                 command.audioBitrate('128k')
-//                 .audioChannels(1) // Set to mono
-//                 .audioFrequency(26_000) // Set sample rate for BirdNET
-//             }
-//             let scaleFactor = 1; // When ffmpeg reports progress, it does so against the full length of the file
-//             if (STATE.detect.nocmig){
-//                 METADATA[inputFilePath] || await setMetadata({file: inputFilePath});
-//                 const boundaries = await setStartEnd(inputFilePath);
-//                 if (boundaries.length > 1) { 
-//                     UI.postMessage({event: 'generate-alert', message: `Multi-day operations are not yet supported: ${inputFilePath} will not be trimmed`});
-//                 } else {
-//                     const {start, end} = boundaries[0];
-//                     if (start === end) return
-//                     command.seekInput(start).duration(end - start)
-//                     scaleFactor = row.duration / (end-start);
-//                     // Now update the duration for the truncated file to ensure accurate mtimes are set
-//                     row.duration = end - start;
-//                 }
-
-//             }
-//             command.output(fullFilePath)
-//             .on('end', () => {
-//                 console.log(`Converted ${inputFilePath} to ${fullFilePath}`);
-//                 const newfileMtime = new Date(Math.round(row.filestart + (row.duration * 1000)));
-//                 utimesSync(fullFilePath, {atime: Date.now(), mtime: newfileMtime});
-//                 // Update the database with the new file path
-//                 db.run("UPDATE files SET archiveName = ? WHERE id = ?", [dbArchiveName, row.id], (err) => {
-//                     if (err) {
-//                     console.error("Error updating the database:", err);
-//                     } else {
-//                     console.log(`Updated database for file: ${inputFilePath}`);
-//                     }
-//                     count++;
-//                     UI.postMessage({event: 'generate-alert', message: `Finished conversion for ${inputFilePath}<br>
-//                         ${count} of ${totalToConvert} completed`})
-//                 });
-//             })
-//             .on('error', (err) => {
-//                 count++;
-//                 DEBUG && console.error(`Error converting file ${inputFilePath}:`, err);
-//                 UI.postMessage({event: 'generate-alert', message: `File not found: ${inputFilePath}`, file: inputFilePath})
-//             })
-//             .on('start', function (commandLine) {
-//                 DEBUG && console.log('FFmpeg command: ' + commandLine);
-//             })
-//             .on('progress', (progress) => {
-//                 if (!isNaN(progress.percent)){
-//                     // Calculate the cumulative progress
-//                     fileProgressMap[inputFilePath] = progress.percent * scaleFactor;
-//                     console.log(`${inputFilePath} progress: ${fileProgressMap[inputFilePath].toFixed(1)}%`)
-//                     const values = Object.values(fileProgressMap);
-//                     // Calculate the sum of the values
-//                     const sum = values.reduce((accumulator, currentValue) => accumulator + currentValue, 0);
-                    
-//                     // Calculate the average
-//                     const average = sum / values.length;
-                    
-//                     UI.postMessage({
-//                         event: `conversion-progress`,
-//                         progress: { percent: average }, // Use cumulative progress for smooth transition
-//                         text: `Archive file conversion progress: ${average.toFixed(1)}% `
-//                     });
-//                 }
-//             })
-//             .run();
-//         }
-//     );
-// }
 
 
 const pLimit = require('p-limit');
 
 async function convertAndOrganiseFiles(threadLimit) {
+    // SANITY checks: archive location exists and is writeable?
+    if (!fs.existsSync(STATE.archive.location)) {
+        UI.postMessage({event: 'generate-alert', type: 'error',  message: `Cannot access archive location: ${STATE.archive.location}. <br> Operation aborted`});
+        return false;
+    }
+    try {
+        fs.accessSync(STATE.archive.location, fs.constants.W_OK);
+    } catch {
+        UI.postMessage({event: 'generate-alert', type: 'error',  message: `Cannot write to archive location: ${STATE.archive.location}. <br> Operation aborted`});
+        return false;
+    }
     threadLimit ??= 4; // Set a default
-    let mkkDirFailed = false;
-    const db = diskDB;
-    let count = 0;
-    let {totalToConvert} = await db.getAsync('SELECT COUNT(*) as totalToConvert from files');
-    const fileProgressMap = {};
-    const limit = pLimit(threadLimit); // Set the limit based on the number of threads
-    const conversions = []; // Array to hold the conversion promises
+    const limit = pLimit(threadLimit);
 
+    const db = diskDB;
+    const fileProgressMap = {};
+    const conversions = []; // Array to hold the conversion promises
     // Ensure 'archiveName' column exists in the files table
     await db.runAsync("ALTER TABLE files ADD COLUMN archiveName TEXT")
         .catch(err => {
@@ -3656,11 +3547,13 @@ async function convertAndOrganiseFiles(threadLimit) {
                 DEBUG && console.log("Column 'archiveName' already exists");
             } else {
                 console.error("Error adding 'archiveName' column:", err);
+                return
             }
         });
 
     // Query the files table to get the necessary data
     const rows = await db.allAsync("SELECT f.id, f.name, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id");
+
     for (const row of rows){
         row.place ??= STATE.place;
         const fileDate = new Date(row.filestart);
@@ -3671,13 +3564,21 @@ async function convertAndOrganiseFiles(threadLimit) {
         const inputFilePath = row.name;
         const outputDir = p.join(place, year, month);
         const outputFileName = p.basename(inputFilePath, p.extname(inputFilePath)) + '.' + STATE.archive.format;
-        const {archiveName} = await db.getAsync('SELECT archiveName FROM files WHERE name = ?', inputFilePath);
         const fullPath = p.join(STATE.archive.location, outputDir);
         const fullFilePath = p.join(fullPath, outputFileName);
         const dbArchiveName = p.join(outputDir, outputFileName);
 
+        // Does the file we want to convert exist?
+        if (!fs.existsSync(inputFilePath)) {
+            UI.postMessage({
+                event: 'generate-alert', type: 'Warning', 
+                message: `Cannot access: ${inputFilePath}<br>Skipping conversion.`
+            });
+            continue;
+        }
+
+        const {archiveName} = await db.getAsync('SELECT archiveName FROM files WHERE name = ?', inputFilePath);
         if (archiveName === dbArchiveName && fs.existsSync(fullFilePath)) {
-            totalToConvert--;
             DEBUG && console.log(`File ${inputFilePath} already converted. Skipping conversion.`);
             continue;
         }
@@ -3686,21 +3587,17 @@ async function convertAndOrganiseFiles(threadLimit) {
             try {
                 fs.mkdirSync(fullPath, { recursive: true });
             } catch (err) {
-                if (!mkkDirFailed){
-                    mkkDirFailed = true;
-                    UI.postMessage({
-                        event: 'generate-alert', type: 'error', 
-                        message: `Failed to create directory: ${fullPath}<br>Error: ${err.message}`
-                    });
-                }
-                totalToConvert--;
+                UI.postMessage({
+                    event: 'generate-alert', type: 'error', 
+                    message: `Failed to create directory: ${fullPath}<br>Error: ${err.message}`
+                });
                 continue;
             }
         }
 
         // Add the file conversion to the pool
         fileProgressMap[inputFilePath] = 0;
-        conversions.push(limit(() => convertFile(inputFilePath, fullFilePath, row, db, dbArchiveName, fileProgressMap, totalToConvert, count++)));
+        conversions.push(limit(() => convertFile(inputFilePath, fullFilePath, row, db, dbArchiveName, fileProgressMap)));
         console.log(conversions)
     }
     
@@ -3741,10 +3638,11 @@ async function convertAndOrganiseFiles(threadLimit) {
             event: `generate-alert`,
             message: summaryMessage
         });
+        console.log('Conversion finished:', conversions)
     })
 };
 
-async function convertFile(inputFilePath, fullFilePath, row, db, dbArchiveName, fileProgressMap, totalToConvert, count) {
+async function convertFile(inputFilePath, fullFilePath, row, db, dbArchiveName, fileProgressMap) {
     METADATA[inputFilePath] || await setMetadata({file: inputFilePath});
     const boundaries = await setStartEnd(inputFilePath);
 
@@ -3763,7 +3661,10 @@ async function convertFile(inputFilePath, fullFilePath, row, db, dbArchiveName, 
                 UI.postMessage({event: 'generate-alert', type: 'warning',  message: `Multi-day operations are not yet supported: ${inputFilePath} will not be trimmed`});
             } else {
                 const {start, end} = boundaries[0];
-                if (start === end) return;
+                if (start === end) {
+                    UI.postMessage({event: 'generate-alert', type: 'warning', message: `${inputFilePath} will not be added to the archive as it is entirely during daylight.`});
+                    return resolve();
+                }
                 command.seekInput(start).duration(end - start);
                 scaleFactor = row.duration / (end-start);
                 row.duration = end - start;
@@ -3781,14 +3682,13 @@ async function convertFile(inputFilePath, fullFilePath, row, db, dbArchiveName, 
                     if (err) {
                         console.error("Error updating the database:", err);
                     } else {
-                        UI.postMessage({event: 'generate-alert', message: `Finished conversion for ${inputFilePath}<br>${count} of ${totalToConvert} completed`});
+                        UI.postMessage({event: 'generate-alert', message: `Finished conversion for ${inputFilePath}`});
                     }
                     resolve();
                 });
             })
             .on('error', (err) => {
-                DEBUG && console.error(`Error converting file ${inputFilePath}:`, err);
-                UI.postMessage({event: 'generate-alert', type: 'error',  message: `File not found: ${inputFilePath}`, file: inputFilePath});
+                UI.postMessage({event: 'generate-alert', type: 'error',  message: `Error converting file ${inputFilePath}:`, err});
                 reject(err);
             })
             .on('progress', (progress) => {

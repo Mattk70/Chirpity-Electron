@@ -5302,7 +5302,7 @@ async function readLabels(labelFile, updating){
         // Create toast body
         const toastBody = document.createElement('div');
         toastBody.className = 'toast-body';
-        toastBody.textContent = message; // Assuming message is defined
+        toastBody.innerHTML = message; // Assuming message is defined
 
         // Append header and body to the wrapper
         wrapper.appendChild(toastHeader);
