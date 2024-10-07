@@ -3623,7 +3623,7 @@ async function convertAndOrganiseFiles(threadLimit) {
         });
 
         // Create a summary message
-        let summaryMessage = `Conversion complete: ${successfulConversions} successful, ${failedConversions} failed.`;
+        let summaryMessage = `Processing complete: ${successfulConversions} successful, ${failedConversions} failed.`;
 
         if (failedConversions > 0) {
             summaryMessage += `<br>Failed conversion reasons:<br><ul>`;
@@ -3638,7 +3638,6 @@ async function convertAndOrganiseFiles(threadLimit) {
             event: `generate-alert`,
             message: summaryMessage
         });
-        console.log('Conversion finished:', conversions)
     })
 };
 

@@ -84,14 +84,18 @@ function extractGuanoMetadata(filePath) {
  */
 function _parseGuanoText(guanoText) {
     const guanoMetadata = {};
-    const lines = guanoText.split('\n');
+    // According to the GUANO Spec, the note field can contain escaped newline characters '\\n' 
+    // So, we'll substitute a placeholder to avoid conflicts
+    const _tempGuano = guanoText.replaceAll('\\n', '\uFFFF');
+    const lines = _tempGuano.split('\n');
 
     lines.forEach(line => {
         const colonIndex = line.indexOf(':');
         if (colonIndex !== -1) {
             const key = line.slice(0, colonIndex).trim();
-            const value = line.slice(colonIndex + 1).trim();
-            
+            // Replace the placeholder with '\n'
+            const value = line.slice(colonIndex + 1).trim().replaceAll('\uFFFF', '\n');
+         
             try {
                 // Attempt to parse JSON-like values
                 if ((value.startsWith('[') && value.endsWith(']')) ||
