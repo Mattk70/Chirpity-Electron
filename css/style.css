@@ -326,10 +326,6 @@ footer {
     z-index: 1000;
 }
 
-#fullscreen {
-    max-width: 70px;
-}
-
 #speciesModal {
     max-height: 90%;
 }

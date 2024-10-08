@@ -225,6 +225,14 @@ let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
 // Set content container height
 DOM.contentWrapperElement.style.height = (bodyElement.clientHeight - 80) + 'px';
 
+const specMaxHeight = () =>{
+        // Get the available viewport height
+        const navPading = document.getElementById('navPadding').clientHeight;
+        const footerHeight = document.querySelector('footer').clientHeight;
+        const timelineHeight = document.getElementById('timeline').clientHeight;
+        return window.innerHeight - navPading - footerHeight - DOM.controlsWrapper.clientHeight - timelineHeight;
+}
+
 // Mouse down event to start dragging
 DOM.controlsWrapper.addEventListener('mousedown', (e) => {
     if (e.target.tagName !== 'DIV' ) return
@@ -232,11 +240,13 @@ DOM.controlsWrapper.addEventListener('mousedown', (e) => {
     const initialHeight = DOM.spectrogram.offsetHeight;
     let newHeight;
     let debounceTimer;
+
     const onMouseMove = (e) => {
         clearTimeout(debounceTimer);
         // Calculate the delta y (drag distance)
         newHeight = initialHeight + e.clientY - startY;
-    
+        // Clamp newHeight to ensure it doesn't exceed the available height
+        newHeight = Math.min(newHeight, specMaxHeight());
         // Adjust the spectrogram dimensions accordingly
         debounceTimer = setTimeout(() => {
             adjustSpecDims(true,  wavesurfer.spectrogram.fftSamples, newHeight);
@@ -339,7 +349,6 @@ function updateSpec({ buffer, play = false, position = 0, resetSpec = false }) {
     wavesurfer.seekTo(position);
     play ? wavesurfer.play() : wavesurfer.pause();
     resetSpec && adjustSpecDims(true);
-    showElement(['fullscreen']);
 }
 
 function createTimeline() {
@@ -1040,7 +1049,7 @@ function refreshResultsView() {
     
     if (fileLoaded) {
         hideAll();
-        showElement(['spectrogramWrapper', 'fullscreen'], false);
+        showElement(['spectrogramWrapper'], false);
         if (!isEmptyObject(predictions)) {
             showElement(['resultTableContainer', 'resultsHead'], false);
         }
@@ -1193,7 +1202,7 @@ function hideElement(id_list) {
 function hideAll() {
     // File hint div,  Waveform, timeline and spec, controls and result table
     hideElement(['exploreWrapper',
-    'spectrogramWrapper', 'resultTableContainer', 'recordsContainer', 'fullscreen', 'resultsHead']);
+    'spectrogramWrapper', 'resultTableContainer', 'recordsContainer', 'resultsHead']);
 }
 
 
@@ -1269,7 +1278,7 @@ restoreLink.addEventListener('click', async () => {
     // Todo: Placeholder for results restore
     worker.postMessage({ action: 'change-mode', mode: 'analyse' });
     hideAll();
-    showElement(['spectrogramWrapper', 'resultTableContainer', 'fullscreen']);
+    showElement(['spectrogramWrapper', 'resultTableContainer']);
     worker.postMessage({ action: 'filter', updateSummary: true });
 });
 
@@ -1388,10 +1397,7 @@ function adjustSpecDims(redraw, fftSamples, newHeight) {
     let specOffset;
     const spectrogramWrapper = document.getElementById('spectrogramWrapper')
     if (!spectrogramWrapper.classList.contains('d-none')) {
-        // Expand up to 512px unless fullscreen
-        const controlsHeight = DOM.controlsWrapper.offsetHeight;
-        const timelineHeight = 22 ; //document.getElementById('timeline').offsetHeight; // This is unset when there is no wavesurfer, so hard-coding
-        const specHeight = config.fullscreen ? contentHeight - timelineHeight - formOffset - controlsHeight : newHeight || config.specMaxHeight;
+        const specHeight = newHeight || Math.min(config.specMaxHeight, specMaxHeight());
         if (newHeight !== 0) {
             config.specMaxHeight = specHeight;
             scheduler.postTask(() => updatePrefs('config.json', config), {priority: 'background'});
@@ -1695,8 +1701,7 @@ window.onload = async () => {
             if (config.webgpu.batchSize === 32 && config.webgpu.threads === 2) 
                 config.webgpu = {threads: 2, batchSize: 4};
 
-        // switch off fullscreen mode - we don't want to persist that setting
-        config.fullscreen = false;
+
         // set version
         config.VERSION = VERSION;
         // switch off debug mode we don't want this to be remembered
@@ -2741,9 +2746,6 @@ function centreSpec(){
         // },
         e: function (e) {
             if (( e.ctrlKey || e.metaKey) && region) exportAudio();
-        },
-        f: function (e) {
-            if ( e.ctrlKey || e.metaKey) toggleFullscreen();
         },
         g: function (e) {
             if ( e.ctrlKey || e.metaKey) showGoToPosition();
@@ -3849,26 +3851,7 @@ function centreSpec(){
         updatePrefs('config.json', config)
     })
     
-    
-    //DOM.nocmigButton.addEventListener('click', changeNocmigMode);
-    //const fullscreen = document.getElementById('fullscreen');
-    
 
-    //DOM.nocmigButton.addEventListener('click', changeNocmigMode);
-    //const fullscreen = document.getElementById('fullscreen');
-    
-    const toggleFullscreen = () => {
-        if (config.fullscreen) {
-            config.fullscreen = false;
-            fullscreen.textContent = 'fullscreen';
-        } else {
-            config.fullscreen = true;
-            fullscreen.textContent = 'fullscreen_exit';
-        }
-        updatePrefs('config.json', config)
-        adjustSpecDims(true, 512);
-    }
-    
     
     const diagnosticMenu = document.getElementById('diagnostics');
     diagnosticMenu.addEventListener('click', async function () {
@@ -4510,8 +4493,6 @@ DOM.gain.addEventListener('input', () => {
                 document.getElementById('frequency-range').classList.toggle('active');
                 break }
             case 'nocmigMode': { changeNocmigMode(); break }
-            case 'fullscreen': { toggleFullscreen(); break}
-
             case 'apply-location': {setDefaultLocation(); break }
             case 'cancel-location': {cancelDefaultLocation(); break }
 

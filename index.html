@@ -416,7 +416,7 @@
                         Files will be stored in the following structure:
                         
                         <p><code>Recording Site / Year / Month / Filename</code></p>
-                        'Lossy' audio requires about 1GB of storage per 24 hours, while 'Lossless' converts files to FLAC format, preserving original fidelity, bitrate, and channels, but roughly halving the file size. Note that for both options, <b class='text-danger'>all metadata will be removed.</b>">?</a></h6>
+                        'Lossy' audio requires about 1GB of storage per 24 hours, while 'Lossless' converts files to FLAC format, preserving original fidelity, bitrate, and channels, but roughly halving the file size.">?</a></h6>
                     
                         
                         <div class="form-group rounded p-2 mb-2">
@@ -632,7 +632,7 @@
                                         <li>Nocmig mode</li>
                                         <li>Audio filters</li>
                                         <li>Context-aware mode (Chirpity model only)</li>
-                                        <li>Fullscreen mode for the spectrogram</li>
+                                        <li>Frequency range adjustment for the spectrogram</li>
                                         <li>Which detection list to use</li>
                                         <li>And the confidence threshold</li>
                                     </ol>
@@ -1149,8 +1149,6 @@
                     class="chirpity-only material-symbols-outlined btn btn-outline-secondary p-1 pt-2 text-warning">swap_horiz</span>
                     <span title="Adjust spectrogram frequency range" id="frequency-range"
                     class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">vertical_align_center</span>
-                    <span title="Toggle Fullscreen mode (Ctrl+F)" id="fullscreen"
-                    class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">fullscreen</span>
                     <span style="max-width: 70px" id="list-icon" class="btn btn-outline-secondary p-1"><img
                         class="icon" src="img/nocturnal.png" alt="nocturnal"></span>
                         <span style="max-width: 70px" title="Prediction confidence threshold" id="threshold-value"
