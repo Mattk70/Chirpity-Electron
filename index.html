@@ -323,7 +323,7 @@
                         </div>
                     </div>
                     <div class="form-group rounded p-2 me-0 mb-2">
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Low Shelf Filter" data-bs-content="When used, attenuates low frequency noise below the frequency thresshold. If enabled before analysis, the modified audio is sent to the model. If only enabled after analysis, this just affects audio playback">?</a>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Low Shelf Filter" data-bs-content="When used, attenuates low frequency noise below the frequency threshold. If enabled before analysis, the modified audio is sent to the model. If only enabled after analysis, this just affects audio playback">?</a>
                         <label for="lowShelfFrequency" class="form-label">
                             Low Shelf filter:
                         </label>
@@ -534,7 +534,7 @@
                             <label class="form-check-label" for="context">
                                 Context mode
                             </label>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Context Mode" data-bs-content="When enabled, context mode adapts predictions by analyzing the surrounding context.
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Context Mode" data-bs-content="When enabled, context mode adapts predictions by analysing the surrounding context.
                             Not available in the BirdNET model">?</a>
                         </div>
                     </div>
@@ -601,14 +601,14 @@
                     <div class="carousel-inner" style="min-height: 400px;">
                         <!-- Carousel items -->
                         <div class="carousel-item active">
-                            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chiprity Nocmig">
+                            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
                             <div class="text-center pb-4">
                                 <h5>Welcome to Chirpity Nocmig</h5>
                                 <p>This tour will highlight a few of the key features of the application. Click the right arrow for the next item</p>
                             </div>
                         </div>
                         <div class="carousel-item" data-element-selector="#navbarSettings">
-                            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chiprity Nocmig">
+                            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
                             <div class="text-start pb-4 ms-3">
                                 <h5 class="text-center">Getting Started</h5>
                                 <ol class="ps-5 ms-5">
@@ -622,7 +622,7 @@
                             </div>
                         </div>
                         <div class="carousel-item" data-element-selector="#filter-panel">
-                            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chiprity Nocmig">
+                            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
                             <div class="text-center pb-4">
                                 <h5>Quick access settings panel</h5>
                                 <p>The icons here allow you to quickly toggle some frequently used settings.</p>
@@ -641,7 +641,7 @@
                             </div>
                         </div>
                         <div class="carousel-item" data-element-selector="#fileContainer">
-                            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chiprity Nocmig">
+                            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
                             <div class="text-center pb-4">
                                 <h5>Context Menus</h5>
                                 <p>Most of the tools can be accessed within context menus. These pop up when you
@@ -652,14 +652,14 @@
                             </div>
                         </div>
                         <div class="carousel-item" data-element-selector="#navbarRecords">
-                            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chiprity Nocmig">
+                            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
                             <div class="text-center pb-4">
                                 <h5>Saved Records</h5>
                                 <p>You can save records for future reference from the Records menu. Here you will
                                     also find the Chart and Explore
                                     sections of the Application. These allow you to revisit the detections you have
                                     saved and view charts of species'
-                                    occurence over time </p>
+                                    occurrence over time </p>
                                 </div>
                             </div>
                             <!-- Add more carousel items as needed -->
@@ -1421,10 +1421,10 @@
         showMap(divID);
         map.on('click', (e) => {
             clearTimeout(clickTimer);
-            //Wait for doubleclick
+            //Wait for dblclick
             clickTimer = setTimeout(() => {onMapClick(e)}, 250);
         })
-        // don't call onMapClick if doubleclicked
+        // don't call onMapClick on dblclick
         map.on('dblclick', (e) => {
             clearTimeout(clickTimer);
         })

@@ -3637,7 +3637,8 @@ function centreSpec(){
         document.getElementById('helpModalBody').innerHTML = await response.text();
         const help = new bootstrap.Modal(document.getElementById('helpModal'));
         help.show();
-        document.addEventListener('shown.bs.modal', replaceCtrlWithCommand)
+        document.removeEventListener('shown.bs.modal', replaceCtrlWithCommand);
+        document.addEventListener('shown.bs.modal', replaceCtrlWithCommand);
     }
     function replaceTextInTitleAttributes() {
         // Select all elements with title attribute in the body of the web page

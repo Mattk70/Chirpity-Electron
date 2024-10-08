@@ -62,9 +62,9 @@
         <th>Only analyse night time periods</th>
         <td>
             Only search for detections at night. Chirpity calculates the end and start of civil twilight from the timestamps of your audio files using the location you have set. If your recording
-            spans both daylight and nighttime periods, the day periods will be skipped. If you are only interested in nocturnal calls this has two benefits: 
+            spans both daylight and night time periods, the day periods will be skipped. If you are only interested in nocturnal calls this has two benefits: 
             <ol>
-                <li>There will be fewer false positves, since both models make more mistakes when many species vocalise at once (e.g. during the dawn chorus)</li>
+                <li>There will be fewer false positives, since both models make more mistakes when many species vocalise at once (e.g. during the dawn chorus)</li>
                 <li>The analysis will complete faster, since it ignores any daytime period</li>
             </ol>
         </td>
@@ -86,7 +86,7 @@
                     class="rounded figure-img float-end img-fluid">
                 <figcaption class="figure-caption text-muted text-end">File name context menu.</figcaption>
             </figure>
-            Set the default location to use for calculating the start and end of civil twilight and also generating your <b>Local Birds</b> list. This setting can be overriden for individual
+            Set the default location to use for calculating the start and end of civil twilight and also generating your <b>Local Birds</b> list. This setting can be overridden for individual
             files by assigning a custom location in the filename context menu.
         </td>
     </tr>
@@ -177,7 +177,7 @@
         <td>Choose from lossless or lossy formats for the audio clips you export from Chirpity.</td>
     </tr>
     <tr>
-        <td><b>Convet to mono</b></td>
+        <td><b>Convert to mono</b></td>
         <td>Combine stereo tracks to a single channel. This will result in smaller file sizes.</td>
     </tr>
     <tr>
@@ -201,12 +201,12 @@
         <td>Choose a colour theme for the spectrogram display, or create your own. If you select 'custom', you will have the option to set the colours for peak, mid and quiet sounds according
             to personal preference. You can also adjust the mid-point position: with a value of 0 or 1, the Spectrogram will be two-tone. Values in between will blend the three colours. 
             If you set the Mid colour the same as one of the others, you will be able to adjust the contrast in the spectrogram using Mid Position adjustments.
-            <p>In combination with audio filter adjustments, a custom colormap allows you to enhance the contrast / visibility of calls using the colours of your choice.</p>
+            <p>In combination with audio filter adjustments, a custom colourmap allows you to enhance the contrast / visibility of calls using the colours of your choice.</p>
         </td>
     </tr>
     <tr>
         <td><b>Window Function</b></td>
-        <td>A variety of windowing functinos are available for the spectrogram display. Each has slightly different characteristics, so changing the window function may also enhance the 
+        <td>A variety of windowing functions are available for the spectrogram display. Each has slightly different characteristics, so changing the window function may also enhance the 
             appearance of the calls in the display.
         </td>
     </tr>
@@ -246,7 +246,7 @@
     </tr>
     <tr>
         <th>SNR filter</th>
-        <td>This setting is also only avaliable for the native Chirpity model. The SNR (Signal to Noise Ratio) filter can only be enabled when using the CPU backend. 
+        <td>This setting is also only available for the native Chirpity model. The SNR (Signal to Noise Ratio) filter can only be enabled when using the CPU backend. 
             When enabled, Chirpity will disregard audio segments with no distinct sound event.
             A stronger signal is required for a prediction to be attempted when higher signal-to-noise values are set.
             The purpose is to deliver significant speed gains, however, the setting may cause Chirpity to miss quieter, more distant calls.
