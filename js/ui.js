@@ -161,61 +161,76 @@ let fileStart, bufferStartTime, fileEnd;
 let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
 // set up some DOM element hamdles
 const bodyElement = document.body;
-let specElement, waveElement, specCanvasElement, specWaveElement;
-let waveCanvasElement, waveWaveElement;
+
 const DOM = {
-    fromSlider: document.getElementById('fromSlider'),
-    toSlider: document.getElementById('toSlider'),
-    fromInput: document.getElementById('fromInput'),
-    toInput: document.getElementById('toInput'),
-     audioBitrate: document.getElementById('bitrate'),
-     audioBitrateContainer: document.getElementById('bitrate-container'),
-     audioDownmix: document.getElementById('downmix'),
-     audioFade: document.getElementById('fade'),
-     audioFiltersIcon: document.getElementById('audioFiltersIcon'),
-     audioFormat: document.getElementById('format'),
-     audioPadding: document.getElementById('padding'),
-     audioQuality: document.getElementById('quality'),
-     audioQualityContainer: document.getElementById('quality-container'),
-     sendFilteredAudio: document.getElementById('send-filtered-audio-to-model'),
-     audioNotification: document.getElementById('audio-notification'),
-     batchSizeSlider: document.getElementById('batch-size'),
-     batchSizeValue: document.getElementById('batch-size-value'),
-     colourmap: document.getElementById('colourmap'),
-     contentWrapperElement: document.getElementById('contentWrapper'),
-     controlsWrapper: document.getElementById('controlsWrapper'),
-     contextAware: document.getElementById('context'),
-     contextAwareIcon: document.getElementById('context-mode'),
-     debugMode: document.getElementById('debug-mode'),
-     defaultLat: document.getElementById('latitude'),
-     defaultLon: document.getElementById('longitude'),
-     fileNumber: document.getElementById('fileNumber'),
-     gain: document.getElementById('gain'),
-     gainAdjustment: document.getElementById('gain-adjustment'),
-     normalise: document.getElementById('normalise'),
-     listToUse: document.getElementById('list-to-use'),
-     listIcon: document.getElementById('list-icon'),
-     speciesThresholdEl: document.getElementById('species-threshold-el'),
-     speciesThreshold: document.getElementById('species-frequency-threshold'),
-     customListFile: document.getElementById('custom-list-location'),
-     customListSelector: document.getElementById('list-file-selector'),
-     customListContainer: document.getElementById('choose-file-container'),
-     localSwitch: document.getElementById('local'),
-     localSwitchContainer: document.getElementById('use-location-container'),
-     modelToUse: document.getElementById('model-to-use'),
-     nocmig: document.getElementById('nocmig'),
-     nocmigButton: document.getElementById('nocmigMode'),
-     numberOfThreads: document.getElementById('threads-value'),
-     progressDiv: document.getElementById('progressDiv'),
-     progressBar: document.getElementById('progress-bar'),
-     resultTableElement: document.getElementById('resultTableContainer'),
-     spectrogramWrapper: document.getElementById('spectrogramWrapper'),
-     spectrogram: document.getElementById('spectrogram'),
-     specLabels: document.getElementById('spec-labels'),
-     summaryTable: document.getElementById('summaryTable'),
-     resultHeader: document.getElementById('resultsHead'),
-     threadSlider: document.getElementById('thread-slider'),
-     timelineSetting: document.getElementById('timelineSetting')
+    // Cache pattern: get fromSlider() { if (!this._fromSlider) { this._fromSlider = document.getElementById('fromSlider') } return this._fromSlider},
+    // Live pattern: get fromSlider() { return document.getElementById('fromSlider')},
+    get fromSlider() { if (!this._fromSlider) { this._fromSlider = document.getElementById('fromSlider') } return this._fromSlider},
+    get toSlider() { if (!this._toSlider) { this._toSlider = document.getElementById('toSlider') } return this._toSlider},
+    get fromInput() { if (!this._fromInput) { this._fromInput = document.getElementById('fromInput') } return this._fromInput},
+    get toInput() { if (!this._toInput) { this._toInput = document.getElementById('toInput') } return this._toInput},
+    get audioBitrate() { if (!this._audioBitrate) { this._audioBitrate = document.getElementById('bitrate') } return this._audioBitrate},
+    get audioBitrateContainer() { if (!this._audioBitrateContainer) { this._audioBitrateContainer = document.getElementById('bitrate-container') } return this._audioBitrateContainer},
+    get audioDownmix() { if (!this._audioDownmix) { this._audioDownmix = document.getElementById('downmix') } return this._audioDownmix},
+    get audioFade() { if (!this._audioFade) { this._audioFade = document.getElementById('fade') } return this._audioFade},
+    get audioFiltersIcon() { if (!this._audioFiltersIcon) { this._audioFiltersIcon = document.getElementById('audioFiltersIcon') } return this._audioFiltersIcon},
+    get audioFormat() { if (!this._audioFormat) { this._audioFormat = document.getElementById('format') } return this._audioFormat},
+    get audioPadding() { if (!this._audioPadding) { this._audioPadding = document.getElementById('padding') } return this._audioPadding},
+    get audioQuality() { if (!this._audioQuality) { this._audioQuality = document.getElementById('quality') } return this._audioQuality},
+    get audioQualityContainer() { if (!this._audioQualityContainer) { this._audioQualityContainer = document.getElementById('quality-container') } return this._audioQualityContainer},
+    get sendFilteredAudio() { if (!this._sendFilteredAudio) { this._sendFilteredAudio = document.getElementById('send-filtered-audio-to-model') } return this._sendFilteredAudio},
+    get audioNotification() { if (!this._audioNotification) { this._audioNotification = document.getElementById('audio-notification') } return this._audioNotification},
+    get batchSizeSlider() { if (!this._batchSizeSlider) { this._batchSizeSlider = document.getElementById('batch-size') } return this._batchSizeSlider},
+    get batchSizeValue() { if (!this._batchSizeValue) { this._batchSizeValue = document.getElementById('batch-size-value') } return this._batchSizeValue},
+    get colourmap() { if (!this._colourmap) { this._colourmap = document.getElementById('colourmap') } return this._colourmap},
+    get contentWrapper() { if (!this._contentWrapper) { this._contentWrapper = document.getElementById('contentWrapper') } return this._contentWrapper},
+    get controlsWrapper() { if (!this._controlsWrapper) { this._controlsWrapper = document.getElementById('controlsWrapper') } return this._controlsWrapper},
+    get contextAware() { if (!this._contextAware) { this._contextAware = document.getElementById('context') } return this._contextAware},
+    get contextAwareIcon() { if (!this._contextAwareIcon) { this._contextAwareIcon = document.getElementById('context-mode') } return this._contextAwareIcon},
+    get debugMode() { if (!this._debugMode) { this._debugMode = document.getElementById('debug-mode') } return this._debugMode},
+    get defaultLat() { if (!this._defaultLat) { this._defaultLat = document.getElementById('latitude') } return this._defaultLat},
+    get defaultLon() { if (!this._defaultLon) { this._defaultLon = document.getElementById('longitude') } return this._defaultLon},
+    get exploreWrapper() { if (!this._exploreWrapper) { this._exploreWrapper = document.getElementById('exploreWrapper') } return this._exploreWrapper},
+    get fileNumber() { if (!this._fileNumber) { this._fileNumber = document.getElementById('fileNumber') } return this._fileNumber},
+    get footer() { if (!this._footer) { this._footer = document.querySelector('footer') } return this._footer },
+    get gain() { if (!this._gain) { this._gain = document.getElementById('gain') } return this._gain},
+    get gainAdjustment() { if (!this._gainAdjustment) { this._gainAdjustment = document.getElementById('gain-adjustment') } return this._gainAdjustment},
+    get normalise() { if (!this._normalise) { this._normalise = document.getElementById('normalise') } return this._normalise},
+    get listToUse() { if (!this._listToUse) { this._listToUse = document.getElementById('list-to-use') } return this._listToUse},
+    get listIcon() { if (!this._listIcon) { this._listIcon = document.getElementById('list-icon') } return this._listIcon},
+    get speciesThresholdEl() { if (!this._speciesThresholdEl) { this._speciesThresholdEl = document.getElementById('species-threshold-el') } return this._speciesThresholdEl},
+    get speciesThreshold() { if (!this._speciesThreshold) { this._speciesThreshold = document.getElementById('species-frequency-threshold') } return this._speciesThreshold},
+    get customListFile() { if (!this._customListFile) { this._customListFile = document.getElementById('custom-list-location') } return this._customListFile},
+    get customListSelector() { if (!this._customListSelector) { this._customListSelector = document.getElementById('list-file-selector') } return this._customListSelector},
+    get customListContainer() { if (!this._customListContainer) { this._customListContainer = document.getElementById('choose-file-container') } return this._customListContainer},
+    get localSwitch() { if (!this._localSwitch) { this._localSwitch = document.getElementById('local') } return this._localSwitch},
+    get localSwitchContainer() { if (!this._localSwitchContainer) { this._localSwitchContainer = document.getElementById('use-location-container') } return this._localSwitchContainer},
+    get modelToUse() { if (!this._modelToUse) { this._modelToUse = document.getElementById('model-to-use') } return this._modelToUse},
+    get navPadding() { if (!this._navPadding) { this._navPadding = document.getElementById('navPadding') } return this._navPadding},
+    get nocmig() { if (!this._nocmig) { this._nocmig = document.getElementById('nocmig') } return this._nocmig},
+    get nocmigButton() { if (!this._nocmigButton) { this._nocmigButton = document.getElementById('nocmigMode') } return this._nocmigButton},
+    get numberOfThreads() { if (!this._numberOfThreads) { this._numberOfThreads = document.getElementById('threads-value') } return this._numberOfThreads},
+    get place() { if (!this._place) { this._place = document.getElementById('place') } return this._place},
+    get progressDiv() { if (!this._progressDiv) { this._progressDiv = document.getElementById('progressDiv') } return this._progressDiv},
+    get progressBar() { if (!this._progressBar) { this._progressBar = document.getElementById('progress-bar') } return this._progressBar},
+    get resultTableElement() { if (!this._resultTableElement) { this._resultTableElement = document.getElementById('resultTableContainer') } return this._resultTableElement},
+    get spectrogramWrapper() { if (!this._spectrogramWrapper) { this._spectrogramWrapper = document.getElementById('spectrogramWrapper') } return this._spectrogramWrapper},
+    get spectrogram() { if (!this._spectrogram) { this._spectrogram = document.getElementById('spectrogram') } return this._spectrogram},
+    get specLabels() { if (!this._specLabels) { this._specLabels = document.getElementById('spec-labels') } return this._specLabels},
+    get summaryTable() { if (!this._summaryTable) { this._summaryTable = document.getElementById('summaryTable') } return this._summaryTable},
+    get resultHeader() { if (!this._resultHeader) { this._resultHeader = document.getElementById('resultsHead') } return this._resultHeader},
+    get threadSlider() { if (!this._threadSlider) { this._threadSlider = document.getElementById('thread-slider') } return this._threadSlider},
+    get timeline() { if (!this._timeline) { this._timeline = document.getElementById('timeline') } return this._timeline},
+    get timelineSetting() { if (!this._timelineSetting) { this._timelineSetting = document.getElementById('timelineSetting') } return this._timelineSetting},
+
+    get contextMenu() { return document.getElementById('context-menu')},
+    get filename() {return document.getElementById("filename")},
+    get resultTable() {return document.getElementById('resultTableBody')},
+    get tooltip() { return document.getElementById('tooltip')},
+    get waveElement() { return document.getElementById('waveform')},
+    get specElement() { return document.getElementById('spectrogram')},
+    get specCanvasElement() { return document.querySelector('#spectrogram canvas')},
+    get waveCanvasElement() { return document.querySelector('#waveform canvas')},
 }
 let activeRow;
 let predictions = {},
@@ -223,14 +238,15 @@ clickedIndex, currentFileDuration;
 
 let currentBuffer, bufferBegin = 0, windowLength = 20;  // seconds
 // Set content container height
-DOM.contentWrapperElement.style.height = (bodyElement.clientHeight - 80) + 'px';
+DOM.contentWrapper.style.height = (bodyElement.clientHeight - 80) + 'px';
 
 const specMaxHeight = () =>{
         // Get the available viewport height
-        const navPading = document.getElementById('navPadding').clientHeight;
-        const footerHeight = document.querySelector('footer').clientHeight;
-        const timelineHeight = document.getElementById('timeline').clientHeight;
-        return window.innerHeight - navPading - footerHeight - DOM.controlsWrapper.clientHeight - timelineHeight;
+        const navPading = DOM.navPadding.clientHeight;
+        const footerHeight = DOM.footer.clientHeight;
+        const timelineHeight = DOM.timeline.clientHeight;
+        const controlsHeight = DOM.controlsWrapper.clientHeight
+        return window.innerHeight - navPading - footerHeight - controlsHeight - timelineHeight;
 }
 
 // Mouse down event to start dragging
@@ -292,10 +308,9 @@ function resetResults({clearSummary = true, clearPagination = true, clearResults
     if (clearSummary) summaryTable.textContent = '';
     
     clearPagination && pagination.forEach(item => item.classList.add('d-none'));
-    const resultTable = document.getElementById('resultTableBody');
-    resultsBuffer = resultTable.cloneNode(false)
+    resultsBuffer = DOM.resultTable.cloneNode(false)
     if (clearResults) {
-        resultTable.textContent = '';
+        DOM.resultTable.textContent = '';
         DOM.resultHeader.textContent = '';
     }
     predictions = {};
@@ -465,41 +480,29 @@ const initWavesurfer = ({
     
     // Show controls
     showElement(['controlsWrapper']);
-    updateElementCache();
     // Resize canvas of spec and labels
     adjustSpecDims(false);
     // remove the tooltip
-    const oldTip = document.getElementById('tooltip')
-    oldTip && oldTip.parentNode.removeChild(oldTip);
+    DOM.tooltip?.remove();
 
     const tooltip = document.createElement('div');
     tooltip.id = 'tooltip';
     document.body.appendChild(tooltip);
     // Add event listener for the gesture events
-    waveElement.removeEventListener('wheel', handleGesture);
-    waveElement.addEventListener('wheel', handleGesture, false);
+    const wave = DOM.waveElement;
+    wave.removeEventListener('wheel', handleGesture);
+    wave.addEventListener('wheel', handleGesture, false);
 
-    waveElement.removeEventListener('mousedown', resetRegions);
-    waveElement.removeEventListener('mousemove', specTooltip);
-    waveElement.removeEventListener('mouseout', hideTooltip);
-    waveElement.removeEventListener('dblclick', centreSpec);
+    wave.removeEventListener('mousedown', resetRegions);
+    wave.removeEventListener('mousemove', specTooltip);
+    wave.removeEventListener('mouseout', hideTooltip);
+    wave.removeEventListener('dblclick', centreSpec);
     
 
-    waveElement.addEventListener('mousemove', specTooltip, {passive: true}); 
-    waveElement.addEventListener('mousedown', resetRegions);
-    waveElement.addEventListener('mouseout', hideTooltip);
-    waveElement.addEventListener('dblclick', centreSpec);
-}
-
-function updateElementCache() {
-    t0 = Date.now();
-    // Update element caches
-    waveElement = document.getElementById('waveform')
-    specElement = document.getElementById('spectrogram');
-    specCanvasElement = document.querySelector('#spectrogram canvas');
-    waveCanvasElement = document.querySelector('#waveform canvas');
-    waveWaveElement = document.querySelector('#waveform wave');
-    specWaveElement = document.querySelector('#spectrogram wave');
+    wave.addEventListener('mousemove', specTooltip, {passive: true}); 
+    wave.addEventListener('mousedown', resetRegions);
+    wave.addEventListener('mouseout', hideTooltip);
+    wave.addEventListener('dblclick', centreSpec);
 }
 
 function increaseFFT(){
@@ -585,7 +588,7 @@ const openFileInList = async (e) => {
 const buildFileMenu = (e) => {
     //e.preventDefault();
     e.stopImmediatePropagation();
-    const menu = document.getElementById('context-menu');
+    const menu = DOM.contextMenu;
     menu.innerHTML = `
     <a class="dropdown-item" id="setCustomLocation"><span
     class="material-symbols-outlined align-bottom pointer">edit_location_alt</span> Amend File Recording Location</a>
@@ -639,8 +642,7 @@ function showDatePicker() {
     form.appendChild(cancelButton);
     
     // Append the form to the filename element
-    const domElement = document.getElementById("filename");
-    domElement.appendChild(form);
+    DOM.filename.appendChild(form);
     // Add submit event listener to the form
     form.addEventListener("submit", function (event) {
         event.preventDefault();
@@ -654,8 +656,6 @@ function showDatePicker() {
         worker.postMessage({ action: 'update-file-start', file: currentFile, start: timestamp });
         resetResults();
         fileStart = timestamp;
-        // update the timeline
-        postBufferUpdate({ file: currentFile, begin: bufferBegin })
         // Remove the form from the DOM
         form.remove();
     });
@@ -667,7 +667,7 @@ function showDatePicker() {
     toggleKeyDownForFormInputs()
 }
 
-const filename = document.getElementById('filename');
+const filename = DOM.filename;
 filename.addEventListener('click', openFileInList);
 filename.addEventListener('contextmenu', buildFileMenu);
 
@@ -733,7 +733,7 @@ function renderFilenamePanel() {
     const openfile = currentFile;
     const files = fileList;
     showGUANO();
-    let filenameElement = document.getElementById('filename');
+    let filenameElement = DOM.filename;
     filenameElement.innerHTML = '';
     //let label = openfile.replace(/^.*[\\\/]/, "");
     const {parentFolder, fileName}  = extractFileNameAndFolder(openfile)
@@ -862,9 +862,9 @@ const displayLocationAddress = async (where) => {
         if (address === false) return
         placeEl.value = address || 'Location not available';
     } else {
-        latEl = document.getElementById('latitude');
-        lonEl = document.getElementById('longitude');
-        placeEl = document.getElementById('place');
+        latEl = DOM.defaultLat;
+        lonEl = DOM.defaultLon;
+        placeEl = DOM.place;
         address = await fetchLocationAddress(latEl.value, lonEl.value, false);
         if (address === false) return
         const content = '<span class="material-symbols-outlined">fmd_good</span> ' + address;
@@ -876,9 +876,9 @@ const displayLocationAddress = async (where) => {
 }
 
 const cancelDefaultLocation = () => {
-    const latEl = document.getElementById('latitude');
-    const lonEl = document.getElementById('longitude');
-    const placeEl = document.getElementById('place');
+    const latEl = DOM.defaultLat;
+    const lonEl = DOM.defaultLon;
+    const placeEl = DOM.place;
     latEl.value = config.latitude;
     lonEl.value = config.longitude;
     placeEl.innerHTML = '<span class="material-symbols-outlined">fmd_good</span> ' + config.location;
@@ -891,7 +891,7 @@ const cancelDefaultLocation = () => {
 const setDefaultLocation = () => {
     config.latitude = parseFloat(DOM.defaultLat.value).toFixed(4);
     config.longitude = parseFloat(parseFloat(DOM.defaultLon.value)).toFixed(4);
-    config.location = document.getElementById('place').textContent.replace('fmd_good', '');
+    config.location = DOM.place.textContent.replace('fmd_good', '');
     updateMap(parseFloat(DOM.defaultLat.value), parseFloat(DOM.defaultLon.value));
     updatePrefs('config.json', config)
     worker.postMessage({
@@ -1108,50 +1108,59 @@ function postAnalyseMessage(args) {
     }
 }
 
-let openStreetMapTimer;
-function fetchLocationAddress(lat, lon) {
+let openStreetMapTimer, currentRequest = null;
+async function fetchLocationAddress(lat, lon) {
+    const isInvalidLatitude = isNaN(lat) || lat === null || lat < -90 || lat > 90;
+    const isInvalidLongitude = isNaN(lon) || lon === null || lon < -180 || lon > 180;
     
-        if (isNaN(lat) || isNaN(lon)  || !lat || !lon){
-            generateToast({type: 'warning',  message:'Both lat and lon values need to be numbers between 180 and -180'})
-            return false
+    if (isInvalidLatitude || isInvalidLongitude) {
+        generateToast({type: 'warning', message: 'Latitude must be between -90 and 90 and longitude between -180 and 180.'});
+        return false;
+    }
+    
+    currentRequest && clearTimeout(openStreetMapTimer); // Cancel pending request
+
+    return new Promise((resolve, reject) => {
+        currentRequest = { lat, lon }; // Store the current request details
+        const storedLocation = LOCATIONS?.find(obj => obj.lat === lat && obj.lon === lon);
+        if (storedLocation) {
+            return resolve(storedLocation.place);
         }
-        return new Promise((resolve, reject) => {
-            clearTimeout(openStreetMapTimer)
-            openStreetMapTimer = setTimeout(() => {
-            if (!LOCATIONS) {
-                worker.postMessage({ action: 'get-locations', file: currentFile });
-                waitForLocations();
-            }
-            const storedLocation = LOCATIONS?.find(obj => obj.lat === lat && obj.lon === lon);
-            if (storedLocation) return resolve(storedLocation.place);
-            
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`)
-            .then(response => {
-                if (!response.ok) {
-                    return reject(`Network error: code ${response.status} fetching Location from OpenStreetmap.` );
+        openStreetMapTimer = setTimeout(async () => {
+            try { 
+                if (!LOCATIONS) {
+                    worker.postMessage({ action: 'get-locations', file: currentFile });
+                    await waitForLocations();  // Ensure this is awaited
                 }
-                return response.json()
-            })
-            .then(data => {
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`);
+                
+                if (!response.ok) {
+                    return reject(new Error(`Network error: code ${response.status} fetching location from OpenStreetMap.`));
+                }
+                const data = await response.json();
+
                 let address;
                 if (data.error) {
                     address = "No location found for this map point";
                 } else {
                     // Just take the first two elements of the address
-                    address = data.display_name.split(',').slice(0,2).join(",").trim();
-                    
-                    LOCATIONS.push({ id: LOCATIONS.length + 1, lat: lat, lon: lon, place: address })
+                    address = data.display_name.split(',').slice(0, 2).join(",").trim();
+                    LOCATIONS.push({ id: LOCATIONS.length + 1, lat: lat, lon: lon, place: address });
                 }
+
                 resolve(address);
-            })
-            .catch(error => {
-                console.warn("A location for this point could not be retrieved from OpenStreetMap")
-                reject(error);
-            })
-        }, 1000) // 1 second delay
-    })
-    
+
+            } catch (error) {
+                console.warn(`A location for this point (lat: ${lat}, lon: ${lon}) could not be retrieved from OpenStreetMap:`, error);
+                generateToast({type: 'warning', message: "Failed to look up this location. Please check your internet connection or try again later."});
+                resolve(`${parseFloat(lat).toFixed(4)}, ${parseFloat(lon).toFixed(4)}`)
+            } finally {
+                currentRequest = null; // Clear the current request
+            }
+        }, 1000); // 1 second delay
+    });
 }
+
 
 
 // Menu bar functions
@@ -1385,18 +1394,15 @@ const loadResultRegion = ({ file = '', start = 0, end = 3, label = '' } = {}) =>
 */
 
 function adjustSpecDims(redraw, fftSamples, newHeight) {
-    const footerHeight = document.getElementById('footer').offsetHeight;
-    const navHeight = document.getElementById('navPadding').clientHeight;
+    const footerHeight = DOM.footer.offsetHeight;
+    const navHeight = DOM.navPadding.clientHeight;
     newHeight ??= 0;
-    //Contentwrapper starts below navbar (66px) and ends above footer (30px). Hence - 96
-    const contentWrapper = document.getElementById('contentWrapper');
-    contentWrapper.style.height = (bodyElement.clientHeight - footerHeight - navHeight) + 'px';
+    DOM.contentWrapper.style.height = (bodyElement.clientHeight - footerHeight - navHeight) + 'px';
     const contentHeight = contentWrapper.offsetHeight;
     // + 2 for padding
-    const formOffset = document.getElementById('exploreWrapper').offsetHeight;
+    const formOffset = DOM.exploreWrapper.offsetHeight;
     let specOffset;
-    const spectrogramWrapper = document.getElementById('spectrogramWrapper')
-    if (!spectrogramWrapper.classList.contains('d-none')) {
+    if (!DOM.spectrogramWrapper.classList.contains('d-none')) {
         const specHeight = newHeight || Math.min(config.specMaxHeight, specMaxHeight());
         if (newHeight !== 0) {
             config.specMaxHeight = specHeight;
@@ -1413,8 +1419,8 @@ function adjustSpecDims(redraw, fftSamples, newHeight) {
                 wavesurfer.setHeight(specHeight);
                 initSpectrogram(specHeight, fftSamples);
             }
-            specCanvasElement.style.width = '100%';
-            specElement.style.zIndex = 0;
+            DOM.specCanvasElement.style.width = '100%';
+            DOM.specElement.style.zIndex = 0;
             //document.querySelector('.spec-labels').style.width = '55px';
         }
         if (wavesurfer && redraw) {
@@ -1423,8 +1429,7 @@ function adjustSpecDims(redraw, fftSamples, newHeight) {
             } else {
         specOffset = 0
     }
-    const resultTableElement = document.getElementById('resultTableContainer');
-    resultTableElement.style.height = (contentHeight - specOffset - formOffset) + 'px';
+    DOM.resultTableElement.style.height = (contentHeight - specOffset - formOffset) + 'px';
 }
 
 ///////////////// Font functions ////////////////
@@ -1670,7 +1675,7 @@ window.onload = async () => {
     window.electron.requestWorkerChannel();
     isMac = await window.electron.isMac();
     replaceCtrlWithCommand()
-    DOM.contentWrapperElement.classList.add('loaded');
+    DOM.contentWrapper.classList.add('loaded');
     
     // Load preferences and override defaults
     [appPath, tempPath] = await getPaths();
@@ -2559,7 +2564,6 @@ function onChartData(args) {
             fftSamples: fftSamples, 
             colorMap: colors
         })).initPlugin('spectrogram')
-        updateElementCache();
     }
     
     function hideTooltip() {
@@ -2816,7 +2820,6 @@ function centreSpec(){
             if (activeRow) {
                 activeRow.classList.remove('table-active')
                 activeRow = activeRow.previousSibling || activeRow;
-                activeRow.focus();
                 if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
             }
         },
@@ -2831,7 +2834,6 @@ function centreSpec(){
             if (activeRow) {
                 activeRow.classList.remove('table-active')
                 activeRow = activeRow.nextSibling || activeRow;
-                activeRow.focus();
                 if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
             }
         },
@@ -2869,7 +2871,6 @@ function centreSpec(){
                 } else {
                     activeRow = activeRow.nextSibling || activeRow;
                 }
-                activeRow.focus();
                 if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
             }
         },
@@ -3123,7 +3124,6 @@ function centreSpec(){
         buffer.innerHTML = summaryHTML;
         old_summary.replaceWith(buffer);
         const currentFilter = document.querySelector('#speciesFilter tr.text-warning');
-        if (currentFilter) currentFilter.focus();
     }
     
     /*
@@ -3159,7 +3159,6 @@ function centreSpec(){
         }
         
         if (activeRow) {
-            activeRow.focus();
             activeRow.click();
         }
         // hide progress div
@@ -4657,9 +4656,6 @@ DOM.gain.addEventListener('input', () => {
                         colorMapFieldset.classList.add('d-none')
                     }
                     if (wavesurfer && currentFile) {
-
-                        // refresh caches
-                        updateElementCache()
                         const fftSamples = wavesurfer.spectrogram.fftSamples;
                         wavesurfer.destroy();
                         wavesurfer = undefined;
@@ -4676,8 +4672,6 @@ DOM.gain.addEventListener('input', () => {
                     document.getElementById('color-threshold').textContent = threshold;
                     config.customColormap = {'loud': loud, 'mid': mid, 'quiet': quiet, 'threshold': threshold, 'windowFn': windowFn};
                     if (wavesurfer && currentFile) {
-                        // refresh caches
-                        updateElementCache()
                         const fftSamples = wavesurfer.spectrogram.fftSamples;
                         wavesurfer.destroy();
                         wavesurfer = undefined;
@@ -4697,8 +4691,6 @@ DOM.gain.addEventListener('input', () => {
                 case 'spec-labels': {
                     config.specLabels = element.checked;                    
                     if (wavesurfer && currentFile) {
-                        // refresh caches
-                        updateElementCache()
                         const fftSamples = wavesurfer.spectrogram.fftSamples;
                         wavesurfer.destroy();
                         wavesurfer = undefined;

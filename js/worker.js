@@ -1111,7 +1111,9 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
     METADATA[file].duration ??= savedMeta?.duration || await getDuration(file).catch(error => {
         console.warn('getDuration error', error)}
     );
-    
+    // Restore GUANO
+    METADATA[file].guano ??= savedMeta?.metadata;
+
     if (METADATA[file].isComplete) {
         return METADATA[file]
     } else {
@@ -2775,8 +2777,10 @@ const sendResult = (index, result, fromDBQuery) => {
 
 const getSavedFileInfo = async (file) => {
     if (diskDB){
-        //if (!archiveFile) return undefined;
-        let row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name = ? OR archiveName = ?',file, file);
+        const prefix = STATE.archive.location + p.sep;
+        // Get rid of archive (library) location prefix
+        const archiveFile = file.replace(prefix , '');
+        let row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name = ? OR archiveName = ?',file, archiveFile);
         if (!row) {
             const baseName = file.replace(/^(.*)\..*$/g, '$1%');
             row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)',baseName);
@@ -3083,7 +3087,7 @@ const onUpdateFileStart = async (args) => {
             // Update the daylight flag if necessary
             let lat, lon;
             if (row.locationID) {
-                const location = await db.getAsync('SELECT lat, lon FROM locations WHERE locationID = ?', row.locationID);
+                const location = await db.getAsync('SELECT lat, lon FROM locations WHERE id = ?', row.locationID);
                 lat = location.lat;
                 lon = location.lon;
             } else {
