@@ -3625,17 +3625,20 @@ async function convertAndOrganiseFiles(threadLimit) {
                 failureReasons.push(result.reason);  // Collect the reason for the failure
             }
         });
-
+        const attempted  = successfulConversions + failedConversions;
         // Create a summary message
-        let summaryMessage = `Processing complete: ${successfulConversions} successful, ${failedConversions} failed.`;
-
-        if (failedConversions > 0) {
-            summaryMessage += `<br>Failed conversion reasons:<br><ul>`;
-            failureReasons.forEach(reason => {
-                summaryMessage += `<li>${reason}</li>`;
-            });
-            summaryMessage += `</ul>`;
-        }
+        let summaryMessage;
+        
+        if (attempted) {
+           summaryMessage = `Processing complete: ${successfulConversions} successful, ${failedConversions} failed.`;
+           if (failedConversions > 0) {
+                summaryMessage += `<br>Failed conversion reasons:<br><ul>`;
+                failureReasons.forEach(reason => {
+                    summaryMessage += `<li>${reason}</li>`;
+                });
+                summaryMessage += `</ul>`;
+            }
+        } else { summaryMessage = 'Library is up to date. Nothing to do'}
 
         // Post the summary message
         UI.postMessage({
