@@ -507,7 +507,7 @@ ipcRenderer.on('new-client', async (event) => {
 function savedFileCheck(fileList) {
     if (diskDB){
         // Construct a parameterized query to count the matching files in the database
-        const query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${prepParams(fileList)}`;
+        const query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${prepParams(fileList)})`;
 
         // Execute the query with the file list as parameters
         diskDB.get(query, fileList, (err, row) => {
@@ -1677,7 +1677,7 @@ const saveResults2DataSet = ({species, included}) => {
     ON species.id = records.speciesID
     JOIN files ON records.fileID = files.id
     WHERE confidence >= ${STATE.detect.confidence}`;
-    db2ResultSQL += filtersApplied(included) ? ` AND speciesID IN (${prepParams(included)}` : '';
+    db2ResultSQL += filtersApplied(included) ? ` AND speciesID IN (${prepParams(included)})` : '';
     
     let params = filtersApplied(included) ? included : [];
     if (species) {
