@@ -983,15 +983,9 @@ function filterFilePaths(filePaths) {
     const filteredPaths = [];
     filePaths.forEach(filePath => {
         const baseName = p.basename(filePath);
-        const hasQuestionMark = filePath.includes('?');
         const isHiddenFile = baseName.startsWith('.');
-
-        if (hasQuestionMark) {
-            generateToast({type: 'warning', message:`<b>${filePath}</b><br> contains an invalid '?' character. It will not be opened`})
-        }
-
         // Only add the path if it’s not hidden and doesn’t contain '?'
-        if (!isHiddenFile && !hasQuestionMark) {
+        if (!isHiddenFile) {
             filteredPaths.push(filePath);
         }
     });

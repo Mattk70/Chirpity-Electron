@@ -612,7 +612,7 @@ const getFiles = async (files, image) => {
             file_list = [...file_list,...dirFiles]
         } else {
             const filename = p.basename(path)
-            filename.startsWith('.') || file_list.push(path) // Exclude hidden files
+            filename.startsWith('.') || file_list.push(path) // Exclude hidden files (in subfolders)
         }
     }
     // filter out unsupported files
@@ -940,7 +940,7 @@ const getDuration = async (src) => {
     let audio;
     return new Promise(function (resolve, reject) {
         audio = new Audio();
-        audio.src = src.replace(/#/g, '%23'); // allow hash in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
+        audio.src = src.replaceAll('#', '%23').replaceAll('?', '%3F'); // allow hash in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
         audio.addEventListener("loadedmetadata", function () {
             const duration = audio.duration;
             audio = undefined;
@@ -1382,7 +1382,7 @@ const getPredictBuffers = async ({
     let chunkStart = start * sampleRate;
     return new Promise((resolve, reject) => {
         let concatenatedBuffer = Buffer.alloc(0);
-        const command = ffmpeg(file)
+        const command = ffmpeg('file:' + file)
             .seekInput(start)
             .duration(end - start)
             .format('wav')
@@ -1505,7 +1505,7 @@ const fetchAudioBuffer = async ({
     end = Math.min(end, METADATA[file].duration);
     // Use ffmpeg to extract the specified audio segment
     return new Promise((resolve, reject) => {
-        let command = ffmpeg(file)
+        let command = ffmpeg('file:' + file)
             .seekInput(start)
             .duration(end - start)
             .format('wav')
@@ -1843,7 +1843,7 @@ const bufferToAudio = async ({
     
     return new Promise(function (resolve, reject) {
         const bufferStream = new PassThrough();
-        let ffmpgCommand = ffmpeg(file)
+        let ffmpgCommand = ffmpeg('file:' + file)
         .toFormat(soundFormat)
         .seekInput(start)
         .duration(end - start)
@@ -3654,7 +3654,7 @@ async function convertFile(inputFilePath, fullFilePath, row, db, dbArchiveName, 
     const boundaries = await setStartEnd(inputFilePath);
 
     return new Promise((resolve, reject) => {
-        let command = ffmpeg(inputFilePath);
+        let command = ffmpeg('file:' + inputFilePath)
     
         if (STATE.archive.format === 'ogg') {
             command.audioBitrate('128k')
