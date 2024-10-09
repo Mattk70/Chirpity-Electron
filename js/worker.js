@@ -582,7 +582,8 @@ async function spawnListWorker() {
     return function listWorker(message_1) {
         return new Promise((resolve_1, reject_1) => {
             worker_1.onmessage = function (event_1) {
-                resolve_1(event_1.data);
+                const { result, messages } = event_1.data;
+                resolve_1({ result, messages });
             };
 
             worker_1.onerror = function (error_1) {

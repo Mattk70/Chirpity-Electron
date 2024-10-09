@@ -2615,8 +2615,9 @@ function onChartData(args) {
         updateListIcon();
         updatePrefs('config.json', config)
         resetResults({clearSummary: true, clearPagination: true, clearResults: true});
-        setListUIState(config.list)
-        worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone })
+        setListUIState(config.list);
+        // Since the custom list function calls for its own update *after* reading the labels, we'll skip updates for custom lists here
+        config.list === 'custom' || worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone })
     })
     
     DOM.customListSelector.addEventListener('click', async () =>{
