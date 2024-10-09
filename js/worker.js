@@ -507,7 +507,7 @@ ipcRenderer.on('new-client', async (event) => {
 function savedFileCheck(fileList) {
     if (diskDB){
         // Construct a parameterized query to count the matching files in the database
-        const query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${fileList.map(() => '?').join(',')})`;
+        const query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${prepParams(fileList)}`;
 
         // Execute the query with the file list as parameters
         diskDB.get(query, fileList, (err, row) => {
@@ -1110,7 +1110,7 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
     METADATA[file].locationID ??= savedMeta?.locationID;
     
     METADATA[file].duration ??= savedMeta?.duration || await getDuration(file).catch(error => {
-        console.warn('getDuration error', error)}
+        console.warn('getDuration error: ', JSON.stringify(error))}
     );
     // Restore GUANO
     METADATA[file].guano ??= savedMeta?.metadata;
@@ -2031,7 +2031,7 @@ async function batchInsertRecords(cname, label, files, originalCname) {
     t0 = Date.now();
     let query = `SELECT * FROM records WHERE speciesID = (SELECT id FROM species WHERE cname = ?) AND confidence >= ? `;
     if (STATE.mode !== 'explore') {
-        query += ` AND fileID in (SELECT id FROM files WHERE name IN (${files.map(() => '?').join(', ')}))`
+        query += ` AND fileID in (SELECT id FROM files WHERE name IN (${prepParams(files)}))`
         params.push(...files);
     } else if (STATE.explore.range.start) {
         query += ` AND dateTime BETWEEN ${STATE.explore.range.start} AND ${STATE.explore.range.end}`;

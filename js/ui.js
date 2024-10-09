@@ -979,15 +979,38 @@ const filterValidFiles = ({ filePaths }) => {
     worker.postMessage({ action: 'get-valid-files-list', files: filePaths })
 }
 
+function filterFilePaths(filePaths) {
+    const filteredPaths = [];
+    filePaths.forEach(filePath => {
+        const baseName = p.basename(filePath);
+        const hasQuestionMark = filePath.includes('?');
+        const isHiddenFile = baseName.startsWith('.');
+
+        if (hasQuestionMark) {
+            generateToast({type: 'warning', message:`<b>${filePath}</b><br> contains an invalid '?' character. It will not be opened`})
+        }
+
+        // Only add the path if it’s not hidden and doesn’t contain '?'
+        if (!isHiddenFile && !hasQuestionMark) {
+            filteredPaths.push(filePath);
+        }
+    });
+    return filteredPaths
+}
+
+
 async function onOpenFiles(args) {
+    const sanitisedList = filterFilePaths(args.filePaths);
+    if (!sanitisedList.length) return
+    // Store the sanitised file list and Load First audio file
     hideAll();
     showElement(['spectrogramWrapper'], false);
     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
     resetDiagnostics();
     // Store the file list and Load First audio file
-    fileList = args.filePaths;
+    fileList = sanitisedList;
     fileList.length > 1 && fileList.length < 25_000 && worker.postMessage({action: 'check-all-files-saved', files: fileList});
-    STATE.openFiles = args.filePaths;
+    STATE.openFiles = fileList;
     // Sort file by time created (the oldest first):
     if (fileList.length > 1) {
         if (modelReady) enableMenuItem(['analyseAll', 'reanalyseAll'])
