@@ -141,7 +141,7 @@ const createDB = async (file) => {
     await db.runAsync('BEGIN');
     await db.runAsync('CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL)');
     await db.runAsync(`CREATE TABLE locations( id INTEGER PRIMARY KEY, lat REAL NOT NULL, lon  REAL NOT NULL, place TEXT NOT NULL, UNIQUE (lat, lon))`);
-    await db.runAsync(`CREATE TABLE files(id INTEGER PRIMARY KEY, name TEXT NOT NULL, duration REAL,filestart INTEGER, locationID INTEGER, archiveName TEXT, metadata TEXT, UNIQUE (name),
+    await db.runAsync(`CREATE TABLE files(id INTEGER PRIMARY KEY, name TEXT NOT NULL, duration REAL, filestart INTEGER, locationID INTEGER, archiveName TEXT, metadata TEXT, UNIQUE (name),
         CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL)`);
     // Ensure place names are unique too
     await db.runAsync('CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)');
@@ -232,6 +232,98 @@ async function loadDB(path) {
     }
     UI.postMessage({event: 'labels', labels: LABELS})
     return true;
+}
+
+// Define the list of updates (always add new updates at the end. ORDER IS IMPORTANT!)
+const DB_updates = [
+    {
+        name: 'add_columns_archiveName_and_metadata_and_foreign_key_to_files',
+        query: async (db) => {
+            try {
+                // Update: Adding foreign key to files
+                await db.runAsync('BEGIN TRANSACTION;');
+                await db.runAsync(`
+                    CREATE TABLE files_new (
+                        id INTEGER PRIMARY KEY, 
+                        name TEXT NOT NULL, 
+                        duration REAL,
+                        filestart INTEGER, 
+                        locationID INTEGER, 
+                        archiveName TEXT, 
+                        metadata TEXT, 
+                        UNIQUE (name),
+                        CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL
+                    );
+                `);
+                await db.runAsync(`
+                    INSERT INTO files_new (id, name, duration, filestart, locationID, archiveName, metadata)
+                    SELECT id, name, duration, filestart, locationID, 
+                        COALESCE(archiveName, NULL) AS archiveName, 
+                        COALESCE(metadata, NULL) AS metadata
+                    FROM files;
+                `);
+                await db.runAsync(`DROP TABLE files;`);
+                await db.runAsync(`ALTER TABLE files_new RENAME TO files;`);
+
+
+                // If we get to here, it's all good: Commit the transaction
+                await db.runAsync('COMMIT;');
+
+            } catch (error) {
+                // If any error occurs, rollback the transaction
+                await db.runAsync('ROLLBACK;');
+                throw new Error(`Migration failed: ${error.message}`);
+            }
+        }
+    },
+];
+
+
+
+// Function to check and apply Updates
+async function checkAndApplyUpdates(db) {
+    // Ensure the system_info table exists
+    await db.runAsync(`
+        CREATE TABLE IF NOT EXISTS db_upgrade (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        );
+    `);
+
+    // Get the last Update applied
+    let lastUpdate = await db.getAsync(
+        `SELECT value FROM db_upgrade WHERE key = 'last_update'`
+    );
+
+    if (!lastUpdate) {
+        // Insert default if not present for older databases
+        lastUpdate = { value: '__' };
+        await db.runAsync(`
+            INSERT INTO db_upgrade (key, value) VALUES ('last_update', '__')
+        `);
+    }
+
+    // Apply updates that come after the last update applied
+    let updateIndex = DB_updates.findIndex(m => m.name === lastUpdate.value);
+    
+    // Start from the next Update
+    updateIndex = updateIndex >= 0 ? updateIndex + 1 : 0;
+
+    for (let i = updateIndex; i < DB_updates.length; i++) {
+        const update = DB_updates[i];
+        try {
+            console.log(`Applying Update: ${update.name}`);
+            await update.query(db);
+
+            // Update the last Update applied
+            await db.runAsync(`UPDATE db_upgrade SET value = ? WHERE key = 'last_update'`, update.name);
+
+            console.log(`Update '${update.name}' applied successfully.`);
+        } catch (err) {
+            console.error(`Error applying Database update '${update.name}':`, err);
+            throw err; // Stop the process if an Update fails
+        }
+    }
 }
 
 
@@ -496,6 +588,7 @@ async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backen
     BATCH_SIZE = batchSize;
     STATE.update({ model: model });
     await loadDB(appPath); // load the diskdb
+    await checkAndApplyUpdates(diskDB);
     await createDB(); // now make the memoryDB
     STATE.update({ db: memoryDB })
     spawnPredictWorkers(model, list, batchSize, threads);

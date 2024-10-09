@@ -48,3 +48,6 @@ try {
     console.error("One or more patterns found. Aborting the build.");
     process.exit(1);
 }
+
+
+//Todo: insert app release date logic
