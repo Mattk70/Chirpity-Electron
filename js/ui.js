@@ -3961,7 +3961,6 @@ function centreSpec(){
             filelist.push(f.path);
         }
         if (filelist.length) filterValidFiles({ filePaths: filelist })
-        trackEvent(config.UUID, 'UI', 'Drop', 'Open Folder(s)', filelist.length);
     });
     
     

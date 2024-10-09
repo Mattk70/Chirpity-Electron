@@ -91,6 +91,7 @@ const STATE = new State();
 
 
 let WINDOW_SIZE = 3;
+const SUPPORTED_FILES = ['.wav', '.flac', '.opus', '.m4a', '.mp3', '.mpga', '.ogg', '.aac', '.mpeg', '.mp4', '.mov'];
 
 let NUM_WORKERS;
 let workerInstance = 0;
@@ -174,53 +175,6 @@ const createDB = async (file) => {
 }
 
 
-async function runMigration(path, num_labels){
-    const dataset_file_path = p.join(path, `archive_dataset${num_labels}.sqlite`);
-    const archive_file_path = p.join(path, `archive${num_labels}.sqlite`);
-    //back-up the archive database
-    fs.copyFileSync(archive_file_path, archive_file_path + '.bak');
-    // Connect to the databases
-    let datasetDB = new sqlite3.Database(dataset_file_path);
-    const archiveDB = new sqlite3.Database(archive_file_path);
-
-    // Get a list of tables in the source database
-    const tables = await datasetDB.allAsync("SELECT name FROM sqlite_master WHERE type='table'").catch(err => console.log(err));
-    await archiveDB.runAsync('BEGIN');
-    // Loop through each table
-    for (const table of tables)  {
-        const tableName = table.name;
-        if (tableName === 'species') continue; // Species are the same
-        // Query the data from the current table
-        const rows = await datasetDB.allAsync(`SELECT * FROM ${tableName}`).catch(err => console.log(err));
-        // Insert the data into the destination database
-        for (const row of rows) {
-            const columns = Object.keys(row);
-            const values = columns.map(col => row[col]);
-            const placeholders = columns.map(() => '?').join(',');
-
-            await archiveDB.runAsync(`INSERT OR IGNORE INTO ${tableName} (${columns.join(',')}) VALUES (${placeholders})`, ...values)
-                .catch(err => console.log(err));
-        };
-    }
-    await archiveDB.runAsync('END');
-    // Close the database connections
-    datasetDB.close(function (){
-        //back-up (rename) the dataset database file
-        fs.rename(dataset_file_path, dataset_file_path + '.bak', function (err) {
-            if (err){
-                console.log(err)
-            } else {
-                console.log('Backup successful');
-            }
-        });
-    });
-    archiveDB.close((err) => {
-        if (err) {
-            console.error(err.message);
-        }
-    });
-}
-
 async function loadDB(path) {
     // We need to get the default labels from the config file
     DEBUG && console.log("Loading db " + path)
@@ -245,16 +199,7 @@ async function loadDB(path) {
     const num_labels = modelLabels.length;
     LABELS = modelLabels; // these are the default english labels
     const file = dataset_database ? p.join(path, `archive_dataset${num_labels}.sqlite`) : p.join(path, `archive${num_labels}.sqlite`)
-    // Migrate records from 1.6.8 if archive_dataset exists
-    if (fs.existsSync(p.join(path, `archive_dataset${num_labels}.sqlite`) )){
-        if (!fs.existsSync(p.join(path, `archive${num_labels}.sqlite`)) ){
-            // there was only an archive_dataset database, so just rename it...
-            fs.renameSync(p.join(path, `archive_dataset${num_labels}.sqlite`), p.join(path, `archive${num_labels}.sqlite`))
-        } else {
-            // copy data from dataset database to archive database
-            await runMigration(path, num_labels)
-        }
-    }
+
     if (!fs.existsSync(file)) {
         await createDB(file);
     } else if (diskDB?.filename !== file) {
@@ -603,11 +548,12 @@ async function spawnListWorker() {
 * @param {*} files must be a list of file paths
 */
 const getFiles = async (files, image) => {
-    let file_list = [];
+    let file_list = [], folderDropped = false;
     for (let i = 0; i < files.length; i++) {
         const path = files[i];
         const stats = fs.lstatSync(path)
         if (stats.isDirectory()) {
+            folderDropped = true
             const dirFiles = await getFilesInDirectory(path)
             file_list = [...file_list,...dirFiles]
         } else {
@@ -616,13 +562,14 @@ const getFiles = async (files, image) => {
         }
     }
     // filter out unsupported files
-    const supported_files = image ? ['.png'] :
-    ['.wav', '.flac', '.opus', '.m4a', '.mp3', '.mpga', '.ogg', '.aac', '.mpeg', '.mp4'];
+    const supported_files = image ? ['.png'] : SUPPORTED_FILES;
     
     file_list = file_list.filter((file) => {
         return supported_files.some(ext => file.toLowerCase().endsWith(ext))
     }
     )
+    const fileOrFolder = folderDropped ? 'Open Folder(s)' : 'Open Files(s)'
+    trackEvent(STATE.UUID, 'UI', 'Drop', fileOrFolder, file_list.length);
     UI.postMessage({ event: 'files', filePaths: file_list });
     return file_list;
 }
@@ -940,7 +887,7 @@ const getDuration = async (src) => {
     let audio;
     return new Promise(function (resolve, reject) {
         audio = new Audio();
-        audio.src = src.replaceAll('#', '%23').replaceAll('?', '%3F'); // allow hash in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
+        audio.src = src.replaceAll('#', '%23').replaceAll('?', '%3F'); // allow hash and ? in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
         audio.addEventListener("loadedmetadata", function () {
             const duration = audio.duration;
             audio = undefined;
@@ -952,8 +899,8 @@ const getDuration = async (src) => {
             resolve(duration);
         });
         audio.addEventListener('error', (error) => {
-            UI.postMessage({event: 'generate-alert', type: 'error',  message: 'Unable to decode file metatada'})
-            reject(error)
+            UI.postMessage({event: 'generate-alert', type: 'error',  message: 'Unable to extract essential metadata from ' + src})
+            reject(error, src)
         })
     });
 }
@@ -973,7 +920,8 @@ async function getWorkingFile(file) {
     let proxy = source_file;
     
     if (!METADATA.file?.isComplete) {
-        await setMetadata({ file: file, proxy: proxy, source_file: source_file });
+        const metadata = await setMetadata({ file: file, proxy: proxy, source_file: source_file });
+        if (!metadata) return false
         METADATA[proxy] = METADATA[file];
     }
     return proxy;
@@ -986,7 +934,7 @@ async function getWorkingFile(file) {
 */
 async function locateFile(file) {
     // Ordered from the highest likely quality to lowest
-    const supported_files = ['.wav', '.flac', '.opus', '.m4a', '.mp3', '.mpga', '.ogg', '.aac', '.mpeg', '.mp4'];
+
     const dir = p.parse(file).dir, name = p.parse(file).name;
     // Check folder exists before trying to traverse it. If not, return empty list
     let [, folderInfo] = fs.existsSync(dir) ?
@@ -996,7 +944,7 @@ async function locateFile(file) {
         filesInFolder.push(item[0])
     })
     let supportedVariants = []
-    supported_files.forEach(ext => {
+    SUPPORTED_FILES.forEach(ext => {
         supportedVariants.push(p.join(dir, name + ext))
     })
     const matchingFileExt = supportedVariants.find(variant => {
@@ -1042,7 +990,7 @@ async function loadAudioFile({
     queued = false,
     goToRegion = true
 }) {
-    file = METADATA[file]?.proxy || await getWorkingFile(file);
+    //file = METADATA[file]?.proxy || await getWorkingFile(file);
     if (file) {
         await fetchAudioBuffer({ file, start, end })
         .then((buffer) => {
@@ -1105,13 +1053,18 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
     // const latitude = savedMeta?.lat || STATE.lat;
     // const longitude = savedMeta?.lon || STATE.lon;
     // const row = await STATE.db.getAsync('SELECT id FROM locations WHERE lat = ? and lon = ?', latitude, longitude);
-    
+
     // using the nullish coalescing operator
     METADATA[file].locationID ??= savedMeta?.locationID;
     
-    METADATA[file].duration ??= savedMeta?.duration || await getDuration(file).catch(error => {
-        console.warn('getDuration error: ', JSON.stringify(error))}
-    );
+    METADATA[file].duration ??= savedMeta?.duration;
+    if (!METADATA[file].duration) {
+        try {
+            METADATA[file].duration = await getDuration(file)
+        } catch {
+            return probeFile(file)
+        }    
+    }
     // Restore GUANO
     METADATA[file].guano ??= savedMeta?.metadata;
 
@@ -1133,7 +1086,7 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
                 console.warn('Error loading guano.js', error)}
             );
             const t0 = Date.now();
-            const guano = await extractGuanoMetadata(file);
+            const guano = await extractGuanoMetadata(file).catch(error => console.warn("Error extracting GUANO", error));
             if (guano){
                 const location = guano['Loc Position'];
                 if (location){
@@ -1165,7 +1118,36 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
         return METADATA[file];
     }
 }
-            
+
+function probeFile(file){
+    // Use ffprobe to get file information
+    ffmpeg.ffprobe('file:'+file, (err, metadata) => {
+        if (err) {
+            console.error('getDuration error: Error retrieving file info:', JSON.stringify(err));
+        } else {
+            //Log the file name
+            console.warn('getDuration error', file);
+            const formats = metadata.format.format_name.split(',')
+                    .filter(format => SUPPORTED_FILES.includes(`.${format}`));
+
+            const codec = metadata.streams[0].codec_name;
+            const ext = p.extname(file).replace('.', '');
+            if (!formats.includes(ext)){
+                UI.postMessage({
+                    event: 'generate-alert', 
+                    type: 'warning',  
+                    message: `The file ${p.basename(file)} seems to have an incorrect extension. 
+                        Chirpity supports the following extensions for this file type: 
+                        <b>${formats.join(',')}</b><br/>
+                        <p> Try renaming it to ${p.basename(file, ext)}${formats[0]}.</p>`});
+            }
+            // Log the metadata to the console
+            console.warn('File metadata:', `Format: ${formats}, Codec: ${codec}`);
+        }
+        return false;
+    });
+}
+
 function setupCtx(audio, rate, destination, file) {
     rate ??= sampleRate;
     // Deal with detached arraybuffer issue
@@ -1496,7 +1478,7 @@ const fetchAudioBuffer = async ({
         file = await getWorkingFile(file);
         if (!file) return;
     }
-    METADATA[file].duration || await setMetadata({file:file});
+    METADATA[file]?.duration || await setMetadata({file:file});
     end ??= METADATA[file].duration; 
     let concatenatedBuffer = Buffer.alloc(0);
 
@@ -1504,6 +1486,7 @@ const fetchAudioBuffer = async ({
     start = METADATA[file].duration < 0.1 ? 0 : Math.min(METADATA[file].duration - 0.1, start)
     end = Math.min(end, METADATA[file].duration);
     // Use ffmpeg to extract the specified audio segment
+    if (isNaN(start)) throw(new Error('fetchAudioBuffer: start is NaN'));
     return new Promise((resolve, reject) => {
         let command = ffmpeg('file:' + file)
             .seekInput(start)
