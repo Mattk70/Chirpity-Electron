@@ -4404,6 +4404,19 @@ DOM.gain.addEventListener('input', () => {
             case 'locate-missing-file': {
                 (async () => await locateFile(MISSING_FILE))(); 
                 break }
+            case 'clear-custom-list': {
+                config.customListFile[config.model] = '';
+                delete LIST_MAP.custom;
+                config.list = 'birds';
+                DOM.listToUse.value = config.list;
+                DOM.customListFile.value = '';
+                updateListIcon();
+                updatePrefs('config.json', config)
+                resetResults({clearSummary: true, clearPagination: true, clearResults: true});
+                setListUIState(config.list);
+                if (currentFile && STATE.analysisDone) worker.postMessage({ action: 'update-list', list: config.list, refreshResults: true })
+                break;
+            }
             case 'compress-and-organise': {compressAndOrganise(); break}
             case 'purge-file': { deleteFile(currentFile); break }
 
@@ -4597,7 +4610,8 @@ DOM.gain.addEventListener('input', () => {
                     config.list = element.value;
                     updateListIcon();
                     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
-                    worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone});
+                    // Don't call this for custom lists
+                    config.list === 'custom' || worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone});
                     break;
                 }
                 case 'locale': {
