@@ -158,7 +158,7 @@ let region, AUDACITY_LABELS = {}, wavesurfer;
 let fileList = [], analyseList = [];
 let fileStart, bufferStartTime, fileEnd;
 
-let zero = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
+
 // set up some DOM element hamdles
 const bodyElement = document.body;
 
@@ -198,6 +198,7 @@ const DOM = {
     get normalise() { if (!this._normalise) { this._normalise = document.getElementById('normalise') } return this._normalise},
     get listToUse() { if (!this._listToUse) { this._listToUse = document.getElementById('list-to-use') } return this._listToUse},
     get listIcon() { if (!this._listIcon) { this._listIcon = document.getElementById('list-icon') } return this._listIcon},
+    get loading() { if (!this._loading) { this._loading = document.getElementById('loading') } return this._loading},
     get speciesThresholdEl() { if (!this._speciesThresholdEl) { this._speciesThresholdEl = document.getElementById('species-threshold-el') } return this._speciesThresholdEl},
     get speciesThreshold() { if (!this._speciesThreshold) { this._speciesThreshold = document.getElementById('species-frequency-threshold') } return this._speciesThreshold},
     get customListFile() { if (!this._customListFile) { this._customListFile = document.getElementById('custom-list-location') } return this._customListFile},
@@ -1242,7 +1243,7 @@ const exporteBird = ()  => exportData('eBird', isSpeciesViewFiltered(true), Infi
 const exportRaven = ()  => exportData('Raven', isSpeciesViewFiltered(true), Infinity);
 
 async function exportData(format, species, limit, duration){
-    const response = await window.electron.selectDirectory('selectDirectory');
+    const response = await window.electron.selectDirectory();
     if (!response.canceled) {
         const directory = response.filePaths[0];
         worker.postMessage({
@@ -1458,8 +1459,8 @@ function adjustSpecDims(redraw, fftSamples, newHeight) {
         
         decreaseBtn.classList.toggle('disabled', config.fontScale === 0.7);
         increaseBtn.classList.toggle('disabled', config.fontScale === 1.1);
-
         updatePrefs('config.json', config)
+        adjustSpecDims(true)
     }
 
 
@@ -1651,7 +1652,7 @@ function fillDefaults(config, defaultConfig) {
 /////////////////////////  Window Handlers ////////////////////////////
 // Set config defaults
 const defaultConfig = {
-    archive: {location: undefined, format: 'ogg', auto: false},
+    archive: {location: undefined, format: 'ogg', auto: false, trim: false},
     fontScale: 1,
     seenTour: false,
     lastUpdateCheck: 0,
@@ -1825,6 +1826,7 @@ window.onload = async () => {
         if (config.archive.location) {
             document.getElementById('archive-location').value = config.archive.location;
             document.getElementById('archive-format').value = config.archive.format;
+            document.getElementById('library-trim').checked = config.archive.trim;
             const autoArchive = document.getElementById('auto-archive');
             autoArchive.checked = config.archive.auto;
 
@@ -1926,6 +1928,9 @@ const setUpWorkerMessaging = () => {
                         document.getElementById("unsaved-icon").classList.add("d-none");
                     }
                     if (args.file){
+                        // Clear the file loading overlay:
+                        clearTimeout(loadingTimeout)
+                        DOM.loading.classList.add('d-none')
                         MISSING_FILE = args.file;
                         args.message += `
                             <div class="d-flex justify-content-center mt-2">
@@ -2839,6 +2844,7 @@ function centreSpec(){
                 activeRow.classList.remove('table-active')
                 activeRow = activeRow.previousSibling || activeRow;
                 if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
+                activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
         },
         PageDown: function () {
@@ -2853,6 +2859,7 @@ function centreSpec(){
                 activeRow.classList.remove('table-active')
                 activeRow = activeRow.nextSibling || activeRow;
                 if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
+                activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
         },
         ArrowLeft: function () {
@@ -2886,8 +2893,10 @@ function centreSpec(){
                 activeRow.classList.remove('table-active')
                 if (e.shiftKey) {
                     activeRow = activeRow.previousSibling || activeRow;
+                    activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 } else {
                     activeRow = activeRow.nextSibling || activeRow;
+                    activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }
                 if (!activeRow.classList.contains('text-bg-dark')) activeRow.click();
             }
@@ -2931,9 +2940,8 @@ function centreSpec(){
         // In case it takes a while:
         if (!queued){
             loadingTimeout = setTimeout(() => {
-                const loading = document.getElementById('loadingOverlay');
-                loading.querySelector('#loadingText').textContent = 'Loading file...';
-                loading.classList.remove('d-none')}, 500)
+                DOM.loading.querySelector('#loadingText').textContent = 'Loading file...';
+                DOM.loading.classList.remove('d-none')}, 500)
         }
     }
     
@@ -3036,8 +3044,7 @@ function centreSpec(){
         fileLoaded = true, locationID = location;
         clearTimeout(loadingTimeout)
         // Clear the loading animation
-        const loading = document.getElementById('loadingOverlay')
-        loading.classList.add('d-none');
+        DOM.loading.classList.add('d-none');
         const resetSpec = !currentFile;
         currentFileDuration = sourceDuration;
         //if (preserveResults) completeDiv.hide();
@@ -3066,6 +3073,7 @@ function centreSpec(){
             if (config.timeOfDay) {
                 bufferStartTime = new Date(fileStart + (bufferBegin * 1000))
             } else {
+                const zero = new Date(0,0,0, 0, 0, 0, 0);
                 bufferStartTime = new Date(zero.getTime() + (bufferBegin * 1000))
             }
             if (windowLength > currentFileDuration) windowLength = currentFileDuration;
@@ -3178,6 +3186,7 @@ function centreSpec(){
         
         if (activeRow) {
             activeRow.click();
+            activeRow.scrollIntoView({ behavior: 'instant', block: 'nearest' });
         }
         // hide progress div
         DOM.progressDiv.classList.add('d-none');
@@ -4445,7 +4454,7 @@ DOM.gain.addEventListener('input', () => {
             case 'eBird': { (async () => await populateHelpModal('Help/ebird.html', 'eBird Record FAQ'))(); break }
             case 'archive-location-select': {
                 (async () =>{
-                    const files = await window.electron.selectDirectory()
+                    const files = await window.electron.selectDirectory(config.archive.location)
                     if (! files.canceled) {
                         const archiveFolder = files.filePaths[0];
                         config.archive.location = archiveFolder;
@@ -4589,8 +4598,8 @@ DOM.gain.addEventListener('input', () => {
                 }
                 case 'timelineSetting': { timelineToggle(e); break }
                 case 'nocmig': { changeNocmigMode(e); break }
-
-                case 'auto-archive': { config.archive.auto = element.checked; break }
+                case 'auto-archive': { config.archive.auto = element.checked } // no break so worker state gets updated
+                case 'library-trim': { config.archive.trim = element.checked }
                 case 'archive-format': {
                     config.archive.format = document.getElementById('archive-format').value;
                     worker.postMessage({action: 'update-state', archive: config.archive})

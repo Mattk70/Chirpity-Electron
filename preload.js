@@ -46,7 +46,7 @@ contextBridge.exposeInMainWorld('electron', {
     unsavedRecords: (isTrue) => ipcRenderer.invoke('unsaved-records', { newValue: isTrue }),
     onDownloadProgress: (callback) => ipcRenderer.on('download-progress', callback),
     saveFile: (args) => ipcRenderer.invoke('saveFile', args),
-    selectDirectory: () => ipcRenderer.invoke('selectDirectory'),
+    selectDirectory: (path) => ipcRenderer.invoke('selectDirectory', path),
     openDialog: (method, config) => ipcRenderer.invoke('openFiles', method, config),
     getPath: () => ipcRenderer.invoke('getPath'),
     getTemp: () => ipcRenderer.invoke('getTemp'),

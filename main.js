@@ -446,13 +446,14 @@ app.whenReady().then(async () => {
     })
     
     
-    ipcMain.handle('selectDirectory', async (config) => {
+    ipcMain.handle('selectDirectory', async (_e, path) => {
         // Show file dialog to select a directory
         return await dialog.showOpenDialog(mainWindow, {
             // From docs:
             // Note: On Windows and Linux an open dialog can not be both a file selector and a directory selector,
             // so if you set properties to ['openFile', 'openDirectory'] on these platforms,
             // a directory selector will be shown.
+            defaultPath: path,
             properties: ['openDirectory']
         });
     })

@@ -215,19 +215,6 @@ async function loadDB(path) {
         DEBUG && console.log("Getting labels from disk db " + path)
         const res = await diskDB.allAsync("SELECT sname || '_' || cname AS labels FROM species ORDER BY id")
         LABELS = res.map(obj => obj.labels); // these are the labels in the preferred locale
-        const sql = 'PRAGMA table_info(files)';
-        const result = await  diskDB.allAsync(sql);
-        // Update legacy tables
-        const archiveNamExists = result.some((column) => column.name === 'archiveName');
-        if (!archiveNamExists) {
-            await diskDB.runAsync('ALTER TABLE files ADD COLUMN archiveName TEXT')
-            console.log('Added archiveName column to files table');
-        }
-        const metadataExists = result.some((column) => column.name === 'metadata');
-        if (!metadataExists) {
-            await diskDB.runAsync('ALTER TABLE files ADD COLUMN metadata TEXT')
-            console.log('Added metadata column to files table');
-        }
         DEBUG && console.log("Opened and cleaned disk db " + file)
     }
     UI.postMessage({event: 'labels', labels: LABELS})
@@ -240,6 +227,8 @@ const DB_updates = [
         name: 'add_columns_archiveName_and_metadata_and_foreign_key_to_files',
         query: async (db) => {
             try {
+                // Disable foreign key checks (or dropping files will drop records too!!!)
+                await db.runAsync('PRAGMA foreign_keys = OFF');
                 // Update: Adding foreign key to files
                 await db.runAsync('BEGIN TRANSACTION;');
                 await db.runAsync(`
@@ -256,10 +245,8 @@ const DB_updates = [
                     );
                 `);
                 await db.runAsync(`
-                    INSERT INTO files_new (id, name, duration, filestart, locationID, archiveName, metadata)
-                    SELECT id, name, duration, filestart, locationID, 
-                        COALESCE(archiveName, NULL) AS archiveName, 
-                        COALESCE(metadata, NULL) AS metadata
+                    INSERT INTO files_new (id, name, duration, filestart, locationID)
+                    SELECT id, name, duration, filestart, locationID
                     FROM files;
                 `);
                 await db.runAsync(`DROP TABLE files;`);
@@ -273,6 +260,9 @@ const DB_updates = [
                 // If any error occurs, rollback the transaction
                 await db.runAsync('ROLLBACK;');
                 throw new Error(`Migration failed: ${error.message}`);
+            } finally {
+                // Disable foreign key checks
+                await db.runAsync('PRAGMA foreign_keys = ON');
             }
         }
     },
@@ -1005,59 +995,58 @@ const getDuration = async (src) => {
 * @returns {Promise<boolean|*>}
 */
 async function getWorkingFile(file) {
-    
-    if (METADATA[file]?.isComplete && METADATA[file]?.proxy) return METADATA[file].proxy;
     // find the file
     const source_file = fs.existsSync(file) ? file : await locateFile(file);
     if (!source_file) return false;
-    let proxy = source_file;
-    
+
     if (!METADATA.file?.isComplete) {
-        const metadata = await setMetadata({ file: file, proxy: proxy, source_file: source_file });
+        const metadata = await setMetadata({ file: file, source_file: source_file });
         if (!metadata) return false
-        METADATA[proxy] = METADATA[file];
+        METADATA[source_file] = METADATA[file];
     }
-    return proxy;
+    return source_file;
 }
 
 /**
-* Function to return path to file searching for new extensions if original file has been compressed.
-* @param file
-* @returns {Promise<*>}
-*/
+ * Function to locate a file either in the archive, or with the same basename but different extension from SUPPORTED_FILES
+ * @param {string} file - Full path to a file that doesn't exist
+ * @returns {string | null} - Full path to the located file or null if not found
+ */
 async function locateFile(file) {
-    // Ordered from the highest likely quality to lowest
 
-    const dir = p.parse(file).dir, name = p.parse(file).name;
-    // Check folder exists before trying to traverse it. If not, return empty list
-    let [, folderInfo] = fs.existsSync(dir) ?
-    await dirInfo({ folder: dir, recursive: false }) : ['', []];
-    let filesInFolder = [];
-    folderInfo.forEach(item => {
-        filesInFolder.push(item[0])
-    })
-    let supportedVariants = []
-    SUPPORTED_FILES.forEach(ext => {
-        supportedVariants.push(p.join(dir, name + ext))
-    })
-    const matchingFileExt = supportedVariants.find(variant => {
-        const matching = (file) => variant.toLowerCase() === file.toLowerCase();
-        return filesInFolder.some(matching)
-    })
-    if (!matchingFileExt) {
-        // Check if the file has been archived
-        const row = await STATE.db.getAsync('SELECT archiveName from files WHERE name = ?', file);
+    // Check if the file has been archived
+    const row = await diskDB.getAsync('SELECT archiveName from files WHERE name = ?', file);
+    if (row?.archiveName){
         const fullPathToFile = p.join(STATE.archive.location, row.archiveName)
-        if (row.archiveName && fs.existsSync(fullPathToFile)) {
-            //METADATA[row.archiveName] = METADATA[file];
+        if (fs.existsSync(fullPathToFile)) {
             return fullPathToFile;
         }
-        else {
-            notifyMissingFile(file)
-            return false;
-        }
     }
-    return matchingFileExt;
+    // Not there, search the directory
+    const dir = p.dirname(file); // Get directory of the provided file
+    const baseName = p.basename(file, p.extname(file)); // Get the base name without extension
+
+    // Read all files in the directory
+    try {
+        const files = fs.readdirSync(dir);
+
+        // Search for a file with the same base name
+        for (const currentFile of files) {
+            const currentBaseName = p.basename(currentFile, p.extname(currentFile));
+            
+            // Check if the base name matches before comparing the extension
+            if (currentBaseName === baseName) {
+                const currentExt = p.extname(currentFile);
+
+                if (SUPPORTED_FILES.includes(currentExt)) {
+                    return p.join(dir, currentFile); // Return the full path of the found file
+                }
+            }
+        }
+    } catch (error) {
+        console.warn(error.message); // Expected that this happens when the directory doesn't exist
+    } 
+    return null;
 }
 
 async function notifyMissingFile(file) {
@@ -1083,7 +1072,7 @@ async function loadAudioFile({
     queued = false,
     goToRegion = true
 }) {
-    //file = METADATA[file]?.proxy || await getWorkingFile(file);
+
     if (file) {
         await fetchAudioBuffer({ file, start, end })
         .then((buffer) => {
@@ -1107,6 +1096,8 @@ async function loadAudioFile({
         })
         .catch( (error) => {
             console.log(error);
+            // notify and return null if no matching file was found
+            notifyMissingFile(file)
         })
         let week;
         if (STATE.list === 'location'){
@@ -1129,15 +1120,12 @@ function addDays(date, days) {
 /**
 * Called by getWorkingFile, setCustomLocation
 * Assigns file metadata to a metadata cache object. file is the key, and is the source file
-* proxy is required if the source file is not a wav to populate the headers
 * @param file: the file name passed to the worker
-* @param proxy: the wav file to use for predictions
 * @param source_file: the file that exists ( will be different after compression)
 * @returns {Promise<unknown>}
 */
-const setMetadata = async ({ file, proxy = file, source_file = file }) => {
-    METADATA[file] ??= { proxy: proxy };
-    METADATA[file].proxy ??= proxy;
+const setMetadata = async ({ file, source_file = file }) => {
+    METADATA[file] ??= {};
     // CHeck the database first, so we honour any manual updates.
     const savedMeta = await getSavedFileInfo(file).catch(error => console.warn('getSavedFileInfo error', error));
     // If we have stored imfo about the file, set the saved flag;
@@ -1569,7 +1557,7 @@ const fetchAudioBuffer = async ({
 }) => {
     if (! fs.existsSync(file)) {
         file = await getWorkingFile(file);
-        if (!file) return;
+        if (!file) throw new Error('Cannot locate ' + file);
     }
     METADATA[file]?.duration || await setMetadata({file:file});
     end ??= METADATA[file].duration; 
@@ -3621,16 +3609,6 @@ async function convertAndOrganiseFiles(threadLimit) {
     const db = diskDB;
     const fileProgressMap = {};
     const conversions = []; // Array to hold the conversion promises
-    // Ensure 'archiveName' column exists in the files table
-    await db.runAsync("ALTER TABLE files ADD COLUMN archiveName TEXT")
-        .catch(err => {
-            if (err.message.includes("duplicate column")) {
-                DEBUG && console.log("Column 'archiveName' already exists");
-            } else {
-                console.error("Error adding 'archiveName' column:", err);
-                return
-            }
-        });
 
     // Query the files table to get the necessary data
     const rows = await db.allAsync("SELECT f.id, f.name, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id");
@@ -3739,7 +3717,7 @@ async function convertFile(inputFilePath, fullFilePath, row, db, dbArchiveName, 
         }
     
         let scaleFactor = 1;
-        if (STATE.detect.nocmig) {
+        if (STATE.archive.trim) {
             if (boundaries.length > 1) { 
                 UI.postMessage({event: 'generate-alert', type: 'warning',  message: `Multi-day operations are not yet supported: ${inputFilePath} will not be trimmed`});
             } else {
