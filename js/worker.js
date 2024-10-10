@@ -416,11 +416,13 @@ async function handleMessage(e) {
         case "export-results": {await getResults(args);
             break;
         }
-        case "file-load-request": {index = 0;
+        case "file-load-request": {
+            index = 0;
             filesBeingProcessed.length && onAbort(args);
             DEBUG && console.log("Worker received audio " + args.file);
             await loadAudioFile(args);
-            METADATA[args.file]?.isSaved ? await onChangeMode("archive") : await onChangeMode("analyse");
+            const mode = METADATA[args.file]?.isSaved ? 'archive' : 'analyse';
+            await onChangeMode(mode);
             break;
         }
         case "filter": {
@@ -1152,17 +1154,9 @@ const setMetadata = async ({ file, source_file = file }) => {
     if (METADATA[file].isComplete) {
         return METADATA[file]
     } else {
-        let fileStart, fileEnd;
-        
-        if (savedMeta?.fileStart) {
-            fileStart = new Date(savedMeta.fileStart);
-            fileEnd = new Date(fileStart.getTime() + (METADATA[file].duration * 1000));
-        } else {
-            const stat = fs.statSync(source_file);
-            fileEnd = new Date(stat.mtime);
-            fileStart = new Date(stat.mtime - (METADATA[file].duration * 1000));
-        }
-        if (STATE.useGUANO && file.toLowerCase().endsWith('wav')){
+        let fileStart, fileEnd, guanoTimestamp;
+
+        if (file.toLowerCase().endsWith('wav')){
             const {extractGuanoMetadata} = await import('./guano.js').catch(error => {
                 console.warn('Error loading guano.js', error)}
             );
@@ -1175,9 +1169,23 @@ const setMetadata = async ({ file, source_file = file }) => {
                     const roundedFloat = (string) => Math.round(parseFloat(string) * 10000) / 10000;
                     await onSetCustomLocation({ lat: roundedFloat(lat), lon: roundedFloat(lon), place: location, files: [file] }) 
                 }
+
+                guanoTimestamp = Date.parse(guano.Timestamp);
+                
                 METADATA[file].guano = JSON.stringify(guano);
             }
             DEBUG && console.log(`GUANO search took: ${(Date.now() - t0)/1000} seconds`);
+        }
+        if (savedMeta?.filestart) { // Saved timestamps have the highest priority
+            fileStart = new Date(savedMeta.filestart);
+            fileEnd = new Date(fileStart.getTime() + (METADATA[file].duration * 1000));
+        } else if (guanoTimestamp) { // Guano if present second priority
+            fileStart = new Date(guanoTimestamp);
+            fileEnd = new Date(guanoTimestamp + (METADATA[file].duration * 1000));
+        } else { // Finally
+            const stat = fs.statSync(source_file);
+            fileEnd = new Date(stat.mtime);
+            fileStart = new Date(stat.mtime - (METADATA[file].duration * 1000));
         }
         
         // split  the duration of this file across any dates it spans
@@ -1196,6 +1204,7 @@ const setMetadata = async ({ file, source_file = file }) => {
         // Now we have completed the date comparison above, we convert fileStart to millis
         fileStart = fileStart.getTime();
         METADATA[file].fileStart = fileStart;
+        METADATA[file].isComplete = true;
         return METADATA[file];
     }
 }
