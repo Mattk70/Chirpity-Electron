@@ -54,8 +54,8 @@ function loadModel(params){
         myModel.width = width;
 
         // Create a mask tensor where the specified indexes are set to 0 and others to 1
-        //const indexesToZero = [25, 30, 110, 319, 378, 403, 404, 405, 406];
-        const indexesToZero = [];
+        const indexesToZero = [25, 30, 110, 319, 378, 403, 404, 405, 406];
+
         myModel.mask = tf.tensor2d(Array.from({ length: 408 }, (_, i) => indexesToZero.includes(i) ? 0 : 1), [1, 408]);
         myModel.labels = labels;
         await myModel.loadModel();

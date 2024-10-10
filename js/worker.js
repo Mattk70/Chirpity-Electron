@@ -1170,9 +1170,9 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
             fileStart = new Date(savedMeta.fileStart);
             fileEnd = new Date(fileStart.getTime() + (METADATA[file].duration * 1000));
         } else {
-            METADATA[file].stat = fs.statSync(source_file);
-            fileEnd = new Date(METADATA[file].stat.mtime);
-            fileStart = new Date(METADATA[file].stat.mtime - (METADATA[file].duration * 1000));
+            const stat = fs.statSync(source_file);
+            fileEnd = new Date(stat.mtime);
+            fileStart = new Date(stat.mtime - (METADATA[file].duration * 1000));
         }
         if (STATE.useGUANO && file.toLowerCase().endsWith('wav')){
             const {extractGuanoMetadata} = await import('./guano.js').catch(error => {
@@ -1185,7 +1185,7 @@ const setMetadata = async ({ file, proxy = file, source_file = file }) => {
                 if (location){
                     const [lat, lon] = location.split(' ');
                     const roundedFloat = (string) => Math.round(parseFloat(string) * 10000) / 10000;
-                    onSetCustomLocation({ lat: roundedFloat(lat), lon: roundedFloat(lon), place: location, files: [file] }) 
+                    await onSetCustomLocation({ lat: roundedFloat(lat), lon: roundedFloat(lon), place: location, files: [file] }) 
                 }
                 METADATA[file].guano = JSON.stringify(guano);
             }
