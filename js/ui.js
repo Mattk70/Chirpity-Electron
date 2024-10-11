@@ -2695,7 +2695,6 @@ function onChartData(args) {
                 }
             }
             PREDICTING = false;
-            STATE.analysisDone = true;
         }
         // Update threads and batch Size in UI
         DOM.threadSlider.value = config[config[config.model].backend].threads;

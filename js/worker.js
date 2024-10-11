@@ -363,18 +363,26 @@ const dirInfo = async ({ folder = undefined, recursive = false }) => {
     return [size, ctimes];
 }
 
+let INITIALISED = null;
+
 async function handleMessage(e) {
     const args = e.data;
     const action = args.action;
     DEBUG && console.log('message received', action)
+    if (action !== "_init_" && INITIALISED) {
+        // Wait until _init_ or onLaunch completes before processing other messages
+        await INITIALISED;
+    }
     switch (action) {
         case "_init_": {
             let {model, batchSize, threads, backend, list} = args;
             const t0 = Date.now();
             STATE.detect.backend = backend;
-            LIST_WORKER = await spawnListWorker(); // this can change the backend if tfjs-node isn't available
-            DEBUG && console.log('List worker took', Date.now() - t0, 'ms to load');
-            await onLaunch({model: model, batchSize: batchSize, threads: threads, backend: STATE.detect.backend, list: list});
+            INITIALISED = (async () => {
+                LIST_WORKER = await spawnListWorker(); // this can change the backend if tfjs-node isn't available
+                DEBUG && console.log('List worker took', Date.now() - t0, 'ms to load');
+                await onLaunch({model: model, batchSize: batchSize, threads: threads, backend: STATE.detect.backend, list: list});
+            })();
             break;
         }
         case "abort": {
@@ -461,7 +469,7 @@ async function handleMessage(e) {
             else {
                 predictWorkers.length && terminateWorkers()
             };
-            await onLaunch(args);
+            INITIALISED =  onLaunch(args);
             break;
         }
         case "post": {await uploadOpus(args);
