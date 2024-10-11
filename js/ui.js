@@ -159,7 +159,7 @@ let fileList = [], analyseList = [];
 let fileStart, bufferStartTime, fileEnd;
 
 
-// set up some DOM element hamdles
+// set up some DOM element handles
 const bodyElement = document.body;
 
 const DOM = {
@@ -1616,7 +1616,7 @@ function primaryLabelInterval(pxPerSec) {
 *
 * Secondary labels are drawn after primary labels, so if
 * you want to have labels every 10 seconds and another color labels
-* every 60 seconds, the 60 second labels should be the secondaries.
+* every 60 seconds, the 60 second labels should be the secondary.
 *
 * Note that if you override the default function, you'll almost
 * certainly want to override formatTimeCallback, primaryLabelInterval
@@ -1985,7 +1985,7 @@ const setUpWorkerMessaging = () => {
                     }
                     break;
                 }
-                case "summary-complate": {onSummaryComplete(args);
+                case "summary-complete": {onSummaryComplete(args);
                     break;
                 }
                 case "new-result": {renderResult(args);
@@ -2276,7 +2276,7 @@ function onChartData(args) {
             labels: dateLabels,
             datasets: Object.entries(results).map(([year, data]) => ({
                 label: year,
-                //shift data to midday - midday rahter than nidnight to midnight if hourly chart and filter not set
+                //shift data to midday - midday rather than nidnight to midnight if hourly chart and filter not set
                 data: aggregation !== 'Hour' ? data :  data.slice(12).join(data.slice(0, 12)),
                 //backgroundColor: 'rgba(255, 0, 64, 0.5)',
                 borderWidth: 1,
@@ -2689,7 +2689,7 @@ function onChartData(args) {
                 SNRSlider.disabled = false;
                 config.filters.SNR = parseFloat(SNRSlider.value);
                 if (config.filters.SNR) {
-                    DOM.contextAware.disabed = true;
+                    DOM.contextAware.disabled = true;
                     config.detect.contextAware = false;
                     contextAwareIconDisplay();
                 }
@@ -4240,7 +4240,7 @@ function centreSpec(){
     
     filterPanelThresholdDisplay.addEventListener('click', (e) => {
         e.stopPropagation();
-        filterPanelRangeInput.autofucus = true
+        filterPanelRangeInput.autofocus = true
         confidenceSliderDisplay.classList.toggle('d-none');
         
     })
@@ -4322,10 +4322,10 @@ function centreSpec(){
         SNRThreshold.textContent = SNRSlider.value;
     });
 
-    const colorMapThreshhold = document.getElementById('color-threshold');
+    const colorMapThreshold = document.getElementById('color-threshold');
     const colorMapSlider = document.getElementById('color-threshold-slider');
     colorMapSlider.addEventListener('input', () => {
-        colorMapThreshhold.textContent = colorMapSlider.value;
+        colorMapThreshold.textContent = colorMapSlider.value;
     });
     
     const handleHPchange = () => {
@@ -5254,7 +5254,7 @@ async function readLabels(labelFile, updating){
                     }
                     alert(`
                     <svg class="bi flex-shrink-0 me-2" width="20" height="20" role="img" aria-label="Info:"><use xlink:href="#info-fill"/></svg>
-                    There's a new version of Chirpity available! <a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blacnk">Check the website</a> for more information`,
+                    There's a new version of Chirpity available! <a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blank">Check the website</a> for more information`,
                     'warning')
                 }
                 config.lastUpdateCheck = latestCheck;

@@ -372,7 +372,7 @@ async function handleMessage(e) {
             let {model, batchSize, threads, backend, list} = args;
             const t0 = Date.now();
             STATE.detect.backend = backend;
-            LIST_WORKER = await spawnListWorker(); // this can change the backend if tfjs-node isn't avaialble
+            LIST_WORKER = await spawnListWorker(); // this can change the backend if tfjs-node isn't available
             DEBUG && console.log('List worker took', Date.now() - t0, 'ms to load');
             await onLaunch({model: model, batchSize: batchSize, threads: threads, backend: STATE.detect.backend, list: list});
             break;
@@ -498,7 +498,7 @@ async function handleMessage(e) {
             STATE.list = args.list;
             STATE.customList = args.list === 'custom' ? args.customList : STATE.customList;
             const {lat, lon, week} = STATE;
-            // Clear the LIST_CACHE & STATE.included kesy to force list regeneration
+            // Clear the LIST_CACHE & STATE.included keys to force list regeneration
             LIST_CACHE = {}; //[`${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`];
             delete STATE.included?.[STATE.model]?.[STATE.list];
             LIST_WORKER && await setIncludedIDs(lat, lon, week )
@@ -806,7 +806,7 @@ const prepResultsStatement = (species, noLimit, included, offset, topRankin) => 
     const range = STATE.selection?.start ? STATE.selection :
         STATE.mode === 'explore' ? STATE.explore.range : false;
     
-    // If you're using the memory db, you're either anlaysing one,  or all of the files
+    // If you're using the memory db, you're either analysing one,  or all of the files
     const [SQLtext, fileParams] = getFileSQLAndParams(range);
     resultStatement += SQLtext, params.push(...fileParams);
 
@@ -874,7 +874,7 @@ async function onAnalyse({
     // Now we've asked for a new analysis, clear the aborted flag
     aborted = false; //STATE.incrementor = 1;
     predictionStart = new Date();
-    // Set the appropraite selection range if this is a selection analysis
+    // Set the appropriate selection range if this is a selection analysis
     STATE.update({ selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined });
     
     DEBUG && console.log(`Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`);
@@ -931,7 +931,7 @@ async function onAnalyse({
             } else {
                 await onChangeMode('archive');
                 FILE_QUEUE.forEach(file => UI.postMessage({ event: 'update-audio-duration', value: METADATA[file].duration }));
-                // Wierdness with promise all - list worker called 2x and no results returned
+                // Weirdness with promise all - list worker called 2x and no results returned
                 //await Promise.all([getResults(), getSummary()] );
                 await getResults();
                 await getSummary();
@@ -1636,7 +1636,7 @@ function isDuringDaylight(datetime, lat, lon) {
 async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
     predictionsRequested[file]++;
     if (worker === undefined) {
-        // pick a worker - this method is faster than looking for avialable workers
+        // pick a worker - this method is faster than looking for available workers
         worker = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance
     }
     const objData = {
@@ -2305,7 +2305,7 @@ const parsePredictions = async (response) => {
 let SEEN_MODEL_READY = false;
 async function parseMessage(e) {
     const response = e.data;
-    // Update this worker's avaialability
+    // Update this worker's availability
     predictWorkers[response.worker].isAvailable = true;
     
     switch (response['message']) {
@@ -2507,7 +2507,7 @@ const getSummary = async ({
 
     t0 = Date.now();
     const summary = await STATE.db.allAsync(sql, ...params);
-    const event = interim ? 'update-summary' : 'summary-complate';
+    const event = interim ? 'update-summary' : 'summary-complete';
     UI.postMessage({
         event: event,
         summary: summary,
@@ -3398,7 +3398,7 @@ const onFileDelete = async (fileName) => {
     } else {
         UI.postMessage({
             event: 'generate-alert', message: `${fileName} 
-            was not found in the Archve databasse.`
+            was not found in the Archive database.`
         });
     }
 }
@@ -3424,7 +3424,7 @@ async function onUpdateLocale(locale, labels, refreshResults){
                     const existingCname = cname;
                     const existingCnameMatch = existingCname.match(/\(([^)]+)\)$/); // Regex to match word(s) within brackets at the end of the string
                     const newCnameMatch = newCname.match(/\(([^)]+)\)$/);
-                    // Do we have a spcific call type to match?
+                    // Do we have a specific call type to match?
                     if (newCnameMatch){
                         // then only update the database where existing and new call types match
                         if (newCnameMatch[0] === existingCnameMatch[0]){
