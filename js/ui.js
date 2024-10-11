@@ -655,6 +655,7 @@ function showDatePicker() {
         
         // Send the data to the worker
         worker.postMessage({ action: 'update-file-start', file: currentFile, start: timestamp });
+        trackEvent(config.UUID, 'Settings Change', 'fileStart', newStart);
         resetResults();
         fileStart = timestamp;
         // Remove the form from the DOM
@@ -4818,7 +4819,7 @@ DOM.gain.addEventListener('input', () => {
             }
             updatePrefs('config.json', config)
             const value = element.type === "checkbox" ? element.checked : element.value;
-            trackEvent(config.UUID, 'Settings Change', target, value);
+            target === 'fileStart' || trackEvent(config.UUID, 'Settings Change', target, value);
         }
     })
     
