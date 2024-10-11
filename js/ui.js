@@ -243,11 +243,11 @@ DOM.contentWrapper.style.height = (bodyElement.clientHeight - 80) + 'px';
 
 const specMaxHeight = () =>{
         // Get the available viewport height
-        const navPading = DOM.navPadding.clientHeight;
+        const navPadding = DOM.navPadding.clientHeight;
         const footerHeight = DOM.footer.clientHeight;
         const timelineHeight = DOM.timeline.clientHeight;
         const controlsHeight = DOM.controlsWrapper.clientHeight
-        return window.innerHeight - navPading - footerHeight - controlsHeight - timelineHeight;
+        return window.innerHeight - navPadding - footerHeight - controlsHeight - timelineHeight;
 }
 
 // Mouse down event to start dragging
@@ -4929,9 +4929,9 @@ async function readLabels(labelFile, updating){
             });
         }
         // Add event Handlers
-        const exporLink = document.getElementById('context-create-clip');
-        hideInSummary ? exporLink.addEventListener('click', batchExportAudio) :
-        exporLink.addEventListener('click', exportAudio);
+        const exportLink = document.getElementById('context-create-clip');
+        hideInSummary ? exportLink.addEventListener('click', batchExportAudio) :
+        exportLink.addEventListener('click', exportAudio);
         if (!hideInSelection) {
             document.getElementById('create-manual-record').addEventListener('click', function (e) {
                 if (e.target.textContent.includes('Edit')) {
