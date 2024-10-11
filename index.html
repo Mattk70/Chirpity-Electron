@@ -78,7 +78,7 @@
                 <fieldset class="border border-secondary rounded m-2 mt-0 mb-0 p-2">
                     <legend style="font-size: large;font-weight:bold">Detections</legend>
                     <div>
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Model" data-bs-content="Select whether to use Chirpity, optimised for Nocturnal Migration Calls in Europe, or BirdNET, which can detect over 6000 species across the globe.">?</a>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Model" id="Model-circle-help"  data-bs-content="Select whether to use Chirpity, optimised for Nocturnal Migration Calls in Europe, or BirdNET, which can detect over 6000 species across the globe.">?</a>
                         <div class="pe-3 input-group rounded p-2 mb-1">
                             <label class="input-group-text col-5" for="model-to-use">Model:</label>
                             <select class="form-select mb-0" id="model-to-use">
@@ -88,7 +88,7 @@
                         </div>
                     </div>
                     <div class="form-group rounded p-2 pe-0 mb-2">
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Confidence Threshold" data-bs-content="Determines the minimum confidence required for results to be returned">?</a>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Confidence Threshold" id="Confidence Threshold-circle-help"  data-bs-content="Determines the minimum confidence required for results to be returned">?</a>
                         <label for="confidence">Confidence threshold:</label>
                         <div class="input-group">
                             <input type="range" class="form-control-range w-75" id="confidence" min="5" max="100" step="5">
@@ -98,7 +98,7 @@
                         </div>
                     </div>
                     <div>
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="List" data-bs-content="Filters the detections returned in results. Local Birds: excludes birds 
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="List" id="List-circle-help"  data-bs-content="Filters the detections returned in results. Local Birds: excludes birds 
                         unlikely to be found in your region. Nocturnal Birds: excludes bird song and species not known to call at night. The custom list allows you to upload a file listing the species to detect">?</a>
                         <div class="pe-3 input-group rounded p-2 mb-1">
                             <label class="input-group-text col-5" for="list-to-use">List:</label>
@@ -125,11 +125,11 @@
                             <div class="form-switch ms-2">
                                 <input class="form-check-input" type="checkbox" role="switch" id="local">
                                 <label class="form-check-label" for="local">Use Location settings</label>
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Use Location settings" data-bs-content="When activated, the Nocturnal birds filter reports birds based on your location settings.">?</a>
+                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Use Location settings" id="Use Location settings-circle-help"  data-bs-content="When activated, the Nocturnal birds filter reports birds based on your location settings.">?</a>
                             </div>
                         </div>
                         <div id="species-threshold-el">
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Species Threshold" data-bs-content="Define the minimum eBird checklist frequency for species inclusion.
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Species Threshold" id="Species Threshold-circle-help"  data-bs-content="Define the minimum eBird checklist frequency for species inclusion.
                             If 'Adjust list for the week of the year' is enabled, the list will be adjusted to include species expected for the recording week.">?</a>
                             <div class="pe-3 input-group rounded p-2 mb-1">
                                 <span class="input-group-text col-5">Threshold:</span>
@@ -147,19 +147,19 @@
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" role="switch" id="nocmig">
                             <label class="form-check-label" for="nocmig">Only analyse night time periods.</label>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Nocmig Mode" data-bs-content="When enabled, this 'Nocmig mode' only searches for and only displays detections found during the night">?</a>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Nocmig Mode" id="Nocmig Mode-circle-help"  data-bs-content="When enabled, this 'Nocmig mode' only searches for and only displays detections found during the night">?</a>
                         </div>
                     </div>
                     <hr>
                     <div class="form-group rounded">
                         <div class="form-check form-switch ps-2">
                             <button class="btn btn-primary" id="clear-call-cache" onclick="return false">Clear Reference Call Cache</button>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Clear Call Cache" data-bs-content="The data used for the reference call comparisons are cached. Clearing the cache will refresh the calls for each species the next time a comparison is requested">?</a>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Clear Call Cache" id="Clear Call Cache-circle-help"  data-bs-content="The data used for the reference call comparisons are cached. Clearing the cache will refresh the calls for each species the next time a comparison is requested">?</a>
                         </div>
                     </div>
                 </fieldset>
                 <fieldset class="border border-secondary rounded m-2 mb-0 p-2">
-                    <legend style="font-size: large;font-weight:bold">Default Location <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Default Location" data-bs-content="Chirpity uses location information to determine the dawn and dusk times for recordings">?</a></legend>
+                    <legend style="font-size: large;font-weight:bold">Default Location <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Default Location" id="Default Location-circle-help"  data-bs-content="Chirpity uses location information to determine the dawn and dusk times for recordings">?</a></legend>
                     <div class="form-group rounded p-2 mb-2">
                         <div class="input-group">
                             <span class="input-group-text pe-2">Lat:</span>
@@ -179,7 +179,7 @@
                 <fieldset class="border border-secondary rounded m-2 mb-0 p-2">
                     <legend style="font-size: large;font-weight:bold">System</legend>
                     <div>
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Language" data-bs-content="Select your preferred language for birds' common names">?</a>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Language" id="Language-circle-help"  data-bs-content="Select your preferred language for birds' common names">?</a>
                         <div class="pe-3 input-group rounded p-2 mb-1">
                             <label class="input-group-text col-5" for="locale">Language:</label>
                             <select class="form-select mb-0" id="locale">
@@ -217,7 +217,7 @@
                     </div>
                     <div class="p-0 chirpity-only node-only d-none">
                         <div class="form-group rounded p-2 pe-0 mb-2">
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Backend" data-bs-content="The webGL/webGPU backends can improve performance and reduce power consumption on some systems.">?</a>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Backend" id="Backend-circle-help"  data-bs-content="The webGL/webGPU backends can improve performance and reduce power consumption on some systems.">?</a>
                             <div>
                                 <label class="ps-0 fs-6 text-start">Backend:</label>
                                 <div class="form-check form-check-inline">
@@ -236,7 +236,7 @@
                         </div>
                     </div>
                     <div>
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Threads" data-bs-content="The number of parallel analyses to run. By default, 
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Threads" id="Threads-circle-help"  data-bs-content="The number of parallel analyses to run. By default, 
                         this is set to the number of CPU cores on the machine for fastest performance. With the GPU backend, a lower number works better e.g. 1-3">?</a>
                         <div class="form-group rounded p-2 pe-0 mb-2">
                             <label for="thread-slider">Threads:</label>
@@ -249,7 +249,7 @@
                         </div>
                     </div>
                     <div>
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Batch Size" data-bs-content="Optimising the batch size can increase processing speed on longer files.">?</a>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Batch Size" id="Batch Size-circle-help"  id="Batch Size-circle-help"  data-bs-content="Optimising the batch size can increase processing speed on longer files.">?</a>
                         <div class="form-group rounded p-2 pe-0 mb-2">
                             <label for="batch-size">Batch Size:</label>
                             <div class="input-group">
@@ -261,7 +261,7 @@
                         </div>
                     </div>
                     <div>
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Audio notification" data-bs-content="When enabled, there will be a system notification when analyses that take over thirty seconds are finished.">?</a>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Audio notification" id="Audio notification-circle-help"  data-bs-content="When enabled, there will be a system notification when analyses that take over thirty seconds are finished.">?</a>
                         <div class="pe-3 form-group rounded p-2 mb-2">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" role="switch" id="audio-notification">
@@ -270,7 +270,7 @@
                         </div>
                     </div>
                     <div>
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Prevent system sleep" data-bs-content="When enabled, prevent the system from suspending whilst Chirpity is in use.">?</a>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Prevent system sleep" id="Prevent system sleep-circle-help"  data-bs-content="When enabled, prevent the system from suspending whilst Chirpity is in use.">?</a>
                         <div class="pe-3 form-group rounded p-2 mb-2">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" role="switch" id="power-save-block">
@@ -279,7 +279,7 @@
                         </div>
                     </div>
                     <div>
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Adjust font size" data-bs-content="Change the global font size settings for the application.">?</a>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Adjust font size" id="Adjust font size-circle-help"  data-bs-content="Change the global font size settings for the application.">?</a>
                         <div class="pe-3 form-group rounded p-2 mb-2">
                                 Adjust font size: 
                                 <span  id="decreaseFont" class="material-symbols-outlined btn btn-outline-secondary p-1">text_decrease</span> 
@@ -291,7 +291,7 @@
                     <legend style="font-size: large;font-weight:bold">Audio Preferences</legend>
                     <div class="me-auto">
                         <div class="form-group rounded p-2 mb-2">
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Volume Adjustment" data-bs-content="Adjust the volume of audio to compensate for low recording levels.">?</a>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Volume Adjustment" id="Volume Adjustment-circle-help"  data-bs-content="Adjust the volume of audio to compensate for low recording levels.">?</a>
                             <label for="gain" class="form-label">
                                 Volume Adjustment:
                             </label>
@@ -308,12 +308,12 @@
                             <label class="form-check-label" for="normalise">Normalise Audio:
                                 <input class="form-check-input" type="checkbox" role="switch" id="normalise">
                             </label>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Normalise" data-bs-content="When enabled, the audio you hear will be normalised, expanding the dynamic range.">?</a>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Normalise" id="Normalise-circle-help"  data-bs-content="When enabled, the audio you hear will be normalised, expanding the dynamic range.">?</a>
                         </div>
                     </div>
                     <div class="me-auto">
                         <div class="form-group rounded p-2 mb-2">
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="High Pass Filter" data-bs-content="When set, removes low frequency noise below the threshold. If enabled before analysis, the modified audio is sent to the model. If only enabled after analysis, this just affects audio playback">?</a>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="High Pass Filter" id="High Pass Filter-circle-help"  data-bs-content="When set, removes low frequency noise below the threshold. If enabled before analysis, the modified audio is sent to the model. If only enabled after analysis, this just affects audio playback">?</a>
                             <label for="HighPassFrequency" class="form-label">
                                 High Pass filter:
                             </label>
@@ -326,7 +326,7 @@
                         </div>
                     </div>
                     <div class="form-group rounded p-2 me-0 mb-2">
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Low Shelf Filter" data-bs-content="When used, attenuates low frequency noise below the frequency threshold. If enabled before analysis, the modified audio is sent to the model. If only enabled after analysis, this just affects audio playback">?</a>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Low Shelf Filter" id="Low Shelf Filter-circle-help"  data-bs-content="When used, attenuates low frequency noise below the frequency threshold. If enabled before analysis, the modified audio is sent to the model. If only enabled after analysis, this just affects audio playback">?</a>
                         <label for="lowShelfFrequency" class="form-label">
                             Low Shelf filter:
                         </label>
@@ -387,7 +387,7 @@
                             <input class="form-check-input" type="checkbox" role="switch" id="downmix">
                             <label class="form-check-label" for="downmix">Convert to mono</label>
                         </div>
-                        <a class="ms-auto circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Downmix" data-bs-content="When enabled, exported audio will be downmixed to mono">?</a>
+                        <a class="ms-auto circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Downmix" id="Downmix-circle-help"  data-bs-content="When enabled, exported audio will be downmixed to mono">?</a>
                     </div>
                     <div class="form-group rounded p-2 pe-0 mb-2">
                         <div class="row pe-2">
@@ -405,13 +405,13 @@
                                 </div>
                             </div>
                             <div class="col-3">
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Decorators" data-bs-content="'Pad' adds 2 seconds before and after a selection to the exported audio.
+                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Decorators" id="Decorators-circle-help"  data-bs-content="'Pad' adds 2 seconds before and after a selection to the exported audio.
                                 'Fade' adds a 1 second fade effect to the start and end of the audio">?</a>
                             </div>
                         </div>
                     </div>
                     <hr>
-                    <h6 class="fs-6">Audio Library:<a class="circle new-circle me-2" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Audio Library" 
+                    <h6 class="fs-6">Audio Library:<a class="circle new-circle me-2" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Audio Library" id="Audio Library-circle-help"  
                         data-bs-html="true" date-bs-html="true" date-bs-sanitize="false" data-bs-content="Chirpity can organise your audio into a permanent library at a location of your choice, such as a data disk or network drive. Once saved, you can remove the original files, and all records will be viewable in the application.
 
                         To save audio to the library, you can either go to the Records menu and choose 'Save Audio from Archive Results to Library', or enable the 'Add to Library on Save' option below.
@@ -427,7 +427,7 @@
                                 <label class="form-check-label" for="auto-archive">Add to Library on Save
                                     <input class="form-check-input" type="checkbox" role="switch" id="auto-archive">
                                 </label>
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Add to Library on Save" data-bs-content="When enabled, audio files are added to the library location whenever detections are saved to the archive.">?</a>
+                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Add to Library on Save" id="Add to Library on Save-circle-help"  data-bs-content="When enabled, audio files are added to the library location whenever detections are saved to the archive.">?</a>
                             </div>
                         </div>
                         <div class="form-group rounded p-2 mb-2">
@@ -435,7 +435,7 @@
                                 <label class="form-check-label" for="library-trim">Crop Library audio to night time periods
                                     <input class="form-check-input" type="checkbox" role="switch" id="library-trim">
                                 </label>
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Add to Library on Save" data-bs-content="When enabled, audio files containing daylight periods are cropped, so the audio is only saved for notcurnal periods.">?</a>
+                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Add to Library on Save" id="Add to Library on Save-circle-help"  data-bs-content="When enabled, audio files containing daylight periods are cropped, so the audio is only saved for notcurnal periods.">?</a>
                             </div>
                         </div>
                         <div class="row p-2" id="choose-archive-location">
@@ -463,7 +463,7 @@
                             <label class="form-check-label" for="spec-labels">Display frequency labels:
                                 <input class="form-check-input" type="checkbox" role="switch" id="spec-labels">
                             </label>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Show frequency labels" data-bs-content="When enabled, the spectrogram will display the frequency on the left side.">?</a>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Show frequency labels" id="Show frequency labels-circle-help"  data-bs-content="When enabled, the spectrogram will display the frequency on the left side.">?</a>
                         </div>
                     </div>
                     <div class="pe-3 input-group rounded p-2 mb-1">
@@ -536,7 +536,7 @@
                             <label class="form-check-label" for="send-filtered-audio-to-model">
                                 Send Filtered Audio for Analysis
                             </label>
-                            <a class="circle text-bg-danger" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Send Filtered Audio" data-bs-content="Sending High Pass or Low Shelf filtered audio to a model will usually have a negative impact on its accuracy. Use this option with caution!">?</a>
+                            <a class="circle text-bg-danger" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Send Filtered Audio" id="Send Filtered Audio-circle-help"  data-bs-content="Sending High Pass or Low Shelf filtered audio to a model will usually have a negative impact on its accuracy. Use this option with caution!">?</a>
                         </div>
                     </div>
                     <div class="chirpity-only form-group rounded p-2 mb-2">
@@ -545,13 +545,13 @@
                             <label class="form-check-label" for="context">
                                 Context mode
                             </label>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Context Mode" data-bs-content="When enabled, context mode adapts predictions by analysing the surrounding context.
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Context Mode" id="Context Mode-circle-help"  data-bs-content="When enabled, context mode adapts predictions by analysing the surrounding context.
                             Not available in the BirdNET model">?</a>
                         </div>
                     </div>
                     <div class="chirpity-only me-auto">
                         <div class="form-group rounded p-2 mb-2">
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Signal to Noise Ratio" data-bs-content="Skip over portions of audio with just background noise. Higher values skip increasingly noisy segments.
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Signal to Noise Ratio" id="Signal to Noise Ratio-circle-help"  data-bs-content="Skip over portions of audio with just background noise. Higher values skip increasingly noisy segments.
                             Not available in the BirdNET model">?</a>
                             <label for="snrValue" class="form-label">
                                 SNR filter:
@@ -569,7 +569,7 @@
                         <div class="text-nowrap">   
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" role="switch" id="debug-mode">
-                                <label class="form-check-label me-2" for="debug-mode">Debug mode</label><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Debug Mode" data-bs-content="Enter debug mode (changes to this setting require a Chirpity relaunch to take effect)">?</a>
+                                <label class="form-check-label me-2" for="debug-mode">Debug mode</label><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Debug Mode" id="Debug Mode-circle-help"  data-bs-content="Enter debug mode (changes to this setting require a Chirpity relaunch to take effect)">?</a>
                             </div>
                         </div>
                     </div>
@@ -577,7 +577,7 @@
                         <div class="text-nowrap">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" role="switch" id="do-not-track">
-                                <label class="form-check-label me-2" for="do-not-track">Opt out of usage analytics</label><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Disable Tracking" data-bs-content="Chirpity collects anonymous system data to enhance user experience and aid bug tracking. If you do not want to share this information, you can disable it here.">?</a>
+                                <label class="form-check-label me-2" for="do-not-track">Opt out of usage analytics</label><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Disable Tracking" id="Disable Tracking-circle-help"  data-bs-content="Chirpity collects anonymous system data to enhance user experience and aid bug tracking. If you do not want to share this information, you can disable it here.">?</a>
                             </div>        
                         </div>
                     </div>
@@ -585,7 +585,7 @@
                         <div class="text-nowrap">
                             <div class="form-check form-switch">
                                 <button class="btn btn-warning" id="reset-defaults" onclick="return false">Reset to default settings</button>
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Default Settings" data-bs-content="Reset the configuration settings to their default values. N.B. Relaunch Chirpity to see changes, also, language settings will need to be re-set manually">?</a>
+                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Default Settings" id="Default Settings-circle-help"  data-bs-content="Reset the configuration settings to their default values. N.B. Relaunch Chirpity to see changes, also, language settings will need to be re-set manually">?</a>
                             </div>
                         </div>
                     </div>
@@ -1122,10 +1122,10 @@
                 </div>
                 <!-- Controls view -->
                 <div class="container-fluid p-1 text-bg-dark d-inline-flex" id="controlsWrapper" style="max-height: 50px" title="Drag to resize the Spectrogram window.">
-                    <a id="guano" class="pointer pt-2 d-none" tabindex="-1" data-bs-custom-class="guano-popover" data-bs-html="true" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="File Metadata">
+                    <a id="guano" class="pointer pt-2 d-none" tabindex="-1" data-bs-custom-class="guano-popover" data-bs-html="true" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="File Metadata" id="File Metadata-circle-help" >
                         <span class="material-symbols-outlined"  title="Display GUANO metadata">other_admission</span></a>
                     <div id="filename" class="col-auto ps-1 overflow-visible flex-nowrap"></div>
-                    <div id="unsaved-icon" class="material-symbols-outlined ms-2 me-2 text-warning pointer d-none"  tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Unsaved Edits" data-bs-content="There are changes to the results that haven't been saved.">warning</div>
+                    <div id="unsaved-icon" class="material-symbols-outlined ms-2 me-2 text-warning pointer d-none"  tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Unsaved Edits" id="Unsaved Edits-circle-help"  data-bs-content="There are changes to the results that haven't been saved.">warning</div>
                     <div class="col-auto btn-group bg-dark ms-2 me-2 text-nowrap" role="group">
                         <button id="playToggle" class="p-1 pe-2 btn btn-outline-secondary" title="Play / Pause (SpaceBar)">
                             <span class="material-symbols-outlined ">play_circle</span><span
