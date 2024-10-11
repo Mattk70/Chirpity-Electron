@@ -189,6 +189,7 @@
 		"uuid": "^8.3.2",
 		"utimes": "5.2.1",
 		"wavefile-reader": "^1.1.1",
-		"wavesurfer.js": "6.6.4"
+		"wavesurfer.js": "6.6.4",
+		"p-limit": "3.1.0"
 	}
 }

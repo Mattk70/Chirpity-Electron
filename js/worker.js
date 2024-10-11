@@ -15,7 +15,7 @@ import { State } from './state.js';
 import { sqlite3 } from './database.js';
 import {trackEvent} from './tracking.js';
 
-const DEBUG = true;
+const DEBUG = false;
 
 // Function to join Buffers and not use Buffer.concat() which leads to detached ArrayBuffers
 function joinBuffers(buffer1, buffer2) {
@@ -3650,7 +3650,7 @@ async function convertAndOrganiseFiles(threadLimit) {
         // Does the file we want to convert exist?
         if (!fs.existsSync(inputFilePath)) {
             UI.postMessage({
-                event: 'generate-alert', type: 'Warning', 
+                event: 'generate-alert', type: 'warning', 
                 message: `Cannot access: ${inputFilePath}<br>Skipping conversion.`
             });
             continue;
@@ -3677,7 +3677,7 @@ async function convertAndOrganiseFiles(threadLimit) {
         // Add the file conversion to the pool
         fileProgressMap[inputFilePath] = 0;
         conversions.push(limit(() => convertFile(inputFilePath, fullFilePath, row, db, dbArchiveName, fileProgressMap)));
-        console.log(conversions)
+
     }
     
     Promise.allSettled(conversions).then((results) => {
