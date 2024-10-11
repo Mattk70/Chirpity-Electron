@@ -1000,12 +1000,9 @@ async function getWorkingFile(file) {
     // find the file
     const source_file = fs.existsSync(file) ? file : await locateFile(file);
     if (!source_file) return false;
-
-    if (!METADATA.file?.isComplete) {
-        const metadata = await setMetadata({ file: file, source_file: source_file });
-        if (!metadata) return false
-        METADATA[source_file] = METADATA[file];
-    }
+    const metadata = await setMetadata({ file: file, source_file: source_file });
+    if (!metadata) return false
+    METADATA[source_file] = METADATA[file];
     return source_file;
 }
 
@@ -1128,34 +1125,23 @@ function addDays(date, days) {
 */
 const setMetadata = async ({ file, source_file = file }) => {
     METADATA[file] ??= {};
+    if (METADATA[file].isComplete) return METADATA[file];
+
     // CHeck the database first, so we honour any manual updates.
     const savedMeta = await getSavedFileInfo(file).catch(error => console.warn('getSavedFileInfo error', error));
-    // If we have stored imfo about the file, set the saved flag;
-    METADATA[file].isSaved = !!savedMeta;
-    // Latitude only provided when updating location
-    // const latitude = savedMeta?.lat || STATE.lat;
-    // const longitude = savedMeta?.lon || STATE.lon;
-    // const row = await STATE.db.getAsync('SELECT id FROM locations WHERE lat = ? and lon = ?', latitude, longitude);
+    if (savedMeta) {
+        METADATA[file] = savedMeta;
+        METADATA[file].isSaved = true; // Queried by UI to establish saved state of file.
+    }
 
-    // using the nullish coalescing operator
-    METADATA[file].locationID ??= savedMeta?.locationID;
-    
-    METADATA[file].duration ??= savedMeta?.duration;
-    if (!METADATA[file].duration) {
+    let guanoTimestamp;    
+    // savedMeta may just have a locationID if it was set by onSetCUstomLocation
+    if (! savedMeta?.duration) {
         try {
             METADATA[file].duration = await getDuration(file)
         } catch {
             return probeFile(file)
-        }    
-    }
-    // Restore GUANO
-    METADATA[file].guano ??= savedMeta?.metadata;
-
-    if (METADATA[file].isComplete) {
-        return METADATA[file]
-    } else {
-        let fileStart, fileEnd, guanoTimestamp;
-
+        }
         if (file.toLowerCase().endsWith('wav')){
             const {extractGuanoMetadata} = await import('./guano.js').catch(error => {
                 console.warn('Error loading guano.js', error)}
@@ -1169,44 +1155,46 @@ const setMetadata = async ({ file, source_file = file }) => {
                     const roundedFloat = (string) => Math.round(parseFloat(string) * 10000) / 10000;
                     await onSetCustomLocation({ lat: roundedFloat(lat), lon: roundedFloat(lon), place: location, files: [file] }) 
                 }
-
                 guanoTimestamp = Date.parse(guano.Timestamp);
-                
+                METADATA[file].fileStart = guanoTimestamp;
                 METADATA[file].guano = JSON.stringify(guano);
             }
             DEBUG && console.log(`GUANO search took: ${(Date.now() - t0)/1000} seconds`);
         }
-        if (savedMeta?.filestart) { // Saved timestamps have the highest priority
-            fileStart = new Date(savedMeta.filestart);
-            fileEnd = new Date(fileStart.getTime() + (METADATA[file].duration * 1000));
-        } else if (guanoTimestamp) { // Guano if present second priority
-            fileStart = new Date(guanoTimestamp);
-            fileEnd = new Date(guanoTimestamp + (METADATA[file].duration * 1000));
-        } else { // Finally
-            const stat = fs.statSync(source_file);
-            fileEnd = new Date(stat.mtime);
-            fileStart = new Date(stat.mtime - (METADATA[file].duration * 1000));
-        }
-        
-        // split  the duration of this file across any dates it spans
-        METADATA[file].dateDuration = {};
-        const key = new Date(fileStart);
-        key.setHours(0, 0, 0, 0);
-        const keyCopy = addDays(key, 0).getTime();
-        if (fileStart.getDate() === fileEnd.getDate()) {
-            METADATA[file].dateDuration[keyCopy] = METADATA[file].duration;
-        } else {
-            const key2 = addDays(key, 1);
-            const key2Copy = addDays(key2, 0).getTime();
-            METADATA[file].dateDuration[keyCopy] = (key2Copy - fileStart) / 1000;
-            METADATA[file].dateDuration[key2Copy] = METADATA[file].duration - METADATA[file].dateDuration[keyCopy];
-        }
-        // Now we have completed the date comparison above, we convert fileStart to millis
-        fileStart = fileStart.getTime();
-        METADATA[file].fileStart = fileStart;
-        METADATA[file].isComplete = true;
-        return METADATA[file];
     }
+    let fileStart, fileEnd;
+    // Prepare to set dateDurations
+    if (savedMeta?.fileStart) { 
+        // Saved timestamps have the highest priority allowing for an override of Guano timestamp/file mtime
+        fileStart = new Date(savedMeta.fileStart);
+        fileEnd = new Date(fileStart.getTime() + (METADATA[file].duration * 1000));
+    } else if (guanoTimestamp) { // Guano has second priority
+        fileStart = new Date(guanoTimestamp);
+        fileEnd = new Date(guanoTimestamp + (METADATA[file].duration * 1000));
+    } else { // Least preferred
+        const stat = fs.statSync(source_file);
+        fileEnd = new Date(stat.mtime);
+        fileStart = new Date(stat.mtime - (METADATA[file].duration * 1000));
+    }
+    
+    // split  the duration of this file across any dates it spans
+    METADATA[file].dateDuration = {};
+    const key = new Date(fileStart);
+    key.setHours(0, 0, 0, 0);
+    const keyCopy = addDays(key, 0).getTime();
+    if (fileStart.getDate() === fileEnd.getDate()) {
+        METADATA[file].dateDuration[keyCopy] = METADATA[file].duration;
+    } else {
+        const key2 = addDays(key, 1);
+        const key2Copy = addDays(key2, 0).getTime();
+        METADATA[file].dateDuration[keyCopy] = (key2Copy - fileStart) / 1000;
+        METADATA[file].dateDuration[key2Copy] = METADATA[file].duration - METADATA[file].dateDuration[keyCopy];
+    }
+    // If we haven't set METADATA.file.fileStart by now we need to create it from a Date
+    METADATA[file].fileStart ??= fileStart.getTime();
+    // Set complete flag
+    METADATA[file].isComplete = true;
+    return METADATA[file];
 }
 
 function probeFile(file){
@@ -2154,7 +2142,7 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
         changes = 1;
         let durationSQL = Object.entries(METADATA[file].dateDuration)
         .map(entry => `(${entry.toString()},${fileID})`).join(',');
-        await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
+        await db.runAsync(`INSERT OR REPLACE INTO duration VALUES ${durationSQL}`);
     } else {
         fileID = res.id;
         fileStart = res.filestart;
@@ -2180,11 +2168,19 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     return changes;
 }
 
+const insertDurations = async (file, id) => {
+    const durationSQL = Object.entries(METADATA[file].dateDuration)
+    .map(entry => `(${entry.toString()},${id})`).join(',');
+    // No "OR IGNORE" in this statement because it should only run when the file is new
+    const result = await STATE.db.runAsync(`INSERT INTO duration VALUES ${durationSQL}`);
+    console.log('durations added ', result.changes)
+}
+
 const generateInsertQuery = async (latestResult, file) => {
     const db = STATE.db;              
     await db.runAsync('BEGIN');
     let insertQuery = 'INSERT OR IGNORE INTO records VALUES ';
-    let fileID, changes;
+    let fileID;
     let res = await db.getAsync('SELECT id FROM files WHERE name = ?', file);
     if (!res) {
         let id = null;
@@ -2204,16 +2200,11 @@ const generateInsertQuery = async (latestResult, file) => {
         res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,?,?,? )',
         undefined, file, METADATA[file].duration, METADATA[file].fileStart, id, null, METADATA[file].guano);
         fileID = res.lastID;
-        changes = 1;
+        await insertDurations(file, fileID);
     } else {
         fileID = res.id;
     }
-    if (changes) {
-        const durationSQL = Object.entries(METADATA[file].dateDuration)
-        .map(entry => `(${entry.toString()},${fileID})`).join(',');
-        // No "OR IGNORE" in this statement because it should only run when the file is new
-        await db.runAsync(`INSERT OR IGNORE INTO duration VALUES ${durationSQL}`);
-    }
+
     let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
     for (let i = 0; i < keysArray.length; i++) {
         const key = parseFloat(keysArray[i]);
@@ -2854,7 +2845,10 @@ const getSavedFileInfo = async (file) => {
         const prefix = STATE.archive.location + p.sep;
         // Get rid of archive (library) location prefix
         const archiveFile = file.replace(prefix , '');
-        let row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name = ? OR archiveName = ?',file, archiveFile);
+        let row = await diskDB.getAsync(`
+            SELECT duration, filestart AS fileStart, metadata AS guano, locationID
+            FROM files LEFT JOIN locations ON files.locationID = locations.id 
+            WHERE name = ? OR archiveName = ?`,file, archiveFile);
         if (!row) {
             const baseName = file.replace(/^(.*)\..*$/g, '$1%');
             row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)',baseName);
@@ -3109,26 +3103,35 @@ const getValidSpecies = async (file) => {
     UI.postMessage({ event: 'valid-species-list', included: includedSpecies, excluded: excludedSpecies })
 };
 
-const onUpdateFileStart = async (args) => {
+const onUpdateFileStart = async (args) => { 
     let file = args.file;
     const newfileMtime = new Date(Math.round(args.start + (METADATA[file].duration * 1000)));
     utimesSync(file, {atime: Date.now(), mtime: newfileMtime});
-    METADATA[file].fileStart = args.start;
-    let db = STATE.db;
-    let row = await db.getAsync(`
-        SELECT id, filestart, duration, locationID FROM files 
-        WHERE name = ?`, file);
 
+    METADATA[file].fileStart = args.start;
+    delete METADATA[file].isComplete;
+    let db = STATE.db;
+    let row = await db.getAsync('SELECT id, locationID FROM files  WHERE name = ?', file);
+    
     if (!row) {
         DEBUG && console.log('File not found in database, adding.');
-        await db.runAsync('INSERT INTO files (id, name, duration, filestart) values (?, ?, ?, ?)', undefined, file, METADATA[file].duration, args.start);
+        const result = await db.runAsync('INSERT INTO files (id, name, duration, filestart) values (?, ?, ?, ?)', undefined, file, METADATA[file].duration, args.start);
+        // update file metadata
+        await setMetadata({file});
+        await insertDurations(file, result.lastID);
         // If no file, no records, so we're done.
     }
     else {
-        const id = row.id;
-        const { changes } = await db.runAsync('UPDATE files SET filestart = ? where id = ?', args.start, id);
+        const {id, locationID} = row;
+        let { changes } = await db.runAsync('UPDATE files SET filestart = ? where id = ?', args.start, id);
         DEBUG && console.log(changes ? `Changed ${file}` : `No changes made`);
-
+        // update file metadata
+        await setMetadata({file});
+        // Update dateDuration
+        let result;
+        result = await db.runAsync('DELETE FROM duration WHERE fileID = ?', id);
+        console.log(result.changes, ' entries deleted from duration');
+        await insertDurations(file, id);
         try {
             // Begin transaction
             await db.runAsync('BEGIN TRANSACTION');
@@ -3160,8 +3163,8 @@ const onUpdateFileStart = async (args) => {
 
             // Update the daylight flag if necessary
             let lat, lon;
-            if (row.locationID) {
-                const location = await db.getAsync('SELECT lat, lon FROM locations WHERE id = ?', row.locationID);
+            if (locationID) {
+                const location = await db.getAsync('SELECT lat, lon FROM locations WHERE id = ?', locationID);
                 lat = location.lat;
                 lon = location.lon;
             } else {
@@ -3190,7 +3193,7 @@ const onUpdateFileStart = async (args) => {
                 // Commit transaction once all rows are processed
                 await db.runAsync('COMMIT');
                 DEBUG && console.log(`File ${file} updated successfully.`);
-                await Promise.all([getResults(), getSummary()]);
+                count && await Promise.all([getResults(), getSummary()]);
             });
         } catch (error) {
             // Rollback in case of error
@@ -3472,7 +3475,6 @@ async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
             } else {
                 METADATA[file] = {}
                 METADATA[file].locationID = id;
-                METADATA[file].isComplete = false;
             }
             // tell the UI the file has a location id
             UI.postMessage({ event: 'file-location-id', file: file, id: id });

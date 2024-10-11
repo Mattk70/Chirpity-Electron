@@ -740,10 +740,11 @@ function renderFilenamePanel() {
     const {parentFolder, fileName}  = extractFileNameAndFolder(openfile)
     const label = `${parentFolder}/${fileName}`;
     let appendStr;
+    const title = ` title="Context-click to update file start time or location" `;
     const isSaved = ['archive', 'explore'].includes(STATE.mode) ? 'text-info' : 'text-warning';
     if (files.length > 1) {
-        appendStr = `<div id="fileContainer" class="btn-group dropup">
-        <span class="filename ${isSaved}">${label}</span>
+        appendStr = `<div id="fileContainer" class="btn-group dropup pointer">
+        <span ${title} class="filename ${isSaved}">${label}</span>
         </button>
         <button class="btn btn-dark dropdown-toggle dropdown-toggle-split" type="button" 
         data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">+${files.length -1}
@@ -761,7 +762,7 @@ function renderFilenamePanel() {
     } else {
         appendStr = `<div id="fileContainer">
         <button class="btn btn-dark" type="button" id="dropdownMenuButton">
-        <span class="filename ${isSaved}">${label}</span>
+        <span ${title} class="filename ${isSaved}">${label}</span>
         </button></div>`;
     }
     
