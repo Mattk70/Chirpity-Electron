@@ -1679,7 +1679,7 @@ const defaultConfig = {
     filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0, sendToModel: false },
     warmup: true,
     hasNode: false,
-    tensorflow: { threads: DIAGNOSTICS['Cores'], batchSize: 32 },
+    tensorflow: { threads: DIAGNOSTICS['Cores'], batchSize: 8 },
     webgpu: { threads: 2, batchSize: 8 },
     webgl: { threads: 2, batchSize: 32 },
     audio: { gain: 0, format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, 
@@ -1894,7 +1894,7 @@ const setUpWorkerMessaging = () => {
                     customAnalysisAllMenu(args.result)
                     break;
                 }
-                case "analysis-complete": {onAnalysisComplete();
+                case "analysis-complete": {onAnalysisComplete(args);
                     break;
                 }
                 case "audio-file-to-save": {onSaveAudio(args);
@@ -2761,7 +2761,12 @@ function centreSpec(){
     /////////// Keyboard Shortcuts  ////////////
       
     const GLOBAL_ACTIONS = { // eslint-disable-line
-        a: function (e) { ( e.ctrlKey || e.metaKey) && currentFile && document.getElementById('analyse').click()},
+        a: function (e) { 
+            if (( e.ctrlKey || e.metaKey) && currentFile) {
+                const element = e.shiftKey ? 'analyseAll' : 'analyse';
+                document.getElementById(element).click();
+            }
+        },
         A: function (e) { ( e.ctrlKey || e.metaKey) && currentFile && document.getElementById('analyseAll').click()},
         c: function (e) { 
             // Center window on playhead
@@ -3210,10 +3215,11 @@ function centreSpec(){
         }
     }
     
-    function onAnalysisComplete(){
+    function onAnalysisComplete({quiet}){
         PREDICTING = false;
         STATE.analysisDone = true;
         DOM.progressDiv.classList.add('d-none');
+        if (quiet) return
         // DIAGNOSTICS:
         t1_analysis = Date.now();
         const analysisTime = ((t1_analysis - t0_analysis) / 1000).toFixed(2);

@@ -71,7 +71,7 @@ onmessage = async (e) => {
                 break;
             }
             case "predict": {
-                if (myModel.model_loaded) {
+                if (myModel?.model_loaded) {
                     const { chunks, start, fileStart, file, snr, confidence, worker, context, resetResults } = e.data;
                     myModel.useContext = context;
                     myModel.selection =  !resetResults;

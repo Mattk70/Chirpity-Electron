@@ -390,6 +390,13 @@ async function handleMessage(e) {
             break;
         }
         case "analyse": {
+            if (!predictWorkers.length) {
+                UI.postMessage({event: 'generate-alert', type: 'warning',  
+                    message: `A previous analysis resulted in an out-of-memory error, it is recommended you reduce the batch size from ${BATCH_SIZE}`
+                })
+                UI.postMessage({event: 'analysis-complete', quiet: true});
+                break;
+            }
             predictionsReceived = {};
             predictionsRequested = {};
             await onAnalyse(args);
@@ -959,21 +966,20 @@ async function onAnalyse({
 
 function onAbort({
     model = STATE.model,
-    list = 'nocturnal',
+    list = STATE.list,
 }) {
     aborted = true;
     FILE_QUEUE = [];
-    index = 0;
-    DEBUG && console.log("abort received")
-    if (filesBeingProcessed.length) {
-        //restart the workers
-        terminateWorkers();
-        spawnPredictWorkers(model, list, BATCH_SIZE, NUM_WORKERS)
-    }
     predictQueue = [];
     filesBeingProcessed = [];
     predictionsReceived = {};
     predictionsRequested = {};
+    index = 0;
+    DEBUG && console.log("abort received")
+    //restart the workers
+    terminateWorkers();
+    spawnPredictWorkers(model, list, BATCH_SIZE, NUM_WORKERS)
+
 }
 
 const getDuration = async (src) => {
@@ -1283,7 +1289,7 @@ function setupCtx(audio, rate, destination, file) {
         offlineSource.start();
         return offlineCtx;
     })
-    .catch(error => console.warn(error, file));    
+    .catch(error => aborted || console.warn(error, file));    
 };
 
 
@@ -1401,7 +1407,10 @@ const getWavePredictBuffers = async ({
 function processPredictQueue(audio, file, end, chunkStart){
 
     if (! audio) [audio, file, end, chunkStart]  = predictQueue.shift(); // Dequeue chunk
-    audio.length === 0 && console.warn('Shifted zero length audio from predict queue')
+    if (audio.length === 0) {
+        console.error('Shifted zero length audio from predict queue');
+        return
+    } 
     setupCtx(audio, undefined, 'model', file).then(offlineCtx => {
         let worker;
         if (offlineCtx) {
@@ -1412,18 +1421,49 @@ function processPredictQueue(audio, file, end, chunkStart){
                 feedChunksToModel(myArray, chunkStart, file, end, worker);
                 return
             }).catch((error) => {
-                console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
+                aborted || console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
                 updateFilesBeingProcessed(file);
                 return
             });
         } else {
-            console.log('Short chunk', audio.length, 'padding');
-            let chunkLength = STATE.model === 'birdnet' ? 144_000 : 72_000;
-            workerInstance = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-            worker = workerInstance;
-            const myArray = new Float32Array(Array.from({ length: chunkLength }).fill(0));
-            feedChunksToModel(myArray, chunkStart, file, end);
-        }}).catch(error => { console.warn(file, error) })
+            if (audio.length === 0){
+                if (!aborted){
+                    // If the audio length is 0 now, we must have run out of memory
+                    console.error(`Out of memory. Batchsize reduction from ${BATCH_SIZE} recommended`);
+                    aborted = true;
+                    // Hard quit
+                    terminateWorkers();
+                    UI.postMessage({event: 'analysis-complete', quiet: true})
+                    const message = `
+                        <p class="text-danger h6">System memory exhausted, the operation has been terminated. </p>
+                        <p>
+                        <b>Tip:</b> Lower the batch size from ${BATCH_SIZE} in the system settings.<p>`;
+                    UI.postMessage({event: 'generate-alert', type: 'error',  message: message})
+                    // Let's do a system notification here:
+                    if (Notification.permission === "granted") {
+                        // Check whether notification permissions have already been granted;
+                        // if so, create a notification
+                        const sysMsg = `System memory exhausted. Aborting analysis. Tip: reduce batch size from ${BATCH_SIZE}`;
+                        const notification = new Notification(sysMsg, {requireInteraction: true, icon: 'img/icon/chirpity_logo2.png'});
+                    } else if (Notification.permission !== "denied") {
+                        // We need to ask the user for permission
+                        Notification.requestPermission().then((permission) => {
+                            // If the user accepts, let's create a notification
+                            if (permission === "granted") {
+                                const notification = new Notification(sysMsg, {requireInteraction: true, icon: 'img/icon/chirpity_logo2.png'});
+                            }
+                        });
+                    }
+                return
+            }
+        }
+        console.log('Short chunk', audio.length, 'padding');
+        let chunkLength = STATE.model === 'birdnet' ? 144_000 : 72_000;
+        workerInstance = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
+        worker = workerInstance;
+        const myArray = new Float32Array(Array.from({ length: chunkLength }).fill(0));
+        feedChunksToModel(myArray, chunkStart, file, end);
+    }}).catch(error => { aborted || console.warn(file, error) })
 }
 
 const getPredictBuffers = async ({
@@ -2087,11 +2127,10 @@ function spawnPredictWorkers(model, list, batchSize, threads) {
 }
 
 const terminateWorkers = () => {
-    predictWorkers.forEach(worker => {
-        worker.postMessage({ message: 'abort' })
+        predictWorkers.forEach(worker => {
         worker.terminate()
     })
-    predictWorkers = [];
+        predictWorkers = [];
 }
 
 async function batchInsertRecords(cname, label, files, originalCname) {
@@ -2181,7 +2220,6 @@ const insertDurations = async (file, id) => {
     .map(entry => `(${entry.toString()},${id})`).join(',');
     // No "OR IGNORE" in this statement because it should only run when the file is new
     const result = await STATE.db.runAsync(`INSERT INTO duration VALUES ${durationSQL}`);
-    console.log('durations added ', result.changes)
 }
 
 const generateInsertQuery = async (latestResult, file) => {
@@ -2367,11 +2405,7 @@ function updateFilesBeingProcessed(file) {
         if (!STATE.selection) getSummary();
         // Need this here in case last file is not sent for analysis (e.g. nocmig mode)
         UI.postMessage({event: 'analysis-complete'})
-        // // refresh the webgpu backend
-        // if (STATE.detect.backend === 'webgpu' ) {
-        //     terminateWorkers();
-        //     spawnPredictWorkers(STATE.model, STATE.list, BATCH_SIZE, NUM_WORKERS)
-        // }
+
     }
 }
         
@@ -3705,8 +3739,10 @@ async function convertAndOrganiseFiles(threadLimit) {
         let summaryMessage;
         
         if (attempted) {
+            let type = 'notice';
            summaryMessage = `Processing complete: ${successfulConversions} successful, ${failedConversions} failed.`;
            if (failedConversions > 0) {
+                type = 'warning';
                 summaryMessage += `<br>Failed conversion reasons:<br><ul>`;
                 failureReasons.forEach(reason => {
                     summaryMessage += `<li>${reason}</li>`;
@@ -3717,7 +3753,7 @@ async function convertAndOrganiseFiles(threadLimit) {
 
         // Post the summary message
         UI.postMessage({
-            event: `generate-alert`,
+            event: `generate-alert`, type: type,
             message: summaryMessage
         });
     })
