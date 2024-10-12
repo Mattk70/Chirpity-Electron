@@ -5406,9 +5406,9 @@ async function getXCComparisons(){
     
     if (XCcache[sname]) renderComparisons(XCcache[sname], cname);
     else {
-        const loading = document.getElementById('loadingOverlay')
-        loading.querySelector('#loadingText').textContent = 'Loading Xeno-Canto data...';
-        loading.classList.remove('d-none');
+
+        DOM.loading.querySelector('#loadingText').textContent = 'Loading Xeno-Canto data...';
+        DOM.loading.classList.remove('d-none');
         const quality = '+q:%22>C%22';
         const length = '+len:3-15';
         fetch(`https://xeno-canto.org/api/2/recordings?query=${sname}${quality}${length}`)
@@ -5637,10 +5637,9 @@ function showCompareSpec() {
     const activeCarouselItem = document.querySelector('#recordings .tab-pane.active .carousel-item.active');
     const mediaContainer = activeCarouselItem.lastChild;
     // need to prevent accumulation, and find event for show/hide loading
-    let loading = document.getElementById('loadingOverlay')
-    loading = loading.cloneNode(true);
-    loading.classList.remove('d-none', 'text-white');
-    loading.firstElementChild.textContent = 'Loading audio from Xeno-Canto...'
+    DOM.loading = loading.cloneNode(true);
+    DOM.loading.classList.remove('d-none', 'text-white');
+    DOM.loading.firstElementChild.textContent = 'Loading audio from Xeno-Canto...'
     mediaContainer.appendChild(loading);
     //console.log("id is ", mediaContainer.id)
     const [specContainer, file] = mediaContainer.getAttribute('name').split('|');
