@@ -5637,9 +5637,9 @@ function showCompareSpec() {
     const activeCarouselItem = document.querySelector('#recordings .tab-pane.active .carousel-item.active');
     const mediaContainer = activeCarouselItem.lastChild;
     // need to prevent accumulation, and find event for show/hide loading
-    DOM.loading = loading.cloneNode(true);
-    DOM.loading.classList.remove('d-none', 'text-white');
-    DOM.loading.firstElementChild.textContent = 'Loading audio from Xeno-Canto...'
+    const loading = DOM.loading.cloneNode(true);
+    loading.classList.remove('d-none', 'text-white');
+    loading.firstElementChild.textContent = 'Loading audio from Xeno-Canto...'
     mediaContainer.appendChild(loading);
     //console.log("id is ", mediaContainer.id)
     const [specContainer, file] = mediaContainer.getAttribute('name').split('|');
