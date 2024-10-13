@@ -1106,7 +1106,7 @@ function postAnalyseMessage(args) {
         disableMenuItem(['analyseSelection']);
         const selection = !!args.end;
         const filesInScope = args.filesInScope;
-        //updateProgress(0);
+
         if (!selection) {
             analyseReset();
             refreshResultsView();

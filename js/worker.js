@@ -1298,7 +1298,7 @@ function checkBacklog(stream) {
         const backlog = sumObjectValues(predictionsRequested) - sumObjectValues(predictionsReceived);
         DEBUG && console.log('backlog:', backlog);
         
-        if (backlog > 200) {
+        if (backlog >=  predictWorkers.length * 4) {
             // If queued value is above 100, wait and check again
             setTimeout(() => {
                 checkBacklog(stream)
@@ -1411,6 +1411,7 @@ function processPredictQueue(audio, file, end, chunkStart){
         console.error('Shifted zero length audio from predict queue');
         return
     } 
+    predictionsRequested[file]++; // do this before any async stuff
     setupCtx(audio, undefined, 'model', file).then(offlineCtx => {
         let worker;
         if (offlineCtx) {
@@ -1421,6 +1422,7 @@ function processPredictQueue(audio, file, end, chunkStart){
                 feedChunksToModel(myArray, chunkStart, file, end, worker);
                 return
             }).catch((error) => {
+                predictionsRequested[file]--; // Didn't request a prediction after all
                 aborted || console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
                 updateFilesBeingProcessed(file);
                 return
@@ -1448,7 +1450,10 @@ function processPredictQueue(audio, file, end, chunkStart){
         worker = workerInstance;
         const myArray = new Float32Array(Array.from({ length: chunkLength }).fill(0));
         feedChunksToModel(myArray, chunkStart, file, end);
-    }}).catch(error => { aborted || console.warn(file, error) })
+    }}).catch(error => { 
+        aborted || console.warn(file, error) ;
+        predictionsRequested[file]--; // Didn't request a prediction after all
+    })
 }
 
 const getPredictBuffers = async ({
@@ -1667,7 +1672,7 @@ function isDuringDaylight(datetime, lat, lon) {
 }
 
 async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
-    predictionsRequested[file]++;
+
     if (worker === undefined) {
         // pick a worker - this method is faster than looking for available workers
         worker = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance
