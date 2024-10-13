@@ -3691,9 +3691,9 @@ async function convertAndOrganiseFiles(threadLimit) {
         const attempted  = successfulConversions + failedConversions;
         // Create a summary message
         let summaryMessage;
+        let type = 'notice';
         
         if (attempted) {
-            let type = 'notice';
            summaryMessage = `Processing complete: ${successfulConversions} successful, ${failedConversions} failed.`;
            if (failedConversions > 0) {
                 type = 'warning';

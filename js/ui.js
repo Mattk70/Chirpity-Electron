@@ -1,6 +1,6 @@
 import {trackVisit, trackEvent} from './tracking.js';
 
-let seenTheDarkness = false, shownDaylightBanner = false, LOCATIONS, locationID = undefined, loadingTimeout;
+let shownDaylightBanner = false, LOCATIONS, locationID = undefined, loadingTimeout;
 const startTime = performance.now();
 let LABELS = [], DELETE_HISTORY = [];
 // Save console.warn and console.error functions
@@ -316,7 +316,6 @@ function resetResults({clearSummary = true, clearPagination = true, clearResults
         DOM.resultHeader.textContent = '';
     }
     predictions = {};
-    seenTheDarkness = false;
     shownDaylightBanner = false;
     DOM.progressDiv.classList.add('d-none');
     updateProgress(0)
@@ -3415,7 +3414,6 @@ function centreSpec(){
                 isDaylight
             } = result;
             const dayNight = isDaylight ? 'daytime' : 'nighttime'; // checkDayNight(timestamp);
-            if (dayNight === 'nighttime') seenTheDarkness = true;
             // Todo: move this logic so pre dark sections of file are not even analysed
             if (config.detect.nocmig && !selection && dayNight === 'daytime') return
             
