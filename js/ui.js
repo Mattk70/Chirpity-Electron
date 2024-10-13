@@ -3420,7 +3420,7 @@ function centreSpec(){
             if (config.detect.nocmig && !selection && dayNight === 'daytime') return
             
             // Show twilight indicator when  nocmig mode off (except when analysing a selection)
-            if (shownDaylightBanner === false && dayNight === 'daytime') {
+            if (shownDaylightBanner === false && dayNight === 'daytime' && STATE.sortOrder === 'timestamp') {
                 // Only do this if change starts midway through a file
                 if ((index - 1) % config.limit !== 0) {
                     // Show the twilight start bar
