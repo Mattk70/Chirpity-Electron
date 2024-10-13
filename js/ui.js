@@ -1364,8 +1364,8 @@ selectionTable.addEventListener('click', resultClick);
 
 async function resultClick(e) {
     let row = e.target.closest('tr');
-    if (!row || row.classList.length === 0) { 
-        // 1. clicked and dragged, 2 no detections in file row, 3. already selected this row
+    if (!row || row.classList.length === 0 || row.classList.contains('text-bg-dark')) { 
+        // 1. clicked and dragged, 2 no detections in file row, 3. daylight banner
         return
     }
     
@@ -3422,7 +3422,7 @@ function centreSpec(){
                 // Only do this if change starts midway through a file
                 if ((index - 1) % config.limit !== 0) {
                     // Show the twilight start bar
-                    tr += `<tr class="text-bg-dark"><td colspan="20" class="text-center text-white">
+                    tr += `<tr class="text-bg-dark"><td colspan="20" class="text-center">
                     Start of civil twilight <span class="material-symbols-outlined text-warning align-bottom">wb_twilight</span>
                     </td></tr>`;
                 }
