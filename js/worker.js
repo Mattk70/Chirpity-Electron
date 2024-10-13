@@ -15,7 +15,7 @@ import { State } from './state.js';
 import { sqlite3 } from './database.js';
 import {trackEvent} from './tracking.js';
 
-const DEBUG = false;
+const DEBUG = true;
 
 // Function to join Buffers and not use Buffer.concat() which leads to detached ArrayBuffers
 function joinBuffers(buffer1, buffer2) {
@@ -1149,8 +1149,8 @@ const setMetadata = async ({ file, source_file = file }) => {
     if (! savedMeta?.duration) {
         try {
             METADATA[file].duration = await getDuration(file)
-        } catch {
-            return probeFile(file)
+        } catch (e) {
+            throw new Error('Unable to determine file duration ', e);
         }
         if (file.toLowerCase().endsWith('wav')){
             const {extractGuanoMetadata} = await import('./guano.js').catch(error => {
@@ -1205,35 +1205,6 @@ const setMetadata = async ({ file, source_file = file }) => {
     // Set complete flag
     METADATA[file].isComplete = true;
     return METADATA[file];
-}
-
-function probeFile(file){
-    // Use ffprobe to get file information
-    ffmpeg.ffprobe('file:'+file, (err, metadata) => {
-        if (err) {
-            console.error('getDuration error: Error retrieving file info:', err);
-        } else {
-            //Log the file name
-            console.warn('getDuration error', file);
-            const formats = metadata.format.format_name.split(',')
-                    .filter(format => SUPPORTED_FILES.includes(`.${format}`));
-
-            const codec = metadata.streams[0].codec_name;
-            const ext = p.extname(file).replace('.', '');
-            if (!formats.includes(ext)){
-                UI.postMessage({
-                    event: 'generate-alert', 
-                    type: 'warning',  
-                    message: `The file ${p.basename(file)} seems to have an incorrect extension. 
-                        Chirpity supports the following extensions for this file type: 
-                        <b>${formats.join(',')}</b><br/>
-                        <p> Try renaming it to ${p.basename(file, ext)}${formats[0]}.</p>`});
-            }
-            // Log the metadata to the console
-            console.warn('File metadata:', `Format: ${formats}, Codec: ${codec}`);
-        }
-        return false;
-    });
 }
 
 function setupCtx(audio, rate, destination, file) {
