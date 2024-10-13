@@ -1215,7 +1215,7 @@ function probeFile(file){
     // Use ffprobe to get file information
     ffmpeg.ffprobe('file:'+file, (err, metadata) => {
         if (err) {
-            console.error('getDuration error: Error retrieving file info:', JSON.stringify(err));
+            console.error('getDuration error: Error retrieving file info:', err);
         } else {
             //Log the file name
             console.warn('getDuration error', file);
