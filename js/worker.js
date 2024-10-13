@@ -20,12 +20,8 @@ const DEBUG = false;
 // Function to join Buffers and not use Buffer.concat() which leads to detached ArrayBuffers
 function joinBuffers(buffer1, buffer2) {
     // Create a new buffer with the combined length
-    const combinedBuffer = Buffer.alloc(buffer1.length + buffer2.length);
-
-    // Copy buffer1 into the new buffer
+    const combinedBuffer = Buffer.allocUnsafe(buffer1.length + buffer2.length);
     buffer1.copy(combinedBuffer, 0);
-
-    // Copy buffer2 into the new buffer, starting from the end of buffer1
     buffer2.copy(combinedBuffer, buffer1.length);
     return combinedBuffer;
 }
@@ -1294,23 +1290,20 @@ function setupCtx(audio, rate, destination, file) {
 
 
 function checkBacklog(stream) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         const backlog = sumObjectValues(predictionsRequested) - sumObjectValues(predictionsReceived);
         DEBUG && console.log('backlog:', backlog);
         
-        if (backlog >=  predictWorkers.length * 4) {
-            // If queued value is above 100, wait and check again
+        if (backlog >= predictWorkers.length * 2) {
+            // If backlog is too high, check again after a short delay
             setTimeout(() => {
-                checkBacklog(stream)
-                    .then(resolve) // Resolve the promise when backlog is within limit
-                    .catch(reject);
-            }, 500); // Check every 0.5 seconds
+                resolve(checkBacklog(stream)); // Recursively call until backlog is within limits
+            }, 50);
         } else {
-            resolve(stream.read()); // backlog ok then read the stream data
+            resolve(stream.read()); // Backlog ok, read the stream data
         }
     });
 }
-
 
 /**
 *
