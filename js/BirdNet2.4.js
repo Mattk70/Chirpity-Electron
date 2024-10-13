@@ -24,7 +24,10 @@ onmessage = async (e) => {
     let response;
     try {
         switch (modelRequest) {
-
+            case 'change-batch-size': {
+                myModel.warmUp(e.data.batchSize);
+                break;
+            }
             case "load": {
                 const version = e.data.model;
                 DEBUG && console.log("load request to worker");

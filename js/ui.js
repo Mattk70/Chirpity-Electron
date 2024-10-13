@@ -4693,20 +4693,33 @@ DOM.gain.addEventListener('input', () => {
                     break;
                 }
                 case 'thread-slider': {
-                        // number of threads
-                    DOM.numberOfThreads.textContent = DOM.threadSlider.value;
-                    config[config[config.model].backend].threads = DOM.threadSlider.valueAsNumber;
-                    loadModel();
+                    if (PREDICTING){
+                        generateToast({message: 'It is not possible to change the number of threads while an analysis is underway', type:'warning'})
+                        DOM.threadSlider.value = config[config[config.model].backend].threads
+                    } else {
+                        // change number of threads
+                        DOM.numberOfThreads.textContent = DOM.threadSlider.value;
+                        config[config[config.model].backend].threads = DOM.threadSlider.valueAsNumber;
+                        worker.postMessage({action: 'change-threads', threads: DOM.threadSlider.valueAsNumber})
+                    }
                     break;
                 }
                 case 'batch-size': {
-                    DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
-                    config[config[config.model].backend].batchSize = BATCH_SIZE_LIST[element.value];
-                    // Need this in case a non-default batchsize was set, and then changed to 32
-                    if (config[config.model].backend === 'tensorflow') config.tensorflow.batchSizeWasReset = true;
-                    loadModel();
-                    // Reset region maxLength
-                    initRegion();
+                    if (PREDICTING){
+                        generateToast({message: 'It is not possible to change the batch size while an analysis is underway', type:'warning'})
+                        const batch = config[config[config.model].backend].batchSize;
+                        DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(batch);
+                        DOM.batchSizeValue.textContent = batch;
+                    } else {
+                        DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
+                        config[config[config.model].backend].batchSize = BATCH_SIZE_LIST[element.value];
+                        // Need this in case a non-default batchsize was set, and then changed to 32
+                        if (config[config.model].backend === 'tensorflow') config.tensorflow.batchSizeWasReset = true;
+
+                        worker.postMessage({action: 'change-batch-size', batchSize: BATCH_SIZE_LIST[element.value]})
+                        // Reset region maxLength
+                        initRegion();
+                    }
                     break;
                 }
                 case 'colourmap': {

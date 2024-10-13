@@ -398,6 +398,27 @@ async function handleMessage(e) {
             await onAnalyse(args);
             break;
         }
+        case 'change-batch-size': {
+            BATCH_SIZE = args.batchSize;
+            predictWorkers.forEach(worker => {
+                worker.postMessage({message:'change-batch-size', batchSize: BATCH_SIZE})
+            })
+            break;
+        }
+        case 'change-threads': {
+            const threads = e.data.threads;
+            const delta = threads - predictWorkers.length;
+            NUM_WORKERS+=delta;
+            if (delta > 0) {
+                spawnPredictWorkers(STATE.model, STATE.list, BATCH_SIZE, delta)
+            } else {
+                for (let i = delta; i < 0; i++) {
+                    const worker = predictWorkers.pop();
+                    worker.terminate();
+                }
+            }
+            break;
+        }
         case "change-mode": {
             await onChangeMode(args.mode);
             break;
@@ -594,7 +615,8 @@ async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backen
     await checkAndApplyUpdates(diskDB);
     await createDB(); // now make the memoryDB
     STATE.update({ db: memoryDB })
-    spawnPredictWorkers(model, list, batchSize, threads);
+    NUM_WORKERS = threads;
+    spawnPredictWorkers(model, list, batchSize, NUM_WORKERS);
 }
 
 
@@ -2025,13 +2047,7 @@ const processQueue = async () => {
         await parseMessage(message).catch( (error) => {
             console.warn("Parse message error", error, 'message was', message);
         });
-        // Dial down the getSummary calls if the queue length starts growing
-        // if (messageQueue.length > NUM_WORKERS * 2 )  {
-        //     STATE.incrementor = Math.min(STATE.incrementor *= 2, 256);
-        //     console.log('increased incrementor to ', STATE.incrementor)
-        // }
-
-        
+       
         // Set isParsing to false to allow the next message to be processed
         isParsing = false;
         
@@ -2043,7 +2059,6 @@ const processQueue = async () => {
                
 /// Workers  From the MDN example5
 function spawnPredictWorkers(model, list, batchSize, threads) {
-    NUM_WORKERS = threads;
     // And be ready to receive the list:
     for (let i = 0; i < threads; i++) {
         const workerSrc = model === 'v3' ? 'BirdNet' : model === 'birdnet' ? 'BirdNet2.4' : 'model';
