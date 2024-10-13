@@ -1438,22 +1438,7 @@ function processPredictQueue(audio, file, end, chunkStart){
                         <p class="text-danger h6">System memory exhausted, the operation has been terminated. </p>
                         <p>
                         <b>Tip:</b> Lower the batch size from ${BATCH_SIZE} in the system settings.<p>`;
-                    UI.postMessage({event: 'generate-alert', type: 'error',  message: message})
-                    // Let's do a system notification here:
-                    if (Notification.permission === "granted") {
-                        // Check whether notification permissions have already been granted;
-                        // if so, create a notification
-                        const sysMsg = `System memory exhausted. Aborting analysis. Tip: reduce batch size from ${BATCH_SIZE}`;
-                        const notification = new Notification(sysMsg, {requireInteraction: true, icon: 'img/icon/chirpity_logo2.png'});
-                    } else if (Notification.permission !== "denied") {
-                        // We need to ask the user for permission
-                        Notification.requestPermission().then((permission) => {
-                            // If the user accepts, let's create a notification
-                            if (permission === "granted") {
-                                const notification = new Notification(sysMsg, {requireInteraction: true, icon: 'img/icon/chirpity_logo2.png'});
-                            }
-                        });
-                    }
+                    UI.postMessage({event: 'generate-alert', type: 'error',  message: message, autohide: false})
                 return
             }
         }

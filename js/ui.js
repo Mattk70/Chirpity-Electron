@@ -1723,10 +1723,18 @@ window.onload = async () => {
             };
         //fill in defaults - after updates add new items
         fillDefaults(config, defaultConfig);
-        // Reset defaults for webgpu
-            if (config.webgpu.batchSize === 32 && config.webgpu.threads === 2) 
-                config.webgpu = {threads: 2, batchSize: 4};
-
+        // Reset defaults for tensorflow batchsize. If removing, update change handler for batch-size
+        if (config.tensorflow.batchSizeWasReset !== true && config.tensorflow.batchSize === 32) {
+            const RAM = parseInt(DIAGNOSTICS['System Memory'].replace(' GB', ''));
+            if (!RAM || RAM < 9){
+                config.tensorflow.batchSize = 8;
+                generateToast({message: `The new default CPU backend batch size of 8 has been applied. 
+                    This should result in faster prediction due to lower memory requirements. 
+                    Batch size can still be changed in settings`, autohide: false})
+            }
+            config.tensorflow.batchSizeWasReset = true;
+            updatePrefs('config.json', config)
+        }
 
         // set version
         config.VERSION = VERSION;
@@ -1946,7 +1954,7 @@ const setUpWorkerMessaging = () => {
                             </div>
                             `
                     }
-                    generateToast({ type: args.type, message: args.message});
+                    generateToast({ type: args.type, message: args.message, autohide: args.autohide});
                     // This is how we know the database update has completed
                     if (args.database && config.archive.auto) document.getElementById('compress-and-organise').click();
                 break;
@@ -4696,6 +4704,8 @@ DOM.gain.addEventListener('input', () => {
                 case 'batch-size': {
                     DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
                     config[config[config.model].backend].batchSize = BATCH_SIZE_LIST[element.value];
+                    // Need this in case a non-default batchsize was set, and then changed to 32
+                    if (config[config.model].backend === 'tensorflow') config.tensorflow.batchSizeWasReset = true;
                     loadModel();
                     // Reset region maxLength
                     initRegion();
@@ -5278,7 +5288,7 @@ async function readLabels(labelFile, updating){
     }
     
 
-    function generateToast({message = '', type = 'info'} ={}) {
+    function generateToast({message = '', type = 'info', autohide = true} ={}) {
         const domEl = document.getElementById('toastContainer');
         
         const wrapper = document.createElement('div');
@@ -5329,7 +5339,7 @@ async function readLabels(labelFile, updating){
 
         
         domEl.appendChild(wrapper)
-        const toast = new bootstrap.Toast(wrapper)
+        const toast = new bootstrap.Toast(wrapper, {autohide: autohide})
         toast.show()
         if (message === 'Analysis complete.'){
             const duration = parseFloat(DIAGNOSTICS['Analysis Duration'].replace(' seconds', ''));
