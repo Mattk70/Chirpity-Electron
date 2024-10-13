@@ -1429,15 +1429,15 @@ function processPredictQueue(audio, file, end, chunkStart){
             if (audio.length === 0){
                 if (!aborted){
                     // If the audio length is 0 now, we must have run out of memory
-                    console.error(`Out of memory. Batchsize reduction from ${BATCH_SIZE} recommended`);
-                    aborted = true;
-                    // Hard quit
                     terminateWorkers();
+                    // Hard quit
                     UI.postMessage({event: 'analysis-complete', quiet: true})
-                    const message = `
-                        <p class="text-danger h6">System memory exhausted, the operation has been terminated. </p>
-                        <p>
-                        <b>Tip:</b> Lower the batch size from ${BATCH_SIZE} in the system settings.<p>`;
+                    console.error(`Out of memory. Batch size was (${BATCH_SIZE}) threads: ${predictWorkers.length}`);
+                        aborted = true;
+                        const message = `
+                            <p class="text-danger h6">System memory exhausted, the operation has been terminated. </p>
+                            <p>
+                            <b>Tip:</b> Close any unnecessary open applications. If that is not effective, reduce the number of Threads ${BATCH_SIZE > 4 ? 'or lower the batch size' : ''} in the system settings'}.<p>`;
                     UI.postMessage({event: 'generate-alert', type: 'error',  message: message, autohide: false})
                 return
             }
