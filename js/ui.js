@@ -1726,7 +1726,7 @@ window.onload = async () => {
         // Reset defaults for tensorflow batchsize. If removing, update change handler for batch-size
         if (config.tensorflow.batchSizeWasReset !== true && config.tensorflow.batchSize === 32) {
             const RAM = parseInt(DIAGNOSTICS['System Memory'].replace(' GB', ''));
-            if (!RAM || RAM < 9){
+            if (!RAM || RAM < 16){
                 config.tensorflow.batchSize = 8;
                 generateToast({message: `The new default CPU backend batch size of 8 has been applied. 
                     This should result in faster prediction due to lower memory requirements. 
