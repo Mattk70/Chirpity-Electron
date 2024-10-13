@@ -204,6 +204,7 @@ const DOM = {
     get customListFile() { if (!this._customListFile) { this._customListFile = document.getElementById('custom-list-location') } return this._customListFile},
     get customListSelector() { if (!this._customListSelector) { this._customListSelector = document.getElementById('list-file-selector') } return this._customListSelector},
     get customListContainer() { if (!this._customListContainer) { this._customListContainer = document.getElementById('choose-file-container') } return this._customListContainer},
+    get locale() { if (!this._locale) { this._locale = document.getElementById('locale') } return this._locale},
     get localSwitch() { if (!this._localSwitch) { this._localSwitch = document.getElementById('local') } return this._localSwitch},
     get localSwitchContainer() { if (!this._localSwitchContainer) { this._localSwitchContainer = document.getElementById('use-location-container') } return this._localSwitchContainer},
     get modelToUse() { if (!this._modelToUse) { this._modelToUse = document.getElementById('model-to-use') } return this._modelToUse},
@@ -1749,7 +1750,7 @@ window.onload = async () => {
         DOM.localSwitch.checked = config.local;
 
         // Show Locale
-        document.getElementById('locale').value = config[config.model].locale;
+        DOM.locale.value = config[config.model].locale;
         // remember audio notification setting
         DOM.audioNotification.checked = config.audio.notification;
         
@@ -4647,19 +4648,24 @@ DOM.gain.addEventListener('input', () => {
                     break;
                 }
                 case 'locale': {
-                    let labelFile;
-                    if (element.value === 'custom'){
-                        labelFile = config.customListFile[config.model];
-                        if (! labelFile) {
-                             generateToast({type: 'warning', message: 'You must select a label file in the list settings to use the custom language option.'});
-                            return;
+                    if (PREDICTING){
+                        generateToast({message: 'It is not possible to change the language while an analysis is underway', type:'warning'})
+                        DOM.locale.value = config[config.model].locale
+                    } else{
+                        let labelFile;
+                        if (element.value === 'custom'){
+                            labelFile = config.customListFile[config.model];
+                            if (! labelFile) {
+                                generateToast({type: 'warning', message: 'You must select a label file in the list settings to use the custom language option.'});
+                                return;
+                            }
+                        } else {
+                            const chirpity = element.value === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
+                            labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${element.value}.txt`; 
                         }
-                    } else {
-                        const chirpity = element.value === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
-                        labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${element.value}.txt`; 
+                        config[config.model].locale = element.value;
+                        readLabels(labelFile, 'locale');
                     }
-                    config[config.model].locale = element.value;
-                    readLabels(labelFile, 'locale');
                     break;
                 }
                 case 'local': {
@@ -5683,7 +5689,6 @@ function showCompareSpec() {
 
 
     ws.on('ready', function () {
-        console.log('ws ready');
         mediaContainer.removeChild(loading);
     })
 
