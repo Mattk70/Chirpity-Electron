@@ -1,6 +1,6 @@
 import {trackVisit, trackEvent} from './tracking.js';
 
-let shownDaylightBanner = false, LOCATIONS, locationID = undefined, loadingTimeout;
+let LOCATIONS, locationID = undefined, loadingTimeout;
 const startTime = performance.now();
 let LABELS = [], DELETE_HISTORY = [];
 // Save console.warn and console.error functions
@@ -54,6 +54,7 @@ window.addEventListener('rejectionhandled', function(event) {
 });
 
 const STATE = {
+    guano: {},
     mode: 'analyse',
     analysisDone: false,
     openFiles: [],
@@ -68,7 +69,8 @@ const STATE = {
     },
     sortOrder: 'timestamp',
     birdList: { lastSelectedSpecies: undefined }, // Used to put the last selected species at the top of the all-species list
-    selection: { start: undefined, end: undefined }
+    selection: { start: undefined, end: undefined },
+    currentAnalysis: {file: null, openFiles: [],  mode: null, species: null, offset: 0, active: null}
 }
 
 // Batch size map for slider
@@ -154,8 +156,6 @@ window.electron.getVersion()
 let modelReady = false, fileLoaded = false, currentFile;
 let PREDICTING = false, t0;
 let region, AUDACITY_LABELS = {}, wavesurfer;
-// fileList is all open files, analyseList is the subset that have been analysed;
-let fileList = [], analyseList = [];
 let fileStart, bufferStartTime, fileEnd;
 
 
@@ -182,6 +182,7 @@ const DOM = {
     get audioNotification() { if (!this._audioNotification) { this._audioNotification = document.getElementById('audio-notification') } return this._audioNotification},
     get batchSizeSlider() { if (!this._batchSizeSlider) { this._batchSizeSlider = document.getElementById('batch-size') } return this._batchSizeSlider},
     get batchSizeValue() { if (!this._batchSizeValue) { this._batchSizeValue = document.getElementById('batch-size-value') } return this._batchSizeValue},
+    get chartsLink() { if (!this._chartsLink) { this._chartsLink = document.getElementById('charts') } return this._chartsLink},
     get colourmap() { if (!this._colourmap) { this._colourmap = document.getElementById('colourmap') } return this._colourmap},
     get contentWrapper() { if (!this._contentWrapper) { this._contentWrapper = document.getElementById('contentWrapper') } return this._contentWrapper},
     get controlsWrapper() { if (!this._controlsWrapper) { this._controlsWrapper = document.getElementById('controlsWrapper') } return this._controlsWrapper},
@@ -190,6 +191,7 @@ const DOM = {
     get debugMode() { if (!this._debugMode) { this._debugMode = document.getElementById('debug-mode') } return this._debugMode},
     get defaultLat() { if (!this._defaultLat) { this._defaultLat = document.getElementById('latitude') } return this._defaultLat},
     get defaultLon() { if (!this._defaultLon) { this._defaultLon = document.getElementById('longitude') } return this._defaultLon},
+    get exploreLink() { if (!this._exploreLink) { this._exploreLink = document.getElementById('explore') } return this._exploreLink},
     get exploreWrapper() { if (!this._exploreWrapper) { this._exploreWrapper = document.getElementById('exploreWrapper') } return this._exploreWrapper},
     get fileNumber() { if (!this._fileNumber) { this._fileNumber = document.getElementById('fileNumber') } return this._fileNumber},
     get footer() { if (!this._footer) { this._footer = document.querySelector('footer') } return this._footer },
@@ -316,7 +318,6 @@ function resetResults({clearSummary = true, clearPagination = true, clearResults
         DOM.resultHeader.textContent = '';
     }
     predictions = {};
-    shownDaylightBanner = false;
     DOM.progressDiv.classList.add('d-none');
     updateProgress(0)
 }
@@ -345,7 +346,7 @@ function updateProgress(val) {
 * @param {*} preserveResults: whether to clear results when opening file (i.e. don't clear results when clicking file in list of open files)
 *  
 */
-async function loadAudioFile({ filePath = '', preserveResults = false }) {
+function loadAudioFile({ filePath = '', preserveResults = false }) {
     fileLoaded = false; locationID = undefined;
     //if (!preserveResults) worker.postMessage({ action: 'change-mode', mode: 'analyse' })
     worker.postMessage({
@@ -582,7 +583,7 @@ function powerSave(on) {
 
 const openFileInList = async (e) => {
     if (!PREDICTING && e.target.tagName === 'A') {
-        await loadAudioFile({ filePath: e.target.id, preserveResults: true })
+        loadAudioFile({ filePath: e.target.id, preserveResults: true })
     }
 }
 
@@ -716,14 +717,14 @@ function formatAsBootstrapTable(jsonData) {
 }
 function showGUANO(){
     const icon = document.getElementById('guano');
-    if (STATE.guano){
+    if (STATE.guano[currentFile]){
         icon.classList.remove('d-none');
         icon.setAttribute('data-bs-content', 'New content for the popover');
         // Reinitialize the popover to reflect the updated content
         const popover = bootstrap.Popover.getInstance(icon);
         popover.setContent({
             '.popover-header': 'GUANO Metadata',
-            '.popover-body': formatAsBootstrapTable(STATE.guano)
+            '.popover-body': formatAsBootstrapTable(STATE.guano[currentFile])
           });
     } else {
         icon.classList.add('d-none');
@@ -733,7 +734,7 @@ function showGUANO(){
 function renderFilenamePanel() {
     if (!currentFile) return;
     const openfile = currentFile;
-    const files = fileList;
+    const files = STATE.openFiles;
     showGUANO();
     let filenameElement = DOM.filename;
     filenameElement.innerHTML = '';
@@ -928,7 +929,7 @@ async function setCustomLocation() {
     const customPlaceEl = document.getElementById('customPlace');
     const locationAdd = document.getElementById('set-location');
     const batchWrapper = document.getElementById('location-batch-wrapper');
-    fileList.length > 1 ? batchWrapper.classList.remove('d-none') : batchWrapper.classList.add('d-none');
+    STATE.openFiles.length > 1 ? batchWrapper.classList.remove('d-none') : batchWrapper.classList.add('d-none');
     // Use the current file location for lat, lon, place or use defaults
     showLocation(false);
     savedLocationSelect.addEventListener('change', function (e) {
@@ -1005,13 +1006,13 @@ async function onOpenFiles(args) {
     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
     resetDiagnostics();
     // Store the file list and Load First audio file
-    fileList = sanitisedList;
-    fileList.length > 1 && fileList.length < 25_000 && worker.postMessage({action: 'check-all-files-saved', files: fileList});
-    STATE.openFiles = fileList;
+    STATE.openFiles = sanitisedList;
+    STATE.openFiles.length > 1 && STATE.openFiles.length < 25_000 && worker.postMessage({action: 'check-all-files-saved', files: STATE.openFiles});
+
     // Sort file by time created (the oldest first):
-    if (fileList.length > 1) {
+    if (STATE.openFiles.length > 1) {
         if (modelReady) enableMenuItem(['analyseAll', 'reanalyseAll'])
-        fileList = fileList.map(fileName => ({
+        STATE.openFiles = STATE.openFiles.map(fileName => ({
             name: fileName,
             time: fs.statSync(fileName).mtime.getTime(),
         }))
@@ -1022,7 +1023,7 @@ async function onOpenFiles(args) {
     }
     // Reset analysis status
     STATE.analysisDone = false;
-    await loadAudioFile({ filePath: fileList[0] });
+    loadAudioFile({ filePath: STATE.openFiles[0] });
     disableMenuItem(['analyseSelection', 'analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'save2db'])
     // Clear unsaved records warning
     window.electron.unsavedRecords(false);
@@ -1054,7 +1055,6 @@ function resetDiagnostics() {
 function analyseReset() {
     clearActive();
     DOM.fileNumber.textContent = '';
-    if (STATE.mode === 'analyse') PREDICTING = true;
     resetDiagnostics();
     AUDACITY_LABELS = {};
     DOM.progressDiv.classList.remove('d-none');
@@ -1073,7 +1073,7 @@ function refreshResultsView() {
         if (!isEmptyObject(predictions)) {
             showElement(['resultTableContainer', 'resultsHead'], false);
         }
-    } else if (!fileList.length) {
+    } else if (!STATE.openFiles.length) {
         hideAll();
     }
 }
@@ -1105,7 +1105,7 @@ function postAnalyseMessage(args) {
         disableMenuItem(['analyseSelection']);
         const selection = !!args.end;
         const filesInScope = args.filesInScope;
-
+        PREDICTING = true;
         if (!selection) {
             analyseReset();
             refreshResultsView();
@@ -1254,7 +1254,7 @@ async function exportData(format, species, limit, duration){
             format: format,
             duration: duration,
             species: species,
-            files: isExplore() ? [] : fileList,
+            files: isExplore() ? [] : STATE.openFiles,
             explore: isExplore(),
             limit: limit,
             range: isExplore() ? STATE.explore.range : undefined
@@ -1262,19 +1262,6 @@ async function exportData(format, species, limit, duration){
     } 
 }
 
-const chartsLink = document.getElementById('charts');
-chartsLink.addEventListener('click', async () => {
-    // Tell the worker we are in Chart mode
-    worker.postMessage({ action: 'change-mode', mode: 'chart' });
-    // Disable analyse file links
-    disableMenuItem(['analyse', 'analyseSelection', 'analyseAll', 'reanalyse', 'reanalyseAll'])
-    worker.postMessage({ action: 'get-detected-species-list', range: STATE.chart.range });
-    const locationFilter = await generateLocationList('chart-locations');
-    locationFilter.addEventListener('change', handleLocationFilterChange);
-    hideAll();
-    showElement(['recordsContainer']);
-    worker.postMessage({ action: 'chart', species: undefined, range: STATE.chart.range });
-});
 
 const handleLocationFilterChange = (e) => {
     const location = e.target.value || undefined;
@@ -1285,8 +1272,41 @@ const handleLocationFilterChange = (e) => {
     if (STATE.mode === 'explore') filterResults() 
 }
 
-const exploreLink = document.getElementById('explore');
-exploreLink.addEventListener('click', async () => {
+function saveAnalyseState() {
+    if (['analyse', 'archive'].includes(STATE.mode)){
+        // Store a reference to the current file
+        STATE.currentAnalysis = {
+            file: currentFile, 
+            openFiles: STATE.openFiles,  
+            mode: STATE.mode,
+            species: isSpeciesViewFiltered(true),
+            offset: STATE.offset,
+            active: activeRow?.rowIndex -1,
+            analysisDone: STATE.analysisDone
+        }
+    }
+}
+
+async function showCharts() {
+    saveAnalyseState();
+    enableMenuItem(['active-analysis', 'explore']);
+    disableMenuItem(['analyse', 'analyseSelection', 'analyseAll', 'reanalyse', 'reanalyseAll', 'charts'])
+    // Tell the worker we are in Chart mode
+    worker.postMessage({ action: 'change-mode', mode: 'chart' });
+    // Disable analyse file links
+    worker.postMessage({ action: 'get-detected-species-list', range: STATE.chart.range });
+    const locationFilter = await generateLocationList('chart-locations');
+    locationFilter.addEventListener('change', handleLocationFilterChange);
+    hideAll();
+    showElement(['recordsContainer']);
+    worker.postMessage({ action: 'chart', species: undefined, range: STATE.chart.range });
+};
+
+async function showExplore() {
+    saveAnalyseState();
+    enableMenuItem(['saveCSV', 'save-eBird', 'save-Raven', 'charts', 'active-analysis']);
+    disableMenuItem(['explore', 'save2db']);
+    STATE.openFiles = [];
     // Tell the worker we are in Explore mode
     worker.postMessage({ action: 'change-mode', mode: 'explore' });
     worker.postMessage({ action: 'get-detected-species-list', range: STATE.explore.range });
@@ -1294,22 +1314,36 @@ exploreLink.addEventListener('click', async () => {
     locationFilter.addEventListener('change', handleLocationFilterChange);
     hideAll();
     showElement(['exploreWrapper'], false);
-    enableMenuItem(['saveCSV', 'save-eBird', 'save-Raven']);
-    worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
+    worker.postMessage({ action: 'update-state', filesToAnalyse: []});
     // Analysis is done
     STATE.analysisDone = true;
-    filterResults({species: undefined, range: STATE.explore.range});
-    resetResults({clearSummary: true, clearPagination: true, clearResults: true});
-});
+    filterResults({species: isSpeciesViewFiltered(true), range: STATE.explore.range});
+    resetResults();
 
-const restoreLink = document.getElementById('restore');
-restoreLink.addEventListener('click', async () => {
-    // Todo: Placeholder for results restore
-    worker.postMessage({ action: 'change-mode', mode: 'analyse' });
+};
+
+async function showAnalyse() {
+    disableMenuItem(['active-analysis']);
+    STATE.diskHasRecords && enableMenuItem(['save2db', 'explore', 'charts']);
+    STATE.mode = STATE.currentAnalysis.mode
+    // Tell the worker we are in Analyse/Archive mode
+    worker.postMessage({ action: 'change-mode', mode: STATE.mode });
     hideAll();
-    showElement(['spectrogramWrapper', 'resultTableContainer']);
-    worker.postMessage({ action: 'filter', updateSummary: true });
-});
+    currentFile = STATE.currentAnalysis.file;
+    STATE.openFiles = STATE.currentAnalysis.openFiles;
+    STATE.analysisDone = STATE.currentAnalysis.analysisDone;
+    if (currentFile) {
+        showElement(['spectrogramWrapper'], false);
+        worker.postMessage({ action: 'update-state', filesToAnalyse: STATE.openFiles});
+        STATE.analysisDone && worker.postMessage({ action: 'filter', 
+            species: STATE.currentAnalysis.species, 
+            offset: STATE.currentAnalysis.offset, 
+            active: STATE.currentAnalysis.active, 
+            updateSummary: true });
+    }
+    resetResults();
+};
+
 
 // const datasetLink = document.getElementById('dataset');
 // datasetLink.addEventListener('click', async () => {
@@ -1365,7 +1399,7 @@ selectionTable.addEventListener('click', resultClick);
 async function resultClick(e) {
     let row = e.target.closest('tr');
     if (!row || row.classList.length === 0) { 
-        // 1. clicked and dragged, 2 no detections in file row, 3. already selected this row
+        // 1. clicked and dragged, 2 no detections in file row
         return
     }
     
@@ -1376,7 +1410,7 @@ async function resultClick(e) {
         return;
     }
     
-    // Search for results rows
+    // Search for results rows - Why???
     while (!(row.classList.contains('nighttime') ||
     row.classList.contains('daytime'))) {
         row = row.previousElementSibling
@@ -1446,7 +1480,7 @@ function adjustSpecDims(redraw, fftSamples, newHeight) {
         if (wavesurfer && redraw) {
             specOffset = spectrogramWrapper.offsetHeight;
         }
-            } else {
+    } else {
         specOffset = 0
     }
     DOM.resultTableElement.style.height = (contentHeight - specOffset - formOffset) + 'px';
@@ -1920,9 +1954,10 @@ const setUpWorkerMessaging = () => {
                     break;
                 }
                 case "diskDB-has-records": {
-                    chartsLink.classList.remove("disabled");
-                    exploreLink.classList.remove("disabled");
+                    DOM.chartsLink.classList.remove("disabled");
+                    DOM.exploreLink.classList.remove("disabled");
                     config.archive.location && document.getElementById('compress-and-organise').classList.remove('disabled');
+                    STATE.diskHasRecords = true;
                     break;
                 }
                 case "file-location-id": {onFileLocationID(args);
@@ -1984,7 +2019,7 @@ const setUpWorkerMessaging = () => {
                         // change header to indicate activation
                         DOM.resultHeader.classList.remove('text-bg-secondary');
                         DOM.resultHeader.classList.add('text-bg-dark');
-                        adjustSpecDims(true)
+                        //adjustSpecDims(true)
                     } else {
                         disableMenuItem(['purge-file']);
                         // change header to indicate deactivation
@@ -2005,8 +2040,6 @@ const setUpWorkerMessaging = () => {
                 // called when an analysis ends, or when the filesbeingprocessed list is empty
                 case "processing-complete": {
                     STATE.analysisDone = true;
-                    //PREDICTING = false;
-                    //DOM.progressDiv.classList.add('d-none');
                     break;
                 }
                 case 'ready-for-tour':{
@@ -2646,7 +2679,7 @@ function onChartData(args) {
         DOM.listToUse.value = config.list;
         updateListIcon();
         updatePrefs('config.json', config)
-        resetResults({clearSummary: true, clearPagination: true, clearResults: true});
+        resetResults();
         setListUIState(config.list);
         // Since the custom list function calls for its own update *after* reading the labels, we'll skip updates for custom lists here
         config.list === 'custom' || worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone })
@@ -2667,6 +2700,7 @@ function onChartData(args) {
 
    
     const loadModel = ()  => {
+        PREDICTING = false;
         t0_warmup = Date.now();
         worker.postMessage({
             action: 'load-model',
@@ -2702,7 +2736,6 @@ function onChartData(args) {
                     contextAwareIconDisplay();
                 }
             }
-            PREDICTING = false;
         }
         // Update threads and batch Size in UI
         DOM.threadSlider.value = config[config[config.model].backend].threads;
@@ -3018,7 +3051,7 @@ function centreSpec(){
         sampleRate = args.sampleRate;
         if (fileLoaded) {
             enableMenuItem(['analyse'])
-            if (fileList.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
+            if (STATE.openFiles.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
         }
         if (region) enableMenuItem(['analyseSelection'])
         t1_warmup = Date.now();
@@ -3079,11 +3112,14 @@ function centreSpec(){
             NEXT_BUFFER = undefined;
             if (currentFile !== file) {
                 currentFile = file;
-                STATE.guano = guano;
-                renderFilenamePanel();
+
                 fileStart = start;
                 fileEnd = new Date(fileStart + (currentFileDuration * 1000));
             }
+            
+            STATE.guano[currentFile] = guano;
+            renderFilenamePanel();
+
             if (config.timeOfDay) {
                 bufferStartTime = new Date(fileStart + (bufferBegin * 1000))
             } else {
@@ -3097,7 +3133,7 @@ function centreSpec(){
             wavesurfer.bufferRequested = false;
             if (modelReady) {
                 enableMenuItem(['analyse']);
-                if (fileList.length > 1) enableMenuItem(['analyseAll'])
+                if (STATE.openFiles.length > 1) enableMenuItem(['analyseAll'])
             }
             if (fileRegion) {
                 createRegion(fileRegion.start, fileRegion.end, fileRegion.label, goToRegion);
@@ -3105,7 +3141,7 @@ function centreSpec(){
                     region.play()
                 }
             } else {
-                clearActive();
+                //clearActive();
             }
             fileLoaded = true;
             //if (activeRow) activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -3118,8 +3154,8 @@ function centreSpec(){
             DOM.fileNumber.innerHTML = args.text;
         } else {
             DOM.progressDiv.classList.remove('d-none');
-            const count = fileList.indexOf(args.file) + 1;
-            DOM.fileNumber.textContent = `File ${count} of ${fileList.length}`;
+            const count = STATE.openFiles.indexOf(args.file) + 1;
+            DOM.fileNumber.textContent = `File ${count} of ${STATE.openFiles.length}`;
         }
         if (args.progress) {
             let progress = Math.round(args.progress * 1000) / 10;
@@ -3132,48 +3168,50 @@ function centreSpec(){
     function updatePagination(total, offset) {
         //Pagination
         total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
+        STATE.offset = offset;
     }
     
     const updateSummary = ({ summary = [], filterSpecies = '' }) => {
-        let total, summaryHTML = `<table id="resultSummary" class="table table-dark p-1"><thead>
-        <tr>
-        <th class="col-3" scope="col">Max</th>
-        <th class="col-5" scope="col">Species</th>
-        <th class="col-1 text-end" scope="col">Detections</th>
-        <th class="col-1 text-end" scope="col">Calls</th>
-        </tr>
-        </thead><tbody id="speciesFilter">`;
-        
-        for (let i = 0; i < summary.length; i++) {
-            const item = summary[i];
-            const selected = item.cname === filterSpecies ? ' text-warning' : '';
-            summaryHTML += `<tr tabindex="-1" class="${selected}">
-            <td class="max">${iconizeScore(item.max)}</td>
-            <td class="cname">
-            <span class="cname">${item.cname}</span> <br><i>${item.sname}</i>
-            </td>
-            <td class="text-end">${item.count}</td>
-            <td class="text-end">${item.calls}</td>
-            </tr>`;
+        if (summary.length){
+            let summaryHTML = `<table id="resultSummary" class="table table-dark p-1"><thead>
+            <tr>
+            <th class="col-3" scope="col">Max</th>
+            <th class="col-5" scope="col">Species</th>
+            <th class="col-1 text-end" scope="col">Detections</th>
+            <th class="col-1 text-end" scope="col">Calls</th>
+            </tr>
+            </thead><tbody id="speciesFilter">`;
             
+            for (let i = 0; i < summary.length; i++) {
+                const item = summary[i];
+                const selected = item.cname === filterSpecies ? ' text-warning' : '';
+                summaryHTML += `<tr tabindex="-1" class="${selected}">
+                <td class="max">${iconizeScore(item.max)}</td>
+                <td class="cname">
+                <span class="cname">${item.cname}</span> <br><i>${item.sname}</i>
+                </td>
+                <td class="text-end">${item.count}</td>
+                <td class="text-end">${item.calls}</td>
+                </tr>`;
+                
+            }
+            summaryHTML += '</tbody></table>';
+            // Get rid of flicker...
+            const old_summary = summaryTable;
+            const buffer = old_summary.cloneNode();
+            buffer.innerHTML = summaryHTML;
+            old_summary.replaceWith(buffer);
         }
-        summaryHTML += '</tbody></table>';
-        // Get rid of flicker...
-        const old_summary = summaryTable;
-        const buffer = old_summary.cloneNode();
-        buffer.innerHTML = summaryHTML;
-        old_summary.replaceWith(buffer);
-        const currentFilter = document.querySelector('#speciesFilter tr.text-warning');
     }
     
     /*
     onResultsComplete is called when the last result is sent from the database
     */
     function onResultsComplete({active = undefined, select = undefined} = {}){
-        let table = document.getElementById('resultTableBody');
-        table.replaceWith(resultsBuffer);
-        table = document.getElementById('resultTableBody');
-
+        PREDICTING = false;
+        DOM.resultTable.replaceWith(resultsBuffer);
+        const table = DOM.resultTable;
+        showElement(['resultTableContainer', 'resultsHead'], false);
         // Set active Row        
         if (active) {
             // Refresh node and scroll to active row:
@@ -3183,9 +3221,7 @@ function centreSpec(){
                 if (rows.length) {
                     activeRow = rows[rows.length - 1];
                 }
-            } else {
-                activeRow.classList.add('table-active');
-            }
+            } 
         } else if (select) {
             const row = getRowFromStart(table, select)
             activeRow = table.rows[row];
@@ -3204,7 +3240,7 @@ function centreSpec(){
         }
         // hide progress div
         DOM.progressDiv.classList.add('d-none');
-        
+        renderFilenamePanel();
     }
 
     function getRowFromStart(table, start){
@@ -3259,12 +3295,14 @@ function centreSpec(){
         if (! PREDICTING  || STATE.mode !== 'analyse') activateResultFilters();
         // Why do we do audacity labels here?
         AUDACITY_LABELS = audacityLabels;
-        if (! isEmptyObject(AUDACITY_LABELS)) {
-            enableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven', 'save2db']);
+        if (isEmptyObject(AUDACITY_LABELS)) {
+            disableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven', 'save2db']);
         } else {
-            disableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven']);
+            enableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven']);
+            STATE.mode !== 'explore' && enableMenuItem(['save2db'])            
         }
         if (currentFile) enableMenuItem(['analyse'])
+        adjustSpecDims(true)
     }
     
     
@@ -3377,8 +3415,8 @@ function centreSpec(){
                 selectionTable.textContent = '';
             }
             else {
-                adjustSpecDims(true); 
-                if (isFromDB) PREDICTING = false;
+                //adjustSpecDims(true); 
+                //if (isFromDB) PREDICTING = false;
                 
                 DOM.resultHeader.innerHTML =`
                 <tr>
@@ -3417,17 +3455,6 @@ function centreSpec(){
             // Todo: move this logic so pre dark sections of file are not even analysed
             if (config.detect.nocmig && !selection && dayNight === 'daytime') return
             
-            // Show twilight indicator when  nocmig mode off (except when analysing a selection)
-            if (shownDaylightBanner === false && dayNight === 'daytime' && STATE.sortOrder === 'timestamp') {
-                // Only do this if change starts midway through a file
-                if ((index - 1) % config.limit !== 0) {
-                    // Show the twilight start bar
-                    tr += `<tr class="text-bg-dark"><td colspan="20" class="text-center text-white">
-                    Start of civil twilight <span class="material-symbols-outlined text-warning align-bottom">wb_twilight</span>
-                    </td></tr>`;
-                }
-                shownDaylightBanner = true;
-            }
             const commentHTML = comment ?
             `<span title="${comment.replaceAll('"', '&quot;')}" class='material-symbols-outlined pointer'>comment</span>` : '';
             const isUncertain = score < 65 ? '&#63;' : '';
@@ -4284,7 +4311,7 @@ function centreSpec(){
             action: 'update-state',
             detect: { confidence: config.detect.confidence }
         });
-        if (STATE.mode == 'explore') {
+        if (STATE.mode === 'explore') {
             // Update the seen species list
             worker.postMessage({ action: 'get-detected-species-list' })
         }
@@ -4418,6 +4445,7 @@ DOM.gain.addEventListener('input', () => {
         const target = e.target.closest('[id]')?.id;
         switch (target)
         {
+            // File menu
             case 'open-file': { showOpenDialog('openFile'); break }
             case 'open-folder': { showOpenDialog('openDirectory'); break }
             case 'saveLabels': { showSaveDialog(); break }
@@ -4427,17 +4455,26 @@ DOM.gain.addEventListener('input', () => {
             case 'export-audio': { exportAudio(); break }
             case 'exit': { exitApplication(); break }
 
+
+            case 'dataset': { worker.postMessage({ action: 'create-dataset', species: isSpeciesViewFiltered(true) }); break }
+            
+            // Records menu
             case 'save2db': { 
                 worker.postMessage({ action: 'save2db', file: currentFile }); 
                 if (config.archive.auto) document.getElementById('compress-and-organise').click();
                 break }
-            case 'dataset': { worker.postMessage({ action: 'create-dataset', species: isSpeciesViewFiltered(true) }); break }
+            case 'charts': { showCharts(); break }
+            case 'explore': { showExplore(); break }
+            case 'active-analysis': { showAnalyse(); break }
+            case 'compress-and-organise': {compressAndOrganise(); break}
+            case 'purge-file': { deleteFile(currentFile); break }
 
+            //Analyse menu
             case 'analyse': {postAnalyseMessage({ filesInScope: [currentFile] }); break }
             case 'analyseSelection': {getSelectionResults(); break }
-            case 'analyseAll': {postAnalyseMessage({ filesInScope: fileList }); break }
+            case 'analyseAll': {postAnalyseMessage({ filesInScope: STATE.openFiles }); break }
             case 'reanalyse': {postAnalyseMessage({ filesInScope: [currentFile], reanalyse: true }); break }
-            case 'reanalyseAll': {postAnalyseMessage({ filesInScope: fileList, reanalyse: true }); break }
+            case 'reanalyseAll': {postAnalyseMessage({ filesInScope: STATE.openFiles, reanalyse: true }); break }
             
             case 'purge-from-toast': { deleteFile(MISSING_FILE); break }
             case 'locate-missing-file': {
@@ -4456,8 +4493,8 @@ DOM.gain.addEventListener('input', () => {
                 if (currentFile && STATE.analysisDone) worker.postMessage({ action: 'update-list', list: config.list, refreshResults: true })
                 break;
             }
-            case 'compress-and-organise': {compressAndOrganise(); break}
-            case 'purge-file': { deleteFile(currentFile); break }
+            
+            
 
             case 'keyboardHelp': { (async () => await populateHelpModal('Help/keyboard.html', 'Keyboard shortcuts'))(); break }
             case 'settingsHelp': { (async () => await populateHelpModal('Help/settings.html', 'Settings Help'))(); break }
@@ -5069,7 +5106,7 @@ async function readLabels(labelFile, updating){
     
     
     const insertManualRecord = (cname, start, end, comment, count, label, action, batch, originalCname, confidence) => {
-        const files = batch ? fileList : currentFile;
+        const files = batch ? STATE.openFiles : currentFile;
         worker.postMessage({
             action: 'insert-manual-record',
             cname: cname,
@@ -5233,7 +5270,7 @@ async function readLabels(labelFile, updating){
             const example_file = await window.electron.getAudio();
             // create a canvas for the audio spec
             showElement(['spectrogramWrapper'], false);
-            await loadAudioFile({ filePath: example_file });
+            loadAudioFile({ filePath: example_file });
         }
         startTour();
     }

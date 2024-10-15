@@ -374,6 +374,7 @@ async function handleMessage(e) {
             let {model, batchSize, threads, backend, list} = args;
             const t0 = Date.now();
             STATE.detect.backend = backend;
+            setGetSummaryQueryInterval()
             INITIALISED = (async () => {
                 LIST_WORKER = await spawnListWorker(); // this can change the backend if tfjs-node isn't available
                 DEBUG && console.log('List worker took', Date.now() - t0, 'ms to load');
@@ -407,6 +408,7 @@ async function handleMessage(e) {
         }
         case 'change-threads': {
             const threads = e.data.threads;
+            setGetSummaryQueryInterval()
             const delta = threads - predictWorkers.length;
             NUM_WORKERS+=delta;
             if (delta > 0) {
@@ -459,15 +461,11 @@ async function handleMessage(e) {
         }
         case "filter": {
             if (STATE.db) {
-                t0 = Date.now();
                 await getResults(args);
-                const t1 = Date.now();
                 args.updateSummary && await getSummary(args);
-                const t2 = Date.now();
                 args.included = await getIncludedIDs(args.file);
                 const [total, offset, species] = await getTotal(args);
                 UI.postMessage({event: 'total-records', total: total, offset: offset, species: species})
-                DEBUG && console.log("Filter took", (Date.now() - t0) / 1000, "seconds", "GetTotal took", (Date.now() - t2) / 1000, "seconds", "GetSummary took", (t2 - t1) / 1000, "seconds");
             }
             break;
         }
@@ -584,6 +582,11 @@ function savedFileCheck(fileList) {
         UI.postMessage({event: 'generate-alert', type: 'error',  message: 'The database has not finished loading. The saved file check was skipped'})
         return undefined
     }
+}
+
+function setGetSummaryQueryInterval(threads){
+    STATE.detect.backend !== 'tensorflow' ? threads * 10 : threads;
+    STATE.incrementor = STATE.detect.backend !== 'tensorflow' ? threads * 10 : threads;
 }
 
 async function onChangeMode(mode) {
@@ -1298,6 +1301,7 @@ function checkBacklog(stream) {
     });
 }
 
+
 /**
 *
 * @param file
@@ -1679,7 +1683,6 @@ async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
     if (predictWorkers[worker]) predictWorkers[worker].isAvailable = false;
     predictWorkers[worker]?.postMessage(objData, [channelData.buffer]);
 }
-
 async function doPrediction({
     file = '',
     start = 0,
@@ -2229,7 +2232,7 @@ const generateInsertQuery = async (latestResult, file) => {
         const speciesIDArray = speciesIDBatch[i];
         for (let j = 0; j < confidenceArray.length; j++) {
             const confidence = Math.round(confidenceArray[j] * 1000);
-            if (confidence < 50) break;
+            if (confidence < STATE.detect.confidence) break;
             const speciesID = speciesIDArray[j];
             insertQuery += `(${timestamp}, ${key}, ${fileID}, ${speciesID}, ${confidence}, null, null, ${key + 3}, null, ${isDaylight}), `;
         }
@@ -2246,53 +2249,55 @@ const generateInsertQuery = async (latestResult, file) => {
 
 const parsePredictions = async (response) => {
     let file = response.file;
-    const included = await getIncludedIDs(file).catch( (error) => console.log('Error getting included IDs', error));
-    const latestResult = response.result, db = STATE.db;
+
+    const latestResult = response.result;
     DEBUG && console.log('worker being used:', response.worker);
     if (! STATE.selection) await generateInsertQuery(latestResult, file).catch(error => console.warn('Error generating insert query', error));
     let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
-    for (let i = 0; i < keysArray.length; i++) {
-        let updateUI = false;
-        let key = parseFloat(keysArray[i]);
-        const timestamp = METADATA[file].fileStart + key * 1000;
-        const confidenceArray = confidenceBatch[i];
-        const speciesIDArray = speciesIDBatch[i];
-        for (let j = 0; j < confidenceArray.length; j++) {
-            let confidence = confidenceArray[j];
-            if (confidence < 0.05) break;
-            confidence*=1000;
-            let speciesID = speciesIDArray[j];
-            updateUI = (confidence > STATE.detect.confidence && (! included.length || included.includes(speciesID)));
-            if (STATE.selection || updateUI) {
-                let end, confidenceRequired;
-                if (STATE.selection) {
-                    const duration = (STATE.selection.end - STATE.selection.start) / 1000;
-                    end = key + duration;
-                    confidenceRequired = STATE.userSettingsInSelection ?
-                    STATE.detect.confidence : 50;
-                } else {
-                    end = key + 3;
-                    confidenceRequired = STATE.detect.confidence;
-                }
-                if (confidence >= confidenceRequired) {
-                    const { cname, sname } = await memoryDB.getAsync(`SELECT cname, sname FROM species WHERE id = ${speciesID}`).catch(error => console.warn('Error getting species name', error));
-                    const result = {
-                        timestamp: timestamp,
-                        position: key,
-                        end: end,
-                        file: file,
-                        cname: cname,
-                        sname: sname,
-                        score: confidence
+    if (index <= 500){
+        const included = await getIncludedIDs(file).catch( (error) => console.log('Error getting included IDs', error));
+        for (let i = 0; i < keysArray.length; i++) {
+            let updateUI = false;
+            let key = parseFloat(keysArray[i]);
+            const timestamp = METADATA[file].fileStart + key * 1000;
+            const confidenceArray = confidenceBatch[i];
+            const speciesIDArray = speciesIDBatch[i];
+            for (let j = 0; j < confidenceArray.length; j++) {
+                let confidence = confidenceArray[j];
+                if (confidence < 0.05) break;
+                confidence*=1000;
+                let speciesID = speciesIDArray[j];
+                updateUI = (confidence > STATE.detect.confidence && (! included.length || included.includes(speciesID)));
+                if (STATE.selection || updateUI) {
+                    let end, confidenceRequired;
+                    if (STATE.selection) {
+                        const duration = (STATE.selection.end - STATE.selection.start) / 1000;
+                        end = key + duration;
+                        confidenceRequired = STATE.userSettingsInSelection ?
+                        STATE.detect.confidence : 50;
+                    } else {
+                        end = key + 3;
+                        confidenceRequired = STATE.detect.confidence;
                     }
-                    sendResult(++index, result, false);
-                    // Only show the highest confidence detection, unless it's a selection analysis
-                    if (! STATE.selection) break;
-                };
+                    if (confidence >= confidenceRequired) {
+                        const { cname, sname } = await memoryDB.getAsync(`SELECT cname, sname FROM species WHERE id = ${speciesID}`).catch(error => console.warn('Error getting species name', error));
+                        const result = {
+                            timestamp: timestamp,
+                            position: key,
+                            end: end,
+                            file: file,
+                            cname: cname,
+                            sname: sname,
+                            score: confidence
+                        }
+                        sendResult(++index, result, false);
+                        // Only show the highest confidence detection, unless it's a selection analysis
+                        if (! STATE.selection) break;
+                    };
+                }
             }
-        }
-    } 
-    
+        } 
+    }
     predictionsReceived[file]++;
     const received = sumObjectValues(predictionsReceived);
     const total = sumObjectValues(batchChunksToSend);
@@ -2427,7 +2432,12 @@ async function processNextFile({
 }
 
 function sumObjectValues(obj) {
-    return Object.values(obj).reduce((total, value) => total + value, 0);
+    let total = 0;
+    for (const key in obj) {
+        total += obj[key];
+    }
+    return total;
+    //return Object.values(obj).reduce((total, value) => total + value, 0);
 }
 
 function onSameDay(timestamp1, timestamp2) {
@@ -2678,7 +2688,7 @@ const getResults = async ({
             } else {
                 species = species || '';
                 const nocmig = STATE.detect.nocmig ? '<b>nocturnal</b>' : ''
-                sendResult(++index, `No ${nocmig} ${species} detections found using the ${STATE.list} list.`, true)
+                sendResult(++index, `No ${nocmig} ${species} detections found ${STATE.mode === 'explore' && 'in the Archive'} using the ${STATE.list} list.`, true)
             }
         }
     }
