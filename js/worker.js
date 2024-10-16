@@ -374,7 +374,7 @@ async function handleMessage(e) {
             let {model, batchSize, threads, backend, list} = args;
             const t0 = Date.now();
             STATE.detect.backend = backend;
-            setGetSummaryQueryInterval()
+            setGetSummaryQueryInterval(threads)
             INITIALISED = (async () => {
                 LIST_WORKER = await spawnListWorker(); // this can change the backend if tfjs-node isn't available
                 DEBUG && console.log('List worker took', Date.now() - t0, 'ms to load');
@@ -408,7 +408,7 @@ async function handleMessage(e) {
         }
         case 'change-threads': {
             const threads = e.data.threads;
-            setGetSummaryQueryInterval()
+            setGetSummaryQueryInterval(threads)
             const delta = threads - predictWorkers.length;
             NUM_WORKERS+=delta;
             if (delta > 0) {
@@ -585,7 +585,6 @@ function savedFileCheck(fileList) {
 }
 
 function setGetSummaryQueryInterval(threads){
-    STATE.detect.backend !== 'tensorflow' ? threads * 10 : threads;
     STATE.incrementor = STATE.detect.backend !== 'tensorflow' ? threads * 10 : threads;
 }
 
@@ -1078,7 +1077,14 @@ async function locateFile(file) {
             }
         }
     } catch (error) {
-        console.warn(error.message); // Expected that this happens when the directory doesn't exist
+        if (error.message.includes('scandir')){
+            const match = str.match(/'([^']+)'/);
+            UI.postMessage({
+                event: 'generate-alert', type: 'warning', 
+                message: `Unable to locate folder "${match}". Perhaps the disk was removed?`
+            })
+        }
+        console.warn(error.message + ' - Disk removed?'); // Expected that this happens when the directory doesn't exist
     } 
     return null;
 }
@@ -1284,7 +1290,6 @@ function setupCtx(audio, rate, destination, file) {
     .catch(error => aborted || console.warn(error, file));    
 };
 
-
 function checkBacklog(stream) {
     return new Promise((resolve) => {
         const backlog = sumObjectValues(predictionsRequested) - sumObjectValues(predictionsReceived);
@@ -1300,7 +1305,28 @@ function checkBacklog(stream) {
         }
     });
 }
+// function checkBacklog(stream) {
+//     return new Promise((resolve, reject) => {
+//         const maxRetries = 20; // Max retries before stopping, to avoid infinite loops
+//         let retryCount = 0;
+//         let checkInterval = 50; // Start with 50ms
+        
+//         const intervalId = setInterval(() => {
+//             const backlog = sumObjectValues(predictionsRequested) - sumObjectValues(predictionsReceived);
+//             DEBUG && console.log('backlog:', backlog);
 
+//             // If backlog is within limits, clear interval and resolve
+//             if (backlog < predictWorkers.length * 2 || retryCount >= maxRetries) {
+//                 clearInterval(intervalId);
+//                 resolve(stream.read());
+//             } else {
+//                 retryCount++;
+//                 // Optionally implement exponential backoff by increasing checkInterval
+//                 checkInterval = Math.min(checkInterval * 2, 1000); // Cap at 1000ms
+//             }
+//         }, checkInterval);
+//     });
+// }
 
 /**
 *
@@ -1511,7 +1537,6 @@ const getPredictBuffers = async ({
                     updateFilesBeingProcessed(file)
                 }
                 DEBUG && console.log('All chunks sent for ', file);
-                //STREAM.end();
                 resolve('finished')
             }
             else {
@@ -1527,9 +1552,9 @@ const getPredictBuffers = async ({
 
                 // if we have a full buffer
                 if (concatenatedBuffer.length > highWaterMark) {     
-                    const audio_chunk = Buffer.allocUnsafeSlow(highWaterMark);
+                    const audio_chunk = Buffer.allocUnsafe(highWaterMark);
                     concatenatedBuffer.copy(audio_chunk, 0, 0, highWaterMark);
-                    const remainder = Buffer.allocUnsafeSlow(concatenatedBuffer.length - highWaterMark);
+                    const remainder = Buffer.allocUnsafe(concatenatedBuffer.length - highWaterMark);
                     concatenatedBuffer.copy(remainder, 0, highWaterMark);
                     const noHeader = audio_chunk.compare(header, 0, header.length, 0, header.length)
                     const audio = noHeader ? joinBuffers(header, audio_chunk) : audio_chunk;
@@ -2254,7 +2279,7 @@ const parsePredictions = async (response) => {
     DEBUG && console.log('worker being used:', response.worker);
     if (! STATE.selection) await generateInsertQuery(latestResult, file).catch(error => console.warn('Error generating insert query', error));
     let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
-    if (index <= 500){
+    if (index < 499){
         const included = await getIncludedIDs(file).catch( (error) => console.log('Error getting included IDs', error));
         for (let i = 0; i < keysArray.length; i++) {
             let updateUI = false;
@@ -2318,7 +2343,9 @@ const parsePredictions = async (response) => {
         updateFilesBeingProcessed(response.file)
         DEBUG && console.log(`File ${file} processed after ${(new Date() - predictionStart) / 1000} seconds: ${filesBeingProcessed.length} files to go`);
     }
-    !STATE.selection && (STATE.increment() === 0) && getSummary({ interim: true });
+
+    !STATE.selection && (STATE.increment() === 0) && await getSummary({ interim: true });
+
     return response.worker
 }
                         
@@ -2521,12 +2548,11 @@ const getSummary = async ({
     interim = false,
     action = undefined,
 } = {}) => {
-    const db = STATE.db;
     const included = STATE.selection ? [] : await getIncludedIDs();
     const [sql, params] = prepSummaryStatement(included);
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
 
-    t0 = Date.now();
+
     const summary = await STATE.db.allAsync(sql, ...params);
     const event = interim ? 'update-summary' : 'summary-complete';
     UI.postMessage({
@@ -2688,7 +2714,7 @@ const getResults = async ({
             } else {
                 species = species || '';
                 const nocmig = STATE.detect.nocmig ? '<b>nocturnal</b>' : ''
-                sendResult(++index, `No ${nocmig} ${species} detections found ${STATE.mode === 'explore' && 'in the Archive'} using the ${STATE.list} list.`, true)
+                sendResult(++index, `No ${nocmig} ${species} detections found ${STATE.mode === 'explore' ? 'in the Archive' : ''} using the ${STATE.list} list.`, true)
             }
         }
     }

@@ -53,7 +53,7 @@ window.addEventListener('rejectionhandled', function(event) {
     config.track && trackEvent(config.UUID, 'Handled UI Promise Rejection', errorMessage, customURLEncode(stackTrace));
 });
 
-const STATE = {
+let STATE = {
     guano: {},
     mode: 'analyse',
     analysisDone: false,
@@ -80,7 +80,6 @@ const BATCH_SIZE_LIST = [4, 8, 16, 32, 48, 64, 96];
 const fs = window.module.fs;
 const colormap = window.module.colormap;
 const p = window.module.p;
-const SunCalc = window.module.SunCalc;
 const uuidv4 = window.module.uuidv4;
 const os = window.module.os;
 
@@ -153,7 +152,7 @@ window.electron.getVersion()
     console.log('Error getting app version:', error)
 });
 
-let modelReady = false, fileLoaded = false, currentFile;
+let modelReady = false, fileLoaded = false;
 let PREDICTING = false, t0;
 let region, AUDACITY_LABELS = {}, wavesurfer;
 let fileStart, bufferStartTime, fileEnd;
@@ -655,7 +654,7 @@ function showDatePicker() {
         const timestamp = new Date(newStart).getTime();
         
         // Send the data to the worker
-        worker.postMessage({ action: 'update-file-start', file: currentFile, start: timestamp });
+        worker.postMessage({ action: 'update-file-start', file: STATE.currentFile, start: timestamp });
         trackEvent(config.UUID, 'Settings Change', 'fileStart', newStart);
         resetResults();
         fileStart = timestamp;
@@ -717,14 +716,14 @@ function formatAsBootstrapTable(jsonData) {
 }
 function showGUANO(){
     const icon = document.getElementById('guano');
-    if (STATE.guano[currentFile]){
+    if (STATE.guano[STATE.currentFile]){
         icon.classList.remove('d-none');
         icon.setAttribute('data-bs-content', 'New content for the popover');
         // Reinitialize the popover to reflect the updated content
         const popover = bootstrap.Popover.getInstance(icon);
         popover.setContent({
             '.popover-header': 'GUANO Metadata',
-            '.popover-body': formatAsBootstrapTable(STATE.guano[currentFile])
+            '.popover-body': formatAsBootstrapTable(STATE.guano[STATE.currentFile])
           });
     } else {
         icon.classList.add('d-none');
@@ -732,8 +731,8 @@ function showGUANO(){
 }
 
 function renderFilenamePanel() {
-    if (!currentFile) return;
-    const openfile = currentFile;
+    if (!STATE.currentFile) return;
+    const openfile = STATE.currentFile;
     const files = STATE.openFiles;
     showGUANO();
     let filenameElement = DOM.filename;
@@ -807,7 +806,7 @@ async function generateLocationList(id) {
     const defaultText = id === 'savedLocations' ? '(Default)' : 'All';
     const el = document.getElementById(id);
     LOCATIONS = undefined;
-    worker.postMessage({ action: 'get-locations', file: currentFile });
+    worker.postMessage({ action: 'get-locations', file: STATE.currentFile });
     await waitForLocations();
     el.innerHTML = `<option value="">${defaultText}</option>`; // clear options
     LOCATIONS.forEach(loc => {
@@ -835,7 +834,7 @@ const showLocation = async (fromSelect) => {
     const customPlaceEl = document.getElementById('customPlace');
     const locationSelect = document.getElementById('savedLocations');
     // Check if currentfile has a location id
-    const id = fromSelect ? parseInt(locationSelect.value) : FILE_LOCATION_MAP[currentFile];
+    const id = fromSelect ? parseInt(locationSelect.value) : FILE_LOCATION_MAP[STATE.currentFile];
     
     if (id) {
         newLocation = LOCATIONS.find(obj => obj.id === id);
@@ -960,8 +959,10 @@ async function setCustomLocation() {
     const addLocation = () => {
         locationID = savedLocationSelect.value;
         const batch = document.getElementById('batchLocations').checked;
-        const files = batch ? STATE.openFiles : [currentFile];
+        const files = batch ? STATE.openFiles : [STATE.currentFile];
         worker.postMessage({ action: 'set-custom-file-location', lat: latEl.value, lon: lonEl.value, place: customPlaceEl.value, files: files })
+        generateLocationList('explore-locations');
+
         locationModal.hide();
     }
     locationAdd.addEventListener('click', addLocation)
@@ -1040,7 +1041,7 @@ async function onOpenFiles(args) {
 * @returns {Promise<void>}
 */
 async function showSaveDialog() {
-    await window.electron.saveFile({ currentFile: currentFile, labels: AUDACITY_LABELS[currentFile] });
+    await window.electron.saveFile({ currentFile: STATE.currentFile, labels: AUDACITY_LABELS[STATE.currentFile] });
 }
 
 function resetDiagnostics() {
@@ -1089,7 +1090,7 @@ const getSelectionResults = (fromDB) => {
     STATE['selection']['end'] = end.toFixed(3);
     
     postAnalyseMessage({
-        filesInScope: [currentFile],
+        filesInScope: [STATE.currentFile],
         start: STATE['selection']['start'],
         end: STATE['selection']['end'],
         offset: 0,
@@ -1102,7 +1103,7 @@ function postAnalyseMessage(args) {
     if (!PREDICTING) {
         // Start a timer
         t0_analysis = Date.now();
-        disableMenuItem(['analyseSelection']);
+        disableMenuItem(['analyseSelection', 'explore', 'charts']);
         const selection = !!args.end;
         const filesInScope = args.filesInScope;
         PREDICTING = true;
@@ -1149,7 +1150,7 @@ async function fetchLocationAddress(lat, lon) {
         openStreetMapTimer = setTimeout(async () => {
             try { 
                 if (!LOCATIONS) {
-                    worker.postMessage({ action: 'get-locations', file: currentFile });
+                    worker.postMessage({ action: 'get-locations', file: STATE.currentFile });
                     await waitForLocations();  // Ensure this is awaited
                 }
                 const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`);
@@ -1274,15 +1275,17 @@ const handleLocationFilterChange = (e) => {
 
 function saveAnalyseState() {
     if (['analyse', 'archive'].includes(STATE.mode)){
+        const active = activeRow?.rowIndex -1
         // Store a reference to the current file
         STATE.currentAnalysis = {
-            file: currentFile, 
+            file: STATE.currentFile, 
             openFiles: STATE.openFiles,  
             mode: STATE.mode,
             species: isSpeciesViewFiltered(true),
             offset: STATE.offset,
-            active: activeRow?.rowIndex -1,
-            analysisDone: STATE.analysisDone
+            active: active,
+            analysisDone: STATE.analysisDone,
+            sortOrder: STATE.sortOrder
         }
     }
 }
@@ -1324,21 +1327,17 @@ async function showExplore() {
 
 async function showAnalyse() {
     disableMenuItem(['active-analysis']);
-    STATE.diskHasRecords && enableMenuItem(['save2db', 'explore', 'charts']);
-    STATE.mode = STATE.currentAnalysis.mode
-    // Tell the worker we are in Analyse/Archive mode
+    //Restore STATE
+    STATE = {...STATE, ...STATE.currentAnalysis}
     worker.postMessage({ action: 'change-mode', mode: STATE.mode });
     hideAll();
-    currentFile = STATE.currentAnalysis.file;
-    STATE.openFiles = STATE.currentAnalysis.openFiles;
-    STATE.analysisDone = STATE.currentAnalysis.analysisDone;
-    if (currentFile) {
+    if (STATE.currentFile) {
         showElement(['spectrogramWrapper'], false);
-        worker.postMessage({ action: 'update-state', filesToAnalyse: STATE.openFiles});
+        worker.postMessage({ action: 'update-state', filesToAnalyse: STATE.openFiles, sortOrder: STATE.sortOrder});
         STATE.analysisDone && worker.postMessage({ action: 'filter', 
-            species: STATE.currentAnalysis.species, 
-            offset: STATE.currentAnalysis.offset, 
-            active: STATE.currentAnalysis.active, 
+            species: STATE.species, 
+            offset: STATE.offset, 
+            active: STATE.active, 
             updateSummary: true });
     }
     resetResults();
@@ -1462,7 +1461,7 @@ function adjustSpecDims(redraw, fftSamples, newHeight) {
             config.specMaxHeight = specHeight;
             scheduler.postTask(() => updatePrefs('config.json', config), {priority: 'background'});
         }
-        if (currentFile) {
+        if (STATE.currentFile) {
             // give the wrapper space for the transport controls and element padding/margins
             if (!wavesurfer) {
                 initWavesurfer({
@@ -1675,16 +1674,25 @@ function updatePrefs(file, data) {
     }
 }
 
-function fillDefaults(config, defaultConfig) {
+function syncConfig(config, defaultConfig) {
+    // First, remove keys from config that are not in defaultConfig
+    Object.keys(config).forEach(key => {
+        if (!(key in defaultConfig)) {
+            delete config[key];
+        }
+    });
+
+    // Then, fill in missing keys from defaultConfig
     Object.keys(defaultConfig).forEach(key => {
         if (!(key in config)) {
             config[key] = defaultConfig[key];
         } else if (typeof config[key] === 'object' && typeof defaultConfig[key] === 'object') {
-            // Recursively fill in defaults for nested objects
-            fillDefaults(config[key], defaultConfig[key]);
+            // Recursively sync nested objects
+            syncConfig(config[key], defaultConfig[key]);
         }
     });
 }
+
 /////////////////////////  Window Handlers ////////////////////////////
 // Set config defaults
 const defaultConfig = {
@@ -1755,7 +1763,7 @@ window.onload = async () => {
             return false;
             };
         //fill in defaults - after updates add new items
-        fillDefaults(config, defaultConfig);
+        syncConfig(config, defaultConfig);
         // Reset defaults for tensorflow batchsize. If removing, update change handler for batch-size
         if (config.tensorflow.batchSizeWasReset !== true && config.tensorflow.batchSize === 32) {
             const RAM = parseInt(DIAGNOSTICS['System Memory'].replace(' GB', ''));
@@ -1983,7 +1991,7 @@ const setUpWorkerMessaging = () => {
                                     Locate File
                                 </button>
                                 <button id="purge-from-toast" class="ms-3 btn btn-danger text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
-                                    Delete File
+                                    Remove from Archive
                                 </button>
                             </div>
                             `
@@ -2013,8 +2021,18 @@ const setUpWorkerMessaging = () => {
                     const mode = args.mode;
                     STATE.mode = mode;
                     renderFilenamePanel();
+                    switch (mode) {
+                        case 'analyse':{
+                            STATE.diskHasRecords && !PREDICTING && enableMenuItem(['explore', 'charts']);
+                            break
+                        }
+                        case 'archive':{
+                            enableMenuItem(['save2db', 'explore', 'charts']);
+                            break
+                        }
+                    }
                     config.debug && console.log("Mode changed to: " + mode);
-                    if (mode === 'archive' || mode === 'explore') {
+                    if (['archive', 'explore'].includes(mode)) {
                         enableMenuItem(['purge-file']);
                         // change header to indicate activation
                         DOM.resultHeader.classList.remove('text-bg-secondary');
@@ -2635,11 +2653,34 @@ function onChartData(args) {
         tooltip.style.visibility = 'hidden';
     };
 
+    // async function specTooltip(event) {
+    //     const waveElement = event.target;
+    //     const specDimensions = waveElement.getBoundingClientRect();
+    //     const frequencyRange = Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
+    //     const yPosition = Math.round((specDimensions.bottom - event.clientY) * (frequencyRange / specDimensions.height)) + Number(config.audio.minFrequency);
+    //     tooltip.textContent = `Frequency: ${yPosition}Hz`;
+    //     if (region) {
+    //         const lineBreak = document.createElement('br');
+    //         const textNode = document.createTextNode(formatRegionTooltip(region.start, region.end));
+            
+    //         tooltip.appendChild(lineBreak);  // Add the line break
+    //         tooltip.appendChild(textNode);   // Add the text node
+    //     }
+    //     Object.assign(tooltip.style, {
+    //         top: `${event.clientY}px`,
+    //         left: `${event.clientX + 15}px`,
+    //         display: 'block',
+    //         visibility: 'visible'
+    //     });
+    // }
+
     async function specTooltip(event) {
         const waveElement = event.target;
         const specDimensions = waveElement.getBoundingClientRect();
         const frequencyRange = Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
         const yPosition = Math.round((specDimensions.bottom - event.clientY) * (frequencyRange / specDimensions.height)) + Number(config.audio.minFrequency);
+        
+        // Update the tooltip content
         tooltip.textContent = `Frequency: ${yPosition}Hz`;
         if (region) {
             const lineBreak = document.createElement('br');
@@ -2648,14 +2689,31 @@ function onChartData(args) {
             tooltip.appendChild(lineBreak);  // Add the line break
             tooltip.appendChild(textNode);   // Add the text node
         }
+    
+        // Get the tooltip's dimensions
+        tooltip.style.display = 'block';  // Ensure tooltip is visible to measure dimensions
+        const tooltipWidth = tooltip.offsetWidth;
+        const windowWidth = window.innerWidth;
+    
+        // Calculate the new tooltip position
+        let tooltipLeft;
+        
+        // If the tooltip would overflow past the right side of the window, position it to the left
+        if (event.clientX + tooltipWidth + 15 > windowWidth) {
+            tooltipLeft = event.clientX - tooltipWidth - 5;  // Position to the left of the mouse cursor
+        } else {
+            tooltipLeft = event.clientX + 15;  // Position to the right of the mouse cursor
+        }
+    
+        // Apply styles to the tooltip
         Object.assign(tooltip.style, {
             top: `${event.clientY}px`,
-            left: `${event.clientX + 15}px`,
+            left: `${tooltipLeft}px`,
             display: 'block',
-            visibility: 'visible'
+            visibility: 'visible',
+            opacity: 1
         });
     }
-
 
     const LIST_MAP = {
         location: 'Searching for birds in your region',
@@ -2803,12 +2861,12 @@ function centreSpec(){
       
     const GLOBAL_ACTIONS = { // eslint-disable-line
         a: function (e) { 
-            if (( e.ctrlKey || e.metaKey) && currentFile) {
+            if (( e.ctrlKey || e.metaKey) && STATE.currentFile) {
                 const element = e.shiftKey ? 'analyseAll' : 'analyse';
                 document.getElementById(element).click();
             }
         },
-        A: function (e) { ( e.ctrlKey || e.metaKey) && currentFile && document.getElementById('analyseAll').click()},
+        A: function (e) { ( e.ctrlKey || e.metaKey) && STATE.currentFile && document.getElementById('analyseAll').click()},
         c: function (e) { 
             // Center window on playhead
             if (( e.ctrlKey || e.metaKey) && currentBuffer) {
@@ -2835,7 +2893,7 @@ function centreSpec(){
         },
         s: function (e) {
             if ( e.ctrlKey || e.metaKey) {
-                worker.postMessage({ action: 'save2db', file: currentFile});
+                worker.postMessage({ action: 'save2db', file: STATE.currentFile});
             }
         },
         t: function (e) {
@@ -2863,6 +2921,7 @@ function centreSpec(){
                     threads: config[config[config.model].backend].threads,
                     list: config.list
                 });
+                STATE.diskHasRecords && enableMenuItem(['explore', 'charts']);
                 generateToast({ message:'Operation cancelled'});
                 DOM.progressDiv.classList.add('d-none');
             }
@@ -2936,7 +2995,11 @@ function centreSpec(){
         '-': function (e) {e.metaKey || e.ctrlKey ? increaseFFT() : zoomSpec('zoomOut')},
         ' ': function () { wavesurfer && wavesurfer.playPause() },
         Tab: function (e) {
-            if (activeRow) {
+            if ((e.metaKey || e.ctrlKey) && ! PREDICTING) { // If you did this when predicting, your results would go straight to the archive
+                const modeToSet = STATE.mode === 'explore' ? 'active-analysis' : 'explore';
+                document.getElementById(modeToSet).click()
+            }
+            else if (activeRow) {
                 activeRow.classList.remove('table-active')
                 if (e.shiftKey) {
                     activeRow = activeRow.previousSibling || activeRow;
@@ -2962,7 +3025,7 @@ function centreSpec(){
     }
     
     const postBufferUpdate = ({
-        file = currentFile,
+        file = STATE.currentFile,
         begin = 0,
         position = 0,
         play = false,
@@ -2995,7 +3058,7 @@ function centreSpec(){
     // Go to position
     const goto = new bootstrap.Modal(document.getElementById('gotoModal'));
     const showGoToPosition = () => {
-        if (currentFile) {
+        if (STATE.currentFile) {
             goto.show();
         }
     }
@@ -3011,7 +3074,7 @@ function centreSpec(){
     
     
     const gotoTime = (e) => {
-        if (currentFile) {
+        if (STATE.currentFile) {
             e.preventDefault();
             let hours = 0, minutes = 0, seconds = 0;
             const time = document.getElementById('timeInput').value;
@@ -3092,7 +3155,7 @@ function centreSpec(){
         clearTimeout(loadingTimeout)
         // Clear the loading animation
         DOM.loading.classList.add('d-none');
-        const resetSpec = !currentFile;
+        const resetSpec = !STATE.currentFile;
         currentFileDuration = sourceDuration;
         //if (preserveResults) completeDiv.hide();
         console.log(`UI received worker-loaded-audio: ${file}, buffered: ${contents === undefined}`);
@@ -3110,14 +3173,14 @@ function centreSpec(){
             }
         } else {
             NEXT_BUFFER = undefined;
-            if (currentFile !== file) {
-                currentFile = file;
+            if (STATE.currentFile !== file) {
+                STATE.currentFile = file;
 
                 fileStart = start;
                 fileEnd = new Date(fileStart + (currentFileDuration * 1000));
             }
             
-            STATE.guano[currentFile] = guano;
+            STATE.guano[STATE.currentFile] = guano;
             renderFilenamePanel();
 
             if (config.timeOfDay) {
@@ -3259,9 +3322,22 @@ function centreSpec(){
         }
     }
     
+// formatDuration: Used for DIAGNOSTICS Duration
+function formatDuration(seconds){
+    let duration = '';
+    const hours = Math.floor(seconds / 3600);          // 1 hour = 3600 seconds
+    if (hours) duration += `${hours} hours `;
+    const minutes = Math.floor((seconds % 3600) / 60); // 1 minute = 60 seconds
+    if (hours || minutes) duration += `${minutes} minutes `;
+    const remainingSeconds = Math.floor(seconds % 60); // Remaining seconds
+    duration += `${remainingSeconds} seconds`;
+    return duration;
+}
+
     function onAnalysisComplete({quiet}){
         PREDICTING = false;
         STATE.analysisDone = true;
+        STATE.diskHasRecords && enableMenuItem(['explore', 'charts']);
         DOM.progressDiv.classList.add('d-none');
         if (quiet) return
         // DIAGNOSTICS:
@@ -3275,7 +3351,7 @@ function centreSpec(){
         trackEvent(config.UUID, `${config.model}-${config[config.model].backend}`, 'Analysis Rate', config[config.model].backend, parseInt(rate));
         
         if (! STATE.selection){
-            DIAGNOSTICS['Analysis Duration'] = analysisTime + ' seconds';
+            DIAGNOSTICS['Analysis Duration'] = formatDuration(analysisTime);
             DIAGNOSTICS['Analysis Rate'] = rate.toFixed(0) + 'x faster than real time performance.';
             generateToast({ message:'Analysis complete.'});
             activateResultFilters();
@@ -3301,7 +3377,7 @@ function centreSpec(){
             enableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven']);
             STATE.mode !== 'explore' && enableMenuItem(['save2db'])            
         }
-        if (currentFile) enableMenuItem(['analyse'])
+        if (STATE.currentFile) enableMenuItem(['analyse'])
         adjustSpecDims(true)
     }
     
@@ -3387,12 +3463,6 @@ function centreSpec(){
         resetResults({clearSummary: false, clearPagination: false, clearResults: false});
     }
     
-    
-    // const checkDayNight = (timestamp) => {
-    //     let astro = SunCalc.getTimes(timestamp, config.latitude, config.longitude);
-    //     return (astro.dawn.setMilliseconds(0) < timestamp && astro.dusk.setMilliseconds(0) > timestamp) ? 'daytime' : 'nighttime';
-    // }
-    
     // TODO: show every detection in the spec window as a region on the spectrogram
     
     async function renderResult({
@@ -3451,7 +3521,7 @@ function centreSpec(){
                 callCount,
                 isDaylight
             } = result;
-            const dayNight = isDaylight ? 'daytime' : 'nighttime'; // checkDayNight(timestamp);
+            const dayNight = isDaylight ? 'daytime' : 'nighttime'; 
             // Todo: move this logic so pre dark sections of file are not even analysed
             if (config.detect.nocmig && !selection && dayNight === 'daytime') return
             
@@ -3545,7 +3615,7 @@ function centreSpec(){
                 const [start, end] = position;
                 worker.postMessage({
                     action: 'delete',
-                    file: currentFile,
+                    file: STATE.currentFile,
                     start: start,
                     end: end,
                     active: getActiveRowID(),
@@ -3654,7 +3724,7 @@ function centreSpec(){
         if (mode === 'save') {
             worker.postMessage({
                 action: 'save',
-                start: start, file: currentFile, end: end, filename: filename, metadata: metadata
+                start: start, file: STATE.currentFile, end: end, filename: filename, metadata: metadata
             })
         } else {
             if (!config.seenThanks) {
@@ -3664,7 +3734,7 @@ function centreSpec(){
             }
             worker.postMessage({
                 action: 'post',
-                start: start, file: currentFile, end: end, defaultName: filename, metadata: metadata, mode: mode
+                start: start, file: STATE.currentFile, end: end, defaultName: filename, metadata: metadata, mode: mode
             })
         }
     }
@@ -3933,19 +4003,7 @@ function centreSpec(){
         let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
         for (let [key, value] of Object.entries(DIAGNOSTICS)) {
             if (key === 'Audio Duration') { // Format duration as days, hours,minutes, etc.
-                if (value < 3600) {
-                    value = new Date(value * 1000).toISOString().substring(14, 19);
-                    value = value.replace(':', ' minutes ').concat(' seconds');
-                } else if (value < 86400) {
-                    value = new Date(value * 1000).toISOString().substring(11, 19)
-                    value = value.replace(':', ' hours ').replace(':', ' minutes ').concat(' seconds')
-                } else {
-                    value = new Date(value * 1000).toISOString().substring(8, 19);
-                    const day = parseInt(value.slice(0, 2)) - 1;
-                    const daysString = day === 1 ? '1 day ' : day.toString() + ' days ';
-                    const dateString = daysString + value.slice(3);
-                    value = dateString.replace(':', ' hours ').replace(':', ' minutes ').concat(' seconds');
-                }
+                value = formatDuration(value)
             }
             diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
         }
@@ -4460,20 +4518,20 @@ DOM.gain.addEventListener('input', () => {
             
             // Records menu
             case 'save2db': { 
-                worker.postMessage({ action: 'save2db', file: currentFile }); 
+                worker.postMessage({ action: 'save2db', file: STATE.currentFile }); 
                 if (config.archive.auto) document.getElementById('compress-and-organise').click();
                 break }
             case 'charts': { showCharts(); break }
             case 'explore': { showExplore(); break }
             case 'active-analysis': { showAnalyse(); break }
             case 'compress-and-organise': {compressAndOrganise(); break}
-            case 'purge-file': { deleteFile(currentFile); break }
+            case 'purge-file': { deleteFile(STATE.currentFile); break }
 
             //Analyse menu
-            case 'analyse': {postAnalyseMessage({ filesInScope: [currentFile] }); break }
+            case 'analyse': {postAnalyseMessage({ filesInScope: [STATE.currentFile] }); break }
             case 'analyseSelection': {getSelectionResults(); break }
             case 'analyseAll': {postAnalyseMessage({ filesInScope: STATE.openFiles }); break }
-            case 'reanalyse': {postAnalyseMessage({ filesInScope: [currentFile], reanalyse: true }); break }
+            case 'reanalyse': {postAnalyseMessage({ filesInScope: [STATE.currentFile], reanalyse: true }); break }
             case 'reanalyseAll': {postAnalyseMessage({ filesInScope: STATE.openFiles, reanalyse: true }); break }
             
             case 'purge-from-toast': { deleteFile(MISSING_FILE); break }
@@ -4490,7 +4548,7 @@ DOM.gain.addEventListener('input', () => {
                 updatePrefs('config.json', config)
                 resetResults({clearSummary: true, clearPagination: true, clearResults: true});
                 setListUIState(config.list);
-                if (currentFile && STATE.analysisDone) worker.postMessage({ action: 'update-list', list: config.list, refreshResults: true })
+                if (STATE.currentFile && STATE.analysisDone) worker.postMessage({ action: 'update-list', list: config.list, refreshResults: true })
                 break;
             }
             
@@ -4500,7 +4558,7 @@ DOM.gain.addEventListener('input', () => {
             case 'settingsHelp': { (async () => await populateHelpModal('Help/settings.html', 'Settings Help'))(); break }
             case 'usage': { (async () => await populateHelpModal('Help/usage.html', 'Usage Guide'))(); break }
             case 'bugs': { (async () => await populateHelpModal('Help/bugs.html', 'Join the Chirpity Users community'))(); break }
-            case 'species': { worker.postMessage({action: 'get-valid-species', file: currentFile}); break }
+            case 'species': { worker.postMessage({action: 'get-valid-species', file: STATE.currentFile}); break }
             case 'startTour': { prepTour(); break }
             case 'eBird': { (async () => await populateHelpModal('Help/ebird.html', 'eBird Record FAQ'))(); break }
             case 'archive-location-select': {
@@ -4767,7 +4825,7 @@ DOM.gain.addEventListener('input', () => {
                     } else {
                         colorMapFieldset.classList.add('d-none')
                     }
-                    if (wavesurfer && currentFile) {
+                    if (wavesurfer && STATE.currentFile) {
                         const fftSamples = wavesurfer.spectrogram.fftSamples;
                         wavesurfer.destroy();
                         wavesurfer = undefined;
@@ -4783,7 +4841,7 @@ DOM.gain.addEventListener('input', () => {
                     const threshold = document.getElementById('color-threshold-slider').valueAsNumber;
                     document.getElementById('color-threshold').textContent = threshold;
                     config.customColormap = {'loud': loud, 'mid': mid, 'quiet': quiet, 'threshold': threshold, 'windowFn': windowFn};
-                    if (wavesurfer && currentFile) {
+                    if (wavesurfer && STATE.currentFile) {
                         const fftSamples = wavesurfer.spectrogram.fftSamples;
                         wavesurfer.destroy();
                         wavesurfer = undefined;
@@ -4802,7 +4860,7 @@ DOM.gain.addEventListener('input', () => {
                 }
                 case 'spec-labels': {
                     config.specLabels = element.checked;                    
-                    if (wavesurfer && currentFile) {
+                    if (wavesurfer && STATE.currentFile) {
                         const fftSamples = wavesurfer.spectrogram.fftSamples;
                         wavesurfer.destroy();
                         wavesurfer = undefined;
@@ -5106,7 +5164,7 @@ async function readLabels(labelFile, updating){
     
     
     const insertManualRecord = (cname, start, end, comment, count, label, action, batch, originalCname, confidence) => {
-        const files = batch ? STATE.openFiles : currentFile;
+        const files = batch ? STATE.openFiles : STATE.currentFile;
         worker.postMessage({
             action: 'insert-manual-record',
             cname: cname,
@@ -5164,7 +5222,7 @@ async function readLabels(labelFile, updating){
     function deleteFile(file) {
         // EventHandler caller 
         if (typeof file === 'object' && file instanceof Event) {
-            file = currentFile;
+            file = STATE.currentFile;
         }
         if (file) {
             if (confirm(`This will remove ${file} and all the associated detections from the database archive. Proceed?`)) {
@@ -5292,7 +5350,7 @@ async function readLabels(labelFile, updating){
     // CI functions
     const getFileLoaded = () => fileLoaded;
     const donePredicting = () => !PREDICTING;
-    const getAudacityLabels = () => AUDACITY_LABELS[currentFile];
+    const getAudacityLabels = () => AUDACITY_LABELS[STATE.currentFile];
     
     
     // Update checking for Mac 

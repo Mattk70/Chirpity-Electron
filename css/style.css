@@ -409,6 +409,8 @@ footer {
     border-radius: 5px;
     z-index: 3;
     display: none;
+    opacity: 0;
+    transition: opacity 1.3s ease; /* Smooth transitions for left and right positions */
 }
 /* ============ desktop view .end// ============ */
 
