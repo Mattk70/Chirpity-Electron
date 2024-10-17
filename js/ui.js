@@ -1050,7 +1050,10 @@ async function onOpenFiles(args) {
 * @returns {Promise<void>}
 */
 async function showSaveDialog() {
-    await window.electron.saveFile({ currentFile: STATE.currentFile, labels: AUDACITY_LABELS[STATE.currentFile] });
+    await window.electron.saveFile({ 
+        currentFile: STATE.currentFile, 
+        labels: AUDACITY_LABELS[STATE.currentFile], 
+        type: 'audacity' });
 }
 
 function resetDiagnostics() {
@@ -1750,7 +1753,7 @@ let appPath, tempPath, isMac;
 window.onload = async () => {
     window.electron.requestWorkerChannel();
     isMac = await window.electron.isMac();
-    replaceCtrlWithCommand()
+    if (isMac) replaceCtrlWithCommand()
     DOM.contentWrapper.classList.add('loaded');
     
     // Load preferences and override defaults
@@ -2245,16 +2248,15 @@ document.addEventListener('change', function (e) {
 })
 
 // Save audio clip
-function onSaveAudio({file, filename}){
-    const anchor = document.createElement('a');
-    document.body.appendChild(anchor);
-    anchor.style = 'display: none';
-    const url = window.URL.createObjectURL(file);
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    window.URL.revokeObjectURL(url);
-    anchor.remove()
+async function onSaveAudio({file, filename, extension}){
+
+    await window.electron.saveFile({ 
+        file: file, 
+        filename: filename,
+        extension: extension
+    })
+
+        
 }
 
 
@@ -3794,7 +3796,6 @@ function formatDuration(seconds){
     }
     
     function replaceCtrlWithCommand() {
-        if (isMac){
             // Select all text nodes in the body of the web page
             const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
             const nodes = [];
@@ -3810,7 +3811,6 @@ function formatDuration(seconds){
             
             // Replace 'Ctrl' with ⌘ in title attributes of elements
             replaceTextInTitleAttributes();
-        }
     }
     
     const populateSpeciesModal = async (included, excluded) => {

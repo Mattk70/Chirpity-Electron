@@ -85,69 +85,69 @@ async function fetchReleaseNotes(version) {
 }
 
 
+if (! isMac){  // The auto updater doesn't work for .pkg installers
+    autoUpdater.on('checking-for-update', function () {
+        logUpdateStatus('Checking for update...');
+        if (process.env.PORTABLE_EXECUTABLE_DIR){
+            logUpdateStatus('This is a portable exe')
+        } 
+    });
 
-autoUpdater.on('checking-for-update', function () {
-    logUpdateStatus('Checking for update...');
-    if (process.env.PORTABLE_EXECUTABLE_DIR){
-        logUpdateStatus('This is a portable exe')
-    } 
-});
+    autoUpdater.on('update-available', async function (info) {
+        if (!process.env.PORTABLE_EXECUTABLE_DIR){
+            autoUpdater.downloadUpdate();
+        } else {
+            
+            // Fetch release notes from GitHub API
+            const releaseNotes = await fetchReleaseNotes(info.version);
+            dialog.showMessageBox({
+                type: 'info',
+                title: 'Update Available',
+                message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}`,
+                buttons: ['OK'],
+                defaultId: 1,
+                noLink: true
+            })
+        }
+    });
 
-autoUpdater.on('update-available', async function (info) {
-    if (!process.env.PORTABLE_EXECUTABLE_DIR){
-        autoUpdater.downloadUpdate();
-    } else {
-        
+    autoUpdater.on('update-not-available', function (info) {
+        logUpdateStatus('Update not available.');
+    });
+
+    autoUpdater.on('error', function (err) {
+        logUpdateStatus('Error in auto-updater:' + err);
+    });
+
+    autoUpdater.on('download-progress', function (progressObj) {
+        mainWindow.webContents.send('download-progress', progressObj);
+    });
+
+
+    autoUpdater.on('update-downloaded', async function (info) {
         // Fetch release notes from GitHub API
         const releaseNotes = await fetchReleaseNotes(info.version);
+        log.info(JSON.stringify(info))
+        // Display dialog to the user with release notes
         dialog.showMessageBox({
             type: 'info',
             title: 'Update Available',
-            message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}`,
-            buttons: ['OK'],
+            message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
+            buttons: ['Quit and Install', 'Install after Exit'],
             defaultId: 1,
             noLink: true
-        })
-    }
-});
-
-autoUpdater.on('update-not-available', function (info) {
-    logUpdateStatus('Update not available.');
-});
-
-autoUpdater.on('error', function (err) {
-    logUpdateStatus('Error in auto-updater:' + err);
-});
-
-autoUpdater.on('download-progress', function (progressObj) {
-    mainWindow.webContents.send('download-progress', progressObj);
-});
-
-
-autoUpdater.on('update-downloaded', async function (info) {
-    // Fetch release notes from GitHub API
-    const releaseNotes = await fetchReleaseNotes(info.version);
-    log.info(JSON.stringify(info))
-    // Display dialog to the user with release notes
-    dialog.showMessageBox({
-        type: 'info',
-        title: 'Update Available',
-        message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
-        buttons: ['Quit and Install', 'Install after Exit'],
-        defaultId: 1,
-        noLink: true
-    }).then((result) => {
-        if (result.response === 0) {
-            // User clicked 'Yes', start the download
-            autoUpdater.quitAndInstall();
-        }
+        }).then((result) => {
+            if (result.response === 0) {
+                // User clicked 'Yes', start the download
+                autoUpdater.quitAndInstall();
+            }
+        });
     });
-});
 
-function logUpdateStatus(message) {
-    console.log(message);
+    function logUpdateStatus(message) {
+        console.log(message);
+    }
 }
-
 
 process.stdin.resume();//so the program will not close instantly
 
@@ -514,35 +514,62 @@ ipcMain.handle('unsaved-records', (_event, data) => {
 
 
 
-ipcMain.handle('saveFile', (event, arg) => {
+ipcMain.handle('saveFile', async (event, arg) => {
     // Show file dialog to select audio file
-    let currentFile = arg.currentFile.substr(0, arg.currentFile.lastIndexOf(".")) + ".txt";
-    dialog.showSaveDialog({
-        filters: [{ name: 'Text Files', extensions: ['txt'] }],
-        defaultPath: currentFile
-    }).then(file => {
-        // Stating whether dialog operation was cancelled or not.
-        //console.log(file.canceled);
-        if (!file.canceled) {
-            const AUDACITY_LABELS = arg.labels;
-            let str = "";
-            // Format results
-            for (let i = 0; i < AUDACITY_LABELS.length; i++) {
-                str += AUDACITY_LABELS[i].timestamp + "\t";
-                str += " " + AUDACITY_LABELS[i].cname;
-                // str += " " + AUDACITY_LABELS[i].sname ;
-                str += " " + (parseFloat(AUDACITY_LABELS[i].score) * 100).toFixed(0) + "%\r\n";
+    if (arg.type === 'audacity'){
+        let currentFile = arg.currentFile.substr(0, arg.currentFile.lastIndexOf(".")) + ".txt";
+        dialog.showSaveDialog({
+            filters: [{ name: 'Text Files', extensions: ['txt'] }],
+            defaultPath: currentFile
+        }).then(file => {
+            // Stating whether dialog operation was cancelled or not.
+            //console.log(file.canceled);
+            if (!file.canceled) {
+                const AUDACITY_LABELS = arg.labels;
+                let str = "";
+                // Format results
+                for (let i = 0; i < AUDACITY_LABELS.length; i++) {
+                    str += AUDACITY_LABELS[i].timestamp + "\t";
+                    str += " " + AUDACITY_LABELS[i].cname;
+                    // str += " " + AUDACITY_LABELS[i].sname ;
+                    str += " " + (parseFloat(AUDACITY_LABELS[i].score) * 100).toFixed(0) + "%\r\n";
+                }
+                fs.writeFile(file.filePath.toString(),
+                str, function (err) {
+                    if (err) throw err;
+                    console.log('Saved!');
+                });
             }
-            fs.writeFile(file.filePath.toString(),
-            str, function (err) {
-                if (err) throw err;
-                console.log('Saved!');
+        }).catch(error => {
+            console.log(error)
+        });
+    } else {
+        const {file, filename, extension} = arg;
+        dialog.showSaveDialog({
+            title: 'Save File',
+            filters: [{ name: 'Audio files', extensions: [extension] }],
+            defaultPath: filename
+        }).then(saveObj => {
+            // Check if the user cancelled the operation
+            const {canceled, filePath} = saveObj;
+            if (canceled) {
+                console.log('User cancelled the save operation.');
+                fs.rmSync(file);
+                return;
+            }
+
+            // Copy the file from temp directory to the selected save location
+            fs.rename(file, filePath, (err) => {
+                if (err) {
+                    console.error('Error saving the file:', err);
+                } else {
+                    console.log('File saved successfully to', filePath);
+                }
+                return;
             });
-        }
-    }).catch(error => {
-        console.log(error)
-    });
-    mainWindow.webContents.send('saveFile', { message: 'file saved!' });
+        })
+    }
+
 });
 
 

@@ -92,7 +92,7 @@ const SUPPORTED_FILES = ['.wav', '.flac', '.opus', '.m4a', '.mp3', '.mpga', '.og
 
 let NUM_WORKERS;
 let workerInstance = 0;
-let appPath, BATCH_SIZE, LABELS, batchChunksToSend = {};
+let appPath, tempPath, BATCH_SIZE, LABELS, batchChunksToSend = {};
 let LIST_WORKER;
 
 const DATASET = false;
@@ -138,13 +138,10 @@ const setupFfmpegCommand = ({
         .audioChannels(channels)
         .audioFrequency(sampleRate);
 
-    if (metadata.length) command.addOutputOptions(metadata);
     // Add filters if provided
     additionalFilters.forEach(filter => {
         command.audioFilters(filter);
     });
-    if (format === 'flac') command.audioFormat('s16')
-
     if (format !== 'flac' && Object.keys(metadata).length > 0) { 
         metadata = Object.entries(metadata).flatMap(([k, v]) => {
             if (typeof v === 'string') {
@@ -594,7 +591,7 @@ async function handleMessage(e) {
             break;
         }
         case "update-state": {
-            appPath = args.path || appPath;
+            appPath = args.path || appPath; tempPath = args.temp || tempPath;
             // If we change the speciesThreshold, we need to invalidate any location caches
             if (args.speciesThreshold) {
                 if (STATE.included?.['birdnet']?.['location'])  STATE.included.birdnet.location = {};
@@ -1944,51 +1941,26 @@ async function uploadOpus({ file, start, end, defaultName, metadata, mode }) {
 }
             
 const bufferToAudio = async ({
-    file = '', start = 0, end = 3, meta = {}, format = undefined
+    file = '', start = 0, end = 3, meta = {}, format = undefined, folder = undefined, filename = undefined
 }) => {
     if (! fs.existsSync(file)) {
         const found = await getWorkingFile(file);
         if (!found) return
     }
-    let audioCodec, mimeType, soundFormat;
     let padding = STATE.audio.padding;
     let fade = STATE.audio.fade;
     let bitrate = STATE.audio.bitrate;
     let quality = parseInt(STATE.audio.quality);
     let downmix = STATE.audio.downmix;
     format ??= STATE.audio.format;
-    const bitrateMap = { 24_000: '24k', 16_000: '16k', 12_000: '12k', 8000: '8k', 44_100: '44k', 22_050: '22k', 11_025: '11k' };
-    if (format === 'mp3') {
-        audioCodec = 'libmp3lame';
-        soundFormat = 'mp3';
-        mimeType = 'audio/mpeg'
-    } else if (format === 'wav') {
-        audioCodec = 'pcm_s16le';
-        soundFormat = 'wav';
-        mimeType = 'audio/wav'
-    } else if (format === 'flac') {
-        audioCodec = 'flac';
-        soundFormat = 'flac';
-        mimeType = 'audio/flac'
-        // Static binary is missing the aac encoder
-        // } else if (format === 'm4a') {
-        //     audioCodec = 'aac';
-        //     soundFormat = 'aac';
-        //     mimeType = 'audio/mp4'
-    } else if (format === 'opus') {
-        audioCodec = 'libopus';
-        soundFormat = 'opus'
-        mimeType = 'audio/ogg'
-    }
+    const formatMap = {
+        mp3: { audioCodec: 'libmp3lame', soundFormat: 'mp3' },
+        wav: { audioCodec: 'pcm_s16le', soundFormat: 'wav' },
+        flac: { audioCodec: 'flac', soundFormat: 'flac' },
+        opus: { audioCodec: 'libopus', soundFormat: 'opus' }
+    };
+    const { audioCodec, soundFormat } = formatMap[format] || {};
     
-    let optionList = [];
-    for (let [k, v] of Object.entries(meta)) {
-        if (typeof v === 'string') {
-            v = v.replaceAll(' ', '_');
-        }
-        optionList.push('-metadata');
-        optionList.push(`${k}=${v}`);
-    }
     METADATA[file] || await getWorkingFile(file);
     if (padding) {
         start -= padding;
@@ -1998,53 +1970,46 @@ const bufferToAudio = async ({
     }
     
     return new Promise(function (resolve, reject) {
-        const bufferStream = new PassThrough();
-        let ffmpgCommand = ffmpeg('file:' + file)
+        let command = ffmpeg('file:' + file)
         .toFormat(soundFormat)
-        .seekInput(start)
-        .duration(end - start)
         .audioChannels(downmix ? 1 : -1)
         // I can't get this to work with Opus
         // .audioFrequency(METADATA[file].sampleRate)
-        .audioCodec(audioCodec)
-        .addOutputOptions(...optionList)
-        
+        .audioCodec(audioCodec).seekInput(start).duration(end - start)
         if (['mp3', 'm4a', 'opus'].includes(format)) {
             //if (format === 'opus') bitrate *= 1000;
-            ffmpgCommand = ffmpgCommand.audioBitrate(bitrate)
+            command = command.audioBitrate(bitrate)
         } else if (['flac'].includes(format)) {
-            ffmpgCommand = ffmpgCommand.audioQuality(quality)
+            command = command.audioQuality(quality)
         }
         if (STATE.filters.active) {
-            if (STATE.filters.lowShelfFrequency > 0){
-                ffmpgCommand = ffmpgCommand.audioFilters(
-                    {
-                        filter: 'lowshelf',
-                        options: `gain=${STATE.filters.lowShelfAttenuation}:f=${STATE.filters.lowShelfFrequency}`
-                    }
-                )
+            const filters = [];
+            if (STATE.filters.lowShelfFrequency > 0) {
+                filters.push({
+                    filter: 'lowshelf',
+                    options: `gain=${STATE.filters.lowShelfAttenuation}:f=${STATE.filters.lowShelfFrequency}`
+                });
             }
-            if (STATE.filters.highPassFrequency > 0){
-                ffmpgCommand = ffmpgCommand.audioFilters(
-                    {
-                        filter: 'highpass',
-                        options: `f=${STATE.filters.highPassFrequency}:poles=1`
-                    }
-                )
-            }
-            if (STATE.audio.normalise){
-                ffmpgCommand = ffmpgCommand.audioFilters(
-                    {
-                        filter: 'loudnorm',
-                        options: "I=-16:LRA=11:TP=-1.5" //:offset=" + STATE.audio.gain
-                    }
-                )
-            }
+            if (STATE.filters.highPassFrequency > 0) {
+                filters.push({
+                    filter: 'highpass',
+                    options: `f=${STATE.filters.highPassFrequency}:poles=1`
+                });
+            }            
+            if (STATE.audio.normalise) {
+                filters.push({
+                    filter: 'loudnorm',
+                    options: "I=-16:LRA=11:TP=-1.5"
+                });
+            }            
+            if (filters.length > 0) {
+                command = command.audioFilters(filters);
+            }            
         }
         if (fade && padding) {
             const duration = end - start;
             if (start >= 1 && end <= METADATA[file].duration - 1) {
-                ffmpgCommand = ffmpgCommand.audioFilters(
+                command = command.audioFilters(
                     {
                         filter: 'afade',
                         options: `t=in:ss=${start}:d=1`
@@ -2055,47 +2020,41 @@ const bufferToAudio = async ({
                     }
                 )}
         }
+        if (Object.entries(meta).length){
+            meta = Object.entries(meta).flatMap(([k, v]) => {
+                if (typeof v === 'string') {
+                    // Escape special characters, including quotes and apostrophes
+                    v=v.replaceAll(' ', '_');
+                };
+                return ['-metadata', `${k}=${v}`]
+            });
+            command.addOutputOptions(meta)
+        }
+        //const destination = p.join((folder || tempPath), 'file.mp3');
+        const destination = p.join((folder || tempPath), filename);
+        command.save(destination);
 
-
-        ffmpgCommand.on('start', function (commandLine) {
+        command.on('start', function (commandLine) {
             DEBUG && console.log('FFmpeg command: ' + commandLine);
         })
-        ffmpgCommand.on('error', (err) => {
+        command.on('error', (err) => {
             console.log('An error occurred: ' + err.message);
         })
-        ffmpgCommand.on('end', function () {
+        command.on('end', function () {
             DEBUG && console.log(format + " file rendered")
+            resolve(destination)
         })
-        ffmpgCommand.writeToStream(bufferStream);
-        
-        let concatenatedBuffer = Buffer.alloc(0);
-        bufferStream.on('readable', () => {
-            const chunk = bufferStream.read();
-            if (chunk === null){
-                let audio = [];
-                audio.push(new Int8Array(concatenatedBuffer))
-                const blob = new Blob(audio, { type: mimeType });
-                resolve(blob);    
-            } else {
-                concatenatedBuffer = concatenatedBuffer.length ?  joinBuffers(concatenatedBuffer, chunk) : chunk;
-            }
-        });
     })
 };
                 
 async function saveAudio(file, start, end, filename, metadata, folder) {
-    const thisBlob = await bufferToAudio({
-        file: file, start: start, end: end, meta: metadata
+    filename = filename.replaceAll(':', '-');
+    const convertedFilePath = await bufferToAudio({
+        file: file, start: start, end: end, meta: metadata, folder: folder, filename: filename
     });
-    if (folder) {
-        const buffer = Buffer.from(await thisBlob.arrayBuffer());
-        if (! fs.existsSync(folder)) fs.mkdirSync(folder, {recursive: true});
-        fs.writeFile(p.join(folder, filename), buffer, {flag: 'w'}, err => {
-            if (err) console.log(err) ;
-            else if (DEBUG) console.log('Audio file saved') });
-    }
+    if (folder && DEBUG) { console.log('Audio file saved: ', convertedFilePath) }
     else {
-        UI.postMessage({event:'audio-file-to-save', file: thisBlob, filename: filename})
+        UI.postMessage({event:'audio-file-to-save', file: convertedFilePath, filename: filename, extension: STATE.audio.format})
     }
 }
 
@@ -2273,7 +2232,7 @@ const generateInsertQuery = async (latestResult, file) => {
         if (METADATA[file].metadata){
             const metadata = JSON.parse(METADATA[file].metadata);
             const guano = metadata.guano;
-            if (guano['Loc Position']){
+            if (guano && guano['Loc Position']){
                 const [lat, lon] = guano['Loc Position'].split(' ');
                 const place = guano['Site Name'] || guano['Loc Position'];
                 const row = await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ?', parseFloat(lat), parseFloat(lon))
@@ -2388,7 +2347,7 @@ const parsePredictions = async (response) => {
         DEBUG && console.log(`File ${file} processed after ${(new Date() - predictionStart) / 1000} seconds: ${filesBeingProcessed.length} files to go`);
     }
 
-    !STATE.selection && (STATE.increment() === 0) && await getSummary({ interim: true });
+    !STATE.selection && (STATE.increment() === 0 || index === 1 ) && await getSummary({ interim: true });
 
     return response.worker
 }
