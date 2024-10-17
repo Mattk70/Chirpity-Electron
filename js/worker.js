@@ -2736,7 +2736,7 @@ const getResults = async ({
                     //const dateString = new Date(r.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
                     const filename = `${r.cname}_${dateString}.${STATE.audio.format}`
                     DEBUG && console.log(`Exporting from ${r.file}, position ${r.position}, into folder ${directory}`)
-                    saveAudio(r.file, r.position, r.end, filename, metadata, directory)
+                    saveAudio(r.file, r.position, r.end, filename, {Artist: 'Chirpity'}, directory)
                     i === result.length - 1 && UI.postMessage({ event: 'generate-alert', message: `${result.length} files saved` })
                 } 
             }

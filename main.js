@@ -86,11 +86,6 @@ async function fetchReleaseNotes(version) {
 
 
 
-
-log.transports.file.resolvePathFn = () => path.join(APP_DATA, 'logs/main.log');
-log.info('App starting...');
-
-
 autoUpdater.on('checking-for-update', function () {
     logUpdateStatus('Checking for update...');
     if (process.env.PORTABLE_EXECUTABLE_DIR){
@@ -177,23 +172,23 @@ async function exitHandler(options, exitCode) {
                 }
             });
         });
-        // Remove old logs
-        const logs = path.join(app.getPath('userData'), 'logs');
-        fs.readdir(logs, (err, files) => {
-            if (err) {
-                console.error('Error reading folder:', err);
-                return;
-            }
-            files.forEach((file) => {
-                fs.unlink(path.join(logs, file), (err) => {
-                    if (err) {
-                        console.error('Error deleting file:', err);
-                    } else {
-                        console.log('Deleted file:', file);
-                    }
-                });
-            });
-        });
+        // Remove old logs - commented out as logs are rotated
+        // const logs = path.join(app.getPath('userData'), 'logs');
+        // fs.readdir(logs, (err, files) => {
+        //     if (err) {
+        //         console.error('Error reading folder:', err);
+        //         return;
+        //     }
+        //     files.forEach((file) => {
+        //         fs.unlink(path.join(logs, file), (err) => {
+        //             if (err) {
+        //                 console.error('Error deleting file:', err);
+        //             } else {
+        //                 console.log('Deleted file:', file);
+        //             }
+        //         });
+        //     });
+        // });
         // Disable debug mode here?
     } else {
         console.log('no clean')
@@ -246,7 +241,7 @@ async function windowStateKeeper(windowName) {
         windowState.isMaximized = window.isMaximized();
         try {
             await settings.set(`windowState.${windowName}`, windowState);
-        } catch (error){}
+        } catch {} // do nothing
     }
     
     function track(win) {
@@ -293,7 +288,7 @@ async function createWindow() {
     // Set icon
     mainWindow.setIcon(__dirname + '/img/icon/icon.png');
     
-    // Hide nav bar excpet in ci mode
+    // Hide nav bar except in ci mode
 
     mainWindow.setMenuBarVisibility(!!process.env.CI);
     
