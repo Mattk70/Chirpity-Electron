@@ -142,7 +142,7 @@ const setupFfmpegCommand = ({
     additionalFilters.forEach(filter => {
         command.audioFilters(filter);
     });
-    if (format !== 'flac' && Object.keys(metadata).length > 0) { 
+    if (Object.keys(metadata).length) { 
         metadata = Object.entries(metadata).flatMap(([k, v]) => {
             if (typeof v === 'string') {
                 // Escape special characters, including quotes and apostrophes
@@ -1341,7 +1341,7 @@ function setupCtx(audio, rate, destination, file) {
     .catch(error => aborted || console.warn(error, file));    
 };
 
-function checkBacklog(stream) {
+function checkBacklog() {
     return new Promise((resolve) => {
         const backlog = sumObjectValues(predictionsRequested) - sumObjectValues(predictionsReceived);
         DEBUG && console.log('backlog:', backlog);
@@ -1349,35 +1349,13 @@ function checkBacklog(stream) {
         if (backlog >= predictWorkers.length * 2) {
             // If backlog is too high, check again after a short delay
             setTimeout(() => {
-                resolve(checkBacklog(stream)); // Recursively call until backlog is within limits
+                resolve(checkBacklog()); // Recursively call until backlog is within limits
             }, 50);
         } else {
-            resolve(stream.read()); // Backlog ok, read the stream data
+            resolve(); // Backlog ok, read the stream data
         }
     });
 }
-// function checkBacklog(stream) {
-//     return new Promise((resolve, reject) => {
-//         const maxRetries = 20; // Max retries before stopping, to avoid infinite loops
-//         let retryCount = 0;
-//         let checkInterval = 50; // Start with 50ms
-        
-//         const intervalId = setInterval(() => {
-//             const backlog = sumObjectValues(predictionsRequested) - sumObjectValues(predictionsReceived);
-//             DEBUG && console.log('backlog:', backlog);
-
-//             // If backlog is within limits, clear interval and resolve
-//             if (backlog < predictWorkers.length * 2 || retryCount >= maxRetries) {
-//                 clearInterval(intervalId);
-//                 resolve(stream.read());
-//             } else {
-//                 retryCount++;
-//                 // Optionally implement exponential backoff by increasing checkInterval
-//                 checkInterval = Math.min(checkInterval * 2, 1000); // Cap at 1000ms
-//             }
-//         }, checkInterval);
-//     });
-// }
 
 /**
 *
@@ -1445,24 +1423,23 @@ const getWavePredictBuffers = async ({
     
         let chunkStart = start * sampleRate;
         // Changed on.('data') handler because of:  https://stackoverflow.com/questions/32978094/nodejs-streams-and-premature-end
-        readStream.on('readable', () => {
+        readStream.on('readable', async () => {
             if (aborted) {
                 readStream.destroy();
                 return
             }
-
-            checkBacklog(readStream).then(chunk => {
-                if (chunk === null || chunk.byteLength <= 1 ) {
-                    // EOF
-                    chunk?.byteLength && predictionsReceived[file]++;
-                    readStream.destroy();
-                } else {
-                    const audio = joinBuffers(meta.header, chunk);
-                    predictQueue.push([audio, file, end, chunkStart]);
-                    chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
-                    processPredictQueue();
-                }
-            })
+            await checkBacklog();
+            const chunk = readStream.read();
+            if (chunk === null || chunk.byteLength <= 1 ) {
+                // EOF
+                chunk?.byteLength && predictionsReceived[file]++;
+                readStream.destroy();
+            } else {
+                const audio = joinBuffers(meta.header, chunk);
+                predictQueue.push([audio, file, end, chunkStart]);
+                chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
+                processPredictQueue();
+            }
         })
         readStream.on('error', err => {
             console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${METADATA[file].duration}`);
@@ -1536,14 +1513,51 @@ const getPredictBuffers = async ({
     if (start > METADATA[file].duration) {
         return
     }
-    let header, shortFile = true;
+
     const MINIMUM_AUDIO_LENGTH = 0.05; // below this value doesn't generate another chunk
     batchChunksToSend[file] = Math.ceil((end - start - MINIMUM_AUDIO_LENGTH) / (BATCH_SIZE * WINDOW_SIZE));
     predictionsReceived[file] = 0;
     predictionsRequested[file] = 0;
-    let highWaterMark =  2 * sampleRate * BATCH_SIZE * WINDOW_SIZE; 
-
+    
+    const samplesInBatch = sampleRate * BATCH_SIZE * WINDOW_SIZE
+    const highWaterMark =  samplesInBatch * 2; 
+    
     let chunkStart = start * sampleRate;
+    if (STATE.detect.backend === 'tensorflow'){
+        const step = (BATCH_SIZE * WINDOW_SIZE);
+        // Throttle the ingest of transcoded audio
+        for (let i = start; i < end; i += step){
+            await checkBacklog();
+            const finish = i + step;
+            await processAudio(file, i, finish, chunkStart, highWaterMark)
+            chunkStart += samplesInBatch;
+        }
+    } else {
+        // Full gas
+        await processAudio(file, start, end, chunkStart, highWaterMark, samplesInBatch)
+    }
+}
+
+function lookForHeader(buffer){
+    //if (buffer.length < 4096) return undefined
+    try {
+        const wav = new wavefileReader.WaveFileReader();
+        wav.fromBuffer(buffer);
+        let headerEnd;
+        wav.signature.subChunks.forEach(el => {
+            if (el['chunkId'] === 'data') {
+                headerEnd = el.chunkData.start;
+            }
+        });
+        return buffer.subarray(0, headerEnd);
+    } catch (e) {
+        DEBUG && console.log(e)
+        return undefined
+    }
+}
+
+function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBatch){
+    let header, shortFile = true;
     return new Promise((resolve, reject) => {
         let concatenatedBuffer = Buffer.alloc(0);
         const command = setupFfmpegCommand({file, start, end, sampleRate})
@@ -1566,19 +1580,19 @@ const getPredictBuffers = async ({
             const chunk = STREAM.read();
             if (chunk === null) {
                 //EOF: deal with part-full buffers
-                if (shortFile) highWaterMark -= header.length;
+                // if (shortFile) highWaterMark -= header.length;
                 if (concatenatedBuffer.byteLength){
                     header || console.warn('no header for ' + file)
                     let noHeader;
-                    if (concatenatedBuffer.length < header.length) noHeader = true;
-                    else noHeader = concatenatedBuffer.compare(header, 0, header.length, 0, header.length)
-                    const audio = noHeader ? joinBuffers(header, concatenatedBuffer) : concatenatedBuffer;
+                    if (concatenatedBuffer.length < header.length) {noHeader = true}
+                    else {noHeader = concatenatedBuffer.compare(header, 0, header.length, 0, header.length)} //compare returns 0 when there is a header in audio_chunk!
+                    const audio = noHeader ? Buffer.concat([header, concatenatedBuffer]) : concatenatedBuffer;
                     processPredictQueue(audio, file, end, chunkStart);
                 } else {
                     updateFilesBeingProcessed(file)
                 }
                 DEBUG && console.log('All chunks sent for ', file);
-                resolve('finished')
+                resolve()
             }
             else {
                 concatenatedBuffer = concatenatedBuffer.length ? joinBuffers(concatenatedBuffer, chunk) : chunk;
@@ -1592,26 +1606,12 @@ const getPredictBuffers = async ({
 
                 // if we have a full buffer
                 if (concatenatedBuffer.length > highWaterMark) {     
-                    // const audio_chunk = Buffer.allocUnsafe(highWaterMark);
-                    // concatenatedBuffer.copy(audio_chunk, 0, 0, highWaterMark);
-                    // const remainder = Buffer.allocUnsafe(concatenatedBuffer.length - highWaterMark);
-
-                    // concatenatedBuffer.copy(remainder, 0, highWaterMark);
-                    // const noHeader = audio_chunk.compare(header, 0, header.length, 0, header.length)
-                    // const audio = noHeader ? joinBuffers(header, audio_chunk) : audio_chunk;
-                    // // If we *do* have a header, we need to reset highwatermark because subsequent chunks *won't* have it
-                    // if (! noHeader) {
-                    //     highWaterMark -= header.length;
-                    //     shortFile = false;
-                    // }
-                    // processPredictQueue(audio, file, end, chunkStart);
-                    // chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate
-                    // concatenatedBuffer = remainder;
                     const audio_chunk = concatenatedBuffer.subarray(0, highWaterMark);
                     const remainder = concatenatedBuffer.subarray(highWaterMark);
-                    const audio = header ? Buffer.concat([header, audio_chunk]) : audio_chunk;
+                    let noHeader = concatenatedBuffer.compare(header, 0, header.length, 0, header.length)
+                    const audio = noHeader ? Buffer.concat([header, audio_chunk]) : audio_chunk;
                     processPredictQueue(audio, file, end, chunkStart);
-                    chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
+                    chunkStart += samplesInBatch;
                     concatenatedBuffer = remainder;
                 }
             }
@@ -1623,24 +1623,6 @@ const getPredictBuffers = async ({
         })
 
     }).catch(error => console.log(error));
-}
-
-function lookForHeader(buffer){
-    //if (buffer.length < 4096) return undefined
-    try {
-        const wav = new wavefileReader.WaveFileReader();
-        wav.fromBuffer(buffer);
-        let headerEnd;
-        wav.signature.subChunks.forEach(el => {
-            if (el['chunkId'] === 'data') {
-                headerEnd = el.chunkData.start;
-            }
-        });
-        return buffer.subarray(0, headerEnd);
-    } catch (e) {
-        DEBUG && console.log(e)
-        return undefined
-    }
 }
 
 /**

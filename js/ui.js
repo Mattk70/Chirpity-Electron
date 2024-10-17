@@ -2656,27 +2656,6 @@ function onChartData(args) {
         tooltip.style.visibility = 'hidden';
     };
 
-    // async function specTooltip(event) {
-    //     const waveElement = event.target;
-    //     const specDimensions = waveElement.getBoundingClientRect();
-    //     const frequencyRange = Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
-    //     const yPosition = Math.round((specDimensions.bottom - event.clientY) * (frequencyRange / specDimensions.height)) + Number(config.audio.minFrequency);
-    //     tooltip.textContent = `Frequency: ${yPosition}Hz`;
-    //     if (region) {
-    //         const lineBreak = document.createElement('br');
-    //         const textNode = document.createTextNode(formatRegionTooltip(region.start, region.end));
-            
-    //         tooltip.appendChild(lineBreak);  // Add the line break
-    //         tooltip.appendChild(textNode);   // Add the text node
-    //     }
-    //     Object.assign(tooltip.style, {
-    //         top: `${event.clientY}px`,
-    //         left: `${event.clientX + 15}px`,
-    //         display: 'block',
-    //         visibility: 'visible'
-    //     });
-    // }
-
     async function specTooltip(event) {
         const waveElement = event.target;
         const specDimensions = waveElement.getBoundingClientRect();
@@ -2771,8 +2750,7 @@ function onChartData(args) {
             warmup: config.warmup,
             threads: config[config[config.model].backend].threads,
             backend: config[config.model].backend
-        });
-        
+        })
     }
     
     const handleBackendChange = (backend) => {
@@ -2808,12 +2786,6 @@ function onChartData(args) {
         initRegion();
         loadModel();
     }
-    
-    const backend = document.getElementsByName('backend');
-    for (let i = 0; i < backend.length; i++) {
-        backend[i].addEventListener('click', handleBackendChange)
-    }
-    
     
     const setTimelinePreferences = () => {
         const timestampFields = document.querySelectorAll('.timestamp');
@@ -4535,6 +4507,8 @@ DOM.gain.addEventListener('input', () => {
             case 'reanalyseAll': {postAnalyseMessage({ filesInScope: STATE.openFiles, reanalyse: true }); break }
             
             case 'purge-from-toast': { deleteFile(MISSING_FILE); break }
+
+            // ----
             case 'locate-missing-file': {
                 (async () => await locateFile(MISSING_FILE))(); 
                 break }
@@ -4551,9 +4525,8 @@ DOM.gain.addEventListener('input', () => {
                 if (STATE.currentFile && STATE.analysisDone) worker.postMessage({ action: 'update-list', list: config.list, refreshResults: true })
                 break;
             }
-            
-            
-
+                        
+            // Help Menu
             case 'keyboardHelp': { (async () => await populateHelpModal('Help/keyboard.html', 'Keyboard shortcuts'))(); break }
             case 'settingsHelp': { (async () => await populateHelpModal('Help/settings.html', 'Settings Help'))(); break }
             case 'usage': { (async () => await populateHelpModal('Help/usage.html', 'Usage Guide'))(); break }
@@ -4561,6 +4534,20 @@ DOM.gain.addEventListener('input', () => {
             case 'species': { worker.postMessage({action: 'get-valid-species', file: STATE.currentFile}); break }
             case 'startTour': { prepTour(); break }
             case 'eBird': { (async () => await populateHelpModal('Help/ebird.html', 'eBird Record FAQ'))(); break }
+            
+            // --- Backends
+            case 'tensorflow':
+            case 'webgl':
+            case 'webgpu':{
+                if (PREDICTING){
+                    generateToast({message: 'It is not possible to change the model backend while an analysis is underway', type:'warning'})
+                    document.getElementById(config[config.model].backend).checked = true;
+                } else {
+                    handleBackendChange(target);
+                }
+                break;
+            }
+
             case 'archive-location-select': {
                 (async () =>{
                     const files = await window.electron.selectDirectory(config.archive.location)

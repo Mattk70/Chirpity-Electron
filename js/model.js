@@ -269,7 +269,7 @@ class Model {
         // const TensorBatch = this.fixUpSpecBatch(specs); // + 1 tensor
         // specs.dispose(); // - 1 tensor
         let paddedTensorBatch, maskedTensorBatch;
-        if (BACKEND === 'webgl' && TensorBatch.shape[0] < this.batchSize) {
+        if (BACKEND === 'webgl' && TensorBatch.shape[0] < this.batchSize && !this.selection) {
             // WebGL backend works best when all batches are the same size
             paddedTensorBatch = this.padBatch(TensorBatch)  // + 1 tensor
         } else if (threshold) {
