@@ -3353,8 +3353,6 @@ function formatDuration(seconds){
             STATE.mode !== 'explore' && enableMenuItem(['save2db'])            
         }
         if (STATE.currentFile) enableMenuItem(['analyse'])
-        
-        adjustSpecDims(true)
     }
     
     
@@ -3454,6 +3452,7 @@ function formatDuration(seconds){
             return
         }
         if (index <= 1) {
+            adjustSpecDims(true)
             if (selection) {
                 const selectionTable = document.getElementById('selectionResultTableBody');
                 selectionTable.textContent = '';
@@ -5000,7 +4999,7 @@ async function readLabels(labelFile, updating){
         // If we haven't clicked the active row or we cleared the region, load the row we clicked
         if (resultContext || hideInSelection || hideInSummary) {
             // Lets check if the summary needs to be filtered
-            if (!(inSummary && target.closest('tr').classList.contains('text-warning'))) {
+            if (inSummary && ! target.closest('tr').classList.contains('text-warning')) {
                 target.click(); // Wait for file to load
                 await waitForFileLoad();
             }
@@ -5230,11 +5229,19 @@ async function readLabels(labelFile, updating){
     function delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
-    
-    async function waitForFileLoad() {
-        while (!fileLoaded) {
-            await delay(100); // Wait for 100 milliseconds before checking again
-        }
+    let fileLoadRetryCount = 0
+    function waitForFileLoad() {
+        let maxRetries = 20;
+        return new Promise((resolve) =>{
+            setTimeout(() =>{
+                if (fileLoaded) resolve(fileLoadRetryCount = 0)
+                else {
+                    console.log('retries: ', ++fileLoadRetryCount)
+                    resolve(waitForFileLoad())
+                }
+            }, 100)
+            if (fileLoadRetryCount >= maxRetries) resolve(fileLoadRetryCount = 0)
+        })
     }
     
     async function waitForLocations() {

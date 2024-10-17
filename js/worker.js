@@ -1146,7 +1146,7 @@ async function notifyMissingFile(file) {
     const row = await diskDB.getAsync('SELECT * FROM FILES WHERE name = ?', file);
     if (row?.id) missingFile = file
     UI.postMessage({
-        event: 'generate-alert', type: 'error', 
+        event: 'generate-alert', type: 'warning', 
         message: `Unable to locate source file with any supported file extension: ${file}`,
         file: missingFile
     })
@@ -1520,7 +1520,7 @@ const getPredictBuffers = async ({
     predictionsRequested[file] = 0;
     
     const samplesInBatch = sampleRate * BATCH_SIZE * WINDOW_SIZE
-    const highWaterMark =  samplesInBatch * 2; 
+    const highWaterMark =  samplesInBatch * 2;
     
     let chunkStart = start * sampleRate;
     if (STATE.detect.backend === 'tensorflow'){
@@ -3727,7 +3727,7 @@ async function convertAndOrganiseFiles(threadLimit) {
         const attempted  = successfulConversions + failedConversions;
         // Create a summary message
         let summaryMessage;
-        let type = 'notice';
+        let type = 'info';
         
         if (attempted) {
            summaryMessage = `Processing complete: ${successfulConversions} successful, ${failedConversions} failed.`;
