@@ -54,7 +54,7 @@ window.addEventListener('rejectionhandled', function(event) {
 });
 
 let STATE = {
-    guano: {},
+    metadata: {},
     mode: 'analyse',
     analysisDone: false,
     openFiles: [],
@@ -70,7 +70,7 @@ let STATE = {
     sortOrder: 'timestamp',
     birdList: { lastSelectedSpecies: undefined }, // Used to put the last selected species at the top of the all-species list
     selection: { start: undefined, end: undefined },
-    currentAnalysis: {file: null, openFiles: [],  mode: null, species: null, offset: 0, active: null}
+    currentAnalysis: {currentFile: null, openFiles: [],  mode: null, species: null, offset: 0, active: null}
 }
 
 // Batch size map for slider
@@ -231,6 +231,7 @@ const DOM = {
     get resultTable() {return document.getElementById('resultTableBody')},
     get tooltip() { return document.getElementById('tooltip')},
     get waveElement() { return document.getElementById('waveform')},
+    get summary() { return document.getElementById('summary')},
     get specElement() { return document.getElementById('spectrogram')},
     get specCanvasElement() { return document.querySelector('#spectrogram canvas')},
     get waveCanvasElement() { return document.querySelector('#waveform canvas')},
@@ -309,8 +310,7 @@ DIAGNOSTICS['System Memory'] = (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) +
 
 function resetResults({clearSummary = true, clearPagination = true, clearResults = true} = {}) {
     if (clearSummary) summaryTable.textContent = '';
-    
-    clearPagination && pagination.forEach(item => item.classList.add('d-none'));
+    if (clearPagination) pagination.forEach(item => item.classList.add('d-none'));
     resultsBuffer = DOM.resultTable.cloneNode(false)
     if (clearResults) {
         DOM.resultTable.textContent = '';
@@ -360,11 +360,16 @@ function loadAudioFile({ filePath = '', preserveResults = false }) {
 
 
 function updateSpec({ buffer, play = false, position = 0, resetSpec = false }) {
-    showElement(['spectrogramWrapper'], false);
-    wavesurfer.loadDecodedBuffer(buffer);
+    if (resetSpec || DOM.spectrogramWrapper.classList.contains('d-none')){
+        DOM.spectrogramWrapper.classList.remove('d-none');
+        wavesurfer.loadDecodedBuffer(buffer);
+        adjustSpecDims(true);
+    } else {
+        wavesurfer.loadDecodedBuffer(buffer);
+    }
     wavesurfer.seekTo(position);
     play ? wavesurfer.play() : wavesurfer.pause();
-    resetSpec && adjustSpecDims(true);
+    
 }
 
 function createTimeline() {
@@ -694,36 +699,40 @@ function extractFileNameAndFolder(path) {
  * @returns {string} - HTML string of the formatted Bootstrap table
  */
 function formatAsBootstrapTable(jsonData) {
-    let tableHtml = "<div class='guano'><table class='table table-striped table-bordered'><thead class='text-bg-light'><tr><th>Key</th><th>Value</th></tr></thead><tbody>";
+    let parsedData = JSON.parse(jsonData);
+    let tableHtml = "<div class='metadata'>";
 
-    // Iterate over the key-value pairs in the JSON object
-    for (const [key, value] of Object.entries(JSON.parse(jsonData))) {
-        tableHtml += '<tr>';
-        tableHtml += `<td><strong>${key}</strong></td>`;
+    for (const [heading, keyValuePairs] of Object.entries(parsedData)) {
+        tableHtml += `<h3>${heading}</h3>`;
+        tableHtml += "<table class='table table-striped table-bordered'><thead class='text-bg-light'><tr><th>Key</th><th>Value</th></tr></thead><tbody>";
 
-        // Check if the value is an object or array, if so, stringify it
-        if (typeof value === 'object') {
-            tableHtml += `<td>${JSON.stringify(value, null, 2)}</td>`;
-        } else {
-            tableHtml += `<td>${value}</td>`;
+        for (const [key, value] of Object.entries(keyValuePairs)) {
+            tableHtml += '<tr>';
+            tableHtml += `<td><strong>${key}</strong></td>`;
+            if (typeof value === 'object') {
+                tableHtml += `<td>${JSON.stringify(value, null, 2)}</td>`;
+            } else {
+                tableHtml += `<td>${value}</td>`;
+            }
+            tableHtml += '</tr>';
         }
 
-        tableHtml += '</tr>';
+        tableHtml += '</tbody></table>';
     }
 
-    tableHtml += '</tbody></table></div>';
-    return tableHtml;
+    tableHtml += '</div>';
+    return tableHtml
 }
-function showGUANO(){
-    const icon = document.getElementById('guano');
-    if (STATE.guano[STATE.currentFile]){
+function showMetadata(){
+    const icon = document.getElementById('metadata');
+    if (STATE.metadata[STATE.currentFile]){
         icon.classList.remove('d-none');
         icon.setAttribute('data-bs-content', 'New content for the popover');
         // Reinitialize the popover to reflect the updated content
         const popover = bootstrap.Popover.getInstance(icon);
         popover.setContent({
-            '.popover-header': 'GUANO Metadata',
-            '.popover-body': formatAsBootstrapTable(STATE.guano[STATE.currentFile])
+            '.popover-header': 'Metadata',
+            '.popover-body': formatAsBootstrapTable(STATE.metadata[STATE.currentFile])
           });
     } else {
         icon.classList.add('d-none');
@@ -734,7 +743,7 @@ function renderFilenamePanel() {
     if (!STATE.currentFile) return;
     const openfile = STATE.currentFile;
     const files = STATE.openFiles;
-    showGUANO();
+    showMetadata();
     let filenameElement = DOM.filename;
     filenameElement.innerHTML = '';
     //let label = openfile.replace(/^.*[\\\/]/, "");
@@ -1265,7 +1274,7 @@ async function exportData(format, species, limit, duration){
 
 
 const handleLocationFilterChange = (e) => {
-    const location = e.target.value || undefined;
+    const location = parseInt(e.target.value) || undefined;
     worker.postMessage({ action: 'update-state', locationID: location });
     // Update the seen species list
     worker.postMessage({ action: 'get-detected-species-list' })
@@ -1275,10 +1284,10 @@ const handleLocationFilterChange = (e) => {
 
 function saveAnalyseState() {
     if (['analyse', 'archive'].includes(STATE.mode)){
-        const active = activeRow?.rowIndex -1
+        const active = activeRow?.rowIndex -1 || null
         // Store a reference to the current file
         STATE.currentAnalysis = {
-            file: STATE.currentFile, 
+            currentFile: STATE.currentFile, 
             openFiles: STATE.openFiles,  
             mode: STATE.mode,
             species: isSpeciesViewFiltered(true),
@@ -1334,11 +1343,16 @@ async function showAnalyse() {
     if (STATE.currentFile) {
         showElement(['spectrogramWrapper'], false);
         worker.postMessage({ action: 'update-state', filesToAnalyse: STATE.openFiles, sortOrder: STATE.sortOrder});
-        STATE.analysisDone && worker.postMessage({ action: 'filter', 
-            species: STATE.species, 
-            offset: STATE.offset, 
-            active: STATE.active, 
-            updateSummary: true });
+        if (STATE.analysisDone) {
+            worker.postMessage({ action: 'filter', 
+                species: STATE.species, 
+                offset: STATE.offset, 
+                active: STATE.active, 
+                updateSummary: true });
+        } else {
+            clearActive();
+            loadAudioFile({filePath: STATE.currentFile});
+        }
     }
     resetResults();
 };
@@ -1764,19 +1778,6 @@ window.onload = async () => {
             };
         //fill in defaults - after updates add new items
         syncConfig(config, defaultConfig);
-        // Reset defaults for tensorflow batchsize. If removing, update change handler for batch-size
-        if (config.tensorflow.batchSizeWasReset !== true && config.tensorflow.batchSize === 32) {
-            const RAM = parseInt(DIAGNOSTICS['System Memory'].replace(' GB', ''));
-            if (!RAM || RAM < 16){
-                config.tensorflow.batchSize = 8;
-                generateToast({message: `The new default CPU backend batch size of 8 has been applied. 
-                    This should result in faster prediction due to lower memory requirements. 
-                    Batch size can still be changed in settings`, autohide: false})
-            }
-            config.tensorflow.batchSizeWasReset = true;
-            updatePrefs('config.json', config)
-        }
-
         // set version
         config.VERSION = VERSION;
         // switch off debug mode we don't want this to be remembered
@@ -1987,10 +1988,10 @@ const setUpWorkerMessaging = () => {
                         MISSING_FILE = args.file;
                         args.message += `
                             <div class="d-flex justify-content-center mt-2">
-                                <button id="locate-missing-file" class="btn btn-secondary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
+                                <button id="locate-missing-file" class="btn btn-primary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
                                     Locate File
                                 </button>
-                                <button id="purge-from-toast" class="ms-3 btn btn-danger text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
+                                <button id="purge-from-toast" class="ms-3 btn btn-warning text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
                                     Remove from Archive
                                 </button>
                             </div>
@@ -3149,7 +3150,7 @@ function centreSpec(){
         play = false,
         queued = false,
         goToRegion = true,
-        guano = undefined
+        metadata = undefined
     }) {
         fileLoaded = true, locationID = location;
         clearTimeout(loadingTimeout)
@@ -3180,7 +3181,7 @@ function centreSpec(){
                 fileEnd = new Date(fileStart + (currentFileDuration * 1000));
             }
             
-            STATE.guano[STATE.currentFile] = guano;
+            STATE.metadata[STATE.currentFile] = metadata;
             renderFilenamePanel();
 
             if (config.timeOfDay) {
@@ -3378,6 +3379,7 @@ function formatDuration(seconds){
             STATE.mode !== 'explore' && enableMenuItem(['save2db'])            
         }
         if (STATE.currentFile) enableMenuItem(['analyse'])
+        
         adjustSpecDims(true)
     }
     
@@ -3435,8 +3437,6 @@ function formatDuration(seconds){
         })
     }
     
-    const summary = document.getElementById('summary');
-    // summary.addEventListener('click', speciesFilter);
     
     function speciesFilter(e) {
         if (PREDICTING || ['TBODY', 'TH', 'DIV'].includes(e.target.tagName)) return; // on Drag or clicked header
@@ -3447,7 +3447,7 @@ function formatDuration(seconds){
             e.target.closest('tr').classList.remove('text-warning');
         } else {
             //Clear any highlighted rows
-            const tableRows = summary.querySelectorAll('tr');
+            const tableRows = DOM.summary.querySelectorAll('tr');
             tableRows.forEach(row => row.classList.remove('text-warning'))
             // Add a highlight to the current row
             e.target.closest('tr').classList.add('text-warning');
@@ -3459,7 +3459,7 @@ function formatDuration(seconds){
             const list = document.getElementById('bird-list-seen');
             list.value = species || '';
         }
-        filterResults()
+        filterResults({updateSummary: false})
         resetResults({clearSummary: false, clearPagination: false, clearResults: false});
     }
     
@@ -3699,25 +3699,25 @@ function formatDuration(seconds){
             const dateString = dateArray.slice(0, 5).join(' ');
             filename = dateString + '.' + config.audio.format;
         }
-        
+
         let metadata = {
-            lat: config.latitude,
-            lon: config.longitude,
+            lat: parseFloat(config.latitude),
+            lon: parseFloat(config.longitude),
             Artist: 'Chirpity',
-            date: new Date().getFullYear(),
             version: VERSION
         };
         if (result) {
+            const date = new Date(result.timestamp);
             metadata = {
                 ...metadata,
                 UUID: config.UUID,
                 start: start,
                 end: end,
-                filename: result.filename,
+                //filename: result.file,
                 cname: result.cname,
                 sname: result.sname,
-                score: result.score,
-                date: result.date
+                score: parseInt(result.score),
+                Year: date.getFullYear()
             };
         }
         
@@ -4037,7 +4037,7 @@ function formatDuration(seconds){
             }
         });
         // Add pointer icon to species summaries
-        const summarySpecies = document.getElementById('summary').querySelectorAll('.cname');
+        const summarySpecies = DOM.summary.querySelectorAll('.cname');
         summarySpecies.forEach(row => row.classList.add('pointer'))
         // change results header to indicate activation
         DOM.resultHeader.classList.remove('text-bg-secondary');
@@ -4808,9 +4808,6 @@ DOM.gain.addEventListener('input', () => {
                     } else {
                         DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
                         config[config[config.model].backend].batchSize = BATCH_SIZE_LIST[element.value];
-                        // Need this in case a non-default batchsize was set, and then changed to 32
-                        if (config[config.model].backend === 'tensorflow') config.tensorflow.batchSizeWasReset = true;
-
                         worker.postMessage({action: 'change-batch-size', batchSize: BATCH_SIZE_LIST[element.value]})
                         // Reset region maxLength
                         initRegion();

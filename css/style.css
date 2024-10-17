@@ -572,7 +572,7 @@ input[type="range"].vertical {
     }
 }
 
-#loadingOverlay {
+#loading {
     position: absolute;
     top: 20vh;
 }
@@ -768,7 +768,7 @@ input[type="range"].vertical {
     z-index: 1;
   }
 
-  .guano-popover {
+  .metadata-popover {
     --bs-popover-max-width: 500px;
     max-height: 500px;
     --bs-popover-border-color: var(--bs-primary);
@@ -779,12 +779,12 @@ input[type="range"].vertical {
     overflow: hidden;
   }
 
-  .guano {
+  .metadata {
     max-height: 450px;
     overflow-y: scroll;
   }
 
-  .guano table {
+  .metadata table {
     width: 100%;  /* Ensure the table takes full width */
     table-layout: auto;
 }
