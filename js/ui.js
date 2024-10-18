@@ -703,7 +703,7 @@ function formatAsBootstrapTable(jsonData) {
     let tableHtml = "<div class='metadata'>";
 
     for (const [heading, keyValuePairs] of Object.entries(parsedData)) {
-        tableHtml += `<h3>${heading}</h3>`;
+        tableHtml += `<h5 class="text-primary">${heading.toUpperCase()}</h5>`;
         tableHtml += "<table class='table table-striped table-bordered'><thead class='text-bg-light'><tr><th>Key</th><th>Value</th></tr></thead><tbody>";
 
         for (const [key, value] of Object.entries(keyValuePairs)) {
@@ -3751,9 +3751,9 @@ function formatDuration(seconds){
         const response = await fetch(file);
         document.getElementById('helpModalBody').innerHTML = await response.text();
         const help = new bootstrap.Modal(document.getElementById('helpModal'));
+        document.removeEventListener('show.bs.modal', replaceCtrlWithCommand);
+        document.addEventListener('show.bs.modal', replaceCtrlWithCommand);
         help.show();
-        document.removeEventListener('shown.bs.modal', replaceCtrlWithCommand);
-        document.addEventListener('shown.bs.modal', replaceCtrlWithCommand);
     }
     function replaceTextInTitleAttributes() {
         // Select all elements with title attribute in the body of the web page
@@ -3771,6 +3771,7 @@ function formatDuration(seconds){
     }
     
     function replaceCtrlWithCommand() {
+        if (isMac){
             // Select all text nodes in the body of the web page
             const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
             const nodes = [];
@@ -3786,6 +3787,7 @@ function formatDuration(seconds){
             
             // Replace 'Ctrl' with ⌘ in title attributes of elements
             replaceTextInTitleAttributes();
+        }
     }
     
     const populateSpeciesModal = async (included, excluded) => {

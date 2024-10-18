@@ -141,6 +141,7 @@ div#contentWrapper.loaded {
 }
 
 .zoom {
+    position: absolute;
     font-size: calc(32px * var(--font-size-scale));;
 }
 
