@@ -160,7 +160,7 @@ select {
 
 .shortcut {
     color: #666;
-    font-size: 14px;
+    font-size: calc(14px * var(--font-size-scale));
     vertical-align: -webkit-baseline-middle;
 }
 
@@ -192,7 +192,7 @@ ul {
     /* Add some padding */
     text-decoration: none;
     /* Remove default text underline */
-    font-size: 14px;
+    font-size: calc(14px * var(--font-size-scale));
     /* Increase the font-size */
     color: black;
     /* Add a black text color */
@@ -487,7 +487,7 @@ footer {
     justify-content: center;
     align-items: center;
     text-align: center;
-    font-size: small;
+    font-size: calc(14px * var(--font-size-scale));;
     color: white;
 }
 
@@ -583,7 +583,7 @@ input[type="range"].vertical {
     width: calc(20px * var(--font-size-scale));
     height: calc(20px * var(--font-size-scale));
     border-radius: 50%;
-    font-size: medium;
+    font-size: calc(14px * var(--font-size-scale));
     background-color: gray;
     color: white;
     text-align: center;
@@ -704,7 +704,7 @@ input[type="range"].vertical {
     position: relative;
     display: flex;
     justify-content: space-between;
-    font-size: 16px;
+    font-size: calc(16px * var(--font-size-scale));
     color: #ffffff;
   }
   
@@ -743,8 +743,8 @@ input[type="range"].vertical {
   .range_container input[type="number"] {
     color: #929292;
     width: 80px;
-    height: 24px;
-    font-size: 20px;
+    height: calc(24px * var(--font-size-scale));
+    font-size: calc(20px * var(--font-size-scale));
     border: none;
   }
   

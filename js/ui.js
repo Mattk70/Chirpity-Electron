@@ -2964,6 +2964,8 @@ function centreSpec(){
         '=': function (e) {e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec('zoomIn')},
         '+': function (e) {e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec('zoomIn')},
         '-': function (e) {e.metaKey || e.ctrlKey ? increaseFFT() : zoomSpec('zoomOut')},
+        'F5': function (e) { reduceFFT() },
+        'F4': function (e) { increaseFFT() },
         ' ': function () { wavesurfer && wavesurfer.playPause() },
         Tab: function (e) {
             if ((e.metaKey || e.ctrlKey) && ! PREDICTING) { // If you did this when predicting, your results would go straight to the archive
