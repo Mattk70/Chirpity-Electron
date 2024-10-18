@@ -816,7 +816,7 @@ async function generateLocationList(id) {
     const el = document.getElementById(id);
     LOCATIONS = undefined;
     worker.postMessage({ action: 'get-locations', file: STATE.currentFile });
-    await waitForLocations();
+    await waitFor(() => LOCATIONS);
     el.innerHTML = `<option value="">${defaultText}</option>`; // clear options
     LOCATIONS.forEach(loc => {
         const option = document.createElement('option')
@@ -1163,7 +1163,7 @@ async function fetchLocationAddress(lat, lon) {
             try { 
                 if (!LOCATIONS) {
                     worker.postMessage({ action: 'get-locations', file: STATE.currentFile });
-                    await waitForLocations();  // Ensure this is awaited
+                    await waitFor(() => LOCATIONS);  // Ensure this is awaited
                 }
                 const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`);
                 
@@ -1437,7 +1437,7 @@ async function resultClick(e) {
     activeRow = row;
     loadResultRegion({ file, start, end, label });
     if (e.target.classList.contains('circle')) {
-        await waitForFileLoad();
+        await waitFor(()=> fileLoaded);
         getSelectionResults(true);
     }
 }
@@ -2560,13 +2560,9 @@ function onChartData(args) {
     
     window.addEventListener('resize', function () {
         waitForFinalEvent(function () {
-            WindowResize();
-        }, 250, 'id1');
+            adjustSpecDims(true);
+        }, 100, 'id1');
     });
-    
-    function WindowResize() {
-        adjustSpecDims(true);
-    }
     
     const contextMenu = document.getElementById('context-menu')
     
@@ -5001,7 +4997,7 @@ async function readLabels(labelFile, updating){
             // Lets check if the summary needs to be filtered
             if (inSummary && ! target.closest('tr').classList.contains('text-warning')) {
                 target.click(); // Wait for file to load
-                await waitForFileLoad();
+                await waitFor(() => fileLoaded);
             }
         }
         if (region === undefined && ! inSummary) return;
@@ -5225,32 +5221,23 @@ async function readLabels(labelFile, updating){
         })
     }
 
-    // Utility functions to wait for file to load
-    function delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-    let fileLoadRetryCount = 0
-    function waitForFileLoad(count) {
+    // Utility functions to wait for a variable to not be falsey
+
+    let retryCount = 0
+    function waitFor(checkFn) {
         let maxRetries = 15;
         return new Promise((resolve) => {
             let interval = setInterval(() => {
-                if (fileLoaded || fileLoadRetryCount >= maxRetries) {
+                if (checkFn() || retryCount >= maxRetries) {
                     clearInterval(interval); // Stop further retries
-                    resolve(fileLoadRetryCount = 0); // Resolve the promise
+                    resolve(retryCount = 0); // Resolve the promise
                 } else {
-                    console.log('retries: ', ++fileLoadRetryCount);
+                    console.log('retries: ', ++retryCount);
                 }
             }, 100);
         });
     }
-    
-    
-    async function waitForLocations() {
-        while (!LOCATIONS) {
-            await delay(100); // Wait for 100 milliseconds before checking again
-        }
-        return;
-    }
+
     
     // TOUR functions
     const tourModal = document.getElementById('tourModal');
