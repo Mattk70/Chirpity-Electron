@@ -1015,9 +1015,15 @@ async function onOpenFiles(args) {
     showElement(['spectrogramWrapper'], false);
     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
     resetDiagnostics();
-    // Store the file list and Load First audio file
     STATE.openFiles = sanitisedList;
-    STATE.openFiles.length > 1 && STATE.openFiles.length < 25_000 && worker.postMessage({action: 'check-all-files-saved', files: STATE.openFiles});
+    // CHeck not more than 25k files
+    if (STATE.openFiles.length >= 25_000){
+        generateToast({message: `Chirpity limits the maximum number of open files to 25,000. Only the first 25,000 of the ${STATE.openFiles.length} attempted will be opened`})
+        STATE.openFiles.splice(25000)
+    }
+    // Store the file list and Load First audio file
+
+    STATE.openFiles.length > 1 && worker.postMessage({action: 'check-all-files-saved', files: STATE.openFiles});
 
     // Sort file by time created (the oldest first):
     if (STATE.openFiles.length > 1) {
