@@ -166,7 +166,7 @@ async function exitHandler(options, exitCode) {
                         if (err) {
                             console.error('Error deleting file:', err);
                         } else {
-                            console.log('Deleted file:', file);
+                            DEBUG && console.log('Deleted file:', file);
                         }
                     });
                 }
@@ -184,18 +184,18 @@ async function exitHandler(options, exitCode) {
         //             if (err) {
         //                 console.error('Error deleting file:', err);
         //             } else {
-        //                 console.log('Deleted file:', file);
+        //                 DEBUG && console.log('Deleted file:', file);
         //             }
         //         });
         //     });
         // });
         // Disable debug mode here?
     } else {
-        console.log('no clean')
+        DEBUG && console.log('no clean')
         
     }
     if (exitCode || exitCode === 0) {
-        console.log(exitCode);
+        DEBUG && console.log(exitCode);
     }
     if (options.exit) {
         process.exit();
@@ -301,7 +301,7 @@ async function createWindow() {
     mainWindow.once('ready-to-show', () => {
         mainWindow.show()
     })
-    console.log("main window created");
+    DEBUG && console.log("main window created");
     // Emitted when the window is closed.
     if (process.platform !== 'darwin') {
         mainWindow.on('closed', () => {
@@ -353,7 +353,7 @@ async function createWorker() {
         workerWindow = undefined;
     });
     if (DEBUG) workerWindow.webContents.openDevTools();
-    console.log("worker created");
+    DEBUG && console.log("worker created");
 }
 
 // This method will be called when Electron has finished loading
@@ -380,7 +380,7 @@ app.whenReady().then(async () => {
         const fileContent = fs.readFileSync(filePath, 'utf8');
         const config = JSON.parse(fileContent);
         DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
-        console.log('CI mode' , process.env.CI)
+        DEBUG && console.log('CI mode' , process.env.CI)
     }
     catch (error) {
         // Handle errors, for example, file not found
@@ -413,7 +413,7 @@ app.whenReady().then(async () => {
     
     app.on('open-file', (event, path) => {
         files.push(path);
-        console.log('file passed to open:', path)
+        DEBUG && console.log('file passed to open:', path)
     });
     
     ipcMain.handle('openFiles', async (_event, _method, config) => {
@@ -463,7 +463,7 @@ app.whenReady().then(async () => {
     });
     
     workerWindow.webContents.once('render-process-gone', (e, details) => {
-        console.log(details);
+        DEBUG && console.log(details);
         const dialogOpts = {
             type: 'warning',
             title: 'Crash report',
@@ -509,7 +509,6 @@ ipcMain.handle('request-worker-channel', async (_event) =>{
 
 ipcMain.handle('unsaved-records', (_event, data) => {
     unsavedRecords = data.newValue; // Update the variable with the new value
-    console.log('Unsaved records:', unsavedRecords);
 });
 
 
@@ -523,7 +522,7 @@ ipcMain.handle('saveFile', async (event, arg) => {
             defaultPath: currentFile
         }).then(file => {
             // Stating whether dialog operation was cancelled or not.
-            //console.log(file.canceled);
+            //DEBUG && console.log(file.canceled);
             if (!file.canceled) {
                 const AUDACITY_LABELS = arg.labels;
                 let str = "";
@@ -537,11 +536,11 @@ ipcMain.handle('saveFile', async (event, arg) => {
                 fs.writeFile(file.filePath.toString(),
                 str, function (err) {
                     if (err) throw err;
-                    console.log('Saved!');
+                    DEBUG && console.log('Saved!');
                 });
             }
         }).catch(error => {
-            console.log(error)
+            console.warn(error)
         });
     } else {
         const {file, filename, extension} = arg;
@@ -553,7 +552,7 @@ ipcMain.handle('saveFile', async (event, arg) => {
             // Check if the user cancelled the operation
             const {canceled, filePath} = saveObj;
             if (canceled) {
-                console.log('User cancelled the save operation.');
+                DEBUG && console.log('User cancelled the save operation.');
                 fs.rmSync(file);
                 return;
             }
@@ -563,7 +562,7 @@ ipcMain.handle('saveFile', async (event, arg) => {
                 if (err) {
                     console.error('Error saving the file:', err);
                 } else {
-                    console.log('File saved successfully to', filePath);
+                    DEBUG && console.log('File saved successfully to', filePath);
                 }
                 return;
             });
@@ -578,9 +577,9 @@ powerSaveBlocker.stop(powerSaveID);
 ipcMain.handle('powerSaveControl', (e, on) => {
     if (on){
         powerSaveID = powerSaveBlocker.start('prevent-app-suspension')
-        //console.log(powerSaveBlocker.isStarted(powerSaveID), powerSaveID)
+        //DEBUG && console.log(powerSaveBlocker.isStarted(powerSaveID), powerSaveID)
     } else {
         powerSaveBlocker.stop(powerSaveID)
-        //console.log(powerSaveBlocker.isStarted(powerSaveID), powerSaveID)
+        //DEBUG && console.log(powerSaveBlocker.isStarted(powerSaveID), powerSaveID)
     }
 })

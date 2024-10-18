@@ -2703,7 +2703,7 @@ const getResults = async ({
             }
         }
     }
-    STATE.selection || UI.postMessage({event: 'database-results-complete', active: active, select: position?.start});
+    (STATE.selection && topRankin === STATE.topRankin)  || UI.postMessage({event: 'database-results-complete', active: active, select: position?.start});
 };
 
 // Function to format the CSV export
