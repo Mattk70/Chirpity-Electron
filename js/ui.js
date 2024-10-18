@@ -5230,19 +5230,20 @@ async function readLabels(labelFile, updating){
         return new Promise(resolve => setTimeout(resolve, ms));
     }
     let fileLoadRetryCount = 0
-    function waitForFileLoad() {
-        let maxRetries = 20;
-        return new Promise((resolve) =>{
-            setTimeout(() =>{
-                if (fileLoaded) resolve(fileLoadRetryCount = 0)
-                else {
-                    console.log('retries: ', ++fileLoadRetryCount)
-                    resolve(waitForFileLoad())
+    function waitForFileLoad(count) {
+        let maxRetries = 15;
+        return new Promise((resolve) => {
+            let interval = setInterval(() => {
+                if (fileLoaded || fileLoadRetryCount >= maxRetries) {
+                    clearInterval(interval); // Stop further retries
+                    resolve(fileLoadRetryCount = 0); // Resolve the promise
+                } else {
+                    console.log('retries: ', ++fileLoadRetryCount);
                 }
-            }, 100)
-            if (fileLoadRetryCount >= maxRetries) resolve(fileLoadRetryCount = 0)
-        })
+            }, 100);
+        });
     }
+    
     
     async function waitForLocations() {
         while (!LOCATIONS) {
