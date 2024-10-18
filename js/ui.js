@@ -1347,7 +1347,7 @@ async function showAnalyse() {
         showElement(['spectrogramWrapper'], false);
         worker.postMessage({ action: 'update-state', filesToAnalyse: STATE.openFiles, sortOrder: STATE.sortOrder});
         if (STATE.analysisDone) {
-            worker.postMessage({ action: 'filter', 
+            filterResults({ 
                 species: STATE.species, 
                 offset: STATE.offset, 
                 active: STATE.active, 
