@@ -141,6 +141,7 @@ div#contentWrapper.loaded {
 }
 
 .zoom {
+    position: absolute;
     font-size: calc(32px * var(--font-size-scale));;
 }
 
@@ -160,7 +161,7 @@ select {
 
 .shortcut {
     color: #666;
-    font-size: 14px;
+    font-size: calc(14px * var(--font-size-scale));
     vertical-align: -webkit-baseline-middle;
 }
 
@@ -192,7 +193,7 @@ ul {
     /* Add some padding */
     text-decoration: none;
     /* Remove default text underline */
-    font-size: 14px;
+    font-size: calc(14px * var(--font-size-scale));
     /* Increase the font-size */
     color: black;
     /* Add a black text color */
@@ -409,6 +410,8 @@ footer {
     border-radius: 5px;
     z-index: 3;
     display: none;
+    opacity: 0;
+    transition: opacity 1.3s ease; /* Smooth transitions for left and right positions */
 }
 /* ============ desktop view .end// ============ */
 
@@ -485,7 +488,7 @@ footer {
     justify-content: center;
     align-items: center;
     text-align: center;
-    font-size: small;
+    font-size: calc(14px * var(--font-size-scale));;
     color: white;
 }
 
@@ -570,7 +573,7 @@ input[type="range"].vertical {
     }
 }
 
-#loadingOverlay {
+#loading {
     position: absolute;
     top: 20vh;
 }
@@ -581,7 +584,7 @@ input[type="range"].vertical {
     width: calc(20px * var(--font-size-scale));
     height: calc(20px * var(--font-size-scale));
     border-radius: 50%;
-    font-size: medium;
+    font-size: calc(14px * var(--font-size-scale));
     background-color: gray;
     color: white;
     text-align: center;
@@ -702,7 +705,7 @@ input[type="range"].vertical {
     position: relative;
     display: flex;
     justify-content: space-between;
-    font-size: 16px;
+    font-size: calc(16px * var(--font-size-scale));
     color: #ffffff;
   }
   
@@ -741,8 +744,8 @@ input[type="range"].vertical {
   .range_container input[type="number"] {
     color: #929292;
     width: 80px;
-    height: 24px;
-    font-size: 20px;
+    height: calc(24px * var(--font-size-scale));
+    font-size: calc(20px * var(--font-size-scale));
     border: none;
   }
   
@@ -766,7 +769,7 @@ input[type="range"].vertical {
     z-index: 1;
   }
 
-  .guano-popover {
+  .metadata-popover {
     --bs-popover-max-width: 500px;
     max-height: 500px;
     --bs-popover-border-color: var(--bs-primary);
@@ -777,12 +780,12 @@ input[type="range"].vertical {
     overflow: hidden;
   }
 
-  .guano {
+  .metadata {
     max-height: 450px;
     overflow-y: scroll;
   }
 
-  .guano table {
+  .metadata table {
     width: 100%;  /* Ensure the table takes full width */
     table-layout: auto;
 }

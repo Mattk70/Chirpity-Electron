@@ -753,8 +753,8 @@
                             <li class="dropdown-item disabled" id="explore">
                                 <span class="material-symbols-outlined">explore</span> Explore Archive
                             </li>
-                            <li class="dropdown-item d-none" id="restore">
-                                <span class="material-symbols-outlined">youtube_searched_for</span> Restore Latest Analysis
+                            <li class="dropdown-item disabled" id="active-analysis">
+                                <span class="material-symbols-outlined">youtube_searched_for</span> Return to Active Analysis
                             </li>
                             <li class="dropdown-divider"></li>
                             <li class="dropdown-item disabled" id="compress-and-organise">
@@ -1122,11 +1122,11 @@
                 </div>
                 <!-- Controls view -->
                 <div class="container-fluid p-1 text-bg-dark d-inline-flex" id="controlsWrapper" style="max-height: 50px" title="Drag to resize the Spectrogram window.">
-                    <a id="guano" class="pointer pt-2 d-none" tabindex="-1" data-bs-custom-class="guano-popover" data-bs-html="true" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="File Metadata" id="File Metadata-circle-help" >
-                        <span class="material-symbols-outlined"  title="Display GUANO metadata">other_admission</span></a>
+                    <a id="metadata" class="pointer pt-2 d-none" tabindex="-1" data-bs-custom-class="metadata-popover" data-bs-html="true" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="File Metadata" id="File Metadata-circle-help" >
+                        <span class="material-symbols-outlined"  title="Display File Metadata">other_admission</span></a>
                     <div id="filename" class="col-auto ps-1 overflow-visible flex-nowrap"></div>
                     <div id="unsaved-icon" class="material-symbols-outlined ms-2 me-2 text-warning pointer d-none"  tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Unsaved Edits" id="Unsaved Edits-circle-help"  data-bs-content="There are changes to the results that haven't been saved.">warning</div>
-                    <div class="col-auto btn-group bg-dark ms-2 me-2 text-nowrap" role="group">
+                    <div class="btn-group bg-dark pt-0 p-1 ms-2 me-2 text-nowrap" role="group">
                         <button id="playToggle" class="p-1 pe-2 btn btn-outline-secondary" title="Play / Pause (SpaceBar)">
                             <span class="material-symbols-outlined ">play_circle</span><span
                             class="align-middle d-none d-lg-inline"> Play </span>
@@ -1135,13 +1135,13 @@
                             class="align-middle d-none d-lg-inline-block">Pause</span>
                         </button>
                     </div>
-                    <div class="col btn-group bg-dark  pe-2" role="group">
+                    <div class="col btn-group bg-dark pt-0 p-1 pe-2" role="group">
                         <button id="zoomIn" title="Zoom into the spectrogram (Keyboard Shortcut: + key)" class="btn btn-outline-secondary"
                         style="max-width: 70px">
-                        <span class="material-symbols-outlined zoom">zoom_in</span>
+                        <span class="material-symbols-outlined zoom translate-middle">zoom_in</span>
                     </button>
                     <button id="zoomOut" title="Zoom out of the spectrogram (Keyboard Shortcut: - key)" class="btn btn-outline-secondary"
-                    style="max-width: 70px"><span class="material-symbols-outlined zoom align-middle">zoom_out</span>
+                    style="max-width: 70px"><span class="material-symbols-outlined zoom  translate-middle">zoom_out</span>
                 </button>
             </div>
             <div id="progressDiv" class="col-2 d-none"><span id="fileNumber"></span><br>

@@ -39,7 +39,10 @@ ipcRenderer.once('provide-worker-channel', async (event) => {
     window.postMessage('provide-worker-channel', '/', event.ports)
 })
 
-
+ipcRenderer.on('error', (event, errorMessage) => {
+    console.error('Uncaught Exception from main process:', errorMessage);
+    alert('Uncaught Exception from main process:', errorMessage)
+  });
 
 contextBridge.exposeInMainWorld('electron', {
     requestWorkerChannel: () => ipcRenderer.invoke('request-worker-channel'),

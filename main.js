@@ -85,74 +85,69 @@ async function fetchReleaseNotes(version) {
 }
 
 
+if (! isMac){  // The auto updater doesn't work for .pkg installers
+    autoUpdater.on('checking-for-update', function () {
+        logUpdateStatus('Checking for update...');
+        if (process.env.PORTABLE_EXECUTABLE_DIR){
+            logUpdateStatus('This is a portable exe')
+        } 
+    });
+
+    autoUpdater.on('update-available', async function (info) {
+        if (!process.env.PORTABLE_EXECUTABLE_DIR){
+            autoUpdater.downloadUpdate();
+        } else {
+            
+            // Fetch release notes from GitHub API
+            const releaseNotes = await fetchReleaseNotes(info.version);
+            dialog.showMessageBox({
+                type: 'info',
+                title: 'Update Available',
+                message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}`,
+                buttons: ['OK'],
+                defaultId: 1,
+                noLink: true
+            })
+        }
+    });
+
+    autoUpdater.on('update-not-available', function (info) {
+        logUpdateStatus('Update not available.');
+    });
+
+    autoUpdater.on('error', function (err) {
+        logUpdateStatus('Error in auto-updater:' + err);
+    });
+
+    autoUpdater.on('download-progress', function (progressObj) {
+        mainWindow.webContents.send('download-progress', progressObj);
+    });
 
 
-log.transports.file.resolvePathFn = () => path.join(APP_DATA, 'logs/main.log');
-log.info('App starting...');
-
-
-autoUpdater.on('checking-for-update', function () {
-    logUpdateStatus('Checking for update...');
-    if (process.env.PORTABLE_EXECUTABLE_DIR){
-        logUpdateStatus('This is a portable exe')
-    } 
-});
-
-autoUpdater.on('update-available', async function (info) {
-    if (!process.env.PORTABLE_EXECUTABLE_DIR){
-        autoUpdater.downloadUpdate();
-    } else {
-        
+    autoUpdater.on('update-downloaded', async function (info) {
         // Fetch release notes from GitHub API
         const releaseNotes = await fetchReleaseNotes(info.version);
+        log.info(JSON.stringify(info))
+        // Display dialog to the user with release notes
         dialog.showMessageBox({
             type: 'info',
             title: 'Update Available',
-            message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}`,
-            buttons: ['OK'],
+            message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
+            buttons: ['Quit and Install', 'Install after Exit'],
             defaultId: 1,
             noLink: true
-        })
-    }
-});
-
-autoUpdater.on('update-not-available', function (info) {
-    logUpdateStatus('Update not available.');
-});
-
-autoUpdater.on('error', function (err) {
-    logUpdateStatus('Error in auto-updater:' + err);
-});
-
-autoUpdater.on('download-progress', function (progressObj) {
-    mainWindow.webContents.send('download-progress', progressObj);
-});
-
-
-autoUpdater.on('update-downloaded', async function (info) {
-    // Fetch release notes from GitHub API
-    const releaseNotes = await fetchReleaseNotes(info.version);
-    log.info(JSON.stringify(info))
-    // Display dialog to the user with release notes
-    dialog.showMessageBox({
-        type: 'info',
-        title: 'Update Available',
-        message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
-        buttons: ['Quit and Install', 'Install after Exit'],
-        defaultId: 1,
-        noLink: true
-    }).then((result) => {
-        if (result.response === 0) {
-            // User clicked 'Yes', start the download
-            autoUpdater.quitAndInstall();
-        }
+        }).then((result) => {
+            if (result.response === 0) {
+                // User clicked 'Yes', start the download
+                autoUpdater.quitAndInstall();
+            }
+        });
     });
-});
 
-function logUpdateStatus(message) {
-    console.log(message);
+    function logUpdateStatus(message) {
+        console.log(message);
+    }
 }
-
 
 process.stdin.resume();//so the program will not close instantly
 
@@ -171,36 +166,36 @@ async function exitHandler(options, exitCode) {
                         if (err) {
                             console.error('Error deleting file:', err);
                         } else {
-                            console.log('Deleted file:', file);
+                            DEBUG && console.log('Deleted file:', file);
                         }
                     });
                 }
             });
         });
-        // Remove old logs
-        const logs = path.join(app.getPath('userData'), 'logs');
-        fs.readdir(logs, (err, files) => {
-            if (err) {
-                console.error('Error reading folder:', err);
-                return;
-            }
-            files.forEach((file) => {
-                fs.unlink(path.join(logs, file), (err) => {
-                    if (err) {
-                        console.error('Error deleting file:', err);
-                    } else {
-                        console.log('Deleted file:', file);
-                    }
-                });
-            });
-        });
+        // Remove old logs - commented out as logs are rotated
+        // const logs = path.join(app.getPath('userData'), 'logs');
+        // fs.readdir(logs, (err, files) => {
+        //     if (err) {
+        //         console.error('Error reading folder:', err);
+        //         return;
+        //     }
+        //     files.forEach((file) => {
+        //         fs.unlink(path.join(logs, file), (err) => {
+        //             if (err) {
+        //                 console.error('Error deleting file:', err);
+        //             } else {
+        //                 DEBUG && console.log('Deleted file:', file);
+        //             }
+        //         });
+        //     });
+        // });
         // Disable debug mode here?
     } else {
-        console.log('no clean')
+        DEBUG && console.log('no clean')
         
     }
     if (exitCode || exitCode === 0) {
-        console.log(exitCode);
+        DEBUG && console.log(exitCode);
     }
     if (options.exit) {
         process.exit();
@@ -246,7 +241,7 @@ async function windowStateKeeper(windowName) {
         windowState.isMaximized = window.isMaximized();
         try {
             await settings.set(`windowState.${windowName}`, windowState);
-        } catch (error){}
+        } catch {} // do nothing
     }
     
     function track(win) {
@@ -293,7 +288,7 @@ async function createWindow() {
     // Set icon
     mainWindow.setIcon(__dirname + '/img/icon/icon.png');
     
-    // Hide nav bar excpet in ci mode
+    // Hide nav bar except in ci mode
 
     mainWindow.setMenuBarVisibility(!!process.env.CI);
     
@@ -306,7 +301,7 @@ async function createWindow() {
     mainWindow.once('ready-to-show', () => {
         mainWindow.show()
     })
-    console.log("main window created");
+    DEBUG && console.log("main window created");
     // Emitted when the window is closed.
     if (process.platform !== 'darwin') {
         mainWindow.on('closed', () => {
@@ -358,7 +353,7 @@ async function createWorker() {
         workerWindow = undefined;
     });
     if (DEBUG) workerWindow.webContents.openDevTools();
-    console.log("worker created");
+    DEBUG && console.log("worker created");
 }
 
 // This method will be called when Electron has finished loading
@@ -385,7 +380,7 @@ app.whenReady().then(async () => {
         const fileContent = fs.readFileSync(filePath, 'utf8');
         const config = JSON.parse(fileContent);
         DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
-        console.log('CI mode' , process.env.CI)
+        DEBUG && console.log('CI mode' , process.env.CI)
     }
     catch (error) {
         // Handle errors, for example, file not found
@@ -418,7 +413,7 @@ app.whenReady().then(async () => {
     
     app.on('open-file', (event, path) => {
         files.push(path);
-        console.log('file passed to open:', path)
+        DEBUG && console.log('file passed to open:', path)
     });
     
     ipcMain.handle('openFiles', async (_event, _method, config) => {
@@ -468,7 +463,7 @@ app.whenReady().then(async () => {
     });
     
     workerWindow.webContents.once('render-process-gone', (e, details) => {
-        console.log(details);
+        DEBUG && console.log(details);
         const dialogOpts = {
             type: 'warning',
             title: 'Crash report',
@@ -487,6 +482,7 @@ app.whenReady().then(async () => {
     autoUpdater.checkForUpdatesAndNotify()
     // Allow multiple instances of Chirpity - experimental! This alone doesn't work:
     //app.releaseSingleInstanceLock()
+
 });
 
 
@@ -513,40 +509,66 @@ ipcMain.handle('request-worker-channel', async (_event) =>{
 
 ipcMain.handle('unsaved-records', (_event, data) => {
     unsavedRecords = data.newValue; // Update the variable with the new value
-    console.log('Unsaved records:', unsavedRecords);
 });
 
 
 
-ipcMain.handle('saveFile', (event, arg) => {
+ipcMain.handle('saveFile', async (event, arg) => {
     // Show file dialog to select audio file
-    let currentFile = arg.currentFile.substr(0, arg.currentFile.lastIndexOf(".")) + ".txt";
-    dialog.showSaveDialog({
-        filters: [{ name: 'Text Files', extensions: ['txt'] }],
-        defaultPath: currentFile
-    }).then(file => {
-        // Stating whether dialog operation was cancelled or not.
-        //console.log(file.canceled);
-        if (!file.canceled) {
-            const AUDACITY_LABELS = arg.labels;
-            let str = "";
-            // Format results
-            for (let i = 0; i < AUDACITY_LABELS.length; i++) {
-                str += AUDACITY_LABELS[i].timestamp + "\t";
-                str += " " + AUDACITY_LABELS[i].cname;
-                // str += " " + AUDACITY_LABELS[i].sname ;
-                str += " " + (parseFloat(AUDACITY_LABELS[i].score) * 100).toFixed(0) + "%\r\n";
+    if (arg.type === 'audacity'){
+        let currentFile = arg.currentFile.substr(0, arg.currentFile.lastIndexOf(".")) + ".txt";
+        dialog.showSaveDialog({
+            filters: [{ name: 'Text Files', extensions: ['txt'] }],
+            defaultPath: currentFile
+        }).then(file => {
+            // Stating whether dialog operation was cancelled or not.
+            //DEBUG && console.log(file.canceled);
+            if (!file.canceled) {
+                const AUDACITY_LABELS = arg.labels;
+                let str = "";
+                // Format results
+                for (let i = 0; i < AUDACITY_LABELS.length; i++) {
+                    str += AUDACITY_LABELS[i].timestamp + "\t";
+                    str += " " + AUDACITY_LABELS[i].cname;
+                    // str += " " + AUDACITY_LABELS[i].sname ;
+                    str += " " + (parseFloat(AUDACITY_LABELS[i].score) * 100).toFixed(0) + "%\r\n";
+                }
+                fs.writeFile(file.filePath.toString(),
+                str, function (err) {
+                    if (err) throw err;
+                    DEBUG && console.log('Saved!');
+                });
             }
-            fs.writeFile(file.filePath.toString(),
-            str, function (err) {
-                if (err) throw err;
-                console.log('Saved!');
+        }).catch(error => {
+            console.warn(error)
+        });
+    } else {
+        const {file, filename, extension} = arg;
+        dialog.showSaveDialog({
+            title: 'Save File',
+            filters: [{ name: 'Audio files', extensions: [extension] }],
+            defaultPath: filename
+        }).then(saveObj => {
+            // Check if the user cancelled the operation
+            const {canceled, filePath} = saveObj;
+            if (canceled) {
+                DEBUG && console.log('User cancelled the save operation.');
+                fs.rmSync(file);
+                return;
+            }
+
+            // Copy the file from temp directory to the selected save location
+            fs.rename(file, filePath, (err) => {
+                if (err) {
+                    console.error('Error saving the file:', err);
+                } else {
+                    DEBUG && console.log('File saved successfully to', filePath);
+                }
+                return;
             });
-        }
-    }).catch(error => {
-        console.log(error)
-    });
-    mainWindow.webContents.send('saveFile', { message: 'file saved!' });
+        })
+    }
+
 });
 
 
@@ -555,9 +577,9 @@ powerSaveBlocker.stop(powerSaveID);
 ipcMain.handle('powerSaveControl', (e, on) => {
     if (on){
         powerSaveID = powerSaveBlocker.start('prevent-app-suspension')
-        //console.log(powerSaveBlocker.isStarted(powerSaveID), powerSaveID)
+        //DEBUG && console.log(powerSaveBlocker.isStarted(powerSaveID), powerSaveID)
     } else {
         powerSaveBlocker.stop(powerSaveID)
-        //console.log(powerSaveBlocker.isStarted(powerSaveID), powerSaveID)
+        //DEBUG && console.log(powerSaveBlocker.isStarted(powerSaveID), powerSaveID)
     }
 })

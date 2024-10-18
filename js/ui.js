@@ -1,6 +1,6 @@
 import {trackVisit, trackEvent} from './tracking.js';
 
-let shownDaylightBanner = false, LOCATIONS, locationID = undefined, loadingTimeout;
+let LOCATIONS, locationID = undefined, loadingTimeout;
 const startTime = performance.now();
 let LABELS = [], DELETE_HISTORY = [];
 // Save console.warn and console.error functions
@@ -53,7 +53,8 @@ window.addEventListener('rejectionhandled', function(event) {
     config.track && trackEvent(config.UUID, 'Handled UI Promise Rejection', errorMessage, customURLEncode(stackTrace));
 });
 
-const STATE = {
+let STATE = {
+    metadata: {},
     mode: 'analyse',
     analysisDone: false,
     openFiles: [],
@@ -68,7 +69,8 @@ const STATE = {
     },
     sortOrder: 'timestamp',
     birdList: { lastSelectedSpecies: undefined }, // Used to put the last selected species at the top of the all-species list
-    selection: { start: undefined, end: undefined }
+    selection: { start: undefined, end: undefined },
+    currentAnalysis: {currentFile: null, openFiles: [],  mode: null, species: null, offset: 0, active: null}
 }
 
 // Batch size map for slider
@@ -78,7 +80,6 @@ const BATCH_SIZE_LIST = [4, 8, 16, 32, 48, 64, 96];
 const fs = window.module.fs;
 const colormap = window.module.colormap;
 const p = window.module.p;
-const SunCalc = window.module.SunCalc;
 const uuidv4 = window.module.uuidv4;
 const os = window.module.os;
 
@@ -151,11 +152,9 @@ window.electron.getVersion()
     console.log('Error getting app version:', error)
 });
 
-let modelReady = false, fileLoaded = false, currentFile;
+let modelReady = false, fileLoaded = false;
 let PREDICTING = false, t0;
 let region, AUDACITY_LABELS = {}, wavesurfer;
-// fileList is all open files, analyseList is the subset that have been analysed;
-let fileList = [], analyseList = [];
 let fileStart, bufferStartTime, fileEnd;
 
 
@@ -182,6 +181,7 @@ const DOM = {
     get audioNotification() { if (!this._audioNotification) { this._audioNotification = document.getElementById('audio-notification') } return this._audioNotification},
     get batchSizeSlider() { if (!this._batchSizeSlider) { this._batchSizeSlider = document.getElementById('batch-size') } return this._batchSizeSlider},
     get batchSizeValue() { if (!this._batchSizeValue) { this._batchSizeValue = document.getElementById('batch-size-value') } return this._batchSizeValue},
+    get chartsLink() { if (!this._chartsLink) { this._chartsLink = document.getElementById('charts') } return this._chartsLink},
     get colourmap() { if (!this._colourmap) { this._colourmap = document.getElementById('colourmap') } return this._colourmap},
     get contentWrapper() { if (!this._contentWrapper) { this._contentWrapper = document.getElementById('contentWrapper') } return this._contentWrapper},
     get controlsWrapper() { if (!this._controlsWrapper) { this._controlsWrapper = document.getElementById('controlsWrapper') } return this._controlsWrapper},
@@ -190,6 +190,7 @@ const DOM = {
     get debugMode() { if (!this._debugMode) { this._debugMode = document.getElementById('debug-mode') } return this._debugMode},
     get defaultLat() { if (!this._defaultLat) { this._defaultLat = document.getElementById('latitude') } return this._defaultLat},
     get defaultLon() { if (!this._defaultLon) { this._defaultLon = document.getElementById('longitude') } return this._defaultLon},
+    get exploreLink() { if (!this._exploreLink) { this._exploreLink = document.getElementById('explore') } return this._exploreLink},
     get exploreWrapper() { if (!this._exploreWrapper) { this._exploreWrapper = document.getElementById('exploreWrapper') } return this._exploreWrapper},
     get fileNumber() { if (!this._fileNumber) { this._fileNumber = document.getElementById('fileNumber') } return this._fileNumber},
     get footer() { if (!this._footer) { this._footer = document.querySelector('footer') } return this._footer },
@@ -230,6 +231,7 @@ const DOM = {
     get resultTable() {return document.getElementById('resultTableBody')},
     get tooltip() { return document.getElementById('tooltip')},
     get waveElement() { return document.getElementById('waveform')},
+    get summary() { return document.getElementById('summary')},
     get specElement() { return document.getElementById('spectrogram')},
     get specCanvasElement() { return document.querySelector('#spectrogram canvas')},
     get waveCanvasElement() { return document.querySelector('#waveform canvas')},
@@ -308,15 +310,13 @@ DIAGNOSTICS['System Memory'] = (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) +
 
 function resetResults({clearSummary = true, clearPagination = true, clearResults = true} = {}) {
     if (clearSummary) summaryTable.textContent = '';
-    
-    clearPagination && pagination.forEach(item => item.classList.add('d-none'));
+    if (clearPagination) pagination.forEach(item => item.classList.add('d-none'));
     resultsBuffer = DOM.resultTable.cloneNode(false)
     if (clearResults) {
         DOM.resultTable.textContent = '';
         DOM.resultHeader.textContent = '';
     }
     predictions = {};
-    shownDaylightBanner = false;
     DOM.progressDiv.classList.add('d-none');
     updateProgress(0)
 }
@@ -345,7 +345,7 @@ function updateProgress(val) {
 * @param {*} preserveResults: whether to clear results when opening file (i.e. don't clear results when clicking file in list of open files)
 *  
 */
-async function loadAudioFile({ filePath = '', preserveResults = false }) {
+function loadAudioFile({ filePath = '', preserveResults = false }) {
     fileLoaded = false; locationID = undefined;
     //if (!preserveResults) worker.postMessage({ action: 'change-mode', mode: 'analyse' })
     worker.postMessage({
@@ -360,11 +360,16 @@ async function loadAudioFile({ filePath = '', preserveResults = false }) {
 
 
 function updateSpec({ buffer, play = false, position = 0, resetSpec = false }) {
-    showElement(['spectrogramWrapper'], false);
-    wavesurfer.loadDecodedBuffer(buffer);
+    if (resetSpec || DOM.spectrogramWrapper.classList.contains('d-none')){
+        DOM.spectrogramWrapper.classList.remove('d-none');
+        wavesurfer.loadDecodedBuffer(buffer);
+        adjustSpecDims(true);
+    } else {
+        wavesurfer.loadDecodedBuffer(buffer);
+    }
     wavesurfer.seekTo(position);
     play ? wavesurfer.play() : wavesurfer.pause();
-    resetSpec && adjustSpecDims(true);
+    
 }
 
 function createTimeline() {
@@ -582,7 +587,7 @@ function powerSave(on) {
 
 const openFileInList = async (e) => {
     if (!PREDICTING && e.target.tagName === 'A') {
-        await loadAudioFile({ filePath: e.target.id, preserveResults: true })
+        loadAudioFile({ filePath: e.target.id, preserveResults: true })
     }
 }
 
@@ -654,7 +659,7 @@ function showDatePicker() {
         const timestamp = new Date(newStart).getTime();
         
         // Send the data to the worker
-        worker.postMessage({ action: 'update-file-start', file: currentFile, start: timestamp });
+        worker.postMessage({ action: 'update-file-start', file: STATE.currentFile, start: timestamp });
         trackEvent(config.UUID, 'Settings Change', 'fileStart', newStart);
         resetResults();
         fileStart = timestamp;
@@ -694,36 +699,40 @@ function extractFileNameAndFolder(path) {
  * @returns {string} - HTML string of the formatted Bootstrap table
  */
 function formatAsBootstrapTable(jsonData) {
-    let tableHtml = "<div class='guano'><table class='table table-striped table-bordered'><thead class='text-bg-light'><tr><th>Key</th><th>Value</th></tr></thead><tbody>";
+    let parsedData = JSON.parse(jsonData);
+    let tableHtml = "<div class='metadata'>";
 
-    // Iterate over the key-value pairs in the JSON object
-    for (const [key, value] of Object.entries(JSON.parse(jsonData))) {
-        tableHtml += '<tr>';
-        tableHtml += `<td><strong>${key}</strong></td>`;
+    for (const [heading, keyValuePairs] of Object.entries(parsedData)) {
+        tableHtml += `<h5 class="text-primary">${heading.toUpperCase()}</h5>`;
+        tableHtml += "<table class='table table-striped table-bordered'><thead class='text-bg-light'><tr><th>Key</th><th>Value</th></tr></thead><tbody>";
 
-        // Check if the value is an object or array, if so, stringify it
-        if (typeof value === 'object') {
-            tableHtml += `<td>${JSON.stringify(value, null, 2)}</td>`;
-        } else {
-            tableHtml += `<td>${value}</td>`;
+        for (const [key, value] of Object.entries(keyValuePairs)) {
+            tableHtml += '<tr>';
+            tableHtml += `<td><strong>${key}</strong></td>`;
+            if (typeof value === 'object') {
+                tableHtml += `<td>${JSON.stringify(value, null, 2)}</td>`;
+            } else {
+                tableHtml += `<td>${value}</td>`;
+            }
+            tableHtml += '</tr>';
         }
 
-        tableHtml += '</tr>';
+        tableHtml += '</tbody></table>';
     }
 
-    tableHtml += '</tbody></table></div>';
-    return tableHtml;
+    tableHtml += '</div>';
+    return tableHtml
 }
-function showGUANO(){
-    const icon = document.getElementById('guano');
-    if (STATE.guano){
+function showMetadata(){
+    const icon = document.getElementById('metadata');
+    if (STATE.metadata[STATE.currentFile]){
         icon.classList.remove('d-none');
         icon.setAttribute('data-bs-content', 'New content for the popover');
         // Reinitialize the popover to reflect the updated content
         const popover = bootstrap.Popover.getInstance(icon);
         popover.setContent({
-            '.popover-header': 'GUANO Metadata',
-            '.popover-body': formatAsBootstrapTable(STATE.guano)
+            '.popover-header': 'Metadata',
+            '.popover-body': formatAsBootstrapTable(STATE.metadata[STATE.currentFile])
           });
     } else {
         icon.classList.add('d-none');
@@ -731,10 +740,10 @@ function showGUANO(){
 }
 
 function renderFilenamePanel() {
-    if (!currentFile) return;
-    const openfile = currentFile;
-    const files = fileList;
-    showGUANO();
+    if (!STATE.currentFile) return;
+    const openfile = STATE.currentFile;
+    const files = STATE.openFiles;
+    showMetadata();
     let filenameElement = DOM.filename;
     filenameElement.innerHTML = '';
     //let label = openfile.replace(/^.*[\\\/]/, "");
@@ -806,8 +815,8 @@ async function generateLocationList(id) {
     const defaultText = id === 'savedLocations' ? '(Default)' : 'All';
     const el = document.getElementById(id);
     LOCATIONS = undefined;
-    worker.postMessage({ action: 'get-locations', file: currentFile });
-    await waitForLocations();
+    worker.postMessage({ action: 'get-locations', file: STATE.currentFile });
+    await waitFor(() => LOCATIONS);
     el.innerHTML = `<option value="">${defaultText}</option>`; // clear options
     LOCATIONS.forEach(loc => {
         const option = document.createElement('option')
@@ -834,7 +843,7 @@ const showLocation = async (fromSelect) => {
     const customPlaceEl = document.getElementById('customPlace');
     const locationSelect = document.getElementById('savedLocations');
     // Check if currentfile has a location id
-    const id = fromSelect ? parseInt(locationSelect.value) : FILE_LOCATION_MAP[currentFile];
+    const id = fromSelect ? parseInt(locationSelect.value) : FILE_LOCATION_MAP[STATE.currentFile];
     
     if (id) {
         newLocation = LOCATIONS.find(obj => obj.id === id);
@@ -928,7 +937,7 @@ async function setCustomLocation() {
     const customPlaceEl = document.getElementById('customPlace');
     const locationAdd = document.getElementById('set-location');
     const batchWrapper = document.getElementById('location-batch-wrapper');
-    fileList.length > 1 ? batchWrapper.classList.remove('d-none') : batchWrapper.classList.add('d-none');
+    STATE.openFiles.length > 1 ? batchWrapper.classList.remove('d-none') : batchWrapper.classList.add('d-none');
     // Use the current file location for lat, lon, place or use defaults
     showLocation(false);
     savedLocationSelect.addEventListener('change', function (e) {
@@ -959,8 +968,10 @@ async function setCustomLocation() {
     const addLocation = () => {
         locationID = savedLocationSelect.value;
         const batch = document.getElementById('batchLocations').checked;
-        const files = batch ? STATE.openFiles : [currentFile];
+        const files = batch ? STATE.openFiles : [STATE.currentFile];
         worker.postMessage({ action: 'set-custom-file-location', lat: latEl.value, lon: lonEl.value, place: customPlaceEl.value, files: files })
+        generateLocationList('explore-locations');
+
         locationModal.hide();
     }
     locationAdd.addEventListener('click', addLocation)
@@ -1004,14 +1015,20 @@ async function onOpenFiles(args) {
     showElement(['spectrogramWrapper'], false);
     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
     resetDiagnostics();
+    STATE.openFiles = sanitisedList;
+    // CHeck not more than 25k files
+    if (STATE.openFiles.length >= 25_000){
+        generateToast({message: `Chirpity limits the maximum number of open files to 25,000. Only the first 25,000 of the ${STATE.openFiles.length} attempted will be opened`})
+        STATE.openFiles.splice(25000)
+    }
     // Store the file list and Load First audio file
-    fileList = sanitisedList;
-    fileList.length > 1 && fileList.length < 25_000 && worker.postMessage({action: 'check-all-files-saved', files: fileList});
-    STATE.openFiles = fileList;
+
+    STATE.openFiles.length > 1 && worker.postMessage({action: 'check-all-files-saved', files: STATE.openFiles});
+
     // Sort file by time created (the oldest first):
-    if (fileList.length > 1) {
+    if (STATE.openFiles.length > 1) {
         if (modelReady) enableMenuItem(['analyseAll', 'reanalyseAll'])
-        fileList = fileList.map(fileName => ({
+        STATE.openFiles = STATE.openFiles.map(fileName => ({
             name: fileName,
             time: fs.statSync(fileName).mtime.getTime(),
         }))
@@ -1022,7 +1039,7 @@ async function onOpenFiles(args) {
     }
     // Reset analysis status
     STATE.analysisDone = false;
-    await loadAudioFile({ filePath: fileList[0] });
+    loadAudioFile({ filePath: STATE.openFiles[0] });
     disableMenuItem(['analyseSelection', 'analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'save2db'])
     // Clear unsaved records warning
     window.electron.unsavedRecords(false);
@@ -1039,7 +1056,10 @@ async function onOpenFiles(args) {
 * @returns {Promise<void>}
 */
 async function showSaveDialog() {
-    await window.electron.saveFile({ currentFile: currentFile, labels: AUDACITY_LABELS[currentFile] });
+    await window.electron.saveFile({ 
+        currentFile: STATE.currentFile, 
+        labels: AUDACITY_LABELS[STATE.currentFile], 
+        type: 'audacity' });
 }
 
 function resetDiagnostics() {
@@ -1054,7 +1074,6 @@ function resetDiagnostics() {
 function analyseReset() {
     clearActive();
     DOM.fileNumber.textContent = '';
-    if (STATE.mode === 'analyse') PREDICTING = true;
     resetDiagnostics();
     AUDACITY_LABELS = {};
     DOM.progressDiv.classList.remove('d-none');
@@ -1073,7 +1092,7 @@ function refreshResultsView() {
         if (!isEmptyObject(predictions)) {
             showElement(['resultTableContainer', 'resultsHead'], false);
         }
-    } else if (!fileList.length) {
+    } else if (!STATE.openFiles.length) {
         hideAll();
     }
 }
@@ -1089,7 +1108,7 @@ const getSelectionResults = (fromDB) => {
     STATE['selection']['end'] = end.toFixed(3);
     
     postAnalyseMessage({
-        filesInScope: [currentFile],
+        filesInScope: [STATE.currentFile],
         start: STATE['selection']['start'],
         end: STATE['selection']['end'],
         offset: 0,
@@ -1102,10 +1121,10 @@ function postAnalyseMessage(args) {
     if (!PREDICTING) {
         // Start a timer
         t0_analysis = Date.now();
-        disableMenuItem(['analyseSelection']);
+        disableMenuItem(['analyseSelection', 'explore', 'charts']);
         const selection = !!args.end;
         const filesInScope = args.filesInScope;
-
+        PREDICTING = true;
         if (!selection) {
             analyseReset();
             refreshResultsView();
@@ -1149,8 +1168,8 @@ async function fetchLocationAddress(lat, lon) {
         openStreetMapTimer = setTimeout(async () => {
             try { 
                 if (!LOCATIONS) {
-                    worker.postMessage({ action: 'get-locations', file: currentFile });
-                    await waitForLocations();  // Ensure this is awaited
+                    worker.postMessage({ action: 'get-locations', file: STATE.currentFile });
+                    await waitFor(() => LOCATIONS);  // Ensure this is awaited
                 }
                 const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`);
                 
@@ -1254,7 +1273,7 @@ async function exportData(format, species, limit, duration){
             format: format,
             duration: duration,
             species: species,
-            files: isExplore() ? [] : fileList,
+            files: isExplore() ? [] : STATE.openFiles,
             explore: isExplore(),
             limit: limit,
             range: isExplore() ? STATE.explore.range : undefined
@@ -1262,22 +1281,9 @@ async function exportData(format, species, limit, duration){
     } 
 }
 
-const chartsLink = document.getElementById('charts');
-chartsLink.addEventListener('click', async () => {
-    // Tell the worker we are in Chart mode
-    worker.postMessage({ action: 'change-mode', mode: 'chart' });
-    // Disable analyse file links
-    disableMenuItem(['analyse', 'analyseSelection', 'analyseAll', 'reanalyse', 'reanalyseAll'])
-    worker.postMessage({ action: 'get-detected-species-list', range: STATE.chart.range });
-    const locationFilter = await generateLocationList('chart-locations');
-    locationFilter.addEventListener('change', handleLocationFilterChange);
-    hideAll();
-    showElement(['recordsContainer']);
-    worker.postMessage({ action: 'chart', species: undefined, range: STATE.chart.range });
-});
 
 const handleLocationFilterChange = (e) => {
-    const location = e.target.value || undefined;
+    const location = parseInt(e.target.value) || undefined;
     worker.postMessage({ action: 'update-state', locationID: location });
     // Update the seen species list
     worker.postMessage({ action: 'get-detected-species-list' })
@@ -1285,8 +1291,43 @@ const handleLocationFilterChange = (e) => {
     if (STATE.mode === 'explore') filterResults() 
 }
 
-const exploreLink = document.getElementById('explore');
-exploreLink.addEventListener('click', async () => {
+function saveAnalyseState() {
+    if (['analyse', 'archive'].includes(STATE.mode)){
+        const active = activeRow?.rowIndex -1 || null
+        // Store a reference to the current file
+        STATE.currentAnalysis = {
+            currentFile: STATE.currentFile, 
+            openFiles: STATE.openFiles,  
+            mode: STATE.mode,
+            species: isSpeciesViewFiltered(true),
+            offset: STATE.offset,
+            active: active,
+            analysisDone: STATE.analysisDone,
+            sortOrder: STATE.sortOrder
+        }
+    }
+}
+
+async function showCharts() {
+    saveAnalyseState();
+    enableMenuItem(['active-analysis', 'explore']);
+    disableMenuItem(['analyse', 'analyseSelection', 'analyseAll', 'reanalyse', 'reanalyseAll', 'charts'])
+    // Tell the worker we are in Chart mode
+    worker.postMessage({ action: 'change-mode', mode: 'chart' });
+    // Disable analyse file links
+    worker.postMessage({ action: 'get-detected-species-list', range: STATE.chart.range });
+    const locationFilter = await generateLocationList('chart-locations');
+    locationFilter.addEventListener('change', handleLocationFilterChange);
+    hideAll();
+    showElement(['recordsContainer']);
+    worker.postMessage({ action: 'chart', species: undefined, range: STATE.chart.range });
+};
+
+async function showExplore() {
+    saveAnalyseState();
+    enableMenuItem(['saveCSV', 'save-eBird', 'save-Raven', 'charts', 'active-analysis']);
+    disableMenuItem(['explore', 'save2db']);
+    STATE.openFiles = [];
     // Tell the worker we are in Explore mode
     worker.postMessage({ action: 'change-mode', mode: 'explore' });
     worker.postMessage({ action: 'get-detected-species-list', range: STATE.explore.range });
@@ -1294,22 +1335,37 @@ exploreLink.addEventListener('click', async () => {
     locationFilter.addEventListener('change', handleLocationFilterChange);
     hideAll();
     showElement(['exploreWrapper'], false);
-    enableMenuItem(['saveCSV', 'save-eBird', 'save-Raven']);
-    worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
+    worker.postMessage({ action: 'update-state', filesToAnalyse: []});
     // Analysis is done
     STATE.analysisDone = true;
-    filterResults({species: undefined, range: STATE.explore.range});
-    resetResults({clearSummary: true, clearPagination: true, clearResults: true});
-});
+    filterResults({species: isSpeciesViewFiltered(true), range: STATE.explore.range});
+    resetResults();
 
-const restoreLink = document.getElementById('restore');
-restoreLink.addEventListener('click', async () => {
-    // Todo: Placeholder for results restore
-    worker.postMessage({ action: 'change-mode', mode: 'analyse' });
+};
+
+async function showAnalyse() {
+    disableMenuItem(['active-analysis']);
+    //Restore STATE
+    STATE = {...STATE, ...STATE.currentAnalysis}
+    worker.postMessage({ action: 'change-mode', mode: STATE.mode });
     hideAll();
-    showElement(['spectrogramWrapper', 'resultTableContainer']);
-    worker.postMessage({ action: 'filter', updateSummary: true });
-});
+    if (STATE.currentFile) {
+        showElement(['spectrogramWrapper'], false);
+        worker.postMessage({ action: 'update-state', filesToAnalyse: STATE.openFiles, sortOrder: STATE.sortOrder});
+        if (STATE.analysisDone) {
+            filterResults({ 
+                species: STATE.species, 
+                offset: STATE.offset, 
+                active: STATE.active, 
+                updateSummary: true });
+        } else {
+            clearActive();
+            loadAudioFile({filePath: STATE.currentFile});
+        }
+    }
+    resetResults();
+};
+
 
 // const datasetLink = document.getElementById('dataset');
 // datasetLink.addEventListener('click', async () => {
@@ -1364,8 +1420,8 @@ selectionTable.addEventListener('click', resultClick);
 
 async function resultClick(e) {
     let row = e.target.closest('tr');
-    if (!row || row.classList.length === 0 || row.classList.contains('text-bg-dark')) { 
-        // 1. clicked and dragged, 2 no detections in file row, 3. daylight banner
+    if (!row || row.classList.length === 0) { 
+        // 1. clicked and dragged, 2 no detections in file row
         return
     }
     
@@ -1376,7 +1432,7 @@ async function resultClick(e) {
         return;
     }
     
-    // Search for results rows
+    // Search for results rows - Why???
     while (!(row.classList.contains('nighttime') ||
     row.classList.contains('daytime'))) {
         row = row.previousElementSibling
@@ -1387,7 +1443,7 @@ async function resultClick(e) {
     activeRow = row;
     loadResultRegion({ file, start, end, label });
     if (e.target.classList.contains('circle')) {
-        await waitForFileLoad();
+        await waitFor(()=> fileLoaded);
         getSelectionResults(true);
     }
 }
@@ -1428,7 +1484,7 @@ function adjustSpecDims(redraw, fftSamples, newHeight) {
             config.specMaxHeight = specHeight;
             scheduler.postTask(() => updatePrefs('config.json', config), {priority: 'background'});
         }
-        if (currentFile) {
+        if (STATE.currentFile) {
             // give the wrapper space for the transport controls and element padding/margins
             if (!wavesurfer) {
                 initWavesurfer({
@@ -1446,7 +1502,7 @@ function adjustSpecDims(redraw, fftSamples, newHeight) {
         if (wavesurfer && redraw) {
             specOffset = spectrogramWrapper.offsetHeight;
         }
-            } else {
+    } else {
         specOffset = 0
     }
     DOM.resultTableElement.style.height = (contentHeight - specOffset - formOffset) + 'px';
@@ -1641,16 +1697,25 @@ function updatePrefs(file, data) {
     }
 }
 
-function fillDefaults(config, defaultConfig) {
+function syncConfig(config, defaultConfig) {
+    // First, remove keys from config that are not in defaultConfig
+    Object.keys(config).forEach(key => {
+        if (!(key in defaultConfig)) {
+            delete config[key];
+        }
+    });
+
+    // Then, fill in missing keys from defaultConfig
     Object.keys(defaultConfig).forEach(key => {
         if (!(key in config)) {
             config[key] = defaultConfig[key];
         } else if (typeof config[key] === 'object' && typeof defaultConfig[key] === 'object') {
-            // Recursively fill in defaults for nested objects
-            fillDefaults(config[key], defaultConfig[key]);
+            // Recursively sync nested objects
+            syncConfig(config[key], defaultConfig[key]);
         }
     });
 }
+
 /////////////////////////  Window Handlers ////////////////////////////
 // Set config defaults
 const defaultConfig = {
@@ -1694,7 +1759,7 @@ let appPath, tempPath, isMac;
 window.onload = async () => {
     window.electron.requestWorkerChannel();
     isMac = await window.electron.isMac();
-    replaceCtrlWithCommand()
+    if (isMac) replaceCtrlWithCommand()
     DOM.contentWrapper.classList.add('loaded');
     
     // Load preferences and override defaults
@@ -1721,20 +1786,7 @@ window.onload = async () => {
             return false;
             };
         //fill in defaults - after updates add new items
-        fillDefaults(config, defaultConfig);
-        // Reset defaults for tensorflow batchsize. If removing, update change handler for batch-size
-        if (config.tensorflow.batchSizeWasReset !== true && config.tensorflow.batchSize === 32) {
-            const RAM = parseInt(DIAGNOSTICS['System Memory'].replace(' GB', ''));
-            if (!RAM || RAM < 16){
-                config.tensorflow.batchSize = 8;
-                generateToast({message: `The new default CPU backend batch size of 8 has been applied. 
-                    This should result in faster prediction due to lower memory requirements. 
-                    Batch size can still be changed in settings`, autohide: false})
-            }
-            config.tensorflow.batchSizeWasReset = true;
-            updatePrefs('config.json', config)
-        }
-
+        syncConfig(config, defaultConfig);
         // set version
         config.VERSION = VERSION;
         // switch off debug mode we don't want this to be remembered
@@ -1920,9 +1972,10 @@ const setUpWorkerMessaging = () => {
                     break;
                 }
                 case "diskDB-has-records": {
-                    chartsLink.classList.remove("disabled");
-                    exploreLink.classList.remove("disabled");
+                    DOM.chartsLink.classList.remove("disabled");
+                    DOM.exploreLink.classList.remove("disabled");
                     config.archive.location && document.getElementById('compress-and-organise').classList.remove('disabled');
+                    STATE.diskHasRecords = true;
                     break;
                 }
                 case "file-location-id": {onFileLocationID(args);
@@ -1944,11 +1997,11 @@ const setUpWorkerMessaging = () => {
                         MISSING_FILE = args.file;
                         args.message += `
                             <div class="d-flex justify-content-center mt-2">
-                                <button id="locate-missing-file" class="btn btn-secondary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
+                                <button id="locate-missing-file" class="btn btn-primary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
                                     Locate File
                                 </button>
-                                <button id="purge-from-toast" class="ms-3 btn btn-danger text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
-                                    Delete File
+                                <button id="purge-from-toast" class="ms-3 btn btn-warning text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
+                                    Remove from Archive
                                 </button>
                             </div>
                             `
@@ -1978,13 +2031,23 @@ const setUpWorkerMessaging = () => {
                     const mode = args.mode;
                     STATE.mode = mode;
                     renderFilenamePanel();
+                    switch (mode) {
+                        case 'analyse':{
+                            STATE.diskHasRecords && !PREDICTING && enableMenuItem(['explore', 'charts']);
+                            break
+                        }
+                        case 'archive':{
+                            enableMenuItem(['save2db', 'explore', 'charts']);
+                            break
+                        }
+                    }
                     config.debug && console.log("Mode changed to: " + mode);
-                    if (mode === 'archive' || mode === 'explore') {
+                    if (['archive', 'explore'].includes(mode)) {
                         enableMenuItem(['purge-file']);
                         // change header to indicate activation
                         DOM.resultHeader.classList.remove('text-bg-secondary');
                         DOM.resultHeader.classList.add('text-bg-dark');
-                        adjustSpecDims(true)
+                        //adjustSpecDims(true)
                     } else {
                         disableMenuItem(['purge-file']);
                         // change header to indicate deactivation
@@ -2005,8 +2068,6 @@ const setUpWorkerMessaging = () => {
                 // called when an analysis ends, or when the filesbeingprocessed list is empty
                 case "processing-complete": {
                     STATE.analysisDone = true;
-                    //PREDICTING = false;
-                    //DOM.progressDiv.classList.add('d-none');
                     break;
                 }
                 case 'ready-for-tour':{
@@ -2193,16 +2254,15 @@ document.addEventListener('change', function (e) {
 })
 
 // Save audio clip
-function onSaveAudio({file, filename}){
-    const anchor = document.createElement('a');
-    document.body.appendChild(anchor);
-    anchor.style = 'display: none';
-    const url = window.URL.createObjectURL(file);
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    window.URL.revokeObjectURL(url);
-    anchor.remove()
+async function onSaveAudio({file, filename, extension}){
+
+    await window.electron.saveFile({ 
+        file: file, 
+        filename: filename,
+        extension: extension
+    })
+
+        
 }
 
 
@@ -2506,13 +2566,9 @@ function onChartData(args) {
     
     window.addEventListener('resize', function () {
         waitForFinalEvent(function () {
-            WindowResize();
-        }, 250, 'id1');
+            adjustSpecDims(true);
+        }, 100, 'id1');
     });
-    
-    function WindowResize() {
-        adjustSpecDims(true);
-    }
     
     const contextMenu = document.getElementById('context-menu')
     
@@ -2607,6 +2663,8 @@ function onChartData(args) {
         const specDimensions = waveElement.getBoundingClientRect();
         const frequencyRange = Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
         const yPosition = Math.round((specDimensions.bottom - event.clientY) * (frequencyRange / specDimensions.height)) + Number(config.audio.minFrequency);
+        
+        // Update the tooltip content
         tooltip.textContent = `Frequency: ${yPosition}Hz`;
         if (region) {
             const lineBreak = document.createElement('br');
@@ -2615,14 +2673,31 @@ function onChartData(args) {
             tooltip.appendChild(lineBreak);  // Add the line break
             tooltip.appendChild(textNode);   // Add the text node
         }
+    
+        // Get the tooltip's dimensions
+        tooltip.style.display = 'block';  // Ensure tooltip is visible to measure dimensions
+        const tooltipWidth = tooltip.offsetWidth;
+        const windowWidth = window.innerWidth;
+    
+        // Calculate the new tooltip position
+        let tooltipLeft;
+        
+        // If the tooltip would overflow past the right side of the window, position it to the left
+        if (event.clientX + tooltipWidth + 15 > windowWidth) {
+            tooltipLeft = event.clientX - tooltipWidth - 5;  // Position to the left of the mouse cursor
+        } else {
+            tooltipLeft = event.clientX + 15;  // Position to the right of the mouse cursor
+        }
+    
+        // Apply styles to the tooltip
         Object.assign(tooltip.style, {
             top: `${event.clientY}px`,
-            left: `${event.clientX + 15}px`,
+            left: `${tooltipLeft}px`,
             display: 'block',
-            visibility: 'visible'
+            visibility: 'visible',
+            opacity: 1
         });
     }
-
 
     const LIST_MAP = {
         location: 'Searching for birds in your region',
@@ -2646,7 +2721,7 @@ function onChartData(args) {
         DOM.listToUse.value = config.list;
         updateListIcon();
         updatePrefs('config.json', config)
-        resetResults({clearSummary: true, clearPagination: true, clearResults: true});
+        resetResults();
         setListUIState(config.list);
         // Since the custom list function calls for its own update *after* reading the labels, we'll skip updates for custom lists here
         config.list === 'custom' || worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone })
@@ -2667,6 +2742,7 @@ function onChartData(args) {
 
    
     const loadModel = ()  => {
+        PREDICTING = false;
         t0_warmup = Date.now();
         worker.postMessage({
             action: 'load-model',
@@ -2676,8 +2752,7 @@ function onChartData(args) {
             warmup: config.warmup,
             threads: config[config[config.model].backend].threads,
             backend: config[config.model].backend
-        });
-        
+        })
     }
     
     const handleBackendChange = (backend) => {
@@ -2702,7 +2777,6 @@ function onChartData(args) {
                     contextAwareIconDisplay();
                 }
             }
-            PREDICTING = false;
         }
         // Update threads and batch Size in UI
         DOM.threadSlider.value = config[config[config.model].backend].threads;
@@ -2714,12 +2788,6 @@ function onChartData(args) {
         initRegion();
         loadModel();
     }
-    
-    const backend = document.getElementsByName('backend');
-    for (let i = 0; i < backend.length; i++) {
-        backend[i].addEventListener('click', handleBackendChange)
-    }
-    
     
     const setTimelinePreferences = () => {
         const timestampFields = document.querySelectorAll('.timestamp');
@@ -2770,12 +2838,12 @@ function centreSpec(){
       
     const GLOBAL_ACTIONS = { // eslint-disable-line
         a: function (e) { 
-            if (( e.ctrlKey || e.metaKey) && currentFile) {
+            if (( e.ctrlKey || e.metaKey) && STATE.currentFile) {
                 const element = e.shiftKey ? 'analyseAll' : 'analyse';
                 document.getElementById(element).click();
             }
         },
-        A: function (e) { ( e.ctrlKey || e.metaKey) && currentFile && document.getElementById('analyseAll').click()},
+        A: function (e) { ( e.ctrlKey || e.metaKey) && STATE.currentFile && document.getElementById('analyseAll').click()},
         c: function (e) { 
             // Center window on playhead
             if (( e.ctrlKey || e.metaKey) && currentBuffer) {
@@ -2802,7 +2870,7 @@ function centreSpec(){
         },
         s: function (e) {
             if ( e.ctrlKey || e.metaKey) {
-                worker.postMessage({ action: 'save2db', file: currentFile});
+                worker.postMessage({ action: 'save2db', file: STATE.currentFile});
             }
         },
         t: function (e) {
@@ -2830,6 +2898,7 @@ function centreSpec(){
                     threads: config[config[config.model].backend].threads,
                     list: config.list
                 });
+                STATE.diskHasRecords && enableMenuItem(['explore', 'charts']);
                 generateToast({ message:'Operation cancelled'});
                 DOM.progressDiv.classList.add('d-none');
             }
@@ -2901,9 +2970,15 @@ function centreSpec(){
         '=': function (e) {e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec('zoomIn')},
         '+': function (e) {e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec('zoomIn')},
         '-': function (e) {e.metaKey || e.ctrlKey ? increaseFFT() : zoomSpec('zoomOut')},
+        'F5': function (e) { reduceFFT() },
+        'F4': function (e) { increaseFFT() },
         ' ': function () { wavesurfer && wavesurfer.playPause() },
         Tab: function (e) {
-            if (activeRow) {
+            if ((e.metaKey || e.ctrlKey) && ! PREDICTING) { // If you did this when predicting, your results would go straight to the archive
+                const modeToSet = STATE.mode === 'explore' ? 'active-analysis' : 'explore';
+                document.getElementById(modeToSet).click()
+            }
+            else if (activeRow) {
                 activeRow.classList.remove('table-active')
                 if (e.shiftKey) {
                     activeRow = activeRow.previousSibling || activeRow;
@@ -2929,7 +3004,7 @@ function centreSpec(){
     }
     
     const postBufferUpdate = ({
-        file = currentFile,
+        file = STATE.currentFile,
         begin = 0,
         position = 0,
         play = false,
@@ -2962,7 +3037,7 @@ function centreSpec(){
     // Go to position
     const goto = new bootstrap.Modal(document.getElementById('gotoModal'));
     const showGoToPosition = () => {
-        if (currentFile) {
+        if (STATE.currentFile) {
             goto.show();
         }
     }
@@ -2978,7 +3053,7 @@ function centreSpec(){
     
     
     const gotoTime = (e) => {
-        if (currentFile) {
+        if (STATE.currentFile) {
             e.preventDefault();
             let hours = 0, minutes = 0, seconds = 0;
             const time = document.getElementById('timeInput').value;
@@ -3018,7 +3093,7 @@ function centreSpec(){
         sampleRate = args.sampleRate;
         if (fileLoaded) {
             enableMenuItem(['analyse'])
-            if (fileList.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
+            if (STATE.openFiles.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
         }
         if (region) enableMenuItem(['analyseSelection'])
         t1_warmup = Date.now();
@@ -3053,13 +3128,13 @@ function centreSpec(){
         play = false,
         queued = false,
         goToRegion = true,
-        guano = undefined
+        metadata = undefined
     }) {
         fileLoaded = true, locationID = location;
         clearTimeout(loadingTimeout)
         // Clear the loading animation
         DOM.loading.classList.add('d-none');
-        const resetSpec = !currentFile;
+        const resetSpec = !STATE.currentFile;
         currentFileDuration = sourceDuration;
         //if (preserveResults) completeDiv.hide();
         console.log(`UI received worker-loaded-audio: ${file}, buffered: ${contents === undefined}`);
@@ -3077,13 +3152,16 @@ function centreSpec(){
             }
         } else {
             NEXT_BUFFER = undefined;
-            if (currentFile !== file) {
-                currentFile = file;
-                STATE.guano = guano;
-                renderFilenamePanel();
+            if (STATE.currentFile !== file) {
+                STATE.currentFile = file;
+
                 fileStart = start;
                 fileEnd = new Date(fileStart + (currentFileDuration * 1000));
             }
+            
+            STATE.metadata[STATE.currentFile] = metadata;
+            renderFilenamePanel();
+
             if (config.timeOfDay) {
                 bufferStartTime = new Date(fileStart + (bufferBegin * 1000))
             } else {
@@ -3097,7 +3175,7 @@ function centreSpec(){
             wavesurfer.bufferRequested = false;
             if (modelReady) {
                 enableMenuItem(['analyse']);
-                if (fileList.length > 1) enableMenuItem(['analyseAll'])
+                if (STATE.openFiles.length > 1) enableMenuItem(['analyseAll'])
             }
             if (fileRegion) {
                 createRegion(fileRegion.start, fileRegion.end, fileRegion.label, goToRegion);
@@ -3105,7 +3183,7 @@ function centreSpec(){
                     region.play()
                 }
             } else {
-                clearActive();
+                //clearActive();
             }
             fileLoaded = true;
             //if (activeRow) activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -3118,8 +3196,8 @@ function centreSpec(){
             DOM.fileNumber.innerHTML = args.text;
         } else {
             DOM.progressDiv.classList.remove('d-none');
-            const count = fileList.indexOf(args.file) + 1;
-            DOM.fileNumber.textContent = `File ${count} of ${fileList.length}`;
+            const count = STATE.openFiles.indexOf(args.file) + 1;
+            DOM.fileNumber.textContent = `File ${count} of ${STATE.openFiles.length}`;
         }
         if (args.progress) {
             let progress = Math.round(args.progress * 1000) / 10;
@@ -3132,48 +3210,50 @@ function centreSpec(){
     function updatePagination(total, offset) {
         //Pagination
         total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
+        STATE.offset = offset;
     }
     
     const updateSummary = ({ summary = [], filterSpecies = '' }) => {
-        let total, summaryHTML = `<table id="resultSummary" class="table table-dark p-1"><thead>
-        <tr>
-        <th class="col-3" scope="col">Max</th>
-        <th class="col-5" scope="col">Species</th>
-        <th class="col-1 text-end" scope="col">Detections</th>
-        <th class="col-1 text-end" scope="col">Calls</th>
-        </tr>
-        </thead><tbody id="speciesFilter">`;
-        
-        for (let i = 0; i < summary.length; i++) {
-            const item = summary[i];
-            const selected = item.cname === filterSpecies ? ' text-warning' : '';
-            summaryHTML += `<tr tabindex="-1" class="${selected}">
-            <td class="max">${iconizeScore(item.max)}</td>
-            <td class="cname">
-            <span class="cname">${item.cname}</span> <br><i>${item.sname}</i>
-            </td>
-            <td class="text-end">${item.count}</td>
-            <td class="text-end">${item.calls}</td>
-            </tr>`;
+        if (summary.length){
+            let summaryHTML = `<table id="resultSummary" class="table table-dark p-1"><thead>
+            <tr>
+            <th class="col-3" scope="col">Max</th>
+            <th class="col-5" scope="col">Species</th>
+            <th class="col-1 text-end" scope="col">Detections</th>
+            <th class="col-1 text-end" scope="col">Calls</th>
+            </tr>
+            </thead><tbody id="speciesFilter">`;
             
+            for (let i = 0; i < summary.length; i++) {
+                const item = summary[i];
+                const selected = item.cname === filterSpecies ? ' text-warning' : '';
+                summaryHTML += `<tr tabindex="-1" class="${selected}">
+                <td class="max">${iconizeScore(item.max)}</td>
+                <td class="cname">
+                <span class="cname">${item.cname}</span> <br><i>${item.sname}</i>
+                </td>
+                <td class="text-end">${item.count}</td>
+                <td class="text-end">${item.calls}</td>
+                </tr>`;
+                
+            }
+            summaryHTML += '</tbody></table>';
+            // Get rid of flicker...
+            const old_summary = summaryTable;
+            const buffer = old_summary.cloneNode();
+            buffer.innerHTML = summaryHTML;
+            old_summary.replaceWith(buffer);
         }
-        summaryHTML += '</tbody></table>';
-        // Get rid of flicker...
-        const old_summary = summaryTable;
-        const buffer = old_summary.cloneNode();
-        buffer.innerHTML = summaryHTML;
-        old_summary.replaceWith(buffer);
-        const currentFilter = document.querySelector('#speciesFilter tr.text-warning');
     }
     
     /*
     onResultsComplete is called when the last result is sent from the database
     */
     function onResultsComplete({active = undefined, select = undefined} = {}){
-        let table = document.getElementById('resultTableBody');
-        table.replaceWith(resultsBuffer);
-        table = document.getElementById('resultTableBody');
-
+        PREDICTING = false;
+        DOM.resultTable.replaceWith(resultsBuffer);
+        const table = DOM.resultTable;
+        showElement(['resultTableContainer', 'resultsHead'], false);
         // Set active Row        
         if (active) {
             // Refresh node and scroll to active row:
@@ -3183,9 +3263,7 @@ function centreSpec(){
                 if (rows.length) {
                     activeRow = rows[rows.length - 1];
                 }
-            } else {
-                activeRow.classList.add('table-active');
-            }
+            } 
         } else if (select) {
             const row = getRowFromStart(table, select)
             activeRow = table.rows[row];
@@ -3204,7 +3282,7 @@ function centreSpec(){
         }
         // hide progress div
         DOM.progressDiv.classList.add('d-none');
-        
+        renderFilenamePanel();
     }
 
     function getRowFromStart(table, start){
@@ -3223,9 +3301,22 @@ function centreSpec(){
         }
     }
     
+// formatDuration: Used for DIAGNOSTICS Duration
+function formatDuration(seconds){
+    let duration = '';
+    const hours = Math.floor(seconds / 3600);          // 1 hour = 3600 seconds
+    if (hours) duration += `${hours} hours `;
+    const minutes = Math.floor((seconds % 3600) / 60); // 1 minute = 60 seconds
+    if (hours || minutes) duration += `${minutes} minutes `;
+    const remainingSeconds = Math.floor(seconds % 60); // Remaining seconds
+    duration += `${remainingSeconds} seconds`;
+    return duration;
+}
+
     function onAnalysisComplete({quiet}){
         PREDICTING = false;
         STATE.analysisDone = true;
+        STATE.diskHasRecords && enableMenuItem(['explore', 'charts']);
         DOM.progressDiv.classList.add('d-none');
         if (quiet) return
         // DIAGNOSTICS:
@@ -3239,7 +3330,7 @@ function centreSpec(){
         trackEvent(config.UUID, `${config.model}-${config[config.model].backend}`, 'Analysis Rate', config[config.model].backend, parseInt(rate));
         
         if (! STATE.selection){
-            DIAGNOSTICS['Analysis Duration'] = analysisTime + ' seconds';
+            DIAGNOSTICS['Analysis Duration'] = formatDuration(analysisTime);
             DIAGNOSTICS['Analysis Rate'] = rate.toFixed(0) + 'x faster than real time performance.';
             generateToast({ message:'Analysis complete.'});
             activateResultFilters();
@@ -3259,12 +3350,13 @@ function centreSpec(){
         if (! PREDICTING  || STATE.mode !== 'analyse') activateResultFilters();
         // Why do we do audacity labels here?
         AUDACITY_LABELS = audacityLabels;
-        if (! isEmptyObject(AUDACITY_LABELS)) {
-            enableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven', 'save2db']);
+        if (isEmptyObject(AUDACITY_LABELS)) {
+            disableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven', 'save2db']);
         } else {
-            disableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven']);
+            enableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven']);
+            STATE.mode !== 'explore' && enableMenuItem(['save2db'])            
         }
-        if (currentFile) enableMenuItem(['analyse'])
+        if (STATE.currentFile) enableMenuItem(['analyse'])
     }
     
     
@@ -3321,8 +3413,6 @@ function centreSpec(){
         })
     }
     
-    const summary = document.getElementById('summary');
-    // summary.addEventListener('click', speciesFilter);
     
     function speciesFilter(e) {
         if (PREDICTING || ['TBODY', 'TH', 'DIV'].includes(e.target.tagName)) return; // on Drag or clicked header
@@ -3333,7 +3423,7 @@ function centreSpec(){
             e.target.closest('tr').classList.remove('text-warning');
         } else {
             //Clear any highlighted rows
-            const tableRows = summary.querySelectorAll('tr');
+            const tableRows = DOM.summary.querySelectorAll('tr');
             tableRows.forEach(row => row.classList.remove('text-warning'))
             // Add a highlight to the current row
             e.target.closest('tr').classList.add('text-warning');
@@ -3345,15 +3435,9 @@ function centreSpec(){
             const list = document.getElementById('bird-list-seen');
             list.value = species || '';
         }
-        filterResults()
+        filterResults({updateSummary: false})
         resetResults({clearSummary: false, clearPagination: false, clearResults: false});
     }
-    
-    
-    // const checkDayNight = (timestamp) => {
-    //     let astro = SunCalc.getTimes(timestamp, config.latitude, config.longitude);
-    //     return (astro.dawn.setMilliseconds(0) < timestamp && astro.dusk.setMilliseconds(0) > timestamp) ? 'daytime' : 'nighttime';
-    // }
     
     // TODO: show every detection in the spec window as a region on the spectrogram
     
@@ -3372,13 +3456,14 @@ function centreSpec(){
             return
         }
         if (index <= 1) {
+            adjustSpecDims(true)
             if (selection) {
                 const selectionTable = document.getElementById('selectionResultTableBody');
                 selectionTable.textContent = '';
             }
             else {
-                adjustSpecDims(true); 
-                if (isFromDB) PREDICTING = false;
+                //adjustSpecDims(true); 
+                //if (isFromDB) PREDICTING = false;
                 
                 DOM.resultHeader.innerHTML =`
                 <tr>
@@ -3413,21 +3498,10 @@ function centreSpec(){
                 callCount,
                 isDaylight
             } = result;
-            const dayNight = isDaylight ? 'daytime' : 'nighttime'; // checkDayNight(timestamp);
+            const dayNight = isDaylight ? 'daytime' : 'nighttime'; 
             // Todo: move this logic so pre dark sections of file are not even analysed
             if (config.detect.nocmig && !selection && dayNight === 'daytime') return
             
-            // Show twilight indicator when  nocmig mode off (except when analysing a selection)
-            if (shownDaylightBanner === false && dayNight === 'daytime' && STATE.sortOrder === 'timestamp') {
-                // Only do this if change starts midway through a file
-                if ((index - 1) % config.limit !== 0) {
-                    // Show the twilight start bar
-                    tr += `<tr class="text-bg-dark"><td colspan="20" class="text-center">
-                    Start of civil twilight <span class="material-symbols-outlined text-warning align-bottom">wb_twilight</span>
-                    </td></tr>`;
-                }
-                shownDaylightBanner = true;
-            }
             const commentHTML = comment ?
             `<span title="${comment.replaceAll('"', '&quot;')}" class='material-symbols-outlined pointer'>comment</span>` : '';
             const isUncertain = score < 65 ? '&#63;' : '';
@@ -3518,7 +3592,7 @@ function centreSpec(){
                 const [start, end] = position;
                 worker.postMessage({
                     action: 'delete',
-                    file: currentFile,
+                    file: STATE.currentFile,
                     start: start,
                     end: end,
                     active: getActiveRowID(),
@@ -3602,32 +3676,32 @@ function centreSpec(){
             const dateString = dateArray.slice(0, 5).join(' ');
             filename = dateString + '.' + config.audio.format;
         }
-        
+
         let metadata = {
-            lat: config.latitude,
-            lon: config.longitude,
+            lat: parseFloat(config.latitude),
+            lon: parseFloat(config.longitude),
             Artist: 'Chirpity',
-            date: new Date().getFullYear(),
             version: VERSION
         };
         if (result) {
+            const date = new Date(result.timestamp);
             metadata = {
                 ...metadata,
                 UUID: config.UUID,
                 start: start,
                 end: end,
-                filename: result.filename,
+                //filename: result.file,
                 cname: result.cname,
                 sname: result.sname,
-                score: result.score,
-                date: result.date
+                score: parseInt(result.score),
+                Year: date.getFullYear()
             };
         }
         
         if (mode === 'save') {
             worker.postMessage({
                 action: 'save',
-                start: start, file: currentFile, end: end, filename: filename, metadata: metadata
+                start: start, file: STATE.currentFile, end: end, filename: filename, metadata: metadata
             })
         } else {
             if (!config.seenThanks) {
@@ -3637,7 +3711,7 @@ function centreSpec(){
             }
             worker.postMessage({
                 action: 'post',
-                start: start, file: currentFile, end: end, defaultName: filename, metadata: metadata, mode: mode
+                start: start, file: STATE.currentFile, end: end, defaultName: filename, metadata: metadata, mode: mode
             })
         }
     }
@@ -3677,9 +3751,9 @@ function centreSpec(){
         const response = await fetch(file);
         document.getElementById('helpModalBody').innerHTML = await response.text();
         const help = new bootstrap.Modal(document.getElementById('helpModal'));
+        document.removeEventListener('show.bs.modal', replaceCtrlWithCommand);
+        document.addEventListener('show.bs.modal', replaceCtrlWithCommand);
         help.show();
-        document.removeEventListener('shown.bs.modal', replaceCtrlWithCommand);
-        document.addEventListener('shown.bs.modal', replaceCtrlWithCommand);
     }
     function replaceTextInTitleAttributes() {
         // Select all elements with title attribute in the body of the web page
@@ -3906,19 +3980,7 @@ function centreSpec(){
         let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
         for (let [key, value] of Object.entries(DIAGNOSTICS)) {
             if (key === 'Audio Duration') { // Format duration as days, hours,minutes, etc.
-                if (value < 3600) {
-                    value = new Date(value * 1000).toISOString().substring(14, 19);
-                    value = value.replace(':', ' minutes ').concat(' seconds');
-                } else if (value < 86400) {
-                    value = new Date(value * 1000).toISOString().substring(11, 19)
-                    value = value.replace(':', ' hours ').replace(':', ' minutes ').concat(' seconds')
-                } else {
-                    value = new Date(value * 1000).toISOString().substring(8, 19);
-                    const day = parseInt(value.slice(0, 2)) - 1;
-                    const daysString = day === 1 ? '1 day ' : day.toString() + ' days ';
-                    const dateString = daysString + value.slice(3);
-                    value = dateString.replace(':', ' hours ').replace(':', ' minutes ').concat(' seconds');
-                }
+                value = formatDuration(value)
             }
             diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
         }
@@ -3952,7 +4014,7 @@ function centreSpec(){
             }
         });
         // Add pointer icon to species summaries
-        const summarySpecies = document.getElementById('summary').querySelectorAll('.cname');
+        const summarySpecies = DOM.summary.querySelectorAll('.cname');
         summarySpecies.forEach(row => row.classList.add('pointer'))
         // change results header to indicate activation
         DOM.resultHeader.classList.remove('text-bg-secondary');
@@ -4284,7 +4346,7 @@ function centreSpec(){
             action: 'update-state',
             detect: { confidence: config.detect.confidence }
         });
-        if (STATE.mode == 'explore') {
+        if (STATE.mode === 'explore') {
             // Update the seen species list
             worker.postMessage({ action: 'get-detected-species-list' })
         }
@@ -4418,6 +4480,7 @@ DOM.gain.addEventListener('input', () => {
         const target = e.target.closest('[id]')?.id;
         switch (target)
         {
+            // File menu
             case 'open-file': { showOpenDialog('openFile'); break }
             case 'open-folder': { showOpenDialog('openDirectory'); break }
             case 'saveLabels': { showSaveDialog(); break }
@@ -4427,19 +4490,30 @@ DOM.gain.addEventListener('input', () => {
             case 'export-audio': { exportAudio(); break }
             case 'exit': { exitApplication(); break }
 
+
+            case 'dataset': { worker.postMessage({ action: 'create-dataset', species: isSpeciesViewFiltered(true) }); break }
+            
+            // Records menu
             case 'save2db': { 
-                worker.postMessage({ action: 'save2db', file: currentFile }); 
+                worker.postMessage({ action: 'save2db', file: STATE.currentFile }); 
                 if (config.archive.auto) document.getElementById('compress-and-organise').click();
                 break }
-            case 'dataset': { worker.postMessage({ action: 'create-dataset', species: isSpeciesViewFiltered(true) }); break }
+            case 'charts': { showCharts(); break }
+            case 'explore': { showExplore(); break }
+            case 'active-analysis': { showAnalyse(); break }
+            case 'compress-and-organise': {compressAndOrganise(); break}
+            case 'purge-file': { deleteFile(STATE.currentFile); break }
 
-            case 'analyse': {postAnalyseMessage({ filesInScope: [currentFile] }); break }
+            //Analyse menu
+            case 'analyse': {postAnalyseMessage({ filesInScope: [STATE.currentFile] }); break }
             case 'analyseSelection': {getSelectionResults(); break }
-            case 'analyseAll': {postAnalyseMessage({ filesInScope: fileList }); break }
-            case 'reanalyse': {postAnalyseMessage({ filesInScope: [currentFile], reanalyse: true }); break }
-            case 'reanalyseAll': {postAnalyseMessage({ filesInScope: fileList, reanalyse: true }); break }
+            case 'analyseAll': {postAnalyseMessage({ filesInScope: STATE.openFiles }); break }
+            case 'reanalyse': {postAnalyseMessage({ filesInScope: [STATE.currentFile], reanalyse: true }); break }
+            case 'reanalyseAll': {postAnalyseMessage({ filesInScope: STATE.openFiles, reanalyse: true }); break }
             
             case 'purge-from-toast': { deleteFile(MISSING_FILE); break }
+
+            // ----
             case 'locate-missing-file': {
                 (async () => await locateFile(MISSING_FILE))(); 
                 break }
@@ -4453,19 +4527,32 @@ DOM.gain.addEventListener('input', () => {
                 updatePrefs('config.json', config)
                 resetResults({clearSummary: true, clearPagination: true, clearResults: true});
                 setListUIState(config.list);
-                if (currentFile && STATE.analysisDone) worker.postMessage({ action: 'update-list', list: config.list, refreshResults: true })
+                if (STATE.currentFile && STATE.analysisDone) worker.postMessage({ action: 'update-list', list: config.list, refreshResults: true })
                 break;
             }
-            case 'compress-and-organise': {compressAndOrganise(); break}
-            case 'purge-file': { deleteFile(currentFile); break }
-
+                        
+            // Help Menu
             case 'keyboardHelp': { (async () => await populateHelpModal('Help/keyboard.html', 'Keyboard shortcuts'))(); break }
             case 'settingsHelp': { (async () => await populateHelpModal('Help/settings.html', 'Settings Help'))(); break }
             case 'usage': { (async () => await populateHelpModal('Help/usage.html', 'Usage Guide'))(); break }
             case 'bugs': { (async () => await populateHelpModal('Help/bugs.html', 'Join the Chirpity Users community'))(); break }
-            case 'species': { worker.postMessage({action: 'get-valid-species', file: currentFile}); break }
+            case 'species': { worker.postMessage({action: 'get-valid-species', file: STATE.currentFile}); break }
             case 'startTour': { prepTour(); break }
             case 'eBird': { (async () => await populateHelpModal('Help/ebird.html', 'eBird Record FAQ'))(); break }
+            
+            // --- Backends
+            case 'tensorflow':
+            case 'webgl':
+            case 'webgpu':{
+                if (PREDICTING){
+                    generateToast({message: 'It is not possible to change the model backend while an analysis is underway', type:'warning'})
+                    document.getElementById(config[config.model].backend).checked = true;
+                } else {
+                    handleBackendChange(target);
+                }
+                break;
+            }
+
             case 'archive-location-select': {
                 (async () =>{
                     const files = await window.electron.selectDirectory(config.archive.location)
@@ -4713,9 +4800,6 @@ DOM.gain.addEventListener('input', () => {
                     } else {
                         DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
                         config[config[config.model].backend].batchSize = BATCH_SIZE_LIST[element.value];
-                        // Need this in case a non-default batchsize was set, and then changed to 32
-                        if (config[config.model].backend === 'tensorflow') config.tensorflow.batchSizeWasReset = true;
-
                         worker.postMessage({action: 'change-batch-size', batchSize: BATCH_SIZE_LIST[element.value]})
                         // Reset region maxLength
                         initRegion();
@@ -4730,7 +4814,7 @@ DOM.gain.addEventListener('input', () => {
                     } else {
                         colorMapFieldset.classList.add('d-none')
                     }
-                    if (wavesurfer && currentFile) {
+                    if (wavesurfer && STATE.currentFile) {
                         const fftSamples = wavesurfer.spectrogram.fftSamples;
                         wavesurfer.destroy();
                         wavesurfer = undefined;
@@ -4746,7 +4830,7 @@ DOM.gain.addEventListener('input', () => {
                     const threshold = document.getElementById('color-threshold-slider').valueAsNumber;
                     document.getElementById('color-threshold').textContent = threshold;
                     config.customColormap = {'loud': loud, 'mid': mid, 'quiet': quiet, 'threshold': threshold, 'windowFn': windowFn};
-                    if (wavesurfer && currentFile) {
+                    if (wavesurfer && STATE.currentFile) {
                         const fftSamples = wavesurfer.spectrogram.fftSamples;
                         wavesurfer.destroy();
                         wavesurfer = undefined;
@@ -4765,7 +4849,7 @@ DOM.gain.addEventListener('input', () => {
                 }
                 case 'spec-labels': {
                     config.specLabels = element.checked;                    
-                    if (wavesurfer && currentFile) {
+                    if (wavesurfer && STATE.currentFile) {
                         const fftSamples = wavesurfer.spectrogram.fftSamples;
                         wavesurfer.destroy();
                         wavesurfer = undefined;
@@ -4921,9 +5005,9 @@ async function readLabels(labelFile, updating){
         // If we haven't clicked the active row or we cleared the region, load the row we clicked
         if (resultContext || hideInSelection || hideInSummary) {
             // Lets check if the summary needs to be filtered
-            if (!(inSummary && target.closest('tr').classList.contains('text-warning'))) {
+            if (inSummary && ! target.closest('tr').classList.contains('text-warning')) {
                 target.click(); // Wait for file to load
-                await waitForFileLoad();
+                await waitFor(() => fileLoaded);
             }
         }
         if (region === undefined && ! inSummary) return;
@@ -5069,7 +5153,7 @@ async function readLabels(labelFile, updating){
     
     
     const insertManualRecord = (cname, start, end, comment, count, label, action, batch, originalCname, confidence) => {
-        const files = batch ? fileList : currentFile;
+        const files = batch ? STATE.openFiles : STATE.currentFile;
         worker.postMessage({
             action: 'insert-manual-record',
             cname: cname,
@@ -5127,7 +5211,7 @@ async function readLabels(labelFile, updating){
     function deleteFile(file) {
         // EventHandler caller 
         if (typeof file === 'object' && file instanceof Event) {
-            file = currentFile;
+            file = STATE.currentFile;
         }
         if (file) {
             if (confirm(`This will remove ${file} and all the associated detections from the database archive. Proceed?`)) {
@@ -5147,23 +5231,23 @@ async function readLabels(labelFile, updating){
         })
     }
 
-    // Utility functions to wait for file to load
-    function delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+    // Utility functions to wait for a variable to not be falsey
+
+    let retryCount = 0
+    function waitFor(checkFn) {
+        let maxRetries = 15;
+        return new Promise((resolve) => {
+            let interval = setInterval(() => {
+                if (checkFn() || retryCount >= maxRetries) {
+                    clearInterval(interval); // Stop further retries
+                    resolve(retryCount = 0); // Resolve the promise
+                } else {
+                    console.log('retries: ', ++retryCount);
+                }
+            }, 100);
+        });
     }
-    
-    async function waitForFileLoad() {
-        while (!fileLoaded) {
-            await delay(100); // Wait for 100 milliseconds before checking again
-        }
-    }
-    
-    async function waitForLocations() {
-        while (!LOCATIONS) {
-            await delay(100); // Wait for 100 milliseconds before checking again
-        }
-        return;
-    }
+
     
     // TOUR functions
     const tourModal = document.getElementById('tourModal');
@@ -5233,7 +5317,7 @@ async function readLabels(labelFile, updating){
             const example_file = await window.electron.getAudio();
             // create a canvas for the audio spec
             showElement(['spectrogramWrapper'], false);
-            await loadAudioFile({ filePath: example_file });
+            loadAudioFile({ filePath: example_file });
         }
         startTour();
     }
@@ -5255,7 +5339,7 @@ async function readLabels(labelFile, updating){
     // CI functions
     const getFileLoaded = () => fileLoaded;
     const donePredicting = () => !PREDICTING;
-    const getAudacityLabels = () => AUDACITY_LABELS[currentFile];
+    const getAudacityLabels = () => AUDACITY_LABELS[STATE.currentFile];
     
     
     // Update checking for Mac 

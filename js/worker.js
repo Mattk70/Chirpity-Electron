@@ -14,8 +14,9 @@ const merge = require('lodash.merge');
 import { State } from './state.js';
 import { sqlite3 } from './database.js';
 import {trackEvent} from './tracking.js';
+import {extractWaveMetadata} from './metadata.js';
 
-const DEBUG = true;
+const DEBUG = false;
 
 // Function to join Buffers and not use Buffer.concat() which leads to detached ArrayBuffers
 function joinBuffers(buffer1, buffer2) {
@@ -91,7 +92,7 @@ const SUPPORTED_FILES = ['.wav', '.flac', '.opus', '.m4a', '.mp3', '.mpga', '.og
 
 let NUM_WORKERS;
 let workerInstance = 0;
-let appPath, BATCH_SIZE, LABELS, batchChunksToSend = {};
+let appPath, tempPath, BATCH_SIZE, LABELS, batchChunksToSend = {};
 let LIST_WORKER;
 
 const DATASET = false;
@@ -117,7 +118,57 @@ let diskDB, memoryDB;
 
 let t0; // Application profiler
 
+const setupFfmpegCommand = ({ 
+    file, 
+    start = 0, 
+    end = undefined, 
+    sampleRate = 24000, 
+    channels = 1, 
+    format = 'wav', 
+    additionalFilters = [],
+    metadata = {},
+    audioCodec = null,
+    audioBitrate = null,
+    outputOptions = []
+}) => {
+    const command = ffmpeg('file:' + file)
+        .seekInput(start)
+        .duration(end - start)
+        .format(format)
+        .audioChannels(channels)
+        .audioFrequency(sampleRate);
 
+    // Add filters if provided
+    additionalFilters.forEach(filter => {
+        command.audioFilters(filter);
+    });
+    if (Object.keys(metadata).length) { 
+        metadata = Object.entries(metadata).flatMap(([k, v]) => {
+            if (typeof v === 'string') {
+                // Escape special characters, including quotes and apostrophes
+                v=v.replaceAll(' ', '_');
+            };
+            return ['-metadata', `${k}=${v}`]
+        });
+        command.addOutputOptions(metadata)
+    } 
+
+    // Set codec if provided
+    if (audioCodec) command.audioCodec(audioCodec);
+
+    // Set bitRate if provided
+    if (audioBitrate) command.audioBitrate(audioBitrate);
+
+    // Add any additional output options
+    if (outputOptions.length) command.addOutputOptions(...outputOptions);
+
+    if (DEBUG){
+        command.on('start', function (commandLine) {
+            console.log('FFmpeg command: ' + commandLine);
+        })
+    }
+    return command;
+};
 
 
 const getSelectionRange = (file, start, end) => {
@@ -374,6 +425,7 @@ async function handleMessage(e) {
             let {model, batchSize, threads, backend, list} = args;
             const t0 = Date.now();
             STATE.detect.backend = backend;
+            setGetSummaryQueryInterval(threads)
             INITIALISED = (async () => {
                 LIST_WORKER = await spawnListWorker(); // this can change the backend if tfjs-node isn't available
                 DEBUG && console.log('List worker took', Date.now() - t0, 'ms to load');
@@ -407,6 +459,7 @@ async function handleMessage(e) {
         }
         case 'change-threads': {
             const threads = e.data.threads;
+            setGetSummaryQueryInterval(threads)
             const delta = threads - predictWorkers.length;
             NUM_WORKERS+=delta;
             if (delta > 0) {
@@ -459,15 +512,11 @@ async function handleMessage(e) {
         }
         case "filter": {
             if (STATE.db) {
-                t0 = Date.now();
                 await getResults(args);
-                const t1 = Date.now();
                 args.updateSummary && await getSummary(args);
-                const t2 = Date.now();
                 args.included = await getIncludedIDs(args.file);
                 const [total, offset, species] = await getTotal(args);
                 UI.postMessage({event: 'total-records', total: total, offset: offset, species: species})
-                DEBUG && console.log("Filter took", (Date.now() - t0) / 1000, "seconds", "GetTotal took", (Date.now() - t2) / 1000, "seconds", "GetSummary took", (t2 - t1) / 1000, "seconds");
             }
             break;
         }
@@ -542,7 +591,7 @@ async function handleMessage(e) {
             break;
         }
         case "update-state": {
-            appPath = args.path || appPath;
+            appPath = args.path || appPath; tempPath = args.temp || tempPath;
             // If we change the speciesThreshold, we need to invalidate any location caches
             if (args.speciesThreshold) {
                 if (STATE.included?.['birdnet']?.['location'])  STATE.included.birdnet.location = {};
@@ -584,6 +633,10 @@ function savedFileCheck(fileList) {
         UI.postMessage({event: 'generate-alert', type: 'error',  message: 'The database has not finished loading. The saved file check was skipped'})
         return undefined
     }
+}
+
+function setGetSummaryQueryInterval(threads){
+    STATE.incrementor = STATE.detect.backend !== 'tensorflow' ? threads * 10 : threads;
 }
 
 async function onChangeMode(mode) {
@@ -1075,7 +1128,14 @@ async function locateFile(file) {
             }
         }
     } catch (error) {
-        console.warn(error.message); // Expected that this happens when the directory doesn't exist
+        if (error.message.includes('scandir')){
+            const match = error.message.match(/'([^']+)'/);
+            UI.postMessage({
+                event: 'generate-alert', type: 'warning', 
+                message: `Unable to locate folder "${match}". Perhaps the disk was removed?`
+            })
+        }
+        console.warn(error.message + ' - Disk removed?'); // Expected that this happens when the directory doesn't exist
     } 
     return null;
 }
@@ -1086,7 +1146,7 @@ async function notifyMissingFile(file) {
     const row = await diskDB.getAsync('SELECT * FROM FILES WHERE name = ?', file);
     if (row?.id) missingFile = file
     UI.postMessage({
-        event: 'generate-alert', type: 'error', 
+        event: 'generate-alert', type: 'warning', 
         message: `Unable to locate source file with any supported file extension: ${file}`,
         file: missingFile
     })
@@ -1122,7 +1182,7 @@ async function loadAudioFile({
                 play: play,
                 queued: queued,
                 goToRegion,
-                guano: METADATA[file].guano
+                metadata: METADATA[file].metadata
             }, [audioArray.buffer]);
         })
         .catch( (error) => {
@@ -1175,12 +1235,10 @@ const setMetadata = async ({ file, source_file = file }) => {
             throw new Error('Unable to determine file duration ', e);
         }
         if (file.toLowerCase().endsWith('wav')){
-            const {extractGuanoMetadata} = await import('./guano.js').catch(error => {
-                console.warn('Error loading guano.js', error)}
-            );
             const t0 = Date.now();
-            const guano = await extractGuanoMetadata(file).catch(error => console.warn("Error extracting GUANO", error));
-            if (guano){
+            const wavMetadata = await extractWaveMetadata(file).catch(error => console.warn("Error extracting GUANO", error));
+            if (Object.keys(wavMetadata).includes('guano')){
+                const guano = wavMetadata.guano;
                 const location = guano['Loc Position'];
                 if (location){
                     const [lat, lon] = location.split(' ');
@@ -1189,7 +1247,9 @@ const setMetadata = async ({ file, source_file = file }) => {
                 }
                 guanoTimestamp = Date.parse(guano.Timestamp);
                 METADATA[file].fileStart = guanoTimestamp;
-                METADATA[file].guano = JSON.stringify(guano);
+            }
+            if (Object.keys(wavMetadata).length > 0){
+                METADATA[file].metadata = JSON.stringify(wavMetadata);
             }
             DEBUG && console.log(`GUANO search took: ${(Date.now() - t0)/1000} seconds`);
         }
@@ -1281,8 +1341,7 @@ function setupCtx(audio, rate, destination, file) {
     .catch(error => aborted || console.warn(error, file));    
 };
 
-
-function checkBacklog(stream) {
+function checkBacklog() {
     return new Promise((resolve) => {
         const backlog = sumObjectValues(predictionsRequested) - sumObjectValues(predictionsReceived);
         DEBUG && console.log('backlog:', backlog);
@@ -1290,10 +1349,10 @@ function checkBacklog(stream) {
         if (backlog >= predictWorkers.length * 2) {
             // If backlog is too high, check again after a short delay
             setTimeout(() => {
-                resolve(checkBacklog(stream)); // Recursively call until backlog is within limits
+                resolve(checkBacklog()); // Recursively call until backlog is within limits
             }, 50);
         } else {
-            resolve(stream.read()); // Backlog ok, read the stream data
+            resolve(); // Backlog ok, read the stream data
         }
     });
 }
@@ -1364,24 +1423,23 @@ const getWavePredictBuffers = async ({
     
         let chunkStart = start * sampleRate;
         // Changed on.('data') handler because of:  https://stackoverflow.com/questions/32978094/nodejs-streams-and-premature-end
-        readStream.on('readable', () => {
+        readStream.on('readable', async () => {
             if (aborted) {
                 readStream.destroy();
                 return
             }
-
-            checkBacklog(readStream).then(chunk => {
-                if (chunk === null || chunk.byteLength <= 1 ) {
-                    // EOF
-                    chunk?.byteLength && predictionsReceived[file]++;
-                    readStream.destroy();
-                } else {
-                    const audio = joinBuffers(meta.header, chunk);
-                    predictQueue.push([audio, file, end, chunkStart]);
-                    chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
-                    processPredictQueue();
-                }
-            })
+            await checkBacklog();
+            const chunk = readStream.read();
+            if (chunk === null || chunk.byteLength <= 1 ) {
+                // EOF
+                chunk?.byteLength && predictionsReceived[file]++;
+                readStream.destroy();
+            } else {
+                const audio = joinBuffers(meta.header, chunk);
+                predictQueue.push([audio, file, end, chunkStart]);
+                chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
+                processPredictQueue();
+            }
         })
         readStream.on('error', err => {
             console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${METADATA[file].duration}`);
@@ -1455,99 +1513,29 @@ const getPredictBuffers = async ({
     if (start > METADATA[file].duration) {
         return
     }
-    let header, shortFile = true;
+
     const MINIMUM_AUDIO_LENGTH = 0.05; // below this value doesn't generate another chunk
     batchChunksToSend[file] = Math.ceil((end - start - MINIMUM_AUDIO_LENGTH) / (BATCH_SIZE * WINDOW_SIZE));
     predictionsReceived[file] = 0;
     predictionsRequested[file] = 0;
-    let highWaterMark =  2 * sampleRate * BATCH_SIZE * WINDOW_SIZE; 
     
-
+    const samplesInBatch = sampleRate * BATCH_SIZE * WINDOW_SIZE
+    const highWaterMark =  samplesInBatch * 2;
+    
     let chunkStart = start * sampleRate;
-    return new Promise((resolve, reject) => {
-        let concatenatedBuffer = Buffer.alloc(0);
-        const command = ffmpeg('file:' + file)
-            .seekInput(start)
-            .duration(end - start)
-            .format('wav')
-            .audioChannels(1) // Set to mono
-            .audioFrequency(sampleRate) // Set sample rate 
-
-        command.on('error', (error) => {
-            updateFilesBeingProcessed(file)
-            if (error.message.includes('SIGKILL')) console.log('FFMPEG process shut down at user request')
-            else {
-                error.message = error.message + '|' + error.stack;
-            }
-            console.log('Ffmpeg error in file:\n', file, 'stderr:\n', error)
-            reject(console.warn('getPredictBuffers: Error in ffmpeg extracting audio segment:', error));
-        });
-        command.on('start', function (commandLine) {
-            DEBUG && console.log('FFmpeg command: ' + commandLine);
-        })
-
-        const STREAM = command.pipe();
-        STREAM.on('readable', () => {           
-            if (aborted) {
-                STREAM.end();
-                return
-            }
-            const chunk = STREAM.read();
-            if (chunk === null) {
-                //EOF: deal with part-full buffers
-                if (shortFile) highWaterMark -= header.length;
-                if (concatenatedBuffer.byteLength){
-                    header || console.warn('no header for ' + file)
-                    let noHeader;
-                    if (concatenatedBuffer.length < header.length) noHeader = true;
-                    else noHeader = concatenatedBuffer.compare(header, 0, header.length, 0, header.length)
-                    const audio = noHeader ? joinBuffers(header, concatenatedBuffer) : concatenatedBuffer;
-                    processPredictQueue(audio, file, end, chunkStart);
-                } else {
-                    updateFilesBeingProcessed(file)
-                }
-                DEBUG && console.log('All chunks sent for ', file);
-                //STREAM.end();
-                resolve('finished')
-            }
-            else {
-                concatenatedBuffer = concatenatedBuffer.length ? joinBuffers(concatenatedBuffer, chunk) : chunk;
-                if (!header) {
-                    header = lookForHeader(concatenatedBuffer);
-                    // First chunk sent to model is short because it contains the header
-                    // Highwatermark is the length of audio alone
-                    // Initally, the highwatermark needs to add the header length to get the correct length of audio
-                    if (header) highWaterMark += header.length;
-                }
-                
-
-                // if we have a full buffer
-                if (concatenatedBuffer.length > highWaterMark) {     
-                    const audio_chunk = Buffer.allocUnsafeSlow(highWaterMark);
-                    concatenatedBuffer.copy(audio_chunk, 0, 0, highWaterMark);
-                    const remainder = Buffer.allocUnsafeSlow(concatenatedBuffer.length - highWaterMark);
-                    concatenatedBuffer.copy(remainder, 0, highWaterMark);
-                    const noHeader = audio_chunk.compare(header, 0, header.length, 0, header.length)
-                    const audio = noHeader ? joinBuffers(header, audio_chunk) : audio_chunk;
-                    // If we *do* have a header, we need to reset highwatermark because subsequent chunks *won't* have it
-                    if (! noHeader) {
-                        highWaterMark -= header.length;
-                        shortFile = false;
-                    }
-                    processPredictQueue(audio, file, end, chunkStart);
-                    chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate
-                    concatenatedBuffer = remainder;
-
-                }
-            }
-        });
-
-        STREAM.on('error', err => {
-            console.log('stream error: ', err);
-            err.code === 'ENOENT' && notifyMissingFile(file);
-        })
-
-    }).catch(error => console.log(error));
+    if (STATE.detect.backend === 'tensorflow'){
+        const step = (BATCH_SIZE * WINDOW_SIZE);
+        // Throttle the ingest of transcoded audio
+        for (let i = start; i < end; i += step){
+            await checkBacklog();
+            const finish = i + step;
+            await processAudio(file, i, finish, chunkStart, highWaterMark)
+            chunkStart += samplesInBatch;
+        }
+    } else {
+        // Full gas
+        await processAudio(file, start, end, chunkStart, highWaterMark, samplesInBatch)
+    }
 }
 
 function lookForHeader(buffer){
@@ -1566,6 +1554,75 @@ function lookForHeader(buffer){
         DEBUG && console.log(e)
         return undefined
     }
+}
+
+function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBatch){
+    let header, shortFile = true;
+    return new Promise((resolve, reject) => {
+        let concatenatedBuffer = Buffer.alloc(0);
+        const command = setupFfmpegCommand({file, start, end, sampleRate})
+        command.on('error', (error) => {
+            updateFilesBeingProcessed(file)
+            if (error.message.includes('SIGKILL')) console.log('FFMPEG process shut down at user request')
+            else {
+                error.message = error.message + '|' + error.stack;
+            }
+            console.log('Ffmpeg error in file:\n', file, 'stderr:\n', error)
+            reject(console.warn('getPredictBuffers: Error in ffmpeg extracting audio segment:', error));
+        });
+
+        const STREAM = command.pipe();
+        STREAM.on('readable', () => {           
+            if (aborted) {
+                STREAM.end();
+                return
+            }
+            const chunk = STREAM.read();
+            if (chunk === null) {
+                //EOF: deal with part-full buffers
+                // if (shortFile) highWaterMark -= header.length;
+                if (concatenatedBuffer.byteLength){
+                    header || console.warn('no header for ' + file)
+                    let noHeader;
+                    if (concatenatedBuffer.length < header.length) {noHeader = true}
+                    else {noHeader = concatenatedBuffer.compare(header, 0, header.length, 0, header.length)} //compare returns 0 when there is a header in audio_chunk!
+                    const audio = noHeader ? Buffer.concat([header, concatenatedBuffer]) : concatenatedBuffer;
+                    processPredictQueue(audio, file, end, chunkStart);
+                } else {
+                    updateFilesBeingProcessed(file)
+                }
+                DEBUG && console.log('All chunks sent for ', file);
+                resolve()
+            }
+            else {
+                concatenatedBuffer = concatenatedBuffer.length ? joinBuffers(concatenatedBuffer, chunk) : chunk;
+                if (!header) {
+                    header = lookForHeader(concatenatedBuffer);
+                    // First chunk sent to model is short because it contains the header
+                    // Highwatermark is the length of audio alone
+                    // Initally, the highwatermark needs to add the header length to get the correct length of audio
+                    if (header) highWaterMark += header.length;
+                }
+
+                // if we have a full buffer
+                if (concatenatedBuffer.length > highWaterMark) {     
+                    const audio_chunk = concatenatedBuffer.subarray(0, highWaterMark);
+                    const remainder = concatenatedBuffer.subarray(highWaterMark);
+                    let noHeader = concatenatedBuffer.compare(header, 0, header.length, 0, header.length)
+                    const audio = noHeader ? Buffer.concat([header, audio_chunk]) : audio_chunk;
+                    processPredictQueue(audio, file, end, chunkStart);
+                    chunkStart += samplesInBatch;
+                    concatenatedBuffer = remainder;
+                }
+            }
+        });
+
+        STREAM.on('error', err => {
+            console.log('stream error: ', err);
+            err.code === 'ENOENT' && notifyMissingFile(file);
+        })
+
+    }).catch(error => console.log(error));
 }
 
 /**
@@ -1590,43 +1647,34 @@ const fetchAudioBuffer = async ({
     // Use ffmpeg to extract the specified audio segment
     if (isNaN(start)) throw(new Error('fetchAudioBuffer: start is NaN'));
     return new Promise((resolve, reject) => {
-        let command = ffmpeg('file:' + file)
-            .seekInput(start)
-            .duration(end - start)
-            .format('wav')
-            .audioChannels(1) // Set to mono
-            .audioFrequency(24_000) // Set sample rate to 24000 Hz (always - this is for wavesurfer)
-            if (STATE.filters.active) {
-                if (STATE.filters.lowShelfAttenuation && STATE.filters.lowShelfFrequency){
-                    command.audioFilters({
-                        filter: 'lowshelf',
-                        options: `gain=${STATE.filters.lowShelfAttenuation}:f=${STATE.filters.lowShelfFrequency}`
-                    })
+        const command = setupFfmpegCommand({
+            file,
+            start,
+            end,
+            sampleRate: 24000,
+            format: 'wav',
+            channels: 1,
+            additionalFilters: [
+                STATE.filters.lowShelfAttenuation && {
+                    filter: 'lowshelf',
+                    options: `gain=${STATE.filters.lowShelfAttenuation}:f=${STATE.filters.lowShelfFrequency}`
+                },
+                STATE.filters.highPassFrequency && {
+                    filter: 'highpass',
+                    options: `f=${STATE.filters.highPassFrequency}:poles=1`
+                },
+                STATE.audio.normalise && {
+                    filter: 'loudnorm',
+                    options: "I=-16:LRA=11:TP=-1.5"
                 }
-                if (STATE.filters.highPassFrequency){
-                    command.audioFilters({
-                        filter: 'highpass',
-                        options: `f=${STATE.filters.highPassFrequency}:poles=1`
-                    })
-                }
-            }
-            if (STATE.audio.normalise){
-                command.audioFilters(
-                    {
-                        filter: 'loudnorm',
-                        options: "I=-16:LRA=11:TP=-1.5"
-                    }
-                )
-            }
+            ].filter(Boolean),
+        });
         const stream = command.pipe();
         
         command.on('error', error => {
             UI.postMessage({event: 'generate-alert', type: 'error',  message: error})
             reject(new Error('fetchAudioBuffer: Error extracting audio segment:', error));
         });
-        command.on('start', function (commandLine) {
-            DEBUG && console.log('FFmpeg command: ' + commandLine);
-        })
 
         stream.on('readable', () => {
             const chunk = stream.read();
@@ -1679,7 +1727,6 @@ async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
     if (predictWorkers[worker]) predictWorkers[worker].isAvailable = false;
     predictWorkers[worker]?.postMessage(objData, [channelData.buffer]);
 }
-
 async function doPrediction({
     file = '',
     start = 0,
@@ -1873,51 +1920,26 @@ async function uploadOpus({ file, start, end, defaultName, metadata, mode }) {
 }
             
 const bufferToAudio = async ({
-    file = '', start = 0, end = 3, meta = {}, format = undefined
+    file = '', start = 0, end = 3, meta = {}, format = undefined, folder = undefined, filename = undefined
 }) => {
     if (! fs.existsSync(file)) {
         const found = await getWorkingFile(file);
         if (!found) return
     }
-    let audioCodec, mimeType, soundFormat;
     let padding = STATE.audio.padding;
     let fade = STATE.audio.fade;
     let bitrate = STATE.audio.bitrate;
     let quality = parseInt(STATE.audio.quality);
     let downmix = STATE.audio.downmix;
     format ??= STATE.audio.format;
-    const bitrateMap = { 24_000: '24k', 16_000: '16k', 12_000: '12k', 8000: '8k', 44_100: '44k', 22_050: '22k', 11_025: '11k' };
-    if (format === 'mp3') {
-        audioCodec = 'libmp3lame';
-        soundFormat = 'mp3';
-        mimeType = 'audio/mpeg'
-    } else if (format === 'wav') {
-        audioCodec = 'pcm_s16le';
-        soundFormat = 'wav';
-        mimeType = 'audio/wav'
-    } else if (format === 'flac') {
-        audioCodec = 'flac';
-        soundFormat = 'flac';
-        mimeType = 'audio/flac'
-        // Static binary is missing the aac encoder
-        // } else if (format === 'm4a') {
-        //     audioCodec = 'aac';
-        //     soundFormat = 'aac';
-        //     mimeType = 'audio/mp4'
-    } else if (format === 'opus') {
-        audioCodec = 'libopus';
-        soundFormat = 'opus'
-        mimeType = 'audio/ogg'
-    }
+    const formatMap = {
+        mp3: { audioCodec: 'libmp3lame', soundFormat: 'mp3' },
+        wav: { audioCodec: 'pcm_s16le', soundFormat: 'wav' },
+        flac: { audioCodec: 'flac', soundFormat: 'flac' },
+        opus: { audioCodec: 'libopus', soundFormat: 'opus' }
+    };
+    const { audioCodec, soundFormat } = formatMap[format] || {};
     
-    let optionList = [];
-    for (let [k, v] of Object.entries(meta)) {
-        if (typeof v === 'string') {
-            v = v.replaceAll(' ', '_');
-        }
-        optionList.push('-metadata');
-        optionList.push(`${k}=${v}`);
-    }
     METADATA[file] || await getWorkingFile(file);
     if (padding) {
         start -= padding;
@@ -1927,53 +1949,46 @@ const bufferToAudio = async ({
     }
     
     return new Promise(function (resolve, reject) {
-        const bufferStream = new PassThrough();
-        let ffmpgCommand = ffmpeg('file:' + file)
+        let command = ffmpeg('file:' + file)
         .toFormat(soundFormat)
-        .seekInput(start)
-        .duration(end - start)
         .audioChannels(downmix ? 1 : -1)
         // I can't get this to work with Opus
         // .audioFrequency(METADATA[file].sampleRate)
-        .audioCodec(audioCodec)
-        .addOutputOptions(...optionList)
-        
+        .audioCodec(audioCodec).seekInput(start).duration(end - start)
         if (['mp3', 'm4a', 'opus'].includes(format)) {
             //if (format === 'opus') bitrate *= 1000;
-            ffmpgCommand = ffmpgCommand.audioBitrate(bitrate)
+            command = command.audioBitrate(bitrate)
         } else if (['flac'].includes(format)) {
-            ffmpgCommand = ffmpgCommand.audioQuality(quality)
+            command = command.audioQuality(quality)
         }
         if (STATE.filters.active) {
-            if (STATE.filters.lowShelfFrequency > 0){
-                ffmpgCommand = ffmpgCommand.audioFilters(
-                    {
-                        filter: 'lowshelf',
-                        options: `gain=${STATE.filters.lowShelfAttenuation}:f=${STATE.filters.lowShelfFrequency}`
-                    }
-                )
+            const filters = [];
+            if (STATE.filters.lowShelfFrequency > 0) {
+                filters.push({
+                    filter: 'lowshelf',
+                    options: `gain=${STATE.filters.lowShelfAttenuation}:f=${STATE.filters.lowShelfFrequency}`
+                });
             }
-            if (STATE.filters.highPassFrequency > 0){
-                ffmpgCommand = ffmpgCommand.audioFilters(
-                    {
-                        filter: 'highpass',
-                        options: `f=${STATE.filters.highPassFrequency}:poles=1`
-                    }
-                )
-            }
-            if (STATE.audio.normalise){
-                ffmpgCommand = ffmpgCommand.audioFilters(
-                    {
-                        filter: 'loudnorm',
-                        options: "I=-16:LRA=11:TP=-1.5" //:offset=" + STATE.audio.gain
-                    }
-                )
-            }
+            if (STATE.filters.highPassFrequency > 0) {
+                filters.push({
+                    filter: 'highpass',
+                    options: `f=${STATE.filters.highPassFrequency}:poles=1`
+                });
+            }            
+            if (STATE.audio.normalise) {
+                filters.push({
+                    filter: 'loudnorm',
+                    options: "I=-16:LRA=11:TP=-1.5"
+                });
+            }            
+            if (filters.length > 0) {
+                command = command.audioFilters(filters);
+            }            
         }
         if (fade && padding) {
             const duration = end - start;
             if (start >= 1 && end <= METADATA[file].duration - 1) {
-                ffmpgCommand = ffmpgCommand.audioFilters(
+                command = command.audioFilters(
                     {
                         filter: 'afade',
                         options: `t=in:ss=${start}:d=1`
@@ -1984,47 +1999,41 @@ const bufferToAudio = async ({
                     }
                 )}
         }
+        if (Object.entries(meta).length){
+            meta = Object.entries(meta).flatMap(([k, v]) => {
+                if (typeof v === 'string') {
+                    // Escape special characters, including quotes and apostrophes
+                    v=v.replaceAll(' ', '_');
+                };
+                return ['-metadata', `${k}=${v}`]
+            });
+            command.addOutputOptions(meta)
+        }
+        //const destination = p.join((folder || tempPath), 'file.mp3');
+        const destination = p.join((folder || tempPath), filename);
+        command.save(destination);
 
-
-        ffmpgCommand.on('start', function (commandLine) {
+        command.on('start', function (commandLine) {
             DEBUG && console.log('FFmpeg command: ' + commandLine);
         })
-        ffmpgCommand.on('error', (err) => {
+        command.on('error', (err) => {
             console.log('An error occurred: ' + err.message);
         })
-        ffmpgCommand.on('end', function () {
+        command.on('end', function () {
             DEBUG && console.log(format + " file rendered")
+            resolve(destination)
         })
-        ffmpgCommand.writeToStream(bufferStream);
-        
-        let concatenatedBuffer = Buffer.alloc(0);
-        bufferStream.on('readable', () => {
-            const chunk = bufferStream.read();
-            if (chunk === null){
-                let audio = [];
-                audio.push(new Int8Array(concatenatedBuffer))
-                const blob = new Blob(audio, { type: mimeType });
-                resolve(blob);    
-            } else {
-                concatenatedBuffer = concatenatedBuffer.length ?  joinBuffers(concatenatedBuffer, chunk) : chunk;
-            }
-        });
     })
 };
                 
 async function saveAudio(file, start, end, filename, metadata, folder) {
-    const thisBlob = await bufferToAudio({
-        file: file, start: start, end: end, meta: metadata
+    filename = filename.replaceAll(':', '-');
+    const convertedFilePath = await bufferToAudio({
+        file: file, start: start, end: end, meta: metadata, folder: folder, filename: filename
     });
-    if (folder) {
-        const buffer = Buffer.from(await thisBlob.arrayBuffer());
-        if (! fs.existsSync(folder)) fs.mkdirSync(folder, {recursive: true});
-        fs.writeFile(p.join(folder, filename), buffer, {flag: 'w'}, err => {
-            if (err) console.log(err) ;
-            else if (DEBUG) console.log('Audio file saved') });
-    }
+    if (folder && DEBUG) { console.log('Audio file saved: ', convertedFilePath) }
     else {
-        UI.postMessage({event:'audio-file-to-save', file: thisBlob, filename: filename})
+        UI.postMessage({event:'audio-file-to-save', file: convertedFilePath, filename: filename, extension: STATE.audio.format})
     }
 }
 
@@ -2153,7 +2162,7 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
         // Manual records can be added off the bat, so there may be no record of the file in either db
         fileStart = METADATA[file].fileStart;
         res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,?,? )',
-        fileID, file, METADATA[file].duration, fileStart, undefined, undefined, METADATA[file].guano);
+        fileID, file, METADATA[file].duration, fileStart, undefined, undefined, METADATA[file].metadata);
         fileID = res.lastID;
         changes = 1;
         let durationSQL = Object.entries(METADATA[file].dateDuration)
@@ -2199,9 +2208,10 @@ const generateInsertQuery = async (latestResult, file) => {
     let res = await db.getAsync('SELECT id FROM files WHERE name = ?', file);
     if (!res) {
         let id = null;
-        if (METADATA[file].guano){
-            const guano = JSON.parse(METADATA[file].guano);
-            if (guano['Loc Position']){
+        if (METADATA[file].metadata){
+            const metadata = JSON.parse(METADATA[file].metadata);
+            const guano = metadata.guano;
+            if (guano && guano['Loc Position']){
                 const [lat, lon] = guano['Loc Position'].split(' ');
                 const place = guano['Site Name'] || guano['Loc Position'];
                 const row = await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ?', parseFloat(lat), parseFloat(lon))
@@ -2213,7 +2223,7 @@ const generateInsertQuery = async (latestResult, file) => {
             }
         }
         res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,?,?,? )',
-        undefined, file, METADATA[file].duration, METADATA[file].fileStart, id, null, METADATA[file].guano);
+        undefined, file, METADATA[file].duration, METADATA[file].fileStart, id, null, METADATA[file].metadata);
         fileID = res.lastID;
         await insertDurations(file, fileID);
     } else {
@@ -2229,7 +2239,7 @@ const generateInsertQuery = async (latestResult, file) => {
         const speciesIDArray = speciesIDBatch[i];
         for (let j = 0; j < confidenceArray.length; j++) {
             const confidence = Math.round(confidenceArray[j] * 1000);
-            if (confidence < 50) break;
+            if (confidence < STATE.detect.confidence) break;
             const speciesID = speciesIDArray[j];
             insertQuery += `(${timestamp}, ${key}, ${fileID}, ${speciesID}, ${confidence}, null, null, ${key + 3}, null, ${isDaylight}), `;
         }
@@ -2246,53 +2256,55 @@ const generateInsertQuery = async (latestResult, file) => {
 
 const parsePredictions = async (response) => {
     let file = response.file;
-    const included = await getIncludedIDs(file).catch( (error) => console.log('Error getting included IDs', error));
-    const latestResult = response.result, db = STATE.db;
+
+    const latestResult = response.result;
     DEBUG && console.log('worker being used:', response.worker);
     if (! STATE.selection) await generateInsertQuery(latestResult, file).catch(error => console.warn('Error generating insert query', error));
     let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
-    for (let i = 0; i < keysArray.length; i++) {
-        let updateUI = false;
-        let key = parseFloat(keysArray[i]);
-        const timestamp = METADATA[file].fileStart + key * 1000;
-        const confidenceArray = confidenceBatch[i];
-        const speciesIDArray = speciesIDBatch[i];
-        for (let j = 0; j < confidenceArray.length; j++) {
-            let confidence = confidenceArray[j];
-            if (confidence < 0.05) break;
-            confidence*=1000;
-            let speciesID = speciesIDArray[j];
-            updateUI = (confidence > STATE.detect.confidence && (! included.length || included.includes(speciesID)));
-            if (STATE.selection || updateUI) {
-                let end, confidenceRequired;
-                if (STATE.selection) {
-                    const duration = (STATE.selection.end - STATE.selection.start) / 1000;
-                    end = key + duration;
-                    confidenceRequired = STATE.userSettingsInSelection ?
-                    STATE.detect.confidence : 50;
-                } else {
-                    end = key + 3;
-                    confidenceRequired = STATE.detect.confidence;
-                }
-                if (confidence >= confidenceRequired) {
-                    const { cname, sname } = await memoryDB.getAsync(`SELECT cname, sname FROM species WHERE id = ${speciesID}`).catch(error => console.warn('Error getting species name', error));
-                    const result = {
-                        timestamp: timestamp,
-                        position: key,
-                        end: end,
-                        file: file,
-                        cname: cname,
-                        sname: sname,
-                        score: confidence
+    if (index < 499){
+        const included = await getIncludedIDs(file).catch( (error) => console.log('Error getting included IDs', error));
+        for (let i = 0; i < keysArray.length; i++) {
+            let updateUI = false;
+            let key = parseFloat(keysArray[i]);
+            const timestamp = METADATA[file].fileStart + key * 1000;
+            const confidenceArray = confidenceBatch[i];
+            const speciesIDArray = speciesIDBatch[i];
+            for (let j = 0; j < confidenceArray.length; j++) {
+                let confidence = confidenceArray[j];
+                if (confidence < 0.05) break;
+                confidence*=1000;
+                let speciesID = speciesIDArray[j];
+                updateUI = (confidence > STATE.detect.confidence && (! included.length || included.includes(speciesID)));
+                if (STATE.selection || updateUI) {
+                    let end, confidenceRequired;
+                    if (STATE.selection) {
+                        const duration = (STATE.selection.end - STATE.selection.start) / 1000;
+                        end = key + duration;
+                        confidenceRequired = STATE.userSettingsInSelection ?
+                        STATE.detect.confidence : 50;
+                    } else {
+                        end = key + 3;
+                        confidenceRequired = STATE.detect.confidence;
                     }
-                    sendResult(++index, result, false);
-                    // Only show the highest confidence detection, unless it's a selection analysis
-                    if (! STATE.selection) break;
-                };
+                    if (confidence >= confidenceRequired) {
+                        const { cname, sname } = await memoryDB.getAsync(`SELECT cname, sname FROM species WHERE id = ${speciesID}`).catch(error => console.warn('Error getting species name', error));
+                        const result = {
+                            timestamp: timestamp,
+                            position: key,
+                            end: end,
+                            file: file,
+                            cname: cname,
+                            sname: sname,
+                            score: confidence
+                        }
+                        sendResult(++index, result, false);
+                        // Only show the highest confidence detection, unless it's a selection analysis
+                        if (! STATE.selection) break;
+                    };
+                }
             }
-        }
-    } 
-    
+        } 
+    }
     predictionsReceived[file]++;
     const received = sumObjectValues(predictionsReceived);
     const total = sumObjectValues(batchChunksToSend);
@@ -2313,7 +2325,9 @@ const parsePredictions = async (response) => {
         updateFilesBeingProcessed(response.file)
         DEBUG && console.log(`File ${file} processed after ${(new Date() - predictionStart) / 1000} seconds: ${filesBeingProcessed.length} files to go`);
     }
-    !STATE.selection && (STATE.increment() === 0) && getSummary({ interim: true });
+
+    !STATE.selection && (STATE.increment() === 0 || index === 1 ) && await getSummary({ interim: true });
+
     return response.worker
 }
                         
@@ -2427,7 +2441,12 @@ async function processNextFile({
 }
 
 function sumObjectValues(obj) {
-    return Object.values(obj).reduce((total, value) => total + value, 0);
+    let total = 0;
+    for (const key in obj) {
+        total += obj[key];
+    }
+    return total;
+    //return Object.values(obj).reduce((total, value) => total + value, 0);
 }
 
 function onSameDay(timestamp1, timestamp2) {
@@ -2511,12 +2530,11 @@ const getSummary = async ({
     interim = false,
     action = undefined,
 } = {}) => {
-    const db = STATE.db;
     const included = STATE.selection ? [] : await getIncludedIDs();
     const [sql, params] = prepSummaryStatement(included);
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
 
-    t0 = Date.now();
+
     const summary = await STATE.db.allAsync(sql, ...params);
     const event = interim ? 'update-summary' : 'summary-complete';
     UI.postMessage({
@@ -2656,7 +2674,7 @@ const getResults = async ({
                     //const dateString = new Date(r.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
                     const filename = `${r.cname}_${dateString}.${STATE.audio.format}`
                     DEBUG && console.log(`Exporting from ${r.file}, position ${r.position}, into folder ${directory}`)
-                    saveAudio(r.file, r.position, r.end, filename, metadata, directory)
+                    saveAudio(r.file, r.position, r.end, filename, {Artist: 'Chirpity'}, directory)
                     i === result.length - 1 && UI.postMessage({ event: 'generate-alert', message: `${result.length} files saved` })
                 } 
             }
@@ -2678,11 +2696,11 @@ const getResults = async ({
             } else {
                 species = species || '';
                 const nocmig = STATE.detect.nocmig ? '<b>nocturnal</b>' : ''
-                sendResult(++index, `No ${nocmig} ${species} detections found using the ${STATE.list} list.`, true)
+                sendResult(++index, `No ${nocmig} ${species} detections found ${STATE.mode === 'explore' ? 'in the Archive' : ''} using the ${STATE.list} list.`, true)
             }
         }
     }
-    STATE.selection || UI.postMessage({event: 'database-results-complete', active: active, select: position?.start});
+    (STATE.selection && topRankin === STATE.topRankin)  || UI.postMessage({event: 'database-results-complete', active: active, select: position?.start});
 };
 
 // Function to format the CSV export
@@ -3706,7 +3724,7 @@ async function convertAndOrganiseFiles(threadLimit) {
         const attempted  = successfulConversions + failedConversions;
         // Create a summary message
         let summaryMessage;
-        let type = 'notice';
+        let type = 'info';
         
         if (attempted) {
            summaryMessage = `Processing complete: ${successfulConversions} successful, ${failedConversions} failed.`;
