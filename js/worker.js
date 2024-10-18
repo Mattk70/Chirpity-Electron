@@ -2161,7 +2161,7 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     if (!res) { 
         // Manual records can be added off the bat, so there may be no record of the file in either db
         fileStart = METADATA[file].fileStart;
-        res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,?,? )',
+        res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,?,?,? )',
         fileID, file, METADATA[file].duration, fileStart, undefined, undefined, METADATA[file].metadata);
         fileID = res.lastID;
         changes = 1;
