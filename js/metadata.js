@@ -24,7 +24,7 @@ function extractWaveMetadata(filePath) {
                 const format = buffer.toString('utf-8', 8, 12); // Should be "WAVE"
 
                 if (chunkId !== 'RIFF' || format !== 'WAVE') {
-                    return reject(new Error('Invalid WAV file'));
+                    return reject(new Error('Invalid WAV file: ', filePath));
                 }
 
                 let currentOffset = 12; // Start after the RIFF header
