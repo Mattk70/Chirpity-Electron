@@ -49,7 +49,7 @@ console.warn = function() {
     originalWarn.apply(console, arguments);
     
     // Track the warning message using your tracking function
-    trackEvent(STATE.UUID, 'Worker Warning', arguments[0], customURLEncode(arguments[1]));
+    trackEvent(STATE.UUID, 'WW', arguments[0], customURLEncode(arguments[1]));
 };
 
 // Override console.error to intercept and track errors
@@ -58,11 +58,11 @@ console.error = function() {
     originalError.apply(console, arguments);
     
     // Track the error message using your tracking function
-    trackEvent(STATE.UUID, 'Worker Handled Errors', arguments[0], customURLEncode(arguments[1]));
+    trackEvent(STATE.UUID, 'WE', arguments[0], customURLEncode(arguments[1]));
 };
 // Implement error handling in the worker
 self.onerror = function(message, file, lineno, colno, error) {
-    trackEvent(STATE.UUID, 'Unhandled Worker Error', message, customURLEncode(error?.stack));
+    trackEvent(STATE.UUID, 'UWE', message, customURLEncode(error?.stack));
     if (message.includes('dynamic link library')) generateAlert({type: 'error',  message: 'There has been an error loading the model. This may be due to missing AVX support. Chirpity AI models require the AVX2 instructions set to run. If you have AVX2 enabled and still see this notice, please refer to <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">this issue</a> on Github.'})
     // Return false not to inhibit the default error handling
     return false;
@@ -74,7 +74,7 @@ self.addEventListener('unhandledrejection', function(event) {
     const stackTrace = event.reason?.stack;
     
     // Track the unhandled promise rejection
-    trackEvent(STATE.UUID, 'Unhandled Worker Promise Rejections', errorMessage, customURLEncode(stackTrace));
+    trackEvent(STATE.UUID, 'UWPR', errorMessage, customURLEncode(stackTrace));
 });
 
 self.addEventListener('rejectionhandled', function(event) {
@@ -83,7 +83,7 @@ self.addEventListener('rejectionhandled', function(event) {
     const stackTrace = event.reason?.stack;
     
     // Track the unhandled promise rejection
-    trackEvent(STATE.UUID, 'Handled Worker Promise Rejections', errorMessage, customURLEncode(stackTrace));
+    trackEvent(STATE.UUID, 'HWPR', errorMessage, customURLEncode(stackTrace));
 });
 
 //Object will hold files in the diskDB, and the active timestamp from the most recent selection analysis.
