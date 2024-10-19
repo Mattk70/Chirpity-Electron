@@ -1,4 +1,4 @@
-const ID_SITE = 3;
+const ID_SITE = 2;
 
 function trackEvent(uuid, event, action, name, value){
     // Squash result numbers
