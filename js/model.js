@@ -300,7 +300,7 @@ class Model {
                 if (DEBUG) console.log("No surviving tensors in batch", maskedTensorBatch.shape[0])
                 return []
             } else {
-                keys = await maskedKeysTensor.data();
+                keys = Array.from(await maskedKeysTensor.data());
                 maskedKeysTensor.dispose(); // - 1 tensor
                 if (DEBUG) console.log("surviving tensors in batch", maskedTensorBatch.shape[0])
             }

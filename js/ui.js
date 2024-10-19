@@ -22,7 +22,7 @@ console.warn = function() {
     originalWarn.apply(console, arguments);
     
     // Track the warning message using your tracking function
-    trackEvent(config.UUID, 'UIWarn', arguments[0], customURLEncode(arguments[1]));
+    trackEvent(config.UUID, 'Warnings', arguments[0], customURLEncode(arguments[1]));
 };
 
 // Override console.error to intercept and track errors
@@ -31,7 +31,7 @@ console.error = function() {
     originalError.apply(console, arguments);
     
     // Track the error message using your tracking function
-    trackEvent(config.UUID, 'UIError', arguments[0], customURLEncode(arguments[1]));
+    trackEvent(config.UUID, 'Errors', arguments[0], customURLEncode(arguments[1]));
 };
 
 
@@ -41,7 +41,7 @@ window.addEventListener('unhandledrejection', function(event) {
     const stackTrace = event.reason.stack;
     
     // Track the unhandled promise rejection
-    trackEvent(config.UUID, 'UUIPR', errorMessage, customURLEncode(stackTrace));
+    trackEvent(config.UUID, 'Unhandled UI Promise Rejection', errorMessage, customURLEncode(stackTrace));
 });
 
 window.addEventListener('rejectionhandled', function(event) {
@@ -50,7 +50,7 @@ window.addEventListener('rejectionhandled', function(event) {
     const stackTrace = event.reason.stack;
     
     // Track the unhandled promise rejection
-    trackEvent(config.UUID, 'HUIPR', errorMessage, customURLEncode(stackTrace));
+    trackEvent(config.UUID, 'Handled UI Promise Rejection', errorMessage, customURLEncode(stackTrace));
 });
 
 let STATE = {
