@@ -1786,6 +1786,10 @@ window.onload = async () => {
             };
         //fill in defaults - after updates add new items
         syncConfig(config, defaultConfig);
+
+        // Disable SNR
+        config.filters.SNR = 0;
+        
         // set version
         config.VERSION = VERSION;
         // switch off debug mode we don't want this to be remembered

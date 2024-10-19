@@ -272,7 +272,7 @@ class Model {
         if (BACKEND === 'webgl' && TensorBatch.shape[0] < this.batchSize && !this.selection) {
             // WebGL backend works best when all batches are the same size
             paddedTensorBatch = this.padBatch(TensorBatch)  // + 1 tensor
-        } else if (threshold) {
+        } else if (threshold && BACKEND === 'tensorflow' && !this.selection) {
             if (this.version !== 'v1') threshold *= 4;
             const keysTensor = tf.stack(keys); // + 1 tensor
             const snr = this.getSNR(TensorBatch)
