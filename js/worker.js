@@ -31,6 +31,9 @@ function joinBuffers(buffer1, buffer2) {
 const originalWarn = console.warn;
 const originalError = console.error;
 
+const generateAlert =({message, type, autohide}) => {
+    UI.postMessage({event: 'generate-alert', type: type || 'info',  message: message, autohide: autohide});
+}
 function customURLEncode(str) {
     return encodeURIComponent(str)
       .replace(/[!'()*]/g, (c) => {
@@ -60,7 +63,7 @@ console.error = function() {
 // Implement error handling in the worker
 self.onerror = function(message, file, lineno, colno, error) {
     trackEvent(STATE.UUID, 'Unhandled Worker Error', message, customURLEncode(error?.stack));
-    if (message.includes('dynamic link library')) UI.postMessage({event: 'generate-alert', type: 'error',  message: 'There has been an error loading the model. This may be due to missing AVX support. Chirpity AI models require the AVX2 instructions set to run. If you have AVX2 enabled and still see this notice, please refer to <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">this issue</a> on Github.'})
+    if (message.includes('dynamic link library')) generateAlert({type: 'error',  message: 'There has been an error loading the model. This may be due to missing AVX support. Chirpity AI models require the AVX2 instructions set to run. If you have AVX2 enabled and still see this notice, please refer to <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">this issue</a> on Github.'})
     // Return false not to inhibit the default error handling
     return false;
     };
@@ -169,7 +172,6 @@ const setupFfmpegCommand = ({
     }
     return command;
 };
-
 
 const getSelectionRange = (file, start, end) => {
     return { start: (start * 1000) + METADATA[file].fileStart, end: (end * 1000) + METADATA[file].fileStart }
@@ -439,7 +441,7 @@ async function handleMessage(e) {
         }
         case "analyse": {
             if (!predictWorkers.length) {
-                UI.postMessage({event: 'generate-alert', type: 'warning',  
+                generateAlert({type: 'warning',  
                     message: `A previous analysis resulted in an out-of-memory error, it is recommended you reduce the batch size from ${BATCH_SIZE}`
                 })
                 UI.postMessage({event: 'analysis-complete', quiet: true});
@@ -630,7 +632,7 @@ function savedFileCheck(fileList) {
             }
         });
     } else {
-        UI.postMessage({event: 'generate-alert', type: 'error',  message: 'The database has not finished loading. The saved file check was skipped'})
+        generateAlert({type: 'error',  message: 'The database has not finished loading. The saved file check was skipped'})
         return undefined
     }
 }
@@ -1069,7 +1071,7 @@ const getDuration = async (src) => {
             resolve(duration);
         });
         audio.addEventListener('error', (error) => {
-            UI.postMessage({event: 'generate-alert', type: 'error',  message: 'Unable to extract essential metadata from ' + src})
+            generateAlert({type: 'error',  message: 'Unable to extract essential metadata from ' + src})
             reject(error, src)
         })
     });
@@ -1188,7 +1190,8 @@ async function loadAudioFile({
         .catch( (error) => {
             console.log(error);
             // notify and return null if no matching file was found
-            notifyMissingFile(file)
+            generateAlert({type: 'error',  message: error.message});
+            error.code === 'ENOENT' && notifyMissingFile(file)
         })
         let week;
         if (STATE.list === 'location'){
@@ -1236,7 +1239,7 @@ const setMetadata = async ({ file, source_file = file }) => {
         }
         if (file.toLowerCase().endsWith('wav')){
             const t0 = Date.now();
-            const wavMetadata = await extractWaveMetadata(file).catch(error => console.warn("Error extracting GUANO", error));
+            const wavMetadata = await extractWaveMetadata(file)//.catch(error => console.warn("Error extracting GUANO", error));
             if (Object.keys(wavMetadata).includes('guano')){
                 const guano = wavMetadata.guano;
                 const location = guano['Loc Position'];
@@ -1394,7 +1397,7 @@ const getWavePredictBuffers = async ({
         try {
             wav.fromBuffer(chunk);
         } catch (e) {
-            UI.postMessage({event: 'generate-alert', type: 'error',  message: `Cannot parse ${file}, it has an invalid wav header.`});
+            generateAlert({type: 'error',  message: `Cannot parse ${file}, it has an invalid wav header.`});
             console.warn('GetWavePredictBuffers failed: ', e)
             headerStream.close();
             updateFilesBeingProcessed(file);
@@ -1484,7 +1487,7 @@ function processPredictQueue(audio, file, end, chunkStart){
                             <p class="text-danger h6">System memory exhausted, the operation has been terminated. </p>
                             <p>
                             <b>Tip:</b> Close any unnecessary open applications. If that is not effective, reduce the number of Threads ${BATCH_SIZE > 4 ? 'or lower the batch size' : ''} in the system settings'}.<p>`;
-                    UI.postMessage({event: 'generate-alert', type: 'error',  message: message, autohide: false})
+                    generateAlert({type: 'error',  message: message, autohide: false})
                 return
             }
         }
@@ -1672,7 +1675,7 @@ const fetchAudioBuffer = async ({
         const stream = command.pipe();
         
         command.on('error', error => {
-            UI.postMessage({event: 'generate-alert', type: 'error',  message: error})
+            generateAlert({type: 'error',  message: error})
             reject(new Error('fetchAudioBuffer: Error extracting audio segment:', error));
         });
 
@@ -2259,6 +2262,10 @@ const parsePredictions = async (response) => {
     let file = response.file;
 
     const latestResult = response.result;
+    if (!latestResult.length){
+        predictionsReceived[file]++;
+        return response.worker
+    }
     DEBUG && console.log('worker being used:', response.worker);
     if (! STATE.selection) await generateInsertQuery(latestResult, file).catch(error => console.warn('Error generating insert query', error));
     let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
@@ -2400,7 +2407,10 @@ async function processNextFile({
 } = {}) { 
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
-        const found = await getWorkingFile(file).catch(error => console.warn('Error in getWorkingFile', JSON.stringify(error)));
+        const found = await getWorkingFile(file).catch(error => {
+            console.warn('Error in getWorkingFile', error);
+            generateAlert({type: 'warning',  message: error.message})
+        });
         if (found) {
             if (end) {}
             let boundaries = [];
@@ -2436,6 +2446,7 @@ async function processNextFile({
             }
         } else {
             DEBUG && console.log('Recursion: file not found')
+            updateFilesBeingProcessed(file) // remove file from processing list
             await processNextFile(arguments[0]).catch(error => console.warn('Error in recursive processNextFile call', error));
         }
     }
@@ -2656,9 +2667,9 @@ const getResults = async ({
         filename += format == 'Raven' ? `_selections.txt` : '_detections.csv';
         const filePath = p.join(directory, filename);
         writeToPath(filePath, formattedValues, {headers: true, delimiter: format === 'Raven' ? '\t' : ','})
-        .on('error', err => UI.postMessage({event: 'generate-alert', type: 'warning',  message: `Cannot save file ${filePath}\nbecause it is open in another application`}))
+        .on('error', err => generateAlert({type: 'warning',  message: `Cannot save file ${filePath}\nbecause it is open in another application`}))
         .on('finish', () => {
-            UI.postMessage({event: 'generate-alert', message: filePath + ' has been written successfully.'});
+            generateAlert({message: filePath + ' has been written successfully.'});
         });
     }
     else {
@@ -2882,7 +2893,7 @@ const getSavedFileInfo = async (file) => {
         } 
         return row
     } else {
-        UI.postMessage({event: 'generate-alert', type: 'error',  message: 'The database has not finished loading. The check for the presence of the file in the archive has been skipped'})
+        generateAlert({type: 'error',  message: 'The database has not finished loading. The check for the presence of the file in the archive has been skipped'})
         return undefined
     }
 };
@@ -3616,7 +3627,7 @@ async function setIncludedIDs(lat, lon, week) {
 
         if (STATE.included === undefined) STATE.included = {}
         STATE.included = merge(STATE.included, includedObject);
-        messages.forEach(message => UI.postMessage({event: 'generate-alert', type: 'warning',  message: message} ))
+        messages.forEach(message => generateAlert({type: 'warning',  message: message} ))
         return STATE.included;
     })();
 
@@ -3633,13 +3644,13 @@ const pLimit = require('p-limit');
 async function convertAndOrganiseFiles(threadLimit) {
     // SANITY checks: archive location exists and is writeable?
     if (!fs.existsSync(STATE.archive.location)) {
-        UI.postMessage({event: 'generate-alert', type: 'error',  message: `Cannot access archive location: ${STATE.archive.location}. <br> Operation aborted`});
+        generateAlert({type: 'error',  message: `Cannot access archive location: ${STATE.archive.location}. <br> Operation aborted`});
         return false;
     }
     try {
         fs.accessSync(STATE.archive.location, fs.constants.W_OK);
     } catch {
-        UI.postMessage({event: 'generate-alert', type: 'error',  message: `Cannot write to archive location: ${STATE.archive.location}. <br> Operation aborted`});
+        generateAlert({type: 'error',  message: `Cannot write to archive location: ${STATE.archive.location}. <br> Operation aborted`});
         return false;
     }
     threadLimit ??= 4; // Set a default
@@ -3760,11 +3771,11 @@ async function convertFile(inputFilePath, fullFilePath, row, db, dbArchiveName, 
         let scaleFactor = 1;
         if (STATE.archive.trim) {
             if (boundaries.length > 1) { 
-                UI.postMessage({event: 'generate-alert', type: 'warning',  message: `Multi-day operations are not yet supported: ${inputFilePath} will not be trimmed`});
+                generateAlert({type: 'warning',  message: `Multi-day operations are not yet supported: ${inputFilePath} will not be trimmed`});
             } else {
                 const {start, end} = boundaries[0];
                 if (start === end) {
-                    UI.postMessage({event: 'generate-alert', type: 'warning', message: `${inputFilePath} will not be added to the archive as it is entirely during daylight.`});
+                    generateAlert({type: 'warning', message: `${inputFilePath} will not be added to the archive as it is entirely during daylight.`});
                     return resolve();
                 }
                 command.seekInput(start).duration(end - start);
@@ -3784,13 +3795,13 @@ async function convertFile(inputFilePath, fullFilePath, row, db, dbArchiveName, 
                     if (err) {
                         console.error("Error updating the database:", err);
                     } else {
-                        UI.postMessage({event: 'generate-alert', message: `Finished conversion for ${inputFilePath}`});
+                        generateAlert({message: `Finished conversion for ${inputFilePath}`});
                     }
                     resolve();
                 });
             })
             .on('error', (err) => {
-                UI.postMessage({event: 'generate-alert', type: 'error',  message: `Error converting file ${inputFilePath}:`, err});
+                generateAlert({type: 'error',  message: `Error converting file ${inputFilePath}:`, err});
                 reject(err);
             })
             .on('progress', (progress) => {

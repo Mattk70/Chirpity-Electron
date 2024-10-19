@@ -12,19 +12,25 @@ function extractWaveMetadata(filePath) {
     return new Promise((resolve, reject) => {
         // Open the file
         fs.open(filePath, 'r', (err, fd) => {
-            if (err) return reject(err);
+            if (err) {
+                return reject(err);
+            }
 
             const buffer = Buffer.alloc(12); // Initial buffer for RIFF header and first chunk header
 
             // Read the RIFF header (12 bytes)
             fs.read(fd, buffer, 0, 12, 0, (err) => {
-                if (err) return reject(err);
+                if (err) {
+                    fs.close(fd, () => {}); // Close the file descriptor
+                    return reject(err);
+                }
 
                 const chunkId = buffer.toString('utf-8', 0, 4); // Should be "RIFF"
                 const format = buffer.toString('utf-8', 8, 12); // Should be "WAVE"
 
                 if (chunkId !== 'RIFF' || format !== 'WAVE') {
-                    return reject(new Error('Invalid WAV file: ', filePath));
+                    fs.close(fd, () => {}); // Close the file descriptor
+                    return reject(new Error('Invalid WAV file: ' + filePath));
                 }
 
                 let currentOffset = 12; // Start after the RIFF header
@@ -33,13 +39,16 @@ function extractWaveMetadata(filePath) {
                 function readNextChunk() {
                     const chunkHeaderBuffer = Buffer.alloc(8); // 8 bytes for chunk ID and size
                     fs.read(fd, chunkHeaderBuffer, 0, 8, currentOffset, (err) => {
-                        if (err) return reject(err);
+                        if (err) {
+                            fs.close(fd, () => {}); // Close the file descriptor
+                            return reject(err);
+                        }
 
                         const chunkId = chunkHeaderBuffer.toString('utf-8', 0, 4); // Chunk ID
                         const chunkSize = chunkHeaderBuffer.readUInt32LE(4); // Chunk size
                         if (chunkSize === 0) {
                             fs.close(fd, () => {}); // Close the file descriptor
-                            resolve(metadata) // No GUANO found
+                            return resolve(metadata) // No GUANO found
                         }
 
                         currentOffset += 8; // Move past the chunk header
@@ -48,7 +57,10 @@ function extractWaveMetadata(filePath) {
                             // GUANO chunk found, read its content
                             const guanoBuffer = Buffer.alloc(chunkSize);
                             fs.read(fd, guanoBuffer, 0, chunkSize, currentOffset, (err) => {
-                                if (err) return reject(err);
+                                if (err) {
+                                    fs.close(fd, () => {}); // Close the file descriptor
+                                    return reject(err);
+                                }
 
                                 // GUANO data is UTF-8 encoded
                                 const guanoText = guanoBuffer.toString('utf-8');
@@ -60,7 +72,10 @@ function extractWaveMetadata(filePath) {
                             // GUANO chunk found, read its content
                             const bextBuffer = Buffer.alloc(chunkSize);
                             fs.read(fd, bextBuffer, 0, chunkSize, currentOffset, (err) => {
-                                if (err) return reject(err);
+                                if (err) {
+                                    fs.close(fd, () => {}); // Close the file descriptor
+                                    return reject(err);
+                                }
                                 const bext = {
                                     Description: bextBuffer.toString('ascii', 0, 256).replaceAll('\\u000', ''),
                                     Originator: bextBuffer.toString('ascii', 256, 288).replaceAll('\\u000', ''),

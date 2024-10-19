@@ -3221,10 +3221,11 @@ function centreSpec(){
             <th class="col-1 text-end" scope="col">Calls</th>
             </tr>
             </thead><tbody id="speciesFilter">`;
-            
+            let selectedRow = null;
             for (let i = 0; i < summary.length; i++) {
                 const item = summary[i];
                 const selected = item.cname === filterSpecies ? ' text-warning' : '';
+                if (selected) selectedRow = i  + 1;
                 summaryHTML += `<tr tabindex="-1" class="${selected}">
                 <td class="max">${iconizeScore(item.max)}</td>
                 <td class="cname">
@@ -3241,6 +3242,11 @@ function centreSpec(){
             const buffer = old_summary.cloneNode();
             buffer.innerHTML = summaryHTML;
             old_summary.replaceWith(buffer);
+            // scroll to the selected species
+            if (selectedRow){
+                const table = document.getElementById('resultSummary');
+                table.rows[selectedRow].scrollIntoView({ behavior: 'instant', block: 'center' });
+            }
         }
     }
     
@@ -4986,7 +4992,7 @@ async function readLabels(labelFile, updating){
         if (target.classList.contains('circle') || target.closest('thead')) return;
         let hideInSummary = '', hideInSelection = '',
         plural = '', contextDelete;
-        const inSummary = target.closest('#speciesFilter')
+        const inSummary = target.closest('#speciesFilter');
         const resultContext = !target.closest('#summaryTable');
         if (inSummary) {
             hideInSummary = 'd-none';
@@ -4998,7 +5004,8 @@ async function readLabels(labelFile, updating){
         // If we haven't clicked the active row or we cleared the region, load the row we clicked
         if (resultContext || hideInSelection || hideInSummary) {
             // Lets check if the summary needs to be filtered
-            if (inSummary && ! target.closest('tr').classList.contains('text-warning')) {
+            if ((inSummary && ! target.closest('tr').classList.contains('text-warning')) ||
+                (target.closest('#resultTableBody') && ! target.closest('tr').classList.contains('table-active'))) {
                 target.click(); // Wait for file to load
                 await waitFor(() => fileLoaded);
             }
