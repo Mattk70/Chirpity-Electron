@@ -1931,12 +1931,11 @@ window.onload = async () => {
         // check for new version on mac platform. pkg containers are not an auto-updatable target
         // https://www.electron.build/auto-update#auto-updatable-targets
         isMac && checkForMacUpdates();
-        const doNotTrack = document.getElementById('do-not-track')
-        doNotTrack.checked = !config.track;
+
         // Add cpu model & memory to config
         config.CPU = DIAGNOSTICS['CPU'];
         config.RAM = DIAGNOSTICS['System Memory'];
-        config.track && trackVisit(config);
+        trackVisit(config);
     })
 }
 
@@ -4708,11 +4707,6 @@ DOM.gain.addEventListener('input', () => {
                 case 'confidenceValue': case 'confidence': { handleThresholdChange(e); break }
                 case 'context' : { toggleContextAwareMode(e); break }
                 case 'attenuation': { handleAttenuationchange(e); break }
-                case 'do-not-track': {
-                    config.track = !element.checked;
-                    worker.postMessage({ action: 'update-state', track: config.track })
-                    break;
-                }
                 case 'lowShelfFrequency': { handleLowShelfchange(e); break }
                 case 'HighPassFrequency' : { handleHPchange(e); break }
                 case 'snrValue' : { handleSNRchange(e); break }
