@@ -2204,58 +2204,62 @@ const insertDurations = async (file, id) => {
 }
 
 const generateInsertQuery = async (latestResult, file) => {
-    const db = STATE.db;              
-    await db.runAsync('BEGIN');
-    let insertQuery = 'INSERT OR IGNORE INTO records VALUES ';
-    let fileID;
-    let res = await db.getAsync('SELECT id FROM files WHERE name = ?', file);
-    if (!res) {
-        let id = null;
-        if (METADATA[file].metadata){
-            const metadata = JSON.parse(METADATA[file].metadata);
-            const guano = metadata.guano;
-            if (guano && guano['Loc Position']){
-                const [lat, lon] = guano['Loc Position'].split(' ');
-                const place = guano['Site Name'] || guano['Loc Position'];
-                const row = await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ?', parseFloat(lat), parseFloat(lon))
-                if (!row) {
-                    const result = await db.runAsync('INSERT OR IGNORE INTO locations VALUES ( ?, ?,?,? )',
-                     undefined, parseFloat(lat), parseFloat(lon), place);
-                    id = result.lastID;
+    const db = STATE.db;
+    try {
+        await db.runAsync('BEGIN');
+        let insertQuery = 'INSERT OR IGNORE INTO records VALUES ';
+        let fileID;
+        let res = await db.getAsync('SELECT id FROM files WHERE name = ?', file);
+        if (!res) {
+            let id = null;
+            if (METADATA[file].metadata){
+                const metadata = JSON.parse(METADATA[file].metadata);
+                const guano = metadata.guano;
+                if (guano && guano['Loc Position']){
+                    const [lat, lon] = guano['Loc Position'].split(' ');
+                    const place = guano['Site Name'] || guano['Loc Position'];
+                    const row = await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ?', parseFloat(lat), parseFloat(lon))
+                    if (!row) {
+                        const result = await db.runAsync('INSERT OR IGNORE INTO locations VALUES ( ?, ?,?,? )',
+                        undefined, parseFloat(lat), parseFloat(lon), place);
+                        id = result.lastID;
+                    }
                 }
             }
+            res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,?,?,? )',
+            undefined, file, METADATA[file].duration, METADATA[file].fileStart, id, null, METADATA[file].metadata);
+            fileID = res.lastID;
+            await insertDurations(file, fileID);
+        } else {
+            fileID = res.id;
         }
-        res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,?,?,? )',
-        undefined, file, METADATA[file].duration, METADATA[file].fileStart, id, null, METADATA[file].metadata);
-        fileID = res.lastID;
-        await insertDurations(file, fileID);
-    } else {
-        fileID = res.id;
-    }
 
-    let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
-    const minConfidence = Math.min(STATE.detect.confidence, 150); // store results with 15% confidence and up unless confidence set lower
-    for (let i = 0; i < keysArray.length; i++) {
-        const key = parseFloat(keysArray[i]);
-        const timestamp = METADATA[file].fileStart + key * 1000;
-        const isDaylight = isDuringDaylight(timestamp, STATE.lat, STATE.lon);
-        const confidenceArray = confidenceBatch[i];
-        const speciesIDArray = speciesIDBatch[i];
-        for (let j = 0; j < confidenceArray.length; j++) {
-            const confidence = Math.round(confidenceArray[j] * 1000);
-            if (confidence < minConfidence) break;
-            const speciesID = speciesIDArray[j];
-            insertQuery += `(${timestamp}, ${key}, ${fileID}, ${speciesID}, ${confidence}, null, null, ${key + 3}, null, ${isDaylight}), `;
+        let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
+        const minConfidence = Math.min(STATE.detect.confidence, 150); // store results with 15% confidence and up unless confidence set lower
+        for (let i = 0; i < keysArray.length; i++) {
+            const key = parseFloat(keysArray[i]);
+            const timestamp = METADATA[file].fileStart + key * 1000;
+            const isDaylight = isDuringDaylight(timestamp, STATE.lat, STATE.lon);
+            const confidenceArray = confidenceBatch[i];
+            const speciesIDArray = speciesIDBatch[i];
+            for (let j = 0; j < confidenceArray.length; j++) {
+                const confidence = Math.round(confidenceArray[j] * 1000);
+                if (confidence < minConfidence) break;
+                const speciesID = speciesIDArray[j];
+                insertQuery += `(${timestamp}, ${key}, ${fileID}, ${speciesID}, ${confidence}, null, null, ${key + 3}, null, ${isDaylight}), `;
+            }
         }
+        // Remove the trailing comma and space
+        insertQuery = insertQuery.slice(0, -2);
+        //DEBUG && console.log(insertQuery);
+        // Make sure we have some values to INSERT
+        insertQuery.endsWith(')') && await db.runAsync(insertQuery)
+            .catch( (error) => console.log("Database error:", error))
+        await db.runAsync('END');
+        return fileID
+    } catch {
+        await db.runAsync('ROLLBACK');
     }
-    // Remove the trailing comma and space
-    insertQuery = insertQuery.slice(0, -2);
-    //DEBUG && console.log(insertQuery);
-    // Make sure we have some values to INSERT
-    insertQuery.endsWith(')') && await db.runAsync(insertQuery)
-        .catch( (error) => console.log("Database error:", error))
-    await db.runAsync('END');
-    return fileID
 }
 
 const parsePredictions = async (response) => {
