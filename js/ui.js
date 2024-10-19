@@ -22,7 +22,7 @@ console.warn = function() {
     originalWarn.apply(console, arguments);
     
     // Track the warning message using your tracking function
-    config.track && trackEvent(config.UUID, 'Warnings', arguments[0], customURLEncode(arguments[1]));
+    trackEvent(config.UUID, 'Warnings', arguments[0], customURLEncode(arguments[1]));
 };
 
 // Override console.error to intercept and track errors
@@ -31,7 +31,7 @@ console.error = function() {
     originalError.apply(console, arguments);
     
     // Track the error message using your tracking function
-    config.track && trackEvent(config.UUID, 'Errors', arguments[0], customURLEncode(arguments[1]));
+    trackEvent(config.UUID, 'Errors', arguments[0], customURLEncode(arguments[1]));
 };
 
 
@@ -41,7 +41,7 @@ window.addEventListener('unhandledrejection', function(event) {
     const stackTrace = event.reason.stack;
     
     // Track the unhandled promise rejection
-    config.track && trackEvent(config.UUID, 'Unhandled UI Promise Rejection', errorMessage, customURLEncode(stackTrace));
+    trackEvent(config.UUID, 'Unhandled UI Promise Rejection', errorMessage, customURLEncode(stackTrace));
 });
 
 window.addEventListener('rejectionhandled', function(event) {
@@ -50,7 +50,7 @@ window.addEventListener('rejectionhandled', function(event) {
     const stackTrace = event.reason.stack;
     
     // Track the unhandled promise rejection
-    config.track && trackEvent(config.UUID, 'Handled UI Promise Rejection', errorMessage, customURLEncode(stackTrace));
+    trackEvent(config.UUID, 'Handled UI Promise Rejection', errorMessage, customURLEncode(stackTrace));
 });
 
 let STATE = {
@@ -1750,7 +1750,6 @@ const defaultConfig = {
     audio: { gain: 0, format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, 
         fade: false, notification: true, normalise: false, minFrequency: 0, maxFrequency: 11950 },
     limit: 500,
-    track: true,
     debug: false,
     VERSION: VERSION,
     powerSaveBlocker: false
@@ -1781,7 +1780,7 @@ window.onload = async () => {
         
         // Attach an error event listener to the window object
         window.onerror = function(message, file, lineno, colno, error) {
-            config.track && trackEvent(config.UUID, 'Error', error.message, encodeURIComponent(error.stack));
+            trackEvent(config.UUID, 'Error', error.message, encodeURIComponent(error.stack));
             // Return false not to inhibit the default error handling
             return false;
             };
