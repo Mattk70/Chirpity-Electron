@@ -2231,6 +2231,7 @@ const generateInsertQuery = async (latestResult, file) => {
     }
 
     let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
+    const minConfidence = Math.min(STATE.detect.confidence, 150); // store results with 15% confidence and up unless confidence set lower
     for (let i = 0; i < keysArray.length; i++) {
         const key = parseFloat(keysArray[i]);
         const timestamp = METADATA[file].fileStart + key * 1000;
@@ -2239,7 +2240,7 @@ const generateInsertQuery = async (latestResult, file) => {
         const speciesIDArray = speciesIDBatch[i];
         for (let j = 0; j < confidenceArray.length; j++) {
             const confidence = Math.round(confidenceArray[j] * 1000);
-            if (confidence < STATE.detect.confidence) break;
+            if (confidence < minConfidence) break;
             const speciesID = speciesIDArray[j];
             insertQuery += `(${timestamp}, ${key}, ${fileID}, ${speciesID}, ${confidence}, null, null, ${key + 3}, null, ${isDaylight}), `;
         }
@@ -2442,11 +2443,8 @@ async function processNextFile({
 
 function sumObjectValues(obj) {
     let total = 0;
-    for (const key in obj) {
-        total += obj[key];
-    }
+    for (const key in obj) {  total += obj[key] }
     return total;
-    //return Object.values(obj).reduce((total, value) => total + value, 0);
 }
 
 function onSameDay(timestamp1, timestamp2) {
