@@ -1789,7 +1789,7 @@ window.onload = async () => {
 
         // Disable SNR
         config.filters.SNR = 0;
-        
+
         // set version
         config.VERSION = VERSION;
         // switch off debug mode we don't want this to be remembered
@@ -4594,7 +4594,9 @@ DOM.gain.addEventListener('input', () => {
             }
             case 'reset-defaults': {
                 if (confirm('Are you sure you want to revert to the default settings? You will need to relaunch Chirpity to see the changes.')){
+                    const uuid = config.UUID;
                     config = defaultConfig;
+                    config.UUID = uuid;
                     updatePrefs('config.json', config);
                 }
                 break;
