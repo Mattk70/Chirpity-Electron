@@ -225,7 +225,7 @@ const DOM = {
     get threadSlider() { if (!this._threadSlider) { this._threadSlider = document.getElementById('thread-slider') } return this._threadSlider},
     get timeline() { if (!this._timeline) { this._timeline = document.getElementById('timeline') } return this._timeline},
     get timelineSetting() { if (!this._timelineSetting) { this._timelineSetting = document.getElementById('timelineSetting') } return this._timelineSetting},
-
+    get tooltipInstance() { if (!this._tooltipInstance) { this._tooltipInstance = new bootstrap.Tooltip(document.getElementById("copy-uuid")) } return this._tooltipInstance},
     get contextMenu() { return document.getElementById('context-menu')},
     get filename() {return document.getElementById("filename")},
     get resultTable() {return document.getElementById('resultTableBody')},
@@ -1792,6 +1792,7 @@ window.onload = async () => {
         
         // set version
         config.VERSION = VERSION;
+        DIAGNOSTICS['UUID'] = config.UUID;
         // switch off debug mode we don't want this to be remembered
         // Initialize Spectrogram
         initWavesurfer({});
@@ -3990,7 +3991,13 @@ function formatDuration(seconds){
             if (key === 'Audio Duration') { // Format duration as days, hours,minutes, etc.
                 value = formatDuration(value)
             }
-            diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
+            if (key === 'UUID'){
+                diagnosticTable += `<tr><th scope="row">${key}</th><td id="uuid">${value} 
+                    <span id ="copy-uuid" data-bs-toggle="tooltip" data-bs-placement="right" title="Copy to clipboard" 
+                    class="material-symbols-outlined text-secondary"> content_copy</span></td></tr>`;
+            } else {
+                diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
+            }
         }
         diagnosticTable += "</table>";
         document.getElementById('diagnosticsModalBody').innerHTML = diagnosticTable;
@@ -4467,7 +4474,7 @@ DOM.threadSlider.addEventListener('input', () => {
 DOM.gain.addEventListener('input', () => {
     DOM.gainAdjustment.textContent = DOM.gain.value + 'dB';
 })
-    
+
     // Audio preferences:
     
     const showRelevantAudioQuality = () => {
@@ -4547,7 +4554,22 @@ DOM.gain.addEventListener('input', () => {
             case 'species': { worker.postMessage({action: 'get-valid-species', file: STATE.currentFile}); break }
             case 'startTour': { prepTour(); break }
             case 'eBird': { (async () => await populateHelpModal('Help/ebird.html', 'eBird Record FAQ'))(); break }
-            
+            case 'copy-uuid': { 
+                // Get the value from the input element
+                const copyText = document.getElementById('uuid').textContent.split('\n')[0];
+                // Use the clipboard API to copy text
+                navigator.clipboard.writeText(copyText).then(function() {
+                    // Show a message once copied
+                    DOM.tooltipInstance.setContent({ '.tooltip-inner': 'Copied!' });
+                    DOM.tooltipInstance.show();
+                    // Reset the tooltip text to default after 2 seconds
+                    setTimeout(function() {
+                            DOM.tooltipInstance.hide();
+                            DOM.tooltipInstance.setContent({ '.tooltip-inner': 'Click to Copy' });
+                        }, 2000);
+                    }).catch(error => console.warn(error))  ;
+                break;
+            }
             // --- Backends
             case 'tensorflow':
             case 'webgl':
