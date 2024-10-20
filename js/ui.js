@@ -555,16 +555,13 @@ function zoomSpec(direction) {
             }
         }
         // Keep playhead at same time in file
-        position = clamp((timeNow - bufferBegin) / windowLength, 0, 1);
+        position = (timeNow - bufferBegin) / windowLength;
         // adjust region start time to new window start time
         let region = getRegion();
         if (region) {
             const duration = region.end - region.start;
-            region.start = region.start + (oldBufferBegin - bufferBegin);
-            region.end = region.start + duration;
-            const {start, end} = region;
-            if (start < 0 || start > windowLength || end > windowLength) region = undefined;
-            
+            region.start = (oldBufferBegin + region.start) - bufferBegin;
+            region.end = region.start + duration;          
         }
         postBufferUpdate({ begin: bufferBegin, position: position, region: region, goToRegion: false })
     }
@@ -1426,11 +1423,11 @@ async function resultClick(e) {
     }
     
     const [file, start, end, sname, label] = row.getAttribute('name').split('|');
-    if (row.classList.contains('table-active')){
-        createRegion(start - bufferBegin, end - bufferBegin, label, true);
-        e.target.classList.contains('circle') && getSelectionResults(true);
-        return;
-    }
+    // if (row.classList.contains('table-active')){
+    //     createRegion(start - bufferBegin, end - bufferBegin, label, true);
+    //     e.target.classList.contains('circle') && getSelectionResults(true);
+    //     return;
+    // }
     
     // Search for results rows - Why???
     while (!(row.classList.contains('nighttime') ||
@@ -1789,7 +1786,7 @@ window.onload = async () => {
 
         // Disable SNR
         config.filters.SNR = 0;
-        
+
         // set version
         config.VERSION = VERSION;
         DIAGNOSTICS['UUID'] = config.UUID;
@@ -3186,7 +3183,7 @@ function centreSpec(){
                     region.play()
                 }
             } else {
-                //clearActive();
+                resetRegions();
             }
             fileLoaded = true;
             //if (activeRow) activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -4589,7 +4586,7 @@ DOM.gain.addEventListener('input', () => {
                     if (! files.canceled) {
                         const archiveFolder = files.filePaths[0];
                         config.archive.location = archiveFolder;
-                        exploreLink.classList.contains('disabled') || 
+                        DOM.exploreLink.classList.contains('disabled') || 
                             document.getElementById('compress-and-organise').classList.remove('disabled');
                         document.getElementById('archive-location').value = archiveFolder;
                         updatePrefs('config.json', config);
@@ -4616,7 +4613,9 @@ DOM.gain.addEventListener('input', () => {
             }
             case 'reset-defaults': {
                 if (confirm('Are you sure you want to revert to the default settings? You will need to relaunch Chirpity to see the changes.')){
+                    const uuid = config.UUID;
                     config = defaultConfig;
+                    config.UUID = uuid;
                     updatePrefs('config.json', config);
                 }
                 break;

@@ -1349,7 +1349,7 @@ function checkBacklog() {
         const backlog = sumObjectValues(predictionsRequested) - sumObjectValues(predictionsReceived);
         DEBUG && console.log('backlog:', backlog);
         
-        if (backlog >= predictWorkers.length * 2) {
+        if (backlog >= NUM_WORKERS * 2) {
             // If backlog is too high, check again after a short delay
             setTimeout(() => {
                 resolve(checkBacklog()); // Recursively call until backlog is within limits
@@ -1570,8 +1570,8 @@ function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBat
             else {
                 error.message = error.message + '|' + error.stack;
             }
-            console.log('Ffmpeg error in file:\n', file, 'stderr:\n', error)
-            reject(console.warn('getPredictBuffers: Error in ffmpeg extracting audio segment:', error));
+            console.warn('Ffmpeg error in:\n', file, 'stderr:\n', error)
+            reject(console.warn('processAudio: ffmpeg error:\n', file, error));
         });
 
         const STREAM = command.pipe();
@@ -1595,7 +1595,7 @@ function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBat
                     updateFilesBeingProcessed(file)
                 }
                 DEBUG && console.log('All chunks sent for ', file);
-                resolve()
+                return resolve()
             }
             else {
                 concatenatedBuffer = concatenatedBuffer.length ? joinBuffers(concatenatedBuffer, chunk) : chunk;
@@ -1608,7 +1608,7 @@ function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBat
                 }
 
                 // if we have a full buffer
-                if (concatenatedBuffer.length > highWaterMark) {     
+                if (concatenatedBuffer.length > highWaterMark) {
                     const audio_chunk = concatenatedBuffer.subarray(0, highWaterMark);
                     const remainder = concatenatedBuffer.subarray(highWaterMark);
                     let noHeader = concatenatedBuffer.compare(header, 0, header.length, 0, header.length)
@@ -2034,7 +2034,7 @@ async function saveAudio(file, start, end, filename, metadata, folder) {
     const convertedFilePath = await bufferToAudio({
         file: file, start: start, end: end, meta: metadata, folder: folder, filename: filename
     });
-    if (folder && DEBUG) { console.log('Audio file saved: ', convertedFilePath) }
+    if (folder) { DEBUG && console.log('Audio file saved: ', convertedFilePath) }
     else {
         UI.postMessage({event:'audio-file-to-save', file: convertedFilePath, filename: filename, extension: STATE.audio.format})
     }
@@ -2338,7 +2338,7 @@ const parsePredictions = async (response) => {
         DEBUG && console.log(`File ${file} processed after ${(new Date() - predictionStart) / 1000} seconds: ${filesBeingProcessed.length} files to go`);
     }
 
-    !STATE.selection && (STATE.increment() === 0 || index === 1 ) && await getSummary({ interim: true });
+    !STATE.selection && (STATE.increment() === 0) && await getSummary({ interim: true });
 
     return response.worker
 }

@@ -248,7 +248,7 @@ class Model {
         })
     }
 
-    async predictBatch(audio, keys, threshold, confidence) {
+    async predictBatch(audio, keys) {
         const TensorBatch = audio; //this.fixUpSpecBatch(audio); // + 1 tensor
         
         let paddedTensorBatch, maskedTensorBatch;
