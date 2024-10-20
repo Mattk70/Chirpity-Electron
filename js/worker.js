@@ -2034,7 +2034,7 @@ async function saveAudio(file, start, end, filename, metadata, folder) {
     const convertedFilePath = await bufferToAudio({
         file: file, start: start, end: end, meta: metadata, folder: folder, filename: filename
     });
-    if (folder && DEBUG) { console.log('Audio file saved: ', convertedFilePath) }
+    if (folder) { DEBUG && console.log('Audio file saved: ', convertedFilePath) }
     else {
         UI.postMessage({event:'audio-file-to-save', file: convertedFilePath, filename: filename, extension: STATE.audio.format})
     }
