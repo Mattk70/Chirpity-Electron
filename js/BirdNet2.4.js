@@ -92,43 +92,43 @@ onmessage = async (e) => {
                 }
                 break;
             }
-            case "get-spectrogram": {
-                const buffer = e.data.buffer;
-                const specFile = e.data.file;
-                const filepath = e.data.filepath;
-                const spec_height = e.data.height;
-                const spec_width = e.data.width;
-                let image;
-                if (buffer.length !== 72000) {
-                    console.log((`Skipping ${e.data.file} as buffer size is ${buffer.length}`))
-                    return;
-                }
-                const signal = tf.tensor1d(buffer, "float32");
-                const bufferTensor = myModel.normalise_audio(signal);
-                signal.dispose();
-                const imageTensor = tf.tidy(() => {
-                    return myModel.makeSpectrogram(bufferTensor);
-                });
-                image = tf.tidy(() => {
-                    let spec = myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), spec_height, spec_width);
-                    const spec_max = tf.max(spec);
-                    return spec.mul(255).div(spec_max).dataSync();
-                });
-                bufferTensor.dispose();
-                imageTensor.dispose();
-                response = {
-                    message: "spectrogram",
-                    width: 384,
-                    height: 256,
-                    channels: 1,
-                    image: image,
-                    file: specFile,
-                    filepath: filepath,
-                    worker: worker
-                };
-                postMessage(response);
-                break;
-            }
+            // case "get-spectrogram": {
+            //     const buffer = e.data.buffer;
+            //     const specFile = e.data.file;
+            //     const filepath = e.data.filepath;
+            //     const spec_height = e.data.height;
+            //     const spec_width = e.data.width;
+            //     let image;
+            //     if (buffer.length !== 72000) {
+            //         console.log((`Skipping ${e.data.file} as buffer size is ${buffer.length}`))
+            //         return;
+            //     }
+            //     const signal = tf.tensor1d(buffer, "float32");
+            //     const bufferTensor = myModel.normalise_audio(signal);
+            //     signal.dispose();
+            //     const imageTensor = tf.tidy(() => {
+            //         return myModel.makeSpectrogram(bufferTensor);
+            //     });
+            //     image = tf.tidy(() => {
+            //         let spec = myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), spec_height, spec_width);
+            //         const spec_max = tf.max(spec);
+            //         return spec.mul(255).div(spec_max).dataSync();
+            //     });
+            //     bufferTensor.dispose();
+            //     imageTensor.dispose();
+            //     response = {
+            //         message: "spectrogram",
+            //         width: 384,
+            //         height: 256,
+            //         channels: 1,
+            //         image: image,
+            //         file: specFile,
+            //         filepath: filepath,
+            //         worker: worker
+            //     };
+            //     postMessage(response);
+            //     break;
+            // }
         }
     }
     // If worker was respawned
@@ -192,71 +192,9 @@ class Model {
         return true;
     }
 
-    normalize(spec) {
-        return tf.tidy(() => {
-            // console.log('Pre-norm### Min is: ', spec.min().dataSync(), 'Max is: ', spec.max().dataSync())
-            const spec_max = tf.max(spec, [1, 2]).reshape([-1, 1, 1, 1])
-            // const spec_min = tf.min(spec, [1, 2]).reshape([-1, 1, 1, 1])
-            spec = spec.mul(255);
-            spec = spec.div(spec_max);
-            // spec = tf.sub(spec, spec_min).div(tf.sub(spec_max, spec_min));
-            // console.log('{Post norm#### Min is: ', spec.min().dataSync(), 'Max is: ', spec.max().dataSync())
-            return spec
-        })
-    }
-
-    getSNR(spectrograms) {
-        return tf.tidy(() => {
-            const { mean, variance } = tf.moments(spectrograms, 2);
-            const peak = tf.div(variance, mean)
-            let snr = tf.squeeze(tf.max(peak, 1));
-            //snr = tf.sub(255, snr)  // bigger number, less signal
-            // const MEAN = mean.arraySync()
-            // const VARIANCE = variance.arraySync()
-            // const PEAK = peak.arraySync()
-            return snr
-        })
-    }
-
-
-    fixUpSpecBatch(specBatch, h, w) {
-        const img_height = h || this.height;
-        const img_width = w || this.width;
-        return tf.tidy(() => {
-            /*
-            Try out taking log of spec when SNR is below threshold?
-            */
-            //specBatch = tf.log1p(specBatch).mul(20);
-            // Swap axes to fit output shape
-            specBatch = tf.transpose(specBatch, [0, 2, 1]);
-            specBatch = tf.reverse(specBatch, [1]);
-            // Add channel axis
-            specBatch = tf.expandDims(specBatch, -1);
-            //specBatch = tf.slice4d(specBatch, [0, 1, 0, 0], [-1, img_height, img_width, -1]);
-            specBatch = tf.image.resizeBilinear(specBatch, [img_height, img_width], true);
-            return this.version === 'v1' ? specBatch : this.normalize(specBatch)
-        })
-    }
-
-    padBatch(tensor) {
-        return tf.tidy(() => {
-            DEBUG && console.log(`Adding ${this.batchSize - tensor.shape[0]} tensors to the batch`)
-            const shape = [...tensor.shape];
-            shape[0] = this.batchSize - shape[0];
-            const padding = tf.zeros(shape);
-            return tf.concat([tensor, padding], 0)
-        })
-    }
-
     async predictBatch(audio, keys) {
-        const TensorBatch = audio; //this.fixUpSpecBatch(audio); // + 1 tensor
-        
-        let paddedTensorBatch, maskedTensorBatch;
-        if (BACKEND === 'webgl' && TensorBatch.shape[0] < this.batchSize) {
-            // WebGL works best when all batches are the same size
-            paddedTensorBatch = this.padBatch(TensorBatch)  // + 1 tensor
-        } 
-        const tb = paddedTensorBatch || TensorBatch;
+        const tb = audio; //this.fixUpSpecBatch(audio); // + 1 tensor
+
         const prediction = this.model.predict(tb, { batchSize: this.batchSize })
         
         let newPrediction;
@@ -265,9 +203,7 @@ class Model {
             prediction.dispose();
             keys = keys.splice(0, 1);
         }
-        TensorBatch.dispose();
-        if (paddedTensorBatch) paddedTensorBatch.dispose();
-        if (maskedTensorBatch) maskedTensorBatch.dispose();
+        tb.dispose();
 
         const finalPrediction = newPrediction || prediction;
         
@@ -286,24 +222,6 @@ class Model {
 
     }
 
-    makeSpectrogram(signal) {
-        return tf.tidy(() => {
-            let spec = tf.abs(tf.signal.stft(signal, this.frame_length, this.frame_step));
-            signal.dispose();
-            return spec;
-        })
-    }
-
-    normalise_audio = (signal) => {
-        return tf.tidy(() => {
-            //signal = tf.tensor1d(signal, 'float32');
-            const sigMax = tf.max(signal);
-            const sigMin = tf.min(signal);
-            const range = sigMax.sub(sigMin);
-            //return signal.sub(sigMin).div(range).mul(tf.scalar(8192.0, 'float32')).sub(tf.scalar(4095, 'float32'))
-            return signal.sub(sigMin).div(range).mul(tf.scalar(2)).sub(tf.scalar(1))
-        })
-    };
 
     padAudio = (audio) => {
         const remainder = audio.length % this.chunkLength;
