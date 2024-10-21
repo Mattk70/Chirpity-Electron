@@ -1,7 +1,7 @@
 import {trackVisit, trackEvent} from './tracking.js';
 
 let LOCATIONS, locationID = undefined, loadingTimeout;
-const startTime = performance.now();
+
 let LABELS = [], DELETE_HISTORY = [];
 // Save console.warn and console.error functions
 const originalWarn = console.warn;
@@ -738,13 +738,13 @@ function showMetadata(){
 
 function renderFilenamePanel() {
     if (!STATE.currentFile) return;
-    const openfile = STATE.currentFile;
+    const openFile = STATE.currentFile;
     const files = STATE.openFiles;
     showMetadata();
     let filenameElement = DOM.filename;
     filenameElement.innerHTML = '';
-    //let label = openfile.replace(/^.*[\\\/]/, "");
-    const {parentFolder, fileName}  = extractFileNameAndFolder(openfile)
+    //let label = openFile.replace(/^.*[\\\/]/, "");
+    const {parentFolder, fileName}  = extractFileNameAndFolder(openFile)
     const label = `${parentFolder}/${fileName}`;
     let appendStr;
     const title = ` title="Context-click to update file start time or location" `;
@@ -759,7 +759,7 @@ function renderFilenamePanel() {
         </button>
         <div class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton">`;
         files.forEach(item => {
-            if (item !== openfile) {
+            if (item !== openFile) {
                 const label = item.replace(/^.*[\\/]/, "");
                 appendStr += `<a id="${item}" class="dropdown-item openFiles" href="#">
                 <span class="material-symbols-outlined align-bottom">audio_file</span>${label}</a>`;
@@ -839,7 +839,7 @@ const showLocation = async (fromSelect) => {
     const lonEl = document.getElementById('customLon');
     const customPlaceEl = document.getElementById('customPlace');
     const locationSelect = document.getElementById('savedLocations');
-    // Check if currentfile has a location id
+    // Check if current file has a location id
     const id = fromSelect ? parseInt(locationSelect.value) : FILE_LOCATION_MAP[STATE.currentFile];
     
     if (id) {
@@ -852,7 +852,7 @@ const showLocation = async (fromSelect) => {
         }
     }
     else {  //Default location
-        const savedLocationSelect = await generateLocationList('savedLocations');
+        await generateLocationList('savedLocations');
         latEl.value = config.latitude, lonEl.value = config.longitude, customPlaceEl.value = config.location;
     }
     // make sure the  map is initialised
@@ -2611,7 +2611,7 @@ function onChartData(args) {
             formatTimeCallback: () => '',
             dragSelection: true,
             maxRegions: 1,
-            // Region length bug (likely mine) means I don't trust leangths > 60 seconds
+            // Region length bug (likely mine) means I don't trust lengths > 60 seconds
             maxLength: config[config[config.model].backend].batchSize * 3,
             slop: null,
             color: "rgba(255, 255, 255, 0.2)"
@@ -2655,7 +2655,7 @@ function onChartData(args) {
     }
     
     function hideTooltip() {
-        tooltip.style.visibility = 'hidden';
+        DOM.tooltip.style.visibility = 'hidden';
     };
 
     async function specTooltip(event) {
@@ -2665,6 +2665,7 @@ function onChartData(args) {
         const yPosition = Math.round((specDimensions.bottom - event.clientY) * (frequencyRange / specDimensions.height)) + Number(config.audio.minFrequency);
         
         // Update the tooltip content
+        const tooltip = DOM.tooltip;
         tooltip.textContent = `Frequency: ${yPosition}Hz`;
         if (region) {
             const lineBreak = document.createElement('br');
@@ -2674,25 +2675,25 @@ function onChartData(args) {
             tooltip.appendChild(textNode);   // Add the text node
         }
     
-        // Get the tooltip's dimensions
-        tooltip.style.display = 'block';  // Ensure tooltip is visible to measure dimensions
-        const tooltipWidth = tooltip.offsetWidth;
-        const windowWidth = window.innerWidth;
+        // // Get the tooltip's dimensions
+        // tooltip.style.display = 'block';  // Ensure tooltip is visible to measure dimensions
+        // const tooltipWidth = tooltip.offsetWidth;
+        // const windowWidth = window.innerWidth;
     
-        // Calculate the new tooltip position
-        let tooltipLeft;
+        // // Calculate the new tooltip position
+        // let tooltipLeft;
         
-        // If the tooltip would overflow past the right side of the window, position it to the left
-        if (event.clientX + tooltipWidth + 15 > windowWidth) {
-            tooltipLeft = event.clientX - tooltipWidth - 5;  // Position to the left of the mouse cursor
-        } else {
-            tooltipLeft = event.clientX + 15;  // Position to the right of the mouse cursor
-        }
+        // // If the tooltip would overflow past the right side of the window, position it to the left
+        // if (event.clientX + tooltipWidth + 15 > windowWidth) {
+        //     tooltipLeft = event.clientX - tooltipWidth - 5;  // Position to the left of the mouse cursor
+        // } else {
+        //     tooltipLeft = event.clientX + 15;  // Position to the right of the mouse cursor
+        // }
     
         // Apply styles to the tooltip
         Object.assign(tooltip.style, {
             top: `${event.clientY}px`,
-            left: `${tooltipLeft}px`,
+            left: `${event.clientX + 15}px`,
             display: 'block',
             visibility: 'visible',
             opacity: 1
@@ -3524,7 +3525,7 @@ function formatDuration(seconds){
             const labelHTML = label ? tags[label] : '';
             const hide = selection ? 'd-none' : '';
             const countIcon = count > 1 ? `<span class="circle pointer" title="Click to view the ${count} detections at this timecode">${count}</span>` : '';
-            const XC_type = cname.includes('(song)') ? "song" : "nocturnal flight call";
+            //const XC_type = cname.includes('(song)') ? "song" : "nocturnal flight call";
             tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${end || position + 3}|${sname}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
             <td class='text-start text-nowrap timeOfDay ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-start timestamp ${showTimestamp}">${UI_position} </td>
@@ -5527,9 +5528,7 @@ async function readLabels(labelFile, updating){
     }
     
 async function getXCComparisons(){
-    const xc = document.getElementById('context-xc');
     let [,,,sname,cname] = activeRow.getAttribute('name').split('|');
-    const XC_type = cname.includes('(song)') ? "song" :
     cname.includes('call)') ? "call" : "";
     let XCcache;
     try {
