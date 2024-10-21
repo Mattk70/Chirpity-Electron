@@ -6,6 +6,7 @@
 	"scripts": {
 		"start": "electron .",
 		"prebuild": "node prebuild.js",
+		"preexport": "node prebuild.js",
 		"minify": "node minify.js",
 		"export": "electron-builder build --m",
 		"build": "electron-builder --x64 -p always",
