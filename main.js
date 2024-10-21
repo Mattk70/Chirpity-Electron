@@ -562,7 +562,7 @@ ipcMain.handle('saveFile', async (event, arg) => {
                 
                 // Remove the original file
                 fs.unlinkSync(file);
-                console.log(`File moved from ${src} to ${dest}`);
+                DEBUG && console.log(`File moved from ${file} to ${filePath}`);
             } catch (error) {
                 console.error(`Error moving file: ${error}`);
             }
