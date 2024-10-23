@@ -2129,20 +2129,13 @@ function getSpecies(target) {
     return species;
 }
 
-
-function handleGesture(event) {
-    waitForFinalEvent( () => {
-        const key = event.deltaX > 0 ? 'PageDown'  : 'PageUp';
-        const pageEvent = new KeyboardEvent('keydown', {
-            code: key,
-            bubbles: true,
-            cancelable: true // The event is cancelable
-        });
-
-        // Dispatch the event on the document or a specific element
-        document.dispatchEvent(pageEvent);
-    }, 10, 'id2');
-    
+function handleGesture(e) {
+        const key = e.deltaX > 0 ? 'PageDown'  : 'PageUp';
+        console.log(`scrolling x: ${e.deltaX} y: ${e.deltaY}`)
+        waitForFinalEvent(() => {
+            GLOBAL_ACTIONS[key](e);
+            trackEvent(config.UUID, 'Swipe', key, '' );
+        }, 100, 'swipe');
 }
 
 
@@ -2515,16 +2508,6 @@ function onChartData(args) {
             trackEvent(config.UUID, 'KeyPress', action, modifier );
             GLOBAL_ACTIONS[action](e);
         }
-        
-        [].forEach.call(document.querySelectorAll('[data-action]'), function (el) {
-            el.addEventListener('click', function (e) {
-                let action = e.currentTarget.dataset.action;
-                if (action in GLOBAL_ACTIONS) {
-                    e.preventDefault();
-                    GLOBAL_ACTIONS[action](e);
-                }
-            });
-        });
     }
     
     
@@ -2790,7 +2773,7 @@ function centreSpec(){
             if ( e.ctrlKey || e.metaKey) await showOpenDialog('openFile');
         },
         p: function () {
-            (typeof region !== 'undefined') ? region.play() : console.log('Region undefined')
+            (typeof region !== 'undefined') ? playRegion() : console.log('Region undefined')
         },
         q: function (e) {
             e.metaKey && isMac && window.electron.exitApplication()
@@ -4399,6 +4382,15 @@ DOM.gain.addEventListener('input', () => {
     DOM.gainAdjustment.textContent = DOM.gain.value + 'dB';
 })
 
+function playRegion(){
+    // Sanitise region (after zoom, start or end may be outside the windowlength)
+    // I don't want to change the actual region length, so make a copy
+    const myRegion = region;
+    myRegion.start = Math.max(0, myRegion.start)
+    // Have to adjust the windowlength so the finish event isn't fired - causing a page reload)
+    myRegion.end = Math.min(myRegion.end, windowLength * 0.995)
+    myRegion.play() 
+}
     // Audio preferences:
     
     const showRelevantAudioQuality = () => {
@@ -4579,7 +4571,7 @@ DOM.gain.addEventListener('input', () => {
             }
             case 'speciesFilter': { speciesFilter(e); break}
             case 'context-menu': { 
-                e.target.closest('.play') && typeof region !== 'undefined' ? region.play() : console.log('Region undefined')
+                e.target.closest('.play') && typeof region !== 'undefined' ? playRegion() : console.log('Region undefined')
                 break;
             }
             case 'audioFiltersIcon': { toggleFilters(); break }

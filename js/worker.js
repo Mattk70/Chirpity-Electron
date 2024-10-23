@@ -15,7 +15,7 @@ import { sqlite3 } from './database.js';
 import {trackEvent} from './tracking.js';
 import {extractWaveMetadata} from './metadata.js';
 
-const DEBUG = false;
+const DEBUG = true;
 
 // Function to join Buffers and not use Buffer.concat() which leads to detached ArrayBuffers
 function joinBuffers(buffer1, buffer2) {
@@ -134,8 +134,6 @@ const setupFfmpegCommand = ({
     outputOptions = []
 }) => {
     const command = ffmpeg('file:' + file)
-        .seekInput(start)
-        .duration(end - start)
         .format(format)
         .audioChannels(channels)
         .audioFrequency(sampleRate);
@@ -164,6 +162,7 @@ const setupFfmpegCommand = ({
     // Add any additional output options
     if (outputOptions.length) command.addOutputOptions(...outputOptions);
 
+    command.seekInput(start).duration(end - start)
     if (DEBUG){
         command.on('start', function (commandLine) {
             console.log('FFmpeg command: ' + commandLine);
@@ -199,16 +198,16 @@ const createDB = async (file) => {
     if (archiveMode) {
         for (let i = 0; i < LABELS.length; i++) {
             const [sname, cname] = LABELS[i].replaceAll("'", "''").split('_');
-            await db.runAsync(`INSERT INTO species VALUES (${i}, '${sname}', '${cname}')`);
+            await db.runAsync('INSERT INTO species VALUES (?,?,?)', i, sname, cname);
         }
     } else {
         const filename = diskDB.filename;
-        let { code } = await db.runAsync(`ATTACH '${filename}' as disk`);
+        let { code } = await db.runAsync('ATTACH ? as disk', filename);
         // If the db is not ready
         while (code === "SQLITE_BUSY") {
             console.log("Disk DB busy")
             setTimeout(() => {}, 10);
-            let response = await db.runAsync(`ATTACH '${filename}' as disk`);
+            let response = await db.runAsync('ATTACH ? as disk', filename);
             code = response.code;
         }
         let response = await db.runAsync('INSERT INTO files SELECT * FROM disk.files');

@@ -92,43 +92,7 @@ onmessage = async (e) => {
                 }
                 break;
             }
-            // case "get-spectrogram": {
-            //     const buffer = e.data.buffer;
-            //     const specFile = e.data.file;
-            //     const filepath = e.data.filepath;
-            //     const spec_height = e.data.height;
-            //     const spec_width = e.data.width;
-            //     let image;
-            //     if (buffer.length !== 72000) {
-            //         console.log((`Skipping ${e.data.file} as buffer size is ${buffer.length}`))
-            //         return;
-            //     }
-            //     const signal = tf.tensor1d(buffer, "float32");
-            //     const bufferTensor = myModel.normalise_audio(signal);
-            //     signal.dispose();
-            //     const imageTensor = tf.tidy(() => {
-            //         return myModel.makeSpectrogram(bufferTensor);
-            //     });
-            //     image = tf.tidy(() => {
-            //         let spec = myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), spec_height, spec_width);
-            //         const spec_max = tf.max(spec);
-            //         return spec.mul(255).div(spec_max).dataSync();
-            //     });
-            //     bufferTensor.dispose();
-            //     imageTensor.dispose();
-            //     response = {
-            //         message: "spectrogram",
-            //         width: 384,
-            //         height: 256,
-            //         channels: 1,
-            //         image: image,
-            //         file: specFile,
-            //         filepath: filepath,
-            //         worker: worker
-            //     };
-            //     postMessage(response);
-            //     break;
-            // }
+            
         }
     }
     // If worker was respawned
