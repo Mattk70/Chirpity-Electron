@@ -465,7 +465,11 @@ footer {
     border: none
 }
 
-
+.disabled-link {
+    pointer-events: none;
+    opacity: 0.5;
+    cursor: default;
+}
 /* Style the results panel*/
 
 

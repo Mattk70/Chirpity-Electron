@@ -1564,12 +1564,9 @@ function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBat
         const command = setupFfmpegCommand({file, start, end, sampleRate})
         command.on('error', (error) => {
             updateFilesBeingProcessed(file)
-            if (error.message.includes('SIGKILL')) console.log('FFMPEG process shut down at user request')
-            else {
-                error.message = error.message + '|' + error.stack;
-            }
-            console.warn('Ffmpeg error in:\n', file, 'stderr:\n', error)
-            reject(console.warn('processAudio: ffmpeg error:\n', file, error));
+            if (error.message.includes('SIGKILL')) console.warn('FFMPEG process shut down at user request')
+
+            reject(console.warn(`Ffmpeg error in: ${file} stderr: ${error}`));
         });
 
         const STREAM = command.pipe();
