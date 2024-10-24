@@ -1664,7 +1664,7 @@ const defaultConfig = {
     latitude: 52.87,
     longitude: 0.89, 
     location: 'Great Snoring, North Norfolk',
-    detect: { nocmig: false, contextAware: false, confidence: 45 },
+    detect: { nocmig: false, contextAware: false, confidence: 45, iucn: false },
     filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0, sendToModel: false },
     warmup: true,
     hasNode: false,
@@ -1782,6 +1782,7 @@ window.onload = async () => {
         DOM.audioFade.disabled = !DOM.audioPadding.checked;
         DOM.audioDownmix.checked = config.audio.downmix;
         setNocmig(config.detect.nocmig);
+        document.getElementById('iucn').checked = config.detect.iucn;
         modelSettingsDisplay();
         // Block powersave? 
         document.getElementById('power-save-block').checked = config.powerSaveBlocker;
@@ -3125,13 +3126,13 @@ function centreSpec(){
     }
     
     const updateSummary = async ( { summary = [], filterSpecies = '' }) => {
-        
+        const showIUCN = config.detect.iucn;
         if (summary.length){
             let summaryHTML = `<table id="resultSummary" class="table table-dark p-1"><thead>
             <tr>
             <th class="col-3" scope="col">Max</th>
             <th class="col-5" scope="col">Species</th>
-            <th class="col-1" scope="col"></th>
+            ${showIUCN ? '<th class="col-1" scope="col"></th>' : ''}
             <th class="col-1 text-end" scope="col">Detections</th>
             <th class="col-1 text-end" scope="col">Calls</th>
             </tr>
@@ -3139,27 +3140,30 @@ function centreSpec(){
             let selectedRow = null;
             for (let i = 0; i < summary.length; i++) {
                 const item = summary[i];
-                const nice = await getIUCNStatus(item.sname);
-                nice && await new Promise(resolve => setTimeout(resolve, 1000));  // Pause for 1 second between API calls
-                const record = STATE.IUCNcache[item.sname];
-                const iucn = record.scopes.find(obj => obj.scope === 'Global');
-                const status = iucn.status;
-                const url = iucn.url;
-                const redListIcon  =  status;
-                
                 const selected = item.cname === filterSpecies ? ' text-warning' : '';
                 if (selected) selectedRow = i  + 1;
                 summaryHTML += `<tr tabindex="-1" class="${selected}">
                 <td class="max">${iconizeScore(item.max)}</td>
-                <td class="cname">
-                    <span class="cname">${item.cname}</span> <br><i>${item.sname}</i>
-                </td>
-                <td class="text-end"><a title="${IUCNLabel[status]}: Learn more about this species ICUN assessment" 
-                    class="d-inline-block p-1 rounded text-white text-decoration-none text-center ${IUCNMap[redListIcon]} ${!url ? 'disabled-link' : ''}"
-                    href="${url || '#'}" target="_blank"> ${redListIcon}</a></td>
-                <td class="text-end">${item.count}</td>
-                <td class="text-end">${item.calls}</td>
-                </tr>`;
+                    <td class="cname">
+                        <span class="cname">${item.cname}</span> <br><i>${item.sname}</i>
+                    </td>`;
+
+                if (showIUCN) {
+                    const nice = await getIUCNStatus(item.sname);
+                    nice && await new Promise(resolve => setTimeout(resolve, 1000));  // Pause for 1 second between API calls
+                    const record = STATE.IUCNcache[item.sname];
+                    const iucn = record.scopes.find(obj => obj.scope === 'Global');
+                    const status = iucn.status;
+                    const url = iucn.url;
+                    const redListIcon  =  status;
+                    summaryHTML+=
+                        `<td class="text-end"><a title="${IUCNLabel[status]}: Learn more about this species ICUN assessment" 
+                        class="d-inline-block p-1 rounded text-white text-decoration-none text-center ${IUCNMap[redListIcon]} ${!url ? 'disabled-link' : ''}"
+                        href="${url || '#'}" target="_blank"> ${redListIcon}</a></td>`;
+                }
+                summaryHTML += `<td class="text-end">${item.count}</td>
+                    <td class="text-end">${item.calls}</td>
+                    </tr>`;
                 
             }
             summaryHTML += '</tbody></table>';
@@ -4661,6 +4665,7 @@ function playRegion(){
                 }
                 case 'timelineSetting': { timelineToggle(e); break }
                 case 'nocmig': { changeNocmigMode(e); break }
+                case 'iucn': { config.detect.iucn = element.checked; break }
                 case 'auto-archive': { config.archive.auto = element.checked } // no break so worker state gets updated
                 case 'library-trim': { config.archive.trim = element.checked }
                 case 'archive-format': {
@@ -5767,7 +5772,7 @@ function showCompareSpec() {
 
 async function getIUCNStatus(sname = 'Anser anser') {
     if (!Object.keys(STATE.IUCNcache).length) {
-        const path = p.join(appPath, 'IUCNcache.json');
+        const path = p.join(appPath, '../IUCNcache.json');
         if (fs.existsSync(path)){
             const data = await fs.promises.readFile(path, 'utf8').catch(err => {});
             STATE.IUCNcache = JSON.parse(data)
@@ -5837,13 +5842,15 @@ async function getIUCNStatus(sname = 'Anser anser') {
     } 
 }
 const IUCNMap = {
-    'NA': 'bg-secondary',
-    'DD': 'bg-secondary',
-    'LC': 'bg-success',
-    'VU': 'bg-warning',
-    'NT': 'bg-warning',
-    'EN': 'bg-danger',
-    'CE': 'bg-dnager'
+    'NA': 'text-bg-secondary',
+    'DD': 'text-bg-secondary',
+    'LC': 'text-bg-success',
+    'VU': 'text-bg-warning',
+    'NT': 'text-bg-warning',
+    'EN': 'text-bg-danger',
+    'CR': 'text-bg-dnager',
+    'EW': 'text-bg-dark',
+    'EX': 'text-bg-dark'
 }
 const IUCNLabel = {
     'NA': 'No Data',
@@ -5852,7 +5859,9 @@ const IUCNLabel = {
     'VU': 'Vulnerable',
     'NT': 'Near Threatened',
     'EN': 'Endangered',
-    'CE': 'Critically Endangered'
+    'CR': 'Critically Endangered',
+    'EW': 'Extinct in the Wild',
+    'EX': 'Extinct'
 }
 // Make config, LOCATIONS and displayLocationAddress and toasts available to the map script in index.html
 export { config, displayLocationAddress, LOCATIONS, generateToast };
