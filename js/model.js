@@ -172,7 +172,7 @@ class Model {
                 { weightPathPrefix: this.appPath });
             this.model_loaded = true;
             this.inputShape = [...this.model.inputs[0].shape];
-            }
+        }
     }
 
     async warmUp(batchSize) {

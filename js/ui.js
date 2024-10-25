@@ -1945,6 +1945,16 @@ const setUpWorkerMessaging = () => {
                 }
                 case "labels": { 
                     LABELS = args.labels; 
+                    /* Code below to retrieve Red list data
+                    for (let i = 0;i< LABELS.length; i++){
+                        const label = LABELS[i];
+                        const sname = label.split('_')[0];
+                        if (! STATE.IUCNcache[sname]) { 
+                            await getIUCNStatus(sname)
+                            await new Promise(resolve => setTimeout(resolve, 300))
+                        }
+                    }
+                    */
                     // Read a custom list if applicable
                     config.list === 'custom' && setListUIState(config.list);
                     break }
@@ -3149,12 +3159,10 @@ function centreSpec(){
                     </td>`;
 
                 if (showIUCN) {
-                    const nice = await getIUCNStatus(item.sname);
-                    nice && await new Promise(resolve => setTimeout(resolve, 1000));  // Pause for 1 second between API calls
-                    const record = STATE.IUCNcache[item.sname];
+                    const record = await getIUCNStatus(item.sname);
                     const iucn = record.scopes.find(obj => obj.scope === 'Global');
                     const status = iucn.status;
-                    const url = iucn.url;
+                    const url = iucn.url ? 'https://www.iucnredlist.org/species/' + iucn.url : null;
                     const redListIcon  =  status;
                     summaryHTML+=
                         `<td class="text-end"><a title="${IUCNLabel[status]}: Learn more about this species ICUN assessment" 
@@ -5768,25 +5776,24 @@ function showCompareSpec() {
 }
 
 
-
-
 async function getIUCNStatus(sname = 'Anser anser') {
     if (!Object.keys(STATE.IUCNcache).length) {
-        const path = p.join(appPath, '../IUCNcache.json');
+        //const path = p.join(appPath, 'IUCNcache.json');
+        const path = window.location.pathname.replace('index.html', 'IUCNcache.json');
         if (fs.existsSync(path)){
             const data = await fs.promises.readFile(path, 'utf8').catch(err => {});
-            STATE.IUCNcache = JSON.parse(data)
+            STATE.IUCNcache = JSON.parse(data);
         } else { STATE.IUCNcache = {}}
     }
-    if ( STATE.IUCNcache[sname] ) {
-        return  false
-    }
+    return STATE.IUCNcache[sname]
+
+    /* The following code should not be called in the packaged app */
+
     const [genus, species] = sname.split(' ');
-    const API_key = 'bKTBYB324UwZsZ68kbEcqKAiZi14Zcmj5y6r';  
     
     const headers = {
         'Accept': 'application/json',
-        'Authorization': API_key,  // Replace with your actual API key
+        'Authorization': 'API_KEY',  // Replace with the actual API key
         'keepalive': true
       }
 
@@ -5804,25 +5811,26 @@ async function getIUCNStatus(sname = 'Anser anser') {
         const speciesData = { sname, scopes: [] };
 
         // Fetch all the assessments concurrently
-        const assessmentPromises = filteredAssessments.map(item => 
-            fetch(`https://api.iucnredlist.org/api/v4/assessment/${item.assessment_id}`, {headers})
+        const assessmentResults = await Promise.all(
+            filteredAssessments.map(async item => {
+                const response = await fetch(`https://api.iucnredlist.org/api/v4/assessment/${item.assessment_id}`, { headers });
+                if (!response.ok) {
+                    throw new Error(`Network error: code ${response.status} fetching IUCN data.`);
+                }
+                const data = await response.json();
+                await new Promise(resolve => setTimeout(resolve, 300));
+                return data;
+            })
         );
-
-        const assessmentResults = await Promise.allSettled(assessmentPromises); // Handle each promise separately
-
+        
+        
         // Process each result
-        for (let result of assessmentResults) {
-            if (result.status === 'fulfilled') {
-                const item = await result.value.json();
+        for (let item of assessmentResults) {
+            const scope = item.scopes?.[0]?.description?.en || 'Unknown';
+            const status = item.red_list_category?.code || 'Unknown';
+            const url = item.url || 'No URL provided';
 
-                const scope = item.scopes?.[0]?.description?.en || 'Unknown';
-                const status = item.red_list_category?.code || 'Unknown';
-                const url = item.url || 'No URL provided';
-
-                speciesData.scopes.push({scope, status, url });
-            } else {
-                console.error('Error fetching assessment:', result.reason);  // Handle fetch errors
-            }
+            speciesData.scopes.push({scope, status, url });
         }
 
         console.log(speciesData);
