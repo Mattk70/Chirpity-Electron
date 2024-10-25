@@ -1049,7 +1049,7 @@ function onAbort({
     DEBUG && console.log("abort received")
     //restart the workers
     terminateWorkers();
-    spawnPredictWorkers(model, list, BATCH_SIZE, NUM_WORKERS)
+    setTimeout(() => spawnPredictWorkers(model, list, BATCH_SIZE, NUM_WORKERS), 20);
 
 }
 
@@ -1346,14 +1346,14 @@ function checkBacklog() {
     return new Promise((resolve) => {
         const backlog = sumObjectValues(predictionsRequested) - sumObjectValues(predictionsReceived);
         DEBUG && console.log('backlog:', backlog);
-        
+        if (aborted) resolve(false)
         if (backlog >= NUM_WORKERS * 2) {
             // If backlog is too high, check again after a short delay
             setTimeout(() => {
                 resolve(checkBacklog()); // Recursively call until backlog is within limits
             }, 50);
         } else {
-            resolve(); // Backlog ok, read the stream data
+            resolve(true); // Backlog ok, read the stream data
         }
     });
 }
@@ -1429,17 +1429,21 @@ const getWavePredictBuffers = async ({
                 readStream.destroy();
                 return
             }
-            await checkBacklog();
-            const chunk = readStream.read();
-            if (chunk === null || chunk.byteLength <= 1 ) {
-                // EOF
-                chunk?.byteLength && predictionsReceived[file]++;
-                readStream.destroy();
+            const notAborted = await checkBacklog();
+            if (notAborted){
+                const chunk = readStream.read();
+                if (chunk === null || chunk.byteLength <= 1 ) {
+                    // EOF
+                    chunk?.byteLength && predictionsReceived[file]++;
+                    readStream.destroy();
+                } else {
+                    const audio = joinBuffers(meta.header, chunk);
+                    predictQueue.push([audio, file, end, chunkStart]);
+                    chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
+                    processPredictQueue();
+                }
             } else {
-                const audio = joinBuffers(meta.header, chunk);
-                predictQueue.push([audio, file, end, chunkStart]);
-                chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
-                processPredictQueue();
+                readStream.destroy();
             }
         })
         readStream.on('error', err => {
@@ -1528,10 +1532,14 @@ const getPredictBuffers = async ({
         const step = (BATCH_SIZE * WINDOW_SIZE);
         // Throttle the ingest of transcoded audio
         for (let i = start; i < end; i += step){
-            await checkBacklog();
-            const finish = i + step;
-            await processAudio(file, i, finish, chunkStart, highWaterMark)
-            chunkStart += samplesInBatch;
+            const notAborted = await checkBacklog();
+            if (notAborted){
+                const finish = i + step;
+                await processAudio(file, i, finish, chunkStart, highWaterMark)
+                chunkStart += samplesInBatch;
+            } else {
+                break
+            }
         }
     } else {
         // Full gas
@@ -1572,33 +1580,11 @@ function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBat
         });
 
         const STREAM = command.pipe();
-        STREAM.on('readable', () => {           
+        STREAM.on('data', (chunk) => {
             if (aborted) {
-                STREAM.end();
+                STREAM.destroy();
                 return
             }
-            const chunk = STREAM.read();
-            if (chunk === null) {
-                // wait for the ffpmegstream to close: https://github.com/fluent-ffmpeg/node-fluent-ffmpeg/issues/1171#issuecomment-1361524138
-                // //setTimeout( () => {
-                //     command.on('end', () => {
-                    //EOF: deal with part-full buffers
-                    // if (shortFile) highWaterMark -= header.length;
-                    if (concatenatedBuffer.byteLength){
-                        header || console.warn('no header for ' + file)
-                        let noHeader;
-                        if (concatenatedBuffer.length < header.length) {noHeader = true}
-                        else {noHeader = concatenatedBuffer.compare(header, 0, header.length, 0, header.length)} //compare returns 0 when there is a header in audio_chunk!
-                        const audio = noHeader ? Buffer.concat([header, concatenatedBuffer]) : concatenatedBuffer;
-                        processPredictQueue(audio, file, end, chunkStart);
-                    } else {
-                        updateFilesBeingProcessed(file)
-                    }
-                    DEBUG && console.log('All chunks sent for ', file);
-                    return resolve()
-                // })
-            }
-            else {
                 concatenatedBuffer = concatenatedBuffer.length ? joinBuffers(concatenatedBuffer, chunk) : chunk;
                 if (!header) {
                     header = lookForHeader(concatenatedBuffer);
@@ -1618,8 +1604,27 @@ function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBat
                     chunkStart += samplesInBatch;
                     concatenatedBuffer = remainder;
                 }
-            }
+            
         });
+        STREAM.on('end', () => {
+            // wait for the ffpmegstream to close: https://github.com/fluent-ffmpeg/node-fluent-ffmpeg/issues/1171#issuecomment-1361524138
+            setTimeout( () => {
+                //EOF: deal with part-full buffers
+                // if (shortFile) highWaterMark -= header.length;
+                if (concatenatedBuffer.byteLength){
+                    header || console.warn('no header for ' + file)
+                    let noHeader;
+                    if (concatenatedBuffer.length < header.length) {noHeader = true}
+                    else {noHeader = concatenatedBuffer.compare(header, 0, header.length, 0, header.length)} //compare returns 0 when there is a header in audio_chunk!
+                    const audio = noHeader ? Buffer.concat([header, concatenatedBuffer]) : concatenatedBuffer;
+                    processPredictQueue(audio, file, end, chunkStart);
+                } else {
+                   // updateFilesBeingProcessed(file)
+                }
+                DEBUG && console.log('All chunks sent for ', file);
+                return resolve()
+            }, 40)
+        })
 
         STREAM.on('error', err => {
             console.log('stream error: ', err);
