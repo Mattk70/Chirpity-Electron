@@ -15,7 +15,7 @@ import { sqlite3 } from './database.js';
 import {trackEvent} from './tracking.js';
 import {extractWaveMetadata} from './metadata.js';
 
-const DEBUG = true;
+const DEBUG = false;
 
 // Function to join Buffers and not use Buffer.concat() which leads to detached ArrayBuffers
 function joinBuffers(buffer1, buffer2) {
@@ -1599,7 +1599,7 @@ function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBat
                     const audio_chunk = concatenatedBuffer.subarray(0, highWaterMark);
                     const remainder = concatenatedBuffer.subarray(highWaterMark);
                     let noHeader = concatenatedBuffer.compare(header, 0, header.length, 0, header.length)
-                    const audio = noHeader ? Buffer.concat([header, audio_chunk]) : audio_chunk;
+                    const audio = noHeader ? joinBuffers(header, audio_chunk) : audio_chunk;
                     processPredictQueue(audio, file, end, chunkStart);
                     chunkStart += samplesInBatch;
                     concatenatedBuffer = remainder;
@@ -3698,6 +3698,7 @@ async function convertAndOrganiseFiles(threadLimit) {
 
         const {archiveName} = await db.getAsync('SELECT archiveName FROM files WHERE name = ?', inputFilePath);
         if (archiveName === dbArchiveName && fs.existsSync(fullFilePath)) {
+            // TODO: just check for the file, if archvive name is null, add archive name to the db (if it is complete)
             DEBUG && console.log(`File ${inputFilePath} already converted. Skipping conversion.`);
             continue;
         }

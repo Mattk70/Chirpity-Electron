@@ -71,7 +71,8 @@ let STATE = {
     sortOrder: 'timestamp',
     birdList: { lastSelectedSpecies: undefined }, // Used to put the last selected species at the top of the all-species list
     selection: { start: undefined, end: undefined },
-    currentAnalysis: {currentFile: null, openFiles: [],  mode: null, species: null, offset: 0, active: null}
+    currentAnalysis: {currentFile: null, openFiles: [],  mode: null, species: null, offset: 0, active: null},
+    IUCNcache: {}
 }
 
 // Batch size map for slider
@@ -1663,7 +1664,7 @@ const defaultConfig = {
     latitude: 52.87,
     longitude: 0.89, 
     location: 'Great Snoring, North Norfolk',
-    detect: { nocmig: false, contextAware: false, confidence: 45 },
+    detect: { nocmig: false, contextAware: false, confidence: 45, iucn: false },
     filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0, sendToModel: false },
     warmup: true,
     hasNode: false,
@@ -1781,6 +1782,7 @@ window.onload = async () => {
         DOM.audioFade.disabled = !DOM.audioPadding.checked;
         DOM.audioDownmix.checked = config.audio.downmix;
         setNocmig(config.detect.nocmig);
+        document.getElementById('iucn').checked = config.detect.iucn;
         modelSettingsDisplay();
         // Block powersave? 
         document.getElementById('power-save-block').checked = config.powerSaveBlocker;
@@ -1943,6 +1945,16 @@ const setUpWorkerMessaging = () => {
                 }
                 case "labels": { 
                     LABELS = args.labels; 
+                    /* Code below to retrieve Red list data
+                    for (let i = 0;i< LABELS.length; i++){
+                        const label = LABELS[i];
+                        const sname = label.split('_')[0];
+                        if (! STATE.IUCNcache[sname]) { 
+                            await getIUCNStatus(sname)
+                            await new Promise(resolve => setTimeout(resolve, 300))
+                        }
+                    }
+                    */
                     // Read a custom list if applicable
                     config.list === 'custom' && setListUIState(config.list);
                     break }
@@ -3123,12 +3135,14 @@ function centreSpec(){
         STATE.offset = offset;
     }
     
-    const updateSummary = ({ summary = [], filterSpecies = '' }) => {
+    const updateSummary = async ( { summary = [], filterSpecies = '' }) => {
+        const showIUCN = config.detect.iucn;
         if (summary.length){
             let summaryHTML = `<table id="resultSummary" class="table table-dark p-1"><thead>
             <tr>
             <th class="col-3" scope="col">Max</th>
             <th class="col-5" scope="col">Species</th>
+            ${showIUCN ? '<th class="col-1" scope="col"></th>' : ''}
             <th class="col-1 text-end" scope="col">Detections</th>
             <th class="col-1 text-end" scope="col">Calls</th>
             </tr>
@@ -3140,12 +3154,24 @@ function centreSpec(){
                 if (selected) selectedRow = i  + 1;
                 summaryHTML += `<tr tabindex="-1" class="${selected}">
                 <td class="max">${iconizeScore(item.max)}</td>
-                <td class="cname">
-                <span class="cname">${item.cname}</span> <br><i>${item.sname}</i>
-                </td>
-                <td class="text-end">${item.count}</td>
-                <td class="text-end">${item.calls}</td>
-                </tr>`;
+                    <td class="cname">
+                        <span class="cname">${item.cname}</span> <br><i>${item.sname}</i>
+                    </td>`;
+
+                if (showIUCN) {
+                    const record = await getIUCNStatus(item.sname);
+                    const iucn = record.scopes.find(obj => obj.scope === 'Global');
+                    const status = iucn.status;
+                    const url = iucn.url ? 'https://www.iucnredlist.org/species/' + iucn.url : null;
+                    const redListIcon  =  status;
+                    summaryHTML+=
+                        `<td class="text-end"><a title="${IUCNLabel[status]}: Learn more about this species ICUN assessment" 
+                        class="d-inline-block p-1 rounded text-white text-decoration-none text-center ${IUCNMap[redListIcon]} ${!url ? 'disabled-link' : ''}"
+                        href="${url || '#'}" target="_blank"> ${redListIcon}</a></td>`;
+                }
+                summaryHTML += `<td class="text-end">${item.count}</td>
+                    <td class="text-end">${item.calls}</td>
+                    </tr>`;
                 
             }
             summaryHTML += '</tbody></table>';
@@ -4647,6 +4673,7 @@ function playRegion(){
                 }
                 case 'timelineSetting': { timelineToggle(e); break }
                 case 'nocmig': { changeNocmigMode(e); break }
+                case 'iucn': { config.detect.iucn = element.checked; break }
                 case 'auto-archive': { config.archive.auto = element.checked } // no break so worker state gets updated
                 case 'library-trim': { config.archive.trim = element.checked }
                 case 'archive-format': {
@@ -5753,5 +5780,101 @@ function showCompareSpec() {
 
 }
 
+
+async function getIUCNStatus(sname = 'Anser anser') {
+    if (!Object.keys(STATE.IUCNcache).length) {
+        //const path = p.join(appPath, 'IUCNcache.json');
+        const path = window.location.pathname.replace('index.html', 'IUCNcache.json');
+        if (fs.existsSync(path)){
+            const data = await fs.promises.readFile(path, 'utf8').catch(err => {});
+            STATE.IUCNcache = JSON.parse(data);
+        } else { STATE.IUCNcache = {}}
+    }
+    return STATE.IUCNcache[sname]
+
+    /* The following code should not be called in the packaged app */
+
+    const [genus, species] = sname.split(' ');
+    
+    const headers = {
+        'Accept': 'application/json',
+        'Authorization': 'API_KEY',  // Replace with the actual API key
+        'keepalive': true
+      }
+
+    try {
+        const response = await fetch(`https://api.iucnredlist.org/api/v4/taxa/scientific_name?genus_name=${genus}&species_name=${species}`, {headers})
+
+        if (!response.ok) {
+            throw new Error(`Network error: code ${response.status} fetching IUCN data.`);
+        }
+
+        const data = await response.json();
+
+        // Filter out all but the latest assessments
+        const filteredAssessments = data.assessments.filter(assessment => assessment.latest);
+        const speciesData = { sname, scopes: [] };
+
+        // Fetch all the assessments concurrently
+        const assessmentResults = await Promise.all(
+            filteredAssessments.map(async item => {
+                const response = await fetch(`https://api.iucnredlist.org/api/v4/assessment/${item.assessment_id}`, { headers });
+                if (!response.ok) {
+                    throw new Error(`Network error: code ${response.status} fetching IUCN data.`);
+                }
+                const data = await response.json();
+                await new Promise(resolve => setTimeout(resolve, 300));
+                return data;
+            })
+        );
+        
+        
+        // Process each result
+        for (let item of assessmentResults) {
+            const scope = item.scopes?.[0]?.description?.en || 'Unknown';
+            const status = item.red_list_category?.code || 'Unknown';
+            const url = item.url || 'No URL provided';
+
+            speciesData.scopes.push({scope, status, url });
+        }
+
+        console.log(speciesData);
+        STATE.IUCNcache[sname] = speciesData;
+        updatePrefs('IUCNcache.json', STATE.IUCNcache);
+        return true;  // Optionally return the data if you need to use it elsewhere
+
+    } catch (error) {
+        if (error.message.includes('404')) {
+            generateToast({message: `There is no record of <b>${sname}</b> on the IUCN Red List.`, type: 'warning'})
+            STATE.IUCNcache[sname] = {scopes: [{scope: 'Global', status: 'NA', url: null}]}
+            updatePrefs('IUCNcache.json', STATE.IUCNcache);
+            return true
+        }
+        console.error('Error fetching IUCN data:', error.message);
+        return false
+    } 
+}
+const IUCNMap = {
+    'NA': 'text-bg-secondary',
+    'DD': 'text-bg-secondary',
+    'LC': 'text-bg-success',
+    'VU': 'text-bg-warning',
+    'NT': 'text-bg-warning',
+    'EN': 'text-bg-danger',
+    'CR': 'text-bg-dnager',
+    'EW': 'text-bg-dark',
+    'EX': 'text-bg-dark'
+}
+const IUCNLabel = {
+    'NA': 'No Data',
+    'DD': 'Data Deficient',
+    'LC': 'Least Consern',
+    'VU': 'Vulnerable',
+    'NT': 'Near Threatened',
+    'EN': 'Endangered',
+    'CR': 'Critically Endangered',
+    'EW': 'Extinct in the Wild',
+    'EX': 'Extinct'
+}
 // Make config, LOCATIONS and displayLocationAddress and toasts available to the map script in index.html
 export { config, displayLocationAddress, LOCATIONS, generateToast };
