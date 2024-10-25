@@ -41,7 +41,7 @@ const patterns = [
 // Search for the patterns in the source directory
 try {
     searchPatterns(SOURCE_DIR, patterns);
-    searchPatterns(SOURCE_DIR + "/node_modules/fluent-ffmpeg/lib",[/ffmpegProc.kill\(\);?\s+\},\s*\d\d\s*\);?/]);
+    searchPatterns(SOURCE_DIR + "/node_modules/fluent-ffmpeg/lib",[/ffmpegProc.kill\(\);?\s+\},\s*\d{1,3}\s*\);?/]);
     console.log("No patterns found. Proceeding with the build...");
 } catch (error) {
     console.error("An error occurred while searching for the patterns:", error.message);

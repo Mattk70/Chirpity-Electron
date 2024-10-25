@@ -1563,13 +1563,12 @@ function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBat
         let concatenatedBuffer = Buffer.alloc(0);
         const command = setupFfmpegCommand({file, start, end, sampleRate})
         command.on('error', (error) => {
-            updateFilesBeingProcessed(file)
-            if (error.message.includes('SIGKILL')) console.log('FFMPEG process shut down at user request')
-            else {
-                error.message = error.message + '|' + error.stack;
+            if (error.message === 'Output stream closed'){
+                console.warn(`processAudio: ${file} ${error}`);
+            } else {
+                if (error.message.includes('SIGKILL')) console.log('FFMPEG process shut down at user request')
+                reject(error)
             }
-            console.warn('Ffmpeg error in:\n', file, 'stderr:\n', error)
-            reject(console.warn('processAudio: ffmpeg error:\n', file, error));
         });
 
         const STREAM = command.pipe();
@@ -1580,20 +1579,24 @@ function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBat
             }
             const chunk = STREAM.read();
             if (chunk === null) {
-                //EOF: deal with part-full buffers
-                // if (shortFile) highWaterMark -= header.length;
-                if (concatenatedBuffer.byteLength){
-                    header || console.warn('no header for ' + file)
-                    let noHeader;
-                    if (concatenatedBuffer.length < header.length) {noHeader = true}
-                    else {noHeader = concatenatedBuffer.compare(header, 0, header.length, 0, header.length)} //compare returns 0 when there is a header in audio_chunk!
-                    const audio = noHeader ? Buffer.concat([header, concatenatedBuffer]) : concatenatedBuffer;
-                    processPredictQueue(audio, file, end, chunkStart);
-                } else {
-                    updateFilesBeingProcessed(file)
-                }
-                DEBUG && console.log('All chunks sent for ', file);
-                return resolve()
+                // wait for the ffpmegstream to close: https://github.com/fluent-ffmpeg/node-fluent-ffmpeg/issues/1171#issuecomment-1361524138
+                // //setTimeout( () => {
+                //     command.on('end', () => {
+                    //EOF: deal with part-full buffers
+                    // if (shortFile) highWaterMark -= header.length;
+                    if (concatenatedBuffer.byteLength){
+                        header || console.warn('no header for ' + file)
+                        let noHeader;
+                        if (concatenatedBuffer.length < header.length) {noHeader = true}
+                        else {noHeader = concatenatedBuffer.compare(header, 0, header.length, 0, header.length)} //compare returns 0 when there is a header in audio_chunk!
+                        const audio = noHeader ? Buffer.concat([header, concatenatedBuffer]) : concatenatedBuffer;
+                        processPredictQueue(audio, file, end, chunkStart);
+                    } else {
+                        updateFilesBeingProcessed(file)
+                    }
+                    DEBUG && console.log('All chunks sent for ', file);
+                    return resolve()
+                // })
             }
             else {
                 concatenatedBuffer = concatenatedBuffer.length ? joinBuffers(concatenatedBuffer, chunk) : chunk;

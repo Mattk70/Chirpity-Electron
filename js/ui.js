@@ -4910,9 +4910,11 @@ async function readLabels(labelFile, updating){
             DOM.customListSelector.classList.add('btn-outline-danger');
             document.getElementById('navbarSettings').click();
             document.getElementById('list-file-selector').focus();
-            return
+            throw new Error(`Missing label file: ${labelFile}`)
         }
-        else {console.error('There was a problem reading the label file:', error)}
+        else {
+            throw new Error(`There was a problem reading the label file: ${labelFile}`)
+        }
     }).then(filecontents => {
         LABELS = filecontents.trim().split(/\r?\n/);
         // Add unknown species
@@ -4926,7 +4928,7 @@ async function readLabels(labelFile, updating){
         }
 
     }).catch(error =>{
-        console.error('There was a problem reading the label file:', error)
+        console.error(error)
     })
 }
 
@@ -4935,7 +4937,7 @@ async function readLabels(labelFile, updating){
         const target = e.target;
         if (target.classList.contains('circle') || target.closest('thead')) return;
         let hideInSummary = '', hideInSelection = '',
-        plural = '', contextDelete;
+        plural = '';
         const inSummary = target.closest('#speciesFilter');
         const resultContext = !target.closest('#summaryTable');
         if (inSummary) {
@@ -4978,11 +4980,12 @@ async function readLabels(labelFile, updating){
         </a>
         `;
         const modalTitle = document.getElementById('record-entry-modal-label');
+        const contextDelete = document.getElementById('context-delete');
         modalTitle.textContent = `${createOrEdit} Record`;
         if (!hideInSelection) {
             const contextAnalyseSelectionLink = document.getElementById('context-analyse-selection');
             contextAnalyseSelectionLink.addEventListener('click', getSelectionResults);
-            contextDelete = document.getElementById('context-delete');
+            
             resultContext ? contextDelete.addEventListener('click', deleteRecord) :
             contextDelete.addEventListener('click', function () {
                 deleteSpecies(target);
@@ -5001,7 +5004,7 @@ async function readLabels(labelFile, updating){
                 }
             })
         }
-        if (inSummary || activeRow && (region?.attributes.label || hideInSummary)) {}
+        if (inSummary ||  region?.attributes.label || hideInSummary) {}
         else {
             const xc = document.getElementById('context-xc');
             xc.classList.add('d-none');
@@ -5315,8 +5318,10 @@ async function readLabels(labelFile, updating){
                     alert(`
                     <svg class="bi flex-shrink-0 me-2" width="20" height="20" role="img" aria-label="Info:"><use xlink:href="#info-fill"/></svg>
                     There's a new version of Chirpity available! <a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blank">Check the website</a> for more information`,
-                    'warning')
+                    'warning');
+                    
                 }
+                trackEvent(config.UUID, 'Update message', `From ${VERSION}`, `To: ${latestVersion}`);
                 config.lastUpdateCheck = latestCheck;
                 updatePrefs('config.json', config)
             })
