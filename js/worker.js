@@ -1578,7 +1578,14 @@ function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBat
                 reject(error)
             }
         });
-
+        command.on('codecData', function(data) {
+            if (data.duration !== 'N/A') {
+                // Update Metadata with accurate duration
+                const [hours, minutes, seconds] = data.duration.split(':').map(parseFloat);
+                const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+                METADATA[file].duration = totalSeconds
+            }
+          })
         const STREAM = command.pipe();
         STREAM.on('data', (chunk) => {
             if (aborted) {
