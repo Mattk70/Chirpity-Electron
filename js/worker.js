@@ -15,7 +15,7 @@ import { sqlite3 } from './database.js';
 import {trackEvent} from './tracking.js';
 import {extractWaveMetadata} from './metadata.js';
 
-const DEBUG = false;
+const DEBUG = true;
 
 // Function to join Buffers and not use Buffer.concat() which leads to detached ArrayBuffers
 function joinBuffers(buffer1, buffer2) {
@@ -92,7 +92,7 @@ const STATE = new State();
 let WINDOW_SIZE = 3;
 const SUPPORTED_FILES = ['.wav', '.flac', '.opus', '.m4a', '.mp3', '.mpga', '.ogg', '.aac', '.mpeg', '.mp4', '.mov'];
 
-let NUM_WORKERS;
+let NUM_WORKERS, AUDIO_BACKLOG;
 let workerInstance = 0;
 let appPath, tempPath, BATCH_SIZE, LABELS, batchChunksToSend = {};
 let LIST_WORKER;
@@ -192,7 +192,8 @@ const createDB = async (file) => {
         CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL)`);
     // Ensure place names are unique too
     await db.runAsync('CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)');
-    await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT,  comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, UNIQUE (dateTime, fileID, speciesID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,  FOREIGN KEY (speciesID) REFERENCES species(id))`);
+    await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT,  comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, 
+        UNIQUE (dateTime, fileID, speciesID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,  FOREIGN KEY (speciesID) REFERENCES species(id))`);
     await db.runAsync(`CREATE TABLE duration( day INTEGER, duration INTEGER, fileID INTEGER, UNIQUE (day, fileID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`);
 
     if (archiveMode) {
@@ -969,6 +970,8 @@ async function onAnalyse({
     AUDACITY = {};
     batchChunksToSend = {};
     FILE_QUEUE = filesInScope;
+    AUDIO_BACKLOG = 0;
+    STATE.processingPaused = false;
     
     
     if (!STATE.selection) {
@@ -1342,21 +1345,57 @@ function setupCtx(audio, rate, destination, file) {
     .catch(error => aborted || console.warn(error, file));    
 };
 
-function checkBacklog() {
+function checkBacklog(ffmpegCommand = null) {
     return new Promise((resolve) => {
-        const backlog = sumObjectValues(predictionsRequested) - sumObjectValues(predictionsReceived);
-        DEBUG && console.log('backlog:', backlog);
-        if (aborted) resolve(false)
-        if (backlog >= NUM_WORKERS * 2) {
-            // If backlog is too high, check again after a short delay
-            setTimeout(() => {
-                resolve(checkBacklog()); // Recursively call until backlog is within limits
-            }, 50);
-        } else {
-            resolve(true); // Backlog ok, read the stream data
+        let firstRun = true;
+        console.time('checking backlog');
+
+        if (!aborted && AUDIO_BACKLOG < NUM_WORKERS * 2 && !STATE.processingPaused) {
+            console.timeEnd('checking backlog');
+            resolve(true);
+            return;
         }
+
+        const interval = setInterval(() => {
+            const backlog = AUDIO_BACKLOG;
+
+            if (aborted) {
+                clearInterval(interval);
+                resolve(false);
+                return;
+            }
+
+            if (firstRun) {
+                DEBUG && console.log('backlog (initial):', backlog);
+                firstRun = false; // Ensure this logs only on the first call
+            }
+
+            if (backlog >= NUM_WORKERS * 2) {
+                if (ffmpegCommand) {
+                    STATE.processingPaused || (ffmpegCommand && ffmpegCommand.kill('SIGSTOP'));
+                }
+                firstRun && console.log('stop signal sent, backlog: ', backlog);
+                STATE.processingPaused = true;
+
+            } else if (backlog <= NUM_WORKERS) {
+                DEBUG && console.log('backlog (final):', backlog);
+                if (STATE.processingPaused) {
+                    if (ffmpegCommand) {
+                        ffmpegCommand.kill('SIGCONT');
+                    }
+                    console.log('resume signal sent, backlog: ', backlog);
+                    STATE.processingPaused = false;
+                }
+
+                clearInterval(interval); // Backlog is within limits, stop checking
+                console.timeEnd('checking backlog');
+                resolve(true); // Resolve the promise
+            }
+        }, 20);
     });
 }
+
+
 
 /**
 *
@@ -1469,6 +1508,7 @@ function processPredictQueue(audio, file, end, chunkStart){
                 workerInstance = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
                 worker = workerInstance;
                 feedChunksToModel(myArray, chunkStart, file, end, worker);
+                AUDIO_BACKLOG++;
                 return
             }).catch((error) => {
                 predictionsRequested[file]--; // Didn't request a prediction after all
@@ -1499,6 +1539,7 @@ function processPredictQueue(audio, file, end, chunkStart){
         worker = workerInstance;
         const myArray = new Float32Array(Array.from({ length: chunkLength }).fill(0));
         feedChunksToModel(myArray, chunkStart, file, end);
+        AUDIO_BACKLOG++;
     }}).catch(error => { 
         aborted || console.warn(file, error) ;
         predictionsRequested[file]--; // Didn't request a prediction after all
@@ -1528,23 +1569,10 @@ const getPredictBuffers = async ({
     const highWaterMark =  samplesInBatch * 2;
     
     let chunkStart = start * sampleRate;
-    if (STATE.detect.backend === 'tensorflow'){
-        const step = (BATCH_SIZE * WINDOW_SIZE);
-        // Throttle the ingest of transcoded audio
-        for (let i = start; i < end; i += step){
-            const notAborted = await checkBacklog();
-            if (notAborted){
-                const finish = i + step;
-                await processAudio(file, i, finish, chunkStart, highWaterMark)
-                chunkStart += samplesInBatch;
-            } else {
-                break
-            }
-        }
-    } else {
-        // Full gas
-        await processAudio(file, start, end, chunkStart, highWaterMark, samplesInBatch)
-    }
+
+
+    await processAudio(file, start, end, chunkStart, highWaterMark, samplesInBatch)
+
 }
 
 function lookForHeader(buffer){
@@ -1578,6 +1606,10 @@ function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBat
                 reject(error)
             }
         });
+        command.on('progress', (progress) => {
+            console.log('progress: ', progress.timemark)
+            checkBacklog(command)
+        })
         command.on('codecData', function(data) {
             if (data.duration !== 'N/A') {
                 // Update Metadata with accurate duration
@@ -1639,6 +1671,24 @@ function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBat
         })
 
     }).catch(error => console.log(error));
+}
+
+function prepareWavForModel(audio, file, end, chunkStart) {
+    predictionsRequested[file]++;
+    
+    // Calculate the number of samples and directly create a Float32Array
+    const sampleCount = (audio.length - 78) / 2; // 2 bytes per sample for 16-bit PCM
+    const channelData = new Float32Array(sampleCount);
+    
+    // Populate the Float32Array with normalised values
+    for (let i = 0, j = 44; j < audio.length; i++, j += 2) {
+        const sample = audio.readInt16LE(j);
+        channelData[i] = sample / 32768; // Normalise to [-1, 1] range
+    }
+    
+    // Send the channel data to the model
+    feedChunksToModel(channelData, chunkStart, file, end);
+    AUDIO_BACKLOG++;
 }
 
 /**
@@ -2277,7 +2327,7 @@ const generateInsertQuery = async (latestResult, file) => {
 
 const parsePredictions = async (response) => {
     let file = response.file;
-
+    AUDIO_BACKLOG--;
     const latestResult = response.result;
     if (!latestResult.length){
         predictionsReceived[file]++;

@@ -336,7 +336,7 @@ footer {
 }
 
 #dropdownMenuButton {
-    max-width: 350px;
+    max-width: 40vw;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -349,7 +349,7 @@ footer {
 
 .filename,
 .dropdown-menu-dark>a {
-    max-width: 300px;
+    max-width: 40%;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

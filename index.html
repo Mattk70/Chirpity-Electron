@@ -1128,7 +1128,8 @@
                         <span class="material-symbols-outlined"  title="Display File Metadata">other_admission</span></a>
                     <div id="filename" class="col-auto ps-1 overflow-visible flex-nowrap"></div>
                     <div id="unsaved-icon" class="material-symbols-outlined ms-2 me-2 text-warning pointer d-none"  tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Unsaved Edits" data-bs-content="There are changes to the results that haven't been saved.">warning</div>
-                    <div class="btn-group bg-dark pt-0 p-1 ms-2 me-2 text-nowrap" role="group">
+                    <!-- <div class="col-4"> -->
+                    <div class="col btn-group bg-dark pt-0 p-1 ms-2 me-2 text-nowrap" role="group">
                         <button id="playToggle" class="p-1 pe-2 btn btn-outline-secondary" title="Play / Pause (SpaceBar)">
                             <span class="material-symbols-outlined ">play_circle</span><span
                             class="align-middle d-none d-lg-inline"> Play </span>
@@ -1139,17 +1140,16 @@
                     </div>
                     <div class="col btn-group bg-dark pt-0 p-1 pe-2" role="group">
                         <button id="zoomIn" title="Zoom into the spectrogram (Keyboard Shortcut: + key)" class="btn btn-outline-secondary"
-                        style="max-width: 70px">
+                        style="min-width: 3rem">
                         <span class="material-symbols-outlined zoom translate-middle">zoom_in</span>
-                    </button>
-                    <button id="zoomOut" title="Zoom out of the spectrogram (Keyboard Shortcut: - key)" class="btn btn-outline-secondary"
-                    style="max-width: 70px"><span class="material-symbols-outlined zoom  translate-middle">zoom_out</span>
-                </button>
-            </div>
-            <div id="progressDiv" class="col-2 d-none"><span id="fileNumber"></span><br>
+                        </button>
+                        <button id="zoomOut" title="Zoom out of the spectrogram (Keyboard Shortcut: - key)" class="btn btn-outline-secondary"
+                            style="min-width: 3rem"><span class="material-symbols-outlined zoom  translate-middle">zoom_out</span>
+                        </button>
+                    </div>
+                <!-- </div> -->
+            <div id="progressDiv" class="col-2 invisible"><span id="fileNumber"></span><br>
                 <progress id="progress-bar" max="100" style="width:90%"></progress>
-            </div>
-            <div id="complete" class="col-2 pe-2" style="display:none">
             </div>
             <div class="col pe-1">
 

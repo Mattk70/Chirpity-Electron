@@ -244,7 +244,7 @@ function resetResults({clearSummary = true, clearPagination = true, clearResults
         DOM.resultHeader.textContent = '';
     }
     predictions = {};
-    DOM.progressDiv.classList.add('d-none');
+    DOM.progressDiv.classList.add('invisible');
     updateProgress(0)
 }
 
@@ -1000,7 +1000,7 @@ function analyseReset() {
     DOM.fileNumber.textContent = '';
     resetDiagnostics();
     AUDACITY_LABELS = {};
-    DOM.progressDiv.classList.remove('d-none');
+    DOM.progressDiv.classList.remove('invisible');
 }
 
 function isEmptyObject(obj) {
@@ -2822,7 +2822,7 @@ function centreSpec(){
                 });
                 STATE.diskHasRecords && enableMenuItem(['explore', 'charts']);
                 generateToast({ message:'Operation cancelled'});
-                DOM.progressDiv.classList.add('d-none');
+                DOM.progressDiv.classList.add('invisible');
             }
         },
         Home: function () {
@@ -3113,11 +3113,11 @@ function centreSpec(){
     }
     
     function onProgress(args) {
-        DOM.progressDiv.classList.remove('d-none');
+        DOM.progressDiv.classList.remove('invisible');
         if (args.text) {
             DOM.fileNumber.innerHTML = args.text;
         } else {
-            DOM.progressDiv.classList.remove('d-none');
+            DOM.progressDiv.classList.remove('invisible');
             const count = STATE.openFiles.indexOf(args.file) + 1;
             DOM.fileNumber.textContent = `File ${count} of ${STATE.openFiles.length}`;
         }
@@ -3125,7 +3125,7 @@ function centreSpec(){
             let progress = Math.round(args.progress * 1000) / 10;
             updateProgress(progress);
         } else {
-            DOM.progressDiv.classList.remove('d-none');
+            DOM.progressDiv.classList.remove('invisible');
         }
     }
     
@@ -3166,7 +3166,7 @@ function centreSpec(){
                     const redListIcon  =  status;
                     summaryHTML+=
                         `<td class="text-end"><a title="${IUCNLabel[status]}: Learn more about this species ICUN assessment" 
-                        class="d-inline-block p-1 rounded text-white text-decoration-none text-center ${IUCNMap[redListIcon]} ${!url ? 'disabled-link' : ''}"
+                        class="d-inline-block p-1 rounded text-decoration-none text-center ${IUCNMap[redListIcon]} ${!url ? 'disabled-link' : ''}"
                         href="${url || '#'}" target="_blank"> ${redListIcon}</a></td>`;
                 }
                 summaryHTML += `<td class="text-end">${item.count}</td>
@@ -3223,7 +3223,7 @@ function centreSpec(){
             activeRow.scrollIntoView({ behavior: 'instant', block: 'nearest' });
         }
         // hide progress div
-        DOM.progressDiv.classList.add('d-none');
+        DOM.progressDiv.classList.add('invisible');
         renderFilenamePanel();
     }
 
@@ -3259,7 +3259,7 @@ function formatDuration(seconds){
         PREDICTING = false;
         STATE.analysisDone = true;
         STATE.diskHasRecords && enableMenuItem(['explore', 'charts']);
-        DOM.progressDiv.classList.add('d-none');
+        DOM.progressDiv.classList.add('invisible');
         if (quiet) return
         // DIAGNOSTICS:
         t1_analysis = Date.now();
