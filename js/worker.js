@@ -1347,10 +1347,10 @@ function setupCtx(audio, rate, destination, file) {
 
 function checkBacklog(ffmpegCommand = null) {
     return new Promise((resolve) => {
-        let firstRun = true;
+        let firstRun = true, hysteresis_factor = 2;
         DEBUG && console.time('checking backlog');
 
-        if (!aborted && AUDIO_BACKLOG < NUM_WORKERS * 2 && !STATE.processingPaused) {
+        if (!aborted && AUDIO_BACKLOG < NUM_WORKERS * hysteresis_factor && !STATE.processingPaused) {
             DEBUG && console.timeEnd('checking backlog');
             resolve(true);
             return;
@@ -1370,7 +1370,7 @@ function checkBacklog(ffmpegCommand = null) {
                 firstRun = false; // Ensure this logs only on the first call
             }
 
-            if (backlog >= NUM_WORKERS * 2) {
+            if (backlog >= NUM_WORKERS * hysteresis_factor) {
                 if (ffmpegCommand) {
                     STATE.processingPaused || (ffmpegCommand && ffmpegCommand.kill('SIGSTOP'));
                 }
