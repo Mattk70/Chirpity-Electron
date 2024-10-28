@@ -126,7 +126,7 @@ const setupFfmpegCommand = ({
     end = undefined, 
     sampleRate = 24000, 
     channels = 1, 
-    format = 'wav', 
+    format = 's16le', //<= outputs audio without header
     additionalFilters = [],
     metadata = {},
     audioCodec = null,
@@ -1348,10 +1348,10 @@ function setupCtx(audio, rate, destination, file) {
 function checkBacklog(ffmpegCommand = null) {
     return new Promise((resolve) => {
         let firstRun = true;
-        console.time('checking backlog');
+        DEBUG && console.time('checking backlog');
 
         if (!aborted && AUDIO_BACKLOG < NUM_WORKERS * 2 && !STATE.processingPaused) {
-            console.timeEnd('checking backlog');
+            DEBUG && console.timeEnd('checking backlog');
             resolve(true);
             return;
         }
@@ -1388,7 +1388,7 @@ function checkBacklog(ffmpegCommand = null) {
                 }
 
                 clearInterval(interval); // Backlog is within limits, stop checking
-                console.timeEnd('checking backlog');
+                DEBUG && console.timeEnd('checking backlog');
                 resolve(true); // Resolve the promise
             }
         }, 20);
@@ -1505,8 +1505,6 @@ function processPredictQueue(audio, file, end, chunkStart){
         if (offlineCtx) {
             offlineCtx.startRendering().then((resampled) => {
                 const myArray = resampled.getChannelData(0);
-                workerInstance = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-                worker = workerInstance;
                 feedChunksToModel(myArray, chunkStart, file, end, worker);
                 AUDIO_BACKLOG++;
                 return
@@ -1535,8 +1533,6 @@ function processPredictQueue(audio, file, end, chunkStart){
         }
         console.log('Short chunk', audio.length, 'padding');
         let chunkLength = STATE.model === 'birdnet' ? 144_000 : 72_000;
-        workerInstance = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance;
-        worker = workerInstance;
         const myArray = new Float32Array(Array.from({ length: chunkLength }).fill(0));
         feedChunksToModel(myArray, chunkStart, file, end);
         AUDIO_BACKLOG++;
@@ -1607,7 +1603,7 @@ function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBat
             }
         });
         command.on('progress', (progress) => {
-            console.log('progress: ', progress.timemark)
+            DEBUG && console.log('progress: ', progress.timemark)
             checkBacklog(command)
         })
         command.on('codecData', function(data) {
@@ -1624,41 +1620,25 @@ function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBat
                 STREAM.destroy();
                 return
             }
-                concatenatedBuffer = concatenatedBuffer.length ? joinBuffers(concatenatedBuffer, chunk) : chunk;
-                if (!header) {
-                    header = lookForHeader(concatenatedBuffer);
-                    // First chunk sent to model is short because it contains the header
-                    // Highwatermark is the length of audio alone
-                    // Initally, the highwatermark needs to add the header length to get the correct length of audio
-                    if (header) highWaterMark += header.length;
-                }
-
-                // if we have a full buffer
-                if (concatenatedBuffer.length > highWaterMark) {
-                    const audio_chunk = concatenatedBuffer.subarray(0, highWaterMark);
-                    const remainder = concatenatedBuffer.subarray(highWaterMark);
-                    let noHeader = concatenatedBuffer.compare(header, 0, header.length, 0, header.length)
-                    const audio = noHeader ? joinBuffers(header, audio_chunk) : audio_chunk;
-                    processPredictQueue(audio, file, end, chunkStart);
-                    chunkStart += samplesInBatch;
-                    concatenatedBuffer = remainder;
-                }
+            concatenatedBuffer = concatenatedBuffer.length ? joinBuffers(concatenatedBuffer, chunk) : chunk;
+            // if we have a full buffer
+            if (concatenatedBuffer.length > highWaterMark) {
+                const audio_chunk = concatenatedBuffer.subarray(0, highWaterMark);
+                const remainder = concatenatedBuffer.subarray(highWaterMark);
+                prepareWavForModel(audio_chunk, file, end, chunkStart);
+                feedChunksToModel(...predictQueue.shift());
+                chunkStart += samplesInBatch;
+                concatenatedBuffer = remainder;
+            }
             
         });
         STREAM.on('end', () => {
             // wait for the ffpmegstream to close: https://github.com/fluent-ffmpeg/node-fluent-ffmpeg/issues/1171#issuecomment-1361524138
             setTimeout( () => {
                 //EOF: deal with part-full buffers
-                // if (shortFile) highWaterMark -= header.length;
                 if (concatenatedBuffer.byteLength){
-                    header || console.warn('no header for ' + file)
-                    let noHeader;
-                    if (concatenatedBuffer.length < header.length) {noHeader = true}
-                    else {noHeader = concatenatedBuffer.compare(header, 0, header.length, 0, header.length)} //compare returns 0 when there is a header in audio_chunk!
-                    const audio = noHeader ? Buffer.concat([header, concatenatedBuffer]) : concatenatedBuffer;
-                    processPredictQueue(audio, file, end, chunkStart);
-                } else {
-                   // updateFilesBeingProcessed(file)
+                    prepareWavForModel(concatenatedBuffer, file, end, chunkStart);
+                    feedChunksToModel(...predictQueue.shift());
                 }
                 DEBUG && console.log('All chunks sent for ', file);
                 return resolve()
@@ -1677,17 +1657,17 @@ function prepareWavForModel(audio, file, end, chunkStart) {
     predictionsRequested[file]++;
     
     // Calculate the number of samples and directly create a Float32Array
-    const sampleCount = (audio.length - 78) / 2; // 2 bytes per sample for 16-bit PCM
+    const sampleCount = (audio.length) / 2; // 2 bytes per sample for 16-bit PCM
     const channelData = new Float32Array(sampleCount);
     
     // Populate the Float32Array with normalised values
-    for (let i = 0, j = 44; j < audio.length; i++, j += 2) {
+    for (let i = 0, j = 0; j < audio.length; i++, j += 2) {
         const sample = audio.readInt16LE(j);
         channelData[i] = sample / 32768; // Normalise to [-1, 1] range
     }
     
     // Send the channel data to the model
-    feedChunksToModel(channelData, chunkStart, file, end);
+    predictQueue.push([channelData, chunkStart, file, end]);
     AUDIO_BACKLOG++;
 }
 
@@ -1775,7 +1755,10 @@ async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
 
     if (worker === undefined) {
         // pick a worker - this method is faster than looking for available workers
-        worker = ++workerInstance >= NUM_WORKERS ? 0 : workerInstance
+        if (++workerInstance === NUM_WORKERS) {
+            workerInstance = 0;
+        }
+        worker = workerInstance
     }
     const objData = {
         message: 'predict',
@@ -1790,8 +1773,8 @@ async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
         confidence: STATE.detect.confidence,
         chunks: channelData
     };
-    if (predictWorkers[worker]) predictWorkers[worker].isAvailable = false;
-    predictWorkers[worker]?.postMessage(objData, [channelData.buffer]);
+    predictWorkers[worker].isAvailable = false;
+    predictWorkers[worker].postMessage(objData, [channelData.buffer]);
 }
 async function doPrediction({
     file = '',
@@ -2409,12 +2392,10 @@ const parsePredictions = async (response) => {
 let SEEN_MODEL_READY = false;
 async function parseMessage(e) {
     const response = e.data;
-    // Update this worker's availability
-    predictWorkers[response.worker].isAvailable = true;
-    
     switch (response['message']) {
         case "model-ready": {
             predictWorkers[response.worker].isReady = true;
+            predictWorkers[response.worker].isAvailable = true;
             if ( !SEEN_MODEL_READY) {
                 SEEN_MODEL_READY = true;
                 sampleRate = response["sampleRate"];
