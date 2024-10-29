@@ -1,4 +1,5 @@
 # Chirpity ![GitHub release (latest by date)](https://img.shields.io/github/v/release/Mattk70/Chirpity-Electron) ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/Mattk70/Chirpity-Electron/latest/total?style=plastic&label=Latest%20Release%20Downloads)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FMattk70%2FChirpity-Electron.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FMattk70%2FChirpity-Electron?ref=badge_shield)
 
 
 
@@ -66,3 +67,7 @@ npm run export
 The resulting application will be saved in the "dist" folder.
 
 
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FMattk70%2FChirpity-Electron.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FMattk70%2FChirpity-Electron?ref=badge_large)
