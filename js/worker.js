@@ -16,11 +16,12 @@ import {trackEvent} from './tracking.js';
 import {extractWaveMetadata} from './metadata.js';
 let isWin32 = false;
 
-const ntsuspend = require('ntsuspend');
+let ntsuspend;
 if (process.platform === 'win32') {
+    ntsuspend = require('ntsuspend');
     isWin32 = true;
   }
-const DEBUG = true;
+const DEBUG = false;
 
 // Function to join Buffers and not use Buffer.concat() which leads to detached ArrayBuffers
 function joinBuffers(buffer1, buffer2) {
@@ -1061,28 +1062,59 @@ function onAbort({
 
 }
 
-const getDuration = async (src) => {
-    let audio;
-    return new Promise(function (resolve, reject) {
-        audio = new Audio();
-        audio.src = src.replaceAll('#', '%23').replaceAll('?', '%3F'); // allow hash and ? in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
-        audio.addEventListener("loadedmetadata", function () {
-            const duration = audio.duration;
-            audio = undefined;
-            // Tidy up - cloning removes event listeners
-            const old_element = document.getElementById("audio");
-            const new_element = old_element.cloneNode(true);
-            old_element.parentNode.replaceChild(new_element, old_element);
+// const getDuration = async (src) => {
+//     let audio;
+//     return new Promise(function (resolve, reject) {
+//         audio = new Audio();
+//         audio.src = src.replaceAll('#', '%23').replaceAll('?', '%3F'); // allow hash and ? in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
+//         audio.addEventListener("loadedmetadata", function () {
+//             const duration = audio.duration === Infinity ? Number.MAX_SAFE_INTEGER : audio.duration;
+//             audio = undefined;
+//             // Tidy up - cloning removes event listeners
+//             const old_element = document.getElementById("audio");
+//             const new_element = old_element.cloneNode(true);
+//             old_element.parentNode.replaceChild(new_element, old_element);
             
-            resolve(duration);
-        });
-        audio.addEventListener('error', (error) => {
-            generateAlert({type: 'error',  message: 'Unable to extract essential metadata from ' + src})
-            reject(error, src)
-        })
+//             resolve(duration);
+//         });
+//         audio.addEventListener('error', (error) => {
+//             generateAlert({type: 'error',  message: 'Unable to extract essential metadata from ' + src})
+//             reject(error, src)
+//         })
+//     });
+// }
+const getDuration = async (src) => {
+    return new Promise((resolve, reject) => {
+        // Replace special characters in the file path as needed
+        // const formattedSrc = src.replaceAll('#', '%23').replaceAll('?', '%3F');
+        try {
+        const command = ffmpeg('file:' + src)
+            .format(null)
+            .save('null.wav')
+            .on('codecData', (data) => {
+                let duration;
+                if ( ! ['N/A', Infinity].includes(data.duration)) {
+                    // Update Metadata with accurate duration
+                    const [hours, minutes, seconds] = data.duration.split(':').map(parseFloat);
+                    duration = (hours * 3600) + (minutes * 60) + seconds;
+                } else {
+                    duration = Number.MAX_SAFE_INTEGER;
+                }
+                console.log(duration , 'seconds')
+                resolve(duration);
+                command.kill(); // Stop processing after getting the duration
+            })
+            .on('error', (error) => {
+                if (!error.message.includes('ffmpeg was killed')){
+                    generateAlert({ type: 'error', message: 'Unable to extract essential metadata from ' + src });
+                    reject(error);
+                }
+            })
+        } catch (error) {
+            console.log(error)
+        }
     });
-}
-
+};
 
 /**
 * getWorkingFile's purpose is to locate a file and set its metadata. 
@@ -1239,7 +1271,9 @@ const setMetadata = async ({ file, source_file = file }) => {
     // savedMeta may just have a locationID if it was set by onSetCUstomLocation
     if (! savedMeta?.duration) {
         try {
+            console.time('get duration')
             METADATA[file].duration = await getDuration(file)
+            console.timeEnd('get duration')
         } catch (e) {
             throw new Error('Unable to determine file duration ', e);
         }
@@ -1630,11 +1664,11 @@ function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBat
             checkBacklog(command)
         })
         command.on('codecData', function(data) {
-            if (data.duration !== 'N/A') {
+            if ( ! ['N/A', Infinity].includes(data.duration)) {
                 // Update Metadata with accurate duration
                 const [hours, minutes, seconds] = data.duration.split(':').map(parseFloat);
                 const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
-                METADATA[file].duration = totalSeconds
+                METADATA[file].duration = totalSeconds;
             }
           })
         const STREAM = command.pipe();
