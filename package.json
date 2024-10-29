@@ -1,6 +1,6 @@
 {
 	"name": "chirpity",
-	"version": "2.1.2",
+	"version": "2.2.0",
 	"description": "Chirpity Nocmig",
 	"main": "main.js",
 	"scripts": {
@@ -185,12 +185,13 @@
 		"fast-png": "^6.1.0",
 		"fluent-ffmpeg": "^2.1.2",
 		"lodash.merge": "^4.6.2",
+		"ntsuspend": "^1.0.2",
+		"p-limit": "3.1.0",
 		"sqlite3": "5.1.6",
 		"suncalc": "^1.9.0",
-		"uuid": "^8.3.2",
 		"utimes": "5.2.1",
+		"uuid": "^8.3.2",
 		"wavefile-reader": "^1.1.1",
-		"wavesurfer.js": "6.6.4",
-		"p-limit": "3.1.0"
+		"wavesurfer.js": "6.6.4"
 	}
 }

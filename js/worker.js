@@ -14,7 +14,12 @@ import { State } from './state.js';
 import { sqlite3 } from './database.js';
 import {trackEvent} from './tracking.js';
 import {extractWaveMetadata} from './metadata.js';
+let isWin32 = false;
 
+const ntsuspend = require('ntsuspend');
+if (process.platform === 'win32') {
+    isWin32 = true;
+  }
 const DEBUG = true;
 
 // Function to join Buffers and not use Buffer.concat() which leads to detached ArrayBuffers
@@ -1348,10 +1353,8 @@ function setupCtx(audio, rate, destination, file) {
 function checkBacklog(ffmpegCommand = null) {
     return new Promise((resolve) => {
         let firstRun = true, hysteresis_factor = 2;
-        DEBUG && console.time('checking backlog');
 
         if (!aborted && AUDIO_BACKLOG < NUM_WORKERS * hysteresis_factor && !STATE.processingPaused) {
-            DEBUG && console.timeEnd('checking backlog');
             resolve(true);
             return;
         }
@@ -1372,7 +1375,7 @@ function checkBacklog(ffmpegCommand = null) {
 
             if (backlog >= NUM_WORKERS * hysteresis_factor) {
                 if (ffmpegCommand) {
-                    STATE.processingPaused || (ffmpegCommand && ffmpegCommand.kill('SIGSTOP'));
+                    STATE.processingPaused || pauseFfmpeg(ffmpegCommand); //.kill('SIGSTOP');;
                 }
                 firstRun && console.log('stop signal sent, backlog: ', backlog);
                 STATE.processingPaused = true;
@@ -1381,21 +1384,41 @@ function checkBacklog(ffmpegCommand = null) {
                 DEBUG && console.log('backlog (final):', backlog);
                 if (STATE.processingPaused) {
                     if (ffmpegCommand) {
-                        ffmpegCommand.kill('SIGCONT');
+                        resumeFfmpeg(ffmpegCommand); //.kill('SIGCONT');
                     }
                     console.log('resume signal sent, backlog: ', backlog);
                     STATE.processingPaused = false;
                 }
 
                 clearInterval(interval); // Backlog is within limits, stop checking
-                DEBUG && console.timeEnd('checking backlog');
                 resolve(true); // Resolve the promise
             }
         }, 20);
     });
 }
 
+function pauseFfmpeg(ffmpegCommand){
+    if (isWin32){
+        const pid = ffmpegCommand.ffmpegProc.pid;
+        const message = pid ? (ntsuspend.suspend(pid) ? 'Ffmpeg process resumed' : 'Could not resume process') 
+            : 'Could not resume process (exited)';
+        console.log(message)
+    } else {
+        ffmpegCommand.kill('SIGSTOP')
+    }
+}
 
+function resumeFfmpeg(ffmpegCommand){
+    if (isWin32){
+        // Sometimes, the process exits before resume can be called
+        const pid = ffmpegCommand.ffmpegProc?.pid;
+        const message = pid ? (ntsuspend.resume(pid) ? 'Ffmpeg process resumed' : 'Could not resume process') 
+            : 'Could not resume process (exited)';
+        console.log(message)
+    } else {
+        ffmpegCommand.kill('SIGCONT')
+    }
+}
 
 /**
 *
@@ -1634,7 +1657,6 @@ function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBat
         });
         STREAM.on('end', () => {
             // wait for the ffpmegstream to close: https://github.com/fluent-ffmpeg/node-fluent-ffmpeg/issues/1171#issuecomment-1361524138
-            setTimeout( () => {
                 //EOF: deal with part-full buffers
                 if (concatenatedBuffer.byteLength){
                     prepareWavForModel(concatenatedBuffer, file, end, chunkStart);
@@ -1642,7 +1664,6 @@ function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBat
                 }
                 DEBUG && console.log('All chunks sent for ', file);
                 return resolve()
-            }, 40)
         })
 
         STREAM.on('error', err => {
@@ -1755,9 +1776,7 @@ async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
 
     if (worker === undefined) {
         // pick a worker - this method is faster than looking for available workers
-        if (++workerInstance === NUM_WORKERS) {
-            workerInstance = 0;
-        }
+        if (++workerInstance >= NUM_WORKERS) workerInstance = 0;
         worker = workerInstance
     }
     const objData = {

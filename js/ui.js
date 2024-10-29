@@ -4601,7 +4601,7 @@ function playRegion(){
                 break;
             }
             case 'audioFiltersIcon': { toggleFilters(); break }
-            case 'context-mode': { toggleContextAwareMode(); break }
+            //case 'context-mode': { toggleContextAwareMode(); break }
             case 'frequency-range': { 
                 document.getElementById('frequency-range-panel').classList.toggle('d-none');
                 document.getElementById('frequency-range').classList.toggle('active');
@@ -5784,7 +5784,7 @@ function showCompareSpec() {
 async function getIUCNStatus(sname = 'Anser anser') {
     if (!Object.keys(STATE.IUCNcache).length) {
         //const path = p.join(appPath, 'IUCNcache.json');
-        const path = window.location.pathname.replace('index.html', 'IUCNcache.json');
+        const path = window.location.pathname.replace(/^\/(\w:)/, "$1").replace('index.html', 'IUCNcache.json');
         if (fs.existsSync(path)){
             const data = await fs.promises.readFile(path, 'utf8').catch(err => {});
             STATE.IUCNcache = JSON.parse(data);

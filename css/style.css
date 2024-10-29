@@ -538,6 +538,7 @@ input[type="range"].vertical {
     margin: 3px;
     appearance: auto;
     writing-mode: vertical-lr;
+    -webkit-appearance: slider-vertical;
     direction: rtl;
     top: -160px;
     right: 15px;
@@ -550,6 +551,7 @@ input[type="range"].vertical {
     background-color: #111;
     border-color: #999;
     border-radius: 1rem;
+
 }
 
 /* Animate Ellipsis */
