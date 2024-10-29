@@ -1664,7 +1664,7 @@ const defaultConfig = {
     latitude: 52.87,
     longitude: 0.89, 
     location: 'Great Snoring, North Norfolk',
-    detect: { nocmig: false, contextAware: false, confidence: 45, iucn: false },
+    detect: { nocmig: false, contextAware: false, confidence: 45, iucn: true , iucnScope: 'Global'},
     filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0, sendToModel: false },
     warmup: true,
     hasNode: false,
@@ -1783,6 +1783,7 @@ window.onload = async () => {
         DOM.audioDownmix.checked = config.audio.downmix;
         setNocmig(config.detect.nocmig);
         document.getElementById('iucn').checked = config.detect.iucn;
+        document.getElementById('iucn-scope').selected = config.detect.iucnScope;
         modelSettingsDisplay();
         // Block powersave? 
         document.getElementById('power-save-block').checked = config.powerSaveBlocker;
@@ -2646,7 +2647,7 @@ function onChartData(args) {
         resetResults();
         setListUIState(config.list);
         // Since the custom list function calls for its own update *after* reading the labels, we'll skip updates for custom lists here
-        config.list === 'custom' || worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone })
+        config.list === 'custom' || refreshResults()
     })
     
     DOM.customListSelector.addEventListener('click', async () =>{
@@ -3160,13 +3161,13 @@ function centreSpec(){
 
                 if (showIUCN) {
                     const record = await getIUCNStatus(item.sname);
-                    const iucn = record.scopes.find(obj => obj.scope === 'Global');
-                    const status = iucn.status;
-                    const url = iucn.url ? 'https://www.iucnredlist.org/species/' + iucn.url : null;
+                    const iucn = record.scopes.find(obj => obj.scope === config.detect.iucnScope);
+                    const status = iucn?.status || 'NA';
+                    const url = iucn?.url ? 'https://www.iucnredlist.org/species/' + iucn.url : null;
                     const redListIcon  =  status;
                     summaryHTML+=
                         `<td class="text-end"><a title="${IUCNLabel[status]}: Learn more about this species ICUN assessment" 
-                        class="d-inline-block p-1 rounded text-decoration-none text-center ${IUCNMap[redListIcon]} ${!url ? 'disabled-link' : ''}"
+                        class="d-inline-block p-1 w-100 rounded text-decoration-none text-center ${IUCNMap[redListIcon]} ${!url ? 'disabled-link' : ''}"
                         href="${url || '#'}" target="_blank"> ${redListIcon}</a></td>`;
                 }
                 summaryHTML += `<td class="text-end">${item.count}</td>
@@ -4484,7 +4485,7 @@ function playRegion(){
                 updatePrefs('config.json', config)
                 resetResults({clearSummary: true, clearPagination: true, clearResults: true});
                 setListUIState(config.list);
-                if (STATE.currentFile && STATE.analysisDone) worker.postMessage({ action: 'update-list', list: config.list, refreshResults: true })
+                if (STATE.currentFile) refreshResults();
                 break;
             }
                         
@@ -4651,7 +4652,9 @@ function playRegion(){
         target && target !== 'result1' && trackEvent(config.UUID, 'UI', 'Click', target);
     })
     
-    
+    function refreshResults () {
+        worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone })
+    }
     
     // Beginnings of the all-powerful document 'change' listener
     // One listener to rule them all!
@@ -4668,12 +4671,16 @@ function playRegion(){
                     }
                     config.speciesThreshold = element.value;
                     worker.postMessage({ action: 'update-state', speciesThreshold: element.value });
-                    worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone});
+                    refreshResults();
                     break;
                 }
                 case 'timelineSetting': { timelineToggle(e); break }
                 case 'nocmig': { changeNocmigMode(e); break }
-                case 'iucn': { config.detect.iucn = element.checked; break }
+                case 'iucn': { config.detect.iucn = element.checked } // no break so results are refreshed
+                case 'iucn-scope': { 
+                    config.detect.iucnScope = element.value; 
+                    refreshResults();
+                    break }
                 case 'auto-archive': { config.archive.auto = element.checked } // no break so worker state gets updated
                 case 'library-trim': { config.archive.trim = element.checked }
                 case 'archive-format': {
@@ -4698,7 +4705,7 @@ function playRegion(){
 
                     if (! config.useWeek) STATE.week = -1;
                     worker.postMessage({action:'update-state', useWeek: config.useWeek});
-                    worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone});
+                    refreshResults()
                     break;
                 }
                 case 'list-to-use': {
@@ -4707,7 +4714,7 @@ function playRegion(){
                     updateListIcon();
                     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
                     // Don't call this for custom lists
-                    config.list === 'custom' || worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone});
+                    config.list === 'custom' || refreshResults()
                     break;
                 }
                 case 'locale': {
@@ -4734,7 +4741,7 @@ function playRegion(){
                 case 'local': {
                     config.local = element.checked;
                     worker.postMessage({action: 'update-state', local: config.local })
-                    worker.postMessage({ action: 'update-list', list: config.list });
+                    refreshResults()
                     break;
                 }
                 case 'model-to-use': {

@@ -15,7 +15,7 @@ export class State {
             this.blocked = [],
             this.audio = { gain: 0, format: 'mp3', bitrate: 128, padding: false, fade: false, downmix: false, quality: 5, notification: true, normalise: false, maxFrequency: 11950, minFrequency: 0},
             this.filters = { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0, sendToModel: false },
-            this.detect = { backend: 'webgpu', nocmig: false, contextAware: false, confidence: 450, iucn: false },
+            this.detect = { backend: 'webgpu', nocmig: false, contextAware: false, confidence: 450, iucn: false, iucnScope: 'Global'},
             this.chart = { range: { start: undefined, end: undefined }, species: undefined },
             this.explore = { species: undefined, range: { start: undefined, end: undefined } },
             this.model = undefined,
