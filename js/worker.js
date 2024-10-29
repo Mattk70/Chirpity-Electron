@@ -1430,6 +1430,8 @@ function resumeFfmpeg(ffmpegCommand){
 
 let predictQueue = [];
 
+//TODO: refactor and remove header removal logic, don't need wav package
+
 const getWavePredictBuffers = async ({
     file = '', start = 0, end = undefined
 }) => {
