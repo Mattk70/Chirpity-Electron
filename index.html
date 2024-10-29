@@ -78,11 +78,11 @@
                 <fieldset class="border border-secondary rounded m-2 mt-0 mb-0 p-2">
                     <legend style="font-size: large;font-weight:bold">Detections</legend>
                     <div>
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Model" id="Model-circle-help"  data-bs-content="Select whether to use Chirpity, optimised for Nocturnal Migration Calls in Europe, or BirdNET, which can detect over 6000 species across the globe.">?</a>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Model" id="Model-circle-help"  data-bs-content="Select whether to use the Nocmig model, optimised for Nocturnal Migration Calls in Europe, or BirdNET, which can detect over 6000 species across the globe.">?</a>
                         <div class="pe-3 input-group rounded p-2 mb-1">
                             <label class="input-group-text col-5" for="model-to-use">Model:</label>
                             <select class="form-select mb-0" id="model-to-use">
-                                <option value="chirpity">Chirpity</option>
+                                <option value="chirpity">Nocmig</option>
                                 <option value="birdnet">BirdNet</option>
                             </select>
                         </div>
@@ -150,13 +150,22 @@
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Nocmig Mode" id="Nocmig Mode-circle-help"  data-bs-content="When enabled, this 'Nocmig mode' only searches for and only displays detections found during the night">?</a>
                         </div>
                     </div>
+                    <hr>
                     <div class="form-group rounded p-2 pe-0 mb-2">
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" role="switch" id="iucn">
                             <label class="form-check-label" for="iucn">Show species IUCN Red List status in summary.</label>
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Red List Status" id="IUCN-circle-help"  
-                                data-bs-content="When enabled, the latest Global ICUN assessment status is displayed for each species in the summary. The icon links to the assesment page on the ICUN website. ">?</a>
+                                data-bs-content="When enabled, the latest Global IUCN assessment status is displayed for each species in the summary. The icon links to the assessment page on the IUCN website. The Assessment Scope will display the IUCN assessment of the species in that region (where available).">?</a>
                         </div>
+                    </div>
+                    <div class="pe-3 input-group rounded p-2 mb-1">
+                        <label for="iucn-scope" class="input-group-text col-5">Assessment Scope:</label>
+                        <select class="form-select mb-0" id="iucn-scope">
+                            <option value="Global">Global</option>
+                            <option value="Europe">Europe</option>
+                            <option value="Mediterranean">Mediterranean</option>
+                        </select>
                     </div>
                     <hr>
                     <div class="form-group rounded">
@@ -628,7 +637,7 @@
                                     <li>First off, set your location in the settings menu.</li>
                                     <li>Next, consider which model best suits your needs:</li>
                                     <ul>
-                                        <li><b>Chirpity</b> is tuned for nocturnal migration,<br> but only has birds on the British list</li>
+                                        <li><b>Nocmig</b> is tuned for nocturnal migration,<br> but only has birds on the British list</li>
                                         <li><b>BirdNET</b> is trained on global bird species</li>
                                     </ul>
                                 </ol>
@@ -644,7 +653,7 @@
                                     <ol class="text-start ps-5"> 
                                         <li>Nocmig mode</li>
                                         <li>Audio filters</li>
-                                        <li>Context-aware mode (Chirpity model only)</li>
+                                        <li>Context-aware mode (Nocmig model only)</li>
                                         <li>Frequency range adjustment for the spectrogram</li>
                                         <li>Which detection list to use</li>
                                         <li>And the confidence threshold</li>
