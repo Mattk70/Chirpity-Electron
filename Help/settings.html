@@ -15,7 +15,7 @@
         <td>Choose the model to use for detection.
             <ul>
                 <li>
-                    <b>Chirpity</b> will use the native Chirpity model for analysis.
+                    <b>Nocmig</b> will use a model tuned for the nocturnal flight calls of European birds for analysis.
                 </li>
                 <li>
                     <b>BirdNET</b> will use the <a href="https://github.com/kahst/BirdNET-Analyzer" target="_blank">BirdNET</a> model developed by Stefan Kahl et al. from the K. Lisa Yang Center for Conservation Bioacoustics
@@ -51,7 +51,7 @@
                     <li>Precisely define the detections you would like Chirpity to report on</li>
                     <li>Search only for a specific species</li>
                 </ol>
-                You may use a different custom list for both BirdNET and Chirpity models. The format for a 
+                You may use a different custom list for both BirdNET and Nocmig models. The format for a 
                 custom list file is "scientific name_common name", with each species on a new line. <b>Importantly, the custom list needs to use labels in your selected language.</b> You can export a starting
                 list in the correct format from the Help menu, using the "<i>What species are detected?</i>" link. 
         </td>
@@ -118,7 +118,7 @@
     </tr>
     <tr>
         <th>Backend</th>
-        <td>This option is only visible when using the Chirpity model. Choose how predictions are calculated on you computer.
+        <td>This option is only visible when using the Nocmig model. Choose how predictions are calculated on you computer.
             <ul>
                 <li>
                     <b>CPU</b> will use the CPU for predictions, this is generally faster if you have an integrated
@@ -132,7 +132,7 @@
                     <b>WebGPU</b> This employs a new technology and will also use graphics processors. It is similar to WebGL, 
                     but is known to speed up the processing times on Macs, unlike WebGL. WebGPU uses more memory than WebGL, and 
                     if the threads or batch size values are set too high, Chirpity may run out of memory. If this happens 
-                    the spectrogram will disappear from the screen. Use a lower value for threads and / or batch size.
+                    the spectrogram may disappear from the screen or the app may become unresponsive. Use a lower value for threads and / or batch size.
                 </li>
             </ul>
         </td>
@@ -292,13 +292,13 @@
     </tr>
     <tr>
         <th>Context Mode</th>
-        <td> This mode is only available for the native Chirpity model. When enabled, the model will use the surrounding context when making predictions. This helps mitigate
+        <td> This mode is only available for the Nocmig model. When enabled, the model will use the surrounding context when making predictions. This helps mitigate
             against false positive detections.
         </td>
     </tr>
     <tr>
         <th>SNR filter</th>
-        <td>This setting is also only available for the native Chirpity model. The SNR (Signal to Noise Ratio) filter can only be enabled when using the CPU backend. 
+        <td>This setting is also only available for the Nocmig model. The SNR (Signal to Noise Ratio) filter can only be enabled when using the CPU backend. 
             When enabled, Chirpity will disregard audio segments with no distinct sound event.
             A stronger signal is required for a prediction to be attempted when higher signal-to-noise values are set.
             The purpose is to deliver significant speed gains, however, the setting may cause Chirpity to miss quieter, more distant calls.
@@ -310,13 +310,6 @@
             If you have encountered an issue while using Chirpity, you can enable debug mode. When you change this setting, you will need to quit and relaunch the application 
             for the change to take effect. When launched in debug mode, two windows will open, and each will print debugging information to a console on the right of the window.
             This is <b>extremely </b> useful if you want to report a bug - as you can share a screenshot of any errors that appear (these will show up in red in the console).
-        </td>
-    </tr>
-    <tr>
-        <th>Opt out of usage analytics</th>
-        <td>
-            Chirpity sends usage information anonymously to an analytics server. This information is used to help understand how people use Chirpity, and try to identify any bugs
-            or errors. Both help improve the software and prioritise changes for future releases. If you would prefer that Chirpity did not send any usage data, you can disable it here. 
         </td>
     </tr>
 </table>

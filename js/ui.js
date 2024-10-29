@@ -3161,19 +3161,19 @@ function centreSpec(){
 
                 if (showIUCN) {
                     const record = await getIUCNStatus(item.sname);
-                    const iucn = record.scopes.find(obj => obj.scope === config.detect.iucnScope);
+                    // there might not be a record...
+                    const iucn = record?.scopes.find(obj => obj.scope === config.detect.iucnScope);
                     const status = iucn?.status || 'NA';
                     const url = iucn?.url ? 'https://www.iucnredlist.org/species/' + iucn.url : null;
-                    const redListIcon  =  status;
+
                     summaryHTML+=
                         `<td class="text-end"><a title="${IUCNLabel[status]}: Learn more about this species ICUN assessment" 
                         class="d-inline-block p-1 w-100 rounded text-decoration-none text-center ${IUCNMap[redListIcon]} ${!url ? 'disabled-link' : ''}"
-                        href="${url || '#'}" target="_blank"> ${redListIcon}</a></td>`;
+                        href="${url || '#'}" target="_blank"> ${status}</a></td>`;
                 }
                 summaryHTML += `<td class="text-end">${item.count}</td>
                     <td class="text-end">${item.calls}</td>
                     </tr>`;
-                
             }
             summaryHTML += '</tbody></table>';
             // Get rid of flicker...
