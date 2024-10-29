@@ -20,7 +20,7 @@ const ntsuspend = require('ntsuspend');
 if (process.platform === 'win32') {
     isWin32 = true;
   }
-const DEBUG = true;
+const DEBUG = false;
 
 // Function to join Buffers and not use Buffer.concat() which leads to detached ArrayBuffers
 function joinBuffers(buffer1, buffer2) {
