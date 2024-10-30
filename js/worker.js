@@ -596,6 +596,10 @@ async function handleMessage(e) {
             await onUpdateLocale(args.locale, args.labels, args.refreshResults)
             break;
         }
+        case 'update-summary': {
+            await getSummary();
+            break;
+        }
         case "update-state": {
             appPath = args.path || appPath; tempPath = args.temp || tempPath;
             // If we change the speciesThreshold, we need to invalidate any location caches

@@ -937,7 +937,7 @@ async function onOpenFiles(args) {
     // Store the sanitised file list and Load First audio file
     hideAll();
     showElement(['spectrogramWrapper'], false);
-    resetResults({clearSummary: true, clearPagination: true, clearResults: true});
+    resetResults();
     resetDiagnostics();
     STATE.openFiles = sanitisedList;
     // CHeck not more than 25k files
@@ -1052,7 +1052,7 @@ function postAnalyseMessage(args) {
         if (!selection) {
             analyseReset();
             refreshResultsView();
-            resetResults({clearSummary: true, clearPagination: true, clearResults: true});
+            resetResults();
             // change result header to indicate deactivation
             DOM.resultHeader.classList.add('text-bg-secondary');
             DOM.resultHeader.classList.remove('text-bg-dark');
@@ -2647,7 +2647,7 @@ function onChartData(args) {
         resetResults();
         setListUIState(config.list);
         // Since the custom list function calls for its own update *after* reading the labels, we'll skip updates for custom lists here
-        config.list === 'custom' || refreshResults()
+        config.list === 'custom' || updateList()
     })
     
     DOM.customListSelector.addEventListener('click', async () =>{
@@ -4486,7 +4486,7 @@ function playRegion(){
                 updatePrefs('config.json', config)
                 resetResults({clearSummary: true, clearPagination: true, clearResults: true});
                 setListUIState(config.list);
-                if (STATE.currentFile) refreshResults();
+                if (STATE.currentFile) updateList();
                 break;
             }
                         
@@ -4653,10 +4653,17 @@ function playRegion(){
         target && target !== 'result1' && trackEvent(config.UUID, 'UI', 'Click', target);
     })
     
-    function refreshResults () {
-        worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone })
+    function updateList () {
+        STATE.analysisDone && worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone })
     }
     
+    function refreshSummary() {
+        if (STATE.analysisDone) {
+            // resetResults({});
+            worker.postMessage({ action: 'update-summary'})
+        }
+    }
+
     // Beginnings of the all-powerful document 'change' listener
     // One listener to rule them all!
     document.addEventListener('change', function (e) {
@@ -4672,7 +4679,7 @@ function playRegion(){
                     }
                     config.speciesThreshold = element.value;
                     worker.postMessage({ action: 'update-state', speciesThreshold: element.value });
-                    refreshResults();
+                    updateList();
                     break;
                 }
                 case 'timelineSetting': { timelineToggle(e); break }
@@ -4680,7 +4687,8 @@ function playRegion(){
                 case 'iucn': { config.detect.iucn = element.checked } // no break so results are refreshed
                 case 'iucn-scope': { 
                     config.detect.iucnScope = element.value; 
-                    refreshResults();
+                    resetRegions(); 
+                    refreshSummary();
                     break }
                 case 'auto-archive': { config.archive.auto = element.checked } // no break so worker state gets updated
                 case 'library-trim': { config.archive.trim = element.checked }
@@ -4706,7 +4714,7 @@ function playRegion(){
 
                     if (! config.useWeek) STATE.week = -1;
                     worker.postMessage({action:'update-state', useWeek: config.useWeek});
-                    refreshResults()
+                    updateList()
                     break;
                 }
                 case 'list-to-use': {
@@ -4715,7 +4723,7 @@ function playRegion(){
                     updateListIcon();
                     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
                     // Don't call this for custom lists
-                    config.list === 'custom' || refreshResults()
+                    config.list === 'custom' || updateList()
                     break;
                 }
                 case 'locale': {
@@ -4742,7 +4750,7 @@ function playRegion(){
                 case 'local': {
                     config.local = element.checked;
                     worker.postMessage({action: 'update-state', local: config.local })
-                    refreshResults()
+                    updateList()
                     break;
                 }
                 case 'model-to-use': {
