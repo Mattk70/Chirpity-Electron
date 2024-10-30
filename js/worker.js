@@ -1237,9 +1237,7 @@ const setMetadata = async ({ file, source_file = file }) => {
     // savedMeta may just have a locationID if it was set by onSetCUstomLocation
     if (! savedMeta?.duration) {
         try {
-            console.time('get duration')
             METADATA[file].duration = await getDuration(file)
-            console.timeEnd('get duration')
         } catch (e) {
             throw new Error('Unable to determine file duration ', e);
         }
@@ -1418,14 +1416,6 @@ async function processAudio (file, start, end, chunkStart, highWaterMark, sample
             DEBUG && console.log('progress: ', progress.timemark)
             checkBacklog(command)
         })
-        command.on('codecData', function(data) {
-            if ( ! ['N/A', Infinity].includes(data.duration)) {
-                // Update Metadata with accurate duration
-                const [hours, minutes, seconds] = data.duration.split(':').map(parseFloat);
-                const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
-                METADATA[file].duration = totalSeconds;
-            }
-          })
         const STREAM = command.pipe();
         STREAM.on('data', (chunk) => {
             if (aborted) {
@@ -1445,14 +1435,13 @@ async function processAudio (file, start, end, chunkStart, highWaterMark, sample
             
         });
         STREAM.on('end', () => {
-            // wait for the ffpmegstream to close: https://github.com/fluent-ffmpeg/node-fluent-ffmpeg/issues/1171#issuecomment-1361524138
-                //EOF: deal with part-full buffers
-                if (concatenatedBuffer.byteLength){
-                    prepareWavForModel(concatenatedBuffer, file, end, chunkStart);
-                    feedChunksToModel(...predictQueue.shift());
-                }
-                DEBUG && console.log('All chunks sent for ', file);
-                return resolve()
+            //EOF: deal with part-full buffers
+            if (concatenatedBuffer.byteLength){
+                prepareWavForModel(concatenatedBuffer, file, end, chunkStart);
+                feedChunksToModel(...predictQueue.shift());
+            }
+            DEBUG && console.log('All chunks sent for ', file);
+            return resolve()
         })
 
         STREAM.on('error', err => {
@@ -1478,7 +1467,7 @@ function getMonoChannelData(audio){
 
 function prepareWavForModel(audio, file, end, chunkStart) {
     predictionsRequested[file]++;
-    channelData = getMonoChannelData(audio);
+    const channelData = getMonoChannelData(audio);
     // Send the channel data to the model
     predictQueue.push([channelData, chunkStart, file, end]);
     AUDIO_BACKLOG++;
@@ -2192,7 +2181,7 @@ const parsePredictions = async (response) => {
 
     return response.worker
 }
-                        
+           
 let SEEN_MODEL_READY = false;
 async function parseMessage(e) {
     const response = e.data;

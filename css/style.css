@@ -347,9 +347,12 @@ footer {
   max-height: 30vh;
 }
 
+#fileContainer {
+    max-width: 40vw;
+}
+
 .filename,
 .dropdown-menu-dark>a {
-    max-width: 40%;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

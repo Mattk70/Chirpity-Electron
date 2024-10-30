@@ -2667,6 +2667,7 @@ function onChartData(args) {
     const loadModel = ()  => {
         PREDICTING = false;
         t0_warmup = Date.now();
+        STATE.analysisDone = false;
         worker.postMessage({
             action: 'load-model',
             model: config.model,
