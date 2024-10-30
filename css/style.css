@@ -144,7 +144,9 @@ div#contentWrapper.loaded {
     position: absolute;
     font-size: calc(32px * var(--font-size-scale));;
 }
-
+.zoom-xc {
+    font-size: calc(32px * var(--font-size-scale));;
+}
 .species-selector {
     position: relative;
 }

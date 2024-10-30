@@ -20,7 +20,7 @@ if (process.platform === 'win32') {
     ntsuspend = require('ntsuspend');
     isWin32 = true;
   }
-const DEBUG = false;
+const DEBUG = true;
 
 // Function to join Buffers and not use Buffer.concat() which leads to detached ArrayBuffers
 function joinBuffers(buffer1, buffer2) {
@@ -1311,7 +1311,6 @@ function checkBacklog(ffmpegCommand = null) {
 
         const interval = setInterval(() => {
             const backlog = AUDIO_BACKLOG;
-
             if (aborted) {
                 clearInterval(interval);
                 resolve(false);
@@ -2197,12 +2196,10 @@ async function parseMessage(e) {
                 SEEN_MODEL_READY = true;
                 sampleRate = response["sampleRate"];
                 const backend = response["backend"];
-                console.log(backend);
+                DEBUG && console.log(backend);
                 UI.postMessage({
                     event: "model-ready",
-                    message: "ready",
-                    backend: backend,
-                    sampleRate: sampleRate
+                    message: "Give It To Me Baby. Uh-Huh Uh-Huh"
                 });
         }
         break;

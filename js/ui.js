@@ -3014,7 +3014,6 @@ function centreSpec(){
     
     function onModelReady(args) {
         modelReady = true;
-        sampleRate = args.sampleRate;
         if (fileLoaded) {
             enableMenuItem(['analyse'])
             if (STATE.openFiles.length > 1) enableMenuItem(['analyseAll', 'reanalyseAll'])
@@ -5615,10 +5614,10 @@ function renderComparisons(lists, cname){
                             </button>
                             <div class="btn-group" role="group">
                                 <button id="cmpZoomIn" title="Zoom into the spectrogram" class="btn btn-outline-secondary p-0">
-                                <span class="material-symbols-outlined zoom">zoom_in</span>
+                                <span class="material-symbols-outlined zoom-xc">zoom_in</span>
                                 </button>
                                 <button id="cmpZoomOut" title="Zoom out of the spectrogram" class="btn btn-outline-secondary p-0"
-                                style="max-width: 70px"><span class="material-symbols-outlined zoom align-middle">zoom_out</span>
+                                style="max-width: 70px"><span class="material-symbols-outlined zoom-xc align-middle">zoom_out</span>
                                 </button>
                             </div>
                         </div>
