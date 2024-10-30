@@ -3,7 +3,6 @@ const { ipcRenderer } = require('electron');
 const fs = require('node:fs');
 const p = require('node:path');
 const { writeFile, mkdir, readdir, stat } = require('node:fs/promises');
-const wavefileReader = require('wavefile-reader');
 const SunCalc = require('suncalc');
 const ffmpeg = require('fluent-ffmpeg');
 const png = require('fast-png');
@@ -1062,59 +1061,28 @@ function onAbort({
 
 }
 
-// const getDuration = async (src) => {
-//     let audio;
-//     return new Promise(function (resolve, reject) {
-//         audio = new Audio();
-//         audio.src = src.replaceAll('#', '%23').replaceAll('?', '%3F'); // allow hash and ? in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
-//         audio.addEventListener("loadedmetadata", function () {
-//             const duration = audio.duration === Infinity ? Number.MAX_SAFE_INTEGER : audio.duration;
-//             audio = undefined;
-//             // Tidy up - cloning removes event listeners
-//             const old_element = document.getElementById("audio");
-//             const new_element = old_element.cloneNode(true);
-//             old_element.parentNode.replaceChild(new_element, old_element);
-            
-//             resolve(duration);
-//         });
-//         audio.addEventListener('error', (error) => {
-//             generateAlert({type: 'error',  message: 'Unable to extract essential metadata from ' + src})
-//             reject(error, src)
-//         })
-//     });
-// }
 const getDuration = async (src) => {
-    return new Promise((resolve, reject) => {
-        // Replace special characters in the file path as needed
-        // const formattedSrc = src.replaceAll('#', '%23').replaceAll('?', '%3F');
-        try {
-        const command = ffmpeg('file:' + src)
-            .format(null)
-            .save('null.wav')
-            .on('codecData', (data) => {
-                let duration;
-                if ( ! ['N/A', Infinity].includes(data.duration)) {
-                    // Update Metadata with accurate duration
-                    const [hours, minutes, seconds] = data.duration.split(':').map(parseFloat);
-                    duration = (hours * 3600) + (minutes * 60) + seconds;
-                } else {
-                    duration = Number.MAX_SAFE_INTEGER;
-                }
-                console.log(duration , 'seconds')
-                resolve(duration);
-                command.kill(); // Stop processing after getting the duration
-            })
-            .on('error', (error) => {
-                if (!error.message.includes('ffmpeg was killed')){
-                    generateAlert({ type: 'error', message: 'Unable to extract essential metadata from ' + src });
-                    reject(error);
-                }
-            })
-        } catch (error) {
-            console.log(error)
-        }
+    let audio;
+    return new Promise(function (resolve, reject) {
+        audio = new Audio();
+        audio.src = src.replaceAll('#', '%23').replaceAll('?', '%3F'); // allow hash and ? in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
+        audio.addEventListener("loadedmetadata", function () {
+            const duration = audio.duration === Infinity ? Number.MAX_SAFE_INTEGER : audio.duration;
+            audio = undefined;
+            // Tidy up - cloning removes event listeners
+            const old_element = document.getElementById("audio");
+            const new_element = old_element.cloneNode(true);
+            old_element.parentNode.replaceChild(new_element, old_element);
+            
+            resolve(duration);
+        });
+        audio.addEventListener('error', (error) => {
+            generateAlert({type: 'error',  message: 'Unable to extract essential metadata from ' + src})
+            reject(error, src)
+        })
     });
-};
+}
+
 
 /**
 * getWorkingFile's purpose is to locate a file and set its metadata. 
@@ -1205,32 +1173,30 @@ async function loadAudioFile({
 }) {
 
     if (file) {
-        await fetchAudioBuffer({ file, start, end })
-        .then((buffer) => {
-            let audioArray = buffer.getChannelData(0);
-            UI.postMessage({
-                event: 'worker-loaded-audio',
-                location: METADATA[file].locationID,
-                start: METADATA[file].fileStart,
-                sourceDuration: METADATA[file].duration,
-                bufferBegin: start,
-                file: file,
-                position: position,
-                contents: audioArray,
-                fileRegion: region,
-                preserveResults: preserveResults,
-                play: play,
-                queued: queued,
-                goToRegion,
-                metadata: METADATA[file].metadata
-            }, [audioArray.buffer]);
-        })
+        const audio = await fetchAudioBuffer({ file, start, end })
         .catch( (error) => {
             console.log(error);
             // notify and return null if no matching file was found
             generateAlert({type: 'error',  message: error.message});
             error.code === 'ENOENT' && notifyMissingFile(file)
         })
+        let audioArray = getMonoChannelData(audio);
+        UI.postMessage({
+            event: 'worker-loaded-audio',
+            location: METADATA[file].locationID,
+            start: METADATA[file].fileStart,
+            sourceDuration: METADATA[file].duration,
+            bufferBegin: start,
+            file: file,
+            position: position,
+            contents: audioArray,
+            fileRegion: region,
+            preserveResults: preserveResults,
+            play: play,
+            queued: queued,
+            goToRegion,
+            metadata: METADATA[file].metadata
+        }, [audioArray.buffer]);
         let week;
         if (STATE.list === 'location'){
             week = STATE.useWeek ? new Date(METADATA[file].fileStart).getWeekNumber() : -1
@@ -1332,58 +1298,6 @@ const setMetadata = async ({ file, source_file = file }) => {
     return METADATA[file];
 }
 
-function setupCtx(audio, rate, destination, file) {
-    rate ??= sampleRate;
-    // Deal with detached arraybuffer issue
-    const useFilters = (STATE.filters.sendToModel && STATE.filters.active) || destination === 'UI';
-    return audioCtx.decodeAudioData(audio.buffer)
-    .then( audioBuffer => {
-        const audioCtxSource = audioCtx.createBufferSource();
-        audioCtxSource.buffer = audioBuffer;
-        audioBuffer = null; //  release memory
-        const duration = audioCtxSource.buffer.duration;
-        const buffer = audioCtxSource.buffer;
-
-        const offlineCtx = new OfflineAudioContext(1, rate * duration, rate);
-        const offlineSource = offlineCtx.createBufferSource();
-        offlineSource.buffer = buffer;
-        let previousFilter = undefined;
-        if (useFilters){
-            if (STATE.filters.active) {
-                if (STATE.filters.highPassFrequency) {
-                    // Create a highpass filter to cut low-frequency noise
-                    const highpassFilter = offlineCtx.createBiquadFilter();
-                    highpassFilter.type = "highpass"; // Standard second-order resonant highpass filter with 12dB/octave rolloff. Frequencies below the cutoff are attenuated; frequencies above it pass through.
-                    highpassFilter.frequency.value = STATE.filters.highPassFrequency; //frequency || 0; // This sets the cutoff frequency. 0 is off. 
-                    highpassFilter.Q.value = 0; // Indicates how peaked the frequency is around the cutoff. The greater the value, the greater the peak.
-                    offlineSource.connect(highpassFilter);
-                    previousFilter = highpassFilter;
-                }
-                if (STATE.filters.lowShelfFrequency && STATE.filters.lowShelfAttenuation) {
-                    // Create a lowshelf filter to attenuate low-frequency noise
-                    const lowshelfFilter = offlineCtx.createBiquadFilter();
-                    lowshelfFilter.type = 'lowshelf';
-                    lowshelfFilter.frequency.value = STATE.filters.lowShelfFrequency; // This sets the cutoff frequency of the lowshelf filter to 1000 Hz
-                    lowshelfFilter.gain.value = STATE.filters.lowShelfAttenuation; // This sets the boost or attenuation in decibels (dB)
-                    previousFilter ? previousFilter.connect(lowshelfFilter) : offlineSource.connect(lowshelfFilter);
-                    previousFilter = lowshelfFilter;
-                }
-            }      
-        }
-        if (STATE.audio.gain){
-            var gainNode = offlineCtx.createGain();
-            gainNode.gain.value = Math.pow(10, STATE.audio.gain / 20);
-            previousFilter ? previousFilter.connect(gainNode) : offlineSource.connect(gainNode);
-            gainNode.connect(offlineCtx.destination);
-        } else {
-            previousFilter ? previousFilter.connect(offlineCtx.destination) : offlineSource.connect(offlineCtx.destination);
-        }
-        offlineSource.start();
-        return offlineCtx;
-    })
-    .catch(error => aborted || console.warn(error, file));    
-};
-
 function checkBacklog(ffmpegCommand = null) {
     return new Promise((resolve) => {
         let firstRun = true, hysteresis_factor = 2;
@@ -1433,7 +1347,7 @@ function checkBacklog(ffmpegCommand = null) {
 
 function pauseFfmpeg(ffmpegCommand){
     if (isWin32){
-        const pid = ffmpegCommand.ffmpegProc.pid;
+        const pid = ffmpegCommand.ffmpegProc?.pid;
         const message = pid ? (ntsuspend.suspend(pid) ? 'Ffmpeg process resumed' : 'Could not resume process') 
             : 'Could not resume process (exited)';
         console.log(message)
@@ -1454,152 +1368,10 @@ function resumeFfmpeg(ffmpegCommand){
     }
 }
 
-/**
-*
-* @param file
-* @param start
-* @param end
-* @returns {Promise<void>}
-*/
+
 
 let predictQueue = [];
 
-//TODO: refactor and remove header removal logic, don't need wav package
-
-const getWavePredictBuffers = async ({
-    file = '', start = 0, end = undefined
-}) => {
-    if (! fs.existsSync(file)) {
-        const found = await getWorkingFile(file);
-        if (!found) return
-        return await getPredictBuffers({file, start, end})
-    }
-    // Ensure max and min are within range
-    start = Math.max(0, start);
-    end = Math.min(METADATA[file].duration, end);
-    if (start > METADATA[file].duration) {
-        return
-    }
-    let meta = {};
-    batchChunksToSend[file] = Math.ceil((end - start) / (BATCH_SIZE * WINDOW_SIZE));
-    predictionsReceived[file] = 0;
-    predictionsRequested[file] = 0;
-    let readStream;
-    // extract the header. With bext and iXML metadata, this can be up to 128k, hence 131072
-    const headerStream = fs.createReadStream(file, {start: 0, end: 524288, highWaterMark: 524288});
-    headerStream.on('readable',  () => {
-        let chunk = headerStream.read();
-        let wav = new wavefileReader.WaveFileReader();
-        try {
-            wav.fromBuffer(chunk);
-        } catch (e) {
-            generateAlert({type: 'error',  message: `Cannot parse ${file}, it has an invalid wav header.`});
-            console.warn('GetWavePredictBuffers failed: ', e)
-            headerStream.close();
-            updateFilesBeingProcessed(file);
-            return;
-        }
-        let headerEnd;
-        wav.signature.subChunks.forEach(el => {
-            if (el['chunkId'] === 'data') {
-                headerEnd = el.chunkData.start;
-            }
-        });
-        meta.header = chunk.subarray(0, headerEnd);
-        const byteRate = wav.fmt.byteRate;
-        const sample_rate = wav.fmt.sampleRate;
-        meta.byteStart = Math.round((start * byteRate) / sample_rate) * sample_rate + headerEnd;
-        meta.byteEnd = Math.round((end * byteRate) / sample_rate) * sample_rate + headerEnd;
-        meta.highWaterMark = byteRate * BATCH_SIZE * WINDOW_SIZE;
-        headerStream.destroy();
-        DEBUG && console.log('Header extracted for ', file);
-
-
-        readStream = fs.createReadStream(file, {
-            start: meta.byteStart, end: meta.byteEnd, highWaterMark: meta.highWaterMark
-        });
-
-    
-        let chunkStart = start * sampleRate;
-        // Changed on.('data') handler because of:  https://stackoverflow.com/questions/32978094/nodejs-streams-and-premature-end
-        readStream.on('readable', async () => {
-            if (aborted) {
-                readStream.destroy();
-                return
-            }
-            const notAborted = await checkBacklog();
-            if (notAborted){
-                const chunk = readStream.read();
-                if (chunk === null || chunk.byteLength <= 1 ) {
-                    // EOF
-                    chunk?.byteLength && predictionsReceived[file]++;
-                    readStream.destroy();
-                } else {
-                    const audio = joinBuffers(meta.header, chunk);
-                    predictQueue.push([audio, file, end, chunkStart]);
-                    chunkStart += WINDOW_SIZE * BATCH_SIZE * sampleRate;
-                    processPredictQueue();
-                }
-            } else {
-                readStream.destroy();
-            }
-        })
-        readStream.on('error', err => {
-            console.log(`readstream error: ${err}, start: ${start}, , end: ${end}, duration: ${METADATA[file].duration}`);
-            err.code === 'ENOENT' && notifyMissingFile(file);
-        })
-    })    
-}
-
-function processPredictQueue(audio, file, end, chunkStart){
-
-    if (! audio) [audio, file, end, chunkStart]  = predictQueue.shift(); // Dequeue chunk
-    if (audio.length === 0) {
-        console.error('Shifted zero length audio from predict queue');
-        return
-    } 
-    predictionsRequested[file]++; // do this before any async stuff
-    setupCtx(audio, undefined, 'model', file).then(offlineCtx => {
-        let worker;
-        if (offlineCtx) {
-            offlineCtx.startRendering().then((resampled) => {
-                const myArray = resampled.getChannelData(0);
-                feedChunksToModel(myArray, chunkStart, file, end, worker);
-                AUDIO_BACKLOG++;
-                return
-            }).catch((error) => {
-                predictionsRequested[file]--; // Didn't request a prediction after all
-                aborted || console.error(`PredictBuffer rendering failed: ${error}, file ${file}`);
-                updateFilesBeingProcessed(file);
-                return
-            });
-        } else {
-            if (audio.length === 0){
-                if (!aborted){
-                    // If the audio length is 0 now, we must have run out of memory
-                    terminateWorkers();
-                    // Hard quit
-                    UI.postMessage({event: 'analysis-complete', quiet: true})
-                    console.error(`Out of memory. Batch size was (${BATCH_SIZE}) threads: ${predictWorkers.length}`);
-                        aborted = true;
-                        const message = `
-                            <p class="text-danger h6">System memory exhausted, the operation has been terminated. </p>
-                            <p>
-                            <b>Tip:</b> Close any unnecessary open applications. If that is not effective, reduce the number of Threads ${BATCH_SIZE > 4 ? 'or lower the batch size' : ''} in the system settings'}.<p>`;
-                    generateAlert({type: 'error',  message: message, autohide: false})
-                return
-            }
-        }
-        console.log('Short chunk', audio.length, 'padding');
-        let chunkLength = STATE.model === 'birdnet' ? 144_000 : 72_000;
-        const myArray = new Float32Array(Array.from({ length: chunkLength }).fill(0));
-        feedChunksToModel(myArray, chunkStart, file, end);
-        AUDIO_BACKLOG++;
-    }}).catch(error => { 
-        aborted || console.warn(file, error) ;
-        predictionsRequested[file]--; // Didn't request a prediction after all
-    })
-}
 
 const getPredictBuffers = async ({
     file = '', start = 0, end = undefined
@@ -1630,26 +1402,7 @@ const getPredictBuffers = async ({
 
 }
 
-function lookForHeader(buffer){
-    //if (buffer.length < 4096) return undefined
-    try {
-        const wav = new wavefileReader.WaveFileReader();
-        wav.fromBuffer(buffer);
-        let headerEnd;
-        wav.signature.subChunks.forEach(el => {
-            if (el['chunkId'] === 'data') {
-                headerEnd = el.chunkData.start;
-            }
-        });
-        return buffer.subarray(0, headerEnd);
-    } catch (e) {
-        DEBUG && console.log(e)
-        return undefined
-    }
-}
-
-function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBatch){
-    let header, shortFile = true;
+async function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBatch){
     return new Promise((resolve, reject) => {
         let concatenatedBuffer = Buffer.alloc(0);
         const command = setupFfmpegCommand({file, start, end, sampleRate})
@@ -1710,19 +1463,22 @@ function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBat
     }).catch(error => console.log(error));
 }
 
+function getMonoChannelData(audio){
+        // Calculate the number of samples and directly create a Float32Array
+        const sampleCount = (audio.length) / 2; // 2 bytes per sample for 16-bit PCM
+        const channelData = new Float32Array(sampleCount);
+        
+        // Populate the Float32Array with normalised values
+        for (let i = 0, j = 0; j < audio.length; i++, j += 2) {
+            const sample = audio.readInt16LE(j);
+            channelData[i] = sample / 32768; // Normalise to [-1, 1] range
+        }
+        return channelData
+}
+
 function prepareWavForModel(audio, file, end, chunkStart) {
     predictionsRequested[file]++;
-    
-    // Calculate the number of samples and directly create a Float32Array
-    const sampleCount = (audio.length) / 2; // 2 bytes per sample for 16-bit PCM
-    const channelData = new Float32Array(sampleCount);
-    
-    // Populate the Float32Array with normalised values
-    for (let i = 0, j = 0; j < audio.length; i++, j += 2) {
-        const sample = audio.readInt16LE(j);
-        channelData[i] = sample / 32768; // Normalise to [-1, 1] range
-    }
-    
+    channelData = getMonoChannelData(audio);
     // Send the channel data to the model
     predictQueue.push([channelData, chunkStart, file, end]);
     AUDIO_BACKLOG++;
@@ -1750,21 +1506,22 @@ const fetchAudioBuffer = async ({
     // Use ffmpeg to extract the specified audio segment
     if (isNaN(start)) throw(new Error('fetchAudioBuffer: start is NaN'));
     return new Promise((resolve, reject) => {
+        const filters = STATE.filters;
         const command = setupFfmpegCommand({
             file,
             start,
             end,
             sampleRate: 24000,
-            format: 'wav',
+            format: 's16le',
             channels: 1,
             additionalFilters: [
-                STATE.filters.lowShelfAttenuation && {
+                filters.lowShelfAttenuation && filters.lowShelfFrequency && {
                     filter: 'lowshelf',
-                    options: `gain=${STATE.filters.lowShelfAttenuation}:f=${STATE.filters.lowShelfFrequency}`
+                    options: `gain=${filters.lowShelfAttenuation}:f=${filters.lowShelfFrequency}`
                 },
-                STATE.filters.highPassFrequency && {
+                filters.highPassFrequency && {
                     filter: 'highpass',
-                    options: `f=${STATE.filters.highPassFrequency}:poles=1`
+                    options: `f=${filters.highPassFrequency}:poles=1`
                 },
                 STATE.audio.normalise && {
                     filter: 'loudnorm',
@@ -1784,15 +1541,7 @@ const fetchAudioBuffer = async ({
             if (chunk === null){
                 // Last chunk
                 const audio = concatenatedBuffer;
-                setupCtx(audio, sampleRate, 'UI', file).then(offlineCtx => {
-                    offlineCtx.startRendering().then(resampled => {
-                        resolve(resampled);
-                    }).catch((error) => {
-                        console.error(`FetchAudio rendering failed: ${error}`);
-                    });
-                }).catch( (error) => {
-                    reject(error.message)
-                });  
+                resolve(audio)
                 stream.destroy();
             } else {
                 concatenatedBuffer = concatenatedBuffer.length ?  joinBuffers(concatenatedBuffer, chunk) : chunk;
@@ -1836,11 +1585,11 @@ async function doPrediction({
     start = 0,
     end = METADATA[file].duration,
 }) {
-    if (file.toLowerCase().endsWith('.wav')){
-        await getWavePredictBuffers({ file: file, start: start, end: end }).catch( (error) => console.warn(error));
-    } else {
+    // if (file.toLowerCase().endsWith('.wav')){
+    //     await getWavePredictBuffers({ file: file, start: start, end: end }).catch( (error) => console.warn(error));
+    // } else {
         await getPredictBuffers({ file: file, start: start, end: end }).catch( (error) => console.warn(error));
-    }
+    // }
     
     UI.postMessage({ event: 'update-audio-duration', value: METADATA[file].duration });
 }
