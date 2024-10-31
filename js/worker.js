@@ -1214,6 +1214,8 @@ const setMetadata = async ({ file, source_file = file }) => {
                     const [lat, lon] = location.split(' ');
                     const roundedFloat = (string) => Math.round(parseFloat(string) * 10000) / 10000;
                     await onSetCustomLocation({ lat: roundedFloat(lat), lon: roundedFloat(lon), place: location, files: [file] }) 
+                    METADATA[file].lat = roundedFloat(lat);
+                    METADATA[file].lon = roundedFloat(lon);
                 }
                 guanoTimestamp = Date.parse(guano.Timestamp);
                 METADATA[file].fileStart = guanoTimestamp;

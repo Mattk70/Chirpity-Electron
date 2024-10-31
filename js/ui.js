@@ -1650,7 +1650,7 @@ const defaultConfig = {
     lastUpdateCheck: 0,
     UUID: uuidv4(),
     colormap: 'inferno',
-    specMaxHeight: 512,
+    specMaxHeight: 260,
     specLabels: true,
     customColormap: {'loud': "#00f5d8", 'mid': "#000000", 'quiet': "#000000", 'threshold': 0.5, 'windowFn': 'hann'},
     timeOfDay: true,
@@ -1882,38 +1882,29 @@ const setUpWorkerMessaging = () => {
             switch (event) {
                 case 'all-files-saved-check-result': {
                     customAnalysisAllMenu(args.result)
-                    break;
-                }
+                    break }
                 case "analysis-complete": {onAnalysisComplete(args);
-                    break;
-                }
+                    break }
                 case "audio-file-to-save": {onSaveAudio(args);
-                    break;
-                }
+                    break }
                 case "chart-data": {onChartData(args);
-                    break;
-                }
+                    break }
                 case "conversion-progress": { 
                     displayProgress(args.progress, args.text)
-                    break;
-                }
+                    break }
                 case "current-file-week": { 
                     STATE.week = args.week
-                    break;
-                }
+                    break }
                 case "diskDB-has-records": {
                     DOM.chartsLink.classList.remove("disabled");
                     DOM.exploreLink.classList.remove("disabled");
                     config.archive.location && document.getElementById('compress-and-organise').classList.remove('disabled');
                     STATE.diskHasRecords = true;
-                    break;
-                }
+                    break }
                 case "file-location-id": {onFileLocationID(args);
-                    break;
-                }
+                    break }
                 case "files": {onOpenFiles(args);
-                    break;
-                }
+                    break }
                 case "generate-alert": {
                     if (args.updateFilenamePanel) {
                         renderFilenamePanel();
@@ -1939,12 +1930,10 @@ const setUpWorkerMessaging = () => {
                     generateToast({ type: args.type, message: args.message, autohide: args.autohide});
                     // This is how we know the database update has completed
                     if (args.database && config.archive.auto) document.getElementById('compress-and-organise').click();
-                break;
-                }
+                break }
                 // Called when last result is returned from a database query
                 case "database-results-complete": {onResultsComplete(args);
-                    break;
-                }
+                    break }
                 case "labels": { 
                     LABELS = args.labels; 
                     /* Code below to retrieve Red list data
@@ -1962,11 +1951,9 @@ const setUpWorkerMessaging = () => {
                     break }
                 case "location-list": {LOCATIONS = args.locations;
                     locationID = args.currentLocation;
-                    break;
-                }
+                    break }
                 case "model-ready": {onModelReady(args);
-                    break;
-                }
+                    break }
                 case "mode-changed": {
                     const mode = args.mode;
                     STATE.mode = mode;
@@ -1994,33 +1981,26 @@ const setUpWorkerMessaging = () => {
                         DOM.resultHeader.classList.add('text-bg-secondary');
                         DOM.resultHeader.classList.remove('text-bg-dark');   
                     }
-                    break;
-                }
+                    break }
                 case "summary-complete": {onSummaryComplete(args);
-                    break;
-                }
+                    break }
                 case "new-result": {renderResult(args);
-                    break;
-                }
+                    break }
                 case "progress": {onProgress(args);
-                    break;
-                }
+                    break }
                 // called when an analysis ends, or when the filesbeingprocessed list is empty
                 case "processing-complete": {
                     STATE.analysisDone = true;
-                    break;
-                }
+                    break }
                 case 'ready-for-tour':{
                     // New users - show the tour
                     if (!config.seenTour) {
                         config.seenTour = true;
                         setTimeout(prepTour, 1500);
                     }
-                    break;
-                }
+                    break }
                 case "seen-species-list": {generateBirdList("seenSpecies", args.list);
-                break;
-                }
+                break }
                 case 'tfjs-node': {
                     // Have we gone from a no-node setting to a node one?
                     const changedEnv = config.hasNode !== args.hasNode;
@@ -2036,29 +2016,22 @@ const setUpWorkerMessaging = () => {
                         console.warn('tfjs-node could not be loaded, webGPU backend forced. CPU is', DIAGNOSTICS['CPU'])
                     }
                     modelSettingsDisplay();
-                    break;
-                }
+                    break }
                 case "valid-species-list": {populateSpeciesModal(args.included, args.excluded);
-                    break;
-                }
+                    break }
                 case "total-records": {updatePagination(args.total, args.offset);
-                    break;
-                }
+                    break }
                 case "unsaved-records": {window.electron.unsavedRecords(true);
                     document.getElementById("unsaved-icon").classList.remove("d-none");
-                    break;
-                }
+                    break }
                 case "update-audio-duration": {DIAGNOSTICS["Audio Duration"] ??= 0;
                     DIAGNOSTICS["Audio Duration"] += args.value;
-                    break;
-                }
+                    break }
                 case "update-summary": {updateSummary(args);
-                    break;
-                }
+                    break }
                 case "worker-loaded-audio": {
                     onWorkerLoadedAudio(args);
-                    break;
-                }
+                    break }
                 default: {generateToast({type: 'error', message:`Unrecognised message from worker:${args.event}`});
                 }
             }
@@ -4680,23 +4653,29 @@ function playRegion(){
                     config.speciesThreshold = element.value;
                     worker.postMessage({ action: 'update-state', speciesThreshold: element.value });
                     updateList();
-                    break;
-                }
+                    break }
                 case 'timelineSetting': { timelineToggle(e); break }
                 case 'nocmig': { changeNocmigMode(e); break }
-                case 'iucn': { config.detect.iucn = element.checked } // no break so results are refreshed
+                case 'iucn': { 
+                    config.detect.iucn = element.checked;
+                    resetRegions(); 
+                    refreshSummary();
+                    break } 
                 case 'iucn-scope': { 
                     config.detect.iucnScope = element.value; 
                     resetRegions(); 
                     refreshSummary();
                     break }
-                case 'auto-archive': { config.archive.auto = element.checked } // no break so worker state gets updated
-                case 'library-trim': { config.archive.trim = element.checked }
+                case 'auto-archive': { config.archive.auto = element.checked;
+                    worker.postMessage({action: 'update-state', archive: config.archive});
+                    break } // no break so worker state gets updated
+                case 'library-trim': { config.archive.trim = element.checked; 
+                    worker.postMessage({action: 'update-state', archive: config.archive});
+                    break }
                 case 'archive-format': {
                     config.archive.format = document.getElementById('archive-format').value;
                     worker.postMessage({action: 'update-state', archive: config.archive})
-                    break;
-                }
+                    break }
                 case 'confidenceValue': case 'confidence': { handleThresholdChange(e); break }
                 case 'context' : { toggleContextAwareMode(e); break }
                 case 'attenuation': { handleAttenuationchange(e); break }
@@ -4707,16 +4686,14 @@ function playRegion(){
                 case 'power-save-block': {
                     config.powerSaveBlocker = element.checked;
                     powerSave(config.powerSaveBlocker);
-                    break;
-                }
+                    break }
                 case 'species-week': {
                     config.useWeek = element.checked;
 
                     if (! config.useWeek) STATE.week = -1;
                     worker.postMessage({action:'update-state', useWeek: config.useWeek});
                     updateList()
-                    break;
-                }
+                    break }
                 case 'list-to-use': {
                     setListUIState(element.value)
                     config.list = element.value;
@@ -4724,8 +4701,7 @@ function playRegion(){
                     resetResults({clearSummary: true, clearPagination: true, clearResults: true});
                     // Don't call this for custom lists
                     config.list === 'custom' || updateList()
-                    break;
-                }
+                    break }
                 case 'locale': {
                     if (PREDICTING){
                         generateToast({message: 'It is not possible to change the language while an analysis is underway', type:'warning'})
@@ -4745,14 +4721,12 @@ function playRegion(){
                         config[config.model].locale = element.value;
                         readLabels(labelFile, 'locale');
                     }
-                    break;
-                }
+                    break }
                 case 'local': {
                     config.local = element.checked;
                     worker.postMessage({action: 'update-state', local: config.local })
                     updateList()
-                    break;
-                }
+                    break }
                 case 'model-to-use': {
                     config.model = element.value;
                     modelSettingsDisplay();
@@ -4763,8 +4737,7 @@ function playRegion(){
                     document.getElementById(config[config.model].backend).checked = true;
                     handleBackendChange(config[config.model].backend);
                     setListUIState(config.list)
-                    break;
-                }
+                    break }
                 case 'thread-slider': {
                     if (PREDICTING){
                         generateToast({message: 'It is not possible to change the number of threads while an analysis is underway', type:'warning'})
@@ -4775,8 +4748,7 @@ function playRegion(){
                         config[config[config.model].backend].threads = DOM.threadSlider.valueAsNumber;
                         worker.postMessage({action: 'change-threads', threads: DOM.threadSlider.valueAsNumber})
                     }
-                    break;
-                }
+                    break }
                 case 'batch-size': {
                     if (PREDICTING){
                         generateToast({message: 'It is not possible to change the batch size while an analysis is underway', type:'warning'})
@@ -4790,8 +4762,7 @@ function playRegion(){
                         // Reset region maxLength
                         initRegion();
                     }
-                    break;
-                }
+                    break }
                 case 'colourmap': {
                     config.colormap = element.value;
                     const colorMapFieldset = document.getElementById('colormap-fieldset')
@@ -4806,8 +4777,7 @@ function playRegion(){
                         wavesurfer = undefined;
                         adjustSpecDims(true, fftSamples)
                     }
-                    break;
-                }
+                    break }
                 case 'window-function': case 'loud-color': case 'mid-color': case 'quiet-color': case 'color-threshold-slider': {
                     const windowFn = document.getElementById('window-function').value;
                     const loud = document.getElementById('loud-color').value;
@@ -4822,8 +4792,7 @@ function playRegion(){
                         wavesurfer = undefined;
                         adjustSpecDims(true, fftSamples)
                     }
-                    break;
-                }
+                    break }
                 case 'gain': {
                     DOM.gainAdjustment.textContent = element.value + 'dB'; //.toString();
                     config.audio.gain = element.value;
@@ -4831,8 +4800,7 @@ function playRegion(){
                     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                     fileLoaded &&
                         postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
-                    break;
-                }
+                    break }
                 case 'spec-labels': {
                     config.specLabels = element.checked;                    
                     if (wavesurfer && STATE.currentFile) {
@@ -4841,8 +4809,7 @@ function playRegion(){
                         wavesurfer = undefined;
                         adjustSpecDims(true, fftSamples)
                     }
-                    break;
-                }
+                    break }
                 case 'fromInput': case 'fromSlider': {
                     config.audio.minFrequency = Math.max(element.valueAsNumber, 0);
                     DOM.fromInput.value = config.audio.minFrequency;
@@ -4853,8 +4820,7 @@ function playRegion(){
                     adjustSpecDims(true, fftSamples);
                     checkFilteredFrequency();
                     worker.postMessage({action: 'update-state', audio: config.audio});
-                    break;
-                }
+                    break }
                 case 'toInput': case 'toSlider': {
                     config.audio.maxFrequency = Math.min(element.valueAsNumber, 11950);
                     DOM.toInput.value = config.audio.maxFrequency;
@@ -4865,59 +4831,50 @@ function playRegion(){
                     adjustSpecDims(true, fftSamples);
                     checkFilteredFrequency();
                     worker.postMessage({action: 'update-state', audio: config.audio});
-                    break;
-                }
+                    break }
                 case 'normalise': {
                     config.audio.normalise = element.checked;
                     worker.postMessage({action:'update-state', audio: config.audio})
                     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                     fileLoaded &&
                         postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
-                    break;
-                }
+                    break }
                 case 'send-filtered-audio-to-model': {
                     config.filters.sendToModel = element.checked;
                     worker.postMessage({ action: 'update-state', filters: config.filters })
-                    break;
-                }
+                    break }
 
                 case 'format': {
                     config.audio.format = element.value;
                     showRelevantAudioQuality();
                     worker.postMessage({ action: 'update-state', audio: config.audio })
-                    break;
-                };
+                    break };
                 
                 case 'bitrate': {
                     config.audio.bitrate = e.target.value;
                     worker.postMessage({ action: 'update-state', audio: config.audio })
-                    break;
-                };
+                    break };
                 
                 case 'quality': {
                     config.audio.quality = element.value;
                     worker.postMessage({ action: 'update-state', audio: config.audio })
-                    break;
-                };
+                    break };
                 
                 case 'fade': {
                     config.audio.fade = element.checked;
                     worker.postMessage({ action: 'update-state', audio: config.audio })
-                    break;
-                };
+                    break };
                 
                 case 'padding': {
                     config.audio.padding = e.target.checked;
                     DOM.audioFade.disabled = !DOM.audioPadding.checked;;
                     worker.postMessage({ action: 'update-state', audio: config.audio })
-                    break;
-                };
+                    break };
                 
                 case 'downmix': {
                     config.audio.downmix = e.target.checked;
                     worker.postMessage({ action: 'update-state', audio: config.audio })
-                    break;
-                };
+                    break };
             }
             updatePrefs('config.json', config)
             const value = element.type === "checkbox" ? element.checked : element.value;
@@ -5483,7 +5440,7 @@ async function readLabels(labelFile, updating){
         return false;
     }
 
-    // Not Harlem, but Fisher-Yates shuffle
+    // Not Harlem, but Fisher-Yates shuffle - used for xc call selection
     function shuffle(array) {
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -5876,14 +5833,14 @@ const IUCNMap = {
     'VU': 'text-bg-warning',
     'NT': 'text-bg-warning',
     'EN': 'text-bg-danger',
-    'CR': 'text-bg-dnager',
+    'CR': 'text-bg-danger',
     'EW': 'text-bg-dark',
     'EX': 'text-bg-dark'
 }
 const IUCNLabel = {
     'NA': 'No Data',
     'DD': 'Data Deficient',
-    'LC': 'Least Consern',
+    'LC': 'Least Concern',
     'VU': 'Vulnerable',
     'NT': 'Near Threatened',
     'EN': 'Endangered',
