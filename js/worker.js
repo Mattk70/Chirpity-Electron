@@ -2,7 +2,7 @@
 const { ipcRenderer } = require('electron');
 const fs = require('node:fs');
 const p = require('node:path');
-const { writeFile, mkdir, readdir, stat } = require('node:fs/promises');
+const { writeFile, mkdir, readdir } = require('node:fs/promises');
 const SunCalc = require('suncalc');
 const ffmpeg = require('fluent-ffmpeg');
 const png = require('fast-png');
@@ -374,48 +374,8 @@ let METADATA = {};
 let index = 0, AUDACITY = {}, predictionStart;
 let sampleRate; // Should really make this a property of the model
 let predictWorkers = [], aborted = false;
-let audioCtx;
-// Set up the audio context:
-function setAudioContext() {
-    audioCtx = new AudioContext({ latencyHint: 'interactive', sampleRate: sampleRate });
-}
-
-
 let UI;
 let FILE_QUEUE = [];
-
-
-const dirInfo = async ({ folder = undefined, recursive = false }) => {
-    const files = await readdir(folder, { withFileTypes: true });
-    const ctimes = [];
-    const paths = files.map(async file => {
-        const path = p.join(folder, file.name);
-        if (file.isDirectory()) {
-            if (recursive) {
-                return await dirInfo({ folder: path, recursive: true })
-            } else {
-                return 0
-            }
-        }
-        if (file.isFile() || file.isSymbolicLink()) {
-            const { size, ctimeMs } = await stat(path);
-            ctimes.push([path, ctimeMs, size]);
-            return size
-            
-        }
-        return 0;
-    });
-    const pathResults = await Promise.all(paths);
-    const flattenedPaths = pathResults.flat(Infinity);
-    const size = flattenedPaths.reduce((i, size) => i + size, 0);
-    // Newest to oldest file, so we can pop the list (faster)
-    ctimes.sort((a, b) => {
-        return a[1] - b[1]
-    })
-    //console.table(ctimes);
-    return [size, ctimes];
-}
-
 let INITIALISED = null;
 
 async function handleMessage(e) {
@@ -669,7 +629,6 @@ async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backen
     SEEN_MODEL_READY = false;
     LIST_CACHE = {}
     sampleRate = model === "birdnet" ? 48_000 : 24_000;
-    setAudioContext(sampleRate);
     UI.postMessage({event:'ready-for-tour'});
     STATE.detect.backend = backend;
     BATCH_SIZE = batchSize;
@@ -1862,7 +1821,7 @@ const bufferToAudio = async ({
             DEBUG && console.log('FFmpeg command: ' + commandLine);
         })
         command.on('error', (err) => {
-            console.log('An error occurred: ' + err.message);
+            reject(console.error('An error occurred: ' + err.message));
         })
         command.on('end', function () {
             DEBUG && console.log(format + " file rendered")
@@ -1968,7 +1927,6 @@ async function batchInsertRecords(cname, label, files, originalCname) {
         query += ` AND dateTime BETWEEN ${STATE.explore.range.start} AND ${STATE.explore.range.end}`;
     }
     const records = await STATE.db.allAsync(query, ...params);
-    const updatedID = db.getAsync('SELECT id FROM species WHERE cname = ?', cname);
     let count = 0;
     await db.runAsync('BEGIN');
     for (let i = 0; i< records.length; i++) {
@@ -2299,13 +2257,6 @@ function sumObjectValues(obj) {
     for (const key in obj) {  total += obj[key] }
     return total;
 }
-
-function onSameDay(timestamp1, timestamp2) {
-    const date1Str = new Date(timestamp1).toLocaleDateString();
-    const date2Str = new Date(timestamp2).toLocaleDateString();
-    return date1Str === date2Str;
-}
-
 
 // Function to calculate the active intervals for an audio file in nocmig mode
 

@@ -5361,9 +5361,8 @@ async function readLabels(labelFile, updating){
                     <svg class="bi flex-shrink-0 me-2" width="20" height="20" role="img" aria-label="Info:"><use xlink:href="#info-fill"/></svg>
                     There's a new version of Chirpity available! <a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blank">Check the website</a> for more information`,
                     'warning');
-                    
+                    trackEvent(config.UUID, 'Update message', `From ${VERSION}`, `To: ${latestVersion}`);
                 }
-                trackEvent(config.UUID, 'Update message', `From ${VERSION}`, `To: ${latestVersion}`);
                 config.lastUpdateCheck = latestCheck;
                 updatePrefs('config.json', config)
             })
