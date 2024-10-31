@@ -1,5 +1,6 @@
 import {trackVisit, trackEvent} from './tracking.js';
 import {DOM} from './DOMcache.js';
+import {IUCNCache} from './IUCNcache.js';
 
 let LOCATIONS, locationID = undefined, loadingTimeout;
 
@@ -72,7 +73,7 @@ let STATE = {
     birdList: { lastSelectedSpecies: undefined }, // Used to put the last selected species at the top of the all-species list
     selection: { start: undefined, end: undefined },
     currentAnalysis: {currentFile: null, openFiles: [],  mode: null, species: null, offset: 0, active: null},
-    IUCNcache: {}
+    IUCNcache:IUCNCache
 }
 
 // Batch size map for slider
@@ -3160,7 +3161,7 @@ function centreSpec(){
                     </td>`;
 
                 if (showIUCN) {
-                    const record = await getIUCNStatus(item.sname);
+                    const record = STATE.IUCNcache[item.sname];
                     // there might not be a record...
                     const iucn = record?.scopes.find(obj => obj.scope === config.detect.iucnScope);
                     const status = iucn?.status || 'NA';
