@@ -20,7 +20,7 @@ if (process.platform === 'win32') {
     ntsuspend = require('ntsuspend');
     isWin32 = true;
   }
-const DEBUG = false;
+const DEBUG = true;
 
 // Function to join Buffers and not use Buffer.concat() which leads to detached ArrayBuffers
 function joinBuffers(buffer1, buffer2) {
@@ -141,7 +141,7 @@ const setupFfmpegCommand = ({
     const command = ffmpeg('file:' + file)
         .format(format)
         .audioChannels(channels)
-        .audioFrequency(sampleRate);
+        // .audioFrequency(sampleRate);
 
     // Add filters if provided
     additionalFilters.forEach(filter => {
