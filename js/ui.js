@@ -3854,10 +3854,6 @@ function formatDuration(seconds){
         updatePrefs('config.json', config)
         showFilterEffect();
         filterIconDisplay();
-        if (config.filters.active){
-            document.getElementById('navbarSettings').click();
-            document.getElementById('decreaseFont').scrollIntoView();
-        }
     }
     
 
@@ -4803,6 +4799,7 @@ function playRegion(){
                     config.audio.gain = element.value;
                     worker.postMessage({action:'update-state', audio: config.audio})
                     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+                    config.filters.active || toggleFilters();
                     fileLoaded &&
                         postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
                     break }
