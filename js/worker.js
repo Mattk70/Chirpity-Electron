@@ -1291,14 +1291,14 @@ function checkBacklog(ffmpegCommand = null) {
 
             if (backlog >= NUM_WORKERS * hysteresis_factor) {
                 if (! STATE.processingPaused[pid]) {
-                    pauseFfmpeg(pid); //.kill('SIGSTOP');;
+                    pauseFfmpeg(ffmpegCommand, pid);
                     DEBUG && console.log(`pause signal sent to ffmpeg(${pid}), backlog: ${backlog}`);
                     STATE.processingPaused[pid] = true;
                 }
             } else if (backlog <= NUM_WORKERS) {
                 DEBUG && console.log('backlog (final):', backlog);
                 if (STATE.processingPaused[pid]) {
-                     resumeFfmpeg(pid); //.kill('SIGCONT');
+                     resumeFfmpeg(ffmpegCommand, pid);
                      DEBUG && console.log(`resume signal sent to ffmpeg(${pid}), backlog: ${backlog}`);
                      STATE.processingPaused[pid] = false;
                 }
@@ -1309,7 +1309,7 @@ function checkBacklog(ffmpegCommand = null) {
     });
 }
 
-function pauseFfmpeg(pid){
+function pauseFfmpeg(ffmpegCommand, pid){
     if (isWin32){
         const message = pid ? (ntsuspend.suspend(pid) ? 'Ffmpeg process paused' : 'Could not pause process') 
             : 'Could not pause process (exited)';
@@ -1319,7 +1319,7 @@ function pauseFfmpeg(pid){
     }
 }
 
-function resumeFfmpeg(pid){
+function resumeFfmpeg(ffmpegCommand, pid){
     if (isWin32){
         const message = pid ? (ntsuspend.resume(pid) ? 'Ffmpeg process resumed' : 'Could not resume process') 
             : 'Could not resume process (exited)';
