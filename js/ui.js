@@ -1442,6 +1442,7 @@ function adjustSpecDims(redraw, fftSamples, newHeight) {
         
         decreaseBtn.classList.toggle('disabled', config.fontScale === 0.7);
         increaseBtn.classList.toggle('disabled', config.fontScale === 1.1);
+        decreaseBtn.scrollIntoView({block: 'center', behavior: 'auto'})
         updatePrefs('config.json', config)
         adjustSpecDims(true)
     }
@@ -3853,6 +3854,10 @@ function formatDuration(seconds){
         updatePrefs('config.json', config)
         showFilterEffect();
         filterIconDisplay();
+        if (config.filters.active){
+            document.getElementById('navbarSettings').click();
+            document.getElementById('decreaseFont').scrollIntoView();
+        }
     }
     
 

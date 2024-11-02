@@ -939,7 +939,7 @@ async function onAnalyse({
     batchChunksToSend = {};
     FILE_QUEUE = filesInScope;
     AUDIO_BACKLOG = 0;
-    STATE.processingPaused = false;
+    STATE.processingPaused = {};
     
     
     if (!STATE.selection) {
@@ -1263,9 +1263,14 @@ const setMetadata = async ({ file, source_file = file }) => {
 
 function checkBacklog(ffmpegCommand = null) {
     return new Promise((resolve) => {
+        const pid = ffmpegCommand.ffmpegProc?.pid;
+        if (! pid){
+            console.warn('Ffmpeg process already exited in check backlog call')
+            return 
+        }
         let firstRun = true, hysteresis_factor = 2;
 
-        if (!aborted && AUDIO_BACKLOG < NUM_WORKERS * hysteresis_factor && !STATE.processingPaused) {
+        if (!aborted && AUDIO_BACKLOG < NUM_WORKERS * hysteresis_factor && ! STATE.processingPaused[pid]) {
             resolve(true);
             return;
         }
@@ -1284,22 +1289,18 @@ function checkBacklog(ffmpegCommand = null) {
             }
 
             if (backlog >= NUM_WORKERS * hysteresis_factor) {
-                if (ffmpegCommand) {
-                    STATE.processingPaused || pauseFfmpeg(ffmpegCommand); //.kill('SIGSTOP');;
+                if (! STATE.processingPaused[pid]) {
+                    pauseFfmpeg(pid); //.kill('SIGSTOP');;
+                    DEBUG && console.log(`pause signal sent to ffmpeg(${pid}), backlog: ${backlog}`);
+                    STATE.processingPaused[pid] = true;
                 }
-                firstRun && console.log('stop signal sent, backlog: ', backlog);
-                STATE.processingPaused = true;
-
             } else if (backlog <= NUM_WORKERS) {
                 DEBUG && console.log('backlog (final):', backlog);
-                if (STATE.processingPaused) {
-                    if (ffmpegCommand) {
-                        resumeFfmpeg(ffmpegCommand); //.kill('SIGCONT');
-                    }
-                    console.log('resume signal sent, backlog: ', backlog);
-                    STATE.processingPaused = false;
+                if (STATE.processingPaused[pid]) {
+                     resumeFfmpeg(pid); //.kill('SIGCONT');
+                     DEBUG && console.log(`resume signal sent to ffmpeg(${pid}), backlog: ${backlog}`);
+                     STATE.processingPaused[pid] = false;
                 }
-
                 clearInterval(interval); // Backlog is within limits, stop checking
                 resolve(true); // Resolve the promise
             }
@@ -1307,21 +1308,18 @@ function checkBacklog(ffmpegCommand = null) {
     });
 }
 
-function pauseFfmpeg(ffmpegCommand){
+function pauseFfmpeg(pid){
     if (isWin32){
-        const pid = ffmpegCommand.ffmpegProc?.pid;
-        const message = pid ? (ntsuspend.suspend(pid) ? 'Ffmpeg process resumed' : 'Could not resume process') 
-            : 'Could not resume process (exited)';
+        const message = pid ? (ntsuspend.suspend(pid) ? 'Ffmpeg process paused' : 'Could not pause process') 
+            : 'Could not pause process (exited)';
         console.log(message)
     } else {
         ffmpegCommand.kill('SIGSTOP')
     }
 }
 
-function resumeFfmpeg(ffmpegCommand){
+function resumeFfmpeg(pid){
     if (isWin32){
-        // Sometimes, the process exits before resume can be called
-        const pid = ffmpegCommand.ffmpegProc?.pid;
         const message = pid ? (ntsuspend.resume(pid) ? 'Ffmpeg process resumed' : 'Could not resume process') 
             : 'Could not resume process (exited)';
         console.log(message)
@@ -1367,7 +1365,8 @@ const getPredictBuffers = async ({
 async function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBatch){
     return new Promise((resolve, reject) => {
         let concatenatedBuffer = Buffer.alloc(0);
-        const command = setupFfmpegCommand({file, start, end, sampleRate})
+        const additionalFilters = STATE.filters.sendToModel ? setAudioFilters() : [];
+        const command = setupFfmpegCommand({file, start, end, sampleRate, additionalFilters})
         command.on('error', (error) => {
             if (error.message === 'Output stream closed'){
                 console.warn(`processAudio: ${file} ${error}`);
@@ -1459,7 +1458,7 @@ const fetchAudioBuffer = async ({
     // Use ffmpeg to extract the specified audio segment
     if (isNaN(start)) throw(new Error('fetchAudioBuffer: start is NaN'));
     return new Promise((resolve, reject) => {
-        const filters = STATE.filters;
+        const additionalFilters = setAudioFilters();
         const command = setupFfmpegCommand({
             file,
             start,
@@ -1467,21 +1466,9 @@ const fetchAudioBuffer = async ({
             sampleRate: 24000,
             format: 's16le',
             channels: 1,
-            additionalFilters: [
-                filters.lowShelfAttenuation && filters.lowShelfFrequency && {
-                    filter: 'lowshelf',
-                    options: `gain=${filters.lowShelfAttenuation}:f=${filters.lowShelfFrequency}`
-                },
-                filters.highPassFrequency && {
-                    filter: 'highpass',
-                    options: `f=${filters.highPassFrequency}:poles=1`
-                },
-                STATE.audio.normalise && {
-                    filter: 'loudnorm',
-                    options: "I=-16:LRA=11:TP=-1.5"
-                }
-            ].filter(Boolean),
+            additionalFilters: additionalFilters
         });
+
         const stream = command.pipe();
         
         command.on('error', error => {
@@ -1501,6 +1488,28 @@ const fetchAudioBuffer = async ({
             }
         })
     });
+}
+
+function setAudioFilters(){
+    const filters = STATE.filters;
+    return STATE.filters.active ?  [
+        filters.lowShelfAttenuation && filters.lowShelfFrequency && {
+            filter: 'lowshelf',
+            options: `gain=${filters.lowShelfAttenuation}:f=${filters.lowShelfFrequency}`
+        },
+        filters.highPassFrequency && {
+            filter: 'highpass',
+            options: `f=${filters.highPassFrequency}:poles=1`
+        },
+        STATE.audio.gain && {
+            filter: 'volume',
+            options: `volume=${STATE.audio.gain}dB`
+        },
+        STATE.audio.normalise && {
+            filter: 'loudnorm',
+            options: "I=-16:LRA=11:TP=-1.5"
+        }
+    ].filter(Boolean) : [];
 }
 
 // Helper function to check if a given time is within daylight hours
@@ -1748,8 +1757,8 @@ const bufferToAudio = async ({
     
     METADATA[file] || await getWorkingFile(file);
     if (padding) {
-        start -= padding;
-        end += padding;
+        start -= 1;
+        end += 1;
         start = Math.max(0, start);
         end = Math.min(end, METADATA[file].duration);
     }
@@ -1760,50 +1769,31 @@ const bufferToAudio = async ({
         .audioChannels(downmix ? 1 : -1)
         // I can't get this to work with Opus
         // .audioFrequency(METADATA[file].sampleRate)
-        .audioCodec(audioCodec).seekInput(start).duration(end - start)
+        .audioCodec(audioCodec)
+        .seekInput(start).duration(end - start)
         if (['mp3', 'm4a', 'opus'].includes(format)) {
             //if (format === 'opus') bitrate *= 1000;
             command = command.audioBitrate(bitrate)
         } else if (['flac'].includes(format)) {
             command = command.audioQuality(quality)
         }
-        if (STATE.filters.active) {
-            const filters = [];
-            if (STATE.filters.lowShelfFrequency > 0) {
-                filters.push({
-                    filter: 'lowshelf',
-                    options: `gain=${STATE.filters.lowShelfAttenuation}:f=${STATE.filters.lowShelfFrequency}`
-                });
-            }
-            if (STATE.filters.highPassFrequency > 0) {
-                filters.push({
-                    filter: 'highpass',
-                    options: `f=${STATE.filters.highPassFrequency}:poles=1`
-                });
-            }            
-            if (STATE.audio.normalise) {
-                filters.push({
-                    filter: 'loudnorm',
-                    options: "I=-16:LRA=11:TP=-1.5"
-                });
-            }            
-            if (filters.length > 0) {
-                command = command.audioFilters(filters);
-            }            
-        }
+        const filters = setAudioFilters();
+        if (filters.length > 0) {
+            command = command.audioFilters(filters);
+        }            
+
         if (fade && padding) {
             const duration = end - start;
-            if (start >= 1 && end <= METADATA[file].duration - 1) {
-                command = command.audioFilters(
-                    {
-                        filter: 'afade',
-                        options: `t=in:ss=${start}:d=1`
-                    },
-                    {
-                        filter: 'afade',
-                        options: `t=out:st=${duration - 1}:d=1`
-                    }
-                )}
+            command = command.audioFilters(
+                {
+                    filter: 'afade',
+                    options: `t=in:ss=${start}:d=1`
+                },
+                {
+                    filter: 'afade',
+                    options: `t=out:st=${duration - 1}:d=1`
+                }
+            )
         }
         if (Object.entries(meta).length){
             meta = Object.entries(meta).flatMap(([k, v]) => {
