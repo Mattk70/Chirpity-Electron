@@ -20,7 +20,7 @@ if (process.platform === 'win32') {
     ntsuspend = require('ntsuspend');
     isWin32 = true;
   }
-const DEBUG = true;
+let DEBUG = false;
 
 // Function to join Buffers and not use Buffer.concat() which leads to detached ArrayBuffers
 function joinBuffers(buffer1, buffer2) {
@@ -572,6 +572,7 @@ async function handleMessage(e) {
                 if (STATE.included?.['birdnet']?.['nocturnal'])  delete STATE.included.birdnet.nocturnal;
             }
             STATE.update(args);
+            DEBUG = STATE.debug;
             break;
         }
         default: {UI.postMessage("Worker communication lines open");
@@ -1312,7 +1313,7 @@ function pauseFfmpeg(pid){
     if (isWin32){
         const message = pid ? (ntsuspend.suspend(pid) ? 'Ffmpeg process paused' : 'Could not pause process') 
             : 'Could not pause process (exited)';
-        console.log(message)
+        DEBUG && console.log(message)
     } else {
         ffmpegCommand.kill('SIGSTOP')
     }
@@ -1322,7 +1323,7 @@ function resumeFfmpeg(pid){
     if (isWin32){
         const message = pid ? (ntsuspend.resume(pid) ? 'Ffmpeg process resumed' : 'Could not resume process') 
             : 'Could not resume process (exited)';
-        console.log(message)
+        DEBUG && console.log(message)
     } else {
         ffmpegCommand.kill('SIGCONT')
     }

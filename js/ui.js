@@ -1844,7 +1844,7 @@ window.onload = async () => {
             useWeek: config.useWeek,
             local: config.local,
             UUID: config.UUID,
-            track: config.track
+            debug: config.debug
         });
         const {model, list} = config;
         t0_warmup = Date.now();

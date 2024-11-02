@@ -37,7 +37,8 @@ export class State {
             this.track = true,
             this.powerSaveBlocker = false,
             this.archive = {location: undefined, format: 'ogg', auto: false, trim: false},
-            this.useGUANO = true
+            this.useGUANO = true;
+            this.debug = false
     }
 
 
