@@ -141,7 +141,7 @@ const setupFfmpegCommand = ({
     const command = ffmpeg('file:' + file)
         .format(format)
         .audioChannels(channels)
-        // .audioFrequency(sampleRate);
+        .audioFrequency(sampleRate);
 
     // Add filters if provided
     additionalFilters.forEach(filter => {
@@ -606,7 +606,7 @@ function savedFileCheck(fileList) {
 }
 
 function setGetSummaryQueryInterval(threads){
-    STATE.incrementor = STATE.detect.backend !== 'tensorflow' ? threads * 10 : threads;
+    //STATE.incrementor = STATE.detect.backend !== 'tensorflow' ? threads * 10 : threads;
 }
 
 async function onChangeMode(mode) {
