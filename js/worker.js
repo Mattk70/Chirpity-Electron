@@ -1365,7 +1365,7 @@ const getPredictBuffers = async ({
 
 async function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBatch){
     return new Promise((resolve, reject) => {
-        let concatenatedBuffer = Buffer.alloc(0);
+        let concatenatedBuffer = Buffer.allocUnsafe(0);
         const additionalFilters = STATE.filters.sendToModel ? setAudioFilters() : [];
         const command = setupFfmpegCommand({file, start, end, sampleRate, additionalFilters})
         command.on('error', (error) => {
@@ -1386,9 +1386,10 @@ async function processAudio (file, start, end, chunkStart, highWaterMark, sample
                 STREAM.destroy();
                 return
             }
-            concatenatedBuffer = concatenatedBuffer.length ? joinBuffers(concatenatedBuffer, chunk) : chunk;
+            concatenatedBuffer = concatenatedBuffer.length ? Buffer.concat([concatenatedBuffer, chunk]) : chunk;
             // if we have a full buffer
             if (concatenatedBuffer.length > highWaterMark) {
+                AUDIO_BACKLOG++;
                 const audio_chunk = concatenatedBuffer.subarray(0, highWaterMark);
                 const remainder = concatenatedBuffer.subarray(highWaterMark);
                 prepareWavForModel(audio_chunk, file, end, chunkStart);
@@ -1416,25 +1417,42 @@ async function processAudio (file, start, end, chunkStart, highWaterMark, sample
     }).catch(error => console.log(error));
 }
 
-function getMonoChannelData(audio){
-        // Calculate the number of samples and directly create a Float32Array
-        const sampleCount = (audio.length) / 2; // 2 bytes per sample for 16-bit PCM
-        const channelData = new Float32Array(sampleCount);
-        
-        // Populate the Float32Array with normalised values
-        for (let i = 0, j = 0; j < audio.length; i++, j += 2) {
-            const sample = audio.readInt16LE(j);
-            channelData[i] = sample / 32768; // Normalise to [-1, 1] range
-        }
-        return channelData
+function getMonoChannelData(audio) {
+    const sampleCount = audio.length / 2;
+    const channelData = new Float32Array(sampleCount);
+    const dataView = new DataView(audio.buffer, audio.byteOffset, audio.byteLength);
+
+    // Process in blocks of 4 samples at a time for loop unrolling (optional)
+    let i = 0;
+    let j = 0;
+    const end = sampleCount - (sampleCount % 8); // Ensure we don’t overshoot the buffer
+
+    for (; i < end; i += 8, j += 16) {
+        // Unrolled loop
+        channelData[i] = dataView.getInt16(j, true) / 32768;
+        channelData[i + 1] = dataView.getInt16(j + 2, true) / 32768;
+        channelData[i + 2] = dataView.getInt16(j + 4, true) / 32768;
+        channelData[i + 3] = dataView.getInt16(j + 6, true) / 32768;
+        channelData[i + 4] = dataView.getInt16(j + 8, true) / 32768;
+        channelData[i + 5] = dataView.getInt16(j + 10, true) / 32768;
+        channelData[i + 6] = dataView.getInt16(j + 12, true) / 32768;
+        channelData[i + 7] = dataView.getInt16(j + 14, true) / 32768;
+    }
+
+    // Process remaining samples (if any)
+    for (; i < sampleCount; i++, j += 2) {
+        channelData[i] = dataView.getInt16(j, true) / 32768;
+    }
+
+    return channelData;
 }
+
 
 function prepareWavForModel(audio, file, end, chunkStart) {
     predictionsRequested[file]++;
     const channelData = getMonoChannelData(audio);
     // Send the channel data to the model
     predictQueue.push([channelData, chunkStart, file, end]);
-    AUDIO_BACKLOG++;
 }
 
 /**
