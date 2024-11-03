@@ -1583,11 +1583,8 @@ async function doPrediction({
     start = 0,
     end = METADATA[file].duration,
 }) {
-    // if (file.toLowerCase().endsWith('.wav')){
-    //     await getWavePredictBuffers({ file: file, start: start, end: end }).catch( (error) => console.warn(error));
-    // } else {
-        await getPredictBuffers({ file: file, start: start, end: end }).catch( (error) => console.warn(error));
-    // }
+
+    await getPredictBuffers({ file: file, start: start, end: end }).catch( (error) => console.warn(error));
     
     UI.postMessage({ event: 'update-audio-duration', value: METADATA[file].duration });
 }
