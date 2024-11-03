@@ -3281,7 +3281,7 @@ function formatDuration(seconds){
     const pagination = document.querySelectorAll('.pagination');
     pagination.forEach(item => {
         item.addEventListener('click', (e) => {
-            if (e.target.tagName === 'A') { // Did we click a link in the list?
+            if (STATE.analysisDone && e.target.tagName === 'A') { // Did we click a link in the list?
                 let clicked = e.target.textContent;
                 let currentPage = pagination[0].querySelector('.active');
                 currentPage = parseInt(currentPage.textContent);

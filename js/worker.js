@@ -481,8 +481,7 @@ async function handleMessage(e) {
                 await getResults(args);
                 args.updateSummary && await getSummary(args);
                 args.included = await getIncludedIDs(args.file);
-                const [total, offset, species] = await getTotal(args);
-                UI.postMessage({event: 'total-records', total: total, offset: offset, species: species})
+                await getTotal(args);
             }
             break;
         }
@@ -799,7 +798,7 @@ const prepSummaryStatement = (included) => {
 }
     
 
-const getTotal = async ({species = undefined, offset = undefined, included = [], file = undefined}= {}) => {
+const getTotal = async ({species = undefined, offset = undefined, included = STATE.included, file = undefined}= {}) => {
     let params = [];
     const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
     offset = offset ?? (species !== undefined ? STATE.filteredOffset[species] : STATE.globalOffset);
@@ -827,7 +826,7 @@ const getTotal = async ({species = undefined, offset = undefined, included = [],
         SQL += ' AND speciesID = (SELECT id from species WHERE cname = ?) '; 
     }
     const {total} = await STATE.db.getAsync(SQL, ...params)
-    return [total, offset, species]
+    UI.postMessage({event: 'total-records', total: total, offset: offset, species: species})
 }
 
 const prepResultsStatement = (species, noLimit, included, offset, topRankin) => {
@@ -1137,36 +1136,39 @@ async function loadAudioFile({
 }) {
 
     if (file) {
-        const audio = await fetchAudioBuffer({ file, start, end })
+        fetchAudioBuffer({ file, start, end })
+        .then(audio => {
+            let audioArray = getMonoChannelData(audio);
+            UI.postMessage({
+                event: 'worker-loaded-audio',
+                location: METADATA[file].locationID,
+                start: METADATA[file].fileStart,
+                sourceDuration: METADATA[file].duration,
+                bufferBegin: start,
+                file: file,
+                position: position,
+                contents: audioArray,
+                fileRegion: region,
+                preserveResults: preserveResults,
+                play: play,
+                queued: queued,
+                goToRegion,
+                metadata: METADATA[file].metadata
+            }, [audioArray.buffer]);
+            let week;
+            if (STATE.list === 'location'){
+                week = STATE.useWeek ? new Date(METADATA[file].fileStart).getWeekNumber() : -1
+                // Send the week number of the surrent file
+                UI.postMessage({event: 'current-file-week', week: week})
+            } else { UI.postMessage({event: 'current-file-week', week: undefined}) }
+        })
         .catch( (error) => {
-            console.log(error);
+            console.warn(error);
             // notify and return null if no matching file was found
             generateAlert({type: 'error',  message: error.message});
             error.code === 'ENOENT' && notifyMissingFile(file)
         })
-        let audioArray = getMonoChannelData(audio);
-        UI.postMessage({
-            event: 'worker-loaded-audio',
-            location: METADATA[file].locationID,
-            start: METADATA[file].fileStart,
-            sourceDuration: METADATA[file].duration,
-            bufferBegin: start,
-            file: file,
-            position: position,
-            contents: audioArray,
-            fileRegion: region,
-            preserveResults: preserveResults,
-            play: play,
-            queued: queued,
-            goToRegion,
-            metadata: METADATA[file].metadata
-        }, [audioArray.buffer]);
-        let week;
-        if (STATE.list === 'location'){
-            week = STATE.useWeek ? new Date(METADATA[file].fileStart).getWeekNumber() : -1
-            // Send the week number of the surrent file
-            UI.postMessage({event: 'current-file-week', week: week})
-        } else { UI.postMessage({event: 'current-file-week', week: undefined}) }
+
     }
 }
 
@@ -2163,7 +2165,10 @@ const parsePredictions = async (response) => {
         DEBUG && console.log(`File ${file} processed after ${(new Date() - predictionStart) / 1000} seconds: ${filesBeingProcessed.length} files to go`);
     }
 
-    !STATE.selection && (STATE.increment() === 0) && await getSummary({ interim: true });
+    if (!STATE.selection && STATE.increment() === 0) {
+        getSummary({ interim: true });
+        getTotal()
+    }
 
     return response.worker
 }
@@ -2405,8 +2410,7 @@ const getResults = async ({
         offset = (position.page - 1) * limit;
         active = position.row;
         // update the pagination
-        const [total, , ] = await getTotal({species: species, offset: offset, included: included})
-        UI.postMessage({event: 'total-records', total: total, offset: offset, species: species})
+        await getTotal({species: species, offset: offset, included: included})
     }
     offset = offset ?? (species ? (STATE.filteredOffset[species] ?? 0) : STATE.globalOffset);
     if (species) STATE.filteredOffset[species] = offset;
