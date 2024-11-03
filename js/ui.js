@@ -3142,7 +3142,7 @@ function centreSpec(){
                     const url = iucn?.url ? 'https://www.iucnredlist.org/species/' + iucn.url : null;
 
                     summaryHTML+=
-                        `<td class="text-end"><a title="${IUCNLabel[status]}: Learn more about this species ICUN assessment" 
+                        `<td class="text-end"><a id="iucn-link-${item.sname}" title="${IUCNLabel[status]}: Learn more about this species ICUN assessment" 
                         class="d-inline-block p-1 w-100 rounded text-decoration-none text-center ${IUCNMap[status]} ${!url ? 'disabled-link' : ''}"
                         href="${url || '#'}" target="_blank"> ${status}</a></td>`;
                 }
