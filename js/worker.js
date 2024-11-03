@@ -391,7 +391,6 @@ async function handleMessage(e) {
             let {model, batchSize, threads, backend, list} = args;
             const t0 = Date.now();
             STATE.detect.backend = backend;
-            setGetSummaryQueryInterval(threads)
             INITIALISED = (async () => {
                 LIST_WORKER = await spawnListWorker(); // this can change the backend if tfjs-node isn't available
                 DEBUG && console.log('List worker took', Date.now() - t0, 'ms to load');
@@ -425,7 +424,6 @@ async function handleMessage(e) {
         }
         case 'change-threads': {
             const threads = e.data.threads;
-            setGetSummaryQueryInterval(threads)
             const delta = threads - predictWorkers.length;
             NUM_WORKERS+=delta;
             if (delta > 0) {
@@ -606,7 +604,7 @@ function savedFileCheck(fileList) {
 }
 
 function setGetSummaryQueryInterval(threads){
-    //STATE.incrementor = STATE.detect.backend !== 'tensorflow' ? threads * 10 : threads;
+    STATE.incrementor = STATE.detect.backend !== 'tensorflow' ? threads * 10 : threads;
 }
 
 async function onChangeMode(mode) {
@@ -927,7 +925,7 @@ async function onAnalyse({
     circleClicked = false
 }) {
     // Now we've asked for a new analysis, clear the aborted flag
-    aborted = false; //STATE.incrementor = 1;
+    aborted = false; STATE.incrementor = 1;
     predictionStart = new Date();
     // Set the appropriate selection range if this is a selection analysis
     STATE.update({ selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined });
@@ -2143,6 +2141,9 @@ const parsePredictions = async (response) => {
                 }
             }
         } 
+    } else if (index === 500){
+        // Slow down the summary updates
+        setGetSummaryQueryInterval(threads)
     }
     predictionsReceived[file]++;
     const received = sumObjectValues(predictionsReceived);
