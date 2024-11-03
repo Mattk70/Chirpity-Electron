@@ -1305,7 +1305,7 @@ function checkBacklog(ffmpegCommand = null) {
                 clearInterval(interval); // Backlog is within limits, stop checking
                 resolve(true); // Resolve the promise
             }
-        }, 20);
+        }, 200);
     });
 }
 
@@ -1365,7 +1365,8 @@ const getPredictBuffers = async ({
 
 async function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBatch){
     return new Promise((resolve, reject) => {
-        let concatenatedBuffer = Buffer.allocUnsafe(0);
+        let currentIndex = 0;
+        const audioBuffer = Buffer.allocUnsafe(highWaterMark);
         const additionalFilters = STATE.filters.sendToModel ? setAudioFilters() : [];
         const command = setupFfmpegCommand({file, start, end, sampleRate, additionalFilters})
         command.on('error', (error) => {
@@ -1384,30 +1385,47 @@ async function processAudio (file, start, end, chunkStart, highWaterMark, sample
         STREAM.on('data', (chunk) => {
             if (aborted) {
                 STREAM.destroy();
-                return
+                return;
             }
-            concatenatedBuffer = concatenatedBuffer.length ? Buffer.concat([concatenatedBuffer, chunk]) : chunk;
-            // if we have a full buffer
-            if (concatenatedBuffer.length > highWaterMark) {
+            // Copy incoming chunk into the audioBuffer
+            const remainingSpace = highWaterMark - currentIndex;
+            if (chunk.length <= remainingSpace) {
+                chunk.copy(audioBuffer, currentIndex);
+                currentIndex += chunk.length;
+            } else {
+                // Fill remaining space
+                chunk.copy(audioBuffer, currentIndex);
+                // Process full buffer
                 AUDIO_BACKLOG++;
-                const audio_chunk = concatenatedBuffer.subarray(0, highWaterMark);
-                const remainder = concatenatedBuffer.subarray(highWaterMark);
-                prepareWavForModel(audio_chunk, file, end, chunkStart);
+                prepareWavForModel(audioBuffer.subarray(0, highWaterMark), file, end, chunkStart);
                 feedChunksToModel(...predictQueue.shift());
                 chunkStart += samplesInBatch;
-                concatenatedBuffer = remainder;
+        
+                // Handle the remainder
+                const remainder = chunk.subarray(highWaterMark - currentIndex);
+                remainder.copy(audioBuffer, 0);
+                currentIndex = remainder.length; // Reset index for the new chunk
             }
-            
+        
+            // If we have filled the buffer completely
+            if (currentIndex === highWaterMark) {
+                AUDIO_BACKLOG++;
+                prepareWavForModel(audioBuffer, file, end, chunkStart);
+                feedChunksToModel(...predictQueue.shift());
+                chunkStart += samplesInBatch;
+                currentIndex = 0; // Reset index for the next fill
+            }
         });
         STREAM.on('end', () => {
-            //EOF: deal with part-full buffers
-            if (concatenatedBuffer.byteLength){
-                prepareWavForModel(concatenatedBuffer, file, end, chunkStart);
+            // Handle any remaining data in the buffer
+            if (currentIndex > 0) { // Check if there's any data left in the buffer
+                prepareWavForModel(audioBuffer.subarray(0, currentIndex), file, end, chunkStart);
                 feedChunksToModel(...predictQueue.shift());
             }
+            
             DEBUG && console.log('All chunks sent for ', file);
-            return resolve()
-        })
+            return resolve();
+        });
 
         STREAM.on('error', err => {
             console.log('stream error: ', err);
@@ -1540,11 +1558,10 @@ function isDuringDaylight(datetime, lat, lon) {
 
 async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
 
-    if (worker === undefined) {
-        // pick a worker - this method is faster than looking for available workers
-        if (++workerInstance >= NUM_WORKERS) workerInstance = 0;
-        worker = workerInstance
-    }
+    // pick a worker - this method is faster than looking for available workers
+    if (++workerInstance >= NUM_WORKERS) workerInstance = 0;
+    worker = workerInstance
+
     const objData = {
         message: 'predict',
         worker: worker,
