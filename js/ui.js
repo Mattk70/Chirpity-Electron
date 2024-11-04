@@ -3244,10 +3244,10 @@ function formatDuration(seconds){
         const rate = duration / analysisTime;
         
         trackEvent(config.UUID, `${config.model}-${config[config.model].backend}`, 'Audio Duration', config[config.model].backend, Math.round(duration));
-        trackEvent(config.UUID, `${config.model}-${config[config.model].backend}`, 'Analysis Duration', config[config.model].backend, parseInt(analysisTime));
-        trackEvent(config.UUID, `${config.model}-${config[config.model].backend}`, 'Analysis Rate', config[config.model].backend, parseInt(rate));
         
         if (! STATE.selection){
+            trackEvent(config.UUID, `${config.model}-${config[config.model].backend}`, 'Analysis Rate', config[config.model].backend, parseInt(rate));
+            trackEvent(config.UUID, `${config.model}-${config[config.model].backend}`, 'Analysis Duration', config[config.model].backend, parseInt(analysisTime));
             DIAGNOSTICS['Analysis Duration'] = formatDuration(analysisTime);
             DIAGNOSTICS['Analysis Rate'] = rate.toFixed(0) + 'x faster than real time performance.';
             generateToast({ message:'Analysis complete.'});
