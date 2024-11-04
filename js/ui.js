@@ -3262,7 +3262,6 @@ function formatDuration(seconds){
         filterSpecies = undefined,
         audacityLabels = {},
         summary = [],
-        active = undefined,
     }) {
         updateSummary({ summary: summary, filterSpecies: filterSpecies });
         if (! PREDICTING  || STATE.mode !== 'analyse') activateResultFilters();

@@ -1,6 +1,6 @@
 {
 	"name": "chirpity",
-	"version": "2.2.5",
+	"version": "2.2.6",
 	"description": "Chirpity Nocmig",
 	"main": "main.js",
 	"scripts": {
@@ -28,6 +28,7 @@
 		"files": [
 			"**/*",
 			"!test*${/*}",
+			"!build*${/*}",
 			"!custom*{/*}",
 			"!.vscode${/*}",
 			"!.idea{*/}",
@@ -43,7 +44,7 @@
 			"!custom_tfjs${/*}",
 			"!*git*${/*}",
 			"!package-lock.json",
-			"!yarnlock",
+			"!yarn.lock",
 			"!pyproject.toml",
 			"!README.md",
 			"!saved_model$(/*)",

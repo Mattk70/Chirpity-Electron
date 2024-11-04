@@ -142,6 +142,7 @@ const setupFfmpegCommand = ({
         .format(format)
         .audioChannels(channels)
         .audioFrequency(sampleRate);
+        // .addInputOptions([`-ar=${sampleRate}`, '-filter_type', "'kaiser'" ] )
 
     // Add filters if provided
     additionalFilters.forEach(filter => {
@@ -2143,7 +2144,7 @@ const parsePredictions = async (response) => {
         } 
     } else if (index === 500){
         // Slow down the summary updates
-        setGetSummaryQueryInterval(threads)
+        setGetSummaryQueryInterval(NUM_WORKERS)
     }
     predictionsReceived[file]++;
     const received = sumObjectValues(predictionsReceived);
