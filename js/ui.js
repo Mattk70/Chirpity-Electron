@@ -1868,7 +1868,7 @@ window.onload = async () => {
         // Add cpu model & memory to config
         config.CPU = DIAGNOSTICS['CPU'];
         config.RAM = DIAGNOSTICS['System Memory'];
-        trackVisit(config);
+        setTimeout(() => {trackVisit(config)}, 5000);
     })
 }
 
