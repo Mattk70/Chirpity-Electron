@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Define the directory where your source files are located
-let SOURCE_DIR = "C:/Users/simpo/PycharmProjects/Chirpity-Electron";
+let SOURCE_DIR = process.cwd() //"C:/Users/simpo/PycharmProjects/Chirpity-Electron";
 if (!fs.existsSync(SOURCE_DIR)) SOURCE_DIR = "/Users/matthew/PycharmProjects/Chirpity-Electron"
 // Function to recursively search for patterns in files
 function searchPatterns(directory, patterns) {
