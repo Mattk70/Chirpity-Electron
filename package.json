@@ -8,8 +8,8 @@
 		"prebuild": "node prebuild.js",
 		"preexport": "node prebuild.js",
 		"minify": "node minify.js",
-		"export": "electron-builder build --m",
-		"build": "electron-builder --linux --x64 -p always",
+		"export": "electron-builder build --linux --x64 --m",
+		"build": "electron-builder --win --x64 -p always",
 		"postinstall": "electron-builder install-app-deps"
 	},
 	"repository": {
