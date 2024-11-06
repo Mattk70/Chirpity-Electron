@@ -18,7 +18,7 @@ Author: Matthew Kirkland
 - ...and <a href="https://chirpity.mattkirkland.co.uk/">more</a>
 
 ## Application setup
-Visit https://chirpity.mattkirkland.co.uk for platform specific installation instructions - Chirpity binaries are available for both Windows and Mac platforms. Linux users will need to run the application from source, as described below.
+Visit https://chirpity.mattkirkland.co.uk for platform specific installation instructions - Chirpity binaries are available for Windows, Mac and Linux platforms. 
 
 ## Running the application from source
 

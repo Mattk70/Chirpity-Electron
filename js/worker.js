@@ -132,8 +132,8 @@ const setupFfmpegCommand = ({
     const command = ffmpeg('file:' + file)
         .format(format)
         .audioChannels(channels)
-        .audioFrequency(sampleRate);
-        // .addInputOptions([`-ar=${sampleRate}`, '-filter_type', "'kaiser'" ] )
+        .audioFrequency(sampleRate)
+        //.audioFilters('aresample=filter_type=kaiser:kaiser_beta=9.90322');
 
     // Add filters if provided
     additionalFilters.forEach(filter => {
@@ -1018,15 +1018,11 @@ const getDuration = async (src) => {
     let audio;
     return new Promise(function (resolve, reject) {
         audio = new Audio();
+
         audio.src = src.replaceAll('#', '%23').replaceAll('?', '%3F'); // allow hash and ? in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
         audio.addEventListener("loadedmetadata", function () {
             const duration = audio.duration === Infinity ? Number.MAX_SAFE_INTEGER : audio.duration;
-            audio = undefined;
-            // Tidy up - cloning removes event listeners
-            const old_element = document.getElementById("audio");
-            const new_element = old_element.cloneNode(true);
-            old_element.parentNode.replaceChild(new_element, old_element);
-            
+            audio.remove();
             resolve(duration);
         });
         audio.addEventListener('error', (error) => {
@@ -2486,6 +2482,33 @@ const getResults = async ({
         .on('finish', () => {
             generateAlert({message: filePath + ' has been written successfully.'});
         });
+
+    } else if (format === 'Audacity'){
+        const groupedResult = result.reduce((acc, item) => {
+            // Check if the file already exists as a key in acc
+            const filteredItem = {
+                start: item.position,
+                end: item.end,
+                cname: `${item.cname} ${item.score / 10}%`
+              };
+            if (!acc[item.file]) {
+              // If it doesn't, create an array for that file
+              acc[item.file] = [];
+            }
+            // Push the item into the array for the matching file key
+            acc[item.file].push(filteredItem);
+            return acc;
+          }, {});
+        Object.keys(groupedResult).forEach(file =>{
+            const suffix = p.extname(file);
+            const filename = p.basename(file, suffix)  + '.txt';
+            const filePath = p.join(directory, filename);
+            writeToPath(filePath, groupedResult[file], {headers: false, delimiter: '\t'})
+            .on('error', err => generateAlert({type: 'warning',  message: `Cannot save file ${filePath}\nbecause it is open in another application`}))
+            .on('finish', () => {
+                generateAlert({message: filePath + ' has been written successfully.'});
+            });
+        })
     }
     else {
         for (let i = 0; i < result.length; i++) {
@@ -2523,8 +2546,8 @@ const getResults = async ({
                 sendResult(++index, `No ${nocmig} ${species} detections found ${STATE.mode === 'explore' ? 'in the Archive' : ''} using the ${STATE.list} list.`, true)
             }
         }
+        (STATE.selection && topRankin === STATE.topRankin)  || UI.postMessage({event: 'database-results-complete', active: active, select: position?.start});
     }
-    (STATE.selection && topRankin === STATE.topRankin)  || UI.postMessage({event: 'database-results-complete', active: active, select: position?.start});
 };
 
 // Function to format the CSV export
@@ -2559,6 +2582,7 @@ async function formatCSVValues(obj) {
     newObj['Comment'] = modifiedObj.comment
     newObj['Call count'] = modifiedObj.callCount
     newObj['File offset'] = secondsToHHMMSS(modifiedObj.position)
+    newObj['Start (s)'] = modifiedObj.position
     newObj['Latitude'] = latitude;
     newObj['Longitude'] = longitude;
     newObj['Place'] = place;
@@ -2669,22 +2693,11 @@ const formatDate = (timestamp) =>{
 }
 
 const sendResult = (index, result, fromDBQuery) => {
-    const file = result.file;
-    if (typeof result === 'object') {
-        // Convert confidence back to % value
-        result.score = (result.score / 10).toFixed(0)
-        // Recreate Audacity labels (will create filtered view of labels if filtered)
-        const audacity = {
-            timestamp: `${result.position}\t${result.position + WINDOW_SIZE}`,
-            cname: result.cname,
-            score: Number(result.score) / 100
-        };
-        AUDACITY[file] ??= [];
-        AUDACITY[file].push(audacity);
-    }
+    // Convert confidence back to % value
+    result.score = (result.score / 10).toFixed(0)
     UI.postMessage({
         event: 'new-result',
-        file: file,
+        file: result.file,
         result: result,
         index: index,
         isFromDB: fromDBQuery,
