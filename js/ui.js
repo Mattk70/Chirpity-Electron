@@ -975,18 +975,6 @@ async function onOpenFiles(args) {
 }
 
 
-/**
-*
-*
-* @returns {Promise<void>}
-*/
-async function showSaveDialog() {
-    await window.electron.saveFile({ 
-        currentFile: STATE.currentFile, 
-        labels: AUDACITY_LABELS[STATE.currentFile], 
-        type: 'audacity' });
-}
-
 function resetDiagnostics() {
     delete DIAGNOSTICS['Audio Duration'];
     delete DIAGNOSTICS['Analysis Rate'];
@@ -1187,6 +1175,7 @@ async function batchExportAudio() {
 const export2CSV = ()  => exportData('text', isSpeciesViewFiltered(true), Infinity);
 const exporteBird = ()  => exportData('eBird', isSpeciesViewFiltered(true), Infinity);
 const exportRaven = ()  => exportData('Raven', isSpeciesViewFiltered(true), Infinity);
+const exportAudacity = ()  => exportData('Audacity', isSpeciesViewFiltered(true), Infinity);
 
 async function exportData(format, species, limit, duration){
     const response = await window.electron.selectDirectory();
@@ -3267,11 +3256,11 @@ function formatDuration(seconds){
         if (! PREDICTING  || STATE.mode !== 'analyse') activateResultFilters();
         // Why do we do audacity labels here?
         AUDACITY_LABELS = audacityLabels;
-        if (isEmptyObject(AUDACITY_LABELS)) {
-            disableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven', 'save2db']);
-        } else {
+        if (summary.length) {
             enableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven']);
             STATE.mode !== 'explore' && enableMenuItem(['save2db'])            
+        } else {
+            disableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven', 'save2db']);
         }
         if (STATE.currentFile) enableMenuItem(['analyse'])
     }
@@ -4415,7 +4404,7 @@ function playRegion(){
             // File menu
             case 'open-file': { showOpenDialog('openFile'); break }
             case 'open-folder': { showOpenDialog('openDirectory'); break }
-            case 'saveLabels': { showSaveDialog(); break }
+            case 'saveLabels': { exportAudacity(); break }
             case 'saveCSV': { export2CSV(); break }
             case 'save-eBird': { exporteBird(); break }
             case 'save-Raven': { exportRaven(); break }
