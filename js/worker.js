@@ -20,16 +20,7 @@ if (process.platform === 'win32') {
     ntsuspend = require('ntsuspend');
     isWin32 = true;
   }
-let DEBUG = false;
-
-// Function to join Buffers and not use Buffer.concat() which leads to detached ArrayBuffers
-function joinBuffers(buffer1, buffer2) {
-    // Create a new buffer with the combined length
-    const combinedBuffer = Buffer.allocUnsafe(buffer1.length + buffer2.length);
-    buffer1.copy(combinedBuffer, 0);
-    buffer2.copy(combinedBuffer, buffer1.length);
-    return combinedBuffer;
-}
+let DEBUG;
 
 // Save console.warn and console.error functions
 const originalWarn = console.warn;
@@ -1522,7 +1513,7 @@ const fetchAudioBuffer = async ({
                 resolve(audio)
                 stream.destroy();
             } else {
-                concatenatedBuffer = concatenatedBuffer.length ?  joinBuffers(concatenatedBuffer, chunk) : chunk;
+                concatenatedBuffer = concatenatedBuffer.length ?  Buffer.concat([concatenatedBuffer, chunk]) : chunk;
             }
         })
     });
