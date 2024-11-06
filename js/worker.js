@@ -141,8 +141,8 @@ const setupFfmpegCommand = ({
     const command = ffmpeg('file:' + file)
         .format(format)
         .audioChannels(channels)
-        .audioFrequency(sampleRate);
-        // .addInputOptions([`-ar=${sampleRate}`, '-filter_type', "'kaiser'" ] )
+        .audioFrequency(sampleRate)
+        //.audioFilters('aresample=filter_type=kaiser:kaiser_beta=9.90322');
 
     // Add filters if provided
     additionalFilters.forEach(filter => {
@@ -1027,15 +1027,11 @@ const getDuration = async (src) => {
     let audio;
     return new Promise(function (resolve, reject) {
         audio = new Audio();
+
         audio.src = src.replaceAll('#', '%23').replaceAll('?', '%3F'); // allow hash and ? in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
         audio.addEventListener("loadedmetadata", function () {
             const duration = audio.duration === Infinity ? Number.MAX_SAFE_INTEGER : audio.duration;
-            audio = undefined;
-            // Tidy up - cloning removes event listeners
-            const old_element = document.getElementById("audio");
-            const new_element = old_element.cloneNode(true);
-            old_element.parentNode.replaceChild(new_element, old_element);
-            
+            audio.remove();
             resolve(duration);
         });
         audio.addEventListener('error', (error) => {
