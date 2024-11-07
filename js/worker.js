@@ -109,7 +109,6 @@ Date.prototype.getWeekNumber = function(){
 
 
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path.replace('app.asar', 'app.asar.unpacked');
-//ffmpeg.setFfmpegPath(staticFfmpeg.path.replace('app.asar', 'app.asar.unpacked'));
 ffmpeg.setFfmpegPath(ffmpegPath);
 let predictionsRequested = {}, predictionsReceived = {}, filesBeingProcessed = [];
 let diskDB, memoryDB;
@@ -1327,7 +1326,7 @@ const getPredictBuffers = async ({
 }) => {
     if (! fs.existsSync(file)) { 
         const found = await getWorkingFile(file);
-        if (!found) return
+        if (!found) throw new Error('Unable to locate ' + file);
     }
     // Ensure max and min are within range
     start = Math.max(0, start);
@@ -1407,6 +1406,7 @@ async function processAudio (file, start, end, chunkStart, highWaterMark, sample
         STREAM.on('end', () => {
             // Handle any remaining data in the buffer
             if (currentIndex > 0) { // Check if there's any data left in the buffer
+                AUDIO_BACKLOG++;
                 prepareWavForModel(audioBuffer.subarray(0, currentIndex), file, end, chunkStart);
                 feedChunksToModel(...predictQueue.shift());
             }
@@ -1470,8 +1470,9 @@ const fetchAudioBuffer = async ({
     file = '', start = 0, end = undefined
 }) => {
     if (! fs.existsSync(file)) {
-        file = await getWorkingFile(file);
-        if (!file) throw new Error('Cannot locate ' + file);
+        const result = await getWorkingFile(file);
+        if (!result) throw new Error('Cannot locate ' + file);
+        else file = result;
     }
     METADATA[file]?.duration || await setMetadata({file:file});
     end ??= METADATA[file].duration; 
@@ -2227,8 +2228,8 @@ async function processNextFile({
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
         const found = await getWorkingFile(file).catch(error => {
-            console.warn('Error in getWorkingFile', error);
-            generateAlert({type: 'warning',  message: error.message})
+            console.warn('Can\'t locate: ', file);
+            generateAlert({type: 'warning',  message: 'Cannot locate: ' + file})
         });
         if (found) {
             if (end) {}
