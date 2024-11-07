@@ -3586,20 +3586,16 @@ function formatDuration(seconds){
         let metadata = {
             lat: parseFloat(config.latitude),
             lon: parseFloat(config.longitude),
-            Artist: 'Chirpity',
-            version: VERSION
+            Artist: 'Chirpity ' + VERSION.toString(),
         };
         if (result) {
             const date = new Date(result.timestamp);
             metadata = {
                 ...metadata,
-                UUID: config.UUID,
-                start: start,
-                end: end,
                 //filename: result.file,
-                cname: result.cname,
-                sname: result.sname,
-                score: parseInt(result.score),
+                Genre: result.sname.split(' ')[0],
+                Title: `${result.cname} - ${result.sname}`,
+                Track: parseInt(result.score),
                 Year: date.getFullYear()
             };
         }
