@@ -1,14 +1,16 @@
 {
 	"name": "chirpity",
-	"version": "2.2.6",
+	"version": "2.3.0",
 	"description": "Chirpity Nocmig",
 	"main": "main.js",
 	"scripts": {
 		"start": "electron .",
 		"prebuild": "node prebuild.js",
 		"preexport": "node prebuild.js",
+		"preAppImage": "node prebuild.js",
 		"minify": "node minify.js",
-		"export": "electron-builder build --linux --x64 --m",
+		"export": "electron-builder build --m",
+		"AppImage": "electron-builder build --linux --x64",
 		"build": "electron-builder --win --x64 -p always",
 		"postinstall": "electron-builder install-app-deps"
 	},
