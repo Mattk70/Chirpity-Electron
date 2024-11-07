@@ -2695,7 +2695,7 @@ const formatDate = (timestamp) =>{
 
 const sendResult = (index, result, fromDBQuery) => {
     // Convert confidence back to % value
-    result.score = (result.score / 10).toFixed(0)
+    if (typeof result == 'object') result.score = (result.score / 10).toFixed(0);
     UI.postMessage({
         event: 'new-result',
         file: result.file,
