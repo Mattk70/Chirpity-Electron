@@ -1038,6 +1038,7 @@ function postAnalyseMessage(args) {
         const selection = !!args.end;
         const filesInScope = args.filesInScope;
         PREDICTING = true;
+        disableSettingsListElements(true)
         if (!selection) {
             analyseReset();
             refreshResultsView();
@@ -2561,21 +2562,6 @@ function onChartData(args) {
             tooltip.appendChild(textNode);   // Add the text node
         }
     
-        // // Get the tooltip's dimensions
-        // tooltip.style.display = 'block';  // Ensure tooltip is visible to measure dimensions
-        // const tooltipWidth = tooltip.offsetWidth;
-        // const windowWidth = window.innerWidth;
-    
-        // // Calculate the new tooltip position
-        // let tooltipLeft;
-        
-        // // If the tooltip would overflow past the right side of the window, position it to the left
-        // if (event.clientX + tooltipWidth + 15 > windowWidth) {
-        //     tooltipLeft = event.clientX - tooltipWidth - 5;  // Position to the left of the mouse cursor
-        // } else {
-        //     tooltipLeft = event.clientX + 15;  // Position to the right of the mouse cursor
-        // }
-    
         // Apply styles to the tooltip
         Object.assign(tooltip.style, {
             top: `${event.clientY}px`,
@@ -2600,7 +2586,10 @@ function onChartData(args) {
 
     }
     DOM.listIcon.addEventListener('click', () => {
-        // todo: skip custom list if custom list not set
+        if (PREDICTING){
+            generateToast({type:'warning', message: 'It is not possible to change the list settings while an analysis is underway. However, the list <b>can</b> be changed after the analysis completes', type:'warning'})
+            return;
+        }
         const keys = Object.keys(LIST_MAP);
         const currentListIndex = keys.indexOf(config.list);
         const next = (currentListIndex === keys.length - 1) ? 0 : currentListIndex + 1;
@@ -2779,6 +2768,7 @@ function centreSpec(){
             if (PREDICTING) {
                 console.log('Operation aborted');
                 PREDICTING = false;
+                disableSettingsListElements(true);
                 STATE.analysisDone = true;
                 worker.postMessage({
                     action: 'abort',
@@ -2891,6 +2881,13 @@ function centreSpec(){
         } : undefined;
     }
     
+    function disableSettingsListElements(bool){
+        DOM.listToUse.disabled = bool;
+        DOM.customListContainer.disabled = bool;  
+        DOM.localSwitchContainer.disabled = bool
+        DOM.speciesThreshold.disabled = bool;
+        DOM.speciesWeek.disabled = bool;
+    }
     const postBufferUpdate = ({
         file = STATE.currentFile,
         begin = 0,
@@ -3158,6 +3155,7 @@ function centreSpec(){
     */
     function onResultsComplete({active = undefined, select = undefined} = {}){
         PREDICTING = false;
+        disableSettingsListElements(false)
         DOM.resultTable.replaceWith(resultsBuffer);
         const table = DOM.resultTable;
         showElement(['resultTableContainer', 'resultsHead'], false);
@@ -3222,6 +3220,7 @@ function formatDuration(seconds){
 
     function onAnalysisComplete({quiet}){
         PREDICTING = false;
+        disableSettingsListElements(false)
         STATE.analysisDone = true;
         STATE.diskHasRecords && enableMenuItem(['explore', 'charts']);
         DOM.progressDiv.classList.add('invisible');
@@ -3356,11 +3355,6 @@ function formatDuration(seconds){
     }) {
 
         let tr = '';
-        if (typeof (result) === 'string') {
-            // const nocturnal = config.detect.nocmig ? '<b>during the night</b>' : '';
-            generateToast({ message: result});
-            return
-        }
         if (index <= 1) {
             adjustSpecDims(true)
             if (selection) {
@@ -3368,9 +3362,6 @@ function formatDuration(seconds){
                 selectionTable.textContent = '';
             }
             else {
-                //adjustSpecDims(true); 
-                //if (isFromDB) PREDICTING = false;
-                
                 DOM.resultHeader.innerHTML =`
                 <tr>
                     <th id="sort-time" class="time-sort col text-start timeOfDay" title="Sort results by detection time"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> Time</th>
@@ -3381,7 +3372,6 @@ function formatDuration(seconds){
                     <th class="col text-end">Notes</th>
                 </tr>`;
                 setTimelinePreferences();
-                //showSortIcon();
                 showElement(['resultTableContainer', 'resultsHead'], false);
             }
         }  else if (!isFromDB && index % (config.limit + 1) === 0) {
@@ -3424,7 +3414,6 @@ function formatDuration(seconds){
             const labelHTML = label ? tags[label] : '';
             const hide = selection ? 'd-none' : '';
             const countIcon = count > 1 ? `<span class="circle pointer" title="Click to view the ${count} detections at this timecode">${count}</span>` : '';
-            //const XC_type = cname.includes('(song)') ? "song" : "nocturnal flight call";
             tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${end || position + 3}|${sname}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
             <td class='text-start text-nowrap timeOfDay ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-start timestamp ${showTimestamp}">${UI_position} </td>
@@ -3454,7 +3443,6 @@ function formatDuration(seconds){
         const table = isSelection ? document.getElementById('selectionResultTableBody')
         : document.getElementById('resultTableBody');
         if (isFromDB && !isSelection) {
-            //if (!resultsBuffer) resultsBuffer = table.cloneNode();
             resultsBuffer.lastElementChild ?
             resultsBuffer.lastElementChild.insertAdjacentHTML('afterend', row) :
             resultsBuffer.innerHTML = row;
@@ -4612,7 +4600,7 @@ function playRegion(){
     })
     
     function updateList () {
-        STATE.analysisDone && worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone })
+        worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone })
     }
     
     function refreshSummary() {

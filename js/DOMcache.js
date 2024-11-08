@@ -39,6 +39,7 @@ const DOM = {
     get listIcon() { if (!this._listIcon) { this._listIcon = document.getElementById('list-icon') } return this._listIcon},
     get loading() { if (!this._loading) { this._loading = document.getElementById('loading') } return this._loading},
     get speciesThresholdEl() { if (!this._speciesThresholdEl) { this._speciesThresholdEl = document.getElementById('species-threshold-el') } return this._speciesThresholdEl},
+    get speciesWeek() { if (!this._speciesWeek) { this._speciesWeek = document.getElementById('species-week') } return this._speciesWeek},
     get speciesThreshold() { if (!this._speciesThreshold) { this._speciesThreshold = document.getElementById('species-frequency-threshold') } return this._speciesThreshold},
     get customListFile() { if (!this._customListFile) { this._customListFile = document.getElementById('custom-list-location') } return this._customListFile},
     get customListSelector() { if (!this._customListSelector) { this._customListSelector = document.getElementById('list-file-selector') } return this._customListSelector},

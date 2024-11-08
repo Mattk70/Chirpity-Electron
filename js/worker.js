@@ -2540,11 +2540,12 @@ const getResults = async ({
         if (!result.length) {
             if (STATE.selection) {
                 // No more detections in the selection
+                generateAlert({message: 'No detections found in the selection'})
                 sendResult(++index, 'No detections found in the selection', true)
             } else {
                 species = species || '';
-                const nocmig = STATE.detect.nocmig ? '<b>nocturnal</b>' : ''
-                sendResult(++index, `No ${nocmig} ${species} detections found ${STATE.mode === 'explore' ? 'in the Archive' : ''} using the ${STATE.list} list.`, true)
+                const nocmig = STATE.detect.nocmig ? '<b>nocturnal</b>' : '';
+                generateAlert({message: `No ${nocmig} ${species} detections found ${STATE.mode === 'explore' ? 'in the Archive' : ''} using the ${STATE.list} list.`});
             }
         }
         (STATE.selection && topRankin === STATE.topRankin)  || UI.postMessage({event: 'database-results-complete', active: active, select: position?.start});
