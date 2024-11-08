@@ -642,8 +642,12 @@ async function spawnListWorker() {
             if (message === 'list-model-ready') {
                 return resolve(worker);
             } else if (message === "tfjs-node") {
-                event.data.available || (STATE.detect.backend = 'webgpu');
-                UI.postMessage({event: 'tfjs-node', hasNode: event.data.available})
+                STATE.hasNode = true;
+                if (!event.data.available) {
+                    STATE.detect.backend = 'webgpu';
+                    STATE.hasNode = false;
+                }
+                UI.postMessage({event: 'tfjs-node', hasNode: STATE.hasNode})
             }
         };
 
