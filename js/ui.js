@@ -1042,7 +1042,7 @@ function postAnalyseMessage(args) {
         const selection = !!args.end;
         const filesInScope = args.filesInScope;
         PREDICTING = true;
-        disableSettingsListElements(true)
+        disableSettingsDuringAnalysis(true)
         if (!selection) {
             analyseReset();
             refreshResultsView();
@@ -2122,8 +2122,6 @@ function handleGesture(e) {
 }
 
 
-
-
 document.addEventListener('change', function (e) {
     const target = e.target;
     const context = target.parentNode.classList.contains('chart') ? 'chart' : 'explore';
@@ -2773,7 +2771,7 @@ function centreSpec(){
             if (PREDICTING) {
                 console.log('Operation aborted');
                 PREDICTING = false;
-                disableSettingsListElements(true);
+                disableSettingsDuringAnalysis(true);
                 STATE.analysisDone = true;
                 worker.postMessage({
                     action: 'abort',
@@ -2886,13 +2884,21 @@ function centreSpec(){
         } : undefined;
     }
     
-    function disableSettingsListElements(bool){
+    function disableSettingsDuringAnalysis(bool){
+        DOM.modelToUse.disabled = bool;
+        DOM.threadSlider.disabled = bool;
+        DOM.batchSizeSlider.disabled = bool;
+        DOM.locale.disabled = bool;
         DOM.listToUse.disabled = bool;
         DOM.customListContainer.disabled = bool;  
         DOM.localSwitchContainer.disabled = bool
         DOM.speciesThreshold.disabled = bool;
         DOM.speciesWeek.disabled = bool;
+        DOM.backendOptions.forEach(backend => backend.disabled = bool)
+        DOM.contextAware.disabled = bool;
+        DOM.sendFilteredAudio.disabled = bool;
     }
+
     const postBufferUpdate = ({
         file = STATE.currentFile,
         begin = 0,
@@ -3160,7 +3166,7 @@ function centreSpec(){
     */
     function onResultsComplete({active = undefined, select = undefined} = {}){
         PREDICTING = false;
-        disableSettingsListElements(false)
+        disableSettingsDuringAnalysis(false)
         DOM.resultTable.replaceWith(resultsBuffer);
         const table = DOM.resultTable;
         showElement(['resultTableContainer', 'resultsHead'], false);
@@ -3225,7 +3231,7 @@ function formatDuration(seconds){
 
     function onAnalysisComplete({quiet}){
         PREDICTING = false;
-        disableSettingsListElements(false)
+        disableSettingsDuringAnalysis(false)
         STATE.analysisDone = true;
         STATE.diskHasRecords && enableMenuItem(['explore', 'charts']);
         DOM.progressDiv.classList.add('invisible');
@@ -3836,6 +3842,10 @@ function formatDuration(seconds){
 
     
     const toggleContextAwareMode = () => {
+        if (PREDICTING){
+            generateToast({message: 'It is not possible to change the context-mode settings while an analysis is underway.', type:'warning'})
+            return;
+        }
         if (config.model !== 'birdnet') config.detect.contextAware = !config.detect.contextAware;
         DOM.contextAware.checked = config.detect.contextAware;
         contextAwareIconDisplay();
@@ -4469,12 +4479,7 @@ function playRegion(){
             case 'tensorflow':
             case 'webgl':
             case 'webgpu':{
-                if (PREDICTING){
-                    generateToast({message: 'It is not possible to change the model backend while an analysis is underway', type:'warning'})
-                    document.getElementById(config[config.model].backend).checked = true;
-                } else {
-                    handleBackendChange(target);
-                }
+                handleBackendChange(target);
                 break;
             }
 
@@ -4554,7 +4559,7 @@ function playRegion(){
                 break;
             }
             case 'audioFiltersIcon': { toggleFilters(); break }
-            //case 'context-mode': { toggleContextAwareMode(); break }
+            case 'context-mode': { toggleContextAwareMode(); break }
             case 'frequency-range': { 
                 document.getElementById('frequency-range-panel').classList.toggle('d-none');
                 document.getElementById('frequency-range').classList.toggle('active');
@@ -4681,24 +4686,19 @@ function playRegion(){
                     config.list === 'custom' || updateList()
                     break }
                 case 'locale': {
-                    if (PREDICTING){
-                        generateToast({message: 'It is not possible to change the language while an analysis is underway', type:'warning'})
-                        DOM.locale.value = config[config.model].locale
-                    } else{
-                        let labelFile;
-                        if (element.value === 'custom'){
-                            labelFile = config.customListFile[config.model];
-                            if (! labelFile) {
-                                generateToast({type: 'warning', message: 'You must select a label file in the list settings to use the custom language option.'});
-                                return;
-                            }
-                        } else {
-                            const chirpity = element.value === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
-                            labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${element.value}.txt`; 
+                    let labelFile;
+                    if (element.value === 'custom'){
+                        labelFile = config.customListFile[config.model];
+                        if (! labelFile) {
+                            generateToast({type: 'warning', message: 'You must select a label file in the list settings to use the custom language option.'});
+                            return;
                         }
-                        config[config.model].locale = element.value;
-                        readLabels(labelFile, 'locale');
+                    } else {
+                        const chirpity = element.value === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
+                        labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${element.value}.txt`; 
                     }
+                    config[config.model].locale = element.value;
+                    readLabels(labelFile, 'locale');
                     break }
                 case 'local': {
                     config.local = element.checked;
@@ -4716,30 +4716,18 @@ function playRegion(){
                     handleBackendChange(config[config.model].backend);
                     setListUIState(config.list)
                     break }
-                case 'thread-slider': {
-                    if (PREDICTING){
-                        generateToast({message: 'It is not possible to change the number of threads while an analysis is underway', type:'warning'})
-                        DOM.threadSlider.value = config[config[config.model].backend].threads
-                    } else {
-                        // change number of threads
-                        DOM.numberOfThreads.textContent = DOM.threadSlider.value;
-                        config[config[config.model].backend].threads = DOM.threadSlider.valueAsNumber;
-                        worker.postMessage({action: 'change-threads', threads: DOM.threadSlider.valueAsNumber})
-                    }
+            case 'thread-slider': {
+                    // change number of threads
+                    DOM.numberOfThreads.textContent = DOM.threadSlider.value;
+                    config[config[config.model].backend].threads = DOM.threadSlider.valueAsNumber;
+                    worker.postMessage({action: 'change-threads', threads: DOM.threadSlider.valueAsNumber})
                     break }
                 case 'batch-size': {
-                    if (PREDICTING){
-                        generateToast({message: 'It is not possible to change the batch size while an analysis is underway', type:'warning'})
-                        const batch = config[config[config.model].backend].batchSize;
-                        DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(batch);
-                        DOM.batchSizeValue.textContent = batch;
-                    } else {
-                        DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
-                        config[config[config.model].backend].batchSize = BATCH_SIZE_LIST[element.value];
-                        worker.postMessage({action: 'change-batch-size', batchSize: BATCH_SIZE_LIST[element.value]})
-                        // Reset region maxLength
-                        initRegion();
-                    }
+                    DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
+                    config[config[config.model].backend].batchSize = BATCH_SIZE_LIST[element.value];
+                    worker.postMessage({action: 'change-batch-size', batchSize: BATCH_SIZE_LIST[element.value]})
+                    // Reset region maxLength
+                    initRegion();
                     break }
                 case 'colourmap': {
                     config.colormap = element.value;

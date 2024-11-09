@@ -2147,14 +2147,8 @@ const parsePredictions = async (response) => {
     UI.postMessage({ event: 'progress', progress: progress, file: file });
     if (fileProgress === 1) {
         if (index === 0 ) {
-            const result = `No detections found in ${file}. Searched for records using the ${STATE.list} list and having a minimum confidence of ${STATE.detect.confidence/10}%`
-                        UI.postMessage({
-                event: 'new-result',
-                file: file,
-                result: result,
-                index: index,
-                selection: STATE.selection
-            });  
+            const message = `No detections found in ${file}. Searched for records using the ${STATE.list} list and having a minimum confidence of ${STATE.detect.confidence/10}%`
+            generateAlert({message: message})
         } 
         updateFilesBeingProcessed(response.file)
         DEBUG && console.log(`File ${file} processed after ${(new Date() - predictionStart) / 1000} seconds: ${filesBeingProcessed.length} files to go`);
