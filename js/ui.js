@@ -2110,11 +2110,11 @@ function getSpecies(target) {
 function handleGesture(e) {
         const moveDirection = e.deltaX || e.deltaY; // If deltaX is 0, use deltaY
         const key = moveDirection > 0 ? 'PageDown'  : 'PageUp';
-        console.log(`scrolling x: ${e.deltaX} y: ${e.deltaY}`)
+        DEBUG && console.log(`scrolling x: ${e.deltaX} y: ${e.deltaY}`)
         waitForFinalEvent(() => {
             GLOBAL_ACTIONS[key](e);
             trackEvent(config.UUID, 'Swipe', key, '' );
-        }, 100, 'swipe');
+        }, 200, 'swipe');
 }
 
 
