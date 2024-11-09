@@ -2771,7 +2771,7 @@ function centreSpec(){
             if (PREDICTING) {
                 console.log('Operation aborted');
                 PREDICTING = false;
-                disableSettingsDuringAnalysis(true);
+                disableSettingsDuringAnalysis(false);
                 STATE.analysisDone = true;
                 worker.postMessage({
                     action: 'abort',
