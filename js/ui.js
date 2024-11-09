@@ -2108,8 +2108,8 @@ function getSpecies(target) {
 }
 
 function handleGesture(e) {
-        const moveDirectoion = e.deltaX || e.deltaY; // If deltaX is 0, use deltaY
-        const key = moveDirectoion > 0 ? 'PageDown'  : 'PageUp';
+        const moveDirection = e.deltaX || e.deltaY; // If deltaX is 0, use deltaY
+        const key = moveDirection > 0 ? 'PageDown'  : 'PageUp';
         console.log(`scrolling x: ${e.deltaX} y: ${e.deltaY}`)
         waitForFinalEvent(() => {
             GLOBAL_ACTIONS[key](e);
