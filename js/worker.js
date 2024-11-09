@@ -395,8 +395,9 @@ async function handleMessage(e) {
         }
         case "analyse": {
             if (!predictWorkers.length) {
-                generateAlert({type: 'warning',  
-                    message: `A previous analysis resulted in an out-of-memory error, it is recommended you reduce the batch size from ${BATCH_SIZE}`
+                   generateAlert({type: 'Error',  
+                   message: `The ${STATE.model} model has not loaded. Restart Chirpity to continue. If you see this message repeatedly, 
+                   it is likely your computer does not support AVX2 and Chirpity will not run on your system.`
                 })
                 UI.postMessage({event: 'analysis-complete', quiet: true});
                 break;
@@ -641,8 +642,12 @@ async function spawnListWorker() {
             if (message === 'list-model-ready') {
                 return resolve(worker);
             } else if (message === "tfjs-node") {
-                event.data.available || (STATE.detect.backend = 'webgpu');
-                UI.postMessage({event: 'tfjs-node', hasNode: event.data.available})
+                STATE.hasNode = true;
+                if (!event.data.available) {
+                    STATE.detect.backend = 'webgpu';
+                    STATE.hasNode = false;
+                }
+                UI.postMessage({event: 'tfjs-node', hasNode: STATE.hasNode})
             }
         };
 
