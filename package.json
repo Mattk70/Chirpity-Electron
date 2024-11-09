@@ -1,6 +1,6 @@
 {
 	"name": "chirpity",
-	"version": "2.3.1",
+	"version": "2.3.2",
 	"description": "Chirpity Nocmig",
 	"main": "main.js",
 	"scripts": {
@@ -24,7 +24,7 @@
 			{
 				"provider": "github",
 				"owner": "Mattk70",
-				"repo": "https://github.com/Mattk70/Chirpity-Electron"
+				"repo": "Chirpity-Electron"
 			}
 		],
 		"files": [
@@ -184,7 +184,7 @@
 		"colormap": "^2.3.2",
 		"electron-log": "4.4.8",
 		"electron-settings": "^4.0.2",
-		"electron-updater": "6.3.0",
+		"electron-updater": "6.3.9",
 		"fast-png": "^6.1.0",
 		"fluent-ffmpeg": "^2.1.2",
 		"lodash.merge": "^4.6.2",
