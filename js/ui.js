@@ -5558,7 +5558,7 @@ function renderComparisons(lists, cname){
     Object.keys(lists).forEach(callType =>{
         const active = count === 0 ? 'active' : '';
         const callTypePrefix = callType.replaceAll(' ','-');
-        if (lists[callType].length){
+        if (lists[callType]?.length){
             // tab headings
             const tabHeading = document.createElement('li');
             tabHeading.classList.add('nav-item')
