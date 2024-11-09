@@ -5438,14 +5438,14 @@ async function getXCComparisons(){
         fetch(`https://xeno-canto.org/api/2/recordings?query=${sname}${quality}${length}`)
         .then(response =>{
             if (! response.ok) {
-                loading.classList.add('d-none');
+                DOM.loading.classList.add('d-none');
                 return generateToast({type: 'error', message: 'The Xeno-canto API is not responding'})
             }
             return response.json()
         })
         .then(data => {
             // Hide loading
-            loading.classList.add('d-none');
+            DOM.loading.classList.add('d-none');
             // Extract the first 10 items from the recordings array
             const recordings = data.recordings.map(record => ({
                 file: record.file, // media file
@@ -5501,7 +5501,7 @@ async function getXCComparisons(){
               }
         })
         .catch(error => {
-            loading.classList.add('d-none');
+            DOM.loading.classList.add('d-none');
             console.warn('Error getting XC data', error)
         })
     }
@@ -5644,7 +5644,6 @@ function renderComparisons(lists, cname){
     document.body.appendChild(compareDiv)
     const header = compareDiv.querySelector('.modal-header');
     makeDraggable(header);
-    const navTabs = document.getElementById('callTypeHeader');
     callTypeHeader.addEventListener('click', showCompareSpec)
     const comparisonModal = new bootstrap.Modal(compareDiv);
     compareDiv.addEventListener('hidden.bs.modal', () => compareDiv.remove())
