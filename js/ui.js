@@ -145,14 +145,18 @@ async function getPaths() {
 let VERSION;
 let DIAGNOSTICS = {};
 
-window.electron.getVersion()
-.then((appVersion) => {
-    VERSION = appVersion;
-    console.log('App version:', appVersion);
-    DIAGNOSTICS['Chirpity Version'] = VERSION;
-})
-.catch(error => {
-    console.log('Error getting app version:', error)
+let appVersionLoaded = new Promise((resolve, reject) => {
+    window.electron.getVersion()
+    .then((appVersion) => {
+        VERSION = appVersion;
+        console.log('App version:', appVersion);
+        DIAGNOSTICS['Chirpity Version'] = VERSION;
+        resolve();
+    })
+    .catch(error => {
+        console.log('Error getting app version:', error);
+        reject(error);
+    });
 });
 
 let modelReady = false, fileLoaded = false;
@@ -1667,7 +1671,7 @@ const defaultConfig = {
         fade: false, notification: true, normalise: false, minFrequency: 0, maxFrequency: 11950 },
     limit: 500,
     debug: false,
-    VERSION: VERSION,
+    VERSION: null,
     powerSaveBlocker: false
 };
 let appPath, tempPath, isMac;
@@ -1684,7 +1688,7 @@ window.onload = async () => {
 
     // Set footer year
     document.getElementById('year').textContent = new Date().getFullYear();
-
+    await appVersionLoaded;
     await fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
         if (err) {
             console.log('JSON parse error ' + err);
@@ -1858,7 +1862,7 @@ window.onload = async () => {
         // Add cpu model & memory to config
         config.CPU = DIAGNOSTICS['CPU'];
         config.RAM = DIAGNOSTICS['System Memory'];
-        setTimeout(() => {trackVisit(config)}, 5000);
+        trackVisit(config)
     })
 }
 
@@ -3402,7 +3406,7 @@ function formatDuration(seconds){
             `<span title="${comment.replaceAll('"', '&quot;')}" class='material-symbols-outlined pointer'>comment</span>` : '';
             const isUncertain = score < 65 ? '&#63;' : '';
             // store result for feedback function to use
-            predictions[index] = result;
+            if (!selection) predictions[index] = result;
             // Format date and position for  UI
             const tsArray = new Date(timestamp).toString().split(' ');
             const UI_timestamp = `${tsArray[2]} ${tsArray[1]} ${tsArray[3].substring(2)}<br/>${tsArray[4]}`;
@@ -3645,7 +3649,7 @@ function formatDuration(seconds){
         document.addEventListener('show.bs.modal', replaceCtrlWithCommand);
         help.show();
     }
-    function replaceTextInTitleAttributes() {
+    function _replaceTextInTitleAttributes() {
         // Select all elements with title attribute in the body of the web page
         const elementsWithTitle = document.querySelectorAll('[title]');
         
@@ -3656,7 +3660,7 @@ function formatDuration(seconds){
         });
     }
     
-    function replaceTextInTextNode(node) {
+    function _replaceTextInTextNode(node) {
         node.nodeValue = node.nodeValue.replaceAll('Ctrl', '⌘');
     }
     
@@ -3673,10 +3677,10 @@ function formatDuration(seconds){
             }
             
             // Replace 'Ctrl' with ⌘ in each text node
-            nodes.forEach(node => replaceTextInTextNode(node));
+            nodes.forEach(node => _replaceTextInTextNode(node));
             
             // Replace 'Ctrl' with ⌘ in title attributes of elements
-            replaceTextInTitleAttributes();
+            _replaceTextInTitleAttributes();
         }
     }
     
