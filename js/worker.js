@@ -2239,13 +2239,9 @@ async function processNextFile({
                 const { start, end } = boundaries[i];
                 if (start === end) {
                     // Nothing to do for this file
-                    
                     updateFilesBeingProcessed(file);
-                    const result = `No detections. ${file} has no period within it where predictions would be given. <b>Tip:</b> To see detections in this file, disable nocmig mode and run the analysis again.`;
-                    
-                    UI.postMessage({
-                        event: 'new-result', file: file, result: result, index: index
-                    });
+                    const message = `No detections. ${file} has no period within it where predictions would be given. <b>Tip:</b> To see detections in this file, disable nocmig mode and run the analysis again.`;
+                    generateAlert({message: message})
                     
                     DEBUG && console.log('Recursion: start = end')
                     await processNextFile(arguments[0]).catch(error => console.warn('Error in processNextFile call', error));
@@ -2540,7 +2536,6 @@ const getResults = async ({
             if (STATE.selection) {
                 // No more detections in the selection
                 generateAlert({message: 'No detections found in the selection'})
-                sendResult(++index, 'No detections found in the selection', true)
             } else {
                 species = species || '';
                 const nocmig = STATE.detect.nocmig ? '<b>nocturnal</b>' : '';
@@ -2695,7 +2690,7 @@ const formatDate = (timestamp) =>{
 
 const sendResult = (index, result, fromDBQuery) => {
     // Convert confidence back to % value
-    if (typeof result == 'object') result.score = (result.score / 10).toFixed(0);
+    result.score = (result.score / 10).toFixed(0);
     UI.postMessage({
         event: 'new-result',
         file: result.file,

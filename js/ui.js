@@ -2012,7 +2012,9 @@ const setUpWorkerMessaging = () => {
                     }
                     modelSettingsDisplay();
                     break }
-                case "valid-species-list": {populateSpeciesModal(args.included, args.excluded);
+                case "valid-species-list": {
+                    populateSpeciesModal(args.included, args.excluded);
+                    
                     break }
                 case "total-records": {updatePagination(args.total, args.offset);
                     break }
@@ -2502,7 +2504,7 @@ function onChartData(args) {
             dragSelection: true,
             maxRegions: 1,
             // Region length bug (likely mine) means I don't trust lengths > 60 seconds
-            maxLength: config[config[config.model].backend].batchSize * 3,
+            //maxLength: config[config[config.model].backend].batchSize * 3,
             slop: null,
             color: "rgba(255, 255, 255, 0.2)"
         })
