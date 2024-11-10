@@ -4385,7 +4385,7 @@ function playRegion(){
     // Audio preferences:
     
     const showRelevantAudioQuality = () => {
-        if (['mp3', 'opus'].includes(config.audio.format)) {
+        if (['mp3', 'opus', 'aac'].includes(config.audio.format)) {
             DOM.audioBitrateContainer.classList.remove('d-none');
             DOM.audioQualityContainer.classList.add('d-none');
         } else if (config.audio.format === 'flac') {

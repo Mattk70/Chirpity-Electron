@@ -1776,6 +1776,7 @@ const bufferToAudio = async ({
     format ??= STATE.audio.format;
     const formatMap = {
         mp3: { audioCodec: 'libmp3lame', soundFormat: 'mp3' },
+        aac: { audioCodec: 'aac', soundFormat: 'mp4' },
         wav: { audioCodec: 'pcm_s16le', soundFormat: 'wav' },
         flac: { audioCodec: 'flac', soundFormat: 'flac' },
         opus: { audioCodec: 'libopus', soundFormat: 'opus' }
@@ -1798,7 +1799,7 @@ const bufferToAudio = async ({
         // .audioFrequency(METADATA[file].sampleRate)
         .audioCodec(audioCodec)
         .seekInput(start).duration(end - start)
-        if (['mp3', 'm4a', 'opus'].includes(format)) {
+        if (['mp3', 'aac', 'opus'].includes(format)) {
             //if (format === 'opus') bitrate *= 1000;
             command = command.audioBitrate(bitrate)
         } else if (['flac'].includes(format)) {
