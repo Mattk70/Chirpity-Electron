@@ -1671,7 +1671,7 @@ const defaultConfig = {
         fade: false, notification: true, normalise: false, minFrequency: 0, maxFrequency: 11950 },
     limit: 500,
     debug: false,
-    VERSION: null,
+    VERSION: VERSION,
     powerSaveBlocker: false
 };
 let appPath, tempPath, isMac;
