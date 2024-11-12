@@ -119,7 +119,7 @@ const setupFfmpegCommand = ({
     file, 
     start = 0, 
     end = undefined, 
-    sampleRate = 24000, 
+    sampleRate = undefined, 
     channels = 1, 
     format = 's16le', //<= outputs audio without header
     additionalFilters = [],
@@ -130,8 +130,8 @@ const setupFfmpegCommand = ({
 }) => {
     const command = ffmpeg('file:' + file)
         .format(format)
-        .audioChannels(channels)
-        .audioFrequency(sampleRate)
+        .audioChannels(channels);
+        sampleRate && command.audioFrequency(sampleRate);
         //.audioFilters('aresample=filter_type=kaiser:kaiser_beta=9.90322');
 
     // Add filters if provided
@@ -1332,6 +1332,12 @@ const getPredictBuffers = async ({
     if (! fs.existsSync(file)) { 
         const found = await getWorkingFile(file);
         if (!found) throw new Error('Unable to locate ' + file);
+        const index = filesBeingProcessed.indexOf(file);
+        filesBeingProcessed[index] = found;
+        // Need to update state too
+        const stateIndex = STATE.filesToAnalyse.indexOf(file);
+        STATE.filesToAnalyse[stateIndex] = found;
+        file = found;
     }
     // Ensure max and min are within range
     start = Math.max(0, start);
@@ -1357,6 +1363,13 @@ const getPredictBuffers = async ({
 
 async function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBatch){
     return new Promise((resolve, reject) => {
+        // Many compressed files start with a small section of silence due to encoder padding, which affects predictions
+        // To compensate, we move the start back a small amount, and slice the data to remove the silence
+        let remainingTrim;
+        if (start > 0) {
+            remainingTrim  = sampleRate * 0.1;
+            start -= 0.05;
+        }    
         let currentIndex = 0;
         const audioBuffer = Buffer.allocUnsafe(highWaterMark);
         const additionalFilters = STATE.filters.sendToModel ? setAudioFilters() : [];
@@ -1378,6 +1391,17 @@ async function processAudio (file, start, end, chunkStart, highWaterMark, sample
             if (aborted) {
                 STREAM.destroy();
                 return;
+            }
+            if (remainingTrim){
+                if (chunk.length <= remainingTrim) {
+                    // Reduce the remaining trim by the chunk length and skip this chunk
+                    remainingTrim -= chunk.length;
+                    return; // Ignore this chunk and move to the next
+                } else {
+                    // Trim the current chunk by the remaining amount
+                    chunk = chunk.subarray(remainingTrim, highWaterMark);
+                    remainingTrim = 0; // Reset the remainder after trimming
+                }
             }
             // Copy incoming chunk into the audioBuffer
             const remainingSpace = highWaterMark - currentIndex;
@@ -1762,18 +1786,18 @@ async function uploadOpus({ file, start, end, defaultName, metadata, mode }) {
 }
             
 const bufferToAudio = async ({
-    file = '', start = 0, end = 3, meta = {}, format = undefined, folder = undefined, filename = undefined
+    file = '', start = 0, end = 3, meta = {}, format = STATE.audio.format, folder = undefined, filename = undefined
 }) => {
     if (! fs.existsSync(file)) {
         const found = await getWorkingFile(file);
         if (!found) return
+        file = found;
     }
     let padding = STATE.audio.padding;
     let fade = STATE.audio.fade;
-    let bitrate = STATE.audio.bitrate;
-    let quality = parseInt(STATE.audio.quality);
+    let bitrate = ['mp3', 'aac', 'opus'].includes(format) ? STATE.audio.bitrate : undefined;
+    let quality = ['flac'].includes(format) ? parseInt(STATE.audio.quality): undefined;
     let downmix = STATE.audio.downmix;
-    format ??= STATE.audio.format;
     const formatMap = {
         mp3: { audioCodec: 'libmp3lame', soundFormat: 'mp3' },
         aac: { audioCodec: 'aac', soundFormat: 'mp4' },
@@ -1783,46 +1807,24 @@ const bufferToAudio = async ({
     };
     const { audioCodec, soundFormat } = formatMap[format] || {};
     
-    METADATA[file] || await getWorkingFile(file);
     if (padding) {
-        start -= 1;
-        end += 1;
-        start = Math.max(0, start);
-        end = Math.min(end, METADATA[file].duration);
+        start = Math.max(0, start - 1);
+        end = Math.min(METADATA[file].duration, end + 1);
     }
     
     return new Promise(function (resolve, reject) {
-        let command = ffmpeg('file:' + file)
-        .toFormat(soundFormat)
-        .audioChannels(downmix ? 1 : -1)
-        // I can't get this to work with Opus
-        // .audioFrequency(METADATA[file].sampleRate)
-        .audioCodec(audioCodec)
-        .seekInput(start).duration(end - start)
-        if (['mp3', 'aac', 'opus'].includes(format)) {
-            //if (format === 'opus') bitrate *= 1000;
-            command = command.audioBitrate(bitrate)
-        } else if (['flac'].includes(format)) {
-            command = command.audioQuality(quality)
-        }
         const filters = setAudioFilters();
-        if (filters.length > 0) {
-            command = command.audioFilters(filters);
-        }            
-
         if (fade && padding) {
-            const duration = end - start;
-            command = command.audioFilters(
-                {
-                    filter: 'afade',
-                    options: `t=in:ss=${start}:d=1`
+            filters.push(
+                { filter: 'afade',
+                  options: `t=in:ss=${start}:d=1`
                 },
-                {
-                    filter: 'afade',
-                    options: `t=out:st=${duration - 1}:d=1`
+                { filter: 'afade',
+                  options: `t=out:st=${end - start - 1}:d=1`
                 }
             )
         }
+        
         if (Object.entries(meta).length){
             meta = Object.entries(meta).flatMap(([k, v]) => {
                 if (typeof v === 'string') {
@@ -1831,9 +1833,22 @@ const bufferToAudio = async ({
                 };
                 return ['-metadata', `${k}=${v}`]
             });
-            command.addOutputOptions(meta)
         }
-        //const destination = p.join((folder || tempPath), 'file.mp3');
+
+        let command = setupFfmpegCommand({
+            file: file, 
+            start: start, 
+            end: end, 
+            sampleRate: undefined, 
+            audioBitrate: bitrate,
+            audioQuality: quality,
+            audioCodec: audioCodec,
+            format: soundFormat,
+            channels: downmix ? 1 : -1,
+            metadata: meta,
+            additionalFilters: filters
+            })
+        
         const destination = p.join((folder || tempPath), filename);
         command.save(destination);
 
@@ -2709,7 +2724,7 @@ const getSavedFileInfo = async (file) => {
         // Get rid of archive (library) location prefix
         const archiveFile = file.replace(prefix , '');
         let row = await diskDB.getAsync(`
-            SELECT duration, filestart AS fileStart, metadata AS guano, locationID
+            SELECT duration, filestart AS fileStart, metadata, locationID
             FROM files LEFT JOIN locations ON files.locationID = locations.id 
             WHERE name = ? OR archiveName = ?`,file, archiveFile);
         if (!row) {

@@ -354,25 +354,7 @@
         </div>
     </div>
     <!-- context menu-->
-    <div class="dropdown-menu dropdown-menu-sm" id="context-menu">
-        <a class="dropdown-item play"><span class="material-symbols-outlined">play_circle</span> Play</a>
-        <a class="dropdown-item" href="#" id="context-analyse-selection"><span class="material-symbols-outlined">
-            search
-        </span> Analyse</a>
-        <div class="dropdown-divider"></div>
-        <a class="dropdown-item" id="create-manual-record" href="#"><span class="material-symbols-outlined">
-            edit_document
-        </span> Edit Record</a>
-        <a class="dropdown-item" id="context-create-clip" href="#"><span class="material-symbols-outlined">
-            music_note
-        </span> Export Audio Clip</a>
-        <a class="dropdown-item d-none" id="context-xc" href="#" target="xc">
-            <img src="img/logo/XC.png" alt="" style="filter:grayscale(100%);height: 1.5em"> Explore on
-            Xeno-Canto</a>
-            <div class="dropdown-divider"></div>
-            <a class="dropdown-item d-none" id="context-delete" href="#">
-                <span class="delete material-symbols-outlined">delete_forever</span> Delete Record</a>
-            </div>
+    <div class="dropdown-menu dropdown-menu-sm" id="context-menu"> </div>
             <!-- End context menu -->
     <!-- Records container -->
     <div class="d-none h-100 overflow-auto" id="recordsContainer">
@@ -514,7 +496,7 @@
                 </div>
             </fieldset>
         </div>
-    <div class="offcanvas offcanvas-start text-bg-dark" tabindex="-1" id="settings" aria-labelledby="offcanvasExampleLabel">
+    <div class="offcanvas offcanvas-end text-bg-dark" tabindex="-1" id="settings" aria-labelledby="offcanvasExampleLabel">
         <div class="offcanvas-header pb-2">
             <h5 class="offcanvas-title" id="offcanvasExampleLabel">Settings</h5>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" id="close-settings" aria-label="Close"></button>
@@ -1301,12 +1283,13 @@
                             </li>
                         </ul>
                     </li>
+                    <div class="nav-item">
+                        <li class="nav-link"  onclick="placeMap('settingsMap')" id="navbarSettings"
+                        data-bs-toggle="offcanvas" data-bs-target="#settings" aria-controls="settings">Settings <span class="material-symbols-outlined fs-5 align-middle">settings</span></li>
+                    </div>
                 </ul>
             </div>
-            <div class="container-fluid">
-                <button class="btn btn-outline-secondary border-dark float-end text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button" onclick="placeMap('settingsMap')" id="navbarSettings"
-                data-bs-toggle="offcanvas" data-bs-target="#settings" aria-controls="settings">Settings <span class="material-symbols-outlined fs-5 align-middle">settings</span></button>
-            </div>
+
             <!-- navbar-collapse.// -->
             <a href="https://chirpity.mattkirkland.co.uk" title="Visit the Chirpity website" target="_blank"><img id="primaryLogo" src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"></a>
         </div>

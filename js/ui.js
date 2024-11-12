@@ -869,7 +869,7 @@ async function setCustomLocation() {
     STATE.openFiles.length > 1 ? batchWrapper.classList.remove('d-none') : batchWrapper.classList.add('d-none');
     // Use the current file location for lat, lon, place or use defaults
     showLocation(false);
-    savedLocationSelect.addEventListener('change', function (e) {
+    savedLocationSelect.addEventListener('change', function () {
         showLocation(true);
     })
     const addOrDelete = () => {
@@ -1344,7 +1344,7 @@ async function resultClick(e) {
         return
     }
     
-    const [file, start, end, sname, label] = row.getAttribute('name').split('|');
+    const [file, start, end, _, label] = row.getAttribute('name').split('|');
     // if (row.classList.contains('table-active')){
     //     createRegion(start - bufferBegin, end - bufferBegin, label, true);
     //     e.target.classList.contains('circle') && getSelectionResults(true);
@@ -1852,7 +1852,7 @@ window.onload = async () => {
         myAllowList.td = [];
         myAllowList.th = [];
         const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]')
-        const popoverList = [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl, {allowList: myAllowList}))
+        const _ = [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl, {allowList: myAllowList}))
         
 
         // check for new version on mac platform. pkg containers are not an auto-updatable target
@@ -2054,7 +2054,7 @@ function generateBirdOptionList({ store, rows, selected }) {
         // International language sorting, recommended for large arrays - 'en_uk' not valid, but same as 'en'
         sortedList.sort(new Intl.Collator(config[config.model].locale.replace('_uk', '')).compare);
         // Check if we have prepared this before
-        const all = document.getElementById('allSpecies');
+        
         const lastSelectedSpecies = selected || STATE.birdList.lastSelectedSpecies;
         listHTML += '<div class="form-floating"><select spellcheck="false" id="bird-list-all" class="input form-select mb-3" aria-label=".form-select" required>';
         listHTML += '<option value="">All</option>';
@@ -2423,7 +2423,7 @@ function onChartData(args) {
                     padding: {
                         top: 2
                     },
-                    formatter: function (value, context) {
+                    formatter: function (value, _) {
                         return value; // Customize the displayed value as needed
                     }
                 }
@@ -2769,7 +2769,7 @@ function centreSpec(){
         z: function (e) {
             if (( e.ctrlKey || e.metaKey) && DELETE_HISTORY.length) insertManualRecord(...DELETE_HISTORY.pop());
         },
-        Escape: function (e) {
+        Escape: function () {
             if (PREDICTING) {
                 console.log('Operation aborted');
                 PREDICTING = false;
@@ -2853,8 +2853,8 @@ function centreSpec(){
         '=': function (e) {e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec('zoomIn')},
         '+': function (e) {e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec('zoomIn')},
         '-': function (e) {e.metaKey || e.ctrlKey ? increaseFFT() : zoomSpec('zoomOut')},
-        'F5': function (e) { reduceFFT() },
-        'F4': function (e) { increaseFFT() },
+        'F5': function () { reduceFFT() },
+        'F4': function () { increaseFFT() },
         ' ': function () { wavesurfer && wavesurfer.playPause() },
         Tab: function (e) {
             if ((e.metaKey || e.ctrlKey) && ! PREDICTING) { // If you did this when predicting, your results would go straight to the archive
@@ -4128,12 +4128,12 @@ function formatDuration(seconds){
                     //element.innerHTML = savedContent;
                 }
             })
-            picker.on('show', (e) =>{
+            picker.on('show', () =>{
                 picker.setStartTime('12:00')
                 picker.setEndTime('12:00')
                 
             })
-            picker.on('hide', (e) =>{
+            picker.on('hide', () =>{
                 const id = STATE.mode === 'chart' ? 'chartRange' : 'exploreRange';
                 const element = document.getElementById(id);
                 if (! element.textContent){
@@ -4399,7 +4399,8 @@ function playRegion(){
 
     
     document.addEventListener('click', function (e) {
-        const target = e.target.closest('[id]')?.id;
+        const element = e.target;
+        const target = element.closest('[id]')?.id;
         switch (target)
         {
             // File menu
@@ -4475,6 +4476,14 @@ function playRegion(){
                             DOM.tooltipInstance.setContent({ '.tooltip-inner': 'Click to Copy' });
                         }, 2000);
                     }).catch(error => console.warn(error))  ;
+                break;
+            }
+
+            // Context-menu
+            case 'play-region': { playRegion(); break }
+            case 'context-analyse-selection': {getSelectionResults(); break }
+            case 'context-create-clip': {
+                element.closest('#inSummary') ? batchExportAudio() : exportAudio();
                 break;
             }
             // --- Backends
@@ -4556,10 +4565,6 @@ function playRegion(){
                 break
             }
             case 'speciesFilter': { speciesFilter(e); break}
-            case 'context-menu': { 
-                e.target.closest('.play') && typeof region !== 'undefined' ? playRegion() : console.log('Region undefined')
-                break;
-            }
             case 'audioFiltersIcon': { toggleFilters(); break }
             case 'context-mode': { toggleContextAwareMode(); break }
             case 'frequency-range': { 
@@ -4929,41 +4934,37 @@ async function readLabels(labelFile, updating){
         const createOrEdit = ((region?.attributes.label || target.closest('#summary'))) ? 'Edit' : 'Create';
         
         contextMenu.innerHTML = `
-        <a class="dropdown-item play ${hideInSummary}"><span class='material-symbols-outlined'>play_circle</span> Play</a>
-        <a class="dropdown-item ${hideInSummary} ${hideInSelection}" href="#" id="context-analyse-selection">
-        <span class="material-symbols-outlined">search</span> Analyse
-        </a>
-        <div class="dropdown-divider ${hideInSummary}"></div>
-        <a class="dropdown-item" id="create-manual-record" href="#">
-        <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} Record${plural}
-        </a>
-        <a class="dropdown-item" id="context-create-clip" href="#">
-        <span class="material-symbols-outlined">music_note</span> Export Audio Clip${plural}
-        </a>
-        <span class="dropdown-item" id="context-xc" href='#' target="xc">
-        <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> Compare with Reference Calls
-        </span>
-        <div class="dropdown-divider ${hideInSelection}"></div>
-        <a class="dropdown-item ${hideInSelection}" id="context-delete" href="#">
-        <span class='delete material-symbols-outlined'>delete_forever</span> Delete Record${plural}
-        </a>
+        <div id="${inSummary ? 'inSummary' : 'inResults'}">
+            <a class="dropdown-item ${hideInSummary}" id="play-region"><span class='material-symbols-outlined'>play_circle</span> Play</a>
+            <a class="dropdown-item ${hideInSummary} ${hideInSelection}" href="#" id="context-analyse-selection">
+            <span class="material-symbols-outlined">search</span> Analyse
+            </a>
+            <div class="dropdown-divider ${hideInSummary}"></div>
+            <a class="dropdown-item" id="create-manual-record" href="#">
+            <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} Record${plural}
+            </a>
+            <a class="dropdown-item" id="context-create-clip" href="#">
+            <span class="material-symbols-outlined">music_note</span> Export Audio Clip${plural}
+            </a>
+            <span class="dropdown-item" id="context-xc" href='#' target="xc">
+            <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> Compare with Reference Calls
+            </span>
+            <div class="dropdown-divider ${hideInSelection}"></div>
+            <a class="dropdown-item ${hideInSelection}" id="context-delete" href="#">
+            <span class='delete material-symbols-outlined'>delete_forever</span> Delete Record${plural}
+            </a>
+        </div>
         `;
         const modalTitle = document.getElementById('record-entry-modal-label');
         const contextDelete = document.getElementById('context-delete');
         modalTitle.textContent = `${createOrEdit} Record`;
         if (!hideInSelection) {
-            const contextAnalyseSelectionLink = document.getElementById('context-analyse-selection');
-            contextAnalyseSelectionLink.addEventListener('click', getSelectionResults);
-            
             resultContext ? contextDelete.addEventListener('click', deleteRecord) :
             contextDelete.addEventListener('click', function () {
                 deleteSpecies(target);
             });
         }
         // Add event Handlers
-        const exportLink = document.getElementById('context-create-clip');
-        hideInSummary ? exportLink.addEventListener('click', batchExportAudio) :
-        exportLink.addEventListener('click', exportAudio);
         if (!hideInSelection) {
             document.getElementById('create-manual-record').addEventListener('click', function (e) {
                 if (e.target.textContent.includes('Edit')) {
