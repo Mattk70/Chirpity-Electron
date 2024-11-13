@@ -113,11 +113,11 @@ jobs:
 
       # Conditional build command for each OS
       - name: Build Electron application
-        if: env.skip_build != 'true'  # Only run this if the tag comparison was true
+        # if: env.skip_build != 'true'  # Only run this if the tag comparison was true
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            npx electron-builder --win --x64 -p always
+            npx build
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             npx electron-builder --mac  -p always
           else
