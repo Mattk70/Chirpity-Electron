@@ -23,6 +23,11 @@ jobs:
         with:
             node-version: 20.0.x
       - run: echo "🍏 Node setup status is ${{ job.status }}."
+      
+      - name: Install Python dependencies on macOS
+        if: runner.os == 'macOS'
+        run: brew install python@3.9
+        
       - name: Install dependencies
         run: |
           npm install
