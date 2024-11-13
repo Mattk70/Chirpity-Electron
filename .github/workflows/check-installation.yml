@@ -29,6 +29,7 @@ jobs:
           echo "Install's status is ${{ job.status }}."
       # Conditional build command for each OS
       - name: Build Electron application
+        shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             npx electron-builder --win --x64
@@ -39,6 +40,7 @@ jobs:
           fi
       - run: echo "Build status is ${{ job.status }}."
       - name: Check installer exists
+        shell: bash
         run: |
           # Retrieve the version from package.json
           VERSION=$(jq -r '.version' package.json)
