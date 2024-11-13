@@ -34,8 +34,39 @@ jobs:
         run: |
           npm install
           echo "Install's status is ${{ job.status }}."
+
+      # test application here
+
+      # end test application
+      
+      # Fetch tags from origin
+      - name: Fetch all tags
+        run: git fetch --tags
+
+      # Get the latest tag from origin/master
+      - name: Get the latest tag on origin/master
+        id: get_latest_tag
+        run: echo "::set-output name=latest_tag::$(git describe --tags `git rev-list --tags --max-count=1`)"
+
+      # Get the current pushed tag
+      - name: Get the current pushed tag
+        id: get_current_tag
+        run: echo "::set-output name=current_tag::${GITHUB_REF##*/}"
+
+      # Compare tags to decide if build should proceed
+      - name: Check if current tag is greater than the latest tag
+        id: check_tag
+        shell: bash
+        run: |
+          if [ "$(printf "%s\n%s" "${{ steps.get_latest_tag.outputs.latest_tag }}" "${{ steps.get_current_tag.outputs.current_tag }}" | sort -V | tail -n 1)" != "${{ steps.get_current_tag.outputs.current_tag }}" ]; then
+            echo "New tag is not greater than the latest tag on origin/master. Skipping build."
+            echo "skip_build=true" >> $GITHUB_ENV
+          fi
+
+
       # Conditional build command for each OS
       - name: Build Electron application
+        if: env.skip_build != 'true'  # Only run this if the tag comparison was true
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
