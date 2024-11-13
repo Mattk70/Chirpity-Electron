@@ -77,12 +77,10 @@ jobs:
         shell: bash
 
       # test application here
-      - name: Install Xvfb 
-        shell: bash
-        run: sudo apt-get update && sudo apt-get install -y xvfb 
       - name: Set DISPLAY environment variable 
+        if: runner.os == 'Linux'
         run: export DISPLAY=:99
-        shell: bash
+        
       - name: Fire up Application
         run: npm run start
       # end test application
