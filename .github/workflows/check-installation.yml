@@ -42,7 +42,7 @@ jobs:
             PLATFORM="win32-x64"
             BINARY="ffmpeg.exe"
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            PLATFORM="darwin-arm64/ffmpeg"
+            PLATFORM="darwin-arm64"
             BINARY="ffmpeg"
             chmod +x ./build/$PLATFORM/ffmpeg
             echo "Made ffmpeg binary executable for $PLATFORM."
@@ -65,7 +65,7 @@ jobs:
 
       - name: Modify fluent-ffmpeg processor.js
         run: |
-            sed -i '/setTimeout(function() {/,+5s/\(.*\)20;/\1 5000);/g' ./node_modules/fluent-ffmpeg/lib/processor.js
+            sed -i '/setTimeout(function() {/,/}, 20);/c\              setTimeout(function() {\n                if (ffmpegProc.exitCode === null){\n                  emitEnd(new Error('"'"'Output stream closed'"'"'));\n                  ffmpegProc.kill();\n                }\n              }, 5000);'  ./node_modules/fluent-ffmpeg/lib/processor.js
             cat ./node_modules/fluent-ffmpeg/lib/processor.js
         shell: bash
       # test application here
