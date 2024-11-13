@@ -19,7 +19,7 @@ jobs:
       - run: echo "🖥️ The workflow is now ready to test your code on the runner."
 
       - name: Setup node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
             node-version: 20.0.x
       - run: echo "🍏 Node setup status is ${{ job.status }}."
