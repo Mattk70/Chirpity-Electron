@@ -46,19 +46,23 @@ jobs:
       # Get the latest tag from origin/master
       - name: Get the latest tag on origin/master
         id: get_latest_tag
-        run: echo "::set-output name=latest_tag::$(git describe --tags `git rev-list --tags --max-count=1`)"
+        run: |
+          latest_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
+          echo "LATEST_TAG=$latest_tag" >> $GITHUB_ENV
 
       # Get the current pushed tag
       - name: Get the current pushed tag
         id: get_current_tag
-        run: echo "::set-output name=current_tag::${GITHUB_REF##*/}"
+        run: |
+          current_tag="${GITHUB_REF##*/}"
+          echo "CURRENT_TAG=$current_tag" >> $GITHUB_ENV
 
       # Compare tags to decide if build should proceed
       - name: Check if current tag is greater than the latest tag
         id: check_tag
         shell: bash
         run: |
-          if [ "$(printf "%s\n%s" "${{ steps.get_latest_tag.outputs.latest_tag }}" "${{ steps.get_current_tag.outputs.current_tag }}" | sort -V | tail -n 1)" != "${{ steps.get_current_tag.outputs.current_tag }}" ]; then
+          if [ "$(printf "%s\n%s" "$LATEST_TAG" "$CURRENT_TAG" | sort -V | tail -n 1)" != "$CURRENT_TAG" ]; then
             echo "New tag is not greater than the latest tag on origin/master. Skipping build."
             echo "skip_build=true" >> $GITHUB_ENV
           fi
