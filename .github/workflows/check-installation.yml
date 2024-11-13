@@ -27,8 +27,17 @@ jobs:
         run: |
           npm install
           echo "Install's status is ${{ job.status }}."
-      - name: Build
-        run: npx electron-builder --win --x64 
+      # Conditional build command for each OS
+      - name: Build Electron application
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            npx electron-builder --win --x64
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            npx electron-builder --mac
+          else
+            npx electron-builder build --linux --x64
+          fi
+      - run: echo "Build status is ${{ job.status }}."
       - name: Check installer exists
         run: |
           # Retrieve the version from package.json
