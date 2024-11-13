@@ -24,6 +24,11 @@ jobs:
             node-version: 20.0.x
       - run: echo "🍏 Node setup status is ${{ job.status }}."
       
+      # Step to set up Python 3.9
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
       - name: Install Python dependencies on macOS
         if: runner.os == 'macOS'
         run: brew install python@3.9
