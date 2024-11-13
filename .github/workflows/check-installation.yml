@@ -53,6 +53,9 @@ jobs:
             echo "Made ffmpeg binary executable for $PLATFORM."
           fi
           echo "Platform is $PLATFORM, Binary is $BINARY"
+          # Persist environment variables to the GitHub Actions environment
+          echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
+          echo "BINARY=$BINARY" >> $GITHUB_ENV
           
       - name: Overwrite FFmpeg binary
         run: |
