@@ -34,7 +34,36 @@ jobs:
         run: |
           npm install
           echo "Install's status is ${{ job.status }}."
+          
+      - name: Set platform-specific ffmpeg path
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            PLATFORM="win32-x64"
+            BINARY="ffmpeg.exe"
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            PLATFORM="darwin-arm64/ffmpeg"
+            BINARY="ffmpeg"
+            chmod +x ./build/$PLATFORM/ffmpeg
+            echo "Made ffmpeg binary executable for $PLATFORM."
+          elif [[ "$RUNNER_OS" == "Linux" ]]; then
+            PLATFORM="linux-x64"
+            BINARY="ffmpeg"
+            chmod +x ./build/$PLATFORM/ffmpeg
+            echo "Made ffmpeg binary executable for $PLATFORM."
+          fi
+          echo "Platform is $PLATFORM, Binary is $BINARY"
+          
+      - name: Overwrite FFmpeg binary
+        run: |
+          cp ./build/$PLATFORM/$BINARY ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY
+        shell: bash
 
+      - name: Modify fluent-ffmpeg processor.js
+        run: |
+            sed -i '/setTimeout(function() {/,+5s/\(.*\)20;/\1 5000);/g' ./node_modules/fluent-ffmpeg/lib/processor.js
+            cat ./node_modules/fluent-ffmpeg/lib/processor.js
+        shell: bash
       # test application here
 
       # end test application
