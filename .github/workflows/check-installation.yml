@@ -113,7 +113,7 @@ jobs:
 
       # Conditional build command for each OS
       - name: Build Electron application
-        # if: env.skip_build != 'true'  # Only run this if the tag comparison was true
+        if: env.skip_build != 'true'  # Only run this if the tag comparison was true
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
