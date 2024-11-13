@@ -117,7 +117,7 @@ jobs:
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            npx build
+            npm run build
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             npx electron-builder --mac  -p always
           else
