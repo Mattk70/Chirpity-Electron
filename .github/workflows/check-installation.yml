@@ -65,16 +65,18 @@ jobs:
 
       - name: Modify fluent-ffmpeg processor.js
         run: |
-          sed -i '' -e '/setTimeout(function() {/,/}, 20);/c\
-              setTimeout(function() {\
-                if (ffmpegProc.exitCode === null){\
-                  emitEnd(new Error('\''Output stream closed'\''));\
-                  ffmpegProc.kill();\
-                }\
-              }, 5000);' ./node_modules/fluent-ffmpeg/lib/processor.js
-
-            cat ./node_modules/fluent-ffmpeg/lib/processor.js
+          cat ./node_modules/fluent-ffmpeg/lib/processor.js
+          sed -i -e '/setTimeout(function() {/,/}, 20);/c\
+                    setTimeout(function() {\
+                      if (ffmpegProc.exitCode === null){\
+                        emitEnd(new Error('\''Output stream closed'\''));\
+                        ffmpegProc.kill();\
+                      }\
+                    }, 5000);' ./node_modules/fluent-ffmpeg/lib/processor.js
+      
+          cat ./node_modules/fluent-ffmpeg/lib/processor.js
         shell: bash
+
       # test application here
 
       # end test application
