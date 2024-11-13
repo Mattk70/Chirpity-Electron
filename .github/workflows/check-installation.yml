@@ -39,11 +39,11 @@ jobs:
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            npx electron-builder --win --x64
+            npx electron-builder --win --x64 -p always
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            npx electron-builder --mac
+            npx electron-builder --mac  -p always
           else
-            npx electron-builder build --linux --x64
+            npx electron-builder build --linux --x64  -p always
           fi
       - run: echo "Build status is ${{ job.status }}."
       - name: Check installer exists
