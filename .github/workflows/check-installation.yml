@@ -78,6 +78,7 @@ jobs:
           fi
       - run: echo "Build status is ${{ job.status }}."
       - name: Check installer exists
+        if: env.skip_build != 'true' # Only run this if the tag comparison was true
         shell: bash
         run: |
           # Retrieve the version from package.json
