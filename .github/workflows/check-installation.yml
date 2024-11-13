@@ -65,7 +65,6 @@ jobs:
 
       - name: Modify fluent-ffmpeg processor.js
         run: |
-          cat ./node_modules/fluent-ffmpeg/lib/processor.js
           sed -i -e '/^\s*setTimeout(function() {/,/}, 20);/c\
                     setTimeout(function() {\
                       if (ffmpegProc.exitCode === null){\
@@ -114,7 +113,7 @@ jobs:
 
       # Conditional build command for each OS
       - name: Build Electron application
-        if: env.skip_build != 'true'  # Only run this if the tag comparison was true
+        # if: env.skip_build != 'true'  # Only run this if the tag comparison was true
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
