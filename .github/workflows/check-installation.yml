@@ -77,11 +77,19 @@ jobs:
         shell: bash
 
       # test application here
-      - name: Set DISPLAY environment variable 
+
+      - name: Start Xvfb
         if: runner.os == 'Linux'
-        run: export DISPLAY=:99
-        
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          Xvfb :99 -screen 0 1280x1024x24 &
+        env:
+          DISPLAY: :99
+
       - name: Fire up Application
+        env:
+          DISPLAY: :99
         run: npm run start
       # end test application
       
