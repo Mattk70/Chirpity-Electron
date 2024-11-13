@@ -2,8 +2,11 @@ name: Test Chirpity Compilation
 run-name: ${{ github.actor }} is installing chirpity
 on: [push,  workflow_dispatch]
 jobs:
-  Build-Windows:
-    runs-on: windows-latest
+  Build-Chirpity:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest] 
     env: 
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
     steps:
@@ -16,7 +19,7 @@ jobs:
       - run: echo "🖥️ The workflow is now ready to test your code on the runner."
 
       - name: Setup node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
             node-version: 20.0.x
       - run: echo "🍏 Node setup status is ${{ job.status }}."
@@ -31,7 +34,13 @@ jobs:
           # Retrieve the version from package.json
           VERSION=$(jq -r '.version' package.json)
           # Construct the filename
-          FILENAME="chirpity Setup-$VERSION.exe"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            FILENAME="chirpity Setup $VERSION.exe"
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            FILENAME="chirpity Setup $VERSION.pkg"
+          else
+            FILENAME="chirpity Setup $VERSION.AppImage"
+          fi
           # Check if the file exists
           if [ -f "./dist/$FILENAME" ]; then
             echo "Executable $FILENAME found in ./dist"
