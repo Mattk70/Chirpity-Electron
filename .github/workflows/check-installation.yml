@@ -23,7 +23,7 @@ jobs:
           npm install
           echo "Install's status is ${{ job.status }}."
       - name: Build
-        run: electron-builder --win --x64 
+        run: npx electron-builder --win --x64 
       - name: Check installer exists
         run: |
           # Retrieve the version from package.json
