@@ -1,5 +1,5 @@
-import { _electron as electron } from 'playwright'
-import { test, expect } from '@playwright/test'
+import { _electron as electron } from 'playwright';
+import { test, expect } from '@playwright/test';
 import { 
   findLatestBuild, 
   ipcMainCallFirstListener, 
@@ -10,11 +10,12 @@ import {
   ipcRendererSend,
   ipcMainEmit,
   stubMultipleDialogs
-} from 'electron-playwright-helpers'
-import { ElectronApplication, Page } from 'playwright'
-import jimp from 'jimp'
-let electronApp: ElectronApplication
-let page: Page
+} from 'electron-playwright-helpers';
+import { ElectronApplication, Page } from 'playwright';
+import jimp from 'jimp';
+
+let electronApp: ElectronApplication = null;
+let page: Page = null;
 let worker: Page
 let example_file: any
 
@@ -30,8 +31,8 @@ test.beforeAll(async () => {
     executablePath: appInfo.executable
   })
 
+  // Get the path for the example file we want to load
   example_file = await ipcMainInvokeHandler(electronApp, 'getAudio')
-  console.log('Example file:' , example_file)
   await stubMultipleDialogs(electronApp, [
     {
       method: 'showOpenDialog',
@@ -48,18 +49,12 @@ test.beforeAll(async () => {
        },
      },
    ])
-
-  worker = await electronApp.firstWindow();
+   worker = electronApp.firstWindow()
 
   electronApp.on('window', async (window) => {
     const filename = window.url()?.split('/').pop()
     console.log(`Window opened: ${filename}`)
-    page = window
-    // Wait for the model to be ready
-    // const warmup = page.locator('#warmup')
-    // const slowExpect = expect.configure({ timeout: 15_000 });
-    // await slowExpect(warmup).toHaveClass('dropdown-item text-danger d-none') 
-    // capture errors
+    page = window;
     page.on('pageerror', (error) => {
       console.error(error)
     })
@@ -68,6 +63,7 @@ test.beforeAll(async () => {
       console.log(msg.text())
     })
   })
+  await new Promise((resolve) => { const checkPage = setInterval(() => { if (page) { clearInterval(checkPage); resolve(); } }, 100); });
 })
 
 test.afterAll(async () => {
@@ -77,15 +73,17 @@ test.afterAll(async () => {
 
 
 test('Page title is correct', async () => {
-  page = await electronApp.waitForEvent('window')
   const title = await page.title()
+  console.log('title: ', title)
+  console.log('url: ', page.url())
+  
   expect(title).toBe('Chirpity Bird Call Detection')
 })
 
 
 test(`Analyse works`, async () => {
-  await page.locator('#navbarDropdown').click()
-  await page.locator('#open').click()
+  await page.locator('#navBarFile').click()
+  await page.locator('#open-file').click()
   page.locator('wave').first().waitFor({state: 'visible'})
   await  page.locator('#navbarAnalysis').click()
   await page.locator('#analyse').click()
@@ -97,6 +95,8 @@ test(`Analyse works`, async () => {
 //test.describe.configure({ mode: 'parallel' });
 
 test(`Audacity labels work`, async () => {
+  
+  page = await electronApp.waitForEvent('window')
   // Everything shows 8 rows @ 45%
   await page.getByRole('button', { name: 'Settings' }).click();
   await page.getByLabel('Show:').selectOption('everything');
@@ -117,6 +117,8 @@ test(`Audacity labels work`, async () => {
 })
 
 test("Amend file start dialog contains date", async () =>{
+  
+  page = await electronApp.waitForEvent('window')
   await page.getByRole('button', { name: 'example.mp3' }).click({
     button: 'right'
   });
@@ -127,6 +129,8 @@ test("Amend file start dialog contains date", async () =>{
 })
 
 test('Check spectrogram before and after applying filter are different', async () => {
+  
+  page = await electronApp.waitForEvent('window')
   // take a screenshot of the current page
   const screenshot1: Buffer = await page.screenshot()
   await page.getByRole('button', { name: 'Settings' }).click();
@@ -197,5 +201,4 @@ test('Check spectrogram before and after applying filter are different', async (
 //   expect(await newPage.title()).toBe('Window 5')
 //   page = newPage
 // })
-
 
