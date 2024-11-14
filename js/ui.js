@@ -86,6 +86,9 @@ const p = window.module.p;
 const uuidv4 = window.module.uuidv4;
 const os = window.module.os;
 
+// Is this CI / playwright?
+const isTestEnv = window.env.TEST_ENV === 'true';
+
 function hexToRgb(hex) {
     // Remove the '#' character if present
     hex = hex.replace(/^#/, '');
@@ -1989,9 +1992,12 @@ const setUpWorkerMessaging = () => {
                     break }
                 case 'ready-for-tour':{
                     // New users - show the tour
-                    if (!config.seenTour) {
-                        config.seenTour = true;
-                        setTimeout(prepTour, 1500);
+                    if (!isTestEnv){
+                        if (! config.seenTour) {
+                            config.seenTour = true;
+                            const timeOut =  1500;
+                            setTimeout(prepTour, timeOut);
+                        }
                     }
                     break }
                 case "seen-species-list": {generateBirdList("seenSpecies", args.list);

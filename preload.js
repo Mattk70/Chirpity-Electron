@@ -69,7 +69,12 @@ contextBridge.exposeInMainWorld('module', {
     os: os
 });
 
-//
+// Expose only specific environment variables
+contextBridge.exposeInMainWorld('env', {
+    TEST_ENV: process.env.TEST_ENV
+  });
+
+
 
 // Listen for messages from the main process
 // Function to display update download progress

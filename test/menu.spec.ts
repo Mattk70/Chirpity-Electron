@@ -25,10 +25,15 @@ test.beforeAll(async () => {
   // parse the directory and find paths and other info
   const appInfo = parseElectronApp(latestBuild)
   // set the CI environment variable to true
-  process.env.CI = 'e2e'
+  process.env.CI = 'e2e';
   electronApp = await electron.launch({
     args: [appInfo.main],
-    executablePath: appInfo.executable
+    executablePath: appInfo.executable,
+    env: {
+      ...process.env,
+      TEST_ENV: 'true'
+    }
+
   })
 
   // Get the path for the example file we want to load
@@ -63,8 +68,13 @@ test.beforeAll(async () => {
       console.log(msg.text())
     })
   })
-  await new Promise((resolve) => { const checkPage = setInterval(() => { if (page) { clearInterval(checkPage); resolve(); } }, 5000); });
-
+  await new Promise((resolve) => { 
+    const checkPage = setInterval(async () => { 
+      if (page) { 
+        clearInterval(checkPage);
+        resolve(); 
+      } 
+    }, 5000); });
 })
 
 test.afterAll(async () => {
@@ -73,6 +83,15 @@ test.afterAll(async () => {
 })
 
 test.describe.configure({ mode: 'parallel', retries: 2, timeout: 20_000 });
+
+// test('Tour modal appears', async () => {
+//   await page.locator('#tourModal').waitFor({state: 'visible'});
+//   await page.waitForTimeout(500);
+//   const closeButton = await page.locator('#close-tour')
+//   expect(closeButton).toBeVisible()
+//   await page.locator('#close-tour').click();
+// })
+
 
 test('Page title is correct', async () => {
   const title = await page.title()
