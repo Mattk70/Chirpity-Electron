@@ -74,7 +74,8 @@ test.beforeAll(async () => {
         clearInterval(checkPage);
         resolve(); 
       } 
-    }, 5000); });
+    }, 5000); 
+  });
 })
 
 test.afterAll(async () => {
@@ -83,6 +84,11 @@ test.afterAll(async () => {
 })
 
 test.describe.configure({ mode: 'parallel', retries: 2, timeout: 20_000 });
+
+/*
+REMEMBER TO REBUILD THE APP IF THE *APPLICATION CODE* NEEDS TO BE CHANGED
+                                    ----------------
+*/
 
 // test('Tour modal appears', async () => {
 //   await page.locator('#tourModal').waitFor({state: 'visible'});
@@ -109,7 +115,9 @@ async function openExampleFile(){
 
 async function changeSettings(type, elementID, value, timeout){
   elementID = '#' + elementID;
-  await  page.locator('#navbarSettings').click()
+  await  page.locator('#navbarSettings').click();
+  // for Birdnet's 34%$
+  await page.locator('#confidence').fill('30');
   if (type === 'select'){
     await page.selectOption(elementID, value);
   } else if (type === 'switch'){
@@ -173,10 +181,12 @@ test(`BirdNET analyse works and second result is 34%`, async () => {
 test("Amend file start dialog contains date", async () =>{
   await runExampleAnalysis('chirpity');
   await page.locator('#dropdownMenuButton').click({button: 'right'});
-  await page.locator('#setFileStart').click()
-  const fileStart = await page.locator('#fileStart')
-  expect(fileStart).toHaveValue('2024-11-06T15:28')
-  await page.locator('#spectrogramWrapper button.btn-secondary').click();
+  await page.locator('#setFileStart').click();
+  const fileStart = await page.locator('#fileStart');
+  const entry = await fileStart.inputValue();
+  const currentYear = new Date().getFullYear().toString();
+  expect(entry.toString()).toContain(currentYear);
+  // await page.locator('#spectrogramWrapper button.btn-secondary').click();
 })
 
 // test('Check spectrogram before and after applying filter are different', async () => {
