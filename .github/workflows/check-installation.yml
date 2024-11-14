@@ -87,9 +87,9 @@ jobs:
         env:
           DISPLAY: :99
 
-      - name: Fire up Application
-        env:
-          DISPLAY: :99
+      # - name: Fire up Application
+      #   env:
+      #     DISPLAY: :99
       # run: npm run test -- --disable-gpu --disable-software-rasterizer --disable-audio-output
       # end test application
       
