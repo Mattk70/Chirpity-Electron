@@ -124,3 +124,7 @@ pyproject.toml
 
 scratchpad.txt
 js/animation.html
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
