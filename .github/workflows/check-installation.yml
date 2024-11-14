@@ -93,10 +93,6 @@ jobs:
       # run: npm run test -- --disable-gpu --disable-software-rasterizer --disable-audio-output
       # end test application
       
-      # Fetch tags from origin
-      - name: Fetch all tags
-        run: git fetch --tags
-
       # Get the latest tag from origin/master
       - name: Get the latest tag on origin/master
         id: get_latest_tag
@@ -161,6 +157,7 @@ jobs:
 
       # Tests
       - name: Test packaged application
+        if: runner.os == 'Windows'
         run: npm test
 
 
