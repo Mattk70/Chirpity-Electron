@@ -158,7 +158,7 @@ jobs:
 
       # Tests
       - name: Test packaged application
-        if: runner.os != 'Linux'
+        # if: runner.os != 'Linux'
         run: npm test
 
 
