@@ -641,6 +641,7 @@ async function spawnListWorker() {
             
             if (message === 'list-model-ready') {
                 return resolve(worker);
+                
             } else if (message === "tfjs-node") {
                 STATE.hasNode = true;
                 if (!event.data.available) {

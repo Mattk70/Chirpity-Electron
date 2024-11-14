@@ -14,9 +14,9 @@ import {
 import { ElectronApplication, Page } from 'playwright';
 import jimp from 'jimp';
 
-let electronApp: ElectronApplication = null;
-let page: Page = null;
-let worker: Page
+let electronApp: ElectronApplication;
+let page: Page;
+let worker: Page;
 let example_file: any
 
 test.beforeAll(async () => {
@@ -49,7 +49,7 @@ test.beforeAll(async () => {
        },
      },
    ])
-   worker = electronApp.firstWindow()
+   worker = await electronApp.firstWindow()
 
   electronApp.on('window', async (window) => {
     const filename = window.url()?.split('/').pop()
@@ -63,7 +63,7 @@ test.beforeAll(async () => {
       console.log(msg.text())
     })
   })
-  await new Promise((resolve) => { const checkPage = setInterval(() => { if (page) { clearInterval(checkPage); resolve(); } }, 100); });
+  await new Promise((resolve) => { const checkPage = setInterval(() => { if (page) { clearInterval(checkPage); resolve(); } }, 1000); });
 })
 
 test.afterAll(async () => {
@@ -71,6 +71,7 @@ test.afterAll(async () => {
   await electronApp.close()
 })
 
+test.describe.configure({ mode: 'parallel' });
 
 test('Page title is correct', async () => {
   const title = await page.title()
@@ -80,23 +81,51 @@ test('Page title is correct', async () => {
   expect(title).toBe('Chirpity Bird Call Detection')
 })
 
-
-test(`Analyse works`, async () => {
+async function openExampleFile(){
   await page.locator('#navBarFile').click()
   await page.locator('#open-file').click()
-  page.locator('wave').first().waitFor({state: 'visible'})
+  await page.locator('wave').first().waitFor({state: 'visible'})
+}
+
+async function changeSettings(elementID, value, timeout){
+  await  page.locator('#navbarSettings').click()
+  await page.selectOption('#' + elementID, value);
+  await page.locator('#close-settings').click();
+  // Wait ?
+  if (timeout) await page.waitForTimeout(timeout);
+}
+
+test(`Nocmig analyse works and second result is 61%`, async () => {
+  await openExampleFile();
+  await changeSettings('model-to-use', 'chirpity', 5000)
+  await  page.locator('#navbarAnalysis').click();
+  await page.locator('#analyse').click()
+  await  page.locator('#resultTableContainer').waitFor({state: 'visible'})
+  const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
+  expect(callID).not.toBe(undefined)
+  const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
+  // console.log(secondResult, 'second result');
+  expect(secondResult).toBe('61%');
+})
+
+test(`BirdNET analyse works and second result is 34%`, async () => {
+  await openExampleFile()
+  await changeSettings('model-to-use', 'birdnet', 5000)
+
   await  page.locator('#navbarAnalysis').click()
   await page.locator('#analyse').click()
   await  page.locator('#resultTableContainer').waitFor({state: 'visible'})
   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
   expect(callID).not.toBe(undefined)
+  const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
+  // console.log(secondResult, 'second result');
+  expect(secondResult).toBe('34%');
 })
 
-//test.describe.configure({ mode: 'parallel' });
+
 
 test(`Audacity labels work`, async () => {
   
-  page = await electronApp.waitForEvent('window')
   // Everything shows 8 rows @ 45%
   await page.getByRole('button', { name: 'Settings' }).click();
   await page.getByLabel('Show:').selectOption('everything');
@@ -117,8 +146,6 @@ test(`Audacity labels work`, async () => {
 })
 
 test("Amend file start dialog contains date", async () =>{
-  
-  page = await electronApp.waitForEvent('window')
   await page.getByRole('button', { name: 'example.mp3' }).click({
     button: 'right'
   });

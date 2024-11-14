@@ -159,3 +159,8 @@ jobs:
           fi
       - run: echo "File check status is ${{ job.status }}."
 
+      # Tests
+      - name: Test packaged application
+        run: npm test
+
+

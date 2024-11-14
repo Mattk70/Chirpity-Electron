@@ -19,7 +19,7 @@ export default defineConfig({
     //channel: 'chrome',
 
     // Run browser in headless mode.
-    headless: false,
+    headless: true,
 
     // Change the default data-testid attribute.
     //testIdAttribute: 'pw-test-id',
