@@ -6,7 +6,7 @@
       "Ändern Sie die globalen Schriftgrößeneinstellungen für die Anwendung."
     ],
     "Audio Library-circle-help": [
-      "Chirpity kann Ihre Audiodateien in einer permanenten Bibliothek an einem von Ihnen gewählten Speicherort organisieren, z. B. auf einer Datenplatte oder einem Netzlaufwerk. Nach dem Speichern können Sie die Originaldateien löschen, und alle Aufnahmen sind in der Anwendung sichtbar. Um Audio in der Bibliothek zu speichern, können Sie entweder das Menü 'Aufnahmen' aufrufen und 'Audio aus Archivergebnissen in der Bibliothek speichern' auswählen oder die Option 'Zur Bibliothek hinzufügen beim Speichern' unten aktivieren. Dateien werden in der folgenden Struktur gespeichert: <p><code>Aufzeichnungsort / Jahr / Monat / Dateiname</code></p> 'Komprimierte' Audiodateien benötigen etwa 1 GB Speicher für 24 Stunden, während 'verlustfreie' Dateien ins FLAC-Format konvertiert werden, wodurch die ursprüngliche Wiedergabetreue, Bitrate und Kanäle erhalten bleiben, jedoch die Dateigröße etwa halbiert wird."
+      "Chirpity kann Ihre Audiodateien in einer permanenten Bibliothek an einem von Ihnen gewählten Speicherort organisieren, z. B. auf einer Festplatte oder einem Netzlaufwerk. Nach dem Speichern können Sie die Originaldateien löschen, und alle Aufnahmen sind in der Anwendung sichtbar. Um Audio in der Bibliothek zu speichern, können Sie entweder das Menü 'Aufnahmen' aufrufen und 'Audio aus Archivergebnissen in der Bibliothek speichern' auswählen oder die Option 'Zur Bibliothek hinzufügen beim Speichern' unten aktivieren. Dateien werden in der folgenden Struktur gespeichert: <p><code>Aufzeichnungsort / Jahr / Monat / Dateiname</code></p> 'Komprimierte' Audiodateien benötigen etwa 1 GB Speicher für 24 Stunden, während 'verlustfreie' Dateien ins FLAC-Format konvertiert werden, wodurch die ursprüngliche Wiedergabetreue, Bitrate und Kanäle erhalten bleiben, jedoch die Dateigröße etwa halbiert wird."
     ],
     "Audio notification-circle-help": [
       "Wenn aktiviert, wird eine Systembenachrichtigung angezeigt, wenn Analysen, die länger als dreißig Sekunden dauern, abgeschlossen sind."
@@ -21,10 +21,10 @@
       "Daten, die für Referenzaufrufe verwendet werden, werden zwischengespeichert. Durch das Löschen des Caches werden die Aufrufe für jede Spezies aktualisiert, wenn das nächste Mal eine Vergleichsanfrage erfolgt."
     ],
     "Confidence Threshold-circle-help": [
-      "Bestimmt die minimale Vertrauensstufe, die erforderlich ist, damit Ergebnisse zurückgegeben werden."
+      "Bestimmt die minimale Konfidenzschwelle, die erforderlich ist, damit Ergebnisse zurückgegeben werden."
     ],
     "Context Mode-circle-help": [
-      "Wenn aktiviert, passt der Kontextmodus die Vorhersagen durch Analyse des umgebenden Kontexts an. Er kann nur vor einer Analyse geändert werden, und eine anfängliche niedrige Vertrauensschwelle wird empfohlen, z. B. 20-30%. Der Kontextmodus ist im BirdNET-Modell nicht verfügbar."
+      "Wenn aktiviert, passt der Kontextmodus die Vorhersagen durch Analyse des umgebenden Kontexts an. Er kann nur vor einer Analyse geändert werden, und eine anfängliche niedrige Konfidenzschwelle wird empfohlen, z. B. 20-30%. Der Kontextmodus ist im BirdNET-Modell nicht verfügbar."
     ],
     "Crop Library-circle-help": [
       "Wenn aktiviert, werden Audiodateien, die Tageslichtperioden enthalten, beschnitten, sodass nur Audiodateien aus Nachtperioden gespeichert werden."
@@ -87,7 +87,7 @@
       "Die Anzahl der parallelen Analysen, die durchgeführt werden sollen. Standardmäßig ist dies auf die Anzahl der CPU-Kerne der Maschine eingestellt, um eine optimale Leistung zu erzielen. Mit dem GPU-Backend funktioniert eine niedrigere Anzahl besser, z. B. 1-3."
     ],
     "Use Location settings-circle-help": [
-      "Wenn aktiviert, meldet der Nachvogel-Filter die Vögel basierend auf Ihren Standorteinstellungen."
+      "Wenn aktiviert, meldet der Nachtvogel-Filter die Vögel basierend auf Ihren Standorteinstellungen."
     ],
     "Volume Adjustment-circle-help": [
       "Passen Sie die Lautstärke des Audios an, um niedrige Aufnahmestufen auszugleichen."
@@ -211,7 +211,7 @@
     "close-tour": ["Schließen"],
     "settings": {
       "model-to-use": "Modell:",
-      "confidence": "Vertrauensschwelle:",
+      "confidence": "Konfidenzschwelle:",
       "list-to-use": "Liste:",
       "local": "Verwenden Sie Standorteinstellungen",
       "species-frequency-threshold": "Arten-Schwelle",
