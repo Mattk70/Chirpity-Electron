@@ -56,7 +56,6 @@ const DOM = {
     get progressDiv() { if (!this._progressDiv) { this._progressDiv = document.getElementById('progressDiv') } return this._progressDiv},
     get progressBar() { if (!this._progressBar) { this._progressBar = document.getElementById('progress-bar') } return this._progressBar},
     get resultTableElement() { if (!this._resultTableElement) { this._resultTableElement = document.getElementById('resultTableContainer') } return this._resultTableElement},
-    get sendFilteredAudio() { if (!this._sendFilteredAudio) { this._sendFilteredAudio = document.getElementById('send-filtered-audio-to-model') } return this._sendFilteredAudio},
     get spectrogramWrapper() { if (!this._spectrogramWrapper) { this._spectrogramWrapper = document.getElementById('spectrogramWrapper') } return this._spectrogramWrapper},
     get spectrogram() { if (!this._spectrogram) { this._spectrogram = document.getElementById('spectrogram') } return this._spectrogram},
     get specLabels() { if (!this._specLabels) { this._specLabels = document.getElementById('spec-labels') } return this._specLabels},
