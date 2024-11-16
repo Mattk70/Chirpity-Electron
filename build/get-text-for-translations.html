@@ -88,21 +88,34 @@
             // });
           }
         });
-        // // Assuming textAndTitles is the object you want to sort by keys
-        // const sortedKeys = Object.keys(textAndTitles).sort();
-
-        // // Now you can iterate over the sorted keys to access the content
-        // sortedKeys.forEach(key => {
-        //     console.log(key, textAndTitles[key]);  // Output sorted key and its associated list
-        // });
-        // const sortedTextAndTitles = {};
-        // sortedKeys.forEach(key => {
-        //     sortedTextAndTitles[key] = textAndTitles[key];
-        // });
-
-        // Generate JSON output
-        const jsonOutput = JSON.stringify(textAndTitles, null, 2);
-
+        const buttons = doc.querySelectorAll('button:not([id])')
+        buttonCollection = {}
+        buttons.forEach(button => {
+          const label = button.textContent;
+          const closestId = getClosestId(button);
+          buttonCollection[closestId] = buttonCollection[closestId] || [];
+          buttonCollection[closestId].push(label);
+        })
+        const labels = doc.getElementById('settings').querySelectorAll('label')
+        labelCollection = {}
+        labels.forEach(item => {
+          const label = item.textContent.trim();
+          const key = item.getAttribute('for')
+          //const closestId = getClosestId(item);
+          labelCollection['settings'] = labelCollection['settings'] || {};
+          labelCollection['settings'][key] = label;
+        })
+        const headings = doc.getElementById('settings').querySelectorAll( 'h4,h5,h6,legend');
+        const hCollection = {}
+        headings.forEach(item => {
+          const label = item.textContent.trim();
+        
+          //const closestId = getClosestId(item);
+          hCollection['headings'] = hCollection['headings'] || [];
+          hCollection['headings'].push(label);
+        })
+        let  jsonOutput = JSON.stringify(textAndTitles, null, 2);
+        jsonOutput += JSON.stringify(buttonCollection, null, 2) + JSON.stringify(labelCollection, null, 2) + JSON.stringify(hCollection, null, 2);
         // Display JSON in the output area
         document.getElementById('output').textContent = jsonOutput;
       };

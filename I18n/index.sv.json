@@ -153,6 +153,12 @@
         "Analysera alla öppna filer",
         "Ctrl+Shift+A"
     ],
+    "retrieve": [
+        "Hämta resultat för aktuell fil"
+      ],
+      "retrieveAll": [
+        "Hämta resultat för alla öppna filer"
+      ],
     "reanalyse": [
         "Re-analysera aktuell fil"
     ],
@@ -188,5 +194,78 @@
     ],
     "update-progress": [
         "Laddar ner uppdatering:"
-    ]      
+    ],
+    "record-add": ["Lägg till"],
+    "record-dismiss": ["Avvisa"],
+    "help-modal-close": ["Stäng"],
+    "export-list": ["Exportera den inkluderade listan"],
+    "go": ["Gå"],
+    "set-location": ["Ange plats"],
+    "reset-spec-frequency": ["Återställ"],
+    "list-file-selector": ["Välj fil"],
+    "clear-call-cache": ["Rensa referenssamtalscache"],
+    "apply-location": ["Ange"],
+    "cancel-location": ["Avbryt"],
+    "archive-location-select": ["Bibliotekets plats:"],
+    "reset-defaults": ["Återställ till standardinställningar"],
+    "close-tour": ["Stäng"],
+    "settings": {
+        "model-to-use": "Modell:",
+        "confidence": "Konfidensnivå:",
+        "list-to-use": "Lista:",
+        "local": "Använd platsinställningar",
+        "species-frequency-threshold": "Arttröskel",
+        "species-week": "Justera lista för veckans vecka",
+        "nocmig": "Analysera endast nattperioder.",
+        "iucn": "Visa IUCN Röd Lista status i sammanfattningen för arter.",
+        "iucn-scope": "Bedömningsomfattning:",
+        "locale": "Språk:",
+        "null": "Dekoratörer:",
+        "tensorflow": "CPU",
+        "webgl": "WebGL",
+        "webgpu": "WebGPU",
+        "thread-slider": "Trådar:",
+        "batch-size": "Batchstorlek:",
+        "audio-notification": "Aktivera analysfullföljande meddelanden",
+        "power-save-block": "Förhindra att systemet går i viloläge",
+        "font": "Justera teckenstorlek",
+        "gain": "Volymjustering:",
+        "normalise": "Normalisera ljud:",
+        "HighPassFrequency": "Högpassfilter:",
+        "lowShelfFrequency": "Gränsfrekvens:",
+        "attenuation": "Dämpning:",
+        "format": "Format:",
+        "bitrate": "Bitrate:",
+        "quality": "Komprimering:",
+        "downmix": "Konvertera till mono",
+        "padding": "Fyllning",
+        "fade": "Utsuddning",
+        "auto-archive": "Lägg till i bibliotek vid sparande",
+        "library-trim": "Klipp biblioteksljud till nattperioder",
+        "archive-format": "Biblioteksformat:",
+        "spec-labels": "Visa frekvenstagg:",
+        "colourmap": "Färggalleri:",
+        "loud-color": "Toppfärg",
+        "mid-color": "Mellanfärg",
+        "quiet-color": "Tyst färg",
+        "color-threshold-slider": "Mittenposition:",
+        "window-function": "Fönsterfunktion:",
+        "timelineSetting": "Tidslinje:",
+        "send-filtered-audio-to-model": "Skicka filtrerat ljud för analys",
+        "context": "Kontextläge",
+        "snrValue": "SNR-filter:",
+        "debug-mode": "Felsökningsläge"
+    },
+    "headings": [
+        "Inställningar",
+        "Detektioner",
+        "Standardplats",
+        "System",
+        "Ljudinställningar",
+        "Low Shelf-filter",
+        "Ljudexport",
+        "Ljudbibliotek",
+        "Spektrograminställningar",
+        "Avancerat"
+    ]  
 }

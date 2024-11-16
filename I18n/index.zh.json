@@ -153,6 +153,12 @@
     "分析所有打开的文件",
     "Ctrl+Shift+A"
   ],
+  "retrieve": [
+    "获取当前文件的结果"
+  ],
+  "retrieveAll": [
+    "获取所有打开文件的结果"
+  ],
   "reanalyse": [
     "重新分析当前文件"
   ],
@@ -188,5 +194,78 @@
   ],
   "update-progress": [
     "正在下载更新："
-  ]
+  ],
+  "record-add": ["添加"],
+  "record-dismiss": ["取消"],
+  "help-modal-close": ["关闭"],
+  "export-list": ["导出包含的列表"],
+  "go": ["前往"],
+  "set-location": ["设置位置"],
+  "reset-spec-frequency": ["重置"],
+  "list-file-selector": ["选择文件"],
+  "clear-call-cache": ["清除参考通话缓存"],
+  "apply-location": ["设置"],
+  "cancel-location": ["取消"],
+  "archive-location-select": ["库位置："],
+  "reset-defaults": ["恢复默认设置"],
+  "close-tour": ["关闭"],
+  "settings": {
+    "model-to-use": "模型：",
+    "confidence": "置信度阈值：",
+    "list-to-use": "列表：",
+    "local": "使用位置设置",
+    "species-frequency-threshold": "物种阈值",
+    "species-week": "根据年份的周调整列表",
+    "nocmig": "仅分析夜间时期。",
+    "iucn": "在摘要中显示物种的IUCN红色名单状态。",
+    "iucn-scope": "评估范围：",
+    "locale": "语言：",
+    "null": "装饰器：",
+    "tensorflow": "CPU",
+    "webgl": "WebGL",
+    "webgpu": "WebGPU",
+    "thread-slider": "线程：",
+    "batch-size": "批次大小：",
+    "audio-notification": "启用分析完成通知",
+    "power-save-block": "防止系统进入睡眠模式",
+    "font": "调整字体大小",
+    "gain": "音量调整：",
+    "normalise": "音频标准化：",
+    "HighPassFrequency": "高通滤波器：",
+    "lowShelfFrequency": "截止频率：",
+    "attenuation": "衰减：",
+    "format": "格式：",
+    "bitrate": "比特率：",
+    "quality": "压缩：",
+    "downmix": "转换为单声道",
+    "padding": "填充",
+    "fade": "渐变",
+    "auto-archive": "保存时添加到库",
+    "library-trim": "将图书馆音频裁剪为夜间时期",
+    "archive-format": "库格式：",
+    "spec-labels": "显示频率标签：",
+    "colourmap": "色彩图：",
+    "loud-color": "峰值颜色",
+    "mid-color": "中频颜色",
+    "quiet-color": "安静颜色",
+    "color-threshold-slider": "中位位置：",
+    "window-function": "窗口函数：",
+    "timelineSetting": "时间轴：",
+    "send-filtered-audio-to-model": "发送过滤后的音频进行分析",
+    "context": "上下文模式",
+    "snrValue": "SNR滤波器：",
+    "debug-mode": "调试模式"
+  },
+  "headings": [
+    "设置",
+    "检测",
+    "默认位置",
+    "系统",
+    "音频偏好设置",
+    "低架滤波器",
+    "音频导出",
+    "音频库",
+    "频谱图偏好设置",
+    "高级"
+  ]  
 }

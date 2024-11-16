@@ -153,6 +153,12 @@
         "Analyseer Alle Open Bestanden",
         "Ctrl+Shift+A"
     ],
+    "retrieve": [
+        "Verkrijg resultaten voor het huidige bestand"
+      ],
+      "retrieveAll": [
+        "Verkrijg resultaten voor alle geopende bestanden"
+      ],
     "reanalyse": [
         "Hernanalyseer Huidig Bestand"
     ],
@@ -188,6 +194,78 @@
     ],
     "update-progress": [
         "Downloaden van update:"
-    ]
-     
+    ],
+    "record-add": ["Toevoegen"],
+    "record-dismiss": ["Afwijzen"],
+    "help-modal-close": ["Sluiten"],
+    "export-list": ["Lijst exporteren"],
+    "go": ["Ga"],
+    "set-location": ["Locatie instellen"],
+    "reset-spec-frequency": ["Reset"],
+    "list-file-selector": ["Selecteer bestand"],
+    "clear-call-cache": ["Referentieoproep-cache wissen"],
+    "apply-location": ["Instellen"],
+    "cancel-location": ["Annuleren"],
+    "archive-location-select": ["Bibliotheeklocatie:"],
+    "reset-defaults": ["Herstellen naar standaardinstellingen"],
+    "close-tour": ["Sluiten"],
+    "settings": {
+        "model-to-use": "Model:",
+        "confidence": "Vertrouwensdrempel:",
+        "list-to-use": "Lijst:",
+        "local": "Gebruik locatie-instellingen",
+        "species-frequency-threshold": "Soortdrempel",
+        "species-week": "Pas de lijst aan voor de week van het jaar",
+        "nocmig": "Analyseer alleen nachtelijke perioden.",
+        "iucn": "Toon de IUCN Rode Lijststatus van soorten in het overzicht.",
+        "iucn-scope": "Beoordelingsomvang:",
+        "locale": "Taal:",
+        "null": "Decorateurs:",
+        "tensorflow": "CPU",
+        "webgl": "WebGL",
+        "webgpu": "WebGPU",
+        "thread-slider": "Threads:",
+        "batch-size": "Batchgrootte:",
+        "audio-notification": "Schakel meldingen in bij voltooiing van analyse",
+        "power-save-block": "Voorkom slaapstand van het systeem",
+        "font": "Pas de lettergrootte aan",
+        "gain": "Volume-aanpassing:",
+        "normalise": "Audio normaliseren:",
+        "HighPassFrequency": "Hoogdoorlaatfilter:",
+        "lowShelfFrequency": "Snijfrequentie:",
+        "attenuation": "Verzwakking:",
+        "format": "Formaat:",
+        "bitrate": "Bitrate:",
+        "quality": "Compressie:",
+        "downmix": "Omzetten naar mono",
+        "padding": "Vulling",
+        "fade": "Vervagen",
+        "auto-archive": "Toevoegen aan bibliotheek bij opslaan",
+        "library-trim": "Snijd bibliotheekgeluid bij tot nachtelijke perioden",
+        "archive-format": "Bibliotheekformaat:",
+        "spec-labels": "Toon frequentielabels:",
+        "colourmap": "Kleurkaart:",
+        "loud-color": "Piek kleur",
+        "mid-color": "Middelste kleur",
+        "quiet-color": "Stille kleur",
+        "color-threshold-slider": "Middenpositie:",
+        "window-function": "Vensterfunctie:",
+        "timelineSetting": "Tijdlijn:",
+        "send-filtered-audio-to-model": "Verstuur gefilterd geluid voor analyse",
+        "context": "Contextmodus",
+        "snrValue": "SNR-filter:",
+        "debug-mode": "Foutopsporingsmodus"
+    },
+    "headings": [
+        "Instellingen",
+        "Detecties",
+        "Standaardlocatie",
+        "Systeem",
+        "Audio-instellingen",
+        "Low Shelf-filter",
+        "Audio-export",
+        "Audio-bibliotheek",
+        "Spectrogramvoorkeuren",
+        "Geavanceerd"
+    ]   
 }

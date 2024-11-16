@@ -166,6 +166,12 @@
       "Analyse All Open Files",
       "Ctrl+Shift+A"
     ],
+    "retrieve": [
+      "Get Results for Current File"
+    ],
+    "retrieveAll": [
+      "Get Results for All Open Files"
+    ],
     "reanalyse": [
       "Re-analyse Current File"
     ],
@@ -201,5 +207,108 @@
     ],
     "update-progress": [
       "Downloading update:"
-    ]
+    ],
+
+
+    "record-add": [
+      "Add"
+    ],
+    "record-dismiss": [
+      "Dismiss"
+    ],
+    "help-modal-close": [
+      "Close"
+    ],
+    "export-list": [
+      "Export the Included List"
+    ],
+    "go": [
+      "Go"
+    ],
+    "set-location": [
+      "Set Location"
+    ],
+    "reset-spec-frequency": [
+      "Reset"
+    ],
+    "list-file-selector": [
+      "Select file"
+    ],
+    "clear-call-cache": [
+      "Clear Reference Call Cache"
+    ],
+    "apply-location": [
+      "Set"
+    ],
+    "cancel-location": [
+      "Cancel"
+    ],
+    "archive-location-select": [
+      "Library Location:"
+    ],
+    "reset-defaults": [
+      "Reset to default settings"
+    ],
+    "close-tour": [
+      "Close"
+    ],
+    "settings": {
+      "model-to-use": "Model:",
+      "confidence": "Confidence threshold:",
+      "list-to-use": "List:",
+      "local": "Use Location settings",
+      "species-frequency-threshold": "Species Threshold",
+      "species-week": "Adjust list for the week of the year",
+      "nocmig": "Only analyse night time periods.",
+      "iucn": "Show species IUCN Red List status in summary.",
+      "iucn-scope": "Assessment Scope:",
+      "locale": "Language:",
+      "null": "Decorators:",
+      "tensorflow": "CPU",
+      "webgl": "WebGL",
+      "webgpu": "WebGPU",
+      "thread-slider": "Threads:",
+      "batch-size": "Batch Size:",
+      "audio-notification": "Enable analysis completion notifications",
+      "power-save-block": "Prevent system sleep",
+      "font": "Adjust font size",
+      "gain": "Volume Adjustment:",
+      "normalise": "Normalise Audio:",
+      "HighPassFrequency": "High Pass filter:",
+      "lowShelfFrequency": "Cut-off Frequency:",
+      "attenuation": "Attenuation:",
+      "format": "Format:",
+      "bitrate": "Bitrate:",
+      "quality": "Compression:",
+      "downmix": "Convert to mono",
+      "padding": "Pad",
+      "fade": "Fade",
+      "auto-archive": "Add to Library on Save",
+      "library-trim": "Crop Library audio to night time periods",
+      "archive-format": "Library Format:",
+      "spec-labels": "Display frequency labels:",
+      "colourmap": "Colourmap:",
+      "loud-color": "Peak colour",
+      "mid-color": "Mid colour",
+      "quiet-color": "Quiet colour",
+      "color-threshold-slider": "Mid Position:",
+      "window-function": "Window function:",
+      "timelineSetting": "Timeline:",
+      "send-filtered-audio-to-model": "Send Filtered Audio for Analysis",
+      "context": "Context mode",
+      "snrValue": "SNR filter:",
+      "debug-mode": "Debug mode"
+    },  
+    "headings": [
+      "Settings",
+      "Detections",
+      "Default Location",
+      "System",
+      "Audio Preferences",
+      "Low Shelf filter",
+      "Audio Export",
+      "Audio Library",
+      "Spectrogram Preferences",
+      "Advanced"
+    ]    
   }

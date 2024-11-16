@@ -153,6 +153,12 @@
         "Analyser alle åbne filer",
         "Ctrl+Shift+A"
       ],
+      "retrieve": [
+        "Hent resultater for den aktuelle fil"
+      ],
+      "retrieveAll": [
+        "Hent resultater for alle åbne filer"
+      ],
       "reanalyse": [
         "Gen-analyser nuværende fil"
       ],
@@ -188,5 +194,79 @@
       ],
       "update-progress": [
         "Downloader opdatering:"
-      ]
+      ],
+      "record-add": ["Tilføj"],
+      "record-dismiss": ["Afvis"],
+      "help-modal-close": ["Luk"],
+      "export-list": ["Eksporter den inkluderede liste"],
+      "go": ["Gå"],
+      "set-location": ["Angiv placering"],
+      "reset-spec-frequency": ["Nulstil"],
+      "list-file-selector": ["Vælg fil"],
+      "clear-call-cache": ["Ryd referencelyd-cache"],
+      "apply-location": ["Sæt"],
+      "cancel-location": ["Annuller"],
+      "archive-location-select": ["Biblioteksplacering:"],
+      "reset-defaults": ["Nulstil til standardindstillinger"],
+      "close-tour": ["Luk"],
+      "settings": {
+        "model-to-use": "Model:",
+        "confidence": "Konfidensinterval:",
+        "list-to-use": "Liste:",
+        "local": "Brug Lokationsindstillinger",
+        "species-frequency-threshold": "Artstrøskel",
+        "species-week": "Justér listen for årets uge",
+        "nocmig": "Analyser kun nattetimer.",
+        "iucn": "Vis IUCN Rød Liste status for arter i oversigten.",
+        "iucn-scope": "Vurderingsomfang:",
+        "locale": "Sprog:",
+        "null": "Dekoratører:",
+        "tensorflow": "CPU",
+        "webgl": "WebGL",
+        "webgpu": "WebGPU",
+        "thread-slider": "Tråde:",
+        "batch-size": "Batch Størrelse:",
+        "audio-notification": "Aktivér analyse færdiggørelsesmeddelelser",
+        "power-save-block": "Forhindr system i at gå i dvale",
+        "font": "Juster skrifttypestørrelse",
+        "gain": "Volumenjustering:",
+        "normalise": "Normaliser Lyd:",
+        "HighPassFrequency": "Højpasfilter:",
+        "lowShelfFrequency": "Skæringsfrekvens:",
+        "attenuation": "Dæmpning:",
+        "format": "Format:",
+        "bitrate": "Bitrate:",
+        "quality": "Kompression:",
+        "downmix": "Konverter til mono",
+        "padding": "Pudse",
+        "fade": "Fade",
+        "auto-archive": "Tilføj til bibliotek ved gemning",
+        "library-trim": "Skær biblioteksljud til nattetimer",
+        "archive-format": "Biblioteksformat:",
+        "spec-labels": "Vis frekvensetiketter:",
+        "colourmap": "Farvekort:",
+        "loud-color": "Topfarve",
+        "mid-color": "Mellemfrekvensfarve",
+        "quiet-color": "Lavfrekvensfarve",
+        "color-threshold-slider": "Mid-position:",
+        "window-function": "Vinduesfunktion:",
+        "timelineSetting": "Tidslinje:",
+        "send-filtered-audio-to-model": "Send filtreret lyd til analyse",
+        "context": "Konteksttilstand",
+        "snrValue": "SNR filter:",
+        "debug-mode": "Fejlfindingstilstand"
+      },
+      "headings": [
+        "Indstillinger",
+        "Detektioner",
+        "Standardplacering",
+        "System",
+        "Lydindstillinger",
+        "Low Shelf filter",
+        "Lydeksport",
+        "Lydbibliotek",
+        "Spektrogramindstillinger",
+        "Avanceret"
+      ]    
+      
 }

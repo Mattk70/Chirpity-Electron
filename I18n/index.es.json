@@ -153,6 +153,12 @@
       "Analizar todos los archivos abiertos",
       "Ctrl+Shift+A"
     ],
+    "retrieve": [
+      "Obtener resultados para el archivo actual"
+    ],
+    "retrieveAll": [
+      "Obtener resultados para todos los archivos abiertos"
+    ],
     "reanalyse": [
       "Reanalizar archivo actual"
     ],
@@ -188,5 +194,78 @@
     ],
     "update-progress": [
       "Descargando actualización:"
-    ]
+    ],
+    "record-add": ["Añadir"],
+    "record-dismiss": ["Descartar"],
+    "help-modal-close": ["Cerrar"],
+    "export-list": ["Exportar la lista incluida"],
+    "go": ["Ir"],
+    "set-location": ["Establecer ubicación"],
+    "reset-spec-frequency": ["Restablecer"],
+    "list-file-selector": ["Seleccionar archivo"],
+    "clear-call-cache": ["Borrar caché de llamadas de referencia"],
+    "apply-location": ["Establecer"],
+    "cancel-location": ["Cancelar"],
+    "archive-location-select": ["Ubicación de la biblioteca:"],
+    "reset-defaults": ["Restablecer a la configuración predeterminada"],
+    "close-tour": ["Cerrar"],
+    "settings": {
+      "model-to-use": "Modelo:",
+      "confidence": "Umbral de confianza:",
+      "list-to-use": "Lista:",
+      "local": "Usar configuraciones de ubicación",
+      "species-frequency-threshold": "Umbral de Especies",
+      "species-week": "Ajustar la lista para la semana del año",
+      "nocmig": "Analizar solo períodos nocturnos.",
+      "iucn": "Mostrar el estado de la Lista Roja de la UICN en el resumen de especies.",
+      "iucn-scope": "Alcance de la evaluación:",
+      "locale": "Idioma:",
+      "null": "Decoradores:",
+      "tensorflow": "CPU",
+      "webgl": "WebGL",
+      "webgpu": "WebGPU",
+      "thread-slider": "Hilos:",
+      "batch-size": "Tamaño de lote:",
+      "audio-notification": "Habilitar notificaciones de finalización de análisis",
+      "power-save-block": "Evitar que el sistema entre en suspensión",
+      "gain": "Ajuste de volumen:",
+      "font": "Ajustar el tamaño de la fuente",
+      "normalise": "Normalizar audio:",
+      "HighPassFrequency": "Filtro pasa altos:",
+      "lowShelfFrequency": "Frecuencia de corte:",
+      "attenuation": "Atenuación:",
+      "format": "Formato:",
+      "bitrate": "Tasa de bits:",
+      "quality": "Compresión:",
+      "downmix": "Convertir a mono",
+      "padding": "Rellenar",
+      "fade": "Desvanecer",
+      "auto-archive": "Añadir a la biblioteca al guardar",
+      "library-trim": "Recortar el audio de la biblioteca a períodos nocturnos",
+      "archive-format": "Formato de la biblioteca:",
+      "spec-labels": "Mostrar etiquetas de frecuencia:",
+      "colourmap": "Mapa de colores:",
+      "loud-color": "Color de pico",
+      "mid-color": "Color medio",
+      "quiet-color": "Color bajo",
+      "color-threshold-slider": "Posición media:",
+      "window-function": "Función de ventana:",
+      "timelineSetting": "Línea de tiempo:",
+      "send-filtered-audio-to-model": "Enviar audio filtrado para análisis",
+      "context": "Modo contexto",
+      "snrValue": "Filtro SNR:",
+      "debug-mode": "Modo depuración"
+    },
+    "headings": [
+      "Configuración",
+      "Detecciones",
+      "Ubicación predeterminada",
+      "Sistema",
+      "Preferencias de audio",
+      "Filtro de bajo estante",
+      "Exportación de audio",
+      "Biblioteca de audio",
+      "Preferencias de espectrograma",
+      "Avanzado"
+    ]   
 }

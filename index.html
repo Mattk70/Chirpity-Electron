@@ -72,11 +72,11 @@
                     <!-- <div class="col-4"> -->
                     <div class="col btn-group bg-dark pt-0 p-1 ms-2 me-2 text-nowrap" role="group">
                         <button id="playToggle" class="p-1 pe-2 btn btn-outline-secondary" title="Play / Pause (SpaceBar)">
-                            <span class="material-symbols-outlined ">play_circle</span><span
-                            class="align-middle d-none d-lg-inline"> Play </span>
+                            <span class="material-symbols-outlined ">play_circle</span>
+                            <span class="align-middle d-none d-lg-inline"> Play </span>
                             /
-                            <span class="material-symbols-outlined">pause</span><span
-                            class="align-middle d-none d-lg-inline-block">Pause</span>
+                            <span class="material-symbols-outlined">pause</span>
+                            <span class="align-middle d-none d-lg-inline-block">Pause</span>
                         </button>
                     </div>
                     <div class="col btn-group bg-dark pt-0 p-1 pe-2" role="group">
@@ -496,9 +496,9 @@
                 </div>
             </fieldset>
         </div>
-    <div class="offcanvas offcanvas-end text-bg-dark" tabindex="-1" id="settings" aria-labelledby="offcanvasExampleLabel">
+    <div class="offcanvas offcanvas-end text-bg-dark" tabindex="-1" id="settings" aria-labelledby="offcanvas">
         <div class="offcanvas-header pb-2">
-            <h5 class="offcanvas-title" id="offcanvasExampleLabel">Settings</h5>
+            <h5 class="offcanvas-title" id="offcanvas">Settings</h5>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" id="close-settings" aria-label="Close"></button>
         </div>
         <div class="offcanvas-body pt-1">
@@ -561,7 +561,7 @@
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Species Threshold" id="Species Threshold-circle-help"  data-bs-content="Define the minimum eBird checklist frequency for species inclusion.
                             If 'Adjust list for the week of the year' is enabled, the list will be adjusted to include species expected for the recording week.">?</a>
                             <div class="pe-3 input-group rounded p-2 mb-1">
-                                <span class="input-group-text col-5">Threshold:</span>
+                                <label class="input-group-text col-5" for="species-frequency-threshold">Species Threshold:</label>
                                 <input id="species-frequency-threshold" type="number" class="form-control" style="width: 30%;" value="0.03" step="0.01" min="0.01" max="1" aria-label="species frequency threshold" aria-describedby="species-frequency-threshold">
                             </div>
                             <div class="text-nowrap mt-2"><label class="ms-2 me-2" for="species-week">Adjust list for the week of the year</label>
@@ -629,34 +629,34 @@
                         <div class="pe-3 input-group rounded p-2 mb-1">
                             <label class="input-group-text col-5" for="locale">Language:</label>
                             <select class="form-select mb-0" id="locale">
-                                <option value="en_uk">English (UK)</option>
+                                <option value="en_uk">English (UK) *</option>
                                 <option value="en">English (US)</option>
                                 <option value="af">Afrikaans</option>
                                 <option value="ar">العربية</option>
                                 <option value="cs">Čeština</option>
                                 <option value="ca">Català</option>
-                                <option value="da">Dansk</option>
-                                <option value="de">Deutsch</option>
-                                <option value="es">Español</option>
+                                <option value="da">Dansk *</option>
+                                <option value="de">Deutsch *</option>
+                                <option value="es">Español *</option>
                                 <option value="fi">Suomi</option>
-                                <option value="fr">Français</option>
+                                <option value="fr">Français *</option>
                                 <option value="hu">Magyar</option>
                                 <option value="it">Italiano</option>
                                 <option value="ja">日本語</option>
                                 <option value="ko">한국어</option>
-                                <option value="nl">Nederlands</option>
+                                <option value="nl">Nederlands *</option>
                                 <option value="no">Norsk</option>
                                 <option value="pl">Polski</option>
-                                <option value="pt">Português</option>
+                                <option value="pt">Português *</option>
                                 <option value="ro">Română</option>
-                                <option value="ru">Русский</option>
+                                <option value="ru">Русский *</option>
                                 <option value="sk">Slovenčina</option>
                                 <option value="sl">Slovenščina</option>
-                                <option value="sv">Svenska</option>
+                                <option value="sv">Svenska *</option>
                                 <option value="th">ไทย</option>
                                 <option value="tr">Türkçe</option>
                                 <option value="uk">Українська</option>
-                                <option value="zh">中文</option>
+                                <option value="zh">中文 *</option>
                                 <!-- <option value="custom">Custom</option> -->
                             </select>
                         </div>
@@ -665,7 +665,7 @@
                         <div class="form-group rounded p-2 pe-0 mb-2">
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Backend" id="Backend-circle-help"  data-bs-content="The webGL/webGPU backends can improve performance and reduce power consumption on some systems.">?</a>
                             <div>
-                                <label class="ps-0 fs-6 text-start">Backend:</label>
+                                <label class="ps-0 fs-6 text-start" for="backend">Backend:</label>
                                 <div class="form-check form-check-inline">
                                     <label class="form-check-label" for="tensorflow">CPU</label>
                                     <input class="form-check-input" type="radio" name="backend" id="tensorflow" value="tensorflow" checked="">
@@ -727,9 +727,9 @@
                     <div>
                         <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Adjust font size" id="Adjust font size-circle-help"  data-bs-content="Change the global font size settings for the application.">?</a>
                         <div class="pe-3 form-group rounded p-2 mb-2">
-                                Adjust font size: 
-                                <span  id="decreaseFont" class="material-symbols-outlined btn btn-outline-secondary p-1">text_decrease</span> 
-                                <span  id="increaseFont" class="material-symbols-outlined btn btn-outline-secondary p-1">text_increase</span>
+                            <label for="font" class="form-label">Adjust font size: </label>
+                            <span  id="decreaseFont" class="material-symbols-outlined btn btn-outline-secondary p-1">text_decrease</span> 
+                            <span  id="increaseFont" class="material-symbols-outlined btn btn-outline-secondary p-1">text_increase</span>
                         </div>
                     </div>
                 </fieldset>
@@ -738,9 +738,7 @@
                     <div class="me-auto">
                         <div class="form-group rounded p-2 mb-2">
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Volume Adjustment" id="Volume Adjustment-circle-help"  data-bs-content="Adjust the volume of audio to compensate for low recording levels.">?</a>
-                            <label for="gain" class="form-label">
-                                Volume Adjustment:
-                            </label>
+                            <label for="gain" class="form-label">Volume Adjustment:</label>
                             <div class="input-group me-0 p-0">
                                 <input type="range" class="form-control-range w-75" min="0" max="50" id="gain">
                                 <div class="input-group-append">
@@ -752,9 +750,8 @@
                     <hr>
                     <div class="form-group rounded p-2 mb-2">
                         <div class="col form-check form-switch">
-                            <label class="form-check-label" for="normalise">Normalise Audio:
-                                <input class="form-check-input" type="checkbox" role="switch" id="normalise">
-                            </label>
+                            <label class="form-check-label" for="normalise">Normalise Audio:</label>
+                            <input class="form-check-input" type="checkbox" role="switch" id="normalise">
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Normalise" id="Normalise-circle-help"  data-bs-content="When enabled, the audio you hear will be normalised, expanding the dynamic range.">?</a>
                         </div>
                     </div>
@@ -840,7 +837,7 @@
                     </div>
                     <div class="form-group rounded p-2 pe-0 mb-2">
                         <div class="row pe-2">
-                            <label class="col-3">Decorators: </label>
+                            <label class="col-3" for="decorators">Decorators: </label>
                             <div class="col-6 ">
                                 <div class="form-check-inline text-nowrap">
                                     <input class="form-check-input" type="checkbox" id="padding" value="2" checked="">
@@ -873,17 +870,15 @@
                         
                         <div class="form-group rounded p-2 mb-2">
                             <div class="col form-check form-switch">
-                                <label class="form-check-label" for="auto-archive">Add to Library on Save
-                                    <input class="form-check-input" type="checkbox" role="switch" id="auto-archive">
-                                </label>
+                                <label class="form-check-label" for="auto-archive">Add to Library on Save</label>
+                                <input class="form-check-input" type="checkbox" role="switch" id="auto-archive">
                                 <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Add to Library on Save" id="Add to Library on Save-circle-help"  data-bs-content="When enabled, audio files are added to the library location whenever detections are saved to the archive.">?</a>
                             </div>
                         </div>
                         <div class="form-group rounded p-2 mb-2">
                             <div class="col form-check form-switch">
-                                <label class="form-check-label" for="library-trim">Crop Library audio to night time periods
-                                    <input class="form-check-input" type="checkbox" role="switch" id="library-trim">
-                                </label>
+                                <label class="form-check-label" for="library-trim">Crop Library audio to night time periods</label>
+                                <input class="form-check-input" type="checkbox" role="switch" id="library-trim">
                                 <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Crop Library" id="Crop Library-circle-help"  data-bs-content="When enabled, audio files containing daylight periods are cropped, so the audio is only saved for nocturnal periods.">?</a>
                             </div>
                         </div>
@@ -909,9 +904,8 @@
                     <legend style="font-size: large;font-weight:bold">Spectrogram Preferences</legend>
                     <div class="form-group rounded p-2 mb-2">
                         <div class="col form-check form-switch">
-                            <label class="form-check-label" for="spec-labels">Display frequency labels:
-                                <input class="form-check-input" type="checkbox" role="switch" id="spec-labels">
-                            </label>
+                            <label class="form-check-label" for="spec-labels">Display frequency labels:</label>
+                            <input class="form-check-input" type="checkbox" role="switch" id="spec-labels">
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Show frequency labels" id="Show frequency labels-circle-help"  data-bs-content="When enabled, the spectrogram will display the frequency on the left side.">?</a>
                         </div>
                     </div>
@@ -1026,10 +1020,8 @@
                     </div>
                     <div class="col-auto form-group rounded p-2 mb-2">
                         <div class="text-nowrap">
-                            <div class="form-check form-switch">
-                                <button class="btn btn-warning" id="reset-defaults" onclick="return false">Reset to default settings</button>
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Default Settings" id="Default Settings-circle-help"  data-bs-content="Reset the configuration settings to their default values. N.B. Relaunch Chirpity to see changes, also, language settings will need to be re-set manually">?</a>
-                            </div>
+                            <button class="btn btn-warning" id="reset-defaults" onclick="return false">Reset to default settings</button>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Default Settings" id="Default Settings-circle-help"  data-bs-content="Reset the configuration settings to their default values. N.B. Relaunch Chirpity to see changes, also, language settings will need to be re-set manually">?</a>
                         </div>
                     </div>
                 </fieldset>

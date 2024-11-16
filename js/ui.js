@@ -1,7 +1,7 @@
 import {trackVisit, trackEvent} from './tracking.js';
 import {DOM} from './DOMcache.js';
 import {IUCNCache} from './IUCNcache.js';
-
+import {i18nHeadings, localiseUI, i18nContext, i18nLocation, i18nForm, i18nHelp} from './i18n.js';
 let LOCATIONS, locationID = undefined, loadingTimeout;
 
 let LABELS = [], DELETE_HISTORY = [];
@@ -527,11 +527,12 @@ const buildFileMenu = (e) => {
     //e.preventDefault();
     e.stopImmediatePropagation();
     const menu = DOM.contextMenu;
+    const i18n = getI18n(i18nContext);
     menu.innerHTML = `
     <a class="dropdown-item" id="setCustomLocation"><span
-    class="material-symbols-outlined align-bottom pointer">edit_location_alt</span> Amend File Recording Location</a>
+    class="material-symbols-outlined align-bottom pointer">edit_location_alt</span> ${i18n.location}</a>
     <a class="dropdown-item" id="setFileStart"><span
-    class="material-symbols-outlined align-bottom pointer">edit_calendar</span> Amend File Start Time
+    class="material-symbols-outlined align-bottom pointer">edit_calendar</span> ${i18n.time}
     `;
     positionMenu(menu, e);
 }
@@ -549,12 +550,13 @@ function getDatetimeLocalFromEpoch(date) {
 
 function showDatePicker() {
     // Create a form element
+    const i18n = getI18n(i18nForm);
     const form = document.createElement("form");
     form.classList.add("mt-3", "mb-3", "p-3", "rounded", "text-bg-light", 'position-relative');
     form.style.zIndex = "1000";
     // Create a label for the datetime-local input
     const label = document.createElement("label");
-    label.innerHTML = "Select New Date and Time:";
+    label.innerHTML = i18n.select;
     label.classList.add("form-label");
     form.appendChild(label);
     
@@ -569,13 +571,13 @@ function showDatePicker() {
     
     // Create a submit button
     const submitButton = document.createElement("button");
-    submitButton.innerHTML = "Submit";
+    submitButton.innerHTML = i18n.submit;
     submitButton.classList.add("btn", "btn-primary", "mt-2");
     form.appendChild(submitButton);
     
     // Create a cancel button
     var cancelButton = document.createElement("button");
-    cancelButton.innerHTML = "Cancel";
+    cancelButton.innerHTML = i18n.cancel;
     cancelButton.classList.add("btn", "btn-secondary", "mt-2", "ms-2");
     form.appendChild(cancelButton);
     
@@ -715,14 +717,15 @@ function renderFilenamePanel() {
 
 
 function customAnalysisAllMenu(saved){
+
     const analyseAllMenu = document.getElementById('analyseAll');
     const modifier = isMac ? '⌘' : 'Ctrl';
     if (saved) {
-        analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> Get Results for All Open Files
+        analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> ${STATE.i18n.retrieveAll}
         <span class="shortcut float-end">${modifier}+Shift+A</span>`;
         enableMenuItem(['reanalyseAll']);
     } else {
-        analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">search</span> Analyse All Open Files
+        analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">search</span> ${STATE.i18n.analyseAll}
         <span class="shortcut float-end">${modifier}+Shift+A</span>`;
         disableMenuItem(['reanalyseAll']);
     }   
@@ -736,7 +739,7 @@ function customiseAnalysisMenu(saved) {
         <span class="shortcut float-end">${modifier}+A</span>`;
         enableMenuItem(['reanalyse']);
     } else {
-        analyseMenu.innerHTML = `<span class="material-symbols-outlined">search</span> Analyse File
+        analyseMenu.innerHTML = `<span class="material-symbols-outlined">search</span> Analyse Current File
         <span class="shortcut float-end">${modifier}+A</span>`;
         disableMenuItem(['reanalyse']);
     }
@@ -744,7 +747,20 @@ function customiseAnalysisMenu(saved) {
 
 
 async function generateLocationList(id) {
-    const defaultText = id === 'savedLocations' ? '(Default)' : 'All';
+    const d = {
+        "en": ["(Default)", "All"],
+        "da": ["(Standard)", "Alle"],
+        "de": ["(Standard)", "Alle"],
+        "es": ["(Predeterminado)", "Todos"],
+        "fr": ["(Par défaut)", "Tout"],
+        "nl": ["(Standaard)", "Alles"],
+        "pt": ["(Padrão)", "Todos"],
+        "ru": ["(По умолчанию)", "Все"],
+        "sv": ["(Standard)", "Alla"],
+        "zh": ["(默认)", "所有"]
+      }
+    const i18n = d[locale] || d['en'];
+    const defaultText = id === 'savedLocations' ? i18n[0] : i18n[1];
     const el = document.getElementById(id);
     LOCATIONS = undefined;
     worker.postMessage({ action: 'get-locations', file: STATE.currentFile });
@@ -875,13 +891,15 @@ async function setCustomLocation() {
     savedLocationSelect.addEventListener('change', function () {
         showLocation(true);
     })
+
+    const i18n = getI18n(i18nLocation)
     const addOrDelete = () => {
         if (customPlaceEl.value) {
-            locationAdd.textContent = 'Set Location'
+            locationAdd.textContent = i18n[0];
             locationAdd.classList.remove('btn-danger');
             locationAdd.classList.add('button-primary');
         } else {
-            locationAdd.textContent = 'Delete Location'
+            locationAdd.textContent = i18n[1];
             locationAdd.classList.add('btn-danger');
             locationAdd.classList.remove('button-primary');
         }
@@ -889,6 +907,12 @@ async function setCustomLocation() {
     // Highlight delete
     customPlaceEl.addEventListener('keyup', addOrDelete);
     addOrDelete();
+    locationModalDiv.querySelector('h5').textContent = i18n[0];
+    const legends = locationModalDiv.querySelectorAll('legend');
+    for (let i = 0; i < legends.length; i++) {
+        legends[i].textContent = i18n[i+2]; // process each node
+    }
+    locationModalDiv.querySelector('label[for="batchLocations"]').textContent = i18n[4];
     const locationModal = new bootstrap.Modal(locationModalDiv);
     locationModal.show();
     
@@ -1738,7 +1762,7 @@ window.onload = async () => {
         // Show Locale
         DOM.locale.value = config[config.model].locale;
         // Localise UI
-        localiseUI(DOM.locale.value)
+        STATE.i18n = localiseUI(DOM.locale.value)
 
         // remember audio notification setting
         DOM.audioNotification.checked = config.audio.notification;
@@ -3120,15 +3144,16 @@ function centreSpec(){
     }
     
     const updateSummary = async ( { summary = [], filterSpecies = '' }) => {
+        const i18n = getI18n(i18nHeadings);
         const showIUCN = config.detect.iucn;
         if (summary.length){
             let summaryHTML = `<table id="resultSummary" class="table table-dark p-1"><thead>
             <tr>
-            <th class="col-3" scope="col">Max</th>
-            <th class="col-5" scope="col">Species</th>
+            <th class="col-3" scope="col">${i18n.max}</th>
+            <th class="col-5" scope="col">${i18n.species[0]}</th>
             ${showIUCN ? '<th class="col-1" scope="col"></th>' : ''}
-            <th class="col-1 text-end" scope="col">Detections</th>
-            <th class="col-1 text-end" scope="col">Calls</th>
+            <th class="col-1 text-end" scope="col">${i18n.detections}</th>
+            <th class="col-1 text-end" scope="col">${i18n.calls}</th>
             </tr>
             </thead><tbody id="speciesFilter">`;
             let selectedRow = null;
@@ -3367,7 +3392,7 @@ function formatDuration(seconds){
     }
     
     // TODO: show every detection in the spec window as a region on the spectrogram
-    
+
     async function renderResult({
         index = 1,
         result = {},
@@ -3384,14 +3409,15 @@ function formatDuration(seconds){
                 selectionTable.textContent = '';
             }
             else {
+                const i18n = getI18n(i18nHeadings);
                 DOM.resultHeader.innerHTML =`
                 <tr>
-                    <th id="sort-time" class="time-sort col text-start timeOfDay" title="Sort results by detection time"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> Time</th>
-                    <th id="sort-position" class="time-sort text-start timestamp" title="Sort results by detection time"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> Position</th>
-                    <th id="confidence-sort" class="text-start" title="Sort results by detection confidence"><span class="text-muted material-symbols-outlined species-sort-icon d-none">sort</span> Species</th>
-                    <th class="text-end">Calls</th>
-                    <th class="col">Label</th>
-                    <th class="col text-end">Notes</th>
+                    <th id="sort-time" class="time-sort col text-start timeOfDay" title="${i18n.time[1]}"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> ${i18n.time[0]}</th>
+                    <th id="sort-position" class="time-sort text-start timestamp" title="${i18n.position[1]}"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> ${i18n.position[0]}</th>
+                    <th id="confidence-sort" class="text-start" title="${i18n.species[1]}"><span class="text-muted material-symbols-outlined species-sort-icon d-none">sort</span> ${i18n.species[0]}</th>
+                    <th class="text-end">${i18n.calls}</th>
+                    <th class="col">${i18n.label}</th>
+                    <th class="col text-end">${i18n.notes}</th>
                 </tr>`;
                 setTimelinePreferences();
                 showElement(['resultTableContainer', 'resultsHead'], false);
@@ -3705,58 +3731,7 @@ function formatDuration(seconds){
         }
     }
 
-    async function localiseUI(locale) {
-        try {
-             // Try fetching the localisation JSON file
-            let localisationData = {};
-            try {
-                // Fetch the localisation JSON file
-                const basename = 'index';
-                // If no localisation, default to English
-                if (! fs.existsSync(p.join('I18n', `${basename}.${locale}.json`))) {
-                    // Let me know someone was looking for a non-existant locale
-                    console.warn(`User requested ${locale}`);
-                    locale = 'en';
-                }
-                const jsonResponse = await fetch(p.join('I18n', `${basename}.${locale}.json`))
-                if (jsonResponse.ok) {
-                    localisationData = await jsonResponse.json();
-                } else {
-                    console.warn(`JSON file not found: ${filename} parsed to ${locale}.json`);
-                    return; // Return unmodified HTML if JSON not found
-                }
-            } catch (error) {
-                console.warn(`Failed to fetch JSON file: ${filename} parsed to ${locale}.json`, error);
-                return; // Return unmodified HTML if JSON fetch fails
-            }
-            // Update elements 
-            for (const key in localisationData) {
-                if (localisationData.hasOwnProperty(key)) {
-                    const element = document.getElementById(key);
-                    if (element) {
-                        if (key.indexOf('circle-help') !==-1){
-                            // Help button popup text
-                            element.setAttribute('data-bs-content', localisationData[key]);
-                            // refresh the tooltip to reflect the change
-                            const popover = new bootstrap.Popover(element);
-                            popover.update();
-
-                        } else {
-                            // Replace the inner text of the <a> tag but leave <span> unaffected
-                            const spans = element.querySelectorAll('span');
-                            element.textContent = ' ' + localisationData[key][0];
-                            spans.length && element.insertBefore(spans[0], element.firstChild);
-                            spans.length > 1 && element.appendChild(spans[1])
-                        };
-                            // element.innerHTML = localisationData[key];
-                        
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('Localisation Error:', error.message);
-        }
-    }
+    
 
     const populateHelpModal = async (file, label) => {
         document.getElementById('helpModalLabel').textContent = label;
@@ -3767,18 +3742,16 @@ function formatDuration(seconds){
         document.removeEventListener('show.bs.modal', replaceCtrlWithCommand);
         document.addEventListener('show.bs.modal', replaceCtrlWithCommand);
         const close = {
-            fr: 'Fermer',
+            da: 'Luk',
             de: 'Schließen',
             es: 'Cerrar',
+            fr: 'Fermer',
+            nl: 'Sluiten',
             pt: 'Fechar',
             ru: 'Закрыть',
-            nl: 'Sluiten',
-            zh: '关闭',
-            sv: 'Stäng',    // Swedish
-            da: 'Luk'       // Danish
+            sv: 'Stäng', 
+            zh: '关闭'            
           }
-          
-          console.log(close.locale)
         document.getElementById('help-modal-close').innerText = close[locale] || 'Close';
         help.show();
     }
@@ -4521,74 +4494,12 @@ function playRegion(){
         }
     }
 
-    const localeHelp = {
-        keyboard: {
-          en: 'Keyboard Shortcuts',
-          fr: 'Raccourcis clavier',
-          de: 'Tastenkombinationen',
-          es: 'Atajos de teclado',
-          pt: 'Atalhos de teclado',
-          ru: 'Горячие клавиши',
-          nl: 'Sneltoetsen',
-          zh: '键盘快捷键',
-          sv: 'Tangentbordsgenvägar',   // Swedish
-          da: 'Tastaturgenveje'         // Danish
-        },
-        settings: {
-          en: 'Settings Help',
-          fr: 'Aide des paramètres',
-          de: 'Einstellungen Hilfe',
-          es: 'Ayuda de configuración',
-          pt: 'Ajuda de configurações',
-          ru: 'Помощь по настройкам',
-          nl: 'Instellingen help',
-          zh: '设置帮助',
-          sv: 'Inställningshjälp',       // Swedish
-          da: 'Indstillinger Hjælp'     // Danish
-        },
-        usage: {
-          en: 'Usage Guide',
-          fr: 'Guide d\'utilisation',
-          de: 'Benutzerhandbuch',
-          es: 'Guía de uso',
-          pt: 'Guia de uso',
-          ru: 'Руководство пользователя',
-          nl: 'Gebruikershandleiding',
-          zh: '使用指南',
-          sv: 'Användarguide',           // Swedish
-          da: 'Brugervejledning'        // Danish
-        },
-        eBird: {
-          en: 'eBird Record FAQ',
-          fr: 'FAQ des enregistrements eBird',
-          de: 'eBird Datensatz FAQ',
-          es: 'Preguntas frecuentes sobre los registros de eBird',
-          pt: 'FAQ de Registros do eBird',
-          ru: 'Часто задаваемые вопросы о записях eBird',
-          nl: 'eBird Record FAQ',
-          zh: 'eBird记录常见问题',
-          sv: 'eBird Poster FAQ',        // Swedish
-          da: 'eBird Record FAQ'        // Danish
-        },
-        community: {
-          en: 'Join the Chirpity Users Community',
-          fr: 'Rejoindre la communauté des utilisateurs de Chirpity',
-          de: 'Treten Sie der Chirpity-Benutzergemeinschaft bei',
-          es: 'Únete a la comunidad de usuarios de Chirpity',
-          pt: 'Junte-se à comunidade de usuários do Chirpity',
-          ru: 'Присоединиться к сообществу пользователей Chirpity',
-          nl: 'Word lid van de Chirpity-gebruikersgemeenschap',
-          zh: '加入Chirpity用户社区',
-          sv: 'Gå med i Chirpity-användargemenskapen', // Swedish
-          da: 'Bliv medlem af Chirpity-brugerfællesskabet' // Danish
-        }
-      }
-      
       
     
     document.addEventListener('click', function (e) {
         const element = e.target;
         const target = element.closest('[id]')?.id;
+        const locale = config[config.model].locale.replace('_uk', '');
         switch (target)
         {
             // File menu
@@ -4643,13 +4554,13 @@ function playRegion(){
             }
                     
             // Help Menu
-            case 'keyboardHelp': { (async () => await populateHelpModal('Help/keyboard.html', localeHelp.keyboard[config[config.model].locale]))(); break }
-            case 'settingsHelp': { (async () => await populateHelpModal('Help/settings.html', localeHelp.settings[config[config.model].locale]))(); break }
-            case 'usage': { (async () => await populateHelpModal('Help/usage.html', localeHelp.usage[config[config.model].locale]))(); break }
-            case 'bugs': { (async () => await populateHelpModal('Help/community.html', localeHelp.community[config[config.model].locale]))(); break }
+            case 'keyboardHelp': { (async () => await populateHelpModal('Help/keyboard.html', i18nHelp.keyboard[locale]))(); break }
+            case 'settingsHelp': { (async () => await populateHelpModal('Help/settings.html', i18nHelp.settings[locale]))(); break }
+            case 'usage': { (async () => await populateHelpModal('Help/usage.html', i18nHelp.usage[locale]))(); break }
+            case 'bugs': { (async () => await populateHelpModal('Help/community.html', i18nHelp.community[locale]))(); break }
             case 'species': { worker.postMessage({action: 'get-valid-species', file: STATE.currentFile}); break }
             case 'startTour': { prepTour(); break }
-            case 'eBird': { (async () => await populateHelpModal('Help/ebird.html', localeHelp.eBird[config[config.model].locale]))(); break }
+            case 'eBird': { (async () => await populateHelpModal('Help/ebird.html', i18nHelp.eBird[locale]))(); break }
             case 'copy-uuid': { 
                 // Get the value from the input element
                 const copyText = document.getElementById('uuid').textContent.split('\n')[0];
@@ -4891,7 +4802,7 @@ function playRegion(){
                     } else {
                         const chirpity = element.value === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
                         labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${element.value}.txt`; 
-                        localiseUI(element.value)
+                        STATE.i18n = localiseUI(element.value)
                     }
                     config[config.model].locale = element.value;
                     readLabels(labelFile, 'locale');
@@ -5095,8 +5006,13 @@ async function readLabels(labelFile, updating){
     })
 }
 
+function getI18n(context){
+    const locale = config[config.model].locale.replace('_uk', '');
+    return context[locale] || context['en'];
+}
     
     async function createContextMenu(e) {
+        const i18n = getI18n(i18nContext);
         const target = e.target;
         if (target.classList.contains('circle') || target.closest('thead')) return;
         let hideInSummary = '', hideInSelection = '',
@@ -5120,27 +5036,27 @@ async function readLabels(labelFile, updating){
             }
         }
         if (region === undefined && ! inSummary) return;
-        const createOrEdit = ((region?.attributes.label || target.closest('#summary'))) ? 'Edit' : 'Create';
+        const createOrEdit = ((region?.attributes.label || target.closest('#summary'))) ? i18n.edit : i18n.create;
         
         contextMenu.innerHTML = `
         <div id="${inSummary ? 'inSummary' : 'inResults'}">
-            <a class="dropdown-item ${hideInSummary}" id="play-region"><span class='material-symbols-outlined'>play_circle</span> Play</a>
+            <a class="dropdown-item ${hideInSummary}" id="play-region"><span class='material-symbols-outlined'>play_circle</span> ${i18n.play}</a>
             <a class="dropdown-item ${hideInSummary} ${hideInSelection}" href="#" id="context-analyse-selection">
-            <span class="material-symbols-outlined">search</span> Analyse
+            <span class="material-symbols-outlined">search</span> ${i18n.analyse}
             </a>
             <div class="dropdown-divider ${hideInSummary}"></div>
             <a class="dropdown-item" id="create-manual-record" href="#">
-            <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} Record${plural}
+            <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} ${i18n.record}
             </a>
             <a class="dropdown-item" id="context-create-clip" href="#">
-            <span class="material-symbols-outlined">music_note</span> Export Audio Clip${plural}
+            <span class="material-symbols-outlined">music_note</span> ${i18n.export}
             </a>
             <span class="dropdown-item" id="context-xc" href='#' target="xc">
-            <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> Compare with Reference Calls
+            <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> ${i18n.compare}
             </span>
             <div class="dropdown-divider ${hideInSelection}"></div>
             <a class="dropdown-item ${hideInSelection}" id="context-delete" href="#">
-            <span class='delete material-symbols-outlined'>delete_forever</span> Delete Record${plural}
+            <span class='delete material-symbols-outlined'>delete_forever</span> ${i18n.delete}
             </a>
         </div>
         `;
