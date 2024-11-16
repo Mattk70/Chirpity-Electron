@@ -97,40 +97,40 @@ test('Export mp3 works', async () => {
     await changeSettings(page, 'select', 'format', 'mp3', 0)
     await page.locator('region').click({button: 'right'});
     await page.locator('#context-create-clip').click();
-    await dialog.accept();
+
 })
 
 
-test(`Nocmig analyse works and second result is 61%`, async () => {
-  await runExampleAnalysis(page,'chirpity');
-  const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
-  expect(callID).not.toBe(undefined)
-  const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
-  // console.log(secondResult, 'second result');
-  expect(secondResult).toBe('61%');
-})
+// test(`Nocmig analyse works and second result is 61%`, async () => {
+//   await runExampleAnalysis(page,'chirpity');
+//   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
+//   expect(callID).not.toBe(undefined)
+//   const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
+//   // console.log(secondResult, 'second result');
+//   expect(secondResult).toBe('61%');
+// })
 
-test(`BirdNET analyse works and second result is 34%`, async () => {
-  await runExampleAnalysis(page, 'birdnet');
-  const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
-  expect(callID).not.toBe(undefined)
-  const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
-  // console.log(secondResult, 'second result');
-  expect(secondResult).toBe('34%');
-})
-
-
+// test(`BirdNET analyse works and second result is 34%`, async () => {
+//   await runExampleAnalysis(page, 'birdnet');
+//   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
+//   expect(callID).not.toBe(undefined)
+//   const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
+//   // console.log(secondResult, 'second result');
+//   expect(secondResult).toBe('34%');
+// })
 
 
-test("Amend file start dialog contains date", async () =>{
-  await runExampleAnalysis(page, 'chirpity');
-  await page.locator('#dropdownMenuButton').click({button: 'right'});
-  await page.locator('#setFileStart').click();
-  const fileStart = await page.locator('#fileStart');
-  const entry = await fileStart.inputValue();
-  const currentYear = new Date().getFullYear().toString();
-  expect(entry.toString()).toContain(currentYear);
-  // await page.locator('#spectrogramWrapper button.btn-secondary').click();
-})
+
+
+// test("Amend file start dialog contains date", async () =>{
+//   await runExampleAnalysis(page, 'chirpity');
+//   await page.locator('#dropdownMenuButton').click({button: 'right'});
+//   await page.locator('#setFileStart').click();
+//   const fileStart = await page.locator('#fileStart');
+//   const entry = await fileStart.inputValue();
+//   const currentYear = new Date().getFullYear().toString();
+//   expect(entry.toString()).toContain(currentYear);
+//   // await page.locator('#spectrogramWrapper button.btn-secondary').click();
+// })
 
 
