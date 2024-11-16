@@ -1,0 +1,95 @@
+{
+    "file-handling": [
+        "Manuseio de arquivos"
+        ],
+  "show-file-open": [
+    "Mostrar caixa de diálogo de abertura de arquivo"
+  ],
+  "save-detections": [
+    "Salvar as detecções no arquivo de registros."
+  ],
+  "analysis": [
+    "Análise"
+  ],
+  "analyse-file": [
+    "Analisar o arquivo atual."
+  ],
+  "analyeALL": [
+    "Analisar todos os arquivos abertos."
+  ],
+  "stop-analysis": [
+    "Parar análise"
+  ],
+  "toggle-archive": [
+    "Alternar entre explorar o arquivo e os resultados da análise mais recente. Isso permite comparar as detecções atuais com as que você registrou anteriormente."
+  ],
+  "navigate-audio": [
+    "Navegar pelo áudio"
+  ],
+  "play-pause": [
+    "Alternar entre reprodução/pausa do áudio"
+  ],
+  "play-region": [
+    "Reproduzir a região selecionada. Somente ativo se uma região tiver sido selecionada."
+  ],
+  "center-spec": [
+    "Centralizar o espectrograma na posição atual do cabeçote de reprodução. Além disso, se você clicar duas vezes no áudio, ele centralizará o espectrograma nesse ponto."
+  ],
+  "go-to": [
+    "Ir para a posição no arquivo"
+  ],
+  "file-begin": [
+    "Mover o cabeçote de reprodução para o início do arquivo"
+  ],
+  "file-end": [
+    "Mover o cabeçote de reprodução para o final do arquivo"
+  ],
+  "pageup": [
+    "Mover-se para o período anterior no espectrograma. Você também pode usar a roda do mouse ou o gesto de dois dedos no trackpad."
+  ],
+  "pagedown": [
+    "Mover-se para o próximo período no espectrograma"
+  ],
+  "skip-forward": [
+    "Mover o cabeçote de reprodução para frente."
+  ],
+  "skip-back": [
+    "Mover o cabeçote de reprodução para trás."
+  ],
+  "next-detection": [
+    "Pular para a próxima detecção"
+  ],
+  "previous-detection": [
+    "Pular para a detecção anterior"
+  ],
+  "spec-adjust": [
+    "Ajustes do espectrograma"
+  ],
+  "zoom-in": [
+    "Ampliar o espectrograma. Ao ampliar, o Chirpity ajusta automaticamente o tamanho da janela da transformada de Fourier de curto prazo (STFT) para otimizar a resolução espectral"
+  ],
+  "zoom-out": [
+    "Reduzir o espectrograma. Ao reduzir, o Chirpity ajusta automaticamente o tamanho da janela STFT para otimizar a resolução espectral"
+  ],
+  "reduce-fft": [
+    "Reduzir manualmente o tamanho da janela do espectrograma. Ajustar o tamanho da janela tem o efeito de aumentar ou suavizar as chamadas no espectrograma."
+  ],
+  "increase-fft": [
+    "Aumentar manualmente o tamanho da janela do espectrograma"
+  ],
+  "timeline-toggle": [
+    "Alternar entre código de tempo e hora do dia"
+  ],
+  "records": [
+    "Registros"
+  ],
+  "delete": [
+    "Excluir o registro atual"
+  ],
+  "undo": [
+    "Restaurar o(s) registro(s) excluído(s)"
+  ],
+  "validate": [
+    "Validar o registro ativo atual (confirmar a detecção)"
+  ]
+}

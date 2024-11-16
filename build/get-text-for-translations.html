@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Extract Text, Title, Data Attributes</title>
+</head>
+<body>
+  <input type="file" id="fileInput" accept=".html" />
+  <pre id="output"></pre>
+
+  <script>
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect, false);
+
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (!file) {
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const htmlContent = e.target.result;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlContent, 'text/html');
+
+        const textAndTitles = {};
+
+        // Function to find the closest element with an ID
+        function getClosestId(node) {
+          let currentNode = node;
+          // If it's a text node, go up to the parent element
+          if (node.nodeType === Node.TEXT_NODE) {
+            currentNode = node.parentElement; // Move to the parent element
+          }
+          // Find the closest ancestor with an 'id' attribute
+          const closestElement = currentNode.closest('[id]');
+          return closestElement ? closestElement.id : null;
+        }
+
+        // Use TreeWalker to traverse through all text nodes in the body
+        const walker = document.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
+        let node;
+        function removeFirstWordIfLowercase(str) {
+            // Check if the first word starts with a lowercase letter
+            if (/^[a-z]/.test(str)) {
+                // Remove the first word (and the space following it)
+                return str.replace(/^\w+\s*/, '');
+            }
+            // If the first word doesn't start with a lowercase letter, return the string unchanged
+            return str;
+        }
+        // Iterate over each text node using TreeWalker
+        while ((node = walker.nextNode())) {
+          const closestId = getClosestId(node);
+
+        let content = node.textContent.replace(/\s+/g, ' ').trim();
+            // Ignore nodes with empty text or matching the regex /^\w+\_\w+$/
+            if (file.name === 'index.html'){
+                content = removeFirstWordIfLowercase(content);
+                if (! content  ||  content === '?' || /^\w+_\w+$/.test(content)|| /^\d+(%| dB| kbps)?$/.test(content) || 
+                    closestId === null || ['locale', 'colourmap', 'window-function', 'format'].includes(closestId)) {
+                    continue;
+                }
+            }
+          if (content) {
+            textAndTitles[closestId] = textAndTitles[closestId] || [];
+            textAndTitles[closestId].push(content);
+          }
+        }
+
+        // Extract data from <a> elements for links and their data-bs-content
+        const links = doc.querySelectorAll('a');
+        links.forEach(link => {
+          const closestId = getClosestId(link);
+          let linkText = link.textContent.trim().replace(/\s+/g, ' ');
+          linkText = linkText && removeFirstWordIfLowercase(linkText)
+          let dataBsContent = link.getAttribute('data-bs-content');
+          dataBsContent = dataBsContent && removeFirstWordIfLowercase(dataBsContent).replace(/\s+/g, ' ').trim();
+
+          if (dataBsContent !== null) {
+            textAndTitles[closestId] = textAndTitles[closestId] || [];
+            textAndTitles[closestId].push(dataBsContent);
+
+            // textAndTitles.push({
+            //   id: closestId,
+            //   textContent: linkText,
+            //   dataBsContent: dataBsContent 
+            // });
+          }
+        });
+        // // Assuming textAndTitles is the object you want to sort by keys
+        // const sortedKeys = Object.keys(textAndTitles).sort();
+
+        // // Now you can iterate over the sorted keys to access the content
+        // sortedKeys.forEach(key => {
+        //     console.log(key, textAndTitles[key]);  // Output sorted key and its associated list
+        // });
+        // const sortedTextAndTitles = {};
+        // sortedKeys.forEach(key => {
+        //     sortedTextAndTitles[key] = textAndTitles[key];
+        // });
+
+        // Generate JSON output
+        const jsonOutput = JSON.stringify(textAndTitles, null, 2);
+
+        // Display JSON in the output area
+        document.getElementById('output').textContent = jsonOutput;
+      };
+
+      reader.readAsText(file);
+    }
+  </script>
+</body>
+</html>

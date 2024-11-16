@@ -1737,6 +1737,9 @@ window.onload = async () => {
 
         // Show Locale
         DOM.locale.value = config[config.model].locale;
+        // Localise UI
+        localiseUI(DOM.locale.value)
+
         // remember audio notification setting
         DOM.audioNotification.checked = config.audio.notification;
         
@@ -3654,14 +3657,129 @@ function formatDuration(seconds){
         sendFile('save', result)
     }
     
+    async function localiseModal(filename, locale) {
+        try {
+            // Fetch the HTML file
+            const htmlResponse = await fetch(filename);
+            if (!htmlResponse.ok) throw new Error(`Failed to load HTML file: ${filename}.html`);
+        
+            const htmlContent = await htmlResponse.text();
+
+              // Try fetching the localisation JSON file
+            let localisationData = {};
+            try {
+                // Fetch the localisation JSON file
+                const basename = p.basename(filename, '.html')
+                const jsonResponse = await fetch(p.join('I18n', `${basename}.${locale}.json`))
+                if (jsonResponse.ok) {
+                    localisationData = await jsonResponse.json();
+                } else {
+                    console.warn(`JSON file not found: ${filename} parsed to ${locale}.json`);
+                    return htmlContent; // Return unmodified HTML if JSON not found
+                }
+            } catch (error) {
+                console.warn(`Failed to fetch JSON file: ${filename} parsed to ${locale}.json`, error);
+                return htmlContent; // Return unmodified HTML if JSON fetch fails
+            }
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlContent, 'text/html');
+        
+            // Update elements in the parsed HTML
+            for (const key in localisationData) {
+                if (localisationData.hasOwnProperty(key)) {
+                    const element = doc.getElementById(key);
+                    if (element) {
+                        element.innerHTML = Array.isArray(localisationData[key])
+                            ? localisationData[key].join('<br>')
+                            : localisationData[key];
+                    }
+                }
+            }
+        
+            // Return the modified HTML content as a string
+            return doc.documentElement.outerHTML;
+        } catch (error) {
+            console.error('Localisation Error:', error.message);
+            return null; // Return null if there was an error
+        }
+    }
+
+    async function localiseUI(locale) {
+        try {
+             // Try fetching the localisation JSON file
+            let localisationData = {};
+            try {
+                // Fetch the localisation JSON file
+                const basename = 'index';
+                // If no localisation, default to English
+                if (! fs.existsSync(p.join('I18n', `${basename}.${locale}.json`))) {
+                    // Let me know someone was looking for a non-existant locale
+                    console.warn(`User requested ${locale}`);
+                    locale = 'en';
+                }
+                const jsonResponse = await fetch(p.join('I18n', `${basename}.${locale}.json`))
+                if (jsonResponse.ok) {
+                    localisationData = await jsonResponse.json();
+                } else {
+                    console.warn(`JSON file not found: ${filename} parsed to ${locale}.json`);
+                    return; // Return unmodified HTML if JSON not found
+                }
+            } catch (error) {
+                console.warn(`Failed to fetch JSON file: ${filename} parsed to ${locale}.json`, error);
+                return; // Return unmodified HTML if JSON fetch fails
+            }
+            // Update elements 
+            for (const key in localisationData) {
+                if (localisationData.hasOwnProperty(key)) {
+                    const element = document.getElementById(key);
+                    if (element) {
+                        if (key.indexOf('circle-help') !==-1){
+                            // Help button popup text
+                            element.setAttribute('data-bs-content', localisationData[key]);
+                            // refresh the tooltip to reflect the change
+                            const popover = new bootstrap.Popover(element);
+                            popover.update();
+
+                        } else {
+                            // Replace the inner text of the <a> tag but leave <span> unaffected
+                            const spans = element.querySelectorAll('span');
+                            element.textContent = ' ' + localisationData[key][0];
+                            spans.length && element.insertBefore(spans[0], element.firstChild);
+                            spans.length > 1 && element.appendChild(spans[1])
+                        };
+                            // element.innerHTML = localisationData[key];
+                        
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Localisation Error:', error.message);
+        }
+    }
 
     const populateHelpModal = async (file, label) => {
         document.getElementById('helpModalLabel').textContent = label;
-        const response = await fetch(file);
-        document.getElementById('helpModalBody').innerHTML = await response.text();
+        const locale = config[config.model].locale.replace('_uk', '');
+        const response = await localiseModal(file, locale)
+        document.getElementById('helpModalBody').innerHTML = response;
         const help = new bootstrap.Modal(document.getElementById('helpModal'));
         document.removeEventListener('show.bs.modal', replaceCtrlWithCommand);
         document.addEventListener('show.bs.modal', replaceCtrlWithCommand);
+        const close = {
+            fr: 'Fermer',
+            de: 'Schließen',
+            es: 'Cerrar',
+            pt: 'Fechar',
+            ru: 'Закрыть',
+            nl: 'Sluiten',
+            zh: '关闭',
+            sv: 'Stäng',    // Swedish
+            da: 'Luk'       // Danish
+          }
+          
+          console.log(close.locale)
+        document.getElementById('help-modal-close').innerText = close[locale] || 'Close';
         help.show();
     }
     function _replaceTextInTitleAttributes() {
@@ -4403,6 +4521,70 @@ function playRegion(){
         }
     }
 
+    const localeHelp = {
+        keyboard: {
+          en: 'Keyboard Shortcuts',
+          fr: 'Raccourcis clavier',
+          de: 'Tastenkombinationen',
+          es: 'Atajos de teclado',
+          pt: 'Atalhos de teclado',
+          ru: 'Горячие клавиши',
+          nl: 'Sneltoetsen',
+          zh: '键盘快捷键',
+          sv: 'Tangentbordsgenvägar',   // Swedish
+          da: 'Tastaturgenveje'         // Danish
+        },
+        settings: {
+          en: 'Settings Help',
+          fr: 'Aide des paramètres',
+          de: 'Einstellungen Hilfe',
+          es: 'Ayuda de configuración',
+          pt: 'Ajuda de configurações',
+          ru: 'Помощь по настройкам',
+          nl: 'Instellingen help',
+          zh: '设置帮助',
+          sv: 'Inställningshjälp',       // Swedish
+          da: 'Indstillinger Hjælp'     // Danish
+        },
+        usage: {
+          en: 'Usage Guide',
+          fr: 'Guide d\'utilisation',
+          de: 'Benutzerhandbuch',
+          es: 'Guía de uso',
+          pt: 'Guia de uso',
+          ru: 'Руководство пользователя',
+          nl: 'Gebruikershandleiding',
+          zh: '使用指南',
+          sv: 'Användarguide',           // Swedish
+          da: 'Brugervejledning'        // Danish
+        },
+        eBird: {
+          en: 'eBird Record FAQ',
+          fr: 'FAQ des enregistrements eBird',
+          de: 'eBird Datensatz FAQ',
+          es: 'Preguntas frecuentes sobre los registros de eBird',
+          pt: 'FAQ de Registros do eBird',
+          ru: 'Часто задаваемые вопросы о записях eBird',
+          nl: 'eBird Record FAQ',
+          zh: 'eBird记录常见问题',
+          sv: 'eBird Poster FAQ',        // Swedish
+          da: 'eBird Record FAQ'        // Danish
+        },
+        community: {
+          en: 'Join the Chirpity Users Community',
+          fr: 'Rejoindre la communauté des utilisateurs de Chirpity',
+          de: 'Treten Sie der Chirpity-Benutzergemeinschaft bei',
+          es: 'Únete a la comunidad de usuarios de Chirpity',
+          pt: 'Junte-se à comunidade de usuários do Chirpity',
+          ru: 'Присоединиться к сообществу пользователей Chirpity',
+          nl: 'Word lid van de Chirpity-gebruikersgemeenschap',
+          zh: '加入Chirpity用户社区',
+          sv: 'Gå med i Chirpity-användargemenskapen', // Swedish
+          da: 'Bliv medlem af Chirpity-brugerfællesskabet' // Danish
+        }
+      }
+      
+      
     
     document.addEventListener('click', function (e) {
         const element = e.target;
@@ -4459,15 +4641,15 @@ function playRegion(){
                 if (STATE.currentFile) updateList();
                 break;
             }
-                        
+                    
             // Help Menu
-            case 'keyboardHelp': { (async () => await populateHelpModal('Help/keyboard.html', 'Keyboard shortcuts'))(); break }
-            case 'settingsHelp': { (async () => await populateHelpModal('Help/settings.html', 'Settings Help'))(); break }
-            case 'usage': { (async () => await populateHelpModal('Help/usage.html', 'Usage Guide'))(); break }
-            case 'bugs': { (async () => await populateHelpModal('Help/bugs.html', 'Join the Chirpity Users community'))(); break }
+            case 'keyboardHelp': { (async () => await populateHelpModal('Help/keyboard.html', localeHelp.keyboard[config[config.model].locale]))(); break }
+            case 'settingsHelp': { (async () => await populateHelpModal('Help/settings.html', localeHelp.settings[config[config.model].locale]))(); break }
+            case 'usage': { (async () => await populateHelpModal('Help/usage.html', localeHelp.usage[config[config.model].locale]))(); break }
+            case 'bugs': { (async () => await populateHelpModal('Help/community.html', localeHelp.community[config[config.model].locale]))(); break }
             case 'species': { worker.postMessage({action: 'get-valid-species', file: STATE.currentFile}); break }
             case 'startTour': { prepTour(); break }
-            case 'eBird': { (async () => await populateHelpModal('Help/ebird.html', 'eBird Record FAQ'))(); break }
+            case 'eBird': { (async () => await populateHelpModal('Help/ebird.html', localeHelp.eBird[config[config.model].locale]))(); break }
             case 'copy-uuid': { 
                 // Get the value from the input element
                 const copyText = document.getElementById('uuid').textContent.split('\n')[0];
@@ -4709,6 +4891,7 @@ function playRegion(){
                     } else {
                         const chirpity = element.value === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
                         labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${element.value}.txt`; 
+                        localiseUI(element.value)
                     }
                     config[config.model].locale = element.value;
                     readLabels(labelFile, 'locale');

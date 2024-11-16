@@ -1,0 +1,96 @@
+{
+  "file-handling": [
+    "Gestión de archivos"
+    ],
+    "show-file-open": [
+      "Mostrar el cuadro de diálogo de apertura de archivo"
+    ],
+    "save-detections": [
+      "Guardar las detecciones en el archivo de registros."
+    ],
+    "analysis": [
+      "Análisis"
+    ],
+    "analyse-file": [
+      "Analizar el archivo actual."
+    ],
+    "analyeALL": [
+      "Analizar todos los archivos abiertos."
+    ],
+    "stop-analysis": [
+      "Detener el análisis"
+    ],
+    "toggle-archive": [
+      "Alternar entre explorar el archivo y los resultados de análisis más recientes. Esto le permite comparar las detecciones actuales con las que ha grabado previamente."
+    ],
+    "navigate-audio": [
+      "Navegar en el audio"
+    ],
+    "play-pause": [
+      "Alternar reproducción/pausa del audio"
+    ],
+    "play-region": [
+      "Reproducir la región seleccionada. Solo está activo si se ha seleccionado una región."
+    ],
+    "center-spec": [
+      "Centrar el espectrograma en la posición actual del cabezal de reproducción. Además, si hace doble clic en un punto del audio, el espectrograma se centrará en ese punto."
+    ],
+    "go-to": [
+      "Ir a la posición en el archivo"
+    ],
+    "file-begin": [
+      "Mover el cabezal de reproducción al principio del archivo"
+    ],
+    "file-end": [
+      "Mover el cabezal de reproducción al final del archivo"
+    ],
+    "pageup": [
+      "Moverse hacia atrás a la periodo anterior en el espectrograma. También puede usar la rueda del ratón o el deslizamiento con dos dedos en el trackpad."
+    ],
+    "pagedown": [
+      "Moverse hacia adelante al siguiente periodo en el espectrograma"
+    ],
+    "skip-forward": [
+      "Mover el cabezal de reproducción hacia adelante."
+    ],
+    "skip-back": [
+      "Mover el cabezal de reproducción hacia atrás."
+    ],
+    "next-detection": [
+      "Saltar a la siguiente detección"
+    ],
+    "previous-detection": [
+      "Saltar a la detección anterior"
+    ],
+    "spec-adjust": [
+      "Ajustes del espectrograma"
+    ],
+    "zoom-in": [
+      "Acercar el espectrograma. Al hacer zoom, Chirpity ajusta automáticamente el tamaño de la ventana de la transformada de Fourier de corto plazo (STFT) para optimizar la resolución espectral"
+    ],
+    "zoom-out": [
+      "Alejar el espectrograma. Al hacer zoom, Chirpity ajusta automáticamente el tamaño de la ventana STFT para optimizar la resolución espectral"
+    ],
+    "reduce-fft": [
+      "Reducir manualmente el tamaño de la ventana del espectrograma. Ajustar el tamaño de la ventana tiene el efecto de agudizar o difuminar las llamadas en el espectrograma."
+    ],
+    "increase-fft": [
+      "Aumentar manualmente el tamaño de la ventana del espectrograma"
+    ],
+    "timeline-toggle": [
+      "Alternar entre código de tiempo y hora del día"
+    ],
+    "records": [
+      "Registros"
+    ],
+    "delete": [
+      "Eliminar el registro actual"
+    ],
+    "undo": [
+      "Restaurar el/los registro(s) eliminado(s)"
+    ],
+    "validate": [
+      "Validar el registro activo actual (confirmar la detección)"
+    ]
+  }
+  

@@ -1,5 +1,5 @@
-const ID_SITE = 2;
-
+const ID_SITE = 3;
+let VISITOR;
 function trackEvent(uuid, event, action, name, value){
     // Squash result numbers
     name = typeof name == 'string' ? name.replace(/result\d+/, 'result') : name;
@@ -17,6 +17,7 @@ function trackEvent(uuid, event, action, name, value){
 }
 
 function trackVisit(config){
+    VISITOR = config.UUID;
     const {width, height} = window.screen;
     fetch(`https://analytics.mattkirkland.co.uk/matomo.php?idsite=${ID_SITE}&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
             &res=${width}x${height}
@@ -36,6 +37,25 @@ function trackVisit(config){
             if (! response.ok) throw new Error('Network response was not ok', response);
         })
         .catch(error => console.log('Error posting tracking:', error))
+    setInterval(sendHeartbeat, 20 * 60 * 1000); // Send ping every 20 mins
 }
 
+// Function to send the heartbeat request
+function sendHeartbeat() {
+    const url = 'https://analytics.mattkirkland.co.uk/matomo.php';
+    const params = new URLSearchParams({
+        idsite: ID_SITE,         //  Matomo site ID
+        rec: '1',            // Required to record the request
+        ping: '1',           // Indicates this is a heartbeat request
+        visitorId: VISITOR // Replace with the actual visitor ID
+    });
+
+    fetch(`${url}?${params.toString()}`, {
+        method: 'GET'
+    }).then(() => {
+        console.log('Heartbeat sent');
+    }).catch(error => {
+        console.error('Error sending heartbeat:', error);
+    });
+}
 export {trackEvent, trackVisit}

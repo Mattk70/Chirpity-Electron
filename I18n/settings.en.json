@@ -1,0 +1,578 @@
+[
+    {
+      "id": null,
+      "textContent": "Detections"
+    },
+    {
+      "id": null,
+      "textContent": "Model"
+    },
+    {
+      "id": null,
+      "textContent": "Choose the model to use for detection."
+    },
+    {
+      "id": null,
+      "textContent": "Nocmig"
+    },
+    {
+      "id": null,
+      "textContent": "will use a model tuned for the nocturnal flight calls of European birds for analysis."
+    },
+    {
+      "id": null,
+      "textContent": "BirdNET"
+    },
+    {
+      "id": null,
+      "textContent": "will use the"
+    },
+    {
+      "id": null,
+      "textContent": "BirdNET"
+    },
+    {
+      "id": null,
+      "textContent": "model developed by Stefan Kahl et al. from the K. Lisa Yang Center for Conservation Bioacoustics"
+    },
+    {
+      "id": null,
+      "textContent": "Confidence Threshold"
+    },
+    {
+      "id": null,
+      "textContent": "This setting determines the minimum confidence level required for the model to report a detection. Increasing the value reduces false positives but increases the risk of missing genuine calls."
+    },
+    {
+      "id": null,
+      "textContent": "N.B."
+    },
+    {
+      "id": null,
+      "textContent": "Confidence can be adjusted at any time. The results are updated even after analysis."
+    },
+    {
+      "id": null,
+      "textContent": "List"
+    },
+    {
+      "id": null,
+      "textContent": "Local Birds"
+    },
+    {
+      "id": null,
+      "textContent": ". Exclude birds unlikely to be found in your location."
+    },
+    {
+      "id": null,
+      "textContent": "With this option selected, an additional panel appears. The"
+    },
+    {
+      "id": null,
+      "textContent": "Threshold"
+    },
+    {
+      "id": null,
+      "textContent": "value represents the eBird checklist frequency. So, a value of 0.03 means birds that are predicted to occur in less than 3% of eBird checklists in the area are excluded. If you also check \"Use Week\", it excludes birds not expected at the time of year the recording was made - which is read from the file's timestamp."
+    },
+    {
+      "id": null,
+      "textContent": "N.B."
+    },
+    {
+      "id": null,
+      "textContent": "Currently, a limitation to the week specific filters is that the summary of detections will use the list from the latest file in a batch of files. For example, if you analyse files from April 22, October 23 and February 24 in a batch, the list for February 24 will be used for the summary."
+    },
+    {
+      "id": null,
+      "textContent": "Nocturnal Birds"
+    },
+    {
+      "id": null,
+      "textContent": ". This will exclude detections of bird song and the calls of species which do not typically vocalise during the night. When you enable \""
+    },
+    {
+      "id": null,
+      "textContent": "Use Location settings"
+    },
+    {
+      "id": null,
+      "textContent": "\" for the BirdNET model, the list will comprise the birds on the"
+    },
+    {
+      "id": null,
+      "textContent": "Local Birds"
+    },
+    {
+      "id": null,
+      "textContent": "list, excluding those which do not call at night."
+    },
+    {
+      "id": null,
+      "textContent": "Birds"
+    },
+    {
+      "id": null,
+      "textContent": ". Include detections for all birds, excluding non-avian classes."
+    },
+    {
+      "id": null,
+      "textContent": "Everything"
+    },
+    {
+      "id": null,
+      "textContent": ". In addition to all bird species, show non-bird detections including segments that were considered noise."
+    },
+    {
+      "id": null,
+      "textContent": "Custom"
+    },
+    {
+      "id": null,
+      "textContent": ". Provide a list for the model to use. Custom lists allow you to:"
+    },
+    {
+      "id": null,
+      "textContent": "Precisely define the detections you would like Chirpity to report on"
+    },
+    {
+      "id": null,
+      "textContent": "Search only for a specific species"
+    },
+    {
+      "id": null,
+      "textContent": "You may use a different custom list for both BirdNET and Nocmig models. The format for a custom list file is \"scientific name_common name\", with each species on a new line."
+    },
+    {
+      "id": null,
+      "textContent": "Importantly, the custom list needs to use labels in your selected language."
+    },
+    {
+      "id": null,
+      "textContent": "You can export a starting list in the correct format from the Help menu, using the \""
+    },
+    {
+      "id": null,
+      "textContent": "What species are detected?"
+    },
+    {
+      "id": null,
+      "textContent": "\" link."
+    },
+    {
+      "id": null,
+      "textContent": "Only analyse night time periods"
+    },
+    {
+      "id": null,
+      "textContent": "Only search for detections at night. Chirpity calculates the end and start of civil twilight from the timestamps of your audio files using the location you have set. If your recording spans both daylight and night time periods, the day periods will be skipped. If you are only interested in nocturnal calls this has two benefits:"
+    },
+    {
+      "id": null,
+      "textContent": "There will be fewer false positives, since both models make more mistakes when many species vocalise at once (e.g. during the dawn chorus)"
+    },
+    {
+      "id": null,
+      "textContent": "The analysis will complete faster, since it ignores any daytime period"
+    },
+    {
+      "id": null,
+      "textContent": "Show Species IUCN Red List status in the summary"
+    },
+    {
+      "id": null,
+      "textContent": "Display the global Red List status of the species in the summary table, as assessed by the"
+    },
+    {
+      "id": null,
+      "textContent": "IUCN"
+    },
+    {
+      "id": null,
+      "textContent": "There are 7 categories:"
+    },
+    {
+      "id": null,
+      "textContent": "Least Concern (LC)"
+    },
+    {
+      "id": null,
+      "textContent": "Near Threatened (NT)"
+    },
+    {
+      "id": null,
+      "textContent": "Vulnerable (VU)"
+    },
+    {
+      "id": null,
+      "textContent": "Endangered (EN)"
+    },
+    {
+      "id": null,
+      "textContent": "Critically ENdangered (CR)"
+    },
+    {
+      "id": null,
+      "textContent": "Extinct in the Wild"
+    },
+    {
+      "id": null,
+      "textContent": "Extinct"
+    },
+    {
+      "id": null,
+      "textContent": "If you click the icon, it will open the assessment page with the species' range and details of the assessment in your web browser. The data is sourced from:"
+    },
+    {
+      "id": null,
+      "textContent": "IUCN 2024. IUCN Red List of Threatened Species. Version 2024-2"
+    },
+    {
+      "id": null,
+      "textContent": "Clear reference call cache"
+    },
+    {
+      "id": null,
+      "textContent": "The species' comparison metadata that determine what you see when you select \"Compare with Reference Calls\" on a context menu are saved to disk. If you clear the cache, the saved data are deleted, and species data will be re-requested from the Xeno-Canto website when you next ask for a comparison. This may be useful if a reference file is removed from the site, or if you would like to update the selection of calls."
+    },
+    {
+      "id": null,
+      "textContent": "Default Location"
+    },
+    {
+      "id": null,
+      "textContent": "File name context menu."
+    },
+    {
+      "id": null,
+      "textContent": "Set the default location to use for calculating the start and end of civil twilight and also generating your"
+    },
+    {
+      "id": null,
+      "textContent": "Local Birds"
+    },
+    {
+      "id": null,
+      "textContent": "list. This setting can be overridden for individual files by assigning a custom location in the filename context menu."
+    },
+    {
+      "id": null,
+      "textContent": "System"
+    },
+    {
+      "id": null,
+      "textContent": "Language"
+    },
+    {
+      "id": null,
+      "textContent": "Choose the language for the \"common name\" labels, where translations exist. The translated labels have been obtained from"
+    },
+    {
+      "id": null,
+      "textContent": "eBird"
+    },
+    {
+      "id": null,
+      "textContent": "."
+    },
+    {
+      "id": null,
+      "textContent": "Backend"
+    },
+    {
+      "id": null,
+      "textContent": "This option is only visible when using the Nocmig model. Choose how predictions are calculated on you computer."
+    },
+    {
+      "id": null,
+      "textContent": "CPU"
+    },
+    {
+      "id": null,
+      "textContent": "will use the CPU for predictions, this is generally faster if you have an integrated graphics card."
+    },
+    {
+      "id": null,
+      "textContent": "WebGL"
+    },
+    {
+      "id": null,
+      "textContent": "will use the graphics card. If you have a dedicated graphics card, this will typically be significantly faster."
+    },
+    {
+      "id": null,
+      "textContent": "WebGPU"
+    },
+    {
+      "id": null,
+      "textContent": "This employs a new technology and will also use graphics processors. It is similar to WebGL, but is known to speed up the processing times on Macs, unlike WebGL. WebGPU uses more memory than WebGL, and if the threads or batch size values are set too high, Chirpity may run out of memory. If this happens the spectrogram may disappear from the screen or the app may become unresponsive. Use a lower value for threads and / or batch size."
+    },
+    {
+      "id": null,
+      "textContent": "Threads"
+    },
+    {
+      "id": null,
+      "textContent": "This setting allows you to select the number of threads to use for predictions. When using the CPU backend, the number of threads is automatically set to match the number of CPU cores available on the computer. By default, the GPU backend uses two threads. Adjusting this setting, along with the batch size, can increase the speed of processing."
+    },
+    {
+      "id": null,
+      "textContent": "Batch Size"
+    },
+    {
+      "id": null,
+      "textContent": "This setting determines the number of three-second audio chunks to process for each model request. Larger values may lead to faster processing, especially on long files, although too large a value will reduce the processing speed and may even cause memory issues. The optimal value may also differ depending on the file format being analysed."
+    },
+    {
+      "id": null,
+      "textContent": "Enable analysis completion notifications"
+    },
+    {
+      "id": null,
+      "textContent": "This is useful if you would like to run Chirpity analysis in the background, or with the window minimised. A system alert will notify you when the analysis completes."
+    },
+    {
+      "id": null,
+      "textContent": "Audio Preferences"
+    },
+    {
+      "id": null,
+      "textContent": "Volume Adjustment"
+    },
+    {
+      "id": null,
+      "textContent": "If your recordings are very quiet, you can increase the loudness of the audio by increasing the gain. The volume of audio can be increased by up to 50 decibels."
+    },
+    {
+      "id": null,
+      "textContent": "Normalise audio"
+    },
+    {
+      "id": null,
+      "textContent": "If enabled, the levels in the audio file will be normalised. In simple terms, this will maximise the volume range between the quietest and loudest sounds. The effect will ensure all audio plays at a similar volume, and vocalisations in quiet audio files will be easier to hear."
+    },
+    {
+      "id": null,
+      "textContent": "High Pass filter"
+    },
+    {
+      "id": null,
+      "textContent": "This filter removes the sound below the frequency selected. Intended primarily for recordings made in in urban settings, this suppresses low-frequency hum."
+    },
+    {
+      "id": null,
+      "textContent": "Low Shelf filter"
+    },
+    {
+      "id": null,
+      "textContent": "This filter is similar to the High Pass filter. However, rather than simply remove noise, it reduces the volume of low frequency noise. The advantage of a low shelf filter is that you can reduce the hum, whilst still being able to hear species which have low frequency calls. You can set the threshold frequency, and the strength of the filter to apply (Attenuation)."
+    },
+    {
+      "id": null,
+      "textContent": "Audio Export"
+    },
+    {
+      "id": null,
+      "textContent": "Format and Bitrate"
+    },
+    {
+      "id": null,
+      "textContent": "Choose from lossless or lossy formats for the audio clips you export from Chirpity."
+    },
+    {
+      "id": null,
+      "textContent": "Convert to mono"
+    },
+    {
+      "id": null,
+      "textContent": "Combine stereo tracks to a single channel. This will result in smaller file sizes."
+    },
+    {
+      "id": null,
+      "textContent": "Decorators"
+    },
+    {
+      "id": null,
+      "textContent": "These two options can be used to:"
+    },
+    {
+      "id": null,
+      "textContent": "Pad:"
+    },
+    {
+      "id": null,
+      "textContent": "Add two seconds to the beginning and end of the audio selected for export"
+    },
+    {
+      "id": null,
+      "textContent": "Fade:"
+    },
+    {
+      "id": null,
+      "textContent": "Apply a fade effect to the beginning and end of your exported files."
+    },
+    {
+      "id": null,
+      "textContent": "Audio Library"
+    },
+    {
+      "id": null,
+      "textContent": "Add to Library on Save"
+    },
+    {
+      "id": null,
+      "textContent": "When you save a set of results to the archive database, the associated audio files will be converted to the library format and saved in the archive location."
+    },
+    {
+      "id": null,
+      "textContent": "Crop library audio to night time periods"
+    },
+    {
+      "id": null,
+      "textContent": "This will crop the start or end sections of a file to remove the audio that was recorded during daylight. Specifically, before the end of Civil Twilight in the evening and after the end of Civil Twilight in the morning. Those periods are set according to the file's location settings."
+    },
+    {
+      "id": null,
+      "textContent": "Library Location"
+    },
+    {
+      "id": null,
+      "textContent": "Select a folder in which to store the audio library. The files will be organised according to the following structure:"
+    },
+    {
+      "id": null,
+      "textContent": "<Your chosen location> / Recording site / Year / Month / filename"
+    },
+    {
+      "id": null,
+      "textContent": "For example:"
+    },
+    {
+      "id": null,
+      "textContent": "D:\\Vögel\\56075, Karthäuserhofgelände\\2024\\Juli\\20240704_0130.flac"
+    },
+    {
+      "id": null,
+      "textContent": "Library Format"
+    },
+    {
+      "id": null,
+      "textContent": "The library can store your audio in a lossy or lossless format."
+    },
+    {
+      "id": null,
+      "textContent": "Lossy:"
+    },
+    {
+      "id": null,
+      "textContent": "Audio is converted to Ogg Vorbis. This is the recommended option. The audio will be virtually indistinguishable from the original in the application - both to the model and to the human ear. The file size will be dramatically reduced - to the extent that a full 24 hours of recordings will require about 1 Gigabyte of storage."
+    },
+    {
+      "id": null,
+      "textContent": "Lossless:"
+    },
+    {
+      "id": null,
+      "textContent": "If the lossless option is selected, the audio fidelity (bitrate, channels and sample rate) will be identical to the original file - even WAV files. By using the FLAC format, the archived files will have roughly half the size of their WAV equivalents."
+    },
+    {
+      "id": null,
+      "textContent": "Spectrogram Preferences"
+    },
+    {
+      "id": null,
+      "textContent": "Colourmap"
+    },
+    {
+      "id": null,
+      "textContent": "Choose a colour theme for the spectrogram display, or create your own. If you select 'custom', you will have the option to set the colours for peak, mid and quiet sounds according to personal preference. You can also adjust the mid-point position: with a value of 0 or 1, the Spectrogram will be two-tone. Values in between will blend the three colours. If you set the Mid colour the same as one of the others, you will be able to adjust the contrast in the spectrogram using Mid Position adjustments."
+    },
+    {
+      "id": null,
+      "textContent": "In combination with audio filter adjustments, a custom colourmap allows you to enhance the contrast / visibility of calls using the colours of your choice."
+    },
+    {
+      "id": null,
+      "textContent": "Window Function"
+    },
+    {
+      "id": null,
+      "textContent": "A variety of windowing functions are available for the spectrogram display. Each has slightly different characteristics, so changing the window function may also enhance the appearance of the calls in the display."
+    },
+    {
+      "id": null,
+      "textContent": "Timeline"
+    },
+    {
+      "id": null,
+      "textContent": "The spectrogram timeline has two modes:"
+    },
+    {
+      "id": null,
+      "textContent": "Timecode"
+    },
+    {
+      "id": null,
+      "textContent": "displays the time elapsed from the beginning of the file."
+    },
+    {
+      "id": null,
+      "textContent": "Time of Day"
+    },
+    {
+      "id": null,
+      "textContent": "relies on file timestamps to determine the actual time of detected calls. If a file's timestamp does not reflect the recording time, the reading will be inaccurate. To edit the start time of the current file, set the desired date and time using the filename context menu."
+    },
+    {
+      "id": null,
+      "textContent": "Advanced"
+    },
+    {
+      "id": null,
+      "textContent": "Send Filtered Audio for Analysis"
+    },
+    {
+      "id": null,
+      "textContent": "By default, the filter settings in the Audio Preferences are just used to modify the audio in the application interface. If you enable this setting, the modified audio will be used for analysis. This is usually a bad idea, as it impairs the accuracy of the models in most situations. However, if your recordings have a considerable amount of low frequency noise, it"
+    },
+    {
+      "id": null,
+      "textContent": "may"
+    },
+    {
+      "id": null,
+      "textContent": "be that modifying the audio using these filters will improve the models' ability to make accurate detections."
+    },
+    {
+      "id": null,
+      "textContent": "Context Mode"
+    },
+    {
+      "id": null,
+      "textContent": "This mode is only available for the Nocmig model. When enabled, the model will use the surrounding context when making predictions. This helps mitigate against false positive detections."
+    },
+    {
+      "id": null,
+      "textContent": "SNR filter"
+    },
+    {
+      "id": null,
+      "textContent": "This setting is also only available for the Nocmig model. The SNR (Signal to Noise Ratio) filter can only be enabled when using the CPU backend. When enabled, Chirpity will disregard audio segments with no distinct sound event. A stronger signal is required for a prediction to be attempted when higher signal-to-noise values are set. The purpose is to deliver significant speed gains, however, the setting may cause Chirpity to miss quieter, more distant calls."
+    },
+    {
+      "id": null,
+      "textContent": "Debug mode"
+    },
+    {
+      "id": null,
+      "textContent": "If you have encountered an issue while using Chirpity, you can enable debug mode. When you change this setting, you will need to quit and relaunch the application for the change to take effect. When launched in debug mode, two windows will open, and each will print debugging information to a console on the right of the window. This is"
+    },
+    {
+      "id": null,
+      "textContent": "extremely"
+    },
+    {
+      "id": null,
+      "textContent": "useful if you want to report a bug - as you can share a screenshot of any errors that appear (these will show up in red in the console)."
+    }
+  ]

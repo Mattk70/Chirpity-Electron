@@ -1,0 +1,95 @@
+{
+  "file-handling": [
+    "Filhantering"
+  ],
+  "show-file-open": [
+    "Visa filöppningsdialog"
+  ],
+  "save-detections": [
+    "Spara detektioner till rekordarkivet."
+  ],
+  "analysis": [
+    "Analys"
+  ],
+  "analyse-file": [
+    "Analysera den aktuella filen."
+  ],
+  "analyeALL": [
+    "Analysera alla öppna filer."
+  ],
+  "stop-analysis": [
+    "Stoppa analysen"
+  ],
+  "toggle-archive": [
+    "Byt mellan att utforska arkivet och de senaste analysresultaten. Detta låter dig jämföra aktuella detektioner med de som du tidigare har registrerat."
+  ],
+  "navigate-audio": [
+    "Navigera i ljud"
+  ],
+  "play-pause": [
+    "Växla mellan Spela/Pausa ljudet"
+  ],
+  "play-region": [
+    "Spela den valda regionen. Endast aktiv om en region har valts."
+  ],
+  "center-spec": [
+    "Centrera spektrogrammet vid den aktuella uppspelningspositionen. Om du dubbelklickar på musen vid en punkt i ljudet, centrerar det spektrogrammet på den punkten."
+  ],
+  "go-to": [
+    "Gå till position i filen"
+  ],
+  "file-begin": [
+    "Flytta uppspelningshuvudet till början av filen"
+  ],
+  "file-end": [
+    "Flytta uppspelningshuvudet till slutet av filen"
+  ],
+  "pageup": [
+    "Flytta tillbaka till föregående period i spektrogrammet. Du kan också använda musens hjul eller en tvåfingers svepning på pekplattan."
+  ],
+  "pagedown": [
+    "Flytta framåt till nästa period i spektrogrammet"
+  ],
+  "skip-forward": [
+    "Flytta uppspelningshuvudet framåt."
+  ],
+  "skip-back": [
+    "Flytta uppspelningshuvudet bakåt."
+  ],
+  "next-detection": [
+    "Hoppa till nästa detektion"
+  ],
+  "previous-detection": [
+    "Hoppa tillbaka till föregående detektion"
+  ],
+  "spec-adjust": [
+    "Spektrogramjusteringar"
+  ],
+  "zoom-in": [
+    "Zooma in på spektrogrammet. Vid zoomning justerar Chirpity automatiskt korttids Fouriertransformfönstrets storlek för att optimera den spektrala upplösningen"
+  ],
+  "zoom-out": [
+    "Zooma ut på spektrogrammet. Vid zoomning justerar Chirpity automatiskt STFT-fönstrets storlek för att optimera den spektrala upplösningen"
+  ],
+  "reduce-fft": [
+    "Minska manuellt spektrogramfönstrets storlek. Justering av fönsterstorleken gör att ljuden i spektrogrammet blir skarpare eller suddigare."
+  ],
+  "increase-fft": [
+    "Öka manuellt spektrogramfönstrets storlek"
+  ],
+  "timeline-toggle": [
+    "Byt mellan tidskod och tid på dygnet"
+  ],
+  "records": [
+    "Poster"
+  ],
+  "delete": [
+    "Radera aktuell post"
+  ],
+  "undo": [
+    "Återställ raderad post(er)"
+  ],
+  "validate": [
+    "Validera den aktuella aktiva posten (bekräfta detektionen)"
+  ]
+}

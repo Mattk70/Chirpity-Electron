@@ -1,0 +1,205 @@
+{
+    "Add to Library on Save-circle-help": [
+      "When enabled, audio files are added to the library location whenever detections are saved to the archive."
+    ],
+    "Adjust font size-circle-help": [
+      "Change the global font size settings for the application."
+    ],
+    "Audio Library-circle-help": [
+      "Chirpity can organise your audio into a permanent library at a location of your choice, such as a data disk or network drive. Once saved, you can remove the original files, and all records will be viewable in the application. To save audio to the library, you can either go to the Records menu and choose 'Save Audio from Archive Results to Library', or enable the 'Add to Library on Save' option below. Files will be stored in the following structure: <p><code>Recording Site / Year / Month / Filename</code></p> 'Lossy' audio requires about 1GB of storage per 24 hours, while 'Lossless' converts files to FLAC format, preserving original fidelity, bitrate, and channels, but roughly halving the file size."
+    ],
+    "Audio notification-circle-help": [
+      "When enabled, there will be a system notification when analyses that take over thirty seconds are finished."
+    ],
+    "Backend-circle-help": [
+      "The webGL/webGPU backends can improve performance and reduce power consumption on some systems."
+    ],
+    "Batch Size-circle-help": [
+      "Optimising the batch size can increase processing speed on longer files."
+    ],
+    "Clear Call Cache-circle-help": [
+      "The data used for the reference call comparisons are cached. Clearing the cache will refresh the calls for each species the next time a comparison is requested"
+    ],
+    "Confidence Threshold-circle-help": [
+      "Determines the minimum confidence required for results to be returned"
+    ],
+    "Context Mode-circle-help": [
+      "When enabled, context mode adapts predictions by analysing the surrounding context. It can only be changed prior to an analysis, and a low initial confidence threshold is recommended e.g 20-30%. Context mode is not available in the BirdNET model"
+    ],
+    "Crop Library-circle-help": [
+      "When enabled, audio files containing daylight periods are cropped, so the audio is only saved for nocturnal periods."
+    ],
+    "Debug Mode-circle-help": [
+      "Enter debug mode (changes to this setting require a Chirpity relaunch to take effect)"
+    ],
+    "Decorators-circle-help": [
+      "'Pad' adds 2 seconds before and after a selection to the exported audio. 'Fade' adds a 1 second fade effect to the start and end of the audio"
+    ],
+    "Default Location-circle-help": [
+      "Chirpity uses location information to determine the dawn and dusk times for recordings"
+    ],
+    "Default Settings-circle-help": [
+      "Reset the configuration settings to their default values. N.B. Relaunch Chirpity to see changes, also, language settings will need to be re-set manually"
+    ],
+    "Down mix-circle-help": [
+      "When enabled, exported audio will be downmixed to mono"
+    ],
+    "High Pass Filter-circle-help": [
+      "When set, removes low frequency noise below the threshold."
+    ],
+    "IUCN-circle-help": [
+      "When enabled, the latest Global IUCN assessment status is displayed for each species in the summary. The icon links to the assessment page on the IUCN website. The Assessment Scope will display the IUCN assessment of the species in that region (where available)."
+    ],
+    "Language-circle-help": [
+      "Select your preferred language for birds' common names"
+    ],
+    "List-circle-help": [
+      "Filters the detections returned in results. Local Birds: excludes birds unlikely to be found in your region. Nocturnal Birds: excludes bird song and species not known to call at night. The custom list allows you to upload a file listing the species to detect"
+    ],
+    "Low Shelf Filter-circle-help": [
+      "When used, attenuates low frequency noise below the cut-off frequency."
+    ],
+    "Model-circle-help": [
+      "Select whether to use the Nocmig model, optimised for Nocturnal Migration Calls in Europe, or BirdNET, which can detect over 6000 species across the globe."
+    ],
+    "Nocmig Mode-circle-help": [
+      "When enabled, this 'Nocmig mode' only searches for and only displays detections found during the night"
+    ],
+    "Normalise-circle-help": [
+      "When enabled, the audio you hear will be normalised, expanding the dynamic range."
+    ],
+    "Prevent system sleep-circle-help": [
+      "When enabled, prevent the system from suspending whilst Chirpity is in use."
+    ],
+    "Send Filtered Audio-circle-help": [
+      "Sending High Pass or Low Shelf filtered audio to a model will usually have a negative impact on its accuracy. Use this option with caution!"
+    ],
+    "Show frequency labels-circle-help": [
+      "When enabled, the spectrogram will display the frequency on the left side."
+    ],
+    "Signal to Noise Ratio-circle-help": [
+      "The SNR filter, when enabled, will skip over portions of audio where any audio event is below the threshold. Higher values skip increasingly noisy segments. whilst this will result in faster processing it must be considered <b><i>experimental</i></b> and any non-zero value may miss detections. <b>Tip:</b> To find a workable SNR value, run analysis on a short file with the faintest detections you can confidently identify. Increase the SNR value until the detection is not picked up. Once you find this threshold, back it off to the highest level that picks up the detection."
+    ],
+    "Species Threshold-circle-help": [
+      "Define the minimum eBird checklist frequency for species inclusion. If 'Adjust list for the week of the year' is enabled, the list will be adjusted to include species expected for the recording week."
+    ],
+    "Threads-circle-help": [
+      "The number of parallel analyses to run. By default, this is set to the number of CPU cores on the machine for fastest performance. With the GPU backend, a lower number works better e.g. 1-3"
+    ],
+    "Use Location settings-circle-help": [
+      "When activated, the Nocturnal birds filter reports birds based on your location settings."
+    ],
+    "Volume Adjustment-circle-help": [
+      "Adjust the volume of audio to compensate for low recording levels."
+    ],
+
+    "navBarFile": [
+      "File"
+    ],
+    "navbarHelp": [
+      "Help"
+    ],
+    "navbarRecords": [
+      "Records"
+    ],
+    "navbarAnalysis": [
+      "Analysis"
+    ],
+    "navbarSettings": [
+      "Settings"
+    ],
+
+
+    "open-file": [
+      "Open Audio File(s)",
+      "Ctrl+O"
+    ],
+    "open-folder": [
+      "Open Folder(s)"
+    ],
+    "saveCSV": [
+      "Export Results to CSV"
+    ],
+    "save-eBird": [
+      "Export eBird Record file"
+    ],
+    "save-Raven": [
+      "Export Raven Selection Table"
+    ],
+    "export-audio": [
+      "Export Selected Audio",
+      "Ctrl+E"
+    ],
+    "saveLabels": [
+      "Save Audacity Labels"
+    ],
+    "exit": [
+      "Exit"
+    ],
+    "save2db": [
+      "Save to Archive",
+      "Ctrl+S"
+    ],
+    "charts": [
+      "View charts"
+    ],
+    "explore": [
+      "Explore Archive"
+    ],
+    "active-analysis": [
+      "Return to Active Analysis"
+    ],
+    "compress-and-organise": [
+      "Save Audio from Archive Results to Library"
+    ],
+    "purge-file": [
+      "Remove Current File From Archive"
+    ],
+    "analyse": [
+      "Analyse Current File",
+      "Ctrl+A"
+    ],
+    "analyseSelection": [
+      "Analyse Selected Interval"
+    ],
+    "analyseAll": [
+      "Analyse All Open Files",
+      "Ctrl+Shift+A"
+    ],
+    "reanalyse": [
+      "Re-analyse Current File"
+    ],
+    "reanalyseAll": [
+      "Re-analyse All Open Files"
+    ],
+    "usage": [
+      "Using Chirpity"
+    ],
+    "settingsHelp": [
+      "Settings"
+    ],
+    "keyboardHelp": [
+      "Keyboard Shortcuts"
+    ],
+    "diagnostics": [
+      "Diagnostics"
+    ],
+    "startTour": [
+      "Show Tour"
+    ],
+    "bugs": [
+      "Join the community"
+    ],
+    "FAQ": [
+      "FAQs"
+    ],
+    "species": [
+      "What species are detected?"
+    ],
+    "eBird": [
+      "What is an eBird Record?"
+    ],
+    "update-progress": [
+      "Downloading update:"
+    ]
+  }

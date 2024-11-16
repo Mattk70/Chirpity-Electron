@@ -1,0 +1,95 @@
+{
+  "file-handling": [
+    "Filhåndtering"
+  ],
+  "show-file-open": [
+    "Vis filåbningsdialog"
+  ],
+  "save-detections": [
+    "Gem detektioner til rekordarkivet."
+  ],
+  "analysis": [
+    "Analyse"
+  ],
+  "analyse-file": [
+    "Analyser den aktuelle fil."
+  ],
+  "analyeALL": [
+    "Analyser alle åbne filer."
+  ],
+  "stop-analysis": [
+    "Stop analyse"
+  ],
+  "toggle-archive": [
+    "Skift mellem at udforske arkivet og de nyeste analyseresultater. Dette giver dig mulighed for at sammenligne aktuelle detektioner med dem, du tidligere har optaget."
+  ],
+  "navigate-audio": [
+    "Navigere i lyd"
+  ],
+  "play-pause": [
+    "Skift mellem Afspil/Pause lyden"
+  ],
+  "play-region": [
+    "Afspil den valgte region. Kun aktiv, hvis en region er valgt."
+  ],
+  "center-spec": [
+    "Centrum spektrogrammet ved den aktuelle afspilningsposition. Desuden, hvis du dobbeltklikker med musen på et punkt i lyden, vil det centrere spektrogrammet på dette punkt."
+  ],
+  "go-to": [
+    "Gå til position i filen"
+  ],
+  "file-begin": [
+    "Flyt afspilningshovedet til begyndelsen af filen"
+  ],
+  "file-end": [
+    "Flyt afspilningshovedet til slutningen af filen"
+  ],
+  "pageup": [
+    "Flyt tilbage til den forrige periode i spektrogrammet. Du kan også bruge musens hjul eller et to-fingers swipe på trackpad'en."
+  ],
+  "pagedown": [
+    "Flyt frem til den næste periode i spektrogrammet"
+  ],
+  "skip-forward": [
+    "Flyt afspilningshovedet fremad."
+  ],
+  "skip-back": [
+    "Flyt afspilningshovedet baglæns."
+  ],
+  "next-detection": [
+    "Spring til næste detektion"
+  ],
+  "previous-detection": [
+    "Spring tilbage til forrige detektion"
+  ],
+  "spec-adjust": [
+    "Spektrogramjusteringer"
+  ],
+  "zoom-in": [
+    "Zoom ind på spektrogrammet. Når du zoomer, justerer Chirpity automatisk korttids Fourier-transformvinduesstørrelsen for at optimere den spektrale opløsning"
+  ],
+  "zoom-out": [
+    "Zoom ud på spektrogrammet. Når du zoomer, justerer Chirpity automatisk STFT-vinduesstørrelsen for at optimere den spektrale opløsning"
+  ],
+  "reduce-fft": [
+    "Reducer manuelt spektrogramvinduesstørrelsen. Justering af vinduesstørrelsen vil skærpe/sudse kald i spektrogrammet."
+  ],
+  "increase-fft": [
+    "Øg manuelt spektrogramvinduesstørrelsen"
+  ],
+  "timeline-toggle": [
+    "Skift mellem tidskode og tidspunkt på dagen"
+  ],
+  "records": [
+    "Poster"
+  ],
+  "delete": [
+    "Slet aktuel post"
+  ],
+  "undo": [
+    "Gendan slettede post(er)"
+  ],
+  "validate": [
+    "Valider den aktuelle aktive post (bekræft detektionen)"
+  ]
+}

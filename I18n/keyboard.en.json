@@ -1,0 +1,95 @@
+{
+  "file-handling": [
+    "File Handling"
+    ],
+"show-file-open": [
+  "Show file open dialog"
+],
+"save-detections": [
+  "Save detections to the records archive."
+],
+"analysis": [
+  "Analysis"
+],
+"analyse-file": [
+  "Analyse the current file."
+],
+"analyeALL": [
+  "Analyse all open files."
+],
+"stop-analysis": [
+  "Stop analysis"
+],
+"toggle-archive": [
+  "Toggle between exploring the archive and the latest analysis results. This allows you to compare current detections with those you've previously recorded."
+],
+"navigate-audio": [
+  "Navigating Audio"
+],
+"play-pause": [
+  "Toggle Play/Pause the audio"
+],
+"play-region": [
+  "Play the selected region. Only active if a region has been selected."
+],
+"center-spec": [
+  "Centre the spectrogram at the current playhead position. Also, if you double-click the mouse at a point in the audio, it will centre the spectrogram at that point"
+],
+"go-to": [
+  "Go to position in file"
+],
+"file-begin": [
+  "Move the playhead to the beginning of the file"
+],
+"file-end": [
+  "Move the playhead to the end of the file"
+],
+"pageup": [
+  "Move back to the previous period in the spectrogram. You can also use the mouse wheel or two finger trackpad swipe."
+],
+"pagedown": [
+  "Move forward to the next period in the spectrogram"
+],
+"skip-forward": [
+  "Move the playhead forward."
+],
+"skip-back": [
+  "Move the playhead backward."
+],
+"next-detection": [
+  "Skip to the next detection"
+],
+"previous-detection": [
+  "Skip back to the previous detection"
+],
+"spec-adjust": [
+  "Spectrogram Adjustments"
+],
+"zoom-in": [
+  "Zoom in on the spectrogram. When zooming, Chirpity automatically adjusts the short-time Fourier transform (STFT) window size to optimize the spectral resolution"
+],
+"zoom-out": [
+  "Zoom out the spectrogram. When zooming, Chirpity automatically adjusts the STFT window size to optimize the spectral resolution"
+],
+"reduce-fft": [
+  "Manually reduce the spectrogram window size. Adjusting the window size has the effect of sharpening / blurring the calls in the spectrogram."
+],
+"increase-fft": [
+  "Manually increase the spectrogram window size"
+],
+"timeline-toggle": [
+  "Toggle between Timecode and Time of Day"
+],
+"records": [
+  "Records"
+],
+"delete": [
+  "Delete current record"
+],
+"undo": [
+  "Restore deleted record(s)"
+],
+"validate": [
+  "Validate the current active record (confirm the detection)"
+]
+}

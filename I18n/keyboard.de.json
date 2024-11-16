@@ -1,0 +1,95 @@
+{
+"file-handling": [
+    "Dateiverwaltung"
+    ],
+  "show-file-open": [
+    "Dateiauswahldialog anzeigen"
+  ],
+  "save-detections": [
+    "Erkenntnisse im Aufzeichnungsarchiv speichern."
+  ],
+  "analysis": [
+    "Analyse"
+  ],
+  "analyse-file": [
+    "Aktuelle Datei analysieren."
+  ],
+  "analyeALL": [
+    "Alle offenen Dateien analysieren."
+  ],
+  "stop-analysis": [
+    "Analyse stoppen"
+  ],
+  "toggle-archive": [
+    "Zwischen Archiv durchsuchen und den neuesten Analyseergebnissen wechseln. Dies ermöglicht es, aktuelle Erkennungen mit denen zu vergleichen, die Sie zuvor aufgezeichnet haben."
+  ],
+  "navigate-audio": [
+    "Audio navigieren"
+  ],
+  "play-pause": [
+    "Wiedergabe/Pause des Audios umschalten"
+  ],
+  "play-region": [
+    "Ausgewählte Region abspielen. Nur aktiv, wenn eine Region ausgewählt wurde."
+  ],
+  "center-spec": [
+    "Spektrogramm auf die aktuelle Wiedergabeposition zentrieren. Wenn Sie außerdem mit der Maus doppelklicken, wird das Spektrogramm auf diesen Punkt zentriert."
+  ],
+  "go-to": [
+    "Zur Position im Datei wechseln"
+  ],
+  "file-begin": [
+    "Wiedergabekopf zum Anfang der Datei verschieben"
+  ],
+  "file-end": [
+    "Wiedergabekopf zum Ende der Datei verschieben"
+  ],
+  "pageup": [
+    "Zum vorherigen Zeitraum im Spektrogramm wechseln. Sie können auch das Mausrad oder eine Zwei-Finger-Wischbewegung auf dem Trackpad verwenden."
+  ],
+  "pagedown": [
+    "Zum nächsten Zeitraum im Spektrogramm wechseln"
+  ],
+  "skip-forward": [
+    "Wiedergabekopf nach vorne bewegen."
+  ],
+  "skip-back": [
+    "Wiedergabekopf nach hinten bewegen."
+  ],
+  "next-detection": [
+    "Zur nächsten Erkennung überspringen"
+  ],
+  "previous-detection": [
+    "Zur vorherigen Erkennung zurückspringen"
+  ],
+  "spec-adjust": [
+    "Spektrogrammanpassungen"
+  ],
+  "zoom-in": [
+    "Spektrogramm vergrößern. Beim Vergrößern passt Chirpity automatisch die Fenstergröße der Kurzzeit-Fourier-Transformation (STFT) an, um die spektrale Auflösung zu optimieren"
+  ],
+  "zoom-out": [
+    "Spektrogramm verkleinern. Beim Verkleinern passt Chirpity automatisch die Fenstergröße der STFT an, um die spektrale Auflösung zu optimieren"
+  ],
+  "reduce-fft": [
+    "Manuell die Fenstergröße des Spektrogramms verringern. Die Anpassung der Fenstergröße hat den Effekt, die Anrufe im Spektrogramm zu schärfen oder zu verwischen."
+  ],
+  "increase-fft": [
+    "Manuell die Fenstergröße des Spektrogramms vergrößern"
+  ],
+  "timeline-toggle": [
+    "Zwischen Zeitcode und Tageszeit umschalten"
+  ],
+  "records": [
+    "Datensätze"
+  ],
+  "delete": [
+    "Aktuellen Datensatz löschen"
+  ],
+  "undo": [
+    "Gelöschte(n) Datensatz/Datensätze wiederherstellen"
+  ],
+  "validate": [
+    "Aktuellen aktiven Datensatz validieren (Erkennung bestätigen)"
+  ]
+}

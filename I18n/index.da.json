@@ -1,0 +1,192 @@
+{
+    "Add to Library on Save-circle-help": [
+        "Hvis aktiveret, tilføjes lydfiler til bibliotekets placering ved hver arkivregistrering."
+    ],
+    "Adjust font size-circle-help": [
+        "Ændr de globale skriftstørrelsesindstillinger for applikationen."
+    ],
+    "Audio Library-circle-help": [
+        "Chirpity kan organisere dine lydfiler i et permanent bibliotek på en placering, du vælger, f.eks. en datadisk eller netværksdrev. Når filerne er gemt, kan du slette de oprindelige filer, og alle optagelser er synlige i applikationen. For at gemme lyd i biblioteket kan du enten vælge 'Gem lyd fra arkivresultater i bibliotek' i menuen 'Optagelser' eller aktivere 'Tilføj til bibliotek ved gemning' nedenfor. Filer gemmes i følgende struktur: <p><code>Optagelsesplacering / År / Måned / Filnavn</code></p> 'Komprimerede' lydfiler kræver omkring 1 GB plads for 24 timers lyd, mens 'tabsfrie' filer konverteres til FLAC-format, der bevarer den oprindelige lydkvalitet, bitrate og kanaler, men reducerer filstørrelsen til cirka halvdelen."
+    ],
+    "Audio notification-circle-help": [
+        "Hvis aktiveret, vises en systemmeddelelse, når analyser, der tager længere end tredive sekunder, er færdige."
+    ],
+    "Backend-circle-help": [
+        "WebGL/WebGPU-backends kan forbedre ydeevnen og reducere energiforbruget på visse systemer."
+    ],
+    "Batch Size-circle-help": [
+        "Optimering af batchstørrelsen kan øge behandlingshastigheden for længere filer."
+    ],
+    "Clear Call Cache-circle-help": [
+        "Data brugt til referencekald gemmes i cache. Rydning af cachen opdaterer kald for hver art næste gang en sammenligningsanmodning foretages."
+    ],
+    "Confidence Threshold-circle-help": [
+        "Bestemmer det minimale tillidsniveau, der kræves for, at resultater returneres."
+    ],
+    "Context Mode-circle-help": [
+        "Når aktiveret, tilpasser konteksttilstand forudsigelser ved at analysere den omgivende kontekst. Det kan kun ændres før en analyse, og en lav initial tillidsgrænse anbefales, f.eks. 20-30 %. Konteksttilstand er ikke tilgængelig i BirdNET-modellen."
+    ],
+    "Crop Library-circle-help": [
+        "Hvis aktiveret, beskæres lydfiler, der indeholder dagslydsperioder, så kun lydfiler fra natperioder gemmes."
+    ],
+    "Debug Mode-circle-help": [
+        "Aktivér fejlsøgningsmodus (ændringer i denne indstilling kræver en genstart af Chirpity for at træde i kraft)."
+    ],
+    "Decorators-circle-help": [
+        "'Pad' tilføjer 2 sekunder før og efter et udvalg i det eksporterede lyd. 'Fade' tilføjer en 1-sekunders fade-effekt i starten og slutningen af lydfilen."
+    ],
+    "Default Location-circle-help": [
+        "Chirpity bruger placeringsoplysninger til at bestemme skumrings- og daggryperioder for optagelser."
+    ],
+    "Default Settings-circle-help": [
+        "Nulstil konfigurationsindstillinger til standardværdierne. Bemærk: Genstart Chirpity for at se ændringerne. Sprogindstillinger skal nulstilles manuelt."
+    ],
+    "Down mix-circle-help": [
+        "Hvis aktiveret, konverteres eksporteret lyd til mono."
+    ],
+    "High Pass Filter-circle-help": [
+        "Hvis aktiveret, fjernes lavfrekvent støj under tærsklen."
+    ],
+    "IUCN-circle-help": [
+        "Hvis aktiveret, vises den seneste globale IUCN-status for hver art i rapporten. Ikonet linker til vurderingssiden på IUCN-webstedet. Feltet 'Scope' viser vurderingen af arten i denne region (hvis tilgængelig)."
+    ],
+    "Language-circle-help": [
+        "Vælg dit foretrukne sprog til fuglenavne."
+    ],
+    "List-circle-help": [
+        "Filtrerer de registreringer, der returneres i resultaterne. 'Lokale fugle': ekskluderer fugle, der sandsynligvis ikke findes i din region. 'Natfugle': ekskluderer fuglekald og arter, der ikke er kendt for at kalde om natten. Den brugerdefinerede liste giver dig mulighed for at uploade en fil, der angiver de arter, der skal genkendes."
+    ],
+    "Low Shelf Filter-circle-help": [
+        "Hvis anvendt, dæmpes lavfrekvent støj under skæringsfrekvensen."
+    ],
+    "Model-circle-help": [
+        "Vælg, om du vil bruge Nocmig-modellen, der er optimeret til natlige trækfuglekald i Europa, eller BirdNET, der kan genkende over 6000 arter på verdensplan."
+    ],
+    "Nocmig Mode-circle-help": [
+        "Når aktiveret, viser denne 'Nocmig'-tilstand kun de registreringer, der findes om natten."
+    ],
+    "Normalise-circle-help": [
+        "Hvis aktiveret, normaliseres det lyd, du hører, hvilket udvider det dynamiske område."
+    ],
+    "Prevent system sleep-circle-help": [
+        "Hvis aktiveret, forhindrer det, at systemet går i dvale, mens Chirpity er i brug."
+    ],
+    "Send Filtered Audio-circle-help": [
+        "At sende højpas- eller lavhylde-filtreret lyd til en model påvirker normalt modellens nøjagtighed negativt. Brug denne mulighed med forsigtighed!"
+    ],
+    "Show frequency labels-circle-help": [
+        "Hvis aktiveret, viser spektrogrammet frekvensen på venstre side."
+    ],
+    "Signal to Noise Ratio-circle-help": [
+        "Når aktiveret, ignorerer SNR-filteret dele af lyd, hvor ethvert akustisk signal er under tærsklen. Højere værdier ignorerer gradvist højere segmenter. Selvom dette kan føre til hurtigere behandling, bør det betragtes som <b><i>eksperimentelt</i></b>, og enhver ikke-nulværdi kan overse registreringer. <b>Tip:</b> For at finde en anvendelig SNR-værdi skal du udføre en analyse på en kort fil med de svageste registreringer, du sikkert kan identificere. Forøg SNR-værdien, indtil registreringen ikke længere fanges. Når denne tærskel er fundet, skal du reducere den til det højeste niveau, der fanger registreringen."
+    ],
+    "Species Threshold-circle-help": [
+        "Bestem den minimale hyppighed på eBird-tjeklisten for at inkludere arter. Hvis 'Tilpas liste til årets uge' er aktiveret, tilpasses listen for at inkludere de arter, der forventes for optagelsesugen."
+    ],
+    "Threads-circle-help": [
+        "Antallet af parallelle analyser, der skal udføres. Som standard er dette indstillet til antallet af CPU-kerner på maskinen for optimal ydeevne. Med GPU-backenden fungerer et lavere antal bedre, f.eks. 1-3."
+    ],
+    "Use Location settings-circle-help": [
+        "Når aktiveret, rapporterer natfuglefilteret fugle baseret på dine placeringsindstillinger."
+    ],
+    "Volume Adjustment-circle-help": [
+        "Juster lydstyrken for at kompensere for lave optagelsesniveauer."
+    ],
+    "navBarFile": ["Fil"],
+    "navbarHelp": ["Hjælp"],
+    "navbarRecords": ["Optegnelser"],
+    "navbarAnalysis": ["Analyse"],
+    "navbarSettings": ["Indstillinger"],
+    "open-file": [
+        "Åbn lydfil(er)",
+        "Ctrl+O"
+      ],
+      "open-folder": [
+        "Åbn mappe(r)"
+      ],
+      "saveCSV": [
+        "Eksportér resultater til CSV"
+      ],
+      "save-eBird": [
+        "Eksportér eBird rekordfil"
+      ],
+      "save-Raven": [
+        "Eksportér Raven valg tabel"
+      ],
+      "export-audio": [
+        "Eksportér valgt lyd",
+        "Ctrl+E"
+      ],
+      "saveLabels": [
+        "Gem Audacity etiketter"
+      ],
+      "exit": [
+        "Afslut"
+      ],
+      "save2db": [
+        "Gem til arkiv",
+        "Ctrl+S"
+      ],
+      "charts": [
+        "Vis diagrammer"
+      ],
+      "explore": [
+        "Udforsk arkiv"
+      ],
+      "active-analysis": [
+        "Vend tilbage til aktiv analyse"
+      ],
+      "compress-and-organise": [
+        "Gem lyd fra arkivresultater til bibliotek"
+      ],
+      "purge-file": [
+        "Fjern nuværende fil fra arkiv"
+      ],
+      "analyse": [
+        "Analyser nuværende fil",
+        "Ctrl+A"
+      ],
+      "analyseSelection": [
+        "Analyser valgt interval"
+      ],
+      "analyseAll": [
+        "Analyser alle åbne filer",
+        "Ctrl+Shift+A"
+      ],
+      "reanalyse": [
+        "Gen-analyser nuværende fil"
+      ],
+      "reanalyseAll": [
+        "Gen-analyser alle åbne filer"
+      ],
+      "usage": [
+        "Bruger Chirpity"
+      ],
+      "settingsHelp": [
+        "Indstillinger"
+      ],
+      "keyboardHelp": [
+        "Tastaturgenveje"
+      ],
+      "diagnostics": [
+        "Diagnostik"
+      ],
+      "startTour": [
+        "Vis tur"
+      ],
+      "bugs": [
+        "Deltag i fællesskabet"
+      ],
+      "FAQ": [
+        "Ofte stillede spørgsmål"
+      ],
+      "species": [
+        "Hvilke arter er detekteret?"
+      ],
+      "eBird": [
+        "Hvad er en eBird rekord?"
+      ],
+      "update-progress": [
+        "Downloader opdatering:"
+      ]
+}

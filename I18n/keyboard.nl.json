@@ -1,0 +1,95 @@
+{
+  "file-handling": [
+    "Bestandsbeheer"
+  ],
+  "show-file-open": [
+    "Bestandsopen dialoog tonen"
+  ],
+  "save-detections": [
+    "Opslaan van detecties naar het archief van records."
+  ],
+  "analysis": [
+    "Analyse"
+  ],
+  "analyse-file": [
+    "Analyseer het huidige bestand."
+  ],
+  "analyeALL": [
+    "Analyseer alle open bestanden."
+  ],
+  "stop-analysis": [
+    "Stop analyse"
+  ],
+  "toggle-archive": [
+    "Wissel tussen het verkennen van het archief en de nieuwste analyseresultaten. Dit stelt je in staat om huidige detecties te vergelijken met die je eerder hebt geregistreerd."
+  ],
+  "navigate-audio": [
+    "Navigeren door audio"
+  ],
+  "play-pause": [
+    "Speel/Pauze audio omschakelen"
+  ],
+  "play-region": [
+    "Speel de geselecteerde regio af. Alleen actief als een regio is geselecteerd."
+  ],
+  "center-spec": [
+    "Centreer het spectrogram op de huidige afspeelkoppositie. Ook, als je dubbelklikt met de muis op een punt in de audio, wordt het spectrogram op dat punt gecentreerd."
+  ],
+  "go-to": [
+    "Ga naar positie in bestand"
+  ],
+  "file-begin": [
+    "Beweeg de afspeelkop naar het begin van het bestand"
+  ],
+  "file-end": [
+    "Beweeg de afspeelkop naar het einde van het bestand"
+  ],
+  "pageup": [
+    "Beweeg terug naar de vorige periode in het spectrogram. Je kunt ook het muiswiel of een tweevinger veegbeweging op het trackpad gebruiken."
+  ],
+  "pagedown": [
+    "Beweeg naar de volgende periode in het spectrogram"
+  ],
+  "skip-forward": [
+    "Beweeg de afspeelkop naar voren."
+  ],
+  "skip-back": [
+    "Beweeg de afspeelkop naar achteren."
+  ],
+  "next-detection": [
+    "Spring naar de volgende detectie"
+  ],
+  "previous-detection": [
+    "Spring terug naar de vorige detectie"
+  ],
+  "spec-adjust": [
+    "Spectrogramaanpassingen"
+  ],
+  "zoom-in": [
+    "Zoom in op het spectrogram. Bij inzoomen past Chirpity automatisch de venstergrootte van de korttijd Fouriertransformatie (STFT) aan om de spectrale resolutie te optimaliseren"
+  ],
+  "zoom-out": [
+    "Zoom uit op het spectrogram. Bij uitzoomen past Chirpity automatisch de STFT venstergrootte aan om de spectrale resolutie te optimaliseren"
+  ],
+  "reduce-fft": [
+    "Handmatig de spectrogramvenstergrootte verkleinen. Het aanpassen van de venstergrootte heeft het effect van het scherper of vervagen van de oproepen in het spectrogram."
+  ],
+  "increase-fft": [
+    "Handmatig de spectrogramvenstergrootte vergroten"
+  ],
+  "timeline-toggle": [
+    "Wissel tussen tijdcode en tijd van de dag"
+  ],
+  "records": [
+    "Records"
+  ],
+  "delete": [
+    "Verwijder huidig record"
+  ],
+  "undo": [
+    "Herstel verwijderde record(s)"
+  ],
+  "validate": [
+    "Valideer het huidige actieve record (bevestig de detectie)"
+  ]
+}

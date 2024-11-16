@@ -1,0 +1,192 @@
+{
+    "Add to Library on Save-circle-help": [
+      "Cuando está activada, los archivos de audio se añaden a la ubicación de la biblioteca cada vez que se guardan detecciones en el archivo."
+    ],
+    "Adjust font size-circle-help": [
+      "Cambia los ajustes globales del tamaño de fuente para la aplicación."
+    ],
+    "Audio Library-circle-help": [
+      "Chirpity puede organizar tu audio en una biblioteca permanente en una ubicación de tu elección, como un disco de datos o una unidad de red. Una vez guardados, puedes eliminar los archivos originales, y todos los registros serán visibles en la aplicación. Para guardar audio en la biblioteca, puedes ir al menú Registros y elegir 'Guardar audio de los resultados archivados en la biblioteca', o activar la opción 'Añadir a la biblioteca al guardar' a continuación. Los archivos se guardarán con la siguiente estructura: <p><code>Sitio de grabación / Año / Mes / Nombre del archivo</code></p> El audio 'con pérdida' requiere aproximadamente 1 GB de almacenamiento por cada 24 horas, mientras que el audio 'sin pérdida' convierte los archivos al formato FLAC, preservando la fidelidad, la tasa de bits y los canales originales, pero reduciendo el tamaño del archivo aproximadamente a la mitad."
+    ],
+    "Audio notification-circle-help": [
+      "Cuando está activada, habrá una notificación del sistema cuando los análisis que tardan más de treinta segundos hayan finalizado."
+    ],
+    "Backend-circle-help": [
+      "Los backends webGL/webGPU pueden mejorar el rendimiento y reducir el consumo de energía en algunos sistemas."
+    ],
+    "Batch Size-circle-help": [
+      "Optimizar el tamaño del lote puede aumentar la velocidad de procesamiento en archivos largos."
+    ],
+    "Clear Call Cache-circle-help": [
+      "Los datos utilizados para las comparaciones de llamadas de referencia se almacenan en caché. Limpiar la caché actualizará las llamadas de cada especie la próxima vez que se solicite una comparación."
+    ],
+    "Confidence Threshold-circle-help": [
+      "Determina la confianza mínima requerida para que se devuelvan resultados."
+    ],
+    "Context Mode-circle-help": [
+      "Cuando está activado, el modo de contexto adapta las predicciones analizando el contexto circundante. Solo se puede cambiar antes de un análisis, y se recomienda un umbral de confianza inicial bajo, por ejemplo, del 20-30%. El modo de contexto no está disponible en el modelo BirdNET."
+    ],
+    "Crop Library-circle-help": [
+      "Cuando está activada, los archivos de audio que contienen periodos diurnos se recortan, por lo que solo se guarda el audio correspondiente a los periodos nocturnos."
+    ],
+    "Debug Mode-circle-help": [
+      "Entra en el modo de depuración (los cambios en esta configuración requieren reiniciar Chirpity para que surtan efecto)."
+    ],
+    "Decorators-circle-help": [
+      "'Pad' añade 2 segundos antes y después de una selección al audio exportado. 'Fade' añade un efecto de fundido de 1 segundo al inicio y al final del audio."
+    ],
+    "Default Location-circle-help": [
+      "Chirpity utiliza información de ubicación para determinar los tiempos de amanecer y atardecer de las grabaciones."
+    ],
+    "Default Settings-circle-help": [
+      "Restaura los ajustes de configuración a sus valores predeterminados. N.B. Relanza Chirpity para ver los cambios; además, los ajustes de idioma deberán restablecerse manualmente."
+    ],
+    "Down mix-circle-help": [
+      "Cuando está activada, el audio exportado se mezcla a mono."
+    ],
+    "High Pass Filter-circle-help": [
+      "Cuando se establece, elimina el ruido de baja frecuencia por debajo del umbral."
+    ],
+    "IUCN-circle-help": [
+      "Cuando está activada, se muestra el estado de evaluación global más reciente de la IUCN para cada especie en el resumen. El icono enlaza a la página de evaluación en el sitio web de la IUCN. El Alcance de la Evaluación mostrará la evaluación de la especie en esa región (cuando esté disponible)."
+    ],
+    "Language-circle-help": [
+      "Selecciona tu idioma preferido para los nombres comunes de las aves."
+    ],
+    "List-circle-help": [
+      "Filtra las detecciones devueltas en los resultados. Aves locales: excluye aves que probablemente no se encuentren en tu región. Aves nocturnas: excluye cantos de aves y especies que no se sabe que llamen por la noche. La lista personalizada te permite subir un archivo que enumere las especies a detectar."
+    ],
+    "Low Shelf Filter-circle-help": [
+      "Cuando se utiliza, atenúa el ruido de baja frecuencia por debajo de la frecuencia de corte."
+    ],
+    "Model-circle-help": [
+      "Selecciona si deseas usar el modelo Nocmig, optimizado para llamadas de migración nocturna en Europa, o BirdNET, que puede detectar más de 6000 especies en todo el mundo."
+    ],
+    "Nocmig Mode-circle-help": [
+      "Cuando está activado, este 'modo Nocmig' solo busca y muestra detecciones encontradas durante la noche."
+    ],
+    "Normalise-circle-help": [
+      "Cuando está activada, el audio que escuchas será normalizado, ampliando el rango dinámico."
+    ],
+    "Prevent system sleep-circle-help": [
+      "Cuando está activada, evita que el sistema entre en suspensión mientras se utiliza Chirpity."
+    ],
+    "Send Filtered Audio-circle-help": [
+      "Enviar audio filtrado con High Pass o Low Shelf a un modelo generalmente tendrá un impacto negativo en su precisión. ¡Usa esta opción con precaución!"
+    ],
+    "Show frequency labels-circle-help": [
+      "Cuando está activada, el espectrograma mostrará la frecuencia en el lado izquierdo."
+    ],
+    "Signal to Noise Ratio-circle-help": [
+      "El filtro SNR, cuando está activado, omitirá porciones de audio donde cualquier evento de audio esté por debajo del umbral. Los valores más altos omiten segmentos cada vez más ruidosos. Aunque esto resultará en un procesamiento más rápido, debe considerarse <b><i>experimental</i></b> y cualquier valor distinto de cero puede omitir detecciones. <b>Consejo:</b> Para encontrar un valor de SNR adecuado, realiza un análisis en un archivo corto con las detecciones más tenues que puedas identificar con confianza. Aumenta el valor del SNR hasta que la detección no sea captada. Una vez que encuentres este umbral, redúcelo al nivel más alto que capture la detección."
+    ],
+    "Species Threshold-circle-help": [
+      "Define la frecuencia mínima de la lista de verificación de eBird para la inclusión de especies. Si 'Ajustar la lista para la semana del año' está activada, la lista se ajustará para incluir las especies esperadas para la semana de grabación."
+    ],
+    "Threads-circle-help": [
+      "El número de análisis paralelos a ejecutar. Por defecto, se establece en el número de núcleos de CPU de la máquina para un rendimiento más rápido. Con el backend de GPU, funciona mejor un número más bajo, por ejemplo, 1-3."
+    ],
+    "Use Location settings-circle-help": [
+      "Cuando está activado, el filtro de Aves nocturnas informa sobre las aves según los ajustes de ubicación."
+    ],
+    "Volume Adjustment-circle-help": [
+      "Ajusta el volumen del audio para compensar niveles bajos de grabación."
+    ],
+    "navBarFile": ["Archivo"],
+    "navbarHelp": ["Ayuda"],
+    "navbarRecords": ["Registros"],
+    "navbarAnalysis": ["Análisis"],
+    "navbarSettings": ["Configuración"],
+    "open-file": [
+      "Abrir archivo(s) de audio",
+      "Ctrl+O"
+    ],
+    "open-folder": [
+      "Abrir carpeta(s)"
+    ],
+    "saveCSV": [
+      "Exportar resultados a CSV"
+    ],
+    "save-eBird": [
+      "Exportar archivo de registro eBird"
+    ],
+    "save-Raven": [
+      "Exportar tabla de selección Raven"
+    ],
+    "export-audio": [
+      "Exportar audio seleccionado",
+      "Ctrl+E"
+    ],
+    "saveLabels": [
+      "Guardar etiquetas de Audacity"
+    ],
+    "exit": [
+      "Salir"
+    ],
+    "save2db": [
+      "Guardar en archivo",
+      "Ctrl+S"
+    ],
+    "charts": [
+      "Ver gráficos"
+    ],
+    "explore": [
+      "Explorar archivo"
+    ],
+    "active-analysis": [
+      "Volver a análisis activo"
+    ],
+    "compress-and-organise": [
+      "Guardar audio de los resultados del archivo a la biblioteca"
+    ],
+    "purge-file": [
+      "Eliminar archivo actual del archivo"
+    ],
+    "analyse": [
+      "Analizar archivo actual",
+      "Ctrl+A"
+    ],
+    "analyseSelection": [
+      "Analizar intervalo seleccionado"
+    ],
+    "analyseAll": [
+      "Analizar todos los archivos abiertos",
+      "Ctrl+Shift+A"
+    ],
+    "reanalyse": [
+      "Reanalizar archivo actual"
+    ],
+    "reanalyseAll": [
+      "Reanalizar todos los archivos abiertos"
+    ],
+    "usage": [
+      "Usando Chirpity"
+    ],
+    "settingsHelp": [
+      "Configuraciones"
+    ],
+    "keyboardHelp": [
+      "Atajos de teclado"
+    ],
+    "diagnostics": [
+      "Diagnóstico"
+    ],
+    "startTour": [
+      "Mostrar recorrido"
+    ],
+    "bugs": [
+      "Únete a la comunidad"
+    ],
+    "FAQ": [
+      "Preguntas frecuentes"
+    ],
+    "species": [
+      "¿Qué especies se detectan?"
+    ],
+    "eBird": [
+      "¿Qué es un registro eBird?"
+    ],
+    "update-progress": [
+      "Descargando actualización:"
+    ]
+}

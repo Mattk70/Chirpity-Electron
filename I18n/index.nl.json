@@ -1,0 +1,193 @@
+{
+    "Add to Library on Save-circle-help": [
+        "Wanneer ingeschakeld, worden audiobestanden toegevoegd aan de bibliotheeklocatie telkens wanneer detecties worden opgeslagen in het archief."
+    ],
+    "Adjust font size-circle-help": [
+        "Wijzig de globale lettergrootte-instellingen voor de applicatie."
+    ],
+    "Audio Library-circle-help": [
+        "Chirpity kan je audio organiseren in een permanente bibliotheek op een locatie naar keuze, zoals een datadisk of netwerkschijf. Zodra de bestanden zijn opgeslagen, kun je de originele bestanden verwijderen, en alle records zijn zichtbaar in de applicatie. Om audio in de bibliotheek op te slaan, kun je naar het menu 'Records' gaan en 'Audio opslaan van archiefresultaten naar bibliotheek' kiezen, of de optie 'Toevoegen aan bibliotheek bij opslaan' hieronder inschakelen. Bestanden worden opgeslagen in de volgende structuur: <p><code>Opnamelocatie / Jaar / Maand / Bestandsnaam</code></p> 'Lossy' audio vereist ongeveer 1 GB opslagruimte per 24 uur, terwijl 'Lossless' bestanden omzet naar het FLAC-formaat, waarbij originele geluidskwaliteit, bitrate en kanalen behouden blijven, maar het bestand ongeveer halveert in grootte."
+    ],
+    "Audio notification-circle-help": [
+        "Wanneer ingeschakeld, verschijnt er een systeemmelding zodra analyses die meer dan dertig seconden duren, zijn voltooid."
+    ],
+    "Backend-circle-help": [
+        "De webGL/webGPU-backends kunnen de prestaties verbeteren en het stroomverbruik op sommige systemen verminderen."
+    ],
+    "Batch Size-circle-help": [
+        "Het optimaliseren van de batchgrootte kan de verwerkingssnelheid voor langere bestanden verhogen."
+    ],
+    "Clear Call Cache-circle-help": [
+        "De gegevens die worden gebruikt voor referentieoproepenvergelijkingen worden in de cache opgeslagen. Het wissen van de cache vernieuwt de oproepen voor elke soort de volgende keer dat een vergelijking wordt aangevraagd."
+    ],
+    "Confidence Threshold-circle-help": [
+        "Bepaalt het minimale vertrouwen dat nodig is om resultaten te retourneren."
+    ],
+    "Context Mode-circle-help": [
+        "Wanneer ingeschakeld, past de contextmodus voorspellingen aan door de omliggende context te analyseren. Dit kan alleen worden gewijzigd vóór een analyse en een lage aanvankelijke vertrouwensdrempel wordt aanbevolen, bijvoorbeeld 20-30%. Contextmodus is niet beschikbaar in het BirdNET-model."
+    ],
+    "Crop Library-circle-help": [
+        "Wanneer ingeschakeld, worden audiobestanden met daglichtperioden bijgesneden, zodat alleen audio van nachtelijke perioden wordt opgeslagen."
+    ],
+    "Debug Mode-circle-help": [
+        "Schakel de foutopsporingsmodus in (wijzigingen in deze instelling vereisen een herstart van Chirpity om effect te hebben)."
+    ],
+    "Decorators-circle-help": [
+        "'Pad' voegt 2 seconden voor en na een selectie toe aan het geëxporteerde audio. 'Fade' voegt een fade-effect van 1 seconde toe aan het begin en einde van het audio."
+    ],
+    "Default Location-circle-help": [
+        "Chirpity gebruikt locatiegegevens om de zonsopgang- en zonsondergangtijden voor opnamen te bepalen."
+    ],
+    "Default Settings-circle-help": [
+        "Herstel de configuratie-instellingen naar de standaardwaarden. N.B. Herstart Chirpity om de wijzigingen te zien; ook moeten de taalinstellingen handmatig opnieuw worden ingesteld."
+    ],
+    "Down mix-circle-help": [
+        "Wanneer ingeschakeld, wordt geëxporteerde audio naar mono gemixt."
+    ],
+    "High Pass Filter-circle-help": [
+        "Verwijdert, indien ingesteld, laagfrequent geluid onder de drempel."
+    ],
+    "IUCN-circle-help": [
+        "Wanneer ingeschakeld, wordt de nieuwste wereldwijde IUCN-beoordelingsstatus voor elke soort weergegeven in het overzicht. Het pictogram linkt naar de beoordelingspagina op de IUCN-website. De beoordelingsscope toont de beoordeling van de soort in die regio (indien beschikbaar)."
+    ],
+    "Language-circle-help": [
+        "Selecteer je voorkeurstaal voor de algemene namen van vogels."
+    ],
+    "List-circle-help": [
+        "Filtert de detecties die in de resultaten worden geretourneerd. Lokale vogels: sluit vogels uit die waarschijnlijk niet in jouw regio voorkomen. Nachtelijke vogels: sluit vogelzang en soorten die niet bekend staan om 's nachts te roepen, uit. De aangepaste lijst stelt je in staat een bestand te uploaden waarin de te detecteren soorten worden vermeld."
+    ],
+    "Low Shelf Filter-circle-help": [
+        "Verzwakt, indien gebruikt, laagfrequent geluid onder de afsnijfrequentie."
+    ],
+    "Model-circle-help": [
+        "Kies of je het Nocmig-model wilt gebruiken, geoptimaliseerd voor nachtelijke migratieoproepen in Europa, of BirdNET, dat meer dan 6000 soorten wereldwijd kan detecteren."
+    ],
+    "Nocmig Mode-circle-help": [
+        "Wanneer ingeschakeld, zoekt deze 'Nocmig-modus' alleen naar en toont alleen detecties die 's nachts zijn gevonden."
+    ],
+    "Normalise-circle-help": [
+        "Wanneer ingeschakeld, wordt het audio dat je hoort genormaliseerd, waardoor het dynamische bereik wordt vergroot."
+    ],
+    "Prevent system sleep-circle-help": [
+        "Wanneer ingeschakeld, voorkomt dit dat het systeem in slaapstand gaat terwijl Chirpity in gebruik is."
+    ],
+    "Send Filtered Audio-circle-help": [
+        "Het verzenden van High Pass- of Low Shelf-gefilterde audio naar een model heeft meestal een negatieve invloed op de nauwkeurigheid. Gebruik deze optie met voorzichtigheid!"
+    ],
+    "Show frequency labels-circle-help": [
+        "Wanneer ingeschakeld, toont het spectrogram de frequentie aan de linkerkant."
+    ],
+    "Signal to Noise Ratio-circle-help": [
+        "De SNR-filter, wanneer ingeschakeld, slaat delen van audio over waarbij een audio-evenement onder de drempel ligt. Hogere waarden slaan steeds luidruchtiger segmenten over. Hoewel dit resulteert in snellere verwerking, moet het als <b><i>experimenteel</i></b> worden beschouwd en kunnen detecties worden gemist bij elke niet-nulwaarde. <b>Tip:</b> Om een werkbare SNR-waarde te vinden, analyseer een kort bestand met de zwakste detecties die je met vertrouwen kunt identificeren. Verhoog de SNR-waarde totdat de detectie niet wordt opgepikt. Zodra je deze drempel hebt gevonden, verlaag je het naar het hoogste niveau dat de detectie oppikt."
+    ],
+    "Species Threshold-circle-help": [
+        "Definieer de minimale eBird-checklistfrequentie voor soorteninclusie. Als 'Lijst aanpassen voor de week van het jaar' is ingeschakeld, wordt de lijst aangepast om soorten op te nemen die worden verwacht voor de opnamenweek."
+    ],
+    "Threads-circle-help": [
+        "Het aantal parallelle analyses om uit te voeren. Standaard wordt dit ingesteld op het aantal CPU-kernen op de machine voor de snelste prestaties. Bij gebruik van de GPU-backend werkt een lager aantal beter, bijvoorbeeld 1-3."
+    ],
+    "Use Location settings-circle-help": [
+        "Wanneer ingeschakeld, rapporteert het filter voor nachtelijke vogels vogels op basis van je locatie-instellingen."
+    ],
+    "Volume Adjustment-circle-help": [
+        "Pas het volume van audio aan om lage opnamevolumes te compenseren."
+    ],
+    "navBarFile": ["Bestand"],
+    "navbarHelp": ["Help"],
+    "navbarRecords": ["Records"],
+    "navbarAnalysis": ["Analyse"],
+    "navbarSettings": ["Instellingen"],
+    "open-file": [
+        "Open Audio Bestand(en)",
+        "Ctrl+O"
+    ],
+    "open-folder": [
+        "Open Map(pen)"
+    ],
+    "saveCSV": [
+        "Exporteer Resultaten naar CSV"
+    ],
+    "save-eBird": [
+        "Exporteer eBird Record bestand"
+    ],
+    "save-Raven": [
+        "Exporteer Raven Selectie Tabel"
+    ],
+    "export-audio": [
+        "Exporteer Geselecteerd Audio",
+        "Ctrl+E"
+    ],
+    "saveLabels": [
+        "Sla Audacity Labels op"
+    ],
+    "exit": [
+        "Afsluiten"
+    ],
+    "save2db": [
+        "Opslaan naar Archief",
+        "Ctrl+S"
+    ],
+    "charts": [
+        "Bekijk grafieken"
+    ],
+    "explore": [
+        "Verken Archief"
+    ],
+    "active-analysis": [
+        "Terug naar Actieve Analyse"
+    ],
+    "compress-and-organise": [
+        "Sla Audio van Archief Resultaten op naar Bibliotheek"
+    ],
+    "purge-file": [
+        "Verwijder Huidig Bestand uit Archief"
+    ],
+    "analyse": [
+        "Analyseer Huidig Bestand",
+        "Ctrl+A"
+    ],
+    "analyseSelection": [
+        "Analyseer Geselecteerd Interval"
+    ],
+    "analyseAll": [
+        "Analyseer Alle Open Bestanden",
+        "Ctrl+Shift+A"
+    ],
+    "reanalyse": [
+        "Hernanalyseer Huidig Bestand"
+    ],
+    "reanalyseAll": [
+        "Hernanalyseer Alle Open Bestanden"
+    ],
+    "usage": [
+        "Chirpity Gebruiken"
+    ],
+    "settingsHelp": [
+        "Instellingen"
+    ],
+    "keyboardHelp": [
+        "Toetsenbord Sneltoetsen"
+    ],
+    "diagnostics": [
+        "Diagnostiek"
+    ],
+    "startTour": [
+        "Toon Rondleiding"
+    ],
+    "bugs": [
+        "Word lid van de community"
+    ],
+    "FAQ": [
+        "FAQs"
+    ],
+    "species": [
+        "Welke soorten worden gedetecteerd?"
+    ],
+    "eBird": [
+        "Wat is een eBird Record?"
+    ],
+    "update-progress": [
+        "Downloaden van update:"
+    ]
+     
+}

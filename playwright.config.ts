@@ -24,5 +24,6 @@ export default defineConfig({
     // Change the default data-testid attribute.
     //testIdAttribute: 'pw-test-id',
   },
+  
 });
 

@@ -12,7 +12,8 @@ import {
   stubMultipleDialogs
 } from 'electron-playwright-helpers';
 import { ElectronApplication, Page } from 'playwright';
-import jimp from 'jimp';
+import {changeSettings, openExampleFile, runExampleAnalysis} from './helpers';
+//import {Jimp} from 'jimp';
 
 let electronApp: ElectronApplication;
 let page: Page;
@@ -72,7 +73,7 @@ test.beforeAll(async () => {
     const checkPage = setInterval(async () => { 
       if (page) { 
         clearInterval(checkPage);
-        resolve(); 
+        resolve('');
       } 
     }, 5000); 
   });
@@ -107,41 +108,9 @@ test('Page title is correct', async () => {
   expect(title).toBe('Chirpity Bird Call Detection')
 })
 
-async function openExampleFile(){
-  await page.locator('#navBarFile').click()
-  await page.locator('#open-file').click()
-  await page.locator('wave').first().waitFor({state: 'visible'})
-}
-
-async function changeSettings(type, elementID, value, timeout){
-  elementID = '#' + elementID;
-  await  page.locator('#navbarSettings').click();
-  // for Birdnet's 34%$
-  await page.locator('#confidence').fill('30');
-  if (type === 'select'){
-    await page.selectOption(elementID, value);
-  } else if (type === 'switch'){
-    await page.locator(elementID).setChecked(value);
-  }  else {
-    await page.locator(elementID).fill(value);
-  }
-  await page.locator('#close-settings').click();
-  // Wait ?
-  if (timeout) await page.waitForTimeout(timeout);
-}
-
-async function runExampleAnalysis(model){
-  await openExampleFile()
-  await changeSettings('select', 'model-to-use', model, 5000)
-
-  await  page.locator('#navbarAnalysis').click()
-  await page.locator('#analyse').click()
-  await  page.locator('#resultTableContainer').waitFor({state: 'visible'})
-}
-
 
 test(`Nocmig analyse works and second result is 61%`, async () => {
-  await runExampleAnalysis('chirpity');
+  await runExampleAnalysis(page,'chirpity');
   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
   expect(callID).not.toBe(undefined)
   const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
@@ -150,7 +119,7 @@ test(`Nocmig analyse works and second result is 61%`, async () => {
 })
 
 test(`BirdNET analyse works and second result is 34%`, async () => {
-  await runExampleAnalysis('birdnet');
+  await runExampleAnalysis(page, 'birdnet');
   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
   expect(callID).not.toBe(undefined)
   const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
@@ -179,7 +148,7 @@ test(`BirdNET analyse works and second result is 34%`, async () => {
 // })
 
 test("Amend file start dialog contains date", async () =>{
-  await runExampleAnalysis('chirpity');
+  await runExampleAnalysis(page, 'chirpity');
   await page.locator('#dropdownMenuButton').click({button: 'right'});
   await page.locator('#setFileStart').click();
   const fileStart = await page.locator('#fileStart');

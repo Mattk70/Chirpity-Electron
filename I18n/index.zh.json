@@ -1,0 +1,192 @@
+{
+  "Add to Library on Save-circle-help": [
+    "启用后，每当将检测结果保存到存档时，音频文件将添加到库位置中。"
+  ],
+  "Adjust font size-circle-help": [
+    "更改应用程序的全局字体大小设置。"
+  ],
+  "Audio Library-circle-help": [
+    "Chirpity 可以将您的音频组织成一个永久的库，存放在您选择的位置，例如数据磁盘或网络驱动器。一旦保存，您可以删除原始文件，所有记录将在应用程序中可见。要将音频保存到库中，您可以前往记录菜单并选择“从存档结果保存音频到库”，或启用下方的“保存时添加到库”选项。文件将按以下结构存储：<p><code>录音地点 / 年 / 月 / 文件名</code></p> ‘有损’音频每 24 小时需要约 1GB 的存储空间，而‘无损’将文件转换为 FLAC 格式，保留原始的保真度、比特率和声道，但文件大小大约减半。"
+  ],
+  "Audio notification-circle-help": [
+    "启用后，当分析超过 30 秒时，系统会发出通知。"
+  ],
+  "Backend-circle-help": [
+    "webGL/webGPU 后端可以在某些系统上提高性能并减少功耗。"
+  ],
+  "Batch Size-circle-help": [
+    "优化批处理大小可以提高较长文件的处理速度。"
+  ],
+  "Clear Call Cache-circle-help": [
+    "参考呼叫比较所使用的数据已被缓存。清除缓存将在下次请求比较时刷新每个物种的呼叫。"
+  ],
+  "Confidence Threshold-circle-help": [
+    "确定返回结果所需的最低置信度。"
+  ],
+  "Context Mode-circle-help": [
+    "启用后，情境模式通过分析周围的情境来调整预测。只能在分析之前更改，并建议设置较低的初始置信度，例如 20-30%。情境模式在 BirdNET 模型中不可用。"
+  ],
+  "Crop Library-circle-help": [
+    "启用后，包含白天时间段的音频文件将被裁剪，只保留夜间的音频。"
+  ],
+  "Debug Mode-circle-help": [
+    "进入调试模式（更改此设置需要重新启动 Chirpity 才能生效）。"
+  ],
+  "Decorators-circle-help": [
+    "‘填充’在导出的音频的选择部分前后各添加 2 秒。‘淡化’在音频的开头和结尾添加 1 秒淡化效果。"
+  ],
+  "Default Location-circle-help": [
+    "Chirpity 使用位置信息来确定录音的日出和日落时间。"
+  ],
+  "Default Settings-circle-help": [
+    "将配置设置重置为默认值。注意：重新启动 Chirpity 以查看更改，同时需要手动重新设置语言设置。"
+  ],
+  "Down mix-circle-help": [
+    "启用后，导出的音频将混音为单声道。"
+  ],
+  "High Pass Filter-circle-help": [
+    "设置后，将移除低于阈值的低频噪音。"
+  ],
+  "IUCN-circle-help": [
+    "启用后，摘要中将显示每个物种的最新全球 IUCN 评估状态。图标链接到 IUCN 网站上的评估页面。评估范围将显示该地区的物种 IUCN 评估（如果有）。"
+  ],
+  "Language-circle-help": [
+    "选择您首选的鸟类常见名称的语言。"
+  ],
+  "List-circle-help": [
+    "过滤结果中返回的检测项。地方鸟类：排除不太可能出现在您地区的鸟类。夜行鸟类：排除不以夜间鸣叫著称的鸟类和鸟鸣。自定义列表允许您上传列出需要检测的物种的文件。"
+  ],
+  "Low Shelf Filter-circle-help": [
+    "启用后，将削弱低于截止频率的低频噪音。"
+  ],
+  "Model-circle-help": [
+    "选择使用为欧洲夜间迁徙鸣声优化的 Nocmig 模型，或 BirdNET，它可以检测全球超过 6000 种物种。"
+  ],
+  "Nocmig Mode-circle-help": [
+    "启用后，此‘Nocmig 模式’仅搜索并显示在夜间找到的检测结果。"
+  ],
+  "Normalise-circle-help": [
+    "启用后，您听到的音频将被标准化，扩展动态范围。"
+  ],
+  "Prevent system sleep-circle-help": [
+    "启用后，在使用 Chirpity 时防止系统进入睡眠状态。"
+  ],
+  "Send Filtered Audio-circle-help": [
+    "将高通或低搁架滤波后的音频发送到模型通常会对其准确性产生负面影响。请谨慎使用此选项！"
+  ],
+  "Show frequency labels-circle-help": [
+    "启用后，频谱图将在左侧显示频率。"
+  ],
+  "Signal to Noise Ratio-circle-help": [
+    "启用 SNR 滤波器后，会跳过音频中任何音频事件低于阈值的部分。较高的值会跳过噪声更大的部分。虽然这会加快处理速度，但必须被视为<b><i>实验性</i></b>，且任何非零值都可能遗漏检测。<b>提示：</b>要找到合适的 SNR 值，请对您可以自信识别的最微弱检测运行短文件分析。增加 SNR 值直到未拾取检测。一旦找到该阈值，将其降低到仍能拾取检测的最高水平。"
+  ],
+  "Species Threshold-circle-help": [
+    "定义物种包含的最低 eBird 检查表频率。如果启用了‘根据年份周调整列表’，则会调整列表以包含录音周内预期的物种。"
+  ],
+  "Threads-circle-help": [
+    "运行并行分析的线程数。默认情况下，这设置为计算机上的 CPU 核心数以实现最快性能。使用 GPU 后端时，较低的线程数效果更好，例如 1-3。"
+  ],
+  "Use Location settings-circle-help": [
+    "激活后，夜行鸟类过滤器将基于您的位置设置报告鸟类。"
+  ],
+  "Volume Adjustment-circle-help": [
+    "调整音量以补偿低录音电平。"
+  ],
+  "navBarFile": ["文件"],
+  "navbarHelp": ["帮助"],
+  "navbarRecords": ["记录"],
+  "navbarAnalysis": ["分析"],
+  "navbarSettings": ["设置"],
+  "open-file": [
+    "打开音频文件",
+    "Ctrl+O"
+  ],
+  "open-folder": [
+    "打开文件夹"
+  ],
+  "saveCSV": [
+    "将结果导出为CSV"
+  ],
+  "save-eBird": [
+    "导出eBird记录文件"
+  ],
+  "save-Raven": [
+    "导出Raven选择表"
+  ],
+  "export-audio": [
+    "导出选定的音频",
+    "Ctrl+E"
+  ],
+  "saveLabels": [
+    "保存Audacity标签"
+  ],
+  "exit": [
+    "退出"
+  ],
+  "save2db": [
+    "保存到档案",
+    "Ctrl+S"
+  ],
+  "charts": [
+    "查看图表"
+  ],
+  "explore": [
+    "浏览档案"
+  ],
+  "active-analysis": [
+    "返回到活动分析"
+  ],
+  "compress-and-organise": [
+    "将档案结果中的音频保存到库中"
+  ],
+  "purge-file": [
+    "从档案中删除当前文件"
+  ],
+  "analyse": [
+    "分析当前文件",
+    "Ctrl+A"
+  ],
+  "analyseSelection": [
+    "分析选定的区间"
+  ],
+  "analyseAll": [
+    "分析所有打开的文件",
+    "Ctrl+Shift+A"
+  ],
+  "reanalyse": [
+    "重新分析当前文件"
+  ],
+  "reanalyseAll": [
+    "重新分析所有打开的文件"
+  ],
+  "usage": [
+    "使用Chirpity"
+  ],
+  "settingsHelp": [
+    "设置"
+  ],
+  "keyboardHelp": [
+    "键盘快捷键"
+  ],
+  "diagnostics": [
+    "诊断"
+  ],
+  "startTour": [
+    "显示导览"
+  ],
+  "bugs": [
+    "加入社区"
+  ],
+  "FAQ": [
+    "常见问题"
+  ],
+  "species": [
+    "检测到哪些物种？"
+  ],
+  "eBird": [
+    "什么是eBird记录？"
+  ],
+  "update-progress": [
+    "正在下载更新："
+  ]
+}
