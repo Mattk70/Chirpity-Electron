@@ -114,8 +114,21 @@
           hCollection['headings'] = hCollection['headings'] || [];
           hCollection['headings'].push(label);
         })
+        // Get all elements with the 'title' attribute
+        const titleAttributes = doc.querySelectorAll('[title]');
+
+        // Create an array of the 'title' attribute values
+        const titles = Array.from(titleAttributes).reduce((acc, element) => {
+  const id = element.id; // Get the ID of the element
+  const title = element.getAttribute('title'); // Get the title attribute value
+  if (id) { // Ensure the element has an ID
+    acc[id] = title; // Set the ID as the key and the title as the value
+  }
+  return acc;
+}, {});
+
         let  jsonOutput = JSON.stringify(textAndTitles, null, 2);
-        jsonOutput += JSON.stringify(buttonCollection, null, 2) + JSON.stringify(labelCollection, null, 2) + JSON.stringify(hCollection, null, 2);
+        jsonOutput += JSON.stringify(buttonCollection, null, 2) + JSON.stringify(labelCollection, null, 2) + JSON.stringify(hCollection, null, 2) + JSON.stringify(titles, null, 2);
         // Display JSON in the output area
         document.getElementById('output').textContent = jsonOutput;
       };

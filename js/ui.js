@@ -1,8 +1,8 @@
 import {trackVisit, trackEvent} from './tracking.js';
 import {DOM} from './DOMcache.js';
 import {IUCNCache} from './IUCNcache.js';
-import {i18nHeadings, localiseUI, i18nContext, i18nLocation, i18nForm, i18nHelp} from './i18n.js';
-let LOCATIONS, locationID = undefined, loadingTimeout;
+import {i18nHeadings, localiseUI, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP} from './i18n.js';
+let LOCATIONS, locationID = undefined, loadingTimeout, LIST_MAP;
 
 let LABELS = [], DELETE_HISTORY = [];
 // Save console.warn and console.error functions
@@ -108,6 +108,13 @@ function createColormap(){
         {index: 1, rgb: hexToRgb(config.customColormap.loud)}
     ] : config.colormap;
     return colormap({ colormap: map, nshades:256, format: 'float' });
+}
+function interpolate(template, variables) {
+    return template.replace(/\$\{(.*?)\}/g, (match, key) => {
+        const value = variables[key.trim()] 
+        if (value == null) return match
+        else return value;
+    });
 }
 
 
@@ -674,6 +681,7 @@ function showMetadata(){
 }
 
 function renderFilenamePanel() {
+    const i18n = getI18n(i18nTitles);
     if (!STATE.currentFile) return;
     const openFile = STATE.currentFile;
     const files = STATE.openFiles;
@@ -684,7 +692,7 @@ function renderFilenamePanel() {
     const {parentFolder, fileName}  = extractFileNameAndFolder(openFile)
     const label = `${parentFolder}/${fileName}`;
     let appendStr;
-    const title = ` title="Context-click to update file start time or location" `;
+    const title = ` title="${i18n.filename}" `;
     const isSaved = ['archive', 'explore'].includes(STATE.mode) ? 'text-info' : 'text-warning';
     if (files.length > 1) {
         appendStr = `<div id="fileContainer" class="btn-group dropup pointer">
@@ -974,7 +982,7 @@ async function onOpenFiles(args) {
     STATE.openFiles = sanitisedList;
     // CHeck not more than 25k files
     if (STATE.openFiles.length >= 25_000){
-        generateToast({message: `Chirpity limits the maximum number of open files to 25,000. Only the first 25,000 of the ${STATE.openFiles.length} attempted will be opened`})
+        generateToast({message: 'maxFiles', variables: {'STATE.openFiles.length': STATE.openFiles.length}})
         STATE.openFiles.splice(25000)
     }
     // Store the file list and Load First audio file
@@ -1088,7 +1096,7 @@ function postAnalyseMessage(args) {
             circleClicked: args.fromDB
         });
     } else {
-        generateToast({type: 'warning', message: 'An analysis is underway. Press <b>Esc</b> to cancel it before running a new analysis.'})
+        generateToast({type: 'warning', message: 'analysisUnderway'})
     }
 }
 
@@ -1098,7 +1106,7 @@ async function fetchLocationAddress(lat, lon) {
     const isInvalidLongitude = isNaN(lon) || lon === null || lon < -180 || lon > 180;
     
     if (isInvalidLatitude || isInvalidLongitude) {
-        generateToast({type: 'warning', message: 'Latitude must be between -90 and 90 and longitude between -180 and 180.'});
+        generateToast({type: 'warning', message: 'placeOutOfBounds'});
         return false;
     }
     
@@ -1136,7 +1144,7 @@ async function fetchLocationAddress(lat, lon) {
 
             } catch (error) {
                 console.warn(`A location for this point (lat: ${lat}, lon: ${lon}) could not be retrieved from OpenStreetMap:`, error);
-                generateToast({type: 'warning', message: "Failed to look up this location. Please check your internet connection or try again later."});
+                generateToast({type: 'warning', message: 'placeNotFound'});
                 resolve(`${parseFloat(lat).toFixed(4)}, ${parseFloat(lon).toFixed(4)}`)
             } finally {
                 currentRequest = null; // Clear the current request
@@ -1201,7 +1209,7 @@ function hideAll() {
 
 async function batchExportAudio() {
     const species = isSpeciesViewFiltered(true); 
-    species ? exportData('audio', species, 1000) : generateToast({type: 'warning', message: "Filter results by species to export audio files"});
+    species ? exportData('audio', species, 1000) : generateToast({type: 'warning', message: 'mustFilterSpecies'});
 }
 
 const export2CSV = ()  => exportData('text', isSpeciesViewFiltered(true), Infinity);
@@ -1456,14 +1464,14 @@ function adjustSpecDims(redraw, fftSamples, newHeight) {
 
 ///////////////// Font functions ////////////////
     // Function to set the font size scale
-    function setFontSizeScale() {
+    function setFontSizeScale(doNotScroll) {
         document.documentElement.style.setProperty('--font-size-scale', config.fontScale);
         const decreaseBtn = document.getElementById('decreaseFont');
         const increaseBtn = document.getElementById('increaseFont');
         
         decreaseBtn.classList.toggle('disabled', config.fontScale === 0.7);
         increaseBtn.classList.toggle('disabled', config.fontScale === 1.1);
-        decreaseBtn.scrollIntoView({block: 'center', behavior: 'auto'})
+        doNotScroll || decreaseBtn.scrollIntoView({block: 'center', behavior: 'auto'})
         updatePrefs('config.json', config)
         adjustSpecDims(true)
     }
@@ -1745,7 +1753,7 @@ window.onload = async () => {
         initWavesurfer({});
         // Set UI option state
         // Fontsize
-        config.fontScale === 1 || setFontSizeScale();
+        config.fontScale === 1 || setFontSizeScale(true);
         // Map slider value to batch size
         DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config[config.model].backend].batchSize);
         DOM.batchSizeSlider.max = (BATCH_SIZE_LIST.length - 1).toString();
@@ -1761,6 +1769,7 @@ window.onload = async () => {
 
         // Show Locale
         DOM.locale.value = config[config.model].locale;
+        LIST_MAP = getI18n(i18nLIST_MAP)
         // Localise UI
         STATE.i18n = localiseUI(DOM.locale.value)
 
@@ -1771,7 +1780,7 @@ window.onload = async () => {
         DOM.speciesThreshold.value = config.speciesThreshold;
         document.getElementById('species-week').checked = config.useWeek;
         DOM.customListFile.value = config.customListFile[config.model];
-        if (DOM.customListFile.value)  LIST_MAP.custom = 'Using a custom list';
+        if (! DOM.customListFile.value)  delete LIST_MAP.custom;
         // And update the icon
         updateListIcon();
         // timeline
@@ -1952,7 +1961,7 @@ const setUpWorkerMessaging = () => {
                             </div>
                             `
                     }
-                    generateToast({ type: args.type, message: args.message, autohide: args.autohide});
+                    generateToast(args);
                     // This is how we know the database update has completed
                     if (args.database && config.archive.auto) document.getElementById('compress-and-organise').click();
                 break }
@@ -2040,7 +2049,8 @@ const setUpWorkerMessaging = () => {
                     if (!config.hasNode && config[config.model].backend !== 'webgpu'){
                         // No node? Not using webgpu? Force webgpu
                         handleBackendChange('webgpu');
-                        generateToast({type: 'warning',  message: 'The standard backend could not be loaded on this machine. An experimental backend (webGPU) has been used instead.'});
+                        //generateToast({type: 'warning',  message: 'The standard backend could not be loaded on this machine. An experimental backend (webGPU) has been used instead.'});
+                        generateToast({type: 'warning',  message: 'noNode'});
                         console.warn('tfjs-node could not be loaded, webGPU backend forced. CPU is', DIAGNOSTICS['CPU'])
                     }
                     modelSettingsDisplay();
@@ -2062,7 +2072,7 @@ const setUpWorkerMessaging = () => {
                 case "worker-loaded-audio": {
                     onWorkerLoadedAudio(args);
                     break }
-                default: {generateToast({type: 'error', message:`Unrecognised message from worker:${args.event}`});
+                default: {generateToast({type: 'error', message: 'badMessage', variables:{'args.event': args.event}});
                 }
             }
         })
@@ -2196,8 +2206,6 @@ async function onSaveAudio({file, filename, extension}){
         filename: filename,
         extension: extension
     })
-
-        
 }
 
 
@@ -2610,13 +2618,6 @@ function onChartData(args) {
         });
     }
 
-    const LIST_MAP = {
-        location: 'Searching for birds in your region',
-        nocturnal: 'Searching for nocturnal birds',
-        birds: 'Searching for all birds',
-        everything: 'Searching for everything'
-    };
-
     const updateListIcon = () => {
         DOM.listIcon.innerHTML = config.list === 'custom' ?
             `<span class="material-symbols-outlined mt-1" title="${LIST_MAP[config.list]}" style="width: 30px">fact_check</span>` :
@@ -2625,7 +2626,7 @@ function onChartData(args) {
     }
     DOM.listIcon.addEventListener('click', () => {
         if (PREDICTING){
-            generateToast({type:'warning', message: 'It is not possible to change the list settings while an analysis is underway. However, the list <b>can</b> be changed after the analysis completes', type:'warning'})
+            generateToast({message: 'changeListBlocked', type:'warning'})
             return;
         }
         const keys = Object.keys(LIST_MAP);
@@ -2649,7 +2650,7 @@ function onChartData(args) {
             config.customListFile[config.model] = customListFile;
             DOM.customListFile.value = customListFile;
             readLabels(config.customListFile[config.model], 'list');
-            LIST_MAP.custom = 'Using a custom list';
+            LIST_MAP = getI18n(i18nLIST_MAP);
             updatePrefs('config.json', config)
         }
     })
@@ -2815,7 +2816,7 @@ function centreSpec(){
                     list: config.list
                 });
                 STATE.diskHasRecords && enableMenuItem(['explore', 'charts']);
-                generateToast({ message:'Operation cancelled'});
+                generateToast({ message:'cancelled'});
                 DOM.progressDiv.classList.add('invisible');
             }
         },
@@ -3002,7 +3003,7 @@ function centreSpec(){
                 seconds = Math.min(parseFloat(timeArray[2]), 59.999);
             } else {
                 // Invalid input
-                generateToast({type: 'warning',  message:'Invalid time format. Please enter time in one of the following formats: \n1. Float (for seconds) \n2. Two numbers separated by a colon (for minutes and seconds) \n3. Three numbers separated by colons (for hours, minutes, and seconds)'});
+                generateToast({type: 'warning',  message:'badTime'});
                 return;
             }
             let start = hours * 3600 + minutes * 60 + seconds;
@@ -3285,7 +3286,7 @@ function formatDuration(seconds){
             trackEvent(config.UUID, `${config.model}-${config[config.model].backend}`, 'Analysis Duration', config[config.model].backend, parseInt(analysisTime));
             DIAGNOSTICS['Analysis Duration'] = formatDuration(analysisTime);
             DIAGNOSTICS['Analysis Rate'] = rate.toFixed(0) + 'x faster than real time performance.';
-            generateToast({ message:'Analysis complete.'});
+            generateToast({ message:'complete'});
             activateResultFilters();
         }
     }
@@ -3643,7 +3644,7 @@ function formatDuration(seconds){
             })
         } else {
             if (!config.seenThanks) {
-                generateToast({ message:'Thank you, your feedback helps improve Chirpity predictions'});
+                generateToast({ message:'feedback'});
                 config.seenThanks = true;
                 updatePrefs('config.json', config)
             }
@@ -3849,13 +3850,14 @@ function formatDuration(seconds){
     }
     
     function setNocmig(on) {
+        const i18n = getI18n(i18nTitles);
         if (on) {
             DOM.nocmigButton.textContent = 'nights_stay';
-            DOM.nocmigButton.title = 'Nocmig mode on';
+            DOM.nocmigButton.title = i18n.nocmigOn;
             DOM.nocmigButton.classList.add('text-info');
         } else {
             DOM.nocmigButton.textContent = 'bedtime_off';
-            DOM.nocmigButton.title = 'Nocmig mode off';
+            DOM.nocmigButton.title = i18n.nocmigOff;
             DOM.nocmigButton.classList.remove('text-info');
         }
         DOM.nocmig.checked = config.detect.nocmig;
@@ -3918,12 +3920,13 @@ function formatDuration(seconds){
     }
 
     const contextAwareIconDisplay = () => {
+        const i18n = getI18n(i18nTitles);
         if (config.detect.contextAware) {
             DOM.contextAwareIcon.classList.add('text-warning');
-            DOM.contextAwareIcon.title = "Context aware mode enabled";
+            DOM.contextAwareIcon.title = i18n.contextModeOn;
         } else {
             DOM.contextAwareIcon.classList.remove('text-warning');
-            DOM.contextAwareIcon.title = "Context aware mode disabled";
+            DOM.contextAwareIcon.title = i18n.contextModeOff;
         }
     };
     
@@ -3937,12 +3940,10 @@ function formatDuration(seconds){
         showFilterEffect();
         filterIconDisplay();
     }
-    
-
-    
+       
     const toggleContextAwareMode = () => {
         if (PREDICTING){
-            generateToast({message: 'It is not possible to change the context-mode settings while an analysis is underway.', type:'warning'})
+            generateToast({message: 'contextBlocked', type:'warning'})
             return;
         }
         if (config.model !== 'birdnet') config.detect.contextAware = !config.detect.contextAware;
@@ -4369,12 +4370,13 @@ function formatDuration(seconds){
 
     // Filter handling
     const filterIconDisplay = () => {
+        const i18n = getI18n(i18nTitles);
         if (config.filters.active && (config.filters.highPassFrequency || (config.filters.lowShelfAttenuation && config.filters.lowShelfFrequency) || config.filters.SNR)) {
             DOM.audioFiltersIcon.classList.add('text-warning');
-            DOM.audioFiltersIcon.title = 'Experimental audio filters applied';
+            DOM.audioFiltersIcon.title = i18n.audioFiltersOn;
         } else {
             DOM.audioFiltersIcon.classList.remove('text-warning')
-            DOM.audioFiltersIcon.title = 'No audio filters applied';
+            DOM.audioFiltersIcon.title = i18n.audioFiltersOff;
         }
     }
     // High pass threshold
@@ -4690,8 +4692,8 @@ function playRegion(){
             }
             case 'clear-call-cache': {
                 const data = fs.rm(p.join(appPath, 'XCcache.json'), err =>{
-                    if (err) generateToast({type: 'error', message: 'No call cache was found.'}) && config.debug && console.log('No XC cache found', err);
-                    else generateToast({message: 'The call cache was successfully cleared.'})
+                    if (err) generateToast({type: 'error', message: 'noCallCache'}) && config.debug && console.log('No XC cache found', err);
+                    else generateToast({message: 'callCacheCleared'})
                 })
                 break;
             }
@@ -4736,7 +4738,7 @@ function playRegion(){
             switch (target) {
                 case 'species-frequency-threshold' : {
                     if (isNaN(element.value) || element.value === '') {
-                        generateToast({type: 'warning',  message:'The threshold must be a number between 0.001 and 1'});
+                        generateToast({type: 'warning',  message:'badThreshold'});
                         return false
                     }
                     config.speciesThreshold = element.value;
@@ -4796,7 +4798,7 @@ function playRegion(){
                     if (element.value === 'custom'){
                         labelFile = config.customListFile[config.model];
                         if (! labelFile) {
-                            generateToast({type: 'warning', message: 'You must select a label file in the list settings to use the custom language option.'});
+                            generateToast({type: 'warning', message: 'labelFileNeeded'});
                             return;
                         }
                     } else {
@@ -4816,7 +4818,7 @@ function playRegion(){
                     config.model = element.value;
                     modelSettingsDisplay();
                     DOM.customListFile.value = config.customListFile[config.model];
-                    DOM.customListFile.value ? LIST_MAP.custom = 'Using a custom list' : delete LIST_MAP.custom;
+                    DOM.customListFile.value ? LIST_MAP = getI18n(i18nLIST_MAP) : delete LIST_MAP.custom;
                     document.getElementById('locale').value = config[config.model].locale;
                     //config[config.model].backend = config.hasNode ? 'tensorflow' : 'webgpu';
                     document.getElementById(config[config.model].backend).checked = true;
@@ -4967,7 +4969,7 @@ function setListUIState(list){
     } else if (list === 'custom') {
         DOM.customListContainer.classList.remove('d-none');  
         if (!config.customListFile[config.model]) {
-            generateToast({type: 'warning', message: 'You need to upload a custom list for the model before using the custom list option.'})
+            generateToast({type: 'warning', message: 'listFileNeeded'})
             return
         }
         readLabels(config.customListFile[config.model], 'list');
@@ -5007,7 +5009,7 @@ async function readLabels(labelFile, updating){
 }
 
 function getI18n(context){
-    const locale = config[config.model].locale.replace('_uk', '');
+    const locale = config[config.model].locale;
     return context[locale] || context['en'];
 }
     
@@ -5406,7 +5408,10 @@ function getI18n(context){
     }
     
 
-    function generateToast({message = '', type = 'info', autohide = true} ={}) {
+    function generateToast({message = '', type = 'info', autohide = true, variables = {}} ={}) {
+        // i18n
+        const i18n = getI18n(i18nToasts);
+        message = interpolate(i18n[message], variables);
         const domEl = document.getElementById('toastContainer');
         
         const wrapper = document.createElement('div');
@@ -5424,7 +5429,7 @@ function getI18n(context){
         iconSpan.classList.add('material-symbols-outlined', 'pe-2');
         iconSpan.textContent = type; // The icon name
         const typeColours = { info: 'text-primary', warning: 'text-warning', error: 'text-danger'};
-        const typeText = { info: 'Notice', warning: 'Warning', error: 'Error'};
+        const typeText = { info: i18n.info, warning: i18n.warning, error: i18n.error};
         iconSpan.classList.add(typeColours[type]);
         const strong = document.createElement('strong');
         strong.className = 'me-auto';
@@ -5432,7 +5437,7 @@ function getI18n(context){
 
         const small = document.createElement('small');
         small.className = 'text-muted';
-        small.textContent = 'just now';
+        small.textContent = ''; //just now';
 
         const button = document.createElement('button');
         button.type = 'button';
@@ -5459,7 +5464,7 @@ function getI18n(context){
         domEl.appendChild(wrapper)
         const toast = new bootstrap.Toast(wrapper, {autohide: autohide})
         toast.show()
-        if (message === 'Analysis complete.'){
+        if (message === i18n.complete){
             const duration = parseFloat(DIAGNOSTICS['Analysis Duration'].replace(' seconds', ''));
             if (config.audio.notification && duration > 30){
                 if (Notification.permission === "granted") {
@@ -5547,7 +5552,7 @@ async function getXCComparisons(){
         .then(response =>{
             if (! response.ok) {
                 DOM.loading.classList.add('d-none');
-                return generateToast({type: 'error', message: 'The Xeno-canto API is not responding'})
+                return generateToast({type: 'error', message: 'noXC'})
             }
             return response.json()
         })
@@ -5598,7 +5603,7 @@ async function getXCComparisons(){
               }
             });
             if (songCount === 0 && callCount === 0 && flightCallCount === 0 && nocturnalFlightCallCount === 0) {
-                generateToast({type: 'warning', message: 'The Xeno-canto site has no comparisons available'})
+                generateToast({type: 'warning', message: 'noComparisons'})
                 return
               } else {
                 // Let's cache the result, 'cos the XC API is quite slow
@@ -5891,7 +5896,7 @@ async function getIUCNStatus(sname = 'Anser anser') {
 
     } catch (error) {
         if (error.message.includes('404')) {
-            generateToast({message: `There is no record of <b>${sname}</b> on the IUCN Red List.`, type: 'warning'})
+            generateToast({message:  'noIUCNRecord', variables: {sname: sname}, type: 'warning'})
             STATE.IUCNcache[sname] = {scopes: [{scope: 'Global', status: 'NA', url: null}]}
             updatePrefs('IUCNcache.json', STATE.IUCNcache);
             return true

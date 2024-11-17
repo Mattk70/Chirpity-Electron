@@ -26,8 +26,8 @@ let DEBUG;
 const originalWarn = console.warn;
 const originalError = console.error;
 
-const generateAlert =({message, type, autohide}) => {
-    UI.postMessage({event: 'generate-alert', type: type || 'info',  message: message, autohide: autohide});
+const generateAlert =({message, type, autohide, variables}) => {
+    UI.postMessage({event: 'generate-alert', type: type || 'info',  message, autohide, variables});
 }
 function customURLEncode(str) {
     return encodeURIComponent(str)
@@ -58,7 +58,7 @@ console.error = function() {
 // Implement error handling in the worker
 self.onerror = function(message, file, lineno, colno, error) {
     trackEvent(STATE.UUID, 'Unhandled Worker Error', message, customURLEncode(error?.stack));
-    if (message.includes('dynamic link library')) generateAlert({type: 'error',  message: 'There has been an error loading the model. This may be due to missing AVX support. Chirpity AI models require the AVX2 instructions set to run. If you have AVX2 enabled and still see this notice, please refer to <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">this issue</a> on Github.'})
+    if (message.includes('dynamic link library')) generateAlert({type: 'error',  message: 'noDLL'})
     // Return false not to inhibit the default error handling
     return false;
     };
@@ -395,10 +395,7 @@ async function handleMessage(e) {
         }
         case "analyse": {
             if (!predictWorkers.length) {
-                   generateAlert({type: 'Error',  
-                   message: `The ${STATE.model} model has not loaded. Restart Chirpity to continue. If you see this message repeatedly, 
-                   it is likely your computer does not support AVX2 and Chirpity will not run on your system.`
-                })
+                   generateAlert({type: 'Error', message: 'noLoad', variables: {model: STATE.model}})
                 UI.postMessage({event: 'analysis-complete', quiet: true});
                 break;
             }
@@ -590,7 +587,7 @@ function savedFileCheck(fileList) {
             }
         });
     } else {
-        generateAlert({type: 'error',  message: 'The database has not finished loading. The saved file check was skipped'})
+        generateAlert({type: 'error',  message: 'dbNotLoaded'})
         return undefined
     }
 }
@@ -1031,7 +1028,7 @@ const getDuration = async (src) => {
             resolve(duration);
         });
         audio.addEventListener('error', (error) => {
-            generateAlert({type: 'error',  message: 'Unable to extract essential metadata from ' + src})
+            generateAlert({type: 'error',  message: 'badMetadata', variables: {src}})
             reject(error, src)
         })
     });
@@ -1156,7 +1153,7 @@ async function loadAudioFile({
         .catch( (error) => {
             console.warn(error);
             // notify and return null if no matching file was found
-            generateAlert({type: 'error',  message: error.message});
+            //generateAlert({type: 'error',  message: 'noFile', variables: {file, error: error.message}});
             error.code === 'ENOENT' && notifyMissingFile(file)
         })
 
@@ -1501,7 +1498,7 @@ const fetchAudioBuffer = async ({
 }) => {
     if (! fs.existsSync(file)) {
         const result = await getWorkingFile(file);
-        if (!result) throw new Error('Cannot locate ' + file);
+        if (!result) return //throw new Error('Cannot locate ' + file);
         else file = result;
     }
     METADATA[file]?.duration || await setMetadata({file:file});
@@ -1528,7 +1525,7 @@ const fetchAudioBuffer = async ({
         const stream = command.pipe();
         
         command.on('error', error => {
-            generateAlert({type: 'error',  message: error})
+            generateAlert({type: 'error',  message: 'ffmpeg', variables: {error}})
             reject(new Error('fetchAudioBuffer: Error extracting audio segment:', error));
         });
 
@@ -2164,8 +2161,7 @@ const parsePredictions = async (response) => {
     UI.postMessage({ event: 'progress', progress: progress, file: file });
     if (fileProgress === 1) {
         if (index === 0 ) {
-            const message = `No detections found in ${file}. Searched for records using the ${STATE.list} list and having a minimum confidence of ${STATE.detect.confidence/10}%`
-            generateAlert({message: message})
+            generateAlert({message: 'noDetectionsDetailed2', variables: {file, list: STATE.list, confidence: STATE.detect.confidence/10}})
         } 
         updateFilesBeingProcessed(response.file)
         DEBUG && console.log(`File ${file} processed after ${(new Date() - predictionStart) / 1000} seconds: ${filesBeingProcessed.length} files to go`);
@@ -2245,7 +2241,7 @@ async function processNextFile({
         let file = FILE_QUEUE.shift()
         const found = await getWorkingFile(file).catch(error => {
             console.warn('Can\'t locate: ', file);
-            generateAlert({type: 'warning',  message: 'Cannot locate: ' + file})
+            generateAlert({type: 'warning',  message: 'noFile', variables: {file, error}})
         });
         if (found) {
             if (end) {}
@@ -2257,8 +2253,7 @@ async function processNextFile({
                 if (start === end) {
                     // Nothing to do for this file
                     updateFilesBeingProcessed(file);
-                    const message = `No detections. ${file} has no period within it where predictions would be given. <b>Tip:</b> To see detections in this file, disable nocmig mode and run the analysis again.`;
-                    generateAlert({message: message})
+                    generateAlert({message: 'noNight', variables: {file}})
                     
                     DEBUG && console.log('Recursion: start = end')
                     await processNextFile(arguments[0]).catch(error => console.warn('Error in processNextFile call', error));
@@ -2491,9 +2486,9 @@ const getResults = async ({
         filename += format == 'Raven' ? `_selections.txt` : '_detections.csv';
         const filePath = p.join(directory, filename);
         writeToPath(filePath, formattedValues, {headers: true, delimiter: format === 'Raven' ? '\t' : ','})
-        .on('error', err => generateAlert({type: 'warning',  message: `Cannot save file ${filePath}\nbecause it is open in another application`}))
+        .on('error', err => generateAlert({type: 'warning',  message: 'saveBlocked', variables: {filePath}}))
         .on('finish', () => {
-            generateAlert({message: filePath + ' has been written successfully.'});
+            generateAlert({message:'goodSave', variables: {filePath}});
         });
 
     } else if (format === 'Audacity'){
@@ -2517,9 +2512,9 @@ const getResults = async ({
             const filename = p.basename(file, suffix)  + '.txt';
             const filePath = p.join(directory, filename);
             writeToPath(filePath, groupedResult[file], {headers: false, delimiter: '\t'})
-            .on('error', err => generateAlert({type: 'warning',  message: `Cannot save file ${filePath}\nbecause it is open in another application`}))
+            .on('error', err => generateAlert({type: 'warning',  message: 'saveBlocked', variables: {filePath}}))
             .on('finish', () => {
-                generateAlert({message: filePath + ' has been written successfully.'});
+                generateAlert({message:'goodSave', variables: {filePath}});
             });
         })
     }
@@ -2552,11 +2547,12 @@ const getResults = async ({
         if (!result.length) {
             if (STATE.selection) {
                 // No more detections in the selection
-                generateAlert({message: 'No detections found in the selection'})
+                generateAlert({message: 'noDetections'})
             } else {
                 species = species || '';
                 const nocmig = STATE.detect.nocmig ? '<b>nocturnal</b>' : '';
-                generateAlert({message: `No ${nocmig} ${species} detections found ${STATE.mode === 'explore' ? 'in the Archive' : ''} using the ${STATE.list} list.`});
+                const archive = STATE.mode === 'explore' ? 'in the Archive' : '';
+                generateAlert({message: `noDetectionsDetailed`, variables: {nocmig, archive, species, list: STATE.list }});
             }
         }
         (STATE.selection && topRankin === STATE.topRankin)  || UI.postMessage({event: 'database-results-complete', active: active, select: position?.start});
@@ -2734,7 +2730,7 @@ const getSavedFileInfo = async (file) => {
         } 
         return row
     } else {
-        generateAlert({type: 'error',  message: 'The database has not finished loading. The check for the presence of the file in the archive has been skipped'})
+        generateAlert({type: 'error',  message: 'dbNotLoaded'})
         return undefined
     }
 };
@@ -3468,7 +3464,7 @@ async function setIncludedIDs(lat, lon, week) {
 
         if (STATE.included === undefined) STATE.included = {}
         STATE.included = merge(STATE.included, includedObject);
-        messages.forEach(message => generateAlert({type: 'warning',  message: message} ))
+        messages.forEach(message => generateAlert({type: 'warning',  message: 'noSnameFound', variables: {sname: message.sname, line: message.sname, model: message.model}} ))
         return STATE.included;
     })();
 
@@ -3485,13 +3481,13 @@ const pLimit = require('p-limit');
 async function convertAndOrganiseFiles(threadLimit) {
     // SANITY checks: archive location exists and is writeable?
     if (!fs.existsSync(STATE.archive.location)) {
-        generateAlert({type: 'error',  message: `Cannot access archive location: ${STATE.archive.location}. <br> Operation aborted`});
+        generateAlert({type: 'error',  message: 'noArchive', variables: {location: STATE.archive.location}});
         return false;
     }
     try {
         fs.accessSync(STATE.archive.location, fs.constants.W_OK);
     } catch {
-        generateAlert({type: 'error',  message: `Cannot write to archive location: ${STATE.archive.location}. <br> Operation aborted`});
+        generateAlert({type: 'error',  message: 'noWriteArchive', variables: {location: STATE.archive.location}});
         return false;
     }
     threadLimit ??= 4; // Set a default
@@ -3613,11 +3609,11 @@ async function convertFile(inputFilePath, fullFilePath, row, db, dbArchiveName, 
         let scaleFactor = 1;
         if (STATE.archive.trim) {
             if (boundaries.length > 1) { 
-                generateAlert({type: 'warning',  message: `Multi-day operations are not yet supported: ${inputFilePath} will not be trimmed`});
+                generateAlert({type: 'warning',  message: 'multiDay', variables: {file: inputFilePath}});
             } else {
                 const {start, end} = boundaries[0];
                 if (start === end) {
-                    generateAlert({type: 'warning', message: `${inputFilePath} will not be added to the archive as it is entirely during daylight.`});
+                    generateAlert({type: 'warning', message: 'allDaylight', variables: {file: inputFilePath}});
                     return resolve();
                 }
                 command.seekInput(start).duration(end - start);
@@ -3637,13 +3633,13 @@ async function convertFile(inputFilePath, fullFilePath, row, db, dbArchiveName, 
                     if (err) {
                         console.error("Error updating the database:", err);
                     } else {
-                        generateAlert({message: `Finished conversion for ${inputFilePath}`});
+                        generateAlert({message: 'conversionDone', variables: {file: inputFilePath}});
                     }
                     resolve();
                 });
             })
             .on('error', (err) => {
-                generateAlert({type: 'error',  message: `Error converting file ${inputFilePath}:`, err});
+                generateAlert({type: 'error',  message: 'conversionDone', variables: {file: inputFilePath, error: err}});
                 reject(err);
             })
             .on('progress', (progress) => {

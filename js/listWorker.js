@@ -296,13 +296,7 @@ class Model {
                             includedIDs.push(...selectedIndexes);
                         }
                     } else {
-                        sname === 'Unknown Sp.' || messages.push(`Cannot find '${sname}' (at line ${line} of the custom list) in the <strong>${this.model}</strong> list.
-                        <strong>Tips:</strong> 
-                        <ol>
-                            <li>Is your list for the <strong>${this.model}</strong> model? If not, change the model in settings</li>
-                            <li>Check for a typo in your species name</li>
-                        </ol>
-                        `);
+                        sname === 'Unknown Sp.' || messages.push({sname:sname, model:this.model, line: line});
                     }
                 }
             }

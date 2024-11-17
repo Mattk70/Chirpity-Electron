@@ -1,12 +1,11 @@
 {
-    "heading": [
-      "¿Te gustaría ayuda?"
-    ],
-    "content": [
-      "Existe una comunidad de WhatsApp para los usuarios de Chirpity. Puedes compartir problemas, sugerir nuevas funciones y discutir identificaciones de especies en los chats grupales. Si deseas unirte a la comunidad, simplemente presiona este botón para ir a la página de invitación de WhatsApp:"
-    ],
-    "join-whatsapp": [
-      "Únete a la comunidad de WhatsApp de Chirpity"
-    ]
-  }
-  
+  "heading": [
+    "¿Te gustaría ayudar?"
+  ],
+  "content": [
+    "Hay una comunidad de WhatsApp para los usuarios de Chirpity. Puedes compartir problemas, sugerir nuevas funciones y debatir identificaciones de especies en los chats grupales. Si te apetece unirte a la comunidad, basta con darle al botón de abajo para ir a la página de invitación de WhatsApp:"
+  ],
+  "join-whatsapp": [
+    "Únete a la comunidad de WhatsApp de Chirpity"
+  ]
+}
