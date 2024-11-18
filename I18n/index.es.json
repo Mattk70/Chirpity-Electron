@@ -80,7 +80,7 @@
     "go": ["Ir"],
     "set-location": ["Establecer ubicación"],
     "reset-spec-frequency": ["Restablecer"],
-    "frequency-range-legend": ["Rango de frecuencia del espectrograma"],
+    "frequency-range-legend": ["Rango de frecuencia del sonograma"],
     "list-file-selector": ["Seleccionar archivo"],
     "apply-location": ["Establecer"],
     "cancel-location": ["Cancelar"],
