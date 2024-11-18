@@ -148,8 +148,8 @@ const i18nToasts = { // UI.js
         complete: "Análisis completo.",
         feedback: "Gracias, tu retroalimentación ayuda a mejorar las predicciones de Chirpity.",
         contextBlocked: "No es posible cambiar la configuración del modo de contexto mientras un análisis está en curso.",
-        noCallCache: "No se encontró caché de llamadas.",
-        callCacheCleared: "El caché de llamadas se ha limpiado correctamente.",
+        noCallCache: "No se encontró caché de reclamos.",
+        callCacheCleared: "El caché de reclamos se ha limpiado correctamente.",
         badThreshold: "El umbral debe ser un número entre 0.001 y 1.",
         labelFileNeeded: "Debe seleccionar un archivo de etiquetas en la configuración de la lista para usar la opción de idioma personalizado.",
         listFileNeeded: "Debe cargar una lista personalizada para el modelo antes de usar la opción de lista personalizada.",
@@ -453,7 +453,8 @@ const i18nHeadings = {
         label: 'Label',
         notes: 'Notes',
         max: 'Maximum',
-        detections: 'Detections'
+        detections: 'Detections',
+        location: 'Location'
     },
     da: {
         position: ['Position', "Sorter resultater efter detektionstid"],
@@ -463,7 +464,8 @@ const i18nHeadings = {
         label: 'Etiket',
         notes: 'Noter',
         max: 'Maksimum',
-        detections: 'Detektioner'
+        detections: 'Detektioner',
+        location: "Placering"
     },
     de: {
         position: ['Position', "Ergebnisse nach Erkennungszeit sortieren"],
@@ -473,7 +475,8 @@ const i18nHeadings = {
         label: 'Etikett',
         notes: 'Notizen',
         max: 'Maximum',
-        detections: 'Erkennungen'
+        detections: 'Erkennungen',
+        location: "Standort"
     },
     es: {
         position: ['Posición', "Ordenar resultados por la hora de detección"],
@@ -483,7 +486,8 @@ const i18nHeadings = {
         label: 'Etiqueta',
         notes: 'Notas',
         max: 'Máximo',
-        detections: 'Detecciones'
+        detections: 'Detecciones',
+        location: "Ubicación"
     },
     fr: {
         position: ['Position', "Trier les résultats par heure de détection"],
@@ -493,7 +497,8 @@ const i18nHeadings = {
         label: 'Étiquette',
         notes: 'Notes',
         max: 'Maximum',
-        detections: 'Détections'
+        detections: 'Détections',
+        location: "Emplacement"
     },
     nl: {
         position: ['Positie', "Sorteer resultaten op detectietijd"],
@@ -503,7 +508,8 @@ const i18nHeadings = {
         label: 'Label',
         notes: 'Notities',
         max: 'Maximum',
-        detections: 'Detecties'
+        detections: 'Detecties',
+        location: "Locatie"
     },
     pt: {
         position: ['Posição', "Ordenar resultados por tempo de detecção"],
@@ -513,7 +519,8 @@ const i18nHeadings = {
         label: 'Rótulo',
         notes: 'Notas',
         max: 'Máximo',
-        detections: 'Detecções'
+        detections: 'Detecções',
+        location: "Localização"
     },
     ru: {
         position: ['Позиция', "Сортировать результаты по времени обнаружения"],
@@ -523,7 +530,8 @@ const i18nHeadings = {
         label: 'Метка',
         notes: 'Заметки',
         max: 'Максимум',
-        detections: 'Обнаружения'
+        detections: 'Обнаружения',
+        location:  "Местоположение"
     },
     sv: {
         position: ['Position', "Sortera resultat efter upptäcktstid"],
@@ -533,7 +541,8 @@ const i18nHeadings = {
         label: 'Etikett',
         notes: 'Anteckningar',
         max: 'Maximum',
-        detections: 'Upptäckter'
+        detections: 'Upptäckter',
+        location: "Plats"
     },
     zh: {
         position: ['位置', "按检测时间排序结果"],
@@ -543,7 +552,8 @@ const i18nHeadings = {
         label: '标签',
         notes: '备注',
         max: '最大值',
-        detections: '检测'
+        detections: '检测',
+        location: "位置"
     }
 };
 
@@ -686,6 +696,9 @@ const i18nLocation = {
 
 const i18nContext = {
     en: {
+        lastNight: 'Last Night', thisWeek: 'This Week', lastWeek: 'LastWeek', thisMonth: 'This Month', lastMonth: 'Last Month', thisYear: 'This Year', lastYear: 'Last Year',
+        apply: 'Apply', cancel: 'Cancel', filter: 'Apply a date Filter',
+        'nocturnal flight call': 'Nocturnal Flight Call', 'flight call': 'Flight Call', call: 'Call', song: 'Song',
         play: 'Play',
         pause: 'Pause',
         analyse: 'Analyse',
@@ -695,9 +708,14 @@ const i18nContext = {
         delete: 'Delete Record',
         location: 'Amend File Recording Location',
         time: 'Amend File Start Time',
+        frequency: 'Frequency',
+        length: "Region Length",
         plural: 's'
     },
     da: {
+        lastNight: 'I går nat', thisWeek: 'Denne uge', lastWeek: 'Sidste uge', thisMonth: 'Denne måned', lastMonth: 'Sidste måned', thisYear: 'Dette år', lastYear: 'Sidste år',
+        apply: 'Anvend', cancel: 'Annuller', filter: 'Anvend en datofiltrering',
+        'nocturnal flight call': 'Natterflyvningskald', 'flight call': 'Flyvekald', call: 'Kald', song: 'Sang',
         play: 'Afspil',
         pause: 'Pause',
         analyse: 'Analysér',
@@ -707,9 +725,14 @@ const i18nContext = {
         delete: 'Slet post',
         location: 'Rediger filens optagelsesplacering',
         time: 'Rediger filens starttid',
-        plural: 'er'
+        plural: 'er',
+        frequency: "Frekvens",
+        length: "Regionslængde"
     },
     de: {
+        lastNight: 'Letzte Nacht', thisWeek: 'Diese Woche', lastWeek: 'Letzte Woche', thisMonth: 'Dieser Monat', lastMonth: 'Letzter Monat', thisYear: 'Dieses Jahr', lastYear: 'Letztes Jahr',
+        apply: 'Anwenden', cancel: 'Abbrechen', filter: 'Datumsfilter anwenden',
+        'nocturnal flight call': 'Nächtlicher Flugruf', 'flight call': 'Flugruf', call: 'Ruf', song: 'Gesang',
         play: 'Abspielen',
         pause: 'Pause',
         analyse: 'Analysieren',
@@ -719,9 +742,14 @@ const i18nContext = {
         delete: 'Eintrag löschen',
         location: 'Aufnahmeort der Datei ändern',
         time: 'Startzeit der Datei ändern',
-        plural: 'e'
+        plural: 'e',
+        frequency: "Frequenz",
+        length: "Regionlänge"
     },
     es: {
+        lastNight: 'Anoche', thisWeek: 'Esta semana', lastWeek: 'La semana pasada', thisMonth: 'Este mes', lastMonth: 'El mes pasado', thisYear: 'Este año', lastYear: 'El año pasado',
+        apply: 'Aplicar', cancel: 'Cancelar', filter: 'Aplicar un filtro de fecha',
+        'nocturnal flight call': 'Reclamos de vuelo nocturno', 'flight call': 'Reclamos de vuelo', call: 'Reclamos', song: 'Canto',
         play: 'Reproducir',
         pause: 'Pausa',
         analyse: 'Analizar',
@@ -731,9 +759,14 @@ const i18nContext = {
         delete: 'Eliminar este registro',
         location: 'Modificar la ubicación de grabación del archivo',
         time: 'Modificar la hora de inicio del archivo',
-        plural: 's'
+        plural: 's',
+        frequency: "Frecuencia",
+        length: "Longitud de la región"
     },
     fr: {
+        lastNight: 'La nuit dernière', thisWeek: 'Cette semaine', lastWeek: 'La semaine dernière', thisMonth: 'Ce mois-ci', lastMonth: 'Le mois dernier', thisYear: 'Cette année', lastYear: 'L’année dernière',
+        apply: 'Appliquer', cancel: 'Annuler', filter: 'Appliquer un filtre de date',
+        'nocturnal flight call': 'Cri de vol nocturne', 'flight call': 'Cri de vol', call: 'Cri', song: 'Chant',
         play: 'Lecture',
         pause: 'Pause',
         analyse: 'Analyser',
@@ -743,9 +776,14 @@ const i18nContext = {
         delete: 'Supprimer l’enregistrement',
         location: 'Modifier l’emplacement d’enregistrement du fichier',
         time: 'Modifier l’heure de début du fichier',
-        plural: 's'
+        plural: 's',
+        frequency: "Fréquence",
+        length: "Longueur de la région"
     },
     nl: {
+        lastNight: 'Gisteravond', thisWeek: 'Deze week', lastWeek: 'Vorige week', thisMonth: 'Deze maand', lastMonth: 'Vorige maand', thisYear: 'Dit jaar', lastYear: 'Vorig jaar',
+        apply: 'Toepassen', cancel: 'Annuleren', filter: 'Een datumfilter toepassen',
+        'nocturnal flight call': 'Nachtelijke vluchtroep', 'flight call': 'Vluchtroep', call: 'Roep', song: 'Zang',
         play: 'Afspelen',
         pause: 'Pauze',
         analyse: 'Analyseren',
@@ -755,9 +793,14 @@ const i18nContext = {
         delete: 'Record verwijderen',
         location: 'Opnamelocatie van bestand aanpassen',
         time: 'Starttijd van bestand aanpassen',
-        plural: 'en'
+        plural: 'en',
+        frequency: "Frequentie",
+        length: "Regiolengte"
     },
     pt: {
+        lastNight: 'Ontem à noite', thisWeek: 'Esta semana', lastWeek: 'Semana passada', thisMonth: 'Este mês', lastMonth: 'Mês passado', thisYear: 'Este ano', lastYear: 'Ano passado',
+        apply: 'Aplicar', cancel: 'Cancelar', filter: 'Aplicar um filtro de data',
+        'nocturnal flight call': 'Chamado de voo noturno', 'flight call': 'Chamado de voo', call: 'Chamado', song: 'Canto',
         play: 'Reproduzir',
         pause: 'Pausar',
         analyse: 'Analisar',
@@ -767,9 +810,14 @@ const i18nContext = {
         delete: 'Excluir registro',
         location: 'Alterar local de gravação do arquivo',
         time: 'Alterar horário de início do arquivo',
-        plural: 's'
+        plural: 's',
+        frequency: "Frequência",
+        length: "Comprimento da região"
     },
     ru: {
+        lastNight: 'Прошлой ночью', thisWeek: 'На этой неделе', lastWeek: 'На прошлой неделе', thisMonth: 'В этом месяце', lastMonth: 'В прошлом месяце', thisYear: 'В этом году', lastYear: 'В прошлом году',
+        apply: 'Применить', cancel: 'Отмена', filter: 'Применить фильтр по дате',
+        'nocturnal flight call': 'Ночной полётный крик', 'flight call': 'Полётный крик', call: 'Крик', song: 'Песня',        
         play: 'Воспроизвести',
         pause: 'Пауза',
         analyse: 'Анализировать',
@@ -779,9 +827,14 @@ const i18nContext = {
         delete: 'Удалить запись',
         location: 'Изменить место записи файла',
         time: 'Изменить время начала файла',
-        plural: ''
+        plural: '',
+        frequency: "Частота",
+        length: "Длина региона"
     },
     sv: {
+        lastNight: 'I går kväll', thisWeek: 'Denna vecka', lastWeek: 'Förra veckan', thisMonth: 'Denna månad', lastMonth: 'Förra månaden', thisYear: 'Det här året', lastYear: 'Förra året',
+        apply: 'Tillämpa', cancel: 'Avbryt', filter: 'Tillämpa ett datumfilter',
+        'nocturnal flight call': 'Nattlig flyktrop', 'flight call': 'Flyktrop', call: 'Rop', song: 'Sång',
         play: 'Spela upp',
         pause: 'Paus',
         analyse: 'Analysera',
@@ -791,9 +844,14 @@ const i18nContext = {
         delete: 'Ta bort post',
         location: 'Ändra filens inspelningsplats',
         time: 'Ändra filens starttid',
-        plural: 'er'
+        plural: 'er',
+        frequency: "Frekvens",
+        length: "Regionlängd"
     },
     zh: {
+        lastNight: '昨晚', thisWeek: '本周', lastWeek: '上周', thisMonth: '本月', lastMonth: '上月', thisYear: '今年', lastYear: '去年',
+        apply: '应用', cancel: '取消', filter: '应用日期过滤器',
+        'nocturnal flight call': '夜间飞行叫声', 'flight call': '飞行叫声', call: '叫声', song: '歌声',
         play: '播放',
         pause: '暂停',
         analyse: '分析',
@@ -803,7 +861,9 @@ const i18nContext = {
         delete: '删除记录',
         location: '修改文件录制位置',
         time: '修改文件开始时间',
-        plural: ''
+        plural: '',
+        frequency: "频率",
+        length: "区域长度"
     }
 };
 
@@ -1253,9 +1313,21 @@ async function localiseUI(locale) {
         // Translate settings labels
         const form = document.getElementById('settings');
         const labels = form.querySelectorAll('label');
+        const settings = localisationData['settings']
         labels.forEach(label => {
             const id = label.getAttribute('for');
-            label.textContent = localisationData['settings'][id];
+            if (settings[id]){
+                label.textContent = settings[id];
+                // Some nested labels must be skipped
+                if (['tensorflow', 'webgpu', 'webgl', 'colourmap', 'window-function', 'timelineSetting', 'iucn-scope', 'archive-format',
+                     'loud-color', 'mid-color', 'quiet-color', "color-threshold-slider", 'bitrate', 'format', 'quality'].includes(id)) return
+                // Set popOver title. It's in the div, or div parent div
+                const el = label.parentNode.querySelector('a') || label.parentNode.parentNode.querySelector('a') || label.parentNode.parentNode.parentNode.querySelector('a');
+                const heading = label.textContent.replace(':', '');
+                el.setAttribute('data-bs-title', heading);
+                const popover = new bootstrap.Popover(el);
+                popover.update();
+            }
         })
         const play = document.querySelector('#playToggle :nth-child(2)');
         const pause = document.querySelector('#playToggle :nth-child(4)');
@@ -1274,6 +1346,9 @@ async function localiseUI(locale) {
             const key = option.value; // Get the value of the option, which matches the key in i18nLists
             option.textContent = i18nLists[locale][key] ?? option.textContent;
         });
+        // //Explore location header
+        document.querySelector("label[for='explore-locations']").textContent = i18nHeadings[locale].location;
+        document.getElementById('exploreRange').innerHTML = `<span class="material-symbols-outlined align-bottom">date_range</span><span>${localisationData['explore-datefilter']}</span> <span class="material-symbols-outlined float-end">expand_more</span>`;
         console.warn(`Translation took: ${Date.now() - t0} ms`)
         return localisationData
     } catch (error) {

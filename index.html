@@ -37,7 +37,7 @@
         <div class="col align-middle">
             <div class="btn btn-light me-2 pt-3" id="exploreRange">
                 <span class="material-symbols-outlined align-bottom">date_range</span>&nbsp;
-                <span>Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>
+                <span id="explore-datefilter">Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>
             </div>
         </div>
         <div class="species-selector col" id="exploreSpeciesSearch">
@@ -364,7 +364,7 @@
                     <div class="col d-none">
                         <div class="btn btn-light pt-3 mb-2" id="chartRange">
                             <span class="material-symbols-outlined align-bottom">date_range</span>&nbsp;
-                            <span>Apply a date filter</span> <span
+                            <span id="chart-datefilter">Apply a date filter</span> <span
                             class="material-symbols-outlined  align-bottom">expand_more</span>
                         </div>
                     </div>
@@ -475,7 +475,7 @@
         <!-- DIV to Hold the spec frequency controls -->
         <div class="range_container d-none" id="frequency-range-panel">
             <fieldset class="border border-secondary rounded m-2 p-2">
-                <legend class="pb-2 text-bg-dark h6">Spectrogram Frequency Range</legend>
+                <legend class="pb-2 text-bg-dark h6" id="frequency-range-legend">Spectrogram Frequency Range</legend>
                 <div class="sliders_control">
                     <input id="fromSlider" type="range" value="0" min="0" max="11950" step="50"/>
                     <input id="toSlider" type="range" value="12000" min="0" max="11950" step="50"/>
@@ -518,8 +518,8 @@
                     </div>
                     <div class="form-group rounded p-2 pe-0 mb-2">
                         <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Confidence Threshold" id="Confidence Threshold-circle-help"  data-bs-content="Determines the minimum confidence required for results to be returned">?</a>
-                        <label for="confidence">Confidence threshold:</label>
                         <div class="input-group">
+                            <label for="confidence">Confidence threshold:</label>
                             <input type="range" class="form-control-range w-75" id="confidence" min="5" max="100" step="5">
                             <div class="input-group-append">
                                 <span class="input-group-text" id="confidence-value">50%</span>

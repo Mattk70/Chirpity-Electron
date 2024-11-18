@@ -1498,13 +1498,13 @@ function adjustSpecDims(redraw, fftSamples, newHeight) {
 */
 
 
-function formatRegionTooltip(start, end) {
+function formatRegionTooltip(regionLength, start, end) {
     const length = end - start;
     if (length === 3) {
         return `${formatTimeCallback(start)} -  ${formatTimeCallback(end)}`;
-    } else if (length < 1) return `Region length: ${(length * 1000).toFixed(0)}ms`
+    } else if (length < 1) return `${regionLength}: ${(length * 1000).toFixed(0)}ms`
     else {
-        return `Region length: ${length.toFixed(3)}s`
+        return `${regionLength}: ${length.toFixed(3)}s`
     }
 }
 
@@ -1771,8 +1771,10 @@ window.onload = async () => {
         DOM.locale.value = config[config.model].locale;
         LIST_MAP = getI18n(i18nLIST_MAP)
         // Localise UI
-        STATE.i18n = localiseUI(DOM.locale.value)
-
+        localiseUI(DOM.locale.value).then(result => STATE.i18n = result);
+        initialiseDatePicker();
+        STATE.picker.options.lang = DOM.locale.value.replace('_uk', '');
+        
         // remember audio notification setting
         DOM.audioNotification.checked = config.audio.notification;
         
@@ -2091,6 +2093,7 @@ function generateBirdList(store, rows) {
 
 function generateBirdOptionList({ store, rows, selected }) {
     let listHTML = '';
+    const i18n = getI18n(i18nHeadings);
     if (store === 'allSpecies') {
         let sortedList = LABELS.map(label => label.split('_')[1]);
         
@@ -2109,14 +2112,14 @@ function generateBirdOptionList({ store, rows, selected }) {
                 listHTML += `<option value="${sortedList[item]}" selected>${sortedList[item]}</option>`;
             }
         }
-        listHTML += '</select><label for="bird-list-all">Species</label></div>';
+        listHTML += `</select><label for="bird-list-all">${i18n.species[0]}</label></div>`;
     } else {
         listHTML += '<select id="bird-list-seen" class="form-select"><option value="">All</option>';
         for (const item in rows) {
             const isSelected = rows[item].cname === STATE.chart.species ? 'selected' : '';
             listHTML += `<option value="${rows[item].cname}" ${isSelected}>${rows[item].cname}</option>`;
         }
-        listHTML += '</select><label for="bird-list-seen">Species</label>';
+        listHTML += `</select><label for="bird-list-seen">${i18n.species[0]}</label>`;
     }
     
     return listHTML;
@@ -2592,6 +2595,7 @@ function onChartData(args) {
     };
 
     async function specTooltip(event) {
+        const i18n = getI18n(i18nContext);
         const waveElement = event.target;
         const specDimensions = waveElement.getBoundingClientRect();
         const frequencyRange = Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
@@ -2599,10 +2603,10 @@ function onChartData(args) {
         
         // Update the tooltip content
         const tooltip = DOM.tooltip;
-        tooltip.textContent = `Frequency: ${yPosition}Hz`;
+        tooltip.textContent = `${i18n.frequency}: ${yPosition}Hz`;
         if (region) {
             const lineBreak = document.createElement('br');
-            const textNode = document.createTextNode(formatRegionTooltip(region.start, region.end));
+            const textNode = document.createTextNode(formatRegionTooltip(i18n.length, region.start, region.end));
             
             tooltip.appendChild(lineBreak);  // Add the line break
             tooltip.appendChild(textNode);   // Add the text node
@@ -4099,6 +4103,10 @@ function formatDuration(seconds){
     ////////// Date Picker ///////////////
     
     function initialiseDatePicker() {
+        if (STATE.picker) {
+            STATE.picker.destroy();
+            delete STATE.picker
+        }
         const currentDate = new Date();
         
         const thisYear = () => {
@@ -4147,9 +4155,15 @@ function formatDuration(seconds){
             return [middayYesterday, middayToday];
         };
         ['chartRange', 'exploreRange'].forEach(function(element) {
+            const i18n = getI18n(i18nContext);
             element = document.getElementById(element);
-            const picker = new easepick.create({
+            STATE.picker = new easepick.create({
                 element: element,
+                lang: config[config.model].locale.replace('_uk', ''),
+                locale: {
+                    cancel: i18n.cancel,
+                    apply: i18n.apply
+                },
                 css: [
                     './node_modules/@easepick/bundle/dist/index.css',
                 ],
@@ -4160,24 +4174,24 @@ function formatDuration(seconds){
                 plugins: [
                     "RangePlugin",
                     "PresetPlugin",
-                    "KbdPlugin",
                     "TimePlugin"
                 ],
                 PresetPlugin: {
                     customPreset: {
-                        'Last Night': lastNight(),
-                        'This Week': thisWeek(),
-                        'Last Week': lastWeek(),
-                        'This Month': thisMonth(),
-                        'Last Month': lastMonth(),
-                        'This Year': thisYear(),
-                        'Last Year': lastYear()
+                        [i18n.lastNight]: lastNight(),
+                        [i18n.thisWeek]: thisWeek(),
+                        [i18n.lastWeek]: lastWeek(),
+                        [i18n.thisMonth]: thisMonth(),
+                        [i18n.lastMonth]: lastMonth(),
+                        [i18n.thisYear]: thisYear(),
+                        [i18n.lastYear]: lastYear()
                     }
                 },
                 TimePlugin: {
                     format: 'HH:mm',
                 },
             });
+            const picker = STATE.picker;
             picker.on('select', (e) =>{
                 const {start, end} = e.detail;
                 console.log('Range Selected!', JSON.stringify(e.detail))
@@ -4236,13 +4250,12 @@ function formatDuration(seconds){
                 const element = document.getElementById(id);
                 if (! element.textContent){
                     // It's blank
-                    element.innerHTML = '<span class="material-symbols-outlined align-bottom">date_range</span><span>Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>';
-                } else if ( ! element.textContent.includes('Apply a date filter')){
+                    element.innerHTML = `<span class="material-symbols-outlined align-bottom">date_range</span><span>${STATE.i18n['explore-datefilter']}</span> <span class="material-symbols-outlined float-end">expand_more</span>`;
+                } else if ( ! element.textContent.includes(STATE.i18n['explore-datefilter'])){
                     createDateClearButton(element, picker);
                 }
             })
         })
-        
     }
     
     function createDateClearButton(element, picker){
@@ -4255,7 +4268,7 @@ function formatDuration(seconds){
         span.addEventListener('click', (e) =>{
             e.stopImmediatePropagation();
             picker.clear();
-            element.innerHTML = '<span class="material-symbols-outlined align-bottom">date_range</span><span>Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>';
+            element.innerHTML = `<span class="material-symbols-outlined align-bottom">date_range</span><span>${STATE.i18n['explore-datefilter']}</span> <span class="material-symbols-outlined float-end">expand_more</span>`;
         })
     }
     
@@ -4307,7 +4320,6 @@ function formatDuration(seconds){
                 });
             })
         }
-        initialiseDatePicker();
     });
     
     
@@ -4804,9 +4816,12 @@ function playRegion(){
                     } else {
                         const chirpity = element.value === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
                         labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${element.value}.txt`; 
-                        STATE.i18n = localiseUI(element.value)
+                        localiseUI(DOM.locale.value).then(result => STATE.i18n = result);
+                        config[config.model].locale = element.value;
+                        initialiseDatePicker()
                     }
                     config[config.model].locale = element.value;
+                    STATE.picker.options.lang = element.value.replace('_uk', '');
                     readLabels(labelFile, 'locale');
                     break }
                 case 'local': {
@@ -5533,6 +5548,7 @@ async function getXCComparisons(){
     let [,,,sname,cname] = activeRow.getAttribute('name').split('|');
     cname.includes('call)') ? "call" : "";
     let XCcache;
+    const i18n = getI18n(i18nContext);
     try {
         const data = await fs.promises.readFile(p.join(appPath, 'XCcache.json'), 'utf8');
         XCcache = JSON.parse(data);
@@ -5544,7 +5560,7 @@ async function getXCComparisons(){
     if (XCcache[sname]) renderComparisons(XCcache[sname], cname);
     else {
 
-        DOM.loading.querySelector('#loadingText').textContent = 'Loading Xeno-Canto data...';
+        DOM.loading.querySelector('#loadingText').textContent = 'Loading Xeno-Canto data...'; 
         DOM.loading.classList.remove('d-none');
         const quality = '+q:%22>C%22';
         const length = '+len:3-15';
@@ -5626,6 +5642,8 @@ function capitalizeEachWord(str) {
     });
   }
 function renderComparisons(lists, cname){
+    const i18n = getI18n(i18nContext);
+    const i18nTitle = getI18n(i18nTitles);
     cname = cname.replace(/\(.*\)/, '').replace('?', '');
     const compareDiv = document.createElement('div');
     compareDiv.classList.add('modal', 'modal-fade', 'model-lg')
@@ -5642,18 +5660,18 @@ function renderComparisons(lists, cname){
                         <ul class="nav nav-tabs navbar navbar-expand p-0 pt-1" id="callTypeHeader" role="tablist"></ul>
                         <div class="tab-content" id="recordings"></div>
                         <div class="modal-footer justify-content-center pb-0">
-                            <button id="playComparison" class="p-1 pe-2 btn btn-outline-secondary" title="Play / Pause (SpaceBar)">
+                            <button id="playComparison" class="p-1 pe-2 btn btn-outline-secondary" title="${i18nTitle.playToggle}">
                                 <span class="material-symbols-outlined ">play_circle</span><span
-                                class="align-middle d-none d-lg-inline"> Play </span>
+                                class="align-middle d-none d-lg-inline"> ${i18n.play} </span>
                                 /
                                 <span class="material-symbols-outlined">pause</span><span
-                                class="align-middle d-none d-lg-inline-block">Pause</span>
+                                class="align-middle d-none d-lg-inline-block">${i18n.pause}</span>
                             </button>
                             <div class="btn-group" role="group">
-                                <button id="cmpZoomIn" title="Zoom into the spectrogram" class="btn btn-outline-secondary p-0">
+                                <button id="cmpZoomIn" title="${i18nTitle.zoomIn}" class="btn btn-outline-secondary p-0">
                                 <span class="material-symbols-outlined zoom-xc">zoom_in</span>
                                 </button>
-                                <button id="cmpZoomOut" title="Zoom out of the spectrogram" class="btn btn-outline-secondary p-0"
+                                <button id="cmpZoomOut" title="${i18nTitle.zoomOut}" class="btn btn-outline-secondary p-0"
                                 style="max-width: 70px"><span class="material-symbols-outlined zoom-xc align-middle">zoom_out</span>
                                 </button>
                             </div>
@@ -5676,7 +5694,7 @@ function renderComparisons(lists, cname){
             const tabHeading = document.createElement('li');
             tabHeading.classList.add('nav-item')
             tabHeading.setAttribute('role', 'presentation');
-            const button = `<button class="nav-link text-nowrap ${active}" id="${callTypePrefix}-tab" data-bs-toggle="tab" data-bs-target="#${callTypePrefix}-tab-pane" type="button" role="tab" aria-controls="${callTypePrefix}-tab-pane" aria-selected="${count === 0}">${capitalizeEachWord(callType)}</button>`;
+            const button = `<button class="nav-link text-nowrap ${active}" id="${callTypePrefix}-tab" data-bs-toggle="tab" data-bs-target="#${callTypePrefix}-tab-pane" type="button" role="tab" aria-controls="${callTypePrefix}-tab-pane" aria-selected="${count === 0}">${i18n[callType]}</button>`;
             tabHeading.innerHTML = button;
             callTypeHeader.appendChild(tabHeading);
 

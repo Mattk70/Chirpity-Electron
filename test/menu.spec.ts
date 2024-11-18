@@ -84,7 +84,7 @@ test.afterAll(async () => {
   await electronApp.close()
 })
 
-test.describe.configure({ mode: 'parallel', retries: 2, timeout: 20_000 });
+//test.describe.configure({ mode: 'parallel', retries: 2, timeout: 20_000 });
 
 /*
 REMEMBER TO REBUILD THE APP IF THE *APPLICATION CODE* NEEDS TO BE CHANGED
@@ -157,6 +157,115 @@ test("Amend file start dialog contains date", async () =>{
   expect(entry.toString()).toContain(currentYear);
   // await page.locator('#spectrogramWrapper button.btn-secondary').click();
 })
+
+// test("Copes with scatter bomb", async () =>{
+//   await runExampleAnalysis(page, 'chirpity');
+//   await page.locator('#dropdownMenuButton').click({button: 'right'});
+//   await page.locator('#setFileStart').click();
+//   const fileStart = await page.locator('#fileStart');
+//   const entry = await fileStart.inputValue();
+//   const currentYear = new Date().getFullYear().toString();
+//   expect(entry.toString()).toContain(currentYear);
+//   // await page.locator('#spectrogramWrapper button.btn-secondary').click();
+// })
+
+
+/* 
+The current issue with click fest is that while element are hidden, they can't be clicked.
+
+*/
+
+
+test('copes with click fest, including hidden elements', async () => {
+
+
+  // Ensure dropdown menus are opened before interacting with their items
+  const dropdownToggles = page.locator('[data-bs-toggle="dropdown"], [aria-haspopup="true"]');
+  for (let i = 0; i < await dropdownToggles.count(); i++) {
+    try {
+      const toggle = dropdownToggles.nth(i);
+      await toggle.click(); // Open the dropdown
+      console.log('Opened dropdown:', await toggle.getAttribute('aria-label') || 'No label');
+    } catch (error) {
+      console.error('Error opening dropdown:', error);
+    }
+  }
+
+  // Ensure off-canvas panels are opened
+  const offCanvasToggles = page.locator('[data-bs-toggle="offcanvas"]');
+  for (let i = 0; i < await offCanvasToggles.count(); i++) {
+    try {
+      const toggle = offCanvasToggles.nth(i);
+      await toggle.click(); // Open the off-canvas panel
+      console.log('Opened off-canvas panel:', await toggle.getAttribute('aria-label') || 'No label');
+    } catch (error) {
+      console.error('Error opening off-canvas panel:', error);
+    }
+  }
+
+  // Get all clickable elements
+  const clickableElements = page.locator('button, a, input[type="button"], input[type="submit"], [role="button"]');
+  for (let i = 0; i < await clickableElements.count(); i++) {
+    try {
+      const element = clickableElements.nth(i);
+      await element.click({ force: true }); // Force click in case it's hidden
+      console.log('Clicked element:', await element.innerText());
+    } catch (error) {
+      console.error('Error clicking element:', error);
+    }
+  }
+
+  // Interact with checkboxes
+  const checkboxes = page.locator('input[type="checkbox"]');
+  for (let i = 0; i < await checkboxes.count(); i++) {
+    try {
+      const checkbox = checkboxes.nth(i);
+      await checkbox.check({ force: true }); // Force interaction
+      console.log('Checked checkbox:', await checkbox.getAttribute('name'));
+    } catch (error) {
+      console.error('Error checking checkbox:', error);
+    }
+  }
+
+  // Interact with radio buttons
+  const radioButtons = page.locator('input[type="radio"]');
+  for (let i = 0; i < await radioButtons.count(); i++) {
+    try {
+      const radioButton = radioButtons.nth(i);
+      await radioButton.check({ force: true }); // Force interaction
+      console.log('Selected radio button:', await radioButton.getAttribute('name'));
+    } catch (error) {
+      console.error('Error selecting radio button:', error);
+    }
+  }
+
+  // Interact with dropdowns
+  const dropdowns = page.locator('select');
+  for (let i = 0; i < await dropdowns.count(); i++) {
+    try {
+      const dropdown = dropdowns.nth(i);
+      const options = dropdown.locator('option');
+      if (await options.count() > 1) {
+        await dropdown.selectOption({ index: 1 });
+        console.log('Selected option from dropdown:', await dropdown.getAttribute('name'));
+      }
+    } catch (error) {
+      console.error('Error selecting dropdown option:', error);
+    }
+  }
+
+  // Interact with text inputs
+  const textInputs = page.locator('input[type="text"], textarea');
+  for (let i = 0; i < await textInputs.count(); i++) {
+    try {
+      const textInput = textInputs.nth(i);
+      await textInput.fill('Test value');
+      console.log('Filled text input:', await textInput.getAttribute('name'));
+    } catch (error) {
+      console.error('Error filling text input:', error);
+    }
+  }
+});
 
 // test('Check spectrogram before and after applying filter are different', async () => {
   
