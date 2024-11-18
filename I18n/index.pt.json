@@ -82,13 +82,13 @@
   "reset-spec-frequency": ["Redefinir"],
   "frequency-range-legend": ["Faixa de frequência do espectrograma"],
   "list-file-selector": ["Selecionar arquivo"],
-  "clear-call-cache": ["Limpar cache de chamadas de referência"],
   "apply-location": ["Definir"],
   "cancel-location": ["Cancelar"],
   "archive-location-select": ["Localização da biblioteca:"],
-  "reset-defaults": ["Redefinir para as configurações padrão"],
   "close-tour": ["Fechar"],
   "settings": {
+    "clear-call-cache": ["Limpar cache de chamadas de referência"],
+    "reset-defaults": ["Redefinir para as configurações padrão"],
     "model-to-use": "Modelo:",
     "confidence": "Limite de confiança:",
     "list-to-use": "Lista:",
@@ -135,6 +135,16 @@
     "snrValue": "Filtro SNR:",
     "debug-mode": "Modo de depuração"
   },
+  "record-entry": {
+    "record-entry-modal-label": "Editar registro",
+    "call-count": "Contagem de cantos de aves",
+    "record-label": "Tipo de canto de ave",
+    "label-local": "Local",
+    "label-nocmig": "Nocmig",
+    "label-unknown": "Não especificado",
+    "record-comment": "Comentários",
+    "record-add": "Adicionar"
+},
   "headings": ["Configurações","Detecções",
     "Localização padrão",
     "Sistema",

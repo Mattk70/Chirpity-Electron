@@ -82,13 +82,13 @@
       "reset-spec-frequency": ["Nulstil"],
       "frequency-range-legend": ["Spektrogram frekvensområde"],
       "list-file-selector": ["Vælg fil"],
-      "clear-call-cache": ["Ryd referencelyd-cache"],
       "apply-location": ["Sæt"],
       "cancel-location": ["Annuller"],
       "archive-location-select": ["Biblioteksplacering:"],
-      "reset-defaults": ["Nulstil til standardindstillinger"],
       "close-tour": ["Luk"],
       "settings": {
+        "clear-call-cache": ["Ryd referencelyd-cache"],
+        "reset-defaults": ["Nulstil til standardindstillinger"],
         "model-to-use": "Model:",
         "confidence": "Konfidensinterval:",
         "list-to-use": "Liste:",
@@ -135,6 +135,16 @@
         "snrValue": "SNR filter:",
         "debug-mode": "Fejlfindingstilstand"
       },
+      "record-entry": {
+        "record-entry-modal-label": "Rediger post",
+        "call-count": "Antal fuglestemmer",
+        "record-label": "Fuglekaldtype",
+        "label-local": "Lokalt",
+        "label-nocmig": "Nocmig",
+        "label-unknown": "Ikke angivet",
+        "record-comment": "Kommentarer",
+        "record-add": "Tilføj"
+    },
       "headings": ["Indstillinger","Detektioner",
         "Standardplacering",
         "System",

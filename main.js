@@ -365,7 +365,9 @@ app.whenReady().then(async () => {
     } else {
         ipcMain.handle('getVersion', () => app.getVersion());
     }
+
     ipcMain.handle('getPath', () => app.getPath('userData'));
+    ipcMain.handle('getLocale', () => app.getLocale());
     ipcMain.handle('getTemp', () => app.getPath('temp'));
     ipcMain.handle('isMac', () => process.platform === 'darwin');
     ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));

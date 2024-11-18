@@ -148,8 +148,9 @@ new Promise((resolve) => {
 async function getPaths() {
     const appPath = await window.electron.getPath();
     const tempPath = await window.electron.getTemp();
-    console.log('path is', appPath, 'temp is', tempPath);
-    return [appPath, tempPath];
+    const locale = await window.electron.getLocale();
+    console.log('path is', appPath, 'temp is', tempPath, 'raw locale is', locale);
+    return [appPath, tempPath, locale];
 }
 
 let VERSION;
@@ -1709,7 +1710,7 @@ const defaultConfig = {
     VERSION: VERSION,
     powerSaveBlocker: false
 };
-let appPath, tempPath, isMac;
+let appPath, tempPath, systemLocale, isMac;
 window.onload = async () => {
     window.electron.requestWorkerChannel();
     isMac = await window.electron.isMac();
@@ -1717,7 +1718,12 @@ window.onload = async () => {
     DOM.contentWrapper.classList.add('loaded');
     
     // Load preferences and override defaults
-    [appPath, tempPath] = await getPaths();
+    [appPath, tempPath, systemLocale] = await getPaths();
+    // Set default locale
+    systemLocale = systemLocale.replace('en-GB', 'en_uk');
+    systemLocale = systemLocale === 'en_uk' ? systemLocale : systemLocale.slice(0,2).toLowerCase();
+    defaultConfig.chirpity.locale = systemLocale;
+    defaultConfig.birdnet.locale = systemLocale;
     // establish the message channel
     setUpWorkerMessaging()
 
@@ -3473,7 +3479,7 @@ function formatDuration(seconds){
             <td name="${cname}" class='text-start cname'>
             <span class="cname">${cname}</span> ${countIcon} ${iconizeScore(score)}
             </td>
-            <td class="text-end call-count ${hide}">${callCount || 'Present'} </td>
+            <td class="text-end call-count ${hide}">${callCount || '1'} </td>
             
             <td class="label ${hide}">${labelHTML}</td>
             <td class="comment text-end ${hide}">${commentHTML}</td>
@@ -3566,7 +3572,6 @@ function formatDuration(seconds){
             const comment = target.querySelector('.comment').innerText;
             const label = target.querySelector('.label').innerText;
             let callCount = target.querySelector('.call-count').innerText;
-            callCount = callCount.replace('Present', '');
             DELETE_HISTORY.push([species, start, end, comment, callCount, label, undefined, undefined, undefined, confidence])
             
             worker.postMessage({
@@ -4639,7 +4644,21 @@ function playRegion(){
                 break;
             }
             case 'reset-defaults': {
-                if (confirm('Are you sure you want to revert to the default settings? You will need to relaunch Chirpity to see the changes.')){
+                const i18n = {
+                    "en": "Are you sure you want to revert to the default settings? You will need to relaunch Chirpity to see the changes.",
+                    "da": "Er du sikker på, at du vil gendanne standardindstillingerne? Du skal genstarte Chirpity for at se ændringerne.",
+                    "de": "Sind Sie sicher, dass Sie die Standardeinstellungen wiederherstellen möchten? Sie müssen Chirpity neu starten, um die Änderungen zu sehen.",
+                    "es": "¿Está seguro de que desea restablecer la configuración predeterminada? Tendrá que reiniciar Chirpity para ver los cambios.",
+                    "fr": "Êtes-vous sûr de vouloir rétablir les paramètres par défaut ? Vous devrez relancer Chirpity pour voir les modifications.",
+                    "nl": "Weet u zeker dat u wilt terugkeren naar de standaardinstellingen? U moet Chirpity opnieuw starten om de wijzigingen te zien.",
+                    "pt": "Tem certeza de que deseja restaurar as configurações padrão? Você precisará reiniciar o Chirpity para ver as alterações.",
+                    "ru": "Вы уверены, что хотите восстановить настройки по умолчанию? Вам нужно будет перезапустить Chirpity, чтобы увидеть изменения.",
+                    "sv": "Är du säker på att du vill återställa till standardinställningarna? Du måste starta om Chirpity för att se ändringarna.",
+                    "zh": "您确定要恢复默认设置吗？您需要重新启动 Chirpity 才能看到更改。"
+                }
+                const locale = config[config.model].locale 
+                const message = i18n[locale] || i18n['en'];
+                if (confirm(message)){
                     const uuid = config.UUID;
                     config = defaultConfig;
                     config.UUID = uuid;
@@ -5079,7 +5098,7 @@ function getI18n(context){
         `;
         const modalTitle = document.getElementById('record-entry-modal-label');
         const contextDelete = document.getElementById('context-delete');
-        modalTitle.textContent = `${createOrEdit} Record`;
+        modalTitle.textContent = `${createOrEdit}`;
         if (!hideInSelection) {
             resultContext ? contextDelete.addEventListener('click', deleteRecord) :
             contextDelete.addEventListener('click', function () {
@@ -5145,7 +5164,7 @@ function getI18n(context){
         if (cname && activeRow) {
             // Populate the form with existing values
             commentText = activeRow.querySelector('.comment > span')?.title || '';
-            callCount = activeRow.querySelector('.call-count').textContent.replace('Present', '');
+            callCount = parseInt(activeRow.querySelector('.call-count').textContent)
             typeIndex = ['Local', 'Nocmig', ''].indexOf(activeRow.querySelector('.label').textContent);
         }
         const recordEntryBirdList = recordEntryForm.querySelector('#record-entry-birdlist');
@@ -5161,7 +5180,7 @@ function getI18n(context){
         recordEntryForm.querySelector('#DBmode').value = mode;
         recordEntryForm.querySelector('#batch-mode').value = batch;
         recordEntryForm.querySelector('#original-id').value = cname;
-        recordEntryForm.querySelector('#record-add').textContent = mode;
+        //recordEntryForm.querySelector('#record-add').textContent = mode;
         if (typeIndex) recordEntryForm.querySelectorAll('input[name="record-label"]')[typeIndex].checked = true;
         recordEntryModalDiv.addEventListener('shown.bs.modal', focusBirdList)
         toggleKeyDownForFormInputs()
@@ -5253,7 +5272,21 @@ function getI18n(context){
             file = STATE.currentFile;
         }
         if (file) {
-            if (confirm(`This will remove ${file} and all the associated detections from the database archive. Proceed?`)) {
+            const i18n = {
+                en: `This will remove ${file} and all the associated detections from the database archive. Proceed?`,
+                da: `Dette vil fjerne ${file} og alle tilknyttede registreringer fra databasearkivet. Fortsæt?`,
+                de: `Dadurch werden ${file} und alle zugehörigen Erkennungen aus dem Datenbankarchiv entfernt. Fortfahren?`,
+                es: `Esto eliminará ${file} y todas las detecciones asociadas del archivo de la base de datos. ¿Continuar?`,
+                fr: `Cela supprimera ${file} et toutes les détections associées de l'archive de la base de données. Continuer ?`,
+                nl: `Dit verwijdert ${file} en alle bijbehorende detecties uit het databasearchief. Doorgaan?`,
+                pt: `Isso removerá ${file} e todas as detecções associadas do arquivo do banco de dados. Prosseguir?`,
+                ru: `Это удалит ${file} и все связанные обнаружения из архива базы данных. Продолжить?`,
+                sv: `Detta kommer att ta bort ${file} och alla tillhörande detektioner från databasarvet. Fortsätt?`,
+                zh: `这将删除 ${file} 及其所有相关检测记录从数据库存档中。继续吗？`
+            }
+            const locale = config[config.model].locale 
+            const message = i18n[locale] || i18n['en'];
+            if (confirm(message)) {
                 worker.postMessage({
                     action: 'purge-file',
                     fileName: file
@@ -5548,7 +5581,6 @@ async function getXCComparisons(){
     let [,,,sname,cname] = activeRow.getAttribute('name').split('|');
     cname.includes('call)') ? "call" : "";
     let XCcache;
-    const i18n = getI18n(i18nContext);
     try {
         const data = await fs.promises.readFile(p.join(appPath, 'XCcache.json'), 'utf8');
         XCcache = JSON.parse(data);

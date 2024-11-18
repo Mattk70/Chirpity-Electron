@@ -82,13 +82,13 @@
   "reset-spec-frequency": ["重置"],
   "frequency-range-legend":["声谱图频率范围"],
   "list-file-selector": ["选择文件"],
-  "clear-call-cache": ["清除参考通话缓存"],
   "apply-location": ["设置"],
   "cancel-location": ["取消"],
   "archive-location-select": ["库位置："],
-  "reset-defaults": ["恢复默认设置"],
   "close-tour": ["关闭"],
   "settings": {
+    "clear-call-cache": ["清除参考通话缓存"],
+    "reset-defaults": ["恢复默认设置"],
     "model-to-use": "模型：",
     "confidence": "置信度阈值：",
     "list-to-use": "列表：",
@@ -135,6 +135,16 @@
     "snrValue": "SNR滤波器：",
     "debug-mode": "调试模式"
   },
+  "record-entry": {
+    "record-entry-modal-label": "编辑记录",
+    "call-count": "鸟鸣计数",
+    "record-label": "鸟鸣类型",
+    "label-local": "本地",
+    "label-nocmig": "Nocmig",
+    "label-unknown": "未指定",
+    "record-comment": "评论",
+    "record-add": "添加"
+},
   "headings": ["设置","检测",
     "默认位置",
     "系统",

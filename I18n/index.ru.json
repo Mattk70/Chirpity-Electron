@@ -82,13 +82,13 @@
     "reset-spec-frequency": ["Сбросить"],
     "frequency-range-legend":["Частотный диапазон спектрограммы"],
     "list-file-selector": ["Выбрать файл"],
-    "clear-call-cache": ["Очистить кэш справочных вызовов"],
     "apply-location": ["Установить"],
     "cancel-location": ["Отмена"],
     "archive-location-select": ["Расположение библиотеки:"],
-    "reset-defaults": ["Сбросить настройки по умолчанию"],
     "close-tour": ["Закрыть"],
     "settings": {
+        "clear-call-cache": ["Очистить кэш справочных вызовов"],
+        "reset-defaults": ["Сбросить настройки по умолчанию"],
         "model-to-use": "Модель:",
         "confidence": "Порог уверенности:",
         "list-to-use": "Список:",
@@ -134,6 +134,16 @@
         "context": "Контекстный режим",
         "snrValue": "Фильтр SNR:",
         "debug-mode": "Режим отладки"
+    },
+    "record-entry": {
+        "record-entry-modal-label": "Редактировать запись",
+        "call-count": "Количество птичьих звуков",
+        "record-label": "Тип птичьего звука",
+        "label-local": "Местный",
+        "label-nocmig": "Nocmig",
+        "label-unknown": "Не указано",
+        "record-comment": "Комментарии",
+        "record-add": "Добавить"
     },
     "headings": ["Настройки","Обнаружения",
         "Местоположение по умолчанию",

@@ -87,13 +87,13 @@
     "reset-spec-frequency": ["Reset"],
     "frequency-range-legend":["Spectrogram frequency range"],
     "list-file-selector": ["Select file"],
-    "clear-call-cache": ["Clear Reference Call Cache"],
     "apply-location": ["Set"],
     "cancel-location": ["Cancel"],
     "archive-location-select": ["Library Location:"],
-    "reset-defaults": ["Reset to default settings"],
     "close-tour": ["Close"],
     "settings": {
+      "clear-call-cache": ["Clear Reference Call Cache"],
+      "reset-defaults": ["Reset to default settings"],
       "model-to-use": "Model:",
       "confidence": "Confidence threshold:",
       "list-to-use": "List:",
@@ -139,7 +139,18 @@
       "context": "Context mode",
       "snrValue": "SNR filter:",
       "debug-mode": "Debug mode"
-    },  
+    },
+    "record-entry":{
+      "record-entry-modal-label": "Edit Record",
+      "call-count": "Call Count",
+      "record-label": "Call Type",
+      "label-local": "Local",
+      "label-nocmig": "Nocmig",
+      "label-unknown": "Not specified",
+      "record-comment": "Comments",
+      "record-add": "Add"
+    },
+
     "headings": ["Settings","Detections",
       "Default Location",
       "System",

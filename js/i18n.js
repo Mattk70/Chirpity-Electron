@@ -1277,7 +1277,7 @@ async function localiseUI(locale) {
         // Update elements with IDs
         for (const key in localisationData) {
             // Skip settings
-            if (key === 'settings') continue;
+            if (key === 'settings' || key === 'record-entry') continue;
             if (localisationData.hasOwnProperty(key)) {
 
                 const element = document.getElementById(key);
@@ -1310,12 +1310,21 @@ async function localiseUI(locale) {
             const i18nTitle = i18nTitles[locale][title.id];
             title.title = i18nTitle ?? title.title;
         })
+        // Record entry form:
+        const recordEntry = document.getElementById('record-entry-modal').querySelectorAll('h5, label, button')
+        let settings =  localisationData['record-entry'];
+        recordEntry.forEach(label => {
+            const id = label.getAttribute('for') || label.id;
+            if (settings[id]){
+                label.textContent = settings[id]
+            }
+        })
         // Translate settings labels
         const form = document.getElementById('settings');
-        const labels = form.querySelectorAll('label');
-        const settings = localisationData['settings']
+        const labels = form.querySelectorAll('label, button');
+        settings = localisationData['settings']
         labels.forEach(label => {
-            const id = label.getAttribute('for');
+            const id = label.getAttribute('for') || label.id;
             if (settings[id]){
                 label.textContent = settings[id];
                 // Some nested labels must be skipped

@@ -82,13 +82,13 @@
     "reset-spec-frequency": ["Restablecer"],
     "frequency-range-legend": ["Rango de frecuencia del espectrograma"],
     "list-file-selector": ["Seleccionar archivo"],
-    "clear-call-cache": ["Borrar la caché de los reclamos de referencia"],
     "apply-location": ["Establecer"],
     "cancel-location": ["Cancelar"],
     "archive-location-select": ["Ubicación de la biblioteca:"],
-    "reset-defaults": ["Volver a la configuración predeterminada"],
     "close-tour": ["Cerrar"],
     "settings": {
+      "clear-call-cache": ["Borrar la caché de los reclamos de referencia"],
+      "reset-defaults": ["Volver a la configuración predeterminada"],
       "model-to-use": "Modelo:",
       "confidence": "Umbral de confianza:",
       "list-to-use": "Lista:",
@@ -135,6 +135,16 @@
       "snrValue": "Filtro SNR:",
       "debug-mode": "Modo depuración"
     },
+    "record-entry": {
+      "record-entry-modal-label": "Editar registro",
+      "call-count": "Número de reclamos",
+      "record-label": "Tipo de reclamos",
+      "label-local": "Local",
+      "label-nocmig": "Nocmig",
+      "label-unknown": "No especificado",
+      "record-comment": "Comentarios",
+      "record-add": "Agregar"
+  },
     "headings": ["Configuración","Detecciones",
       "Ubicación predeterminada",
       "Sistema",

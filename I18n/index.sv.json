@@ -82,13 +82,13 @@
     "reset-spec-frequency": ["Återställ"],
     "frequency-range-legend":["Spektrogrammets frekvensomfång"],
     "list-file-selector": ["Välj fil"],
-    "clear-call-cache": ["Rensa referenssamtalscache"],
     "apply-location": ["Ange"],
     "cancel-location": ["Avbryt"],
     "archive-location-select": ["Bibliotekets plats:"],
-    "reset-defaults": ["Återställ till standardinställningar"],
     "close-tour": ["Stäng"],
     "settings": {
+        "clear-call-cache": ["Rensa referenssamtalscache"],
+        "reset-defaults": ["Återställ till standardinställningar"],
         "model-to-use": "Modell:",
         "confidence": "Konfidensnivå:",
         "list-to-use": "Lista:",
@@ -134,6 +134,16 @@
         "context": "Kontextläge",
         "snrValue": "SNR-filter:",
         "debug-mode": "Felsökningsläge"
+    },
+    "record-entry": {
+        "record-entry-modal-label": "Redigera post",
+        "call-count": "Antal fågelläten",
+        "record-label": "Typ av fågelläte",
+        "label-local": "Lokal",
+        "label-nocmig": "Nocmig",
+        "label-unknown": "Ej specificerat",
+        "record-comment": "Kommentarer",
+        "record-add": "Lägg till"
     },
     "headings": ["Inställningar","Detektioner",
         "Standardplats",

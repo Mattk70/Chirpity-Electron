@@ -82,13 +82,13 @@
     "reset-spec-frequency": ["Réinitialiser"],
     "frequency-range-legend": ["Plage de fréquences du spectrogramme"],
     "list-file-selector": ["Sélectionner le fichier"],
-    "clear-call-cache": ["Effacer le cache des appels de référence"],
     "apply-location": ["Définir"],
     "cancel-location": ["Annuler"],
     "archive-location-select": ["Emplacement de la bibliothèque:"],
-    "reset-defaults": ["Réinitialiser aux paramètres par défaut"],
     "close-tour": ["Fermer"],
     "settings": {
+      "clear-call-cache": ["Effacer le cache des appels de référence"],
+      "reset-defaults": ["Réinitialiser aux paramètres par défaut"],
       "model-to-use": "Modèle :",
       "confidence": "Seuil de confiance :",
       "list-to-use": "Liste :",
@@ -135,6 +135,16 @@
       "snrValue": "Filtre SNR :",
       "debug-mode": "Mode débogage"
     },
+    "record-entry": {
+      "record-entry-modal-label": "Modifier l'enregistrement",
+      "call-count": "Nombre de cris",
+      "record-label": "Type de cri",
+      "label-local": "Local",
+      "label-nocmig": "Nocmig",
+      "label-unknown": "Non spécifié",
+      "record-comment": "Commentaires",
+      "record-add": "Ajouter"
+  },
     "headings": ["Paramètres","Détections",
       "Emplacement par défaut",
       "Système",

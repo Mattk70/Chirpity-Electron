@@ -82,13 +82,13 @@
     "reset-spec-frequency": ["Zurücksetzen"],
     "frequency-range-legend": ["Spektrogramm-Frequenzbereich"],
     "list-file-selector": ["Datei auswählen"],
-    "clear-call-cache": ["Referenzruf-Cache löschen"],
     "apply-location": ["Festlegen"],
     "cancel-location": ["Abbrechen"],
     "archive-location-select": ["Bibliotheksspeicherort:"],
-    "reset-defaults": ["Auf Standardeinstellungen zurücksetzen"],
     "close-tour": ["Schließen"],
     "settings": {
+      "clear-call-cache": ["Referenzruf-Cache löschen"],
+      "reset-defaults": ["Auf Standardeinstellungen zurücksetzen"],
       "model-to-use": "Modell:",
       "confidence": "Konfidenzschwelle:",
       "list-to-use": "Liste:",
@@ -135,6 +135,16 @@
       "snrValue": "SNR-Filter:",
       "debug-mode": "Fehlermodus"
     },
+    "record-entry": {
+      "record-entry-modal-label": "Datensatz bearbeiten",
+      "call-count": "Rufanzahl",
+      "record-label": "Ruftyp",
+      "label-local": "Lokal",
+      "label-nocmig": "Nocmig",
+      "label-unknown": "Nicht angegeben",
+      "record-comment": "Kommentare",
+      "record-add": "Hinzufügen"
+  },
     "headings": ["Einstellungen","Erkennungen",
       "Standardstandort",
       "System",

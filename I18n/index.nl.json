@@ -82,13 +82,13 @@
     "reset-spec-frequency": ["Reset"],
     "frequency-range-legend": ["Frequentiebereik van spectrogram"],
     "list-file-selector": ["Selecteer bestand"],
-    "clear-call-cache": ["Referentieoproep-cache wissen"],
     "apply-location": ["Instellen"],
     "cancel-location": ["Annuleren"],
     "archive-location-select": ["Bibliotheeklocatie:"],
-    "reset-defaults": ["Herstellen naar standaardinstellingen"],
     "close-tour": ["Sluiten"],
     "settings": {
+        "clear-call-cache": ["Referentieoproep-cache wissen"],
+        "reset-defaults": ["Herstellen naar standaardinstellingen"],
         "model-to-use": "Model:",
         "confidence": "Betrouwbaarheid:",
         "list-to-use": "Lijst:",
@@ -134,6 +134,16 @@
         "context": "Contextmodus",
         "snrValue": "SNR-filter:",
         "debug-mode": "Foutopsporingsmodus"
+    },
+    "record-entry": {
+        "record-entry-modal-label": "Bewerk record",
+        "call-count": "Aantal oproep",
+        "record-label": "Type oproep",
+        "label-local": "Lokaal",
+        "label-nocmig": "Nocmig",
+        "label-unknown": "Niet gespecificeerd",
+        "record-comment": "Opmerkingen",
+        "record-add": "Toevoegen"
     },
     "headings": ["Instellingen","Detecties",
         "Standaardlocatie",
