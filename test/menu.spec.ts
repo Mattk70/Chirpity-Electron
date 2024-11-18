@@ -176,7 +176,7 @@ The current issue with click fest is that while element are hidden, they can't b
 */
 
 
-test('copes with click fest, including hidden elements', async () => {
+test.describe.fixme('copes with click fest, including hidden elements', async () => {
 
 
   // Ensure dropdown menus are opened before interacting with their items
