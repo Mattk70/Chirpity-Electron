@@ -734,7 +734,7 @@ function customAnalysisAllMenu(saved){
         <span class="shortcut float-end">${modifier}+Shift+A</span>`;
         enableMenuItem(['reanalyseAll']);
     } else {
-        analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">search</span> ${STATE.i18n.analyseAll}
+        analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">search</span> ${STATE.i18n.analyseAll[0]}
         <span class="shortcut float-end">${modifier}+Shift+A</span>`;
         disableMenuItem(['reanalyseAll']);
     }   
@@ -744,11 +744,11 @@ function customiseAnalysisMenu(saved) {
     const modifier = isMac ? '⌘' : 'Ctrl';
     const analyseMenu = document.getElementById('analyse');
     if (saved) {
-        analyseMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> Get Results for Current File
+        analyseMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> ${STATE.i18n.retrieve}
         <span class="shortcut float-end">${modifier}+A</span>`;
         enableMenuItem(['reanalyse']);
     } else {
-        analyseMenu.innerHTML = `<span class="material-symbols-outlined">search</span> Analyse Current File
+        analyseMenu.innerHTML = `<span class="material-symbols-outlined">search</span> ${STATE.i18n.analyse[0]}
         <span class="shortcut float-end">${modifier}+A</span>`;
         disableMenuItem(['reanalyse']);
     }
