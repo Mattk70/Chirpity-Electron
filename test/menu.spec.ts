@@ -175,169 +175,171 @@ The current issue with click fest is that while element are hidden, they can't b
 
 */
 
+test.describe.fixme('blocked by elements not being open', () =>{
 
-test.describe.fixme('copes with click fest, including hidden elements', async () => {
-
-
-  // Ensure dropdown menus are opened before interacting with their items
-  const dropdownToggles = page.locator('[data-bs-toggle="dropdown"], [aria-haspopup="true"]');
-  for (let i = 0; i < await dropdownToggles.count(); i++) {
-    try {
-      const toggle = dropdownToggles.nth(i);
-      await toggle.click(); // Open the dropdown
-      console.log('Opened dropdown:', await toggle.getAttribute('aria-label') || 'No label');
-    } catch (error) {
-      console.error('Error opening dropdown:', error);
-    }
-  }
-
-  // Ensure off-canvas panels are opened
-  const offCanvasToggles = page.locator('[data-bs-toggle="offcanvas"]');
-  for (let i = 0; i < await offCanvasToggles.count(); i++) {
-    try {
-      const toggle = offCanvasToggles.nth(i);
-      await toggle.click(); // Open the off-canvas panel
-      console.log('Opened off-canvas panel:', await toggle.getAttribute('aria-label') || 'No label');
-    } catch (error) {
-      console.error('Error opening off-canvas panel:', error);
-    }
-  }
-
-  // Get all clickable elements
-  const clickableElements = page.locator('button, a, input[type="button"], input[type="submit"], [role="button"]');
-  for (let i = 0; i < await clickableElements.count(); i++) {
-    try {
-      const element = clickableElements.nth(i);
-      await element.click({ force: true }); // Force click in case it's hidden
-      console.log('Clicked element:', await element.innerText());
-    } catch (error) {
-      console.error('Error clicking element:', error);
-    }
-  }
-
-  // Interact with checkboxes
-  const checkboxes = page.locator('input[type="checkbox"]');
-  for (let i = 0; i < await checkboxes.count(); i++) {
-    try {
-      const checkbox = checkboxes.nth(i);
-      await checkbox.check({ force: true }); // Force interaction
-      console.log('Checked checkbox:', await checkbox.getAttribute('name'));
-    } catch (error) {
-      console.error('Error checking checkbox:', error);
-    }
-  }
-
-  // Interact with radio buttons
-  const radioButtons = page.locator('input[type="radio"]');
-  for (let i = 0; i < await radioButtons.count(); i++) {
-    try {
-      const radioButton = radioButtons.nth(i);
-      await radioButton.check({ force: true }); // Force interaction
-      console.log('Selected radio button:', await radioButton.getAttribute('name'));
-    } catch (error) {
-      console.error('Error selecting radio button:', error);
-    }
-  }
-
-  // Interact with dropdowns
-  const dropdowns = page.locator('select');
-  for (let i = 0; i < await dropdowns.count(); i++) {
-    try {
-      const dropdown = dropdowns.nth(i);
-      const options = dropdown.locator('option');
-      if (await options.count() > 1) {
-        await dropdown.selectOption({ index: 1 });
-        console.log('Selected option from dropdown:', await dropdown.getAttribute('name'));
+    test('copes with click fest, including hidden elements', async () => {
+      // Ensure dropdown menus are opened before interacting with their items
+      const dropdownToggles = page.locator('[data-bs-toggle="dropdown"], [aria-haspopup="true"]');
+      for (let i = 0; i < await dropdownToggles.count(); i++) {
+        try {
+          const toggle = dropdownToggles.nth(i);
+          await toggle.click(); // Open the dropdown
+          console.log('Opened dropdown:', await toggle.getAttribute('aria-label') || 'No label');
+        } catch (error) {
+          console.error('Error opening dropdown:', error);
+        }
       }
-    } catch (error) {
-      console.error('Error selecting dropdown option:', error);
-    }
-  }
+    
+      // Ensure off-canvas panels are opened
+      const offCanvasToggles = page.locator('[data-bs-toggle="offcanvas"]');
+      for (let i = 0; i < await offCanvasToggles.count(); i++) {
+        try {
+          const toggle = offCanvasToggles.nth(i);
+          await toggle.click(); // Open the off-canvas panel
+          console.log('Opened off-canvas panel:', await toggle.getAttribute('aria-label') || 'No label');
+        } catch (error) {
+          console.error('Error opening off-canvas panel:', error);
+        }
+      }
+    
+      // Get all clickable elements
+      const clickableElements = page.locator('button, a, input[type="button"], input[type="submit"], [role="button"]');
+      for (let i = 0; i < await clickableElements.count(); i++) {
+        try {
+          const element = clickableElements.nth(i);
+          await element.click({ force: true }); // Force click in case it's hidden
+          console.log('Clicked element:', await element.innerText());
+        } catch (error) {
+          console.error('Error clicking element:', error);
+        }
+      }
+    
+      // Interact with checkboxes
+      const checkboxes = page.locator('input[type="checkbox"]');
+      for (let i = 0; i < await checkboxes.count(); i++) {
+        try {
+          const checkbox = checkboxes.nth(i);
+          await checkbox.check({ force: true }); // Force interaction
+          console.log('Checked checkbox:', await checkbox.getAttribute('name'));
+        } catch (error) {
+          console.error('Error checking checkbox:', error);
+        }
+      }
+    
+      // Interact with radio buttons
+      const radioButtons = page.locator('input[type="radio"]');
+      for (let i = 0; i < await radioButtons.count(); i++) {
+        try {
+          const radioButton = radioButtons.nth(i);
+          await radioButton.check({ force: true }); // Force interaction
+          console.log('Selected radio button:', await radioButton.getAttribute('name'));
+        } catch (error) {
+          console.error('Error selecting radio button:', error);
+        }
+      }
+    
+      // Interact with dropdowns
+      const dropdowns = page.locator('select');
+      for (let i = 0; i < await dropdowns.count(); i++) {
+        try {
+          const dropdown = dropdowns.nth(i);
+          const options = dropdown.locator('option');
+          if (await options.count() > 1) {
+            await dropdown.selectOption({ index: 1 });
+            console.log('Selected option from dropdown:', await dropdown.getAttribute('name'));
+          }
+        } catch (error) {
+          console.error('Error selecting dropdown option:', error);
+        }
+      }
+    
+      // Interact with text inputs
+      const textInputs = page.locator('input[type="text"], textarea');
+      for (let i = 0; i < await textInputs.count(); i++) {
+        try {
+          const textInput = textInputs.nth(i);
+          await textInput.fill('Test value');
+          console.log('Filled text input:', await textInput.getAttribute('name'));
+        } catch (error) {
+          console.error('Error filling text input:', error);
+        }
+      }
+    });
+    
+    // test('Check spectrogram before and after applying filter are different', async () => {
+      
+      // page = await electronApp.waitForEvent('window')
+      // // take a screenshot of the current page
+      // const screenshot1: Buffer = await page.screenshot()
+      // await page.getByRole('button', { name: 'Settings' }).click();
+      // await page.getByLabel('Low Shelf filter:').fill('1200');
+      // await page.getByLabel('Attenuation:').fill('18');
+      // await page.getByText('blur_on').click();
+      // await page.getByRole('button', { name: 'Settings' }).isHidden();
+      // await page.waitForFunction(() => getFileLoaded());
+      // // take a screenshot of the page after filter applied
+      // const screenshot2: Buffer = await page.screenshot()
+      // // compare the two images
+      // const different = jimp.diff(await jimp.read(screenshot1), await jimp.read(screenshot2), 0.001)
+      // expect(different.percent).toBeGreaterThan(0)
+      // // Reset blur
+      // await page.getByText('blur_on').click();
+    // })
+    
+    
+    // test('send IPC message from renderer', async () => {
+    //   // evaluate this script in render process
+    //   // requires webPreferences.nodeIntegration true and contextIsolation false
+    //   await page.evaluate(() => {
+    //     // eslint-disable-next-line @typescript-eslint/no-var-requires
+    //     require('electron').ipcRenderer.send('new-window')
+    //   })
+    //   const newPage = await electronApp.waitForEvent('window')
+    //   expect(newPage).toBeTruthy()
+    //   expect(await newPage.title()).toBe('Window 4')
+    //   page = newPage
+    // })
+    
+    // test('receive IPC invoke/handle via renderer', async () => {
+    //   // evaluate this script in RENDERER process and collect the result
+    //   const result = await ipcRendererInvoke(page, 'how-many-windows')
+    //   expect(result).toBe(4)
+    // })
+    
+    // test('receive IPC handle data via main', async () => {
+    //   // evaluate this script in MAIN process and collect the result
+    //   const result = await ipcMainInvokeHandler(electronApp, 'openFiles')
+    //   expect(result).toBe(4)
+    // })
+    
+    // test('receive synchronous data via ipcRendererCallFirstListener()', async () => {
+    //   const data = await ipcRendererCallFirstListener(page, 'get-synchronous-data')
+    //   expect(data).toBe('Synchronous Data')
+    // })
+    
+    // test('receive asynchronous data via ipcRendererCallFirstListener()', async () => {
+    //   const data = await ipcRendererCallFirstListener(page, 'get-asynchronous-data')
+    //   expect(data).toBe('Asynchronous Data')
+    // })
+    
+    // test('receive synchronous data via ipcMainCallFirstListener()', async () => {
+    //   const data = await ipcMainCallFirstListener(electronApp, 'main-synchronous-data')
+    //   expect(data).toBe('Main Synchronous Data')
+    // })
+    
+    // test('receive asynchronous data via ipcMainCallFirstListener()', async () => {
+    //   const data = await ipcMainCallFirstListener(electronApp, 'main-asynchronous-data')
+    //   expect(data).toBe('Main Asynchronous Data')
+    // })
+    
+    // test('select a menu item via the main process', async () => {
+    //   await clickMenuItemById(electronApp, 'new-window')
+    //   const newPage = await electronApp.waitForEvent('window')
+    //   expect(newPage).toBeTruthy()
+    //   expect(await newPage.title()).toBe('Window 5')
+    //   page = newPage
+    // })
+    
+    
 
-  // Interact with text inputs
-  const textInputs = page.locator('input[type="text"], textarea');
-  for (let i = 0; i < await textInputs.count(); i++) {
-    try {
-      const textInput = textInputs.nth(i);
-      await textInput.fill('Test value');
-      console.log('Filled text input:', await textInput.getAttribute('name'));
-    } catch (error) {
-      console.error('Error filling text input:', error);
-    }
-  }
-});
-
-// test('Check spectrogram before and after applying filter are different', async () => {
-  
-  // page = await electronApp.waitForEvent('window')
-  // // take a screenshot of the current page
-  // const screenshot1: Buffer = await page.screenshot()
-  // await page.getByRole('button', { name: 'Settings' }).click();
-  // await page.getByLabel('Low Shelf filter:').fill('1200');
-  // await page.getByLabel('Attenuation:').fill('18');
-  // await page.getByText('blur_on').click();
-  // await page.getByRole('button', { name: 'Settings' }).isHidden();
-  // await page.waitForFunction(() => getFileLoaded());
-  // // take a screenshot of the page after filter applied
-  // const screenshot2: Buffer = await page.screenshot()
-  // // compare the two images
-  // const different = jimp.diff(await jimp.read(screenshot1), await jimp.read(screenshot2), 0.001)
-  // expect(different.percent).toBeGreaterThan(0)
-  // // Reset blur
-  // await page.getByText('blur_on').click();
-// })
-
-
-// test('send IPC message from renderer', async () => {
-//   // evaluate this script in render process
-//   // requires webPreferences.nodeIntegration true and contextIsolation false
-//   await page.evaluate(() => {
-//     // eslint-disable-next-line @typescript-eslint/no-var-requires
-//     require('electron').ipcRenderer.send('new-window')
-//   })
-//   const newPage = await electronApp.waitForEvent('window')
-//   expect(newPage).toBeTruthy()
-//   expect(await newPage.title()).toBe('Window 4')
-//   page = newPage
-// })
-
-// test('receive IPC invoke/handle via renderer', async () => {
-//   // evaluate this script in RENDERER process and collect the result
-//   const result = await ipcRendererInvoke(page, 'how-many-windows')
-//   expect(result).toBe(4)
-// })
-
-// test('receive IPC handle data via main', async () => {
-//   // evaluate this script in MAIN process and collect the result
-//   const result = await ipcMainInvokeHandler(electronApp, 'openFiles')
-//   expect(result).toBe(4)
-// })
-
-// test('receive synchronous data via ipcRendererCallFirstListener()', async () => {
-//   const data = await ipcRendererCallFirstListener(page, 'get-synchronous-data')
-//   expect(data).toBe('Synchronous Data')
-// })
-
-// test('receive asynchronous data via ipcRendererCallFirstListener()', async () => {
-//   const data = await ipcRendererCallFirstListener(page, 'get-asynchronous-data')
-//   expect(data).toBe('Asynchronous Data')
-// })
-
-// test('receive synchronous data via ipcMainCallFirstListener()', async () => {
-//   const data = await ipcMainCallFirstListener(electronApp, 'main-synchronous-data')
-//   expect(data).toBe('Main Synchronous Data')
-// })
-
-// test('receive asynchronous data via ipcMainCallFirstListener()', async () => {
-//   const data = await ipcMainCallFirstListener(electronApp, 'main-asynchronous-data')
-//   expect(data).toBe('Main Asynchronous Data')
-// })
-
-// test('select a menu item via the main process', async () => {
-//   await clickMenuItemById(electronApp, 'new-window')
-//   const newPage = await electronApp.waitForEvent('window')
-//   expect(newPage).toBeTruthy()
-//   expect(await newPage.title()).toBe('Window 5')
-//   page = newPage
-// })
-
+})
