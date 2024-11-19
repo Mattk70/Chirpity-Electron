@@ -1089,10 +1089,7 @@ async function locateFile(file) {
     } catch (error) {
         if (error.message.includes('scandir')){
             const match = error.message.match(/'([^']+)'/);
-            UI.postMessage({
-                event: 'generate-alert', type: 'warning', 
-                message: `Unable to locate folder "${match}". Perhaps the disk was removed?`
-            })
+            generateAlert({type: 'error', message: 'NoDirectory', variables: {match}});
         }
         console.warn(error.message + ' - Disk removed?'); // Expected that this happens when the directory doesn't exist
     } 
@@ -1104,11 +1101,7 @@ async function notifyMissingFile(file) {
     // Look for the file in te Archive
     const row = await diskDB.getAsync('SELECT * FROM FILES WHERE name = ?', file);
     if (row?.id) missingFile = file
-    UI.postMessage({
-        event: 'generate-alert', type: 'warning', 
-        message: `Unable to locate source file with any supported file extension: ${file}`,
-        file: missingFile
-    })
+    generateAlert({type: 'error', message: "dbFileMissing", variables: {file: missingFile}})
 }
 
 async function loadAudioFile({
@@ -2530,7 +2523,7 @@ const getResults = async ({
                     const filename = `${r.cname}_${dateString}.${STATE.audio.format}`
                     DEBUG && console.log(`Exporting from ${r.file}, position ${r.position}, into folder ${directory}`)
                     saveAudio(r.file, r.position, r.end, filename, {Artist: 'Chirpity'}, directory)
-                    i === result.length - 1 && UI.postMessage({ event: 'generate-alert', message: `${result.length} files saved` })
+                    i === result.length - 1 &&  generateAlert({ message: 'goodResultSave', variables: {number: result.length} })
                 } 
             }
             else if (species && STATE.mode !== 'explore') {
@@ -2743,10 +2736,7 @@ const getSavedFileInfo = async (file) => {
 const onSave2DiskDB = async ({file}) => {
     t0 = Date.now();
     if (STATE.db === diskDB) {
-        UI.postMessage({
-            event: 'generate-alert',
-            message: `Records already saved, nothing to do`
-        })
+        generateAlert({message: 'NoOP'})
         return // nothing to do. Also will crash if trying to update disk from disk.
     }
     const included = await getIncludedIDs(file);
@@ -2777,9 +2767,11 @@ const onSave2DiskDB = async ({file}) => {
             // Now we have saved the records, set state to DiskDB
             await onChangeMode('archive');
             getLocations({ db: STATE.db, file: file });
-            UI.postMessage({
-                event: 'generate-alert',
-                message: `Database update complete, ${response.changes} records added to the archive in ${((Date.now() - t0) / 1000)} seconds`,
+            const total = response.changes;
+            const seconds = (Date.now() - t0) / 1000;
+            generateAlert({
+                message: 'goodDBUpdate',
+                variables: {total, seconds},
                 updateFilenamePanel: true,
                 database: true
             })
@@ -3233,27 +3225,18 @@ async function onFileUpdated(oldName, newName){
     try {
         const result = await STATE.db.runAsync(`UPDATE files SET name = ? WHERE name = ? AND duration BETWEEN ? - 1 and ? + 1`, newName, oldName, newDuration, newDuration);
         if (result.changes){
-            UI.postMessage({
-                event: 'generate-alert', message: 'The file location was successfully updated in the database. Refresh the results to see the records.'
-            });
+            generateAlert({ message: 'fileLocationUpdated'});
         } else {
-            UI.postMessage({
-                event: 'generate-alert', type: 'error',  message: '<span class="text-danger">No changes made</span>. The selected file has a different duration to the original file.'
-            });
+            generateAlert({type: 'error',  message: 'durationMismatch'});
         }
     } catch (err) {
         if (err.code === 'SQLITE_CONSTRAINT' && err.message.includes('UNIQUE')) {
             // Unique constraint violation, show specific error message
-            UI.postMessage({
-                event: 'generate-alert', type: 'warning',  
-                message: '<span class="text-danger">No changes made</span>. The selected file already exists in the database.'
-            });
+            generateAlert({type: 'warning', message: 'duplicateFile'});
         } else {
             // Other types of errors
-            UI.postMessage({
-                event: 'generate-alert', type: 'error',  
-                message: `<span class="text-danger">An error occurred while updating the file: ${err.message}</span>`
-            });
+            const message = err.message;
+            generateAlert({type: 'error', message: 'fileUpdateError', variables: {message}});
         }
     }
 }
@@ -3263,18 +3246,12 @@ const onFileDelete = async (fileName) => {
     if (result.changes) {
         //await onChangeMode('analyse');
         getDetectedSpecies();
-        UI.postMessage({
-            event: 'generate-alert',
-            message: `${fileName} 
-            and its associated records were deleted successfully`,
+        generateAlert({message: 'goodFilePurge', variables: {file: fileName}, 
             updateFilenamePanel: true
         });
         await Promise.all([getResults(), getSummary()] );
     } else {
-        UI.postMessage({
-            event: 'generate-alert', message: `${fileName} 
-            was not found in the Archive database.`
-        });
+        generateAlert({ message: 'failedFilePurge', variables: {file: fileName}});
     }
 }
     
@@ -3464,7 +3441,10 @@ async function setIncludedIDs(lat, lon, week) {
 
         if (STATE.included === undefined) STATE.included = {}
         STATE.included = merge(STATE.included, includedObject);
-        messages.forEach(message => generateAlert({type: 'warning',  message: 'noSnameFound', variables: {sname: message.sname, line: message.sname, model: message.model}} ))
+        messages.forEach(message => {
+            message.model = message.model.replace('chirpity', 'Nocmig');
+            generateAlert({type: 'warning',  message: 'noSnameFound', variables: {sname: message.sname, line: message.line, model: message.model}})
+        })
         return STATE.included;
     })();
 
@@ -3516,9 +3496,8 @@ async function convertAndOrganiseFiles(threadLimit) {
 
         // Does the file we want to convert exist?
         if (!fs.existsSync(inputFilePath)) {
-            UI.postMessage({
-                event: 'generate-alert', type: 'warning', 
-                message: `Cannot access: ${inputFilePath}<br>Skipping conversion.`
+            generateAlert({type: 'warning', variables: {file: inputFilePath},
+                message: `fileToConvertNotFound`
             });
             continue;
         }
@@ -3534,9 +3513,9 @@ async function convertAndOrganiseFiles(threadLimit) {
             try {
                 fs.mkdirSync(fullPath, { recursive: true });
             } catch (err) {
-                UI.postMessage({
-                    event: 'generate-alert', type: 'error', 
-                    message: `Failed to create directory: ${fullPath}<br>Error: ${err.message}`
+                generateAlert({type: 'error', 
+                    message: 'mkDirFailed',
+                    variables: {path: fullPath, error: err.message}
                 });
                 continue;
             }
@@ -3574,22 +3553,17 @@ async function convertAndOrganiseFiles(threadLimit) {
         let type = 'info';
         
         if (attempted) {
-           summaryMessage = `Processing complete: ${successfulConversions} successful, ${failedConversions} failed.`;
-           if (failedConversions > 0) {
-                type = 'warning';
-                summaryMessage += `<br>Failed conversion reasons:<br><ul>`;
-                failureReasons.forEach(reason => {
-                    summaryMessage += `<li>${reason}</li>`;
-                });
-                summaryMessage += `</ul>`;
-            }
-        } else { summaryMessage = 'Library is up to date. Nothing to do'}
-
-        // Post the summary message
-        UI.postMessage({
-            event: `generate-alert`, type: type,
-            message: summaryMessage
-        });
+           generateAlert({ message: 'conversionComplete',
+            variables: {successTotal: successfulConversions, failedTotal: failedConversions} })
+        //    if (failedConversions > 0) {
+        //         type = 'warning';
+        //         summaryMessage += `<br>Failed conversion reasons:<br><ul>`;
+        //         failureReasons.forEach(reason => {
+        //             summaryMessage += `<li>${reason}</li>`;
+        //         });
+        //         summaryMessage += `</ul>`;
+        //     }
+        } else { generateAlert({ message: 'libraryUpToDate'}) }
     })
 };
 
@@ -3639,7 +3613,7 @@ async function convertFile(inputFilePath, fullFilePath, row, db, dbArchiveName, 
                 });
             })
             .on('error', (err) => {
-                generateAlert({type: 'error',  message: 'conversionDone', variables: {file: inputFilePath, error: err}});
+                generateAlert({type: 'error',  message: 'badConversion', variables: {file: inputFilePath, error: err}});
                 reject(err);
             })
             .on('progress', (progress) => {

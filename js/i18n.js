@@ -35,13 +35,29 @@ const i18nToasts = { // UI.js
         noDetectionsDetailed: 'No ${nocmig} ${species} detections found ${archive} using the ${list} list.',
         noDetectionsDetailed2: 'No detections found in ${file}. Searched for records using the ${list} list and having a minimum confidence of ${confidence}%',
         dbNotLoaded: "The database has not finished loading. The check for the presence of the file in the archive has been skipped",
-        noSnameFound: "Cannot find '${sname}' (at line ${line} of the custom list) in the <strong>${model}</strong> list. <strong>Tips:</strong> <ol><li>Is your list for the <strong>${model}</strong> model? If not, change the model in settings</li><li>Check for a typo in your species name</li></ol>",
+        noSnameFound: "Cannot find '${sname}' (at line ${line} of the custom list) in the <strong>${model}</strong> model list. <strong>Tips:</strong> <ol><li>Is your list for the <strong>${model}</strong> model? If not, change the model in settings</li><li>Check for a typo in your species name</li></ol>",
         noArchive: "Cannot access archive location: ${location}. <br> Operation aborted",
         noWriteArchive: "Cannot write to archive location: ${location}. <br> Operation aborted",
         multiDay: "Multi-day operations are not yet supported: ${file} will not be trimmed",
         allDaylight: "${file} will not be added to the archive as it is entirely during daylight.",
         conversionDone: "Finished conversion for ${file}",
-        badConversion: "Error converting file ${file}: ${error}"
+        badConversion: "Error converting file ${file}: ${error}",
+
+        noDirectory: "Unable to locate folder '${match}'",
+        dbFileMissing: "Unable to locate the saved file with any supported file extension: ${file}",
+        goodResultSave: "${number} results saved to the Archive",
+        NoOP: 'Records already saved, nothing to do',
+        goodDBUpdate: 'Database update complete, ${total} records added to the archive in ${seconds} seconds',
+        fileLocationUpdated: 'The file location was successfully updated in the Archive. Refresh the results to see the records.',
+        durationMismatch: '<span class="text-danger">No changes made</span>. The selected file has a different duration to the original file.',
+        duplicateFIle: '<span class="text-danger">No changes made</span>. The selected file already exists in the Archive.',
+        fileUpdateError: '<span class="text-danger">An error occurred while updating the file: ${message}</span>',
+        goodFilePurge: '${file} and its associated records were deleted successfully',
+        failedFilePrge: '${file} was not found in in the Archive',
+        fileToConvertNotFound: 'Cannot find ${file}, skipping conversion.',
+        mkDirFailed: 'Failed to create directory: ${path}<br>Error: ${error}',
+        conversionComplete: 'Conversion complete, ${successTotal} successful, ${failedTotal} failed.',
+        libraryUpToDate: 'Library is up to date. Nothing to do'
     },
     da: {
         info: 'Besked', warning: 'Advarsel', error: 'Fejl',
@@ -85,9 +101,23 @@ const i18nToasts = { // UI.js
         multiDay: "Flere dages operationer understøttes endnu ikke: ${file} vil ikke blive beskåret",
         allDaylight: "${file} vil ikke blive tilføjet til arkivet, da det er helt under dagslys.",
         conversionDone: "Konvertering afsluttet for ${file}",
-        badConversion: "Fejl ved konvertering af filen ${file}: ${error}"
+        badConversion: "Fejl ved konvertering af filen ${file}: ${error}",
 
-        
+        noDirectory: "Kan ikke finde mappen '${match}'",
+        dbFileMissing: "Kan ikke finde den gemte fil med en understøttet filtype: ${file}",
+        goodResultSave: "${number} resultater gemt i Arkivet",
+        NoOP: "Poster er allerede gemt, ingen handling nødvendig",
+        goodDBUpdate: "Databaseopdatering fuldført, ${total} poster tilføjet til arkivet på ${seconds} sekunder",
+        fileLocationUpdated: "Filplaceringen blev opdateret i Arkivet. Opdater resultaterne for at se posterne.",
+        durationMismatch: '<span class="text-danger">Ingen ændringer foretaget</span>. Den valgte fil har en anden varighed end den oprindelige fil.',
+        duplicateFIle: '<span class="text-danger">Ingen ændringer foretaget</span>. Den valgte fil findes allerede i Arkivet.',
+        fileUpdateError: '<span class="text-danger">Der opstod en fejl under opdatering af filen: ${message}</span>',
+        goodFilePurge: '${file} og de tilknyttede poster blev slettet med succes',
+        failedFilePrge: "${file} blev ikke fundet i Arkivet",
+        fileToConvertNotFound: "Kan ikke finde ${file}, springer over konvertering.",
+        mkDirFailed: "Kunne ikke oprette mappen: ${path}<br>Fejl: ${error}",
+        conversionComplete: "Konvertering fuldført, ${successTotal} lykkedes, ${failedTotal} fejlede.",
+        libraryUpToDate: "Biblioteket er opdateret. Ingen handling nødvendig"
     },
     de: {
         info: 'Hinweis', warning: 'Warnung', error: 'Fehler',
@@ -131,7 +161,23 @@ const i18nToasts = { // UI.js
         multiDay: "Mehrtägige Operationen werden noch nicht unterstützt: ${file} wird nicht beschnitten",
         allDaylight: "${file} wird nicht zum Archiv hinzugefügt, da es vollständig während des Tageslichts liegt.",
         conversionDone: "Konvertierung für ${file} abgeschlossen",
-        badConversion: "Fehler bei der Konvertierung der Datei ${file}: ${error}"
+        badConversion: "Fehler bei der Konvertierung der Datei ${file}: ${error}",
+
+        noDirectory: "Ordner '${match}' konnte nicht gefunden werden",
+        dbFileMissing: "Die gespeicherte Datei mit einer unterstützten Dateiendung konnte nicht gefunden werden: ${file}",
+        goodResultSave: "${number} Ergebnisse wurden im Archiv gespeichert",
+        NoOP: "Datensätze bereits gespeichert, keine Aktion erforderlich",
+        goodDBUpdate: "Datenbankaktualisierung abgeschlossen, ${total} Datensätze wurden in ${seconds} Sekunden zum Archiv hinzugefügt",
+        fileLocationUpdated: "Der Speicherort der Datei wurde im Archiv erfolgreich aktualisiert. Aktualisieren Sie die Ergebnisse, um die Datensätze anzuzeigen.",
+        durationMismatch: '<span class="text-danger">Keine Änderungen vorgenommen</span>. Die ausgewählte Datei hat eine andere Dauer als die ursprüngliche Datei.',
+        duplicateFIle: '<span class="text-danger">Keine Änderungen vorgenommen</span>. Die ausgewählte Datei ist bereits im Archiv vorhanden.',
+        fileUpdateError: '<span class="text-danger">Beim Aktualisieren der Datei ist ein Fehler aufgetreten: ${message}</span>',
+        goodFilePurge: "${file} und die zugehörigen Datensätze wurden erfolgreich gelöscht",
+        failedFilePrge: "${file} wurde im Archiv nicht gefunden",
+        fileToConvertNotFound: "Kann ${file} nicht finden, Überspringe Konvertierung.",
+        mkDirFailed: "Fehler beim Erstellen des Verzeichnisses: ${path}<br>Fehler: ${error}",
+        conversionComplete: "Konvertierung abgeschlossen, ${successTotal} erfolgreich, ${failedTotal} fehlgeschlagen.",
+        libraryUpToDate: "Die Bibliothek ist auf dem neuesten Stand. Keine Aktion erforderlich"
     },
     es: {
         info: 'Aviso', warning: 'Advertencia', error: 'Error',
@@ -175,7 +221,23 @@ const i18nToasts = { // UI.js
         multiDay: "Las operaciones de varios días no son compatibles todavía: ${file} no se recortará",
         allDaylight: "${file} no se añadirá al archivo ya que se ha grabado en su totalidad de día.",
         conversionDone: "Conversión de ${file} terminada",
-        badConversion: "Error al convertir el archivo ${file}: ${error}"
+        badConversion: "Error al convertir el archivo ${file}: ${error}",
+
+        noDirectory: "No se puede localizar la carpeta '${match}'",
+        dbFileMissing: "No se encuentra el archivo guardado con una extensión compatible: ${file}",
+        goodResultSave: "${number} resultados guardados en el Archivo",
+        NoOP: "Registros ya guardados, no hay nada que hacer",
+        goodDBUpdate: "Actualización de la base de datos completada, ${total} registros añadidos al archivo en ${seconds} segundos",
+        fileLocationUpdated: "La ubicación del archivo se actualizó correctamente en el Archivo. Actualiza los resultados para ver los registros.",
+        durationMismatch: '<span class="text-danger">No se realizaron cambios</span>. El archivo seleccionado tiene una duración diferente al archivo original.',
+        duplicateFIle: '<span class="text-danger">No se realizaron cambios</span>. El archivo seleccionado ya existe en el Archivo.',
+        fileUpdateError: '<span class="text-danger">Ocurrió un error al actualizar el archivo: ${message}</span>',
+        goodFilePurge: "${file} y sus registros asociados fueron eliminados correctamente",
+        failedFilePrge: "${file} no se encontró en el Archivo",
+        fileToConvertNotFound: "No se puede encontrar ${file}, se omite la conversión.",
+        mkDirFailed: "Error al crear el directorio: ${path}<br>Error: ${error}",
+        conversionComplete: "Conversión completada, ${successTotal} exitosas, ${failedTotal} fallidas.",
+        libraryUpToDate: "La biblioteca está actualizada. No hay nada que hacer"
     },
     fr: {
         info: 'Avis', warning: 'Avertissement', error: 'Erreur' ,
@@ -219,7 +281,23 @@ const i18nToasts = { // UI.js
         multiDay: "Les opérations multi-jours ne sont pas encore supportées : ${file} ne sera pas recadré",
         allDaylight: "${file} ne sera pas ajouté à l'archive car il est entièrement durant la journée.",
         conversionDone: "Conversion terminée pour ${file}",
-        badConversion: "Erreur lors de la conversion du fichier ${file} : ${error}"
+        badConversion: "Erreur lors de la conversion du fichier ${file} : ${error}",
+
+        noDirectory: "Impossible de localiser le dossier '${match}'",
+        dbFileMissing: "Impossible de localiser le fichier enregistré avec une extension prise en charge : ${file}",
+        goodResultSave: "${number} résultats enregistrés dans l'Archive",
+        NoOP: "Enregistrements déjà sauvegardés, aucune action nécessaire",
+        goodDBUpdate: "Mise à jour de la base de données terminée, ${total} enregistrements ajoutés à l'archive en ${seconds} secondes",
+        fileLocationUpdated: "L'emplacement du fichier a été mis à jour avec succès dans l'Archive. Actualisez les résultats pour voir les enregistrements.",
+        durationMismatch: '<span class="text-danger">Aucun changement effectué</span>. Le fichier sélectionné a une durée différente de celle du fichier original.',
+        duplicateFIle: '<span class="text-danger">Aucun changement effectué</span>. Le fichier sélectionné existe déjà dans l\'Archive.',
+        fileUpdateError: '<span class="text-danger">Une erreur est survenue lors de la mise à jour du fichier : ${message}</span>',
+        goodFilePurge: '${file} et ses enregistrements associés ont été supprimés avec succès',
+        failedFilePrge: "${file} n'a pas été trouvé dans l'Archive",
+        fileToConvertNotFound: "Impossible de trouver ${file}, conversion ignorée.",
+        mkDirFailed: "Échec de la création du répertoire : ${path}<br>Erreur : ${error}",
+        conversionComplete: "Conversion terminée, ${successTotal} réussie(s), ${failedTotal} échouée(s).",
+        libraryUpToDate: "La bibliothèque est à jour. Aucune action nécessaire"
     },
     nl: {
         info: 'Kennisgeving', warning: 'Waarschuwing', error: 'Fout',
@@ -263,7 +341,23 @@ const i18nToasts = { // UI.js
         multiDay: "Meerdaagse operaties worden nog niet ondersteund: ${file} zal niet worden bijgesneden",
         allDaylight: "${file} wordt niet aan het archief toegevoegd omdat het volledig tijdens de dag is.",
         conversionDone: "Conversie afgerond voor ${file}",
-        badConversion: "Fout bij het converteren van bestand ${file}: ${error}"
+        badConversion: "Fout bij het converteren van bestand ${file}: ${error}",
+
+        noDirectory: "Kan map '${match}' niet vinden",
+        dbFileMissing: "Kan het opgeslagen bestand met een ondersteunde extensie niet vinden: ${file}",
+        goodResultSave: "${number} resultaten opgeslagen in het Archief",
+        NoOP: "Records zijn al opgeslagen, niets te doen",
+        goodDBUpdate: "Database-update voltooid, ${total} records toegevoegd aan het archief in ${seconds} seconden",
+        fileLocationUpdated: "De bestandslocatie is succesvol bijgewerkt in het Archief. Vernieuw de resultaten om de records te zien.",
+        durationMismatch: '<span class="text-danger">Geen wijzigingen aangebracht</span>. Het geselecteerde bestand heeft een andere duur dan het originele bestand.',
+        duplicateFIle: '<span class="text-danger">Geen wijzigingen aangebracht</span>. Het geselecteerde bestand bestaat al in het Archief.',
+        fileUpdateError: '<span class="text-danger">Er is een fout opgetreden bij het bijwerken van het bestand: ${message}</span>',
+        goodFilePurge: "${file} en de bijbehorende records zijn succesvol verwijderd",
+        failedFilePrge: "${file} werd niet gevonden in het Archief",
+        fileToConvertNotFound: "Kan ${file} niet vinden, conversie overgeslagen.",
+        mkDirFailed: "Kan map niet aanmaken: ${path}<br>Fout: ${error}",
+        conversionComplete: "Conversie voltooid, ${successTotal} succesvol, ${failedTotal} mislukt.",
+        libraryUpToDate: "De bibliotheek is up-to-date. Niets te doen"
     },
     pt: {
         info: 'Informação', warning: 'Aviso', error: 'Erro',
@@ -307,7 +401,23 @@ const i18nToasts = { // UI.js
         multiDay: "Operações multi-dia ainda não são suportadas: ${file} não será cortado",
         allDaylight: "${file} não será adicionado ao arquivo, pois é totalmente durante o dia.",
         conversionDone: "Conversão finalizada para ${file}",
-        badConversion: "Erro ao converter o arquivo ${file}: ${error}"
+        badConversion: "Erro ao converter o arquivo ${file}: ${error}",
+
+        noDirectory: "Não foi possível localizar a pasta '${match}'",
+        dbFileMissing: "Não foi possível localizar o arquivo salvo com uma extensão compatível: ${file}",
+        goodResultSave: "${number} resultados salvos no Arquivo",
+        NoOP: "Registros já salvos, nada a fazer",
+        goodDBUpdate: "Atualização do banco de dados concluída, ${total} registros adicionados ao arquivo em ${seconds} segundos",
+        fileLocationUpdated: "A localização do arquivo foi atualizada com sucesso no Arquivo. Atualize os resultados para ver os registros.",
+        durationMismatch: '<span class="text-danger">Nenhuma alteração feita</span>. O arquivo selecionado tem uma duração diferente do arquivo original.',
+        duplicateFIle: '<span class="text-danger">Nenhuma alteração feita</span>. O arquivo selecionado já existe no Arquivo.',
+        fileUpdateError: '<span class="text-danger">Ocorreu um erro ao atualizar o arquivo: ${message}</span>',
+        goodFilePurge: "${file} e seus registros associados foram excluídos com sucesso",
+        failedFilePrge: "${file} não foi encontrado no Arquivo",
+        fileToConvertNotFound: "Não foi possível encontrar ${file}, conversão ignorada.",
+        mkDirFailed: "Falha ao criar o diretório: ${path}<br>Erro: ${error}",
+        conversionComplete: "Conversão concluída, ${successTotal} bem-sucedida(s), ${failedTotal} falhada(s).",
+        libraryUpToDate: "A biblioteca está atualizada. Nada a fazer"
     },
     ru: {
         info: 'Уведомление', warning: 'Предупреждение', error: 'Ошибка',
@@ -351,7 +461,23 @@ const i18nToasts = { // UI.js
         multiDay: "Многодневные операции еще не поддерживаются: ${file} не будет обрезан",
         allDaylight: "${file} не будет добавлен в архив, так как это происходит исключительно в дневное время.",
         conversionDone: "Завершено преобразование для ${file}",
-        badConversion: "Ошибка преобразования файла файла ${file}: ${error}"
+        badConversion: "Ошибка преобразования файла файла ${file}: ${error}",
+
+        noDirectory: "Не удалось найти папку '${match}'",
+        dbFileMissing: "Не удалось найти сохранённый файл с поддерживаемым расширением: ${file}",
+        goodResultSave: "${number} результатов сохранено в архиве",
+        NoOP: "Записи уже сохранены, действий не требуется",
+        goodDBUpdate: "Обновление базы данных завершено, ${total} записей добавлено в архив за ${seconds} секунд",
+        fileLocationUpdated: "Расположение файла успешно обновлено в архиве. Обновите результаты, чтобы увидеть записи.",
+        durationMismatch: '<span class="text-danger">Изменений не внесено</span>. Выбранный файл имеет другую продолжительность по сравнению с оригинальным файлом.',
+        duplicateFIle: '<span class="text-danger">Изменений не внесено</span>. Выбранный файл уже существует в архиве.',
+        fileUpdateError: '<span class="text-danger">Произошла ошибка при обновлении файла: ${message}</span>',
+        goodFilePurge: "${file} и связанные с ним записи успешно удалены",
+        failedFilePrge: "${file} не найден в архиве",
+        fileToConvertNotFound: "Не удалось найти ${file}, пропуск конвертации.",
+        mkDirFailed: "Не удалось создать директорию: ${path}<br>Ошибка: ${error}",
+        conversionComplete: "Конвертация завершена: ${successTotal} успешно, ${failedTotal} с ошибками.",
+        libraryUpToDate: "Библиотека актуальна. Действий не требуется"
     },
     sv: {
         info: 'Meddelande', warning: 'Varning', error: 'Fel',
@@ -395,7 +521,23 @@ const i18nToasts = { // UI.js
         multiDay: "Flerdagsoperationer stöds inte än: ${file} kommer inte att trimmas",
         allDaylight: "${file} kommer inte att läggas till i arkivet eftersom det är helt under dagtid.",
         conversionDone: "Konverteringen för ${file} är klar",
-        badConversion: "Fel vid konvertering av filen ${file}: ${error}"
+        badConversion: "Fel vid konvertering av filen ${file}: ${error}",
+
+        noDirectory: "Kunde inte hitta mappen '${match}'",
+        dbFileMissing: "Kunde inte hitta den sparade filen med ett stödformat: ${file}",
+        goodResultSave: "${number} resultat sparade i arkivet",
+        NoOP: "Poster är redan sparade, inget att göra",
+        goodDBUpdate: "Databasuppdatering klar, ${total} poster lades till i arkivet på ${seconds} sekunder",
+        fileLocationUpdated: "Filens plats uppdaterades framgångsrikt i arkivet. Uppdatera resultaten för att se posterna.",
+        durationMismatch: '<span class="text-danger">Inga ändringar gjorda</span>. Den valda filen har en annan längd än originalfilen.',
+        duplicateFIle: '<span class="text-danger">Inga ändringar gjorda</span>. Den valda filen finns redan i arkivet.',
+        fileUpdateError: '<span class="text-danger">Ett fel uppstod vid uppdatering av filen: ${message}</span>',
+        goodFilePurge: "${file} och dess associerade poster raderades framgångsrikt",
+        failedFilePrge: "${file} hittades inte i arkivet",
+        fileToConvertNotFound: "Kan inte hitta ${file}, hoppar över konverteringen.",
+        mkDirFailed: "Kunde inte skapa katalog: ${path}<br>Fel: ${error}",
+        conversionComplete: "Konvertering klar, ${successTotal} lyckades, ${failedTotal} misslyckades.",
+        libraryUpToDate: "Biblioteket är uppdaterat. Inget att göra"
     },
     zh: {
         info: '通知', warning: '警告', error: '错误',
@@ -439,7 +581,23 @@ const i18nToasts = { // UI.js
         multiDay: "暂不支持多日操作: ${file} 将不会被修剪",
         allDaylight: "${file} 不会被添加到档案中，因为它完全是在白天进行的。",
         conversionDone: "已完成 ${file} 的转换",
-        badConversion: "转换文件 ${file} 时出错: ${error}"
+        badConversion: "转换文件 ${file} 时出错: ${error}",
+
+        noDirectory: "无法找到文件夹 '${match}'",
+        dbFileMissing: "无法找到带有支持的文件扩展名的保存文件：${file}",
+        goodResultSave: "${number} 个结果已保存到档案",
+        NoOP: "记录已保存，无需执行任何操作",
+        goodDBUpdate: "数据库更新完成，${total} 条记录已在 ${seconds} 秒内添加到档案中",
+        fileLocationUpdated: "文件位置已成功更新到档案中。刷新结果以查看记录。",
+        durationMismatch: '<span class="text-danger">未作任何更改</span>。选定的文件与原始文件的时长不同。',
+        duplicateFIle: '<span class="text-danger">未作任何更改</span>。选定的文件已存在于档案中。',
+        fileUpdateError: '<span class="text-danger">更新文件时出错：${message}</span>',
+        goodFilePurge: "${file} 及其相关记录已成功删除",
+        failedFilePrge: "未在档案中找到 ${file}",
+        fileToConvertNotFound: "无法找到 ${file}，跳过转换。",
+        mkDirFailed: "无法创建目录：${path}<br>错误：${error}",
+        conversionComplete: "转换完成，成功：${successTotal}，失败：${failedTotal}。",
+        libraryUpToDate: "资料库已是最新，无需操作"
     }
     
 };

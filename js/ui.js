@@ -5456,10 +5456,10 @@ function getI18n(context){
     }
     
 
-    function generateToast({message = '', type = 'info', autohide = true, variables = {}} ={}) {
+    function generateToast({message = '', type = 'info', autohide = true, variables = undefined} ={}) {
         // i18n
         const i18n = getI18n(i18nToasts);
-        message = interpolate(i18n[message], variables);
+        message = variables ? interpolate(i18n[message], variables) : i18n[message] || message;
         const domEl = document.getElementById('toastContainer');
         
         const wrapper = document.createElement('div');
