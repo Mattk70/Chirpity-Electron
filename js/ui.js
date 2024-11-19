@@ -1904,7 +1904,7 @@ window.onload = async () => {
 
         // check for new version on mac platform. pkg containers are not an auto-updatable target
         // https://www.electron.build/auto-update#auto-updatable-targets
-        isMac && checkForMacUpdates();
+        isMac && ! isTestEnv && checkForMacUpdates();
 
         // Add cpu model & memory to config
         config.CPU = DIAGNOSTICS['CPU'];
@@ -5424,6 +5424,7 @@ function getI18n(context){
             fetch('https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest')
             .then(response => response.json())
             .then(data => {
+                console.log('Data: ', data)
                 const latestVersion = data.tag_name;
                 const latest = parseSemVer(latestVersion);
                 const current = parseSemVer(VERSION);
