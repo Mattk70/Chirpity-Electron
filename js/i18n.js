@@ -1516,7 +1516,7 @@ async function localiseUI(locale) {
         // //Explore location header
         document.querySelector("label[for='explore-locations']").textContent = i18nHeadings[locale].location;
         document.getElementById('exploreRange').innerHTML = `<span class="material-symbols-outlined align-bottom">date_range</span><span>${localisationData['explore-datefilter']}</span> <span class="material-symbols-outlined float-end">expand_more</span>`;
-        console.warn(`Translation took: ${Date.now() - t0} ms`)
+        console.warn('Translation', `${Date.now() - t0} ms`)
         return localisationData
     } catch (error) {
         console.error('Localisation Error:', error.message);
