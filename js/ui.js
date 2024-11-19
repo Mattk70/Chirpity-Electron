@@ -5424,6 +5424,7 @@ function getI18n(context){
             fetch('https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest')
             .then(response => response.json())
             .then(data => {
+                console.log('Data: ', data)
                 const latestVersion = data.tag_name;
                 const latest = parseSemVer(latestVersion);
                 const current = parseSemVer(VERSION);
