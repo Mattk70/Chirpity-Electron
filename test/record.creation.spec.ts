@@ -82,7 +82,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   //await page.pause()
   console.log('in after all')
-  await electronApp.close();
+  electronApp.close();
   console.log('after all: app closed')
 })
 
