@@ -81,7 +81,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   //await page.pause()
-  await electronApp.close()
+  //await electronApp.close()
 })
 
 test.describe.configure({ mode: 'parallel', retries: 2, timeout: 20_000 });
@@ -132,36 +132,5 @@ test('Can create/edit a manual record', async () => {
   expect(hasClass).toBe(true)
 })
 
-// test(`Nocmig analyse works and second result is 61%`, async () => {
-//   await runExampleAnalysis(page,'chirpity');
-//   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
-//   expect(callID).not.toBe(undefined)
-//   const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
-//   // console.log(secondResult, 'second result');
-//   expect(secondResult).toBe('61%');
-// })
-
-// test(`BirdNET analyse works and second result is 34%`, async () => {
-//   await runExampleAnalysis(page, 'birdnet');
-//   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
-//   expect(callID).not.toBe(undefined)
-//   const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
-//   // console.log(secondResult, 'second result');
-//   expect(secondResult).toBe('34%');
-// })
-
-
-
-
-// test("Amend file start dialog contains date", async () =>{
-//   await runExampleAnalysis(page, 'chirpity');
-//   await page.locator('#dropdownMenuButton').click({button: 'right'});
-//   await page.locator('#setFileStart').click();
-//   const fileStart = await page.locator('#fileStart');
-//   const entry = await fileStart.inputValue();
-//   const currentYear = new Date().getFullYear().toString();
-//   expect(entry.toString()).toContain(currentYear);
-//   // await page.locator('#spectrogramWrapper button.btn-secondary').click();
-// })
 
 
