@@ -310,7 +310,7 @@ async function createWindow() {
     }
     
     mainWindow.on('close', (e) => {
-        if (unsavedRecords){
+        if (unsavedRecords && !process.env.CI){
             const choice = dialog.showMessageBoxSync(mainWindow, {
                 type: 'warning',
                 buttons: ['Yes', 'No'],
@@ -512,8 +512,6 @@ ipcMain.handle('request-worker-channel', async (_event) =>{
 ipcMain.handle('unsaved-records', (_event, data) => {
     unsavedRecords = data.newValue; // Update the variable with the new value
 });
-
-
 
 ipcMain.handle('saveFile', async (event, arg) => {
     // Show file dialog to select audio file
