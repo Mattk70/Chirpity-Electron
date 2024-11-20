@@ -2796,7 +2796,7 @@ function centreSpec(){
         },
         s: function (e) {
             if ( e.ctrlKey || e.metaKey) {
-                worker.postMessage({ action: 'save2db', file: STATE.currentFile});
+                document.getElementById('save2db').click();
             }
         },
         t: function (e) {
