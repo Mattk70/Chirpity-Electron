@@ -401,7 +401,8 @@ const initWavesurfer = ({
     
     // Queue up next audio window while playing
     wavesurfer.on('audioprocess', function () {
-        
+        // Ensure the audio file is loaded before proceeding
+        if (!wavesurfer.isReady) return;
         const currentTime = wavesurfer.getCurrentTime();
         const duration = wavesurfer.getDuration();
         const playedPart = currentTime / duration;
@@ -1361,7 +1362,7 @@ function createRegion(start, end, label, goToRegion) {
     if (region.clientWidth <= checkWidth(text)) {
         region.style.writingMode = 'vertical-rl';
     }
-    if (goToRegion) {
+    if (goToRegion && wavesurfer.isReady) {
         const progress = start / wavesurfer.getDuration();
         wavesurfer.seekAndCenter(progress);
     }
