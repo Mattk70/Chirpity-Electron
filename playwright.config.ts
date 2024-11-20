@@ -4,7 +4,7 @@ import { defineConfig, PlaywrightTestConfig } from '@playwright/test'
 export default defineConfig({
   testDir: './test',
   maxFailures: 2,
-  timeout: 120 * 1000,
+  timeout: 30 * 1000,
   use: {
     // Maximum time each action such as `click()` can take. Defaults to 0 (no limit).
     actionTimeout: 0,
