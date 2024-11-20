@@ -151,24 +151,12 @@ test("Amend file start dialog contains date", async () =>{
   await runExampleAnalysis(page, 'chirpity');
   await page.locator('#dropdownMenuButton').click({button: 'right'});
   await page.locator('#setFileStart').click();
-  const fileStart = await page.locator('#fileStart');
+  const fileStart = page.locator('#fileStart');
   const entry = await fileStart.inputValue();
   const currentYear = new Date().getFullYear().toString();
   expect(entry.toString()).toContain(currentYear);
   // await page.locator('#spectrogramWrapper button.btn-secondary').click();
 })
-
-// test("Copes with scatter bomb", async () =>{
-//   await runExampleAnalysis(page, 'chirpity');
-//   await page.locator('#dropdownMenuButton').click({button: 'right'});
-//   await page.locator('#setFileStart').click();
-//   const fileStart = await page.locator('#fileStart');
-//   const entry = await fileStart.inputValue();
-//   const currentYear = new Date().getFullYear().toString();
-//   expect(entry.toString()).toContain(currentYear);
-//   // await page.locator('#spectrogramWrapper button.btn-secondary').click();
-// })
-
 
 /* 
 The current issue with click fest is that while element are hidden, they can't be clicked.
