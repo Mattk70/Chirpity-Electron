@@ -138,7 +138,7 @@ test('Can create/edit a manual record', async () => {
   // File name is blue - saved
   const hasClass = await filename.evaluate(el => el.classList.contains('text-info'));
   
-  console.log('record creation test: before final expect')
+  console.log('record creation test: before final expect', hasClass)
   expect(hasClass).toBe(true)
   console.log('record creation test: complete')
 })

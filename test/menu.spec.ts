@@ -72,10 +72,11 @@ test.beforeAll(async () => {
   await new Promise((resolve) => { 
     const checkPage = setInterval(async () => { 
       if (page) { 
+        page.waitForTimeout(1000)
         clearInterval(checkPage);
         resolve('');
       } 
-    }, 5000); 
+    }, 100); 
   });
 })
 
@@ -84,7 +85,7 @@ test.afterAll(async () => {
   await electronApp.close()
 })
 
-//test.describe.configure({ mode: 'parallel', retries: 2, timeout: 20_000 });
+test.describe.configure({ mode: 'parallel', retries: 2, timeout: 20_000 });
 
 /*
 REMEMBER TO REBUILD THE APP IF THE *APPLICATION CODE* NEEDS TO BE CHANGED
