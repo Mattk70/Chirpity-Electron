@@ -2,13 +2,13 @@ import { _electron as electron } from 'playwright';
 import { test, expect } from '@playwright/test';
 import { 
   findLatestBuild, 
-  ipcMainCallFirstListener, 
-  ipcRendererCallFirstListener, 
+  // ipcMainCallFirstListener, 
+  // ipcRendererCallFirstListener, 
   parseElectronApp,
   ipcMainInvokeHandler,
-  ipcRendererInvoke,
-  ipcRendererSend,
-  ipcMainEmit,
+  // ipcRendererInvoke,
+  // ipcRendererSend,
+  // ipcMainEmit,
   stubMultipleDialogs
 } from 'electron-playwright-helpers';
 import { ElectronApplication, Page } from 'playwright';
@@ -101,6 +101,7 @@ REMEMBER TO REBUILD THE APP IF THE *APPLICATION CODE* NEEDS TO BE CHANGED
 // })
 
 test('Can create/edit a manual record', async () => {
+  console.log('starting record creation test')
   await runExampleAnalysis(page,'chirpity');
   await page.locator('#result1').click();
   await page.locator('region').click({button: 'right'});
@@ -109,6 +110,7 @@ test('Can create/edit a manual record', async () => {
   // @ts-ignore
   const selectedValue = await birdList.evaluate(select => select.value);
   // The edit form has the current species selected
+  console.log('record creation test: before first expect')
   expect(selectedValue === 'Redwing (call)' )
   await birdList.selectOption('Ring Ouzel (call)');
   await page.locator('#call-count').fill('3');
@@ -117,19 +119,28 @@ test('Can create/edit a manual record', async () => {
   const cname = await page.locator('#result1 td.cname > span.material-symbols-outlined')
   const confidence = await cname.textContent();
   // Confidence has a checkmark
+
+  console.log('record creation test: before second expect')
   expect(confidence).toBe('verified');
   const comment =  await (await page.locator('#result1  td.comment  span')).getAttribute('title');
   // Comment saved
+
+  console.log('record creation test: before 3rd expect')
   expect(comment).toBe('a test comment');
   const callCount = await page.locator('#call-count').inputValue();
   // Call count updated
+
+  console.log('record creation test: before 4th expect')
   expect(callCount).toBe('3');
   await page.keyboard.press('ControlOrMeta+s');
   await page.waitForTimeout(5000);
   const filename = await page.locator('#filename span.filename');
   // File name is blue - saved
   const hasClass = await filename.evaluate(el => el.classList.contains('text-info'));
+  
+  console.log('record creation test: before final expect')
   expect(hasClass).toBe(true)
+  console.log('record creation test: complete')
 })
 
 
