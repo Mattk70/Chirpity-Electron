@@ -79,10 +79,12 @@ test.beforeAll(async () => {
   });
 })
 
-// test.afterAll(async () => {
-//   //await page.pause()
-//   await electronApp.close()
-// })
+test.afterAll(async () => {
+  //await page.pause()
+  console.log('in after all')
+  await electronApp.close();
+  console.log('after all: app closed')
+})
 
 test.describe.configure({ mode: 'parallel', retries: 2, timeout: 20_000 });
 
