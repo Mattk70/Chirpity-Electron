@@ -79,10 +79,10 @@ test.beforeAll(async () => {
   });
 })
 
-test.afterAll(async () => {
-  //await page.pause()
-  await electronApp.close()
-})
+// test.afterAll(async () => {
+//   //await page.pause()
+//   await electronApp.close()
+// })
 
 test.describe.configure({ mode: 'parallel', retries: 2, timeout: 20_000 });
 
