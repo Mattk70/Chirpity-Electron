@@ -72,11 +72,10 @@ test.beforeAll(async () => {
   await new Promise((resolve) => { 
     const checkPage = setInterval(async () => { 
       if (page) { 
-        page.waitForTimeout(2000)
         clearInterval(checkPage);
         resolve('');
       } 
-    }, 100); 
+    }, 3000); 
   });
 })
 
