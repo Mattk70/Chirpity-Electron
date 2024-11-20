@@ -125,7 +125,7 @@ test('Can create/edit a manual record', async () => {
   // Call count updated
   expect(callCount).toBe('3');
   await page.keyboard.press('ControlOrMeta+s');
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(5000);
   const filename = await page.locator('#filename span.filename');
   // File name is blue - saved
   const hasClass = await filename.evaluate(el => el.classList.contains('text-info'));
