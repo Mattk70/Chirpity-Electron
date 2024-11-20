@@ -75,13 +75,13 @@ test.beforeAll(async () => {
         clearInterval(checkPage);
         resolve('');
       } 
-    }, 5000); 
+    }, 3000); 
   });
 })
 
 test.afterAll(async () => {
   //await page.pause()
-  //await electronApp.close()
+  await electronApp.close()
 })
 
 test.describe.configure({ mode: 'parallel', retries: 2, timeout: 20_000 });
