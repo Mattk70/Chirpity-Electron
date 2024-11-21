@@ -76,6 +76,11 @@ jobs:
           # uncomment to view changed file
           # cat ./node_modules/fluent-ffmpeg/lib/processor.js
         shell: bash
+      
+      - name: Modify colorScale.js - Add inverted greys colormap
+        run: |
+          sed -i '/"greys":\[{"index":0,"rgb":\[0,0,0\]},{"index":1,"rgb":\[255,255,255\]}\],/a \ \ "igreys":[{"index":0,"rgb":[255,255,255]},{"index":1,"rgb":[0,0,0]}],' ./node_modules/colormap/colorScale.js
+        shell: bash
 
       # test application here
 
