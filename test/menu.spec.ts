@@ -76,7 +76,7 @@ test.beforeAll(async () => {
         clearInterval(checkPage);
         resolve('');
       } 
-    }, 250); 
+    }, 2500); 
   });
 })
 
