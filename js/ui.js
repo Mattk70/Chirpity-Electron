@@ -402,7 +402,7 @@ const initWavesurfer = ({
     // Queue up next audio window while playing
     wavesurfer.on('audioprocess', function () {
         // Ensure the audio file is loaded before proceeding
-        if (!wavesurfer.isReady) return;
+        //if (!wavesurfer.isReady) return;
         try {
             const currentTime = wavesurfer.getCurrentTime();
             const duration = wavesurfer.getDuration();
@@ -419,6 +419,8 @@ const initWavesurfer = ({
         } catch (e) {
             const errorKey = e.message || e.toString();
             if (!loggedErrors.has(errorKey)) {
+                // lets find out if it's because wavesurfer isn't ready
+                console.warn('onAudioProcessError', `isReady: ${wavesurfer.isReady}` )
                 console.warn('onAudioProcessError', e);
                 loggedErrors.add(errorKey);
             }
