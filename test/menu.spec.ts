@@ -159,6 +159,13 @@ test("Amend file start dialog contains date", async () =>{
   // await page.locator('#spectrogramWrapper button.btn-secondary').click();
 })
 
+test("Select inverted greyscale colourmap", async () =>{
+  await runExampleAnalysis(page, 'chirpity');
+  await changeSettings(page, 'select', 'colourmap', 'igreys', 50)
+  // await page.locator('#spectrogramWrapper button.btn-secondary').click();
+})
+
+
 /* 
 The current issue with click fest is that while element are hidden, they can't be clicked.
 
