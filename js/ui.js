@@ -352,7 +352,7 @@ const initWavesurfer = ({
     audio = undefined,
     height = 0
 }) => {
-    let failure = false;
+    const loggedErrors = new Set();
     if (wavesurfer) {
         wavesurfer.pause();
     }
@@ -417,9 +417,10 @@ const initWavesurfer = ({
                 }
             }
         } catch (e) {
-            if (!failure) {
+            const errorKey = e.message || e.toString();
+            if (!loggedErrors.has(errorKey)) {
                 console.warn('onAudioProcessError', e);
-                failure = true;
+                loggedErrors.add(errorKey);
             }
         }
     });
