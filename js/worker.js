@@ -1502,7 +1502,7 @@ const fetchAudioBuffer = async ({
     start = METADATA[file].duration < 0.1 ? 0 : Math.min(METADATA[file].duration - 0.1, start)
     end = Math.min(end, METADATA[file].duration);
     // Use ffmpeg to extract the specified audio segment
-    if (isNaN(start)) throw(new Error('fetchAudioBuffer: start is NaN'));
+    if (isNaN(start)) throw(new Error('fetchAudioBuffer: start is NaN', start));
     return new Promise((resolve, reject) => {
         const additionalFilters = setAudioFilters();
         const command = setupFfmpegCommand({
