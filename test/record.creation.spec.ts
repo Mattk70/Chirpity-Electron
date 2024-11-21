@@ -86,7 +86,6 @@ test.afterAll(async () => {
   console.log(' app closed')
 })
 
-test.describe.configure({ mode: 'parallel', retries: 2, timeout: 20_000 });
 
 /*
 REMEMBER TO REBUILD THE APP IF THE *APPLICATION CODE* NEEDS TO BE CHANGED

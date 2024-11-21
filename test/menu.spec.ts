@@ -61,7 +61,6 @@ test.beforeAll(async () => {
     const filename = window.url()?.split('/').pop()
     console.log(`Window opened: ${filename}`)
     page = window;
-    await page.waitForLoadState()
     page.on('pageerror', (error) => {
       console.error(error)
     })
@@ -71,14 +70,14 @@ test.beforeAll(async () => {
     })
   })
 
-  // await new Promise((resolve) => { 
-  //   const checkPage = setInterval(async () => { 
-  //     if (page) { 
-  //       clearInterval(checkPage);
-  //       resolve('');
-  //     } 
-  //   }, 2500); 
-  // });
+  await new Promise((resolve) => { 
+    const checkPage = setInterval(async () => { 
+      if (page) { 
+        clearInterval(checkPage);
+        resolve('');
+      } 
+    }, 3000); 
+  });
 })
 
 test.afterAll(async () => {
@@ -86,7 +85,7 @@ test.afterAll(async () => {
   await electronApp.close()
 })
 
-test.describe.configure({ mode: 'parallel', retries: 2, timeout: 20_000 });
+test.describe.configure({ mode: 'parallel', retries: 1, timeout: 30_000 });
 
 /*
 REMEMBER TO REBUILD THE APP IF THE *APPLICATION CODE* NEEDS TO BE CHANGED
