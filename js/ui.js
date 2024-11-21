@@ -352,7 +352,7 @@ const initWavesurfer = ({
     audio = undefined,
     height = 0
 }) => {
-    
+    let failure = false;
     if (wavesurfer) {
         wavesurfer.pause();
     }
@@ -403,16 +403,23 @@ const initWavesurfer = ({
     wavesurfer.on('audioprocess', function () {
         // Ensure the audio file is loaded before proceeding
         if (!wavesurfer.isReady) return;
-        const currentTime = wavesurfer.getCurrentTime();
-        const duration = wavesurfer.getDuration();
-        const playedPart = currentTime / duration;
-        
-        if (playedPart > 0.5) {
+        try {
+            const currentTime = wavesurfer.getCurrentTime();
+            const duration = wavesurfer.getDuration();
+            const playedPart = currentTime / duration;
             
-            if (!wavesurfer.bufferRequested && currentFileDuration > bufferBegin + windowLength) {
-                const begin = bufferBegin + windowLength;
-                postBufferUpdate({ begin: begin, play: false, queued: true })
-                wavesurfer.bufferRequested = true;
+            if (playedPart > 0.5) {
+                
+                if (!wavesurfer.bufferRequested && currentFileDuration > bufferBegin + windowLength) {
+                    const begin = bufferBegin + windowLength;
+                    postBufferUpdate({ begin: begin, play: false, queued: true })
+                    wavesurfer.bufferRequested = true;
+                }
+            }
+        } catch (e) {
+            if (!failure) {
+                console.warn('onAudioProcessError', e);
+                failure = true;
             }
         }
     });
