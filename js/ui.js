@@ -2068,7 +2068,6 @@ const setUpWorkerMessaging = () => {
                     if (!config.hasNode && config[config.model].backend !== 'webgpu'){
                         // No node? Not using webgpu? Force webgpu
                         handleBackendChange('webgpu');
-                        //generateToast({type: 'warning',  message: 'The standard backend could not be loaded on this machine. An experimental backend (webGPU) has been used instead.'});
                         generateToast({type: 'warning',  message: 'noNode'});
                         console.warn('tfjs-node could not be loaded, webGPU backend forced. CPU is', DIAGNOSTICS['CPU'])
                     }
@@ -5027,7 +5026,7 @@ async function readLabels(labelFile, updating){
         return response.text();
     }).catch(error =>{
         if (error.message === 'Failed to fetch') {
-            generateToast({type: 'error', message: 'The custom list could not be found, <b class="text-danger">no detections will be shown</b>.'})
+            generateToast({type: 'error', message: 'listNotFound', variables: {file: labelFile}})
             DOM.customListSelector.classList.add('btn-outline-danger');
             document.getElementById('navbarSettings').click();
             document.getElementById('list-file-selector').focus();

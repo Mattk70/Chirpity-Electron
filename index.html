@@ -1382,7 +1382,7 @@
                 firstMarkerEl.classList.add('leaflet-marker-icon-default')
                 marker.on('click', onMapClick);
             } catch (error) {
-                generateToast({message: 'There was an error showing the map: '  + error.message})
+                generateToast({message: 'leafletError' , variables: {error: error.message}})
             }
         }
     }
@@ -1404,7 +1404,7 @@
             // Center the map view on the new marker position
             map.setView([lat, lng]);
         } catch (error) {
-            generateToast({message: 'There was an error updating the map: '  + error.message})
+            generateToast({message: 'leafletError' , variables: {error: error.message}})
         }
     }
 
