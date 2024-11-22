@@ -29,7 +29,7 @@ const i18nToasts = { // UI.js
         noLoad: 'The ${model} model is not loaded. Restart Chirpity to continue. If you see this message repeatedly, it is likely your computer does not support AVX2 and Chirpity will not run on your system.',
         noDLL: 'There has been an error loading the model. This may be due to missing AVX support. Chirpity AI models require the AVX2 instructions set to run. If you have AVX2 enabled and still see this notice, please refer to <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">this issue</a> on Github.',
         noFile: "Cannot locate: ${file}",
-        ffmpeg: 'FFMPEG error extracting audio: ${error',
+        ffmpeg: 'FFMPEG error extracting audio: ${error}',
         noNight: 'No detections. ${file} has no period within it where predictions would be given. <b>Tip:</b> To see detections in this file, disable nocmig mode and run the analysis again.',
         saveBlocked: "Cannot save file ${filePath}\nbecause it is open in another application",
         goodSave: '${filePath} has been written successfully.',
