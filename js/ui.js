@@ -5626,7 +5626,7 @@ async function getXCComparisons(){
                 type: record.type, // call type
                 smp: record.smp, // sample rate
                 licence: record.lic //// licence
-              }));
+              })).filter(record => record.url); // Remove records with empty URL;
 
             // Shuffle recordings so new cache returns a different set
             shuffle(recordings);

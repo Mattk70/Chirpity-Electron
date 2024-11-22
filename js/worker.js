@@ -1098,7 +1098,7 @@ async function locateFile(file) {
 
 async function notifyMissingFile(file) {
     let missingFile;
-    // Look for the file in te Archive
+    // Look for the file in the Archive
     const row = await diskDB.getAsync('SELECT * FROM FILES WHERE name = ?', file);
     if (row?.id) missingFile = file
     generateAlert({type: 'error', message: "dbFileMissing", variables: {file: missingFile}})
