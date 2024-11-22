@@ -19,14 +19,15 @@ let electronApp: ElectronApplication;
 let page: Page;
 let worker: Page;
 let example_file: any
+// find the latest build in the out directory
+const latestBuild = findLatestBuild('./dist')
+// parse the directory and find paths and other info
+const appInfo = parseElectronApp(latestBuild)
+// set the CI environment variable to true
+process.env.CI = 'e2e';
 
 test.beforeAll(async () => {
-  // find the latest build in the out directory
-  const latestBuild = findLatestBuild('./dist')
-  // parse the directory and find paths and other info
-  const appInfo = parseElectronApp(latestBuild)
-  // set the CI environment variable to true
-  process.env.CI = 'e2e';
+
   electronApp = await electron.launch({
     args: [appInfo.main],
     executablePath: appInfo.executable,
@@ -36,7 +37,6 @@ test.beforeAll(async () => {
     }
 
   })
-
   // Get the path for the example file we want to load
   example_file = await ipcMainInvokeHandler(electronApp, 'getAudio')
   await stubMultipleDialogs(electronApp, [
@@ -134,13 +134,16 @@ test('Can create/edit a manual record', async () => {
   console.log('record creation test: before 4th expect')
   expect(callCount).toBe('3');
   await page.keyboard.press('ControlOrMeta+s');
-  await page.waitForTimeout(1000);
-  const filename = await page.locator('#filename span.filename');
-  // File name is blue - saved
-  const hasClass = await filename.evaluate(el => el.classList.contains('text-info'));
-  
-  console.log('record creation test: before final expect', hasClass)
-  expect(hasClass).toBe(true)
+  await page.waitForFunction(
+    ({selector, className}) => {
+      const element = document.querySelector(selector);
+      return element && element.classList.contains(className);
+    },
+    { timeout: 5000, // Adjust timeout as needed
+    selector: '#filename span.filename', // Selector
+    className: 'text-info'} // Class to wait for
+  );
+
   console.log('record creation test: complete')
 })
 

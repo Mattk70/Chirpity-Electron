@@ -19,14 +19,14 @@ let electronApp: ElectronApplication;
 let page: Page;
 let worker: Page;
 let example_file: any
-
+// find the latest build in the out directory
+const latestBuild = findLatestBuild('./dist')
+// parse the directory and find paths and other info
+const appInfo = parseElectronApp(latestBuild)
+// set the CI environment variable to true
+process.env.CI = 'e2e';
 test.beforeAll(async () => {
-  // find the latest build in the out directory
-  const latestBuild = findLatestBuild('./dist')
-  // parse the directory and find paths and other info
-  const appInfo = parseElectronApp(latestBuild)
-  // set the CI environment variable to true
-  process.env.CI = 'e2e';
+
   electronApp = await electron.launch({
     args: [appInfo.main],
     executablePath: appInfo.executable,

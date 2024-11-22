@@ -245,9 +245,13 @@ ul {
 region.wavesurfer-region:before {
     content: attr(data-region-label);
     position: absolute;
-    color: beige;
-    top: 10px;
-    padding-left: 5px;
+    color: beige;    
+    background-color: rgba(0, 0, 0, 0.3); /* Semi-transparent black background */
+    border-radius: 0.5rem; /* Optional: Rounds corners for a cleaner look */
+    padding: 0.1rem 0.5rem; /* Adds padding around the label text */
+    top: 0.75rem;
+    left: 0.5rem;
+    padding-left: 0.5rem;
 }
 
 region.wavesurfer-region[data-region-highlight] {
