@@ -1089,7 +1089,7 @@ async function locateFile(file) {
     } catch (error) {
         if (error.message.includes('scandir')){
             const match = error.message.match(/'([^']+)'/);
-            generateAlert({type: 'error', message: 'NoDirectory', variables: {match}});
+            generateAlert({type: 'error', message: 'noDirectory', variables: {match}});
         }
         console.warn(error.message + ' - Disk removed?'); // Expected that this happens when the directory doesn't exist
     } 
