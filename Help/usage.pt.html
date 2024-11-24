@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Guia de uso do Chirpity Nocmig</title>
+</head>
+
+<body>
+    <h4 class="text-center text-bg-light p-3">Fluxo de trabalho sugerido</h4>
+
+    <ol>
+        <li>Abra um arquivo de áudio, vários arquivos ou uma pasta de áudio. Existem três maneiras de fazer isso:
+            <ol>
+                <li>Arraste e solte os arquivos ou pastas no aplicativo Chirpity Nocmig</li>
+                <li>No aplicativo Chirpity Nocmig, selecione "Arquivo &gt; Abrir arquivo de áudio" ou pressione Ctrl-O e selecione os arquivos para abrir</li>
+                <li>Clique com o botão direito do mouse nos arquivos de áudio no Explorador de Arquivos do Windows (ou Finder no Mac) e selecione "Abrir com" &gt; Chirpity</li>
+            </ol>
+            Idealmente, os arquivos devem ser aqueles gravados pelo seu gravador digital com seus carimbos de data e hora originais. Nesse caso, você poderá usar o modo <b>Hora do dia</b> na linha do tempo do espectrograma, que exibirá o horário real em que os sons foram detectados. Caso contrário, você ainda poderá exibir (e salvar) o horário correto do arquivo e das detecções, editando o horário de início. Isso pode ser feito clicando com o botão direito no nome do arquivo na barra de controle.
+            <figure class="figure float-end m-3">
+                <img src="Help/amend file.png" alt="O menu de contexto acessado pelo nome do arquivo contém opções para alterar o horário de início do arquivo e a localização da gravação" class="rounded figure-img float-end img-fluid">
+                <figcaption class="figure-caption text-muted text-end">Menu de contexto do nome do arquivo.</figcaption>
+            </figure>
+        </li>
+        <li>
+            Selecione &quot;<i>Analisar arquivo atual</i>&quot; no menu <b>Análise</b>. Dependendo do comprimento do arquivo, isso pode levar vários minutos. Um indicador de progresso aparecerá para estimar o tempo restante. Para interromper a análise a qualquer momento, pressione a tecla <b>Esc</b>.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Explorar detecções</h5>
+
+    <ol start="4">
+        <li>
+            Conforme o modelo faz detecções, elas aparecem em uma tabela abaixo do espectrograma. Clicar na linha de uma detecção na tabela fará com que o cursor de reprodução salte para o início dessa detecção e destaque sua posição no espectrograma. Clicar com o botão direito na linha abrirá o menu de contexto da detecção.
+            Este menu contém opções específicas para a detecção destacada no momento. Você pode pressionar a barra de espaço para reproduzir desde o início da seleção e continuar até pressionar a barra de espaço novamente. Clicar no espectrograma moverá o cursor de reprodução para essa posição. Se a reprodução já estiver em andamento, ela continuará, permitindo que você reproduza repetidamente um som específico.
+        </li>
+        <figure class="figure float-end m-3">
+            <img src="Help/detection menu.png" alt="O menu de contexto acessado por uma detecção contém opções para inspecionar e modificar o registro" class="rounded figure-img float-end img-fluid">
+            <figcaption class="figure-caption text-muted text-end">Menu de contexto da detecção.</figcaption>
+        </figure>
+        <li>
+            Se várias detecções forem aplicáveis a um determinado período de tempo, um círculo será exibido ao lado do nome da espécie. Clicar nesse círculo exibirá as outras espécies detectadas na região e a confiança atribuída a essas identificações.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Resumo e filtragem de detecções</h5>
+
+    <ol start="6">
+        <li>
+            Uma tabela de resumo aparecerá à esquerda dos resultados quando o modelo concluir sua análise. Essa tabela permite que você filtre os resultados exibidos na tabela principal de resultados. Clique no nome da espécie no resumo para limitar a exibição a essa única espécie. Isso é <i>extremamente</i> útil se centenas de chamadas de rouxinóis foram detectadas!
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Detecções personalizadas</h5>
+    <ol start="7">
+        <li>
+            Às vezes, um som pode ser perdido ou uma detecção pode ser errônea devido à posição da janela de análise em relação ao som. Você pode mover a janela arrastando-a, ou criar uma nova janela clicando e arrastando para selecionar uma região personalizada no espectrograma. Depois de criar uma nova região, selecione <span class="material-symbols-outlined">search</span> <b>Analisar</b> no menu de contexto ou <b>Análise &gt; Analisar intervalo selecionado</b> no menu.
+            As detecções para a região selecionada aparecerão em uma janela sobreposta e poderão ser salvas nos resultados ou descartadas.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Modificar resultados</h5>
+    <ol start="8">
+        <li>
+            É possível remover resultados selecionando <span class="delete material-symbols-outlined">delete_forever</span> <b>Excluir registro</b> no menu de contexto. Isso pode ser aplicado a uma detecção individual na tabela de resultados ou a uma espécie específica no resumo.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Salvar resultados</h5>
+    <ol start="9">
+        <li>
+            <p><b>Nota:</b> Os resultados não são salvos por padrão.</p>
+            Salve os resultados selecionando <b>Registros &gt; <span class="material-symbols-outlined">archive</span> Salvar no arquivo</b>.
+        </li>
+    </ol>
+
+    <h5 id="reload" class="pt-2">Restaurar resultados</h5>
+    <p>
+        Quando você salva suas detecções no Chirpity, um banco de dados é atualizado com os detalhes das detecções. Se você recarregar seu arquivo posteriormente e selecionar "Obter resultados para o arquivo atual", os resultados salvos serão restaurados. 
+        <b>Nota:</b> Se o arquivo original estiver ausente porque foi compactado em um dos formatos suportados ('.mp3', '.wav', '.mpga', '.ogg', '.opus', '.flac', '.aac'), mas mantém o mesmo nome com uma nova extensão, o Chirpity encontrará e carregará esse arquivo, usando o horário original.
+    </p>
+    <p>
+        No menu de registros, você também pode navegar pelas detecções salvas por espécie e dentro de um intervalo de datas escolhido. Além disso, é possível gerar gráficos das espécies detectadas ao longo do tempo.
+    </p>
+
+    <h5 id="export" class="pt-2">Exportar resultados</h5>
+    Existem várias maneiras de exportar as detecções:
+    <ol>
+        <li>
+            Exporte um clipe de áudio de uma detecção selecionando <span class="material-symbols-outlined">music_note</span> <b>Exportar clipe de áudio</b> no menu de contexto. Por padrão, o nome do arquivo incluirá o nome da espécie e o horário da detecção. O menu <b>Configurações</b> permite controlar o formato e a qualidade dos arquivos exportados, bem como adicionar efeitos de entrada e saída ao início e ao fim do áudio.
+        </li>
+        <li>
+            Exporte até 1000 clipes de áudio de detecções por espécie em "lote". Para isso, selecione <span class="material-symbols-outlined">music_note</span> <b>Exportar clipes de áudio</b> no menu de contexto da tabela de resumo e escolha a pasta onde deseja salvar os arquivos.
+        </li>
+        <li>
+            Exporte os resultados como um arquivo CSV selecionando <span class="material-symbols-outlined">ios_share</span> <b>Exportar resultados para CSV</b> no menu Arquivo. Os resultados serão exportados para um arquivo CSV na pasta escolhida.
+        </li>
+        <li>
+            Salve as detecções como um arquivo de etiquetas no formato do Audacity. Selecione <b>Arquivo &gt; Salvar etiquetas do Audacity</b> no menu. Por padrão, o arquivo de etiquetas terá o mesmo nome do arquivo de áudio, mas com a extensão ".txt".
+        </li>
+    </ol>
+
+    <div class="row mb-3">
+        <div class="col-sm-6">
+            <div class="card">
+                <div class="card-header">Exemplo de uso do Chirpity</div>
+                <div class="card-body">
+                    <div class="ratio ratio-16x9">
+                        <iframe width="100%" height="100%" src="https://www.youtube.com/embed/5_37FMPRkwY?si=qnQNUKJJyuCJ_U4b?vq=hd720&cc_load_policy=1" title="Reprodutor de vídeo do YouTube" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+                    </div>
+                    <p class="card-text">Uma introdução aos principais recursos do Chirpity.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1221,8 +1221,13 @@ const setMetadata = async ({ file, source_file = file }) => {
         fileEnd = new Date(guanoTimestamp + (METADATA[file].duration * 1000));
     } else { // Least preferred
         const stat = fs.statSync(source_file);
-        fileEnd = new Date(stat.mtime);
-        fileStart = new Date(stat.mtime - (METADATA[file].duration * 1000));
+        if (STATE.fileStartMtime){ // Zoom H1E apparently sets mtime to be the start of the recording
+            fileStart = new Date(stat.mtime);
+            fileEnd = new Date(stat.mtime + (METADATA[file].duration * 1000));
+        } else {
+            fileEnd = new Date(stat.mtime);
+            fileStart = new Date(stat.mtime - (METADATA[file].duration * 1000));
+        }
     }
     
     // split  the duration of this file across any dates it spans

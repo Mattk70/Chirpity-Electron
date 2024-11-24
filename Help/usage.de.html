@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chirpity Nocmig Benutzerhandbuch</title>
+</head>
+
+<body>
+    <h4 class="text-center text-bg-light p-3">Empfohlener Arbeitsablauf</h4>
+
+    <ol>
+        <li>Öffnen Sie eine Audiodatei, mehrere Dateien oder einen Ordner mit Audiodateien. Es gibt drei Möglichkeiten, dies zu tun:
+            <ol>
+                <li>Ziehen Sie die Dateien oder Ordner in die Chirpity Nocmig-Anwendung</li>
+                <li>Wählen Sie in der Chirpity Nocmig-Anwendung „Datei &gt; Audiodatei öffnen“ oder drücken Sie Strg-O und wählen Sie die Dateien aus, die geöffnet werden sollen</li>
+                <li>Klicken Sie im Windows-Explorer (oder Finder auf einem Mac) mit der rechten Maustaste auf die Audiodatei(en) und wählen Sie „Öffnen mit“ &gt; Chirpity</li>
+            </ol>
+            Idealerweise sollten die Dateien von Ihrem digitalen Aufnahmegerät stammen und ihren ursprünglichen Zeitstempel behalten. In diesem Fall können Sie den <b>Zeitanzeigemodus</b> nutzen, um die tatsächliche Zeit, zu der Rufe erkannt wurden, auf der Spektrogramm-Zeitachse anzuzeigen. Andernfalls können Sie weiterhin die korrekte Tageszeit für die Datei und die Erkennungen anzeigen (und speichern), indem Sie die Startzeit bearbeiten. Dies kann durch einen Rechtsklick auf den Dateinamen in der Steuerleiste bearbeitet werden.
+            <figure class="figure float-end m-3">
+                <img src="Help/amend file.png" alt="Das Kontextmenü, das über den Dateinamen zugänglich ist, enthält Optionen zum Ändern der Startzeit der Datei und des Aufnahmeorts" class="rounded figure-img float-end img-fluid">
+                <figcaption class="figure-caption text-muted text-end">Kontextmenü für Dateinamen.</figcaption>
+            </figure>
+        </li>
+        <li>
+            Wählen Sie &quot;<i>Aktuelle Datei analysieren</i>&quot; aus dem <b>Analyse</b>-Menü. Je nach Länge der Datei kann dies einige Minuten dauern. Ein Fortschrittsindikator zeigt an, wie lange dies voraussichtlich dauern wird. Um die Analyse jederzeit zu stoppen, drücken Sie die <b>Esc</b>-Taste.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Erkannte Ergebnisse durchsuchen</h5>
+
+    <ol start="4">
+        <li>
+            Während das Modell Erkennungen durchführt, erscheinen diese in einer Tabelle unter dem Spektrogramm. Ein Klick auf eine Zeile der Erkennung in der Tabelle lässt den Abspielkopf zum Beginn dieser Erkennung springen und hebt die Position im Spektrogramm hervor. Ein Rechtsklick auf die Zeile öffnet das Kontextmenü der Erkennung.
+            Dieses Menü enthält Optionen, die speziell für die aktuell hervorgehobene Erkennung gelten. Sie können die Leertaste drücken, um von Anfang der Auswahl an abzuspielen und die Wiedergabe fortzusetzen, bis Sie die Leertaste erneut drücken. Ein Klick auf das Spektrogramm verschiebt den Abspielkopf an diese Position. Wenn derzeit eine Wiedergabe erfolgt, wird diese fortgesetzt, sodass Sie einen Ruf wiederholt abspielen können.
+        </li>
+        <figure class="figure float-end m-3">
+            <img src="Help/detection menu.png" alt="Das Kontextmenü, das über eine Erkennung zugänglich ist, enthält Optionen zum Überprüfen und Ändern des Datensatzes" class="rounded figure-img float-end img-fluid">
+            <figcaption class="figure-caption text-muted text-end">Kontextmenü für Erkennungen.</figcaption>
+        </figure>
+        <li>
+            Wenn für einen bestimmten Zeitraum mehrere Erkennungen gelten, wird neben dem Namen der Art ein Kreis angezeigt. Ein Klick auf diesen Kreis zeigt die anderen in der Region erkannten Arten sowie die Zuverlässigkeit dieser Erkennungen an.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Zusammenfassung und Filterung der Erkennungen</h5>
+
+    <ol start="6">
+        <li>
+            Sobald das Modell die Analyse abgeschlossen hat, erscheint eine Zusammenfassungstabelle links neben den Ergebnissen. Diese Tabelle ermöglicht es Ihnen, die in der Haupttabelle angezeigten Ergebnisse zu filtern. Klicken Sie auf den Artnamen in der Zusammenfassung, um die Anzeige auf diese Art zu beschränken. Dies ist <i>extrem</i> nützlich, wenn Hunderte von Rufen von Rotkehlchen erkannt wurden!
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Benutzerdefinierte Erkennungen</h5>
+    <ol start="7">
+        <li>
+            Manchmal wird ein Ruf übersehen oder eine Erkennung ist fehlerhaft, weil die Position des Analysefensters im Verhältnis zum Ruf nicht optimal ist. Sie können das Fenster verschieben, indem Sie es ziehen, oder ein neues Fenster erstellen, indem Sie auf das Spektrogramm klicken und einen benutzerdefinierten Bereich ziehen. Sobald ein neuer Bereich erstellt wurde, wählen Sie <span class="material-symbols-outlined">search</span> <b>Analysieren</b> im Kontextmenü oder <b>Analyse &gt; Ausgewähltes Intervall analysieren</b> aus dem Menü.
+            Die Erkennungen für den ausgewählten Bereich erscheinen in einem Overlay-Fenster und können gespeichert oder verworfen werden.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Ergebnisse ändern</h5>
+    <ol start="8">
+        <li>
+            Es ist möglich, Ergebnisse zu löschen, indem Sie <span class="delete material-symbols-outlined">delete_forever</span> <b>Datensatz löschen</b> im Kontextmenü auswählen. Dies kann entweder für einzelne Erkennungen in der Ergebnistabelle oder für eine Art in der Zusammenfassung angewendet werden.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Ergebnisse speichern</h5>
+    <ol start="9">
+        <li>
+            <p><b>Hinweis:</b> Ergebnisse werden standardmäßig nicht gespeichert.</p>
+            Speichern Sie Ergebnisse, indem Sie <b>Datensätze &gt; <span class="material-symbols-outlined">archive</span> Im Archiv speichern</b> auswählen.
+        </li>
+    </ol>
+
+    <h5 id="reload" class="pt-2">Ergebnisse wiederherstellen</h5>
+    <p>
+        Wenn Sie Ihre Erkennungen in Chirpity speichern, wird die Datenbank mit den Details der Erkennungen aktualisiert. Wenn Sie Ihre Datei später erneut laden und „Ergebnisse für aktuelle Datei abrufen“ auswählen, werden die gespeicherten Ergebnisse wiederhergestellt. 
+        <b>Hinweis:</b> Wenn die Originaldatei fehlt, weil sie in eines der unterstützten Formate ('.mp3', '.wav', '.mpga', '.ogg', '.opus', '.flac', '.aac') komprimiert wurde, aber denselben Namen mit einer neuen Erweiterung behält, findet und lädt Chirpity diese Datei und verwendet die ursprüngliche Zeit.
+    </p>
+    <p>
+        Im Datensatzmenü können Sie auch gespeicherte Erkennungen nach Art und innerhalb eines von Ihnen gewählten Datumsbereichs durchsuchen. Darüber hinaus können Sie Diagramme der im Laufe der Zeit erkannten Arten erstellen.
+    </p>
+
+    <h5 id="export" class="pt-2">Ergebnisse exportieren</h5>
+    Es gibt mehrere Möglichkeiten, Erkennungen zu exportieren:
+    <ol>
+        <li>
+            Exportieren Sie einen Audioclip einer Erkennung, indem Sie im Kontextmenü <span class="material-symbols-outlined">music_note</span> <b>Audio-Clip exportieren</b> auswählen. Standardmäßig enthält der Dateiname die Art und den Zeitstempel der Erkennung. Im <b>Einstellungen</b>-Menü können Sie das Format und die Qualität der exportierten Dateien steuern sowie Übergangseffekte am Anfang und Ende der Audiodateien anwenden.
+        </li>
+        <li>
+            Exportieren Sie bis zu 1000 Erkennungen einer Art als „Batch“-Audioclips. Wählen Sie dazu <span class="material-symbols-outlined">music_note</span> <b>Audio-Clips exportieren</b> im Kontextmenü der Zusammenfassungstabelle und geben Sie den Ordner an, in dem diese Dateien gespeichert werden sollen.
+        </li>
+        <li>
+            Exportieren Sie die Ergebnisse als CSV-Datei, indem Sie im Datei-Menü <span class="material-symbols-outlined">ios_share</span> <b>Ergebnisse nach CSV exportieren</b> auswählen. Die Ergebnisse werden in einer CSV-Datei im ausgewählten Ordner gespeichert.
+        </li>
+        <li>
+            Speichern Sie die Erkennungen als Label-Datei im Audacity-Format. Wählen Sie <b>Datei &gt; Audacity-Labels speichern</b> aus dem Menü. Standardmäßig erhält die Label-Datei denselben Namen wie die Audiodatei, jedoch mit der Erweiterung „.txt“.
+        </li>
+    </ol>
+
+    <div class="row mb-3">
+        <div class="col-sm-6">
+            <div class="card">
+                <div class="card-header">Beispiel für die Nutzung von Chirpity</div>
+                <div class="card-body">
+                    <div class="ratio ratio-16x9">
+                        <iframe width="100%" height="100%" src="https://www.youtube.com/embed/5_37FMPRkwY?si=qnQNUKJJyuCJ_U4b?vq=hd720&cc_load_policy=1" title="YouTube-Videoplayer" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+                    </div>
+                    <p class="card-text">Eine Einführung in die wichtigsten Funktionen von Chirpity.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -218,7 +218,10 @@ ul {
 
 /* Custom CSS to style the link */
 .xc-link {
-    color: #6c757d; /* Bootstrap's text-muted color */
+    color: #e7e7e7; 
+    background-color: rgba(0, 0, 0, 0.3); /* Semi-transparent black background */
+    border-radius: 0.5rem; /* Optional: Rounds corners for a cleaner look */
+    padding: 0.1rem 0.5rem;
     text-decoration: none; /* Remove underline */
     transition: color 0.3s; /* Smooth color transition */
 }
@@ -246,7 +249,7 @@ region.wavesurfer-region:before {
     content: attr(data-region-label);
     position: absolute;
     color: beige;    
-    background-color: rgba(0, 0, 0, 0.3); /* Semi-transparent black background */
+    background-color: rgba(0, 0, 0, 0.4); /* Semi-transparent black background */
     border-radius: 0.5rem; /* Optional: Rounds corners for a cleaner look */
     padding: 0.1rem 0.5rem; /* Adds padding around the label text */
     top: 0.75rem;

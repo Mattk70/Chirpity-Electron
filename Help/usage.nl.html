@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="nl">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Gebruikershandleiding Chirpity Nocmig</title>
+</head>
+
+<body>
+    <h4 class="text-center text-bg-light p-3">Voorgestelde workflow</h4>
+
+    <ol>
+        <li>Open een audiobestand, meerdere bestanden of een map met audiobestanden. Er zijn drie manieren om dit te doen:
+            <ol>
+                <li>Sleep de bestanden of mappen naar de Chirpity Nocmig-applicatie</li>
+                <li>Selecteer in de Chirpity Nocmig-applicatie Bestand &gt; Audiobestand openen of druk op Ctrl-O en selecteer de bestanden om te openen</li>
+                <li>Rechtsklik op de audiobestanden in Verkenner (of Finder op een Mac) en selecteer "Openen met" &gt; Chirpity</li>
+            </ol>
+            Idealiter zijn de bestanden die van uw digitale recorder met hun oorspronkelijke tijdstempel. In dat geval kunt u gebruik maken van de <b>Tijd van de dag</b>-modus voor de spectrogramtijdlijn, die de werkelijke tijd toont waarop oproepen werden gedetecteerd. Als dit niet het geval is, kunt u nog steeds de juiste tijd van de dag voor het bestand en de detecties weergeven (en opslaan) door de starttijd te bewerken. Dit kan worden aangepast door met de rechtermuisknop op de bestandsnaam in de bedieningsbalk te klikken.
+            <figure class="figure float-end m-3">
+                <img src="Help/amend file.png" alt="Het contextmenu toegankelijk via de bestandsnaam bevat opties om de starttijd van het bestand en de opnamelocatie aan te passen" class="rounded figure-img float-end img-fluid">
+                <figcaption class="figure-caption text-muted text-end">Contextmenu van de bestandsnaam.</figcaption>
+            </figure>
+        </li>
+        <li>
+            Selecteer &quot;<i>Analyseer huidig bestand</i>&quot; in het <b>Analyse</b>-menu. Afhankelijk van de lengte van het bestand kan dit enkele minuten duren. Er verschijnt een voortgangsindicator die aangeeft hoe lang dit waarschijnlijk zal duren. Om de analyse op elk moment te stoppen, drukt u op de <b>Esc</b>-toets.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Detecties verkennen</h5>
+
+    <ol start="4">
+        <li>
+            Terwijl het model detecties uitvoert, verschijnen deze in een tabel onder het spectrogram. Door op een rij van een detectie in de tabel te klikken, springt de afspeelkop naar het begin van die detectie en markeert de locatie op het spectrogram. Door met de rechtermuisknop op de rij te klikken, wordt het contextmenu weergegeven.
+            Dit menu bevat opties die specifiek zijn voor de momenteel gemarkeerde detectie. U kunt op de spatiebalk drukken om af te spelen vanaf het begin van de selectie en doorgaan met afspelen totdat u opnieuw op de spatiebalk drukt. Door op het spectrogram te klikken, wordt de afspeelkop naar die positie verplaatst. Als er momenteel wordt afgespeeld, gaat de afspeelactie door, zodat u een oproep herhaaldelijk kunt afspelen.
+        </li>
+        <figure class="figure float-end m-3">
+            <img src="Help/detection menu.png" alt="Het contextmenu toegankelijk via een detectie bevat opties om het record te inspecteren en te wijzigen" class="rounded figure-img float-end img-fluid">
+            <figcaption class="figure-caption text-muted text-end">Contextmenu voor detecties.</figcaption>
+        </figure>
+        <li>
+            Als er meerdere detecties van toepassing zijn op een bepaalde tijdsperiode, wordt er een cirkel weergegeven naast de naam van de soort. Door op deze cirkel te klikken, worden de andere soorten weergegeven die in het gebied zijn gedetecteerd, samen met de vertrouwen in die identificaties.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Overzicht en filteren van detecties</h5>
+
+    <ol start="6">
+        <li>
+            Een overzichtstabel verschijnt aan de linkerkant van de resultaten zodra het model zijn analyse heeft voltooid. Belangrijk is dat deze tabel u in staat stelt de resultaten te filteren die in de hoofdresultatentabel worden weergegeven. Klik op de naam van de soort in het overzicht om de weergave te beperken tot alleen die soort. Dit is <i>zeer</i> handig als er honderden oproepen van roodborstjes zijn gedetecteerd!
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Aangepaste detecties</h5>
+    <ol start="7">
+        <li>
+            Soms wordt een oproep gemist of is een detectie onjuist vanwege de positie van het analysevenster in relatie tot de oproep. U kunt het venster verplaatsen door het te slepen, of een nieuw venster maken door te klikken en een aangepast gebied op het spectrogram te tekenen. Nadat u een nieuw gebied hebt gemaakt, selecteert u <span class="material-symbols-outlined">search</span> <b>Analyseren</b> in het contextmenu of <b>Analyse &gt; Analyseer geselecteerd interval</b> in het menu.
+            De detecties voor het geselecteerde gebied verschijnen in een overlayvenster en kunnen worden opgeslagen in de resultaten of worden verworpen.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Resultaten aanpassen</h5>
+    <ol start="8">
+        <li>
+            Het is mogelijk om resultaten te verwijderen door <span class="delete material-symbols-outlined">delete_forever</span> <b>Record verwijderen</b> te selecteren in het contextmenu. Dit kan per detectie worden toegepast in de resultatentabel, of per soort in het overzicht.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Resultaten opslaan</h5>
+    <ol start="9">
+        <li>
+            <p><b>Let op:</b> Resultaten worden niet standaard opgeslagen.</p>
+            Sla resultaten op door te selecteren <b>Records &gt; <span class="material-symbols-outlined">archive</span> Opslaan in archief</b>.
+        </li>
+    </ol>
+
+    <h5 id="reload" class="pt-2">Resultaten herstellen</h5>
+    <p>
+        Wanneer u uw detecties in Chirpity opslaat, wordt een database bijgewerkt met de details van de detecties. Als u uw bestand later opnieuw laadt en &quot;Resultaten voor huidig bestand ophalen&quot; selecteert, worden de opgeslagen resultaten hersteld. 
+        <b>Let op:</b> Als het originele bestand ontbreekt omdat het is gecomprimeerd naar een van de ondersteunde formaten ('.mp3', '.wav', '.mpga', '.ogg', '.opus', '.flac', '.aac'), maar dezelfde naam behoudt met een nieuwe extensie, zal Chirpity dat bestand vinden en laden, en de oorspronkelijke tijd gebruiken.
+    </p>
+    <p>
+        Vanuit het recordmenu kunt u ook opgeslagen detecties per soort doorzoeken, evenals binnen een datumbereik naar keuze. Bovendien kunt u grafieken genereren van de gedetecteerde soorten in de loop van de tijd.
+    </p>
+
+    <h5 id="export" class="pt-2">Resultaten exporteren</h5>
+    Er zijn verschillende manieren om detecties te exporteren.
+    <ol>
+        <li>
+            Exporteer een audioclip van een detectie door <span class="material-symbols-outlined">music_note</span> <b>Audiofragment exporteren</b> te selecteren in het contextmenu. Standaard bevat de bestandsnaam de soort en de tijdstempel van de detectie. Het menu <b>Instellingen</b> stelt u in staat om het formaat en de kwaliteit van de geëxporteerde bestanden te regelen, evenals een overgangseffect toe te passen aan het begin en einde van de audio.
+        </li>
+        <li>
+            Exporteer in "batch" tot 1000 audioclips van detecties van soorten door <span class="material-symbols-outlined">music_note</span> <b>Audiofragmenten exporteren</b> te selecteren in het contextmenu van de overzichtstabel. U wordt gevraagd een map te kiezen om de bestanden op te slaan.
+        </li>
+        <li>
+            Exporteer een CSV-bestand van de detecties door <span class="material-symbols-outlined">ios_share</span> <b>Resultaten exporteren naar CSV</b> te selecteren in het Bestand-menu. De resultaten worden geëxporteerd naar een CSV-bestand in de door u gekozen map.
+        </li>
+        <li>
+            Sla de detecties op als een labelbestand in Audacity-formaat. Selecteer <b>Bestand &gt; Audacity-labels opslaan</b> in het menu. Standaard krijgt het labelbestand dezelfde naam als het audiobestand, met de extensie ".txt".
+        </li>
+    </ol>
+
+    <div class="row mb-3">
+        <div class="col-sm-6">
+            <div class="card">
+                <div class="card-header">Voorbeeld van het gebruik van Chirpity</div>
+                <div class="card-body">
+                    <div class="ratio ratio-16x9">
+                        <iframe width="100%" height="100%" src="https://www.youtube.com/embed/5_37FMPRkwY?si=qnQNUKJJyuCJ_U4b?vq=hd720&cc_load_policy=1" title="YouTube-videospeler" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+                    </div>
+                    <p class="card-text">Een introductie tot de belangrijkste functies van Chirpity.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

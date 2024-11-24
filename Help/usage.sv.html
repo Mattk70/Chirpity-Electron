@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="sv">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chirpity Nocmig användarguide</title>
+</head>
+
+<body>
+    <h4 class="text-center text-bg-light p-3">Föreslagen arbetsgång</h4>
+
+    <ol>
+        <li>Öppna en ljudfil, flera filer eller en mapp med ljudfiler. Det finns tre sätt att göra detta:
+            <ol>
+                <li>Dra och släpp filerna eller mapparna i Chirpity Nocmig-applikationen</li>
+                <li>Välj "Fil &gt; Öppna ljudfil" i Chirpity Nocmig-applikationen eller tryck på Ctrl-O och välj de filer du vill öppna</li>
+                <li>Högerklicka på ljudfilen i Windows Utforskaren (eller Finder på en Mac) och välj "Öppna med" &gt; Chirpity</li>
+            </ol>
+            Idealiskt är att filerna är de som spelats in med din digitala inspelare och behåller sina ursprungliga tidsstämplar. I det här fallet kan du använda <b>Tidsläge</b> för spektrogrammets tidslinje, vilket visar den faktiska tid då ljuden upptäcktes. Om inte, kan du fortfarande visa (och spara) rätt tid för filen och upptäckterna genom att redigera dess starttid. Detta kan göras genom att högerklicka på filnamnet i kontrollfältet.
+            <figure class="figure float-end m-3">
+                <img src="Help/amend file.png" alt="Sammanhangsmenyn som nås via filnamnet innehåller alternativ för att ändra filens starttid och inspelningsplats" class="rounded figure-img float-end img-fluid">
+                <figcaption class="figure-caption text-muted text-end">Sammanhangsmeny för filnamn.</figcaption>
+            </figure>
+        </li>
+        <li>
+            Välj &quot;<i>Analysera aktuell fil</i>&quot; från menyn <b>Analys</b>. Beroende på filens längd kan detta ta flera minuter. En framstegsindikator visar hur lång tid det sannolikt kommer att ta. För att stoppa analysen när som helst, tryck på <b>Esc</b>-tangenten.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Utforska upptäckter</h5>
+
+    <ol start="4">
+        <li>
+            När modellen gör upptäckter visas de i en tabell under spektrogrammet. Klicka på en rad i tabellen så flyttas uppspelningshuvudet till början av upptäckten och dess plats markeras på spektrogrammet. Högerklicka på raden för att öppna sammanhangsmenyn för upptäckten.
+            Den här menyn innehåller alternativ som är specifika för den aktuellt markerade upptäckten. Du kan trycka på mellanslagstangenten för att spela upp från början av markeringen och fortsätta tills du trycker på mellanslagstangenten igen. Klicka på spektrogrammet för att flytta uppspelningshuvudet till den platsen. Om uppspelningen redan pågår fortsätter den, vilket gör att du kan spela upp samma ljud flera gånger.
+        </li>
+        <figure class="figure float-end m-3">
+            <img src="Help/detection menu.png" alt="Sammanhangsmenyn som nås via en upptäckt innehåller alternativ för att inspektera och ändra posten" class="rounded figure-img float-end img-fluid">
+            <figcaption class="figure-caption text-muted text-end">Sammanhangsmeny för upptäckter.</figcaption>
+        </figure>
+        <li>
+            Om flera upptäckter gäller för en viss tidsperiod visas en cirkel bredvid artens namn. Klicka på denna cirkel för att visa de andra arterna som upptäcktes i området och deras tillförlitlighet.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Sammanfattning och filtrering av upptäckter</h5>
+
+    <ol start="6">
+        <li>
+            När modellen har slutfört sin analys visas en sammanfattningstabell till vänster om resultaten. Den här tabellen låter dig filtrera de resultat som visas i huvudtabellen. Klicka på artens namn i sammanfattningen för att begränsa visningen till den arten. Detta är <i>extremt</i> användbart om hundratals rödhakar har upptäckts!
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Anpassade upptäckter</h5>
+    <ol start="7">
+        <li>
+            Ibland kan en upptäckt missas eller vara felaktig på grund av analysfönstrets position i förhållande till ljudet. Du kan flytta fönstret genom att dra det, eller skapa ett nytt genom att klicka och dra en anpassad region på spektrogrammet. När en ny region har skapats, välj <span class="material-symbols-outlined">search</span> <b>Analysera</b> från sammanhangsmenyn eller <b>Analys &gt; Analysera valt intervall</b> från menyn.
+            Upptäckterna för den valda regionen visas i ett överläggningsfönster och kan sparas till resultaten eller raderas.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Ändra resultat</h5>
+    <ol start="8">
+        <li>
+            Det är möjligt att ta bort resultat genom att välja <span class="delete material-symbols-outlined">delete_forever</span> <b>Ta bort post</b> i sammanhangsmenyn. Detta kan göras för enskilda upptäckter i resultattabellen eller för en art i sammanfattningen.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Spara resultat</h5>
+    <ol start="9">
+        <li>
+            <p><b>Obs:</b> Resultat sparas inte som standard.</p>
+            Spara resultat genom att välja <b>Poster &gt; <span class="material-symbols-outlined">archive</span> Spara till arkiv</b>.
+        </li>
+    </ol>
+
+    <h5 id="reload" class="pt-2">Återställa resultat</h5>
+    <p>
+        När du sparar dina upptäckter i Chirpity uppdateras en databas med detaljer om upptäckterna. Om du laddar om filen vid ett senare tillfälle och väljer "Hämta resultat för aktuell fil" återställs de sparade resultaten.
+        <b>Obs:</b> Om originalfilen saknas eftersom den har komprimerats till ett av de stödda formaten ('.mp3', '.wav', '.mpga', '.ogg', '.opus', '.flac', '.aac'), men behåller samma namn med en ny filändelse, kommer Chirpity att hitta och läsa in den filen och använda den ursprungliga tiden.
+    </p>
+    <p>
+        Från postmenyn kan du också bläddra bland sparade upptäckter efter art och inom ett valt datumintervall. Dessutom kan du generera diagram över de arter som upptäckts över tid.
+    </p>
+
+    <h5 id="export" class="pt-2">Exportera resultat</h5>
+    Det finns flera sätt att exportera upptäckter:
+    <ol>
+        <li>
+            Exportera ett ljudklipp av en upptäckt genom att välja <span class="material-symbols-outlined">music_note</span> <b>Exportera ljudklipp</b> i sammanhangsmenyn. Som standard kommer filnamnet att innehålla artens namn och tidpunkten för upptäckten. I <b>Inställningar</b>-menyn kan du styra formatet och kvaliteten på de exporterade filerna samt lägga till in- och uttoningseffekter.
+        </li>
+        <li>
+            Exportera upp till 1000 ljudklipp av upptäckter för olika arter i "batch". Välj <span class="material-symbols-outlined">music_note</span> <b>Exportera ljudklipp</b> i sammanhangsmenyn för sammanfattningstabellen och välj mappen där du vill spara filerna.
+        </li>
+        <li>
+            Exportera resultaten som en CSV-fil genom att välja <span class="material-symbols-outlined">ios_share</span> <b>Exportera resultat till CSV</b> från filmenyn. Resultaten exporteras till en CSV-fil i den valda mappen.
+        </li>
+        <li>
+            Spara upptäckterna som en etikettfil i Audacity-format. Välj <b>Fil &gt; Spara Audacity-etiketter</b> från menyn. Som standard får etikettfilen samma namn som ljudfilen, men med filändelsen ".txt".
+        </li>
+    </ol>
+
+    <div class="row mb-3">
+        <div class="col-sm-6">
+            <div class="card">
+                <div class="card-header">Exempel på användning av Chirpity</div>
+                <div class="card-body">
+                    <div class="ratio ratio-16x9">
+                        <iframe width="100%" height="100%" src="https://www.youtube.com/embed/5_37FMPRkwY?si=qnQNUKJJyuCJ_U4b?vq=hd720&cc_load_policy=1" title="YouTube-videospelare" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+                    </div>
+                    <p class="card-text">En introduktion till Chirpitys nyckelfunktioner.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

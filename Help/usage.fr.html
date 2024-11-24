@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Guide d'utilisation de Chirpity Nocmig</title>
+</head>
+
+<body>
+    <h4 class="text-center text-bg-light p-3">Flux de travail suggéré</h4>
+
+    <ol>
+        <li>Ouvrez un fichier audio, des fichiers ou un dossier d'audio. Il existe trois manières de procéder :
+            <ol>
+                <li>Glissez-déposez les fichiers ou dossiers dans l'application Chirpity Nocmig</li>
+                <li>Dans l'application Chirpity Nocmig, sélectionnez Fichier &gt; Ouvrir un fichier audio ou appuyez sur Ctrl-O et sélectionnez les fichiers à ouvrir</li>
+                <li>Cliquez droit sur les fichiers audio dans l'Explorateur Windows (ou Finder sur un Mac) et sélectionnez "Ouvrir avec" &gt; Chirpity</li>
+            </ol>
+            Idéalement, les fichiers doivent être ceux enregistrés par votre enregistreur numérique avec leur horodatage d'origine. Dans ce cas, vous pourrez profiter du mode <b>Heure de la journée</b> pour la chronologie du spectrogramme, qui affichera l'heure exacte à laquelle les cris ont été détectés. Sinon, vous pouvez toujours afficher (et enregistrer) l'heure correcte pour le fichier et les détections si vous modifiez son heure de début.
+            Cela peut être modifié en cliquant droit sur le nom du fichier dans la barre de contrôle.
+            <figure class="figure float-end m-3">
+                <img src="Help/amend file.png" alt="Le menu contextuel accessible depuis le nom du fichier contient des options pour modifier l'heure de début du fichier et la localisation de l'enregistrement" class="rounded figure-img float-end img-fluid">
+                <figcaption class="figure-caption text-muted text-end">Menu contextuel du nom de fichier.</figcaption>
+            </figure>
+        </li>
+        <li>
+            Sélectionnez &quot;<i>Analyser le fichier actuel</i>&quot; dans le menu <b>Analyse</b>. Selon la longueur du fichier, cela peut prendre plusieurs minutes. Un indicateur de progression apparaîtra pour estimer le temps restant. Pour arrêter l'analyse à tout moment, appuyez sur la touche <b>Échap</b>.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Explorer les détections</h5>
+
+    <ol start="4">
+        <li>
+            Lorsque le modèle effectue des détections, elles apparaissent dans un tableau sous le spectrogramme. En cliquant sur une ligne de détection dans le tableau, le curseur se positionnera au début de cette détection et mettra en évidence son emplacement sur le spectrogramme. En cliquant droit sur la ligne, un menu contextuel s'affiche.
+            Ce menu contient des options spécifiques à la détection actuellement mise en surbrillance. Vous pouvez appuyer sur la barre d'espace pour lire à partir du début de la sélection et continuer la lecture jusqu'à ce que vous appuyiez à nouveau sur la barre d'espace. Cliquer sur le spectrogramme déplacera le curseur à cette position. Si la lecture est en cours, elle continuera, vous permettant ainsi de rejouer un cri plusieurs fois.
+        </li>
+        <figure class="figure float-end m-3">
+            <img src="Help/detection menu.png" alt="Le menu contextuel accessible depuis une détection contient des options pour inspecter et modifier l'enregistrement" class="rounded figure-img float-end img-fluid">
+            <figcaption class="figure-caption text-muted text-end">Menu contextuel des détections.</figcaption>
+        </figure>
+        <li>
+            Si plusieurs détections s'appliquent à une même période, un cercle sera affiché à côté du nom de l'espèce. En cliquant sur ce cercle, les autres espèces détectées dans la région s'afficheront, ainsi que leur niveau de confiance.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Résumé et filtrage des détections</h5>
+
+    <ol start="6">
+        <li>
+            Une table récapitulative apparaît à gauche des résultats une fois que le modèle a terminé son analyse. Cette table permet de filtrer les résultats affichés dans le tableau principal. Cliquez sur le nom de l'espèce dans le résumé pour limiter l'affichage à cette espèce uniquement. Cela est <i>extrêmement</i> utile si plusieurs centaines des cris de Rouge-gorge ont été détectés !
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Détections personnalisées</h5>
+    <ol start="7">
+        <li>
+            Parfois, un cri est manqué ou une détection est erronée en raison de la position de la fenêtre d'analyse par rapport au cri. Vous pouvez déplacer la fenêtre en la faisant glisser, ou créer une nouvelle fenêtre en cliquant et en traçant une région personnalisée sur le spectrogramme. Une fois une nouvelle région créée, sélectionnez <span class="material-symbols-outlined">search</span> <b>Analyser</b> dans le menu contextuel ou <b>Analyse &gt; Analyser l'intervalle sélectionné</b> dans le menu.
+            Les détections de la région sélectionnée apparaissent dans une fenêtre superposée et peuvent être enregistrées ou rejetées.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Modification des résultats</h5>
+    <ol start="8">
+        <li>
+            Il est possible de supprimer des résultats en sélectionnant <span class="delete material-symbols-outlined">delete_forever</span> <b>Supprimer l'enregistrement</b> dans le menu contextuel. Cette option peut être appliquée par détection dans le tableau des résultats, ou par espèce dans le résumé.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Enregistrement des résultats</h5>
+    <ol start="9">
+        <li>
+            <p><b>Note :</b> Les résultats ne sont pas enregistrés par défaut.</p> 
+            Enregistrez les résultats en sélectionnant <b>Enregistrements &gt; <span class="material-symbols-outlined">archive</span> Enregistrer dans l'archive</b>.
+        </li>
+    </ol>
+
+    <h5 id="reload" class="pt-2">Restauration des résultats</h5>
+    <p>
+        Lorsque vous enregistrez vos détections dans Chirpity, une base de données est mise à jour avec les détails des détections. Si vous rechargez votre fichier ultérieurement et sélectionnez &quot;Obtenir les résultats pour le fichier actuel&quot;, les résultats enregistrés seront restaurés. 
+        <b>Note :</b> Si le fichier original est manquant car il a été compressé dans l'un des formats pris en charge ('.mp3', '.wav', '.mpga', '.ogg', '.opus', '.flac', '.aac'), mais conserve le même nom avec une nouvelle extension, Chirpity trouvera et chargera ce fichier et utilisera l'heure d'origine.
+    </p>
+    <p>
+        Depuis le menu des enregistrements, vous pouvez également parcourir les détections sauvegardées par espèce et dans une plage de dates de votre choix. De plus, vous pouvez générer des graphiques des espèces détectées au fil du temps.
+    </p>
+
+    <h5 id="export" class="pt-2">Exportation des résultats</h5>
+    Il existe plusieurs façons d'exporter les détections.
+    <ol>
+        <li>
+            Exportez un extrait audio d'une détection en sélectionnant <span class="material-symbols-outlined">music_note</span> <b>Exporter un extrait audio</b> dans le menu contextuel. Par défaut, le nom du fichier contiendra le nom de l'espèce et l'horodatage de la détection. Le menu <b>Paramètres</b> vous permet de contrôler le format et la qualité des fichiers exportés, ainsi que d'ajouter une transition en fondu au début et à la fin de l'extrait audio.
+        </li>
+        <li>
+            Exportez en 'lot' jusqu'à 1000 détections audio d'espèces en sélectionnant <span class="material-symbols-outlined">music_note</span> <b>Exporter des extraits audio</b> dans le menu contextuel du tableau récapitulatif. Un dossier vous sera demandé pour enregistrer les fichiers.
+        </li>
+        <li>
+            Exportez un fichier CSV des détections en sélectionnant <span class="material-symbols-outlined">ios_share</span> <b>Exporter les résultats au format CSV</b> dans le menu Fichier. Les résultats seront exportés dans un fichier CSV dans le dossier choisi.
+        </li>
+        <li>
+            Sauvegardez les détections au format étiquette pour Audacity. Sélectionnez <b>Fichier &gt; Enregistrer les étiquettes Audacity</b> dans le menu. Par défaut, le fichier d'étiquette portera le même nom que le fichier audio, avec une extension ".txt".
+        </li>
+    </ol>
+
+    <div class="row mb-3">
+        <div class="col-sm-6">
+            <div class="card">
+                <div class="card-header">Exemple d'utilisation de Chirpity</div>
+                <div class="card-body">
+                    <div class="ratio ratio-16x9">
+                        <iframe width="100%" height="100%" src="https://www.youtube.com/embed/5_37FMPRkwY?si=qnQNUKJJyuCJ_U4b?vq=hd720&cc_load_policy=1" title="Lecteur vidéo YouTube" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+                    </div>
+                    <p class="card-text">Une présentation des principales fonctionnalités de Chirpity.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

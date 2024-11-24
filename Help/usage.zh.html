@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chirpity Nocmig 使用指南</title>
+</head>
+
+<body>
+    <h4 class="text-center text-bg-light p-3">推荐的工作流程</h4>
+
+    <ol>
+        <li>打开一个音频文件、多个文件或一个音频文件夹。您可以通过以下三种方式完成：
+            <ol>
+                <li>将文件或文件夹拖放到 Chirpity Nocmig 应用程序中</li>
+                <li>在 Chirpity Nocmig 应用程序中，选择“文件 &gt; 打开音频文件”或按 Ctrl-O，然后选择要打开的文件</li>
+                <li>在 Windows 文件资源管理器（或 Mac 的 Finder）中右键点击音频文件，选择“打开方式” &gt; Chirpity</li>
+            </ol>
+            理想情况下，文件应是由您的数字录音机录制的原始文件，并保留其时间戳。这种情况下，您可以使用<b>时间模式</b>，在光谱图时间轴上显示实际检测到声音的时间。如果不是原始文件，您仍然可以显示（并存储）正确的时间，只需编辑文件的起始时间即可。这可以通过右键点击控制栏中的文件名进行编辑。
+            <figure class="figure float-end m-3">
+                <img src="Help/amend file.png" alt="从文件名访问的上下文菜单包含选项，用于修改文件的开始时间和录音位置" class="rounded figure-img float-end img-fluid">
+                <figcaption class="figure-caption text-muted text-end">文件名上下文菜单。</figcaption>
+            </figure>
+        </li>
+        <li>
+            从<b>分析</b>菜单中选择“<i>分析当前文件</i>”。根据文件长度，分析可能需要几分钟。进度指示器将显示剩余时间的估计值。若要随时停止分析，请按<b>Esc</b>键。
+        </li>
+    </ol>
+
+    <h5 class="pt-2">浏览检测结果</h5>
+
+    <ol start="4">
+        <li>
+            当模型执行检测时，检测结果将显示在光谱图下方的表格中。点击表格中的一行将使播放指针跳到该检测的起始位置，并在光谱图上高亮显示其位置。右键点击行可打开检测结果的上下文菜单。
+            此菜单包含特定于当前高亮显示的检测的选项。按下空格键可以从选定部分的开头开始播放，并继续播放直到再次按下空格键。点击光谱图会将播放指针移动到该位置。如果当前正在播放，播放将继续，因此可以重复播放同一段声音。
+        </li>
+        <figure class="figure float-end m-3">
+            <img src="Help/detection menu.png" alt="从检测访问的上下文菜单包含检查和修改记录的选项" class="rounded figure-img float-end img-fluid">
+            <figcaption class="figure-caption text-muted text-end">检测上下文菜单。</figcaption>
+        </figure>
+        <li>
+            如果在同一时间段内存在多个检测结果，则物种名称旁会显示一个圆圈。点击该圆圈将显示该区域内检测到的其他物种，以及分配给这些检测结果的置信度。
+        </li>
+    </ol>
+
+    <h5 class="pt-2">总结与筛选检测结果</h5>
+
+    <ol start="6">
+        <li>
+            模型完成分析后，摘要表会出现在结果的左侧。摘要表允许您筛选主结果表中显示的内容。点击摘要中的物种名称可以将显示限制为单一物种。这在检测到数百个知更鸟（Robin）的鸣叫时非常有用！
+        </li>
+    </ol>
+
+    <h5 class="pt-2">自定义检测</h5>
+    <ol start="7">
+        <li>
+            有时，由于分析窗口与声音的位置关系，一个声音可能被漏掉或错误检测。您可以通过拖动窗口来调整位置，或者通过点击并拖动在光谱图上绘制一个自定义区域来创建一个新窗口。一旦创建了新区域，在上下文菜单中选择 <span class="material-symbols-outlined">search</span> <b>分析</b> 或从菜单中选择 <b>分析 &gt; 分析选定区间</b>。
+            选定区域的检测结果会显示在一个覆盖窗口中，您可以将其保存到结果中或丢弃。
+        </li>
+    </ol>
+
+    <h5 class="pt-2">修改检测结果</h5>
+    <ol start="8">
+        <li>
+            可以通过选择上下文菜单中的 <span class="delete material-symbols-outlined">delete_forever</span> <b>删除记录</b> 来删除结果。此操作可以在结果表中的单个检测上执行，也可以在摘要表中的单个物种上执行。
+        </li>
+    </ol>
+
+    <h5 class="pt-2">保存检测结果</h5>
+    <ol start="9">
+        <li>
+            <p><b>注意：</b>检测结果默认不会被保存。</p>
+            通过选择 <b>记录 &gt; <span class="material-symbols-outlined">archive</span> 保存到存档</b> 来保存结果。
+        </li>
+    </ol>
+
+    <h5 id="reload" class="pt-2">恢复检测结果</h5>
+    <p>
+        当您在 Chirpity 中保存检测结果时，数据库会更新检测的详细信息。如果您稍后重新加载文件并选择“获取当前文件的结果”，保存的结果将会恢复。
+        <b>注意：</b>如果原始文件缺失，因为它已被压缩为支持的格式之一（如 '.mp3'、'.wav'、'.mpga'、'.ogg'、'.opus'、'.flac'、'.aac'），但文件名保持一致，只是扩展名不同，Chirpity 会找到并加载该文件，并使用原始时间。
+    </p>
+    <p>
+        在记录菜单中，您还可以按物种或选择的日期范围浏览保存的检测。此外，您还可以生成显示检测到的物种随时间变化的图表。
+    </p>
+
+    <h5 id="export" class="pt-2">导出检测结果</h5>
+    您可以通过以下方式导出检测结果：
+    <ol>
+        <li>
+            导出检测的音频片段。选择上下文菜单中的 <span class="material-symbols-outlined">music_note</span> <b>导出音频片段</b>。默认情况下，文件名将包含物种名称和检测的时间戳。通过<b>设置</b>菜单，您可以控制导出文件的格式和质量，并在音频的开头和结尾应用淡入和淡出效果。
+        </li>
+        <li>
+            批量导出多达 1000 个检测的音频片段。选择摘要表上下文菜单中的 <span class="material-symbols-outlined">music_note</span> <b>导出音频片段</b>，然后选择保存这些文件的文件夹。
+        </li>
+        <li>
+            导出检测结果为 CSV 文件。选择文件菜单中的 <span class="material-symbols-outlined">ios_share</span> <b>导出结果到 CSV</b>。结果将导出到您选择的文件夹中的 CSV 文件。
+        </li>
+        <li>
+            将检测结果保存为 Audacity 格式的标签文件。选择 <b>文件 &gt; 保存 Audacity 标签</b>。默认情况下，标签文件将与音频文件同名，但扩展名为 ".txt"。
+        </li>
+    </ol>
+
+    <div class="row mb-3">
+        <div class="col-sm-6">
+            <div class="card">
+                <div class="card-header">Chirpity 使用示例</div>
+                <div class="card-body">
+                    <div class="ratio ratio-16x9">
+                        <iframe width="100%" height="100%" src="https://www.youtube.com/embed/5_37FMPRkwY?si=qnQNUKJJyuCJ_U4b?vq=hd720&cc_load_policy=1" title="YouTube 视频播放器" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+                    </div>
+                    <p class="card-text">介绍 Chirpity 的关键功能。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

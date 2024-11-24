@@ -3706,6 +3706,12 @@ function formatDuration(seconds){
     async function localiseModal(filename, locale) {
         try {
             // Fetch the HTML file
+            if (filename.includes('usage')){
+                filename = filename.replace('usage.html', `usage.${locale}.html`);
+                const htmlResponse = await fetch(filename);
+                if (!htmlResponse.ok) throw new Error(`Failed to load HTML file: ${filename}.html`);
+                return await htmlResponse.text();
+            }
             const htmlResponse = await fetch(filename);
             if (!htmlResponse.ok) throw new Error(`Failed to load HTML file: ${filename}.html`);
         
@@ -3751,30 +3757,26 @@ function formatDuration(seconds){
         }
     }
 
-    
 
     const populateHelpModal = async (file, label) => {
         document.getElementById('helpModalLabel').textContent = label;
-        const locale = config[config.model].locale.replace('_uk', '');
+        let locale = config[config.model].locale;
+        const translations = ['en', 'da', 'de', 'es', 'fr', 'nl', 'pt', 'ru', 'sv', 'zh'];
+        locale = translations.includes(locale) ? locale : 'en';
         const response = await localiseModal(file, locale)
         document.getElementById('helpModalBody').innerHTML = response;
         const help = new bootstrap.Modal(document.getElementById('helpModal'));
         document.removeEventListener('show.bs.modal', replaceCtrlWithCommand);
         document.addEventListener('show.bs.modal', replaceCtrlWithCommand);
         const close = {
-            da: 'Luk',
-            de: 'Schließen',
-            es: 'Cerrar',
-            fr: 'Fermer',
-            nl: 'Sluiten',
-            pt: 'Fechar',
-            ru: 'Закрыть',
-            sv: 'Stäng', 
-            zh: '关闭'            
+            da: 'Luk', de: 'Schließen', en: 'Close', es: 'Cerrar',
+            fr: 'Fermer', nl: 'Sluiten', pt: 'Fechar', ru: 'Закрыть',
+            sv: 'Stäng',  zh: '关闭'            
           }
-        document.getElementById('help-modal-close').innerText = close[locale] || 'Close';
+        document.getElementById('help-modal-close').innerText = close[locale];
         help.show();
     }
+
     function _replaceTextInTitleAttributes() {
         // Select all elements with title attribute in the body of the web page
         const elementsWithTitle = document.querySelectorAll('[title]');
@@ -4581,7 +4583,6 @@ function playRegion(){
                 if (STATE.currentFile) updateList();
                 break;
             }
-                    
             // Help Menu
             case 'keyboardHelp': { (async () => await populateHelpModal('Help/keyboard.html', i18nHelp.keyboard[locale]))(); break }
             case 'settingsHelp': { (async () => await populateHelpModal('Help/settings.html', i18nHelp.settings[locale]))(); break }
@@ -5434,7 +5435,6 @@ function getI18n(context){
             fetch('https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest')
             .then(response => response.json())
             .then(data => {
-                console.log('Data: ', data)
                 const latestVersion = data.tag_name;
                 const latest = parseSemVer(latestVersion);
                 const current = parseSemVer(VERSION);

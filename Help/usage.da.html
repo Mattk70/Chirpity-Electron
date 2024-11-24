@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="da">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chirpity Nocmig brugervejledning</title>
+</head>
+
+<body>
+    <h4 class="text-center text-bg-light p-3">Foreslået arbejdsgang</h4>
+
+    <ol>
+        <li>Åbn en lydfil, flere filer eller en mappe med lydfiler. Der er tre måder at gøre dette på:
+            <ol>
+                <li>Træk og slip filerne eller mapperne ind i Chirpity Nocmig-applikationen</li>
+                <li>Vælg "Fil &gt; Åbn lydfil" i Chirpity Nocmig-applikationen, eller tryk Ctrl-O og vælg de filer, du vil åbne</li>
+                <li>Højreklik på lydfilerne i Windows Stifinder (eller Finder på en Mac) og vælg "Åbn med" &gt; Chirpity</li>
+            </ol>
+            Ideelt set skal filerne være dem, der er optaget af din digitale optager med deres oprindelige tidsstempel. I så fald kan du drage fordel af <b>Klokkeslæt</b>-tilstanden på spektrogramtidslinjen, som viser det faktiske tidspunkt, hvor lydene blev registreret. Hvis ikke, kan du stadig vise (og gemme) den korrekte tid for filen og detektionerne, hvis du redigerer starttidspunktet. Dette kan redigeres ved at højreklikke på filnavnet i kontrolpanelet.
+            <figure class="figure float-end m-3">
+                <img src="Help/amend file.png" alt="Kontekstmenuen, der kan tilgås via filnavnet, indeholder muligheder for at ændre filens starttid og optagelsessted" class="rounded figure-img float-end img-fluid">
+                <figcaption class="figure-caption text-muted text-end">Kontekstmenu for filnavn.</figcaption>
+            </figure>
+        </li>
+        <li>
+            Vælg &quot;<i>Analyser aktuel fil</i>&quot; fra <b>Analyse</b>-menuen. Afhængigt af filens længde kan dette tage flere minutter. En statusindikator viser, hvor lang tid det sandsynligvis vil tage. For at stoppe analysen på et hvilket som helst tidspunkt skal du trykke på <b>Esc</b>-tasten.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Udforsk detektioner</h5>
+
+    <ol start="4">
+        <li>
+            Når modellen foretager detektioner, vises de i en tabel under spektrogrammet. Klik på en række i tabellen, og afspilningshovedet springer til starten af den valgte detektion og fremhæver dens placering på spektrogrammet. Højreklik på rækken for at åbne kontekstmenuen for detektionen.
+            Denne menu indeholder muligheder, der er specifikke for den aktuelt markerede detektion. Du kan trykke på mellemrumstasten for at afspille fra starten af markeringen og fortsætte, indtil du trykker på mellemrumstasten igen. Klik på spektrogrammet for at flytte afspilningshovedet til den ønskede position. Hvis der allerede afspilles, vil afspilningen fortsætte, hvilket giver dig mulighed for at afspille lydene gentagne gange.
+        </li>
+        <figure class="figure float-end m-3">
+            <img src="Help/detection menu.png" alt="Kontekstmenuen, der tilgås via en detektion, indeholder muligheder for at inspicere og ændre posten" class="rounded figure-img float-end img-fluid">
+            <figcaption class="figure-caption text-muted text-end">Kontekstmenu for detektioner.</figcaption>
+        </figure>
+        <li>
+            Hvis der findes flere detektioner for en given tidsperiode, vises en cirkel ved siden af artenavnet. Klik på denne cirkel for at vise andre arter, der blev registreret i området, samt den tilknyttede tillid til disse identifikationer.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Resumé og filtrering af detektioner</h5>
+
+    <ol start="6">
+        <li>
+            Når modellen har afsluttet analysen, vises en opsummeringstabel til venstre for resultaterne. Denne tabel gør det muligt at filtrere de resultater, der vises i hovedresultattabellen. Klik på artenavnet i resuméet for at begrænse visningen til denne art alene. Dette er <i>meget</i> nyttigt, hvis der er registreret flere hundrede kald fra rødkælke!
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Tilpassede detektioner</h5>
+    <ol start="7">
+        <li>
+            Nogle gange kan en lyd overses, eller en detektion kan være fejlagtig på grund af analysevinduets placering i forhold til lyden. Du kan flytte vinduet ved at trække det eller oprette et nyt vindue ved at klikke og trække for at markere et brugerdefineret område på spektrogrammet. Når et nyt område er oprettet, skal du vælge <span class="material-symbols-outlined">search</span> <b>Analyser</b> fra kontekstmenuen eller <b>Analyse &gt; Analyser valgte interval</b> fra menuen.
+            Detektionerne for det valgte område vises i et overlay-vindue og kan gemmes til resultaterne eller kasseres.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Ændring af resultater</h5>
+    <ol start="8">
+        <li>
+            Det er muligt at slette resultater ved at vælge <span class="delete material-symbols-outlined">delete_forever</span> <b>Slet post</b> i kontekstmenuen. Dette kan anvendes på individuelle detektioner i resultattabellen eller på arter i resuméet.
+        </li>
+    </ol>
+
+    <h5 class="pt-2">Gem resultater</h5>
+    <ol start="9">
+        <li>
+            <p><b>Bemærk:</b> Resultater gemmes som standard ikke.</p>
+            Gem resultater ved at vælge <b>Poster &gt; <span class="material-symbols-outlined">archive</span> Gem til arkiv</b>.
+        </li>
+    </ol>
+
+    <h5 id="reload" class="pt-2">Gendan resultater</h5>
+    <p>
+        Når du gemmer dine detektioner i Chirpity, opdateres en database med detaljerne for detektionerne. Hvis du genindlæser din fil på et senere tidspunkt og vælger "Hent resultater for aktuel fil", vil de gemte resultater blive gendannet. 
+        <b>Bemærk:</b> Hvis den originale fil mangler, fordi den er blevet komprimeret til et af de understøttede formater ('.mp3', '.wav', '.mpga', '.ogg', '.opus', '.flac', '.aac'), men har samme navn med en ny filtypenavn, vil Chirpity finde og indlæse denne fil og bruge den oprindelige tid.
+    </p>
+    <p>
+        Fra postmenuen kan du også gennemgå gemte detektioner efter arter og inden for en valgfri datointerval. Derudover kan du generere diagrammer over registrerede arter over tid.
+    </p>
+
+    <h5 id="export" class="pt-2">Eksport af resultater</h5>
+    Der er flere måder at eksportere detektioner på:
+    <ol>
+        <li>
+            Eksporter et lydklip af en detektion ved at vælge <span class="material-symbols-outlined">music_note</span> <b>Eksporter lydklip</b> fra kontekstmenuen. Som standard vil filnavnet indeholde arten og tidsstemplet for detektionen. I <b>Indstillinger</b>-menuen kan du kontrollere format og kvalitet for de eksporterede filer samt tilføje fade-effekter til starten og slutningen af lyden.
+        </li>
+        <li>
+            Eksporter op til 1000 lydklip af arter i en "batch". Vælg <span class="material-symbols-outlined">music_note</span> <b>Eksporter lydklip</b> i kontekstmenuen for opsummeringstabellen, og vælg mappen til at gemme filerne.
+        </li>
+        <li>
+            Eksporter resultater som en CSV-fil ved at vælge <span class="material-symbols-outlined">ios_share</span> <b>Eksporter resultater til CSV</b> fra Fil-menuen. Resultaterne eksporteres til en CSV-fil i den valgte mappe.
+        </li>
+        <li>
+            Gem detektionerne som en etiketfil i Audacity-format. Vælg <b>Fil &gt; Gem Audacity-etiketter</b> fra menuen. Som standard vil etiketfilen have samme navn som lydfilen, men med filtypen ".txt".
+        </li>
+    </ol>
+
+    <div class="row mb-3">
+        <div class="col-sm-6">
+            <div class="card">
+                <div class="card-header">Eksempel på brug af Chirpity</div>
+                <div class="card-body">
+                    <div class="ratio ratio-16x9">
+                        <iframe width="100%" height="100%" src="https://www.youtube.com/embed/5_37FMPRkwY?si=qnQNUKJJyuCJ_U4b?vq=hd720&cc_load_policy=1" title="YouTube-videospiller" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+                    </div>
+                    <p class="card-text">En introduktion til de vigtigste funktioner i Chirpity.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
