@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 
@@ -7,24 +8,23 @@
 </head>
 
 <body>
-    <h4 class="text-center text-bg-light p-3">Flujo de trabajo recomendado</h4>
+    <h4 class="text-center text-bg-light p-3">Flujo de trabajo sugerido</h4>
 
     <ol>
         <li>Abra un archivo de audio, varios archivos o una carpeta de audios. Hay tres maneras de hacerlo:
             <ol>
-                <li>Arrastra y suelta los archivos o carpetas en la aplicación Chirpity Nocmig</li>
-                <li>En la aplicación Chirpity Nocmig, selecciona Archivo &gt; Abrir archivo de audio o presiona Ctrl-O y selecciona los archivos para abrir</li>
-                <li>Haz clic derecho en los archivos de audio en el Explorador de Windows (o Finder en un Mac) y selecciona "Abrir con" &gt; Chirpity</li>
+                <li>Arrastre y suelte los archivos o carpetas en la aplicación Chirpity Nocmig</li>
+                <li>En la aplicación Chirpity Nocmig, seleccione Archivo &gt; Abrir archivo de audio o presione Ctrl-O y seleccione los archivos para abrir</li>
+                <li>Haga clic derecho en los archivos de audio en el Explorador de Windows (o Finder en un Mac) y seleccione "Abrir con" &gt; Chirpity</li>
             </ol>
-            Idealmente, los archivos deben ser los grabados por tu grabadora digital con su marca de tiempo original. En este caso, podrás aprovechar el modo <b>Hora del día</b> para la línea de tiempo del espectrograma, que mostrará la hora exacta en que se detectaron las llamadas. Si no es así, aún puedes mostrar (y guardar) la hora correcta para el archivo y las detecciones si editas su hora de inicio.
-            Esto se puede editar haciendo clic derecho en el nombre del archivo en la barra de control.
+            Idealmente, los archivos deberían ser los grabados por su grabadora digital con los datos horarios originales. En este caso, usted le podría sacar partido al modo <b>Hora del día</b> de la línea de tiempo del sonograma, que debería mostrar la hora exacta en que se detectaron los reclamos. Si no están esos datos horarios o no fueran los correctos, se puede editar la hora de inicio haciendo clic derecho en el nombre del archivo de la brra de control y así se podrá mostrar (y guardar) la hora correcta para el archivo y las detecciones.
             <figure class="figure float-end m-3">
                 <img src="Help/amend file.png" alt="El menú contextual accesible desde el nombre del archivo contiene opciones para modificar la hora de inicio del archivo y la ubicación de la grabación" class="rounded figure-img float-end img-fluid">
                 <figcaption class="figure-caption text-muted text-end">Menú contextual del nombre del archivo.</figcaption>
             </figure>
         </li>
         <li>
-            Selecciona &quot;<i>Analizar archivo actual</i>&quot; en el menú <b>Análisis</b>. Dependiendo de la longitud del archivo, esto puede tardar varios minutos. Aparecerá un indicador de progreso para estimar el tiempo restante. Para detener el análisis en cualquier momento, presiona la tecla <b>Esc</b>.
+            Seleccione &quot;<i>Analizar archivo actual</i>&quot; en el menú <b>Análisis</b>. Dependiendo de la longitud del archivo, esto puede tardar varios minutos. Aparecerá un indicador de progreso para estimar el tiempo restante. Para detener el análisis en cualquier momento, basta con presionar la tecla <b>Esc</b>.
         </li>
     </ol>
 
@@ -32,15 +32,15 @@
 
     <ol start="4">
         <li>
-            Cuando el modelo realiza detecciones, estas aparecen en una tabla debajo del espectrograma. Hacer clic en una fila de detección en la tabla hará que el cabezal de reproducción salte al inicio de esa detección y resalte su ubicación en el espectrograma. Al hacer clic derecho en la fila, se mostrará un menú contextual.
-            Este menú contiene opciones específicas para la detección actualmente resaltada. Puedes presionar la barra espaciadora para reproducir desde el inicio de la selección y continuar la reproducción hasta que vuelvas a presionar la barra espaciadora. Hacer clic en el espectrograma moverá el cabezal de reproducción a esa posición. Si la reproducción está en curso, continuará, permitiéndote repetir una llamada varias veces.
+            Cuando el modelo realiza detecciones, estas van apareciendo en una tabla debajo del sonograma. Si se hace clic en alguna de las detecciones concretas de esa tabla, el cabezal de reproducción saltará al inicio de esa detección y resaltará su ubicación en el sonograma. Al hacer clic derecho en ella, se mostrará un menú contextual.
+            Este menú contiene opciones específicas para la detección resaltada en ese momento. Puede presionar la barra espaciadora para reproducir desde el inicio de la selección y continuar la reproducción hasta que vuelva a presionar la barra espaciadora. Si se hace clic en el sonograma, el cabezal de reproducción se moverá a esa posición. Si la reproducción está en curso, continuará, permitiéndole repetir un reclamo varias veces.
         </li>
         <figure class="figure float-end m-3">
             <img src="Help/detection menu.png" alt="El menú contextual accesible desde una detección contiene opciones para inspeccionar y modificar el registro" class="rounded figure-img float-end img-fluid">
             <figcaption class="figure-caption text-muted text-end">Menú contextual de detecciones.</figcaption>
         </figure>
         <li>
-            Si se aplican varias detecciones a un mismo período, se mostrará un círculo junto al nombre de la especie. Al hacer clic en este círculo, se mostrarán las otras especies detectadas en la región, junto con la confianza asignada a esas identificaciones.
+            Si se han detectdo varias especies en un mismo intervalo, se mostrará un circulito junto al nombre de la especie. Al hacer clic en este círculo, se mostrarán las otras especies detectadas en ese intervalo junto con el grado de confianza asignado a esas identificaciones.
         </li>
     </ol>
 
@@ -48,56 +48,56 @@
 
     <ol start="6">
         <li>
-            Una tabla de resumen aparece a la izquierda de los resultados una vez que el modelo ha completado su análisis. Esta tabla permite filtrar los resultados que se muestran en la tabla principal. Haz clic en el nombre de la especie en el resumen para limitar la visualización a esa especie. Esto es <i>extremadamente</i> útil si se detectaron cientos de llamadas de petirrojo.
+            Una vez que el modelo ha completado su análisis, aparece una tabla de resumen a la izquierda. Esta tabla permite filtrar los resultados que se muestran en la tabla principal. Haga clic en el nombre de la especie en el resumen para limitarse a la visualización a esa especie. Esto es <i>extremadamente</i> útil si se han detectado, por ejemplo, cientos de reclamos de petirrojo.
         </li>
     </ol>
 
-    <h5 class="pt-2">Detecciones personalizadas</h5>
+    <h5 class="pt-2">Detecciones personalizadas en profundidad</h5>
     <ol start="7">
         <li>
-            A veces, una llamada se pierde o una detección es errónea debido a la posición de la ventana de análisis en relación con la llamada. Puedes mover la ventana arrastrándola, o crear una nueva ventana haciendo clic y arrastrando una región personalizada en el espectrograma. Una vez creada la nueva región, selecciona <span class="material-symbols-outlined">search</span> <b>Analizar</b> en el menú contextual o <b>Análisis &gt; Analizar intervalo seleccionado</b> en el menú.
-            Las detecciones de la región seleccionada aparecen en una ventana superpuesta y se pueden guardar en los resultados o descartar.
+            A veces, algún reclamo se pierde o  alguna detección es errónea debido a la posición de la ventana de análisis en relación con la reclamo. Puede mover la ventana arrastrándola, o crear una nueva ventana haciendo clic y arrastrar creando un intervalo personalizado en el sonograma. Una vez creado el nuevo intervalo, seleccione <span class="material-symbols-outlined">search</span> <b>Analizar</b> en el menú contextual o <b>Análisis &gt; Analizar el intervalo seleccionado</b> en el menú.
+            Las detecciones del intervalo seleccionado aparecerán en una ventana superpuesta y se pueden guardar en los resultados o descartarlos.
         </li>
     </ol>
 
     <h5 class="pt-2">Modificar resultados</h5>
     <ol start="8">
         <li>
-            Es posible eliminar resultados seleccionando <span class="delete material-symbols-outlined">delete_forever</span> <b>Eliminar registro</b> en el menú contextual. Esto se puede aplicar por detección en la tabla de resultados o por especie en el resumen.
+            Es posible eliminar resultados seleccionando <span class="delete material-symbols-outlined">delete_forever</span> <b>Eliminar este registro</b> en el menú contextual. Esto se puede hacer o bien por detección individual en la tabla de resultados, o bien por especie en el resumen.
         </li>
     </ol>
 
     <h5 class="pt-2">Guardar resultados</h5>
     <ol start="9">
         <li>
-            <p><b>Nota:</b> Los resultados no se guardan por defecto.</p> 
-            Guarda los resultados seleccionando <b>Registros &gt; <span class="material-symbols-outlined">archive</span> Guardar en archivo</b>.
+            <p><b>Atención:</b> Los resultados no se guardan por defecto.</p> 
+            Guarde los resultados seleccionando <b>Registros &gt; <span class="material-symbols-outlined">archive</span> Guardar en el archivo</b>.
         </li>
     </ol>
 
     <h5 id="reload" class="pt-2">Restaurar resultados</h5>
     <p>
-        Cuando guardas tus detecciones en Chirpity, se actualiza una base de datos con los detalles de las detecciones. Si recargas tu archivo más tarde y seleccionas &quot;Obtener resultados para el archivo actual&quot;, se restaurarán los resultados guardados. 
+        Cuando usted guarde las detecciones en Chirpity, se actualiza una base de datos con los detalles de las detecciones. Si recargaa el archivo más tarde y selecciona &quot;Obtener resultados para el archivo actual&quot;, se restaurarán los resultados guardados. 
         <b>Nota:</b> Si falta el archivo original porque fue comprimido en uno de los formatos compatibles ('.mp3', '.wav', '.mpga', '.ogg', '.opus', '.flac', '.aac'), pero conserva el mismo nombre con una nueva extensión, Chirpity encontrará y cargará ese archivo utilizando la hora original.
     </p>
     <p>
-        Desde el menú de registros, también puedes explorar las detecciones guardadas por especie y dentro de un rango de fechas de tu elección. Además, puedes generar gráficos de las especies detectadas a lo largo del tiempo.
+        Desde el menú de registros, también puedee explorar las detecciones guardadas por especie y por el rango de fechas que elija. Además, usted puede generar gráficos de las especies detectadas a lo largo del tiempo.
     </p>
 
     <h5 id="export" class="pt-2">Exportar resultados</h5>
     Hay varias maneras de exportar las detecciones.
     <ol>
         <li>
-            Exporta un clip de audio de una detección seleccionando <span class="material-symbols-outlined">music_note</span> <b>Exportar clip de audio</b> en el menú contextual. Por defecto, el nombre del archivo incluirá la especie y la marca de tiempo de la detección. El menú <b>Configuración</b> te permite controlar el formato y la calidad de los archivos exportados, así como añadir un efecto de desvanecimiento al inicio y al final del audio.
+            Exporte el audio de una detección seleccionando <span class="material-symbols-outlined">music_note</span> <b>Exportar audio(s)</b> en el menú contextual. Por defecto, el nombre del archivo incluirá la especie y la marca de tiempo de la detección. El menú <b>Configuración</b> te permite controlar el formato y la calidad de los archivos exportados, así como añadir un efecto de desvanecimiento al inicio y al final del audio.
         </li>
         <li>
-            Exporta en "lote" hasta 1000 detecciones de especies seleccionando <span class="material-symbols-outlined">music_note</span> <b>Exportar clips de audio</b> en el menú contextual de la tabla de resumen. Se te pedirá una carpeta donde guardar los archivos.
+            Exporte en "lote" hasta mil detecciones de especies seleccionando <span class="material-symbols-outlined">music_note</span> <b>Exportar audio(s)</b> en el menú contextual de la tabla de resumen. Se le pedirá una carpeta donde guardar los archivos.
         </li>
         <li>
-            Exporta un archivo CSV de las detecciones seleccionando <span class="material-symbols-outlined">ios_share</span> <b>Exportar resultados a CSV</b> en el menú Archivo. Los resultados se exportarán en un archivo CSV en la carpeta elegida.
+            Exporte un archivo CSV de las detecciones seleccionando <span class="material-symbols-outlined">ios_share</span> <b>Exportar resultados a CSV</b> en el menú Archivo. Los resultados se exportarán en un archivo CSV en la carpeta que elija.
         </li>
         <li>
-            Guarda las detecciones como un archivo de etiquetas en formato Audacity seleccionando <b>Archivo &gt; Guardar etiquetas de Audacity</b> en el menú. Por defecto, el archivo de etiquetas tendrá el mismo nombre que el archivo de audio, con la extensión ".txt".
+            Guarde las detecciones como un archivo de etiquetas en formato Audacity seleccionando <b>Archivo &gt; Guardar etiquetas de Audacity</b> en el menú. Por defecto, el archivo de etiquetas tendrá el mismo nombre que el archivo de audio, con la extensión ".txt".
         </li>
     </ol>
 
