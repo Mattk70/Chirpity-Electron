@@ -30,6 +30,7 @@
     "Threads-circle-help": ["Die Anzahl der parallelen Analysen, die durchgeführt werden sollen. Standardmäßig ist dies auf die Anzahl der CPU-Kerne der Maschine eingestellt, um eine optimale Leistung zu erzielen. Mit dem GPU-Backend funktioniert eine niedrigere Anzahl besser, z. B. 1-3."],
     "Use Location settings-circle-help": ["Wenn aktiviert, meldet der Nachtvogel-Filter die Vögel basierend auf Ihren Standorteinstellungen."],
     "Volume Adjustment-circle-help": ["Passen Sie die Lautstärke des Audios an, um niedrige Aufnahmestufen auszugleichen."],
+    "File-timestamp-circle-help": [ "Einige Audio-Recorder, zum Beispiel der Zoom H1 Essential, können das gespeicherte Datum und die Uhrzeit der Datei auf den Beginn der Aufnahme statt auf das Ende setzen. Wenn Sie einen solchen Recorder haben, wird durch die Auswahl dieser Option die angezeigte Zeit für Ihre Erkennungen korrigiert (Änderungen an dieser Einstellung erfordern einen Neustart von Chirpity, um wirksam zu werden)."],
     "navBarFile": ["Datei"],
     "navbarHelp": ["Hilfe"],
     "navbarRecords": ["Aufzeichnungen"],
@@ -133,6 +134,7 @@
       "send-filtered-audio-to-model": "Gefiltertes Audio zur Analyse senden",
       "context": "Kontextmodus",
       "snrValue": "SNR-Filter:",
+      "file-timestamp": "Datei-Timestamps kennzeichnen den Beginn der Aufnahme",
       "debug-mode": "Fehlermodus"
     },
     "record-entry": {

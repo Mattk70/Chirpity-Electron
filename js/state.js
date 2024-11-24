@@ -38,7 +38,8 @@ export class State {
             this.powerSaveBlocker = false,
             this.archive = {location: undefined, format: 'ogg', auto: false, trim: false},
             this.useGUANO = true;
-            this.debug = false
+            this.debug = false,
+            this.fileStartMtime = false
     }
 
 

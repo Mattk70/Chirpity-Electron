@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <title>Chirpity Nocmig Indstillinger</title>
+</head>
+<body>
+
+<table class="table table-hover p-1">
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Detektioner</h5></td>
+    </tr>
+    <tr>
+        <th>Model</th>
+        <td>Vælg den model, der skal bruges til detektion.
+            <ul>
+                <li>
+                    <b>Nocmig</b> bruger en model tilpasset natlige flyvekald fra europæiske fugle til analyse.
+                </li>
+                <li>
+                    <b>BirdNET</b> bruger <a href="https://github.com/kahst/BirdNET-Analyzer" target="_blank">BirdNET</a>-modellen udviklet af Stefan Kahl m.fl. fra K. Lisa Yang Center for Conservation Bioacoustics.
+                </li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <th>Tillidsgrænse</th>
+        <td>Denne indstilling bestemmer det minimale tillidsniveau, der kræves for, at modellen rapporterer en detektion.
+            At øge værdien reducerer falske positiver, men øger risikoen for at gå glip af ægte kald.
+            <b>NB.</b> Tilliden kan justeres når som helst. Resultaterne opdateres selv efter analysen.
+        </td>
+    </tr>
+    <tr>
+        <th>Liste</th>
+        <td>
+            <p><b>Lokale fugle</b>. Udeluk fugle, der sandsynligvis ikke findes i dit område.</p>
+            <p style="padding-left: 2em">
+                Når denne mulighed er valgt, vises et ekstra panel. <b>Grænseværdi</b>-indstillingen repræsenterer eBird-tjeklistefrekvensen.
+                For eksempel betyder en værdi på 0,03, at fugle, der forventes i mindre end 3 % af eBird-tjeklisterne i området, udelukkes.
+                Hvis du også markerer "Brug uge", udelukkes fugle, der ikke forventes på tidspunktet for optagelsen - dette læses fra filens tidsstempel.
+                <br /> <b>NB.</b> I øjeblikket har de ugespecifikke filtre en begrænsning, hvor opsummeringen af detektioner bruger 
+                listen fra den seneste fil i en batch af filer.
+                For eksempel, hvis du analyserer filer fra 22. april, 23. oktober og 24. februar i en batch, vil listen for 24. februar blive brugt til opsummeringen.
+            </p>
+            <p><b>Nataktive fugle</b>. Dette udelukker detektioner af fuglesang og kald fra arter, der normalt ikke kalder om natten.
+                Når du aktiverer "<b>Brug lokalitetsindstillinger</b>" for BirdNET-modellen, vil listen omfatte fuglene på listen <b>Lokale fugle</b>, ekskluderet dem, 
+                der ikke kalder om natten.
+            </p>
+            <p><b>Fugle</b>. Inkluder detektioner for alle fugle, undtagen ikke-fugle-klasser.</p>
+            <p><b>Alt</b>. Ud over alle fuglearter vises ikke-fugle detektioner, inklusive segmenter, der blev anset for støj.</p>
+            <p><b>Brugerdefineret</b>. Lever en liste til modellen at bruge. Brugerdefinerede lister giver dig mulighed for:</p>
+            <ol>
+                <li>Præcist at definere, hvilke detektioner du ønsker, at Chirpity skal rapportere.</li>
+                <li>Søge efter en bestemt art.</li>
+            </ol>
+            Du kan bruge en forskellig brugerdefineret liste til både BirdNET og Nocmig-modeller. Formatet for en 
+            brugerdefineret listefil er "videnskabeligt navn_dansk navn", med hver art på en ny linje. <b>Vigtigt, brugerdefinerede lister skal bruge etiketter på det valgte sprog.</b>
+            Du kan eksportere en startliste i det korrekte format fra Hjælp-menuen ved hjælp af linket "<i>Hvilke arter detekteres?</i>".
+        </td>
+    </tr>
+    <tr>
+        <th>Analyser kun natperioder</th>
+        <td>
+            Søg kun efter detektioner om natten. Chirpity beregner begyndelsen og slutningen af den borgerlige skumring ud fra tidsstemplerne i dine lydfiler ved hjælp af den indstillede placering.
+            Hvis din optagelse spænder over både dag- og natperioder, springes dagperioderne over. Hvis du kun er interesseret i natkald, har dette to fordele:
+            <ol>
+                <li>Der vil være færre falske positiver, da begge modeller laver flere fejl, når mange arter kalder samtidig (f.eks. under morgenkoret).</li>
+                <li>Analysen bliver hurtigere, da den ignorerer eventuelle dagperioder.</li>
+            </ol>
+        </td>
+    </tr>
+    <tr>
+        <th>Vis arter på IUCN's Rødliste i opsummeringen</th>
+        <td>
+            Vis den globale rødliste-status for arterne i opsummeringstabellen, som vurderet af <a href="https://www.iucnredlist.org/" target="_blank">IUCN</a>. Der er 7 kategorier:
+            <ol>
+                <li>Mindst bekymring (LC)</li>
+                <li>Næsten truet (NT)</li>
+                <li>Sårbar (VU)</li>
+                <li>Truet (EN)</li>
+                <li>Kritisk truet (CR)</li>
+                <li>Uddød i naturen</li>
+                <li>Uddød</li>
+            </ol>
+            Hvis du klikker på ikonet, åbnes vurderingssiden med arternes udbredelse og vurderingsdetaljer i din webbrowser. Dataene er hentet fra:
+            <cite>
+                IUCN 2024. IUCN's Rødliste over truede arter. Version 2024-2
+            </cite>
+        </td>
+    </tr>
+    <tr>
+        <th>Ryd cache for referencekald</th>
+        <td>
+            Metadata for arters sammenligninger, der bestemmer, hvad du ser, når du vælger "Sammenlign med referencekald" i en kontekstmenu, gemmes på disken.
+            Hvis du rydder cachen, slettes de gemte data, og artsdata vil blive genanmodet fra Xeno-Canto-webstedet, næste gang du beder om en sammenligning.
+            Dette kan være nyttigt, hvis en referencefil fjernes fra siden, eller hvis du ønsker at opdatere valget af kald.
+        </td>
+    </tr>
+    <tr>
+        <th>Standardplacering</th>
+        <td>
+            <figure class="figure float-end m-3">
+                <img src="Help/amend file.png"
+                    alt="Kontekstmenuen, der kan tilgås fra filnavnet, indeholder muligheder for at ændre filens starttidspunkt og optagelsesplacering"
+                    class="rounded figure-img float-end img-fluid">
+                <figcaption class="figure-caption text-muted text-end">Kontekstmenu for filnavn.</figcaption>
+            </figure>
+            Angiv standardplaceringen, der skal bruges til at beregne begyndelsen og slutningen af den borgerlige skumring samt generere din <b>Lokale fugle</b>-liste.
+            Denne indstilling kan tilsidesættes for individuelle filer ved at tildele en brugerdefineret placering i filnavnets kontekstmenu.
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>System</h5></td>
+    </tr>
+    <tr>
+        <th> sprog</th>
+        <td>
+            Vælg sprog for "almindelige navne" etiketter, hvor oversættelser findes. De oversatte etiketter er hentet fra <a href="https://ebird.org/home" target="_blank">eBird</a>.
+        </td>
+    </tr>
+    <tr>
+        <th>Backend</th>
+        <td>Denne indstilling er kun synlig, når du bruger Nocmig-modellen. Vælg, hvordan forudsigelser beregnes på din computer.
+            <ul>
+                <li>
+                    <b>CPU</b> bruger CPU'en til forudsigelser, hvilket generelt er hurtigere, hvis du har et integreret grafikkort.
+                </li>
+                <li>
+                    <b>WebGL</b> bruger grafikkortet. Hvis du har et dedikeret grafikkort, vil dette typisk være
+                    betydeligt hurtigere.
+                </li>
+                <li>
+                    <b>WebGPU</b> Brug af en ny teknologi, der også bruger grafiske processorer. Det ligner WebGL, 
+                    men det er kendt for at fremskynde behandlingstiden på Mac-computere, i modsætning til WebGL. WebGPU bruger mere hukommelse end WebGL, og 
+                    hvis tråde eller batchstørrelsesværdierne er sat for højt, kan Chirpity løbe tør for hukommelse. Hvis dette sker, 
+                    kan spektrogrammet forsvinde fra skærmen, eller appen kan blive ufølsom. Brug en lavere værdi for tråde og / eller batchstørrelse.
+                </li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <th>Tråde</th>
+        <td>Denne indstilling giver dig mulighed for at vælge antallet af tråde, der skal bruges til forudsigelser.
+            Når CPU-backend'en bruges, sættes antallet af tråde automatisk til at matche antallet af CPU-kerner, der er tilgængelige på computeren.
+            Som standard bruger GPU-backend'en to tråde. Justering af denne indstilling sammen med batchstørrelsen kan øge behandlingshastigheden.
+        </td>
+    </tr>
+    <tr>
+        <th>Batchstørrelse</th>
+        <td>Denne indstilling bestemmer antallet af tre-sekunders lydklip, der behandles for hver modelanmodning.
+            Større værdier kan føre til hurtigere behandling, især på lange filer, selvom for store værdier kan reducere behandlingshastigheden og endda forårsage hukommelsesproblemer.
+            Den optimale værdi kan også variere afhængigt af filformatet, der analyseres.
+        </td>
+    </tr>
+    <tr>
+        <th>Aktiver meddelelser om afsluttet analyse</th>
+        <td>
+            Dette er nyttigt, hvis du vil køre Chirpity-analyse i baggrunden, 
+            eller med vinduet minimeret. En systemadvarsel vil underrette dig, når analysen er afsluttet.
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Audioindstillinger</h5></td>
+    </tr>
+    <tr>
+        <td><b>Justering af volumen</b></td>
+        <td>Hvis dine optagelser er meget stille, kan du øge lydstyrken ved at hæve gain. Lydstyrken kan øges med op til 50 decibel.</td>
+    </tr>
+    <tr>
+        <td><b>Normaliser lyd</b></td>
+        <td>
+            Hvis aktiveret, vil niveauerne i lydfilen blive normaliseret. Kort sagt vil dette maksimere volumenområdet mellem de stilleste og højeste lyde. 
+            Effekten vil sikre, at al lyd afspilles med en ensartet volumen, og vokaliseringer i stille lydfiler vil være lettere at høre.
+        </td>
+    </tr>
+    <tr>
+        <th>High Pass filter</th>
+        <td>Dette filter fjerner lyde under den valgte frekvens.
+            Primært beregnet til optagelser lavet i urbane omgivelser, undertrykker det lavfrekvent summen.
+        </td>
+    </tr>
+    <tr>
+        <th>Low Shelf filter</th>
+        <td>Dette filter ligner High Pass-filteret. Dog reducerer det ikke kun støjen, men sænker volumen af lavfrekvent støj. 
+            Fordelen ved et low shelf filter er, at du kan reducere summen, samtidig med at du stadig kan høre arter, der har lavfrekvente kald.
+            Du kan justere tærskelfrekvensen og styrken af filteret (dæmpning).
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Audio Export</h5></td>
+    </tr>
+    <tr>
+        <td><b>Format og Bitrate</b></td>
+        <td>Vælg mellem lossless eller lossy formater for de lydklip, du eksporterer fra Chirpity.</td>
+    </tr>
+    <tr>
+        <td><b>Konverter til mono</b></td>
+        <td>Kombiner stereo spor til én kanal. Dette vil resultere i mindre filstørrelser.</td>
+    </tr>
+    <tr>
+        <th>Dekoratorer</th>
+        <td>Disse to muligheder kan bruges til at:
+            <ul>
+                <li>
+                    <b>Pad:</b> Tilføj to sekunder til begyndelsen og slutningen af den valgte lyd til eksport
+                </li>
+                <li>
+                    <b>Fade:</b> Anvend en fade-effekt på begyndelsen og slutningen af dine eksporterede filer.
+                </li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Audio Bibliotek</h5></td>
+    </tr>
+    <tr>
+        <td><b>Tilføj til bibliotek ved gemning</b></td>
+        <td>Når du gemmer et sæt resultater til arkivdatabasen, vil de tilhørende lydfiler blive konverteret til bibliotekformat og gemt på arkivplaceringen.</td>
+    </tr>
+    <tr>
+        <td><b>Skær lyd i biblioteket til natperioder</b></td>
+        <td>Dette vil beskære begyndelsen eller slutningen af en fil for at fjerne den lyd, der blev optaget i dagslys. Specifikt før slutningen af den borgerlige skumring om aftenen og efter slutningen af den borgerlige skumring om morgenen.
+            Disse perioder er indstillet i henhold til filens lokalitetsindstillinger.
+        </td>
+    </tr>
+    <tr>
+        <td><b>Bibliotekets placering</b></td>
+        <td>Vælg en mappe til at opbevare lydbiblioteket. Filene vil blive organiseret i henhold til følgende struktur:
+            <pre>
+        &lt;Den valgte placering&gt; / Optagelsessted / År / Måned / filnavn</pre>
+        <p>For eksempel: <b>D:\Vögel\56075, Karthäuserhofgelände\2024\Juli\20240704_0130.flac</b></p>
+        </td>
+    </tr>
+    <tr>
+        <th>Bibliotekformat</th>
+        <td>Biblioteket kan gemme din lyd i et lossy eller lossless format.
+            <ul>
+                <li>
+                    <b>Lossy:</b> Lyd konverteres til Ogg Vorbis. Dette er den anbefalede mulighed. Lyden vil være praktisk talt uadskillelig fra originalen i applikationen - både for modellen og for det menneskelige øre.
+                    Filstørrelsen vil blive dramatisk reduceret - så meget, at 24 timers optagelser vil kræve omkring 1 gigabyte lagerplads.
+                </li>
+                <li>
+                    <b>Lossless:</b> Hvis lossless-optionen vælges, vil lydens troværdighed (bitrate, kanaler og sample rate) være identisk med den originale fil - selv WAV-filer. Ved at bruge FLAC-formatet vil de arkiverede filer 
+                    være cirka halvdelen af størrelsen af deres WAV-ækvivalenter.
+                </li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Spektrogramindstillinger</h5></td>
+    </tr>
+    <tr>
+        <td><b>Farvekort</b></td>
+        <td>Vælg et farvetema til spektrogrammet, eller lav dit eget. Hvis du vælger 'brugerdefineret', får du mulighed for at indstille farverne for peak-, midt- og stille lyde efter
+            personlig præference. Du kan også justere midtpunktets position: med en værdi på 0 eller 1 vil spektrogrammet være tofarvet. Værdier imellem vil blande de tre farver.
+            Hvis du sætter Mid-farven den samme som en af de andre, vil du kunne justere kontrasten i spektrogrammet ved at bruge Mid Position justeringerne.
+            <p>I kombination med justering af audiofiltre giver et brugerdefineret farvekort dig mulighed for at forbedre kontrasten / synligheden af kald ved at bruge de farver, du ønsker.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Vinduesfunktion</b></td>
+        <td>En række vinduesfunktioner er tilgængelige for spektrogrammet. Hver af dem har lidt forskellige egenskaber, så ændring af vinduesfunktionen kan også forbedre 
+            udseendet af kald i visningen.
+        </td>
+    </tr>
+    <tr>
+        <th>Tidslinje</th>
+        <td>Spektrogrammets tidslinje har to tilstande:
+            <ul>
+                <li>
+                    <b>Tidskode</b> viser den tid, der er gået fra begyndelsen af filen.
+                </li>
+                <li>
+                    <b>Tid på dagen</b> bruger filens tidsstempler til at bestemme den faktiske tid for de detekterede kald.
+                    Hvis en fils tidsstempel ikke afspejler optagelsestiden, vil læsningen være unøjagtig.
+                    For at redigere starttiden for den aktuelle fil skal du indstille den ønskede dato og tid ved hjælp af filnavnets kontekstmenu.
+                </li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Avanceret</h5></td>
+    </tr>
+    <tr>
+        <th>Send filtreret lyd til analyse</th>
+        <td>
+            Som standard bruges filterindstillingerne i Audioindstillingerne kun til at ændre lyden i applikationens grænseflade. Hvis du aktiverer denne indstilling, 
+            vil den ændrede lyd blive brugt til analyse. Dette er normalt en dårlig idé, da det kan forringe modellernes nøjagtighed i de fleste situationer. Men hvis dine 
+            optagelser har en betydelig mængde lavfrekvent støj, kan det <i>måske</i> være, at ændring af lyden ved hjælp af disse filtre forbedrer modellernes evne til 
+            at lave nøjagtige detektioner.
+        </td>
+    </tr>
+    <tr>
+        <th>Konteksttilstand</th>
+        <td> Denne tilstand er kun tilgængelig for Nocmig-modellen. Når den aktiveres, vil modellen bruge den omgivende kontekst, når den laver forudsigelser. Dette hjælper med at mindske
+            falske positive detektioner.
+        </td>
+    </tr>
+    <tr>
+        <th>SNR filter</th>
+        <td>Denne indstilling er også kun tilgængelig for Nocmig-modellen. SNR (Signal-to-Noise Ratio) filteret kan kun aktiveres, når du bruger CPU-backend'en. 
+            Når det er aktiveret, vil Chirpity ignorere lydsegmenter uden et klart lydhændelse.
+            Et stærkere signal kræves for, at en forudsigelse forsøges, når højere signal-til-støje-værdier er indstillet.
+            Formålet er at levere betydelige hastighedsforøgelser, men denne indstilling kan få Chirpity til at gå glip af stille eller fjerne kald.
+        </td>
+    </tr>
+    <tr>
+        <th>Debug-tilstand</th>
+        <td>
+            Hvis du har stødt på et problem, mens du bruger Chirpity, kan du aktivere debug-tilstand. Når du ændrer denne indstilling, skal du afslutte og genstarte applikationen 
+            for at ændringen kan træde i kraft. Når den startes i debug-tilstand, åbnes to vinduer, og hver af dem vil printe debug-information til en konsol på højre side af vinduet.
+            Dette er <b>meget</b> nyttigt, hvis du ønsker at rapportere en fejl - da du kan dele et skærmbillede af eventuelle fejl, der vises (disse vil blive vist i rød i konsollen).
+        </td>
+    </tr>
+</table>
+</body>
+</html>

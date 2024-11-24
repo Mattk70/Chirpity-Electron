@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Chirpity Nocmig Einstellungen</title>
+</head>
+<body>
+
+<table class="table table-hover p-1">
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Erkennungen</h5></td>
+    </tr>
+    <tr>
+        <th>Modell</th>
+        <td>Wählen Sie das Modell aus, das für die Erkennung verwendet werden soll.
+            <ul>
+                <li>
+                    <b>Nocmig</b> verwendet ein Modell, das für die nächtlichen Flugrufe europäischer Vögel zur Analyse abgestimmt ist.
+                </li>
+                <li>
+                    <b>BirdNET</b> verwendet das <a href="https://github.com/kahst/BirdNET-Analyzer" target="_blank">BirdNET</a> Modell, das von Stefan Kahl et al. vom K. Lisa Yang Center for Conservation Bioacoustics entwickelt wurde.
+                </li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <th>Vertrauensschwelle</th>
+        <td>Diese Einstellung bestimmt das minimale Vertrauensniveau, das erforderlich ist, damit das Modell eine Erkennung meldet.
+            Eine Erhöhung des Werts reduziert falsch-positive Ergebnisse, erhöht jedoch das Risiko, echte Rufe zu verpassen.
+            <b>Hinweis:</b> Das Vertrauen kann jederzeit angepasst werden. Die Ergebnisse werden auch nach der Analyse aktualisiert.
+        </td>
+    </tr>
+    <tr>
+        <th>Liste</th>
+        <td>
+            <p><b>Lokale Vögel</b>. Schließt Vögel aus, die in Ihrer Region voraussichtlich nicht vorkommen.</p>
+            <p style="padding-left: 2em">
+                Wenn diese Option ausgewählt ist, erscheint ein zusätzliches Panel. Der <b>Schwellenwert</b> repräsentiert die Häufigkeit der eBird-Checklisten.
+                Ein Wert von 0,03 bedeutet also, dass Vögel, die in weniger als 3 % der eBird-Checklisten in der Region vorkommen, ausgeschlossen werden.
+                Wenn Sie auch "Woche verwenden" aktivieren, werden Vögel ausgeschlossen, die zu der Jahreszeit, in der die Aufnahme gemacht wurde, nicht erwartet werden - dies wird vom Zeitstempel der Datei abgelesen.
+                <br /> <b>Hinweis:</b> Derzeit hat die wöchentlich spezifische Filterung eine Einschränkung, dass die Zusammenfassung der Erkennungen die 
+                Liste aus der neuesten Datei in einer Batch von Dateien verwendet.
+                Zum Beispiel, wenn Sie Dateien vom 22. April, 23. Oktober und 24. Februar in einer Batch analysieren, wird die Liste vom 24. Februar für die Zusammenfassung verwendet.
+            </p>
+            <p><b>Nachts aktive Vögel</b>. Dies schließt Erkennungen von Vogelgesang und den Rufen von Arten aus, die typischerweise nicht in der Nacht vokalisieren.
+                Wenn Sie "<b>Verwenden Sie Standorteinstellungen</b>" für das BirdNET-Modell aktivieren, wird die Liste die Vögel der <b>Lokalen Vögel</b>-Liste umfassen, 
+                mit Ausnahme derer, die nicht nachts rufen.</p>
+            <p><b>Vögel</b>. Schließt Erkennungen für alle Vögel ein, mit Ausnahme nicht-avianer Klassen.</p>
+            <p><b>Alles</b>. Zeigt zusätzlich zu allen Vogelarten auch Nicht-Vogel-Erkennungen an, einschließlich Segmente, die als Rauschen betrachtet wurden.</p>
+            <p><b>Benutzerdefiniert</b>. Geben Sie eine Liste an, die das Modell verwenden soll. Benutzerdefinierte Listen ermöglichen es Ihnen,:</p>
+            <ol>
+                <li>Die Erkennungen präzise zu definieren, die Sie von Chirpity gemeldet haben möchten</li>
+                <li>Nur nach einer bestimmten Art zu suchen</li>
+            </ol>
+            Sie können eine andere benutzerdefinierte Liste für das BirdNET- und Nocmig-Modell verwenden. Das Format einer 
+            benutzerdefinierten Listen-Datei ist "wissenschaftlicher Name_gängiger Name", mit jeder Art auf einer neuen Zeile. <b>Wichtig ist, dass die benutzerdefinierte Liste die Bezeichnungen in Ihrer ausgewählten Sprache verwenden muss.</b>
+            Sie können eine Startliste im richtigen Format aus dem Hilfemenü exportieren, indem Sie auf den Link "<i>Welche Arten werden erkannt?</i>" klicken.
+        </td>
+    </tr>
+    <tr>
+        <th>Nur Nachtzeiten analysieren</th>
+        <td>
+            Suchen Sie nur nach Erkennungen während der Nacht. Chirpity berechnet den Beginn und das Ende der bürgerlichen Dämmerung aus den Zeitstempeln Ihrer Audiodateien unter Verwendung des von Ihnen festgelegten Standorts.
+            Wenn Ihre Aufnahme sowohl Tages- als auch Nachtzeiträume umfasst, werden die Tageszeiträume übersprungen. Wenn Sie nur an nächtlichen Rufen interessiert sind, hat dies zwei Vorteile:
+            <ol>
+                <li>Es wird weniger falsch-positive Erkennungen geben, da beide Modelle mehr Fehler machen, wenn viele Arten gleichzeitig vokalisieren (z. B. während des Morgengesangs).</li>
+                <li>Die Analyse wird schneller abgeschlossen, da sie den Tageszeitraum ignoriert.</li>
+            </ol>
+        </td>
+    </tr>
+    <tr>
+        <th>Zeige IUCN Rote Liste Status der Arten in der Zusammenfassung</th>
+        <td>
+            Zeigen Sie den globalen Status der Roten Liste der Arten in der Zusammenfassungstabelle an, wie er von der <a href="https://www.iucnredlist.org/" target="_blank">IUCN</a> bewertet wurde. Es gibt 7 Kategorien:
+            <ol>
+                <li>Geringe Besorgnis (LC)</li>
+                <li>Fast bedroht (NT)</li>
+                <li>Vulnerabel (VU)</li>
+                <li>Gefährdet (EN)</li>
+                <li>Kritisch gefährdet (CR)</li>
+                <li>In der Wildnis ausgestorben</li>
+                <li>Ausgestorben</li>
+            </ol>
+            Wenn Sie auf das Symbol klicken, wird die Bewertungsseite mit dem Verbreitungsgebiet der Art und den Details der Bewertung in Ihrem Webbrowser geöffnet. Die Daten stammen von:
+            <cite>
+                IUCN 2024. IUCN Rote Liste der bedrohten Arten. Version 2024-2
+            </cite>
+        </td>
+    </tr>
+    <tr>
+        <th>Cache für Referenzaufrufe löschen</th>
+        <td>
+            Die Metadaten der Artenspezifikationen, die bestimmen, was Sie sehen, wenn Sie „Mit Referenzaufrufen vergleichen“ im Kontextmenü auswählen, werden auf der Festplatte gespeichert. Wenn Sie den Cache löschen,
+            werden die gespeicherten Daten gelöscht, und Artendaten werden bei der nächsten Anfrage zur Vergleichsanalyse von der Xeno-Canto-Website erneut abgerufen.
+            Dies kann nützlich sein, wenn eine Referenzdatei von der Website entfernt wurde oder wenn Sie die Auswahl der Rufe aktualisieren möchten.
+        </td>
+    </tr>
+    <tr>
+        <th>Standardstandort</th>
+        <td>
+            <figure class="figure float-end m-3">
+                <img src="Help/amend file.png"
+                    alt="Das Kontextmenü, das über den Dateinamen aufgerufen wird, enthält Optionen zur Änderung der Startzeit der Datei und des Aufnahmeorts"
+                    class="rounded figure-img float-end img-fluid">
+                <figcaption class="figure-caption text-muted text-end">Kontextmenü für den Dateinamen.</figcaption>
+            </figure>
+            Legen Sie den Standardstandort fest, der zur Berechnung des Beginns und Endes der bürgerlichen Dämmerung sowie zur Generierung Ihrer <b>Lokalen Vögel</b>-Liste verwendet werden soll.
+            Diese Einstellung kann für einzelne Dateien überschrieben werden, indem ein benutzerdefinierter Standort im Kontextmenü des Dateinamens zugewiesen wird.
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>System</h5></td>
+    </tr>
+    <tr>
+        <th>Sprache</th>
+        <td>
+            Wählen Sie die Sprache für die "häufigen Namen"-Bezeichnungen, wo Übersetzungen vorhanden sind. Die übersetzten Bezeichnungen wurden von <a href="https://ebird.org/home" target="_blank">eBird</a> bereitgestellt.
+        </td>
+    </tr>
+    <tr>
+        <th>Backend</th>
+        <td>Diese Option ist nur sichtbar, wenn das Nocmig-Modell verwendet wird. Wählen Sie, wie Vorhersagen auf Ihrem Computer berechnet werden.
+            <ul>
+                <li>
+                    <b>CPU</b> verwendet die CPU für Vorhersagen. Dies ist in der Regel schneller, wenn Sie eine integrierte
+                    Grafikkarte haben.
+                </li>
+                <li>
+                    <b>WebGL</b> verwendet die Grafikkarte. Wenn Sie eine dedizierte Grafikkarte haben, ist dies in der Regel
+                    erheblich schneller.
+                </li>
+                <li>
+                    <b>WebGPU</b> Verwendet eine neue Technologie und nutzt ebenfalls Grafikprozessoren. Es ähnelt WebGL,
+                    aber es ist bekannt dafür, die Verarbeitung auf Macs zu beschleunigen, im Gegensatz zu WebGL. WebGPU verwendet mehr Speicher als WebGL, und 
+                    wenn die Threads oder die Batchgröße zu hoch eingestellt sind, kann Chirpity aus dem Speicher laufen. Wenn dies geschieht,
+                    kann das Spektrogramm vom Bildschirm verschwinden oder die App kann nicht mehr reagieren. Verwenden Sie einen niedrigeren Wert für Threads und / oder Batchgröße.
+                </li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <th>Threads</th>
+        <td>Diese Einstellung ermöglicht es Ihnen, die Anzahl der Threads auszuwählen, die für Vorhersagen verwendet werden sollen.
+            Bei Verwendung des CPU-Backends wird die Anzahl der Threads automatisch auf die Anzahl der verfügbaren CPU-Kerne auf dem Computer eingestellt.
+            Standardmäßig verwendet das GPU-Backend zwei Threads. Durch Anpassen dieser Einstellung zusammen mit der Batchgröße kann die Verarbeitungsgeschwindigkeit erhöht werden.
+        </td>
+    </tr>
+    <tr>
+        <th>Batchgröße</th>
+        <td>Diese Einstellung bestimmt die Anzahl der drei Sekunden langen Audiostücke, die für jede Modellanfrage verarbeitet werden.
+            Größere Werte können zu einer schnelleren Verarbeitung führen, besonders bei langen Dateien, obwohl zu große Werte die Verarbeitungsgeschwindigkeit verringern und sogar zu Speicherproblemen führen können. 
+            Der optimale Wert kann auch je nach dem analysierten Dateiformat variieren.
+        </td>
+    </tr>
+    <tr>
+        <th>Aktivieren Sie Benachrichtigungen über die Analyseabschlüsse</th>
+        <td>
+            Dies ist nützlich, wenn Sie Chirpity-Analysen im Hintergrund ausführen möchten, 
+            oder wenn das Fenster minimiert ist. Eine Systembenachrichtigung informiert Sie, wenn die Analyse abgeschlossen ist.
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Audioeinstellungen</h5></td>
+    </tr>
+    <tr>
+        <td><b>Lautstärkeanpassung</b></td>
+        <td>Wenn Ihre Aufnahmen sehr leise sind, können Sie die Lautstärke erhöhen, indem Sie die Verstärkung erhöhen. Die Lautstärke kann um bis zu 50 Dezibel erhöht werden.</td>
+    </tr>
+    <tr>
+        <td><b>Lautstärkeanpassung</b></td>
+        <td>Wenn Ihre Aufnahmen sehr leise sind, können Sie die Lautstärke erhöhen, indem Sie die Verstärkung erhöhen. Die Lautstärke kann um bis zu 50 Dezibel erhöht werden.</td>
+    </tr>
+    <tr>
+        <td><b>Audio normalisieren</b></td>
+        <td>
+            Wenn aktiviert, werden die Pegel in der Audiodatei normalisiert. Einfach ausgedrückt maximiert dies den Lautstärkebereich zwischen den leisesten und lautesten Tönen. 
+            Die Wirkung stellt sicher, dass alle Audiodateien mit ähnlicher Lautstärke abgespielt werden und Vokalisierungen in leisen Audiodateien leichter hörbar sind.
+        </td>
+    </tr>
+    <tr>
+        <th>High Pass Filter</th>
+        <td>Dieses Filter entfernt Geräusche unterhalb der ausgewählten Frequenz. 
+            Es ist hauptsächlich für Aufnahmen aus städtischen Gebieten gedacht und unterdrückt niederfrequente Brummgeräusche.
+        </td>
+    </tr>
+    <tr>
+        <th>Low Shelf Filter</th>
+        <td>Dieses Filter ist dem High Pass Filter ähnlich. Es reduziert jedoch nicht nur Geräusche, sondern senkt auch die Lautstärke von niederfrequenten Geräuschen. 
+            Der Vorteil eines Low Shelf Filters ist, dass Sie das Brummen verringern können, während Sie weiterhin Arten hören können, die niederfrequente Rufe haben.
+            Sie können die Schwellenfrequenz und die Stärke des Filters (Dämpfung) einstellen.
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Audio Export</h5></td>
+    </tr>
+    <tr>
+        <td><b>Format und Bitrate</b></td>
+        <td>Wählen Sie aus verlustfreien oder verlustbehafteten Formaten für die Audioausschnitte, die Sie aus Chirpity exportieren.</td>
+    </tr>
+    <tr>
+        <td><b>In Mono konvertieren</b></td>
+        <td>Kombinieren Sie Stereo-Tracks zu einem einzelnen Kanal. Dies führt zu kleineren Dateigrößen.</td>
+    </tr>
+    <tr>
+        <th>Dekoratoren</th>
+        <td>Diese beiden Optionen können verwendet werden, um:
+            <ul>
+                <li>
+                    <b>Padding:</b> Fügen Sie zwei Sekunden am Anfang und Ende des für den Export ausgewählten Audios hinzu.
+                </li>
+                <li>
+                    <b>Fade:</b> Wenden Sie einen Fade-Effekt auf den Anfang und das Ende Ihrer exportierten Dateien an.
+                </li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Audio-Bibliothek</h5></td>
+    </tr>
+    <tr>
+        <td><b>Beim Speichern zur Bibliothek hinzufügen</b></td>
+        <td>Wenn Sie eine Ergebnismenge in der Archivdatenbank speichern, werden die zugehörigen Audiodateien in das Bibliotheksformat konvertiert und am Archivstandort gespeichert.</td>
+    </tr>
+    <tr>
+        <td><b>Bibliotheks-Audio auf Nachtzeiten zuschneiden</b></td>
+        <td>Dies schneidet den Anfang oder das Ende einer Datei ab, um das Audio zu entfernen, das während des Tages aufgenommen wurde. Insbesondere vor dem Ende der bürgerlichen Dämmerung am Abend und nach dem Ende der bürgerlichen Dämmerung am Morgen. 
+            Diese Zeiträume werden gemäß den Standorteinstellungen der Datei festgelegt.</td>
+    </tr>
+    <tr>
+        <td><b>Bibliotheksstandort</b></td>
+        <td>Wählen Sie einen Ordner aus, in dem Sie die Audio-Bibliothek speichern möchten. Die Dateien werden gemäß der folgenden Struktur organisiert:
+            <pre>
+        &lt;Ihr gewählter Standort&gt; / Aufnahmeort / Jahr / Monat / Dateiname</pre>
+        <p>Zum Beispiel: <b>D:\Vögel\56075, Karthäuserhofgelände\2024\Juli\20240704_0130.flac</b></p>
+        </td>
+    </tr>
+    <tr>
+        <th>Bibliotheksformat</th>
+        <td>Die Bibliothek kann Ihre Audio-Dateien in einem verlustbehafteten oder verlustfreien Format speichern.
+            <ul>
+                <li>
+                    <b>Verlustbehaftet:</b> Audio wird in Ogg Vorbis konvertiert. Dies ist die empfohlene Option. Das Audio wird in der Anwendung praktisch nicht vom Original zu unterscheiden sein – sowohl für das Modell als auch für das menschliche Ohr.
+                    Die Dateigröße wird dramatisch reduziert – so dass 24 Stunden Aufnahmen etwa 1 GB Speicherplatz benötigen.
+                </li>
+                <li>
+                    <b>Verlustfrei:</b> Wenn die verlustfreie Option ausgewählt wird, bleibt die Audioqualität (Bitrate, Kanäle und Abtastrate) identisch mit der Originaldatei – sogar WAV-Dateien. Durch die Verwendung des FLAC-Formats sind die archivierten Dateien
+                    etwa halb so groß wie ihre WAV-Äquivalente.
+                </li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Spektrogrammeinstellungen</h5></td>
+    </tr>
+    <tr>
+        <td><b>Farbenkarte</b></td>
+        <td>Wählen Sie ein Farbthema für die Spektrogrammanzeige oder erstellen Sie Ihr eigenes. Wenn Sie „Benutzerdefiniert“ auswählen, haben Sie die Möglichkeit, die Farben für Spitzen-, Mittel- und leise Töne nach
+            persönlichen Vorlieben einzustellen. Sie können auch die Position des Mittelpunkts anpassen: Mit einem Wert von 0 oder 1 wird das Spektrogramm zweifarbig. Werte dazwischen mischen die drei Farben.
+            Wenn Sie die Mittel-Farbe auf eine der anderen Farben setzen, können Sie den Kontrast im Spektrogramm mithilfe der Anpassungen der Mittel-Position einstellen.
+            <p>In Kombination mit der Anpassung von Audiofiltern ermöglicht eine benutzerdefinierte Farbenkarte, den Kontrast / die Sichtbarkeit von Rufen mit den Farben Ihrer Wahl zu verstärken.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Fensterfunktion</b></td>
+        <td>Eine Reihe von Fensterfunktionen sind für die Spektrogrammanzeige verfügbar. Jede hat leicht unterschiedliche Eigenschaften, sodass das Ändern der Fensterfunktion auch das 
+            Aussehen der Rufe in der Anzeige verbessern kann.
+        </td>
+    </tr>
+    <tr>
+        <th>Zeitachse</th>
+        <td>Die Spektrogramm-Zeitachse hat zwei Modi:
+            <ul>
+                <li>
+                    <b>Zeitscode</b> zeigt die seit Beginn der Datei vergangene Zeit an.
+                </li>
+                <li>
+                    <b>Tag und Uhrzeit</b> verwendet die Zeitstempel der Datei, um die tatsächliche Zeit der erkannten Rufe zu bestimmen.
+                    Wenn der Zeitstempel einer Datei nicht die Aufnahmezeit widerspiegelt, ist die Anzeige ungenau.
+                    Um die Startzeit der aktuellen Datei zu bearbeiten, stellen Sie das gewünschte Datum und die Uhrzeit im Kontextmenü des Dateinamens ein.
+                </li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Erweitert</h5></td>
+    </tr>
+    <tr>
+        <th>Gefilterte Audiodaten zur Analyse senden</th>
+        <td>
+            Standardmäßig werden die Filtereinstellungen in den Audioeinstellungen nur verwendet, um die Audiodateien in der Anwendung zu ändern. Wenn Sie diese Einstellung aktivieren, 
+            wird das bearbeitete Audio für die Analyse verwendet. Dies ist normalerweise keine gute Idee, da es die Genauigkeit der Modelle in den meisten Situationen beeinträchtigt. Wenn jedoch Ihre 
+            Aufnahmen eine beträchtliche Menge an niederfrequentem Rauschen enthalten, kann das Bearbeiten des Audios mit diesen Filtern die Fähigkeit der Modelle verbessern, 
+            genaue Erkennungen vorzunehmen.
+        </td>
+    </tr>
+    <tr>
+        <th>Kontextmodus</th>
+        <td> Dieser Modus ist nur für das Nocmig-Modell verfügbar. Wenn aktiviert, verwendet das Modell die umgebende Kontextinformation, wenn es Vorhersagen trifft. Dies hilft, 
+            falsche positive Erkennungen zu reduzieren.
+        </td>
+    </tr>
+    <tr>
+        <th>SNR-Filter</th>
+        <td>Diese Einstellung ist ebenfalls nur für das Nocmig-Modell verfügbar. Der SNR (Signal-to-Noise Ratio)-Filter kann nur aktiviert werden, wenn das CPU-Backend verwendet wird. 
+            Wenn aktiviert, ignoriert Chirpity Audiosegmente ohne ein deutliches Soundereignis.
+            Ein stärkeres Signal ist erforderlich, damit eine Vorhersage versucht wird, wenn höhere Signal-zu-Rausch-Werte eingestellt sind.
+            Der Zweck dieser Einstellung ist es, signifikante Geschwindigkeitsgewinne zu erzielen, jedoch kann diese Einstellung dazu führen, dass Chirpity leisere oder entferntere Rufe übersieht.
+        </td>
+    </tr>
+    <tr>
+        <th>Debug-Modus</th>
+        <td>
+            Wenn Sie ein Problem bei der Verwendung von Chirpity festgestellt haben, können Sie den Debug-Modus aktivieren. Wenn Sie diese Einstellung ändern, müssen Sie die Anwendung schließen und neu starten, 
+            damit die Änderung wirksam wird. Wenn die Anwendung im Debug-Modus gestartet wird, öffnen sich zwei Fenster, und jedes gibt Debugging-Informationen in einer Konsole auf der rechten Seite des Fensters aus.
+            Dies ist <b>extrem</b> nützlich, wenn Sie einen Fehler melden möchten – da Sie einen Screenshot von allen Fehlern teilen können, die erscheinen (diese werden in der Konsole rot angezeigt).
+        </td>
+    </tr>
+</table>
+</body>
+</html>

@@ -30,6 +30,7 @@
   "Threads-circle-help": ["O número de análises paralelas a executar. Por padrão, está configurado para o número de núcleos de CPU da máquina para desempenho mais rápido. Com o backend de GPU, um número menor funciona melhor, por exemplo, 1-3."],
   "Use Location settings-circle-help": ["Quando ativada, o filtro de Aves Noturnas relata as aves com base nas configurações de localização."],
   "Volume Adjustment-circle-help": ["Ajuste o volume do áudio para compensar os níveis baixos de gravação."],
+  "File-timestamp-circle-help": ["Alguns gravadores de áudio, como o Zoom H1 Essential, podem definir a data e hora do arquivo salvo para o início da gravação, em vez de para o final. Se você tiver um gravador desse tipo, selecionar esta opção corrigirá os horários mostrados para suas detecções (as alterações nesta configuração requerem o reinício do Chirpity para ter efeito)."],
   "navBarFile": ["Arquivo"],
   "navbarHelp": ["Ajuda"],
   "navbarRecords": ["Registros"],
@@ -133,6 +134,7 @@
     "send-filtered-audio-to-model": "Enviar áudio filtrado para análise",
     "context": "Modo contexto",
     "snrValue": "Filtro SNR:",
+    "file-timestamp": "Os carimbos de data e hora do arquivo marcam o início da gravação",
     "debug-mode": "Modo de depuração"
   },
   "record-entry": {

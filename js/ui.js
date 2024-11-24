@@ -1719,7 +1719,8 @@ const defaultConfig = {
     limit: 500,
     debug: false,
     VERSION: VERSION,
-    powerSaveBlocker: false
+    powerSaveBlocker: false,
+    fileStartMtime: false
 };
 let appPath, tempPath, systemLocale, isMac;
 window.onload = async () => {
@@ -1794,7 +1795,8 @@ window.onload = async () => {
         
         // remember audio notification setting
         DOM.audioNotification.checked = config.audio.notification;
-        
+        // Zoom H1E filestart handling:
+        document.getElementById('file-timestamp').checked = config.fileStartMtime;
         // List appearance in settings 
         DOM.speciesThreshold.value = config.speciesThreshold;
         document.getElementById('species-week').checked = config.useWeek;
@@ -1896,7 +1898,8 @@ window.onload = async () => {
             useWeek: config.useWeek,
             local: config.local,
             UUID: config.UUID,
-            debug: config.debug
+            debug: config.debug,
+            fileStartMtime: config.fileStartMtime
         });
         const {model, list} = config;
         t0_warmup = Date.now();
@@ -3706,10 +3709,16 @@ function formatDuration(seconds){
     async function localiseModal(filename, locale) {
         try {
             // Fetch the HTML file
-            if (filename.includes('usage')){
-                filename = filename.replace('usage.html', `usage.${locale}.html`);
+            if (filename.includes('usage') || filename.includes('settings')){
+                filename = filename.replace('.html', `.${locale}.html`);
                 const htmlResponse = await fetch(filename);
-                if (!htmlResponse.ok) throw new Error(`Failed to load HTML file: ${filename}.html`);
+                if (!htmlResponse.ok) throw new Error(`Failed to load HTML file: ${filename}`);
+                return await htmlResponse.text();
+            } else if (filename.includes('ebird')){
+                locale = (locale === 'es') ? locale : 'en'; // I only have spanish so far
+                filename = filename.replace('.html', `.${locale}.html`);
+                const htmlResponse = await fetch(filename);
+                if (!htmlResponse.ok) throw new Error(`Failed to load HTML file: ${filename}`);
                 return await htmlResponse.text();
             }
             const htmlResponse = await fetch(filename);
@@ -4801,7 +4810,7 @@ function playRegion(){
                     break }
                 case 'auto-archive': { config.archive.auto = element.checked;
                     worker.postMessage({action: 'update-state', archive: config.archive});
-                    break } // no break so worker state gets updated
+                    break } 
                 case 'library-trim': { config.archive.trim = element.checked; 
                     worker.postMessage({action: 'update-state', archive: config.archive});
                     break }
@@ -4815,6 +4824,10 @@ function playRegion(){
                 case 'lowShelfFrequency': { handleLowShelfchange(e); break }
                 case 'HighPassFrequency' : { handleHPchange(e); break }
                 case 'snrValue' : { handleSNRchange(e); break }
+                case 'file-timestamp': {
+                    config.fileStartMtime = element.checked; 
+                    worker.postMessage({ action: 'update-state', fileStartMtime: config.fileStartMtime })
+                    break }
                 case 'audio-notification': { config.audio.notification = element.checked; break }
                 case 'power-save-block': {
                     config.powerSaveBlocker = element.checked;

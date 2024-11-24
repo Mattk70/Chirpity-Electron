@@ -30,6 +30,7 @@
     "Threads-circle-help": ["The number of parallel analyses to run. By default, this is set to the number of CPU cores on the machine for fastest performance. With the GPU backend, a lower number works better e.g. 1-3"],
     "Use Location settings-circle-help": ["When activated, the Nocturnal birds filter reports birds based on your location settings."],
     "Volume Adjustment-circle-help": ["Adjust the volume of audio to compensate for low recording levels."],
+    "File-timestamp-circle-help": ["Some audio recorders, for example the Zoom H1 Essential, can set the file saved date and time to the beginning of the recording, rather than the end. If you have such a recorder selecting this option will fix the times shown for your detections (changes to this setting require a Chirpity relaunch to take effect)"],
 
     "navBarFile": ["File"],
     "navbarHelp": ["Help"],
@@ -138,6 +139,7 @@
       "send-filtered-audio-to-model": "Send Filtered Audio for Analysis",
       "context": "Context mode",
       "snrValue": "SNR filter:",
+      "file-timestamp": "File timestamps mark recording start",
       "debug-mode": "Debug mode"
     },
     "record-entry":{

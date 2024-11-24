@@ -30,6 +30,7 @@
   "Threads-circle-help": ["运行并行分析的线程数。默认情况下，这设置为计算机上的 CPU 核心数以实现最快性能。使用 GPU 后端时，较低的线程数效果更好，例如 1-3。"],
   "Use Location settings-circle-help": ["激活后，夜行鸟类过滤器将基于您的位置设置报告鸟类。"],
   "Volume Adjustment-circle-help": ["调整音量以补偿低录音电平。"],
+  "File-timestamp-circle-help": ["一些音频录音设备，例如Zoom H1 Essential，可以将文件保存的日期和时间设置为录音开始时，而不是结束时。如果您有这样的录音设备，选择此选项将修正检测中显示的时间。（更改此设置需要重新启动 Chirpity 才能生效）。"],
   "navBarFile": ["文件"],
   "navbarHelp": ["帮助"],
   "navbarRecords": ["记录"],
@@ -133,6 +134,7 @@
     "send-filtered-audio-to-model": "发送过滤后的音频进行分析",
     "context": "上下文模式",
     "snrValue": "SNR滤波器：",
+    "file-timestamp": "文件时间戳标记录音开始",
     "debug-mode": "调试模式"
   },
   "record-entry": {

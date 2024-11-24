@@ -932,7 +932,7 @@ const i18nContext = {
         pause: 'Pausa',
         analyse: 'Analizar',
         create: 'Crear', edit: 'Editar', record: 'el registro',
-        export: 'Exportar este fragmento del audio',
+        export: 'Exportar audio(s)',
         compare: 'Comparar con reclamos de referencia',
         delete: 'Eliminar este registro',
         location: 'Modificar la ubicación de grabación del archivo',
