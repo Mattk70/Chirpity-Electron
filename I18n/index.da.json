@@ -17,7 +17,7 @@
     "High Pass Filter-circle-help": ["Hvis aktiveret, fjernes lavfrekvent støj under tærsklen."],
     "IUCN-circle-help": ["Hvis aktiveret, vises den seneste globale IUCN-status for hver art i rapporten. Ikonet linker til vurderingssiden på IUCN-webstedet. Feltet 'Scope' viser vurderingen af arten i denne region (hvis tilgængelig)."],
     "Language-circle-help": ["Vælg dit foretrukne sprog til fuglenavne."],
-    "List-circle-help": ["Filtrerer de registreringer, der returneres i resultaterne. 'Lokale fugle': ekskluderer fugle, der sandsynligvis ikke findes i din region. 'Natfugle': ekskluderer fuglekald og arter, der ikke er kendt for at kalde om natten. Den brugerdefinerede liste giver dig mulighed for at uploade en fil, der angiver de arter, der skal genkendes."],
+    "List-circle-help": ["Filtrerer de registreringer, der returneres i resultaterne. 'Lokale fugle': ekskluderer fugle, der sandsynligvis ikke findes i din region. 'Natlige kald': ekskluderer fuglekald og arter, der ikke er kendt for at kalde om natten. Den brugerdefinerede liste giver dig mulighed for at uploade en fil, der angiver de arter, der skal genkendes."],
     "Low Shelf Filter-circle-help": ["Hvis anvendt, dæmpes lavfrekvent støj under skæringsfrekvensen."],
     "Model-circle-help": ["Vælg, om du vil bruge Nocmig-modellen, der er optimeret til natlige trækfuglekald i Europa, eller BirdNET, der kan genkende over 6000 arter på verdensplan."],
     "Nocmig Mode-circle-help": ["Når aktiveret, viser denne 'Nocmig'-tilstand kun de registreringer, der findes om natten."],

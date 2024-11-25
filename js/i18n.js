@@ -1061,84 +1061,84 @@ const i18nForm = {
 const i18nLIST_MAP = {
     en: { 
         location: 'Searching for birds in your region',
-        nocturnal: 'Searching for nocturnal birds',
+        nocturnal: 'Searching for nocturnal calls',
         birds: 'Searching for all birds',
         everything: 'Searching for everything',
         custom: 'Using a custom list'
     },
     da: {
         location: 'Søger efter fugle i din region',
-        nocturnal: 'Søger efter nataktive fugle',
+        nocturnal: 'Søger efter natlige kald',
         birds: 'Søger efter alle fugle',
         everything: 'Søger efter alt',
         custom: 'Bruger en brugerdefineret liste'
     },
     de: {
         location: 'Suche nach Vögeln in Ihrer Region',
-        nocturnal: 'Suche nach nachtaktiven Vögeln',
+        nocturnal: 'Suche nach nächtlichen Rufen',
         birds: 'Suche nach allen Vögeln',
         everything: 'Suche nach allem',
         custom: 'Verwenden einer benutzerdefinierten Liste'
     },
     es: {
         location: 'Buscando aves de tu zona',
-        nocturnal: 'Buscando paso nocturno',
+        nocturnal: 'Buscando reclamos nocturno',
         birds: 'Buscando cualquier ave identificable',
         everything: 'Buscando cualquier sonido identificable',
         custom: 'Usando una lista personalizada'
     },
     fr: {
         location: 'Recherche des oiseaux dans votre région',
-        nocturnal: 'Recherche des oiseaux nocturnes',
+        nocturnal: 'Recherche des cris nocturnes',
         birds: 'Recherche de tous les oiseaux',
         everything: 'Recherche de tout',
         custom: 'Utilisation d\'une liste personnalisée'
     },
-    it: {
-        location: 'Cercando uccelli nella tua regione',
-        nocturnal: 'Cercando uccelli notturni',
-        birds: 'Cercando tutti gli uccelli',
-        everything: 'Cercando tutto',
-        custom: 'Uso di una lista personalizzata'
-    },
+    // it: {
+    //     location: 'Cercando uccelli nella tua regione',
+    //     nocturnal: 'Cercando uccelli notturni',
+    //     birds: 'Cercando tutti gli uccelli',
+    //     everything: 'Cercando tutto',
+    //     custom: 'Uso di una lista personalizzata'
+    // },
     nl: {
         location: 'Zoeken naar vogels in uw regio',
-        nocturnal: 'Zoeken naar nachtelijke vogels',
+        nocturnal: 'Zoeken naar nachtelijke roepen',
         birds: 'Zoeken naar alle vogels',
         everything: 'Zoeken naar alles',
         custom: 'Gebruik van een aangepaste lijst'
     },
-    pl: {
-        location: 'Szukam ptaków w twoim regionie',
-        nocturnal: 'Szukam ptaków nocnych',
-        birds: 'Szukam wszystkich ptaków',
-        everything: 'Szukam wszystkiego',
-        custom: 'Używanie niestandardowej listy'
-    },
+    // pl: {
+    //     location: 'Szukam ptaków w twoim regionie',
+    //     nocturnal: 'Szukam ptaków nocnych',
+    //     birds: 'Szukam wszystkich ptaków',
+    //     everything: 'Szukam wszystkiego',
+    //     custom: 'Używanie niestandardowej listy'
+    // },
     pt: {
         location: 'Procurando pássaros na sua região',
-        nocturnal: 'Procurando pássaros noturnos',
+        nocturnal: 'Procurando por chamadas noturnos',
         birds: 'Procurando todos os pássaros',
         everything: 'Procurando tudo',
         custom: 'Usando uma lista personalizada'
     },
     ru: {
         location: 'Поиск птиц в вашем регионе',
-        nocturnal: 'Поиск ночных птиц',
+        nocturnal: 'Поиск ночных звуков',
         birds: 'Поиск всех птиц',
         everything: 'Поиск всего',
         custom: 'Использование пользовательского списка'
     },
     sv: {
         location: 'Söker efter fåglar i din region',
-        nocturnal: 'Söker efter nattaktiva fåglar',
+        nocturnal: 'Söker efter nattaktiva läten',
         birds: 'Söker efter alla fåglar',
         everything: 'Söker efter allt',
         custom: 'Använder en anpassad lista'
     },
     zh: {
         location: '正在寻找您所在地区的鸟类',
-        nocturnal: '正在寻找夜间活动的鸟类',
+        nocturnal: '正在寻找夜间叫声',
         birds: '正在寻找所有鸟类',
         everything: '正在寻找一切',
         custom: '使用自定义列表'
@@ -1344,89 +1344,821 @@ const i18nTitles = {
   const i18nLists = {
     en: { 
         location: 'Local Birds', 
-        nocturnal: 'Nocturnal Birds', 
+        nocturnal: 'Nocturnal Calls', 
         birds: 'All Birds', 
         everything: 'Everything', 
         custom: 'Custom' 
     },
     da: {
         location: 'Lokale fugle',
-        nocturnal: 'Nataktive fugle',
+        nocturnal: 'Natlige kald',
         birds: 'Alle fugle',
         everything: 'Alt',
         custom: 'Brugerdefineret'
     },
     de: {
         location: 'Einheimische Vögel',
-        nocturnal: 'Nachtaktive Vögel',
+        nocturnal: 'Nächtliche Rufen',
         birds: 'Alle Vögel',
         everything: 'Alles',
         custom: 'Benutzerdefiniert'
     },
     es: {
         location: 'Aves de la zona',
-        nocturnal: 'Paso nocturno',
+        nocturnal: 'Reclamos nocturnos',
         birds: 'Todas las aves',
         everything: 'Cualquier sonido',
         custom: 'Personalizado'
     },
     fr: {
         location: 'Oiseaux locaux',
-        nocturnal: 'Oiseaux nocturnes',
+        nocturnal: 'Cris nocturnes',
         birds: 'Tous les oiseaux',
         everything: 'Tout',
         custom: 'Personnalisé'
     },
-    it: {
-        location: 'Uccelli locali',
-        nocturnal: 'Uccelli notturni',
-        birds: 'Tutti gli uccelli',
-        everything: 'Tutto',
-        custom: 'Personalizzato'
-    },
+    // it: {
+    //     location: 'Uccelli locali',
+    //     nocturnal: 'Uccelli notturni',
+    //     birds: 'Tutti gli uccelli',
+    //     everything: 'Tutto',
+    //     custom: 'Personalizzato'
+    // },
     nl: {
         location: 'Lokale vogels',
-        nocturnal: 'Nachtelijke vogels',
+        nocturnal: 'Nachtelijke roepen',
         birds: 'Alle vogels',
         everything: 'Alles',
         custom: 'Aangepast'
     },
-    pl: {
-        location: 'Lokalne ptaki',
-        nocturnal: 'Ptaki nocne',
-        birds: 'Wszystkie ptaki',
-        everything: 'Wszystko',
-        custom: 'Niestandardowe'
-    },
+    // pl: {
+    //     location: 'Lokalne ptaki',
+    //     nocturnal: 'Ptaki nocne',
+    //     birds: 'Wszystkie ptaki',
+    //     everything: 'Wszystko',
+    //     custom: 'Niestandardowe'
+    // },
     pt: {
         location: 'Pássaros locais',
-        nocturnal: 'Pássaros noturnos',
+        nocturnal: 'Chamadas noturnos',
         birds: 'Todos os pássaros',
         everything: 'Tudo',
         custom: 'Personalizado'
     },
     ru: {
         location: 'Местные птицы',
-        nocturnal: 'Ночные птицы',
+        nocturnal: 'Ночные звуков',
         birds: 'Все птицы',
         everything: 'Все',
         custom: 'Пользовательский'
     },
     sv: {
         location: 'Lokala fåglar',
-        nocturnal: 'Nattaktiva fåglar',
+        nocturnal: 'Nattliga läten',
         birds: 'Alla fåglar',
         everything: 'Allt',
         custom: 'Anpassad'
     },
     zh: {
         location: '本地鸟类',
-        nocturnal: '夜间鸟类',
+        nocturnal: '夜间叫声',
         birds: '所有鸟类',
         everything: '所有',
         custom: '自定义'
     }
 };
+
+
+const i18nTour = {
+    en: `
+        <!-- Carousel items -->
+        <div class="carousel-item active">
+            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+            <div class="text-center pb-4">
+                <h5>Welcome to Chirpity Nocmig</h5>
+                <p>This tour will highlight a few of the key features of the application. Click the right arrow for the next item</p>
+            </div>
+        </div>
+        <div class="carousel-item" data-element-selector="#navbarSettings">
+            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+            <div class="text-start pb-4 ms-3">
+                <h5 class="text-center">Getting Started</h5>
+                <ol class="ps-5 ms-5">
+                    <li>First off, set your location in the settings menu.</li>
+                    <li>Next, consider which model best suits your needs:</li>
+                    <ul>
+                        <li><b>Nocmig</b> is tuned for nocturnal migration,<br> but only has birds on the British list</li>
+                        <li><b>BirdNET</b> is trained on global bird species</li>
+                    </ul>
+                </ol>
+            </div>
+        </div>
+        <div class="carousel-item" data-element-selector="#filter-panel">
+            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+            <div class="text-center pb-4">
+                <h5>Quick access settings panel</h5>
+                <p>The icons here allow you to quickly toggle some frequently used settings.</p>
+                These include:
+                <div class="w-75 ms-5">
+                    <ol class="text-start ps-5"> 
+                        <li>Nocmig mode</li>
+                        <li>Audio filters</li>
+                        <li>Context-aware mode (Nocmig model only)</li>
+                        <li>Frequency range adjustment for the spectrogram</li>
+                        <li>Which detection list to use</li>
+                        <li>And the confidence threshold</li>
+                    </ol>
+                </div>
+                <p>Explanations for each of these settings can be found under "Settings" in the Help menu.</p>
+            </div>
+        </div>
+        <div class="carousel-item" data-element-selector="#fileContainer">
+            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+            <div class="text-center pb-4">
+                <h5>Context Menus</h5>
+                <p>Most of the tools can be accessed within context menus. These pop up when you
+                    right-click the mouse.
+                    There are context menus for detections, selected regions on the spectrogram and
+                    the filename.
+                </p>
+            </div>
+        </div>
+        <div class="carousel-item" data-element-selector="#navbarRecords">
+            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+            <div class="text-center pb-4">
+                <h5>Saved Records</h5>
+                <p>You can save records for future reference from the Records menu. Here you will
+                    also find the Chart and Explore
+                    sections of the Application. These allow you to revisit the detections you have
+                    saved and view charts of species'
+                    occurrence over time </p>
+                </div>
+            </div>
+            <!-- Add more carousel items as needed -->
+        </div>
+        <!-- Carousel navigation controls -->
+        <a class="carousel-control-prev" href="#carouselExample" role="button" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Previous</span>
+        </a>
+        <a class="carousel-control-next" href="#carouselExample" role="button" data-bs-slide="next">
+            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Next</span>
+        </a>
+    `,
+    fr: `
+        <!-- Carousel items -->
+        <div class="carousel-item active">
+            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+            <div class="text-center pb-4">
+                <h5>Bienvenue sur Chirpity Nocmig</h5>
+                <p>Cette visite met en évidence quelques-unes des fonctionnalités clés de l'application. Cliquez sur la flèche droite pour l'élément suivant</p>
+            </div>
+        </div>
+        <div class="carousel-item" data-element-selector="#navbarSettings">
+            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+            <div class="text-start pb-4 ms-3">
+                <h5 class="text-center">Commencer</h5>
+                <ol class="ps-5 ms-5">
+                    <li>Tout d'abord, définissez votre emplacement dans le menu des paramètres.</li>
+                    <li>Ensuite, choisissez le modèle qui correspond le mieux à vos besoins :</li>
+                    <ul>
+                        <li><b>Nocmig</b> est adapté pour la migration nocturne,<br> mais ne contient que des oiseaux de la liste britannique</li>
+                        <li><b>BirdNET</b> est formé sur des espèces d'oiseaux mondiales</li>
+                    </ul>
+                </ol>
+            </div>
+        </div>
+        <div class="carousel-item" data-element-selector="#filter-panel">
+            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+            <div class="text-center pb-4">
+                <h5>Panneau de paramètres d'accès rapide</h5>
+                <p>Les icônes ici vous permettent de basculer rapidement certains paramètres fréquemment utilisés.</p>
+                Ceux-ci incluent :
+                <div class="w-75 ms-5">
+                    <ol class="text-start ps-5"> 
+                        <li>Mode Nocmig</li>
+                        <li>Filtres audio</li>
+                        <li>Mode contextuel (uniquement pour le modèle Nocmig)</li>
+                        <li>Ajustement de la plage de fréquences pour le spectrogramme</li>
+                        <li>Liste de détection à utiliser</li>
+                        <li>Et le seuil de confiance</li>
+                    </ol>
+                </div>
+                <p>Les explications pour chacun de ces paramètres peuvent être trouvées sous "Paramètres" dans le menu Aide.</p>
+            </div>
+        </div>
+        <div class="carousel-item" data-element-selector="#fileContainer">
+            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+            <div class="text-center pb-4">
+                <h5>Menus contextuels</h5>
+                <p>La plupart des outils sont accessibles via des menus contextuels. Ceux-ci apparaissent lorsque vous faites un clic droit de la souris.
+                    Il existe des menus contextuels pour les détections, les régions sélectionnées sur le spectrogramme et le nom du fichier.
+                </p>
+            </div>
+        </div>
+        <div class="carousel-item" data-element-selector="#navbarRecords">
+            <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+            <div class="text-center pb-4">
+                <h5>Enregistrements enregistrés</h5>
+                <p>Vous pouvez enregistrer des enregistrements pour une référence future depuis le menu des Enregistrements. Vous y trouverez également les sections 
+                    Graphique et Explorer de l'application. Elles vous permettent de revisiter les détections que vous avez enregistrées et de consulter des graphiques de l'occurrence des espèces au fil du temps
+                </p>
+            </div>
+        </div>
+        <!-- Add more carousel items as needed -->
+    </div>
+    <!-- Carousel navigation controls -->
+    <a class="carousel-control-prev" href="#carouselExample" role="button" data-bs-slide="prev">
+        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+        <span class="visually-hidden">Précédent</span>
+    </a>
+    <a class="carousel-control-next" href="#carouselExample" role="button" data-bs-slide="next">
+        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+        <span class="visually-hidden">Suivant</span>
+    </a>
+    `,
+    da: `
+    <!-- Carousel items -->
+    <div class="carousel-item active">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Velkommen til Chirpity Nocmig</h5>
+            <p>Denne tur fremhæver nogle af de vigtigste funktioner i applikationen. Klik på højre pil for næste element</p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#navbarSettings">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-start pb-4 ms-3">
+            <h5 class="text-center">Kom godt i gang</h5>
+            <ol class="ps-5 ms-5">
+                <li>Start med at indstille din placering i indstillingsmenuen.</li>
+                <li>Vælg derefter den model, der bedst passer til dine behov:</li>
+                <ul>
+                    <li><b>Nocmig</b> er indstillet til natlig migration,<br> men har kun fugle fra den britiske liste</li>
+                    <li><b>BirdNET</b> er trænet på globale fuglearter</li>
+                </ul>
+            </ol>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#filter-panel">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Hurtig adgang til indstillingspanelet</h5>
+            <p>Ikonerne her giver dig mulighed for hurtigt at skifte nogle ofte brugte indstillinger.</p>
+            Disse inkluderer:
+            <div class="w-75 ms-5">
+                <ol class="text-start ps-5"> 
+                    <li>Nocmig-tilstand</li>
+                    <li>Lydfiltre</li>
+                    <li>Kontekstafhængig tilstand (kun Nocmig-model)</li>
+                    <li>Justering af frekvensområdet for spektrogrammet</li>
+                    <li>Hvilken detektionsliste der skal bruges</li>
+                    <li>Og tillidsgrænsen</li>
+                </ol>
+            </div>
+            <p>Forklaringer på hver af disse indstillinger kan findes under "Indstillinger" i hjælpemenuen.</p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#fileContainer">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Kontekstmenuer</h5>
+            <p>De fleste af værktøjerne kan tilgås via kontekstmenuer. De vises, når du højreklikker med musen.
+                Der er kontekstmenuer for detektioner, valgte områder på spektrogrammet og filnavnet.
+            </p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#navbarRecords">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Gemte optegnelser</h5>
+            <p>Du kan gemme optegnelser til fremtidig reference fra menuen "Optegnelser". Her finder du også sektionerne Diagram og Udforsk
+                af applikationen. Disse giver dig mulighed for at gennemse de detektioner, du har gemt, og se diagrammer over arternes forekomst over tid.
+            </p>
+        </div>
+    </div>
+    <!-- Add more carousel items as needed -->
+</div>
+<!-- Carousel navigation controls -->
+<a class="carousel-control-prev" href="#carouselExample" role="button" data-bs-slide="prev">
+    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Forrige</span>
+</a>
+<a class="carousel-control-next" href="#carouselExample" role="button" data-bs-slide="next">
+    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Næste</span>
+</a>
+`,
+de: `
+    <!-- Carousel items -->
+    <div class="carousel-item active">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Willkommen bei Chirpity Nocmig</h5>
+            <p>Diese Tour hebt einige der wichtigsten Funktionen der Anwendung hervor. Klicken Sie auf den rechten Pfeil für das nächste Element</p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#navbarSettings">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-start pb-4 ms-3">
+            <h5 class="text-center">Erste Schritte</h5>
+            <ol class="ps-5 ms-5">
+                <li>Stellen Sie zunächst Ihren Standort im Einstellungsmenü ein.</li>
+                <li>Wählen Sie dann das Modell, das am besten zu Ihren Bedürfnissen passt:</li>
+                <ul>
+                    <li><b>Nocmig</b> ist auf nächtliche Migration abgestimmt,<br> aber es enthält nur Vögel der britischen Liste</li>
+                    <li><b>BirdNET</b> ist auf globale Vogelarten trainiert</li>
+                </ul>
+            </ol>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#filter-panel">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Schnellzugriffs-Einstellungsbereich</h5>
+            <p>Die hier angezeigten Symbole ermöglichen es Ihnen, einige häufig verwendete Einstellungen schnell umzuschalten.</p>
+            Diese umfassen:
+            <div class="w-75 ms-5">
+                <ol class="text-start ps-5"> 
+                    <li>Nocmig-Modus</li>
+                    <li>Audiofilter</li>
+                    <li>Kontextabhängiger Modus (nur Nocmig-Modell)</li>
+                    <li>Frequenzbereichsanpassung für das Spektrogramm</li>
+                    <li>Welche Detektionsliste verwendet werden soll</li>
+                    <li>Und der Konfidenzschwellenwert</li>
+                </ol>
+            </div>
+            <p>Erklärungen zu jeder dieser Einstellungen finden Sie unter "Einstellungen" im Hilfemenü.</p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#fileContainer">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Kontextmenüs</h5>
+            <p>Die meisten Werkzeuge können über Kontextmenüs aufgerufen werden. Diese erscheinen, wenn Sie mit der rechten Maustaste klicken.
+                Es gibt Kontextmenüs für Detektionen, ausgewählte Bereiche im Spektrogramm und den Dateinamen.
+            </p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#navbarRecords">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Gespeicherte Aufzeichnungen</h5>
+            <p>Sie können Aufzeichnungen zur späteren Referenz im Menü "Aufzeichnungen" speichern. Hier finden Sie auch die Abschnitte Diagramm und Erforschen
+                der Anwendung. Diese ermöglichen es Ihnen, die gespeicherten Detektionen zu durchsuchen und Diagramme über das Vorkommen von Arten im Laufe der Zeit anzusehen.
+            </p>
+        </div>
+    </div>
+    <!-- Weitere Carousel-Items nach Bedarf hinzufügen -->
+</div>
+<!-- Carousel Navigationssteuerungen -->
+<a class="carousel-control-prev" href="#carouselExample" role="button" data-bs-slide="prev">
+    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Zurück</span>
+</a>
+<a class="carousel-control-next" href="#carouselExample" role="button" data-bs-slide="next">
+    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Weiter</span>
+</a>
+
+`,
+es: `
+    <!-- Carousel items -->
+    <div class="carousel-item active">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Bienvenido a Chirpity Nocmig</h5>
+            <p>Este recorrido destacará algunas de las funciones clave de la aplicación. Haz clic en la flecha derecha para el siguiente elemento</p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#navbarSettings">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-start pb-4 ms-3">
+            <h5 class="text-center">Comenzando</h5>
+            <ol class="ps-5 ms-5">
+                <li>Primero, establece tu ubicación en el menú de configuración.</li>
+                <li>Luego, considera qué modelo se adapta mejor a tus necesidades:</li>
+                <ul>
+                    <li><b>Nocmig</b> está ajustado para la migración nocturna,<br> pero solo tiene aves de la lista británica</li>
+                    <li><b>BirdNET</b> está entrenado con especies de aves globales</li>
+                </ul>
+            </ol>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#filter-panel">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Panel de configuración de acceso rápido</h5>
+            <p>Los iconos aquí te permiten alternar rápidamente algunas configuraciones usadas frecuentemente.</p>
+            Estas incluyen:
+            <div class="w-75 ms-5">
+                <ol class="text-start ps-5"> 
+                    <li>Modo Nocmig</li>
+                    <li>Filtros de audio</li>
+                    <li>Modo consciente del contexto (solo modelo Nocmig)</li>
+                    <li>Ajuste del rango de frecuencias para el espectrograma</li>
+                    <li>Qué lista de detección usar</li>
+                    <li>Y el umbral de confianza</li>
+                </ol>
+            </div>
+            <p>Las explicaciones para cada una de estas configuraciones se encuentran en "Configuración" en el menú de ayuda.</p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#fileContainer">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Menús contextuales</h5>
+            <p>La mayoría de las herramientas se pueden acceder a través de menús contextuales. Estos aparecen cuando haces clic derecho con el ratón.
+                Hay menús contextuales para detecciones, áreas seleccionadas en el espectrograma y el nombre del archivo.
+            </p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#navbarRecords">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Registros guardados</h5>
+            <p>Puedes guardar registros para referencia futura desde el menú de Registros. Aquí también encontrarás las secciones Gráfico y Explorar
+                de la aplicación. Estas te permiten revisar las detecciones guardadas y ver gráficos de la aparición de especies a lo largo del tiempo.
+            </p>
+        </div>
+    </div>
+    <!-- Agregar más elementos del carrusel según sea necesario -->
+</div>
+<!-- Controles de navegación del carrusel -->
+<a class="carousel-control-prev" href="#carouselExample" role="button" data-bs-slide="prev">
+    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Anterior</span>
+</a>
+<a class="carousel-control-next" href="#carouselExample" role="button" data-bs-slide="next">
+    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Siguiente</span>
+</a>
+
+`,
+nl: `
+    <!-- Carousel items -->
+    <div class="carousel-item active">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Welkom bij Chirpity Nocmig</h5>
+            <p>Deze tour benadrukt enkele van de belangrijkste functies van de applicatie. Klik op de rechterpijl voor het volgende item</p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#navbarSettings">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-start pb-4 ms-3">
+            <h5 class="text-center">Aan de slag</h5>
+            <ol class="ps-5 ms-5">
+                <li>Stel eerst je locatie in via het instellingenmenu.</li>
+                <li>Kies vervolgens het model dat het beste bij jouw behoeften past:</li>
+                <ul>
+                    <li><b>Nocmig</b> is geoptimaliseerd voor nachtelijke migratie,<br> maar bevat alleen vogels van de Britse lijst</li>
+                    <li><b>BirdNET</b> is getraind op wereldwijde vogelsoorten</li>
+                </ul>
+            </ol>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#filter-panel">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Sneltoetseninstellingen</h5>
+            <p>De pictogrammen die hier worden weergegeven, stellen je in staat om snel enkele veelgebruikte instellingen in te schakelen.</p>
+            Deze omvatten:
+            <div class="w-75 ms-5">
+                <ol class="text-start ps-5"> 
+                    <li>Nocmig-modus</li>
+                    <li>Audiofilters</li>
+                    <li>Contextuele modus (alleen Nocmig-model)</li>
+                    <li>Frequentiebereikaanpassing voor het spectrogram</li>
+                    <li>Welke detectielijst moet worden gebruikt</li>
+                    <li>En de vertrouwensdrempel</li>
+                </ol>
+            </div>
+            <p>Uitleg over elke instelling vind je onder "Instellingen" in het hulpprogramma-menu.</p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#fileContainer">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Contextmenu's</h5>
+            <p>De meeste tools zijn toegankelijk via contextmenu's. Deze verschijnen wanneer je met de rechtermuisknop klikt.
+                Er zijn contextmenu's voor detecties, geselecteerde gebieden in het spectrogram en de bestandsnaam.
+            </p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#navbarRecords">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Opgeslagen opnames</h5>
+            <p>Je kunt opnames opslaan voor later gebruik via het "Opnamen"-menu. Hier vind je ook de secties Grafieken en Verkennen
+                van de applicatie. Hiermee kun je de opgeslagen detecties doorzoeken en grafieken van de soortenfrequentie in de tijd bekijken.
+            </p>
+        </div>
+    </div>
+    <!-- Voeg meer carousel-items toe indien nodig -->
+</div>
+<!-- Carousel Navigatiebesturing -->
+<a class="carousel-control-prev" href="#carouselExample" role="button" data-bs-slide="prev">
+    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Vorige</span>
+</a>
+<a class="carousel-control-next" href="#carouselExample" role="button" data-bs-slide="next">
+    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Volgende</span>
+</a>
+`,
+pt:`
+    <!-- Carousel items -->
+    <div class="carousel-item active">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Bem-vindo ao Chirpity Nocmig</h5>
+            <p>Este tour destaca algumas das principais funcionalidades do aplicativo. Clique na seta para a direita para o próximo item</p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#navbarSettings">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-start pb-4 ms-3">
+            <h5 class="text-center">Primeiros Passos</h5>
+            <ol class="ps-5 ms-5">
+                <li>Primeiro, defina sua localização no menu de configurações.</li>
+                <li>Em seguida, escolha o modelo que melhor atende às suas necessidades:</li>
+                <ul>
+                    <li><b>Nocmig</b> é otimizado para migração noturna,<br> mas contém apenas aves da lista britânica</li>
+                    <li><b>BirdNET</b> é treinado para espécies de aves globais</li>
+                </ul>
+            </ol>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#filter-panel">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Área de Configurações de Acesso Rápido</h5>
+            <p>Os ícones exibidos aqui permitem alternar rapidamente algumas configurações comuns.</p>
+            Estas incluem:
+            <div class="w-75 ms-5">
+                <ol class="text-start ps-5"> 
+                    <li>Modo Nocmig</li>
+                    <li>Filtros de Áudio</li>
+                    <li>Modo Contextual (somente modelo Nocmig)</li>
+                    <li>Ajuste de Faixa de Frequência para o Espectrograma</li>
+                    <li>Lista de Detecção a ser utilizada</li>
+                    <li>E o Limite de Confiança</li>
+                </ol>
+            </div>
+            <p>Explicações sobre cada uma dessas configurações podem ser encontradas em "Configurações" no menu de Ajuda.</p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#fileContainer">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Menus de Contexto</h5>
+            <p>A maioria das ferramentas pode ser acessada por meio de menus de contexto. Eles aparecem quando você clica com o botão direito do mouse.
+                Existem menus de contexto para detecções, áreas selecionadas no espectrograma e o nome do arquivo.
+            </p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#navbarRecords">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Gravações Salvas</h5>
+            <p>Você pode salvar gravações para referência futura no menu "Gravações". Aqui, você também encontrará as seções de Gráficos e Explorar
+                do aplicativo. Elas permitem que você pesquise as detecções salvas e visualize gráficos sobre a ocorrência das espécies ao longo do tempo.
+            </p>
+        </div>
+    </div>
+    <!-- Adicione mais itens ao Carousel conforme necessário -->
+</div>
+<!-- Controles de Navegação do Carousel -->
+<a class="carousel-control-prev" href="#carouselExample" role="button" data-bs-slide="prev">
+    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Voltar</span>
+</a>
+<a class="carousel-control-next" href="#carouselExample" role="button" data-bs-slide="next">
+    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Próximo</span>
+</a>
+
+`,
+ru: `
+    <!-- Carousel items -->
+    <div class="carousel-item active">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Добро пожаловать в Chirpity Nocmig</h5>
+            <p>Этот тур выделяет некоторые из главных функций приложения. Нажмите на стрелку вправо, чтобы перейти к следующему элементу</p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#navbarSettings">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-start pb-4 ms-3">
+            <h5 class="text-center">Начало работы</h5>
+            <ol class="ps-5 ms-5">
+                <li>Сначала установите ваше местоположение в меню настроек.</li>
+                <li>Затем выберите модель, которая лучше всего подходит для ваших нужд:</li>
+                <ul>
+                    <li><b>Nocmig</b> настроена на ночную миграцию,<br> но включает только птиц из британского списка</li>
+                    <li><b>BirdNET</b> обучена на глобальных видах птиц</li>
+                </ul>
+            </ol>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#filter-panel">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Область быстрого доступа к настройкам</h5>
+            <p>Здесь показаны иконки, которые позволяют быстро переключать некоторые часто используемые настройки.</p>
+            К ним относятся:
+            <div class="w-75 ms-5">
+                <ol class="text-start ps-5"> 
+                    <li>Режим Nocmig</li>
+                    <li>Аудиофильтры</li>
+                    <li>Контекстный режим (только модель Nocmig)</li>
+                    <li>Настройка частотного диапазона для спектрограммы</li>
+                    <li>Выбор списка для детекций</li>
+                    <li>И порог доверия</li>
+                </ol>
+            </div>
+            <p>Объяснения для каждой из этих настроек можно найти в разделе "Настройки" в меню справки.</p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#fileContainer">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Контекстные меню</h5>
+            <p>Большинство инструментов могут быть вызваны через контекстные меню. Они появляются, когда вы щелкаете правой кнопкой мыши.
+                Есть контекстные меню для детекций, выбранных областей на спектрограмме и имени файла.
+            </p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#navbarRecords">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Сохранённые записи</h5>
+            <p>Вы можете сохранить записи для дальнейшего использования в меню "Записи". Также здесь вы найдёте разделы Диаграмма и Исследовать
+                приложения. Эти разделы позволяют вам искать сохранённые детекции и просматривать графики появления видов со временем.
+            </p>
+        </div>
+    </div>
+    <!-- Добавить дополнительные элементы по мере необходимости -->
+</div>
+<!-- Управление навигацией в карусели -->
+<a class="carousel-control-prev" href="#carouselExample" role="button" data-bs-slide="prev">
+    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Назад</span>
+</a>
+<a class="carousel-control-next" href="#carouselExample" role="button" data-bs-slide="next">
+    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Вперёд</span>
+</a>
+`,
+sv:`
+    <!-- Carousel items -->
+    <div class="carousel-item active">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Välkommen till Chirpity Nocmig</h5>
+            <p>Denna rundtur lyfter fram några av de viktigaste funktionerna i applikationen. Klicka på högerpil för att gå till nästa objekt</p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#navbarSettings">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-start pb-4 ms-3">
+            <h5 class="text-center">Komma igång</h5>
+            <ol class="ps-5 ms-5">
+                <li>Ställ först in din plats i inställningsmenyn.</li>
+                <li>Välj sedan den modell som passar dina behov bäst:</li>
+                <ul>
+                    <li><b>Nocmig</b> är anpassad för nattlig migration,<br> men innehåller endast fåglar från Storbritanniens lista</li>
+                    <li><b>BirdNET</b> är tränad på globala fågelarter</li>
+                </ul>
+            </ol>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#filter-panel">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Snabbåtkomstinställningsområde</h5>
+            <p>De ikoner som visas här låter dig snabbt växla mellan några vanliga inställningar.</p>
+            Dessa inkluderar:
+            <div class="w-75 ms-5">
+                <ol class="text-start ps-5"> 
+                    <li>Nocmig-läge</li>
+                    <li>Ljudfilter</li>
+                    <li>Kontextläge (endast Nocmig-modellen)</li>
+                    <li>Frekvensområdejustering för spektrogrammet</li>
+                    <li>Vilken detektionslista som ska användas</li>
+                    <li>Och konfidentsnivåtröskeln</li>
+                </ol>
+            </div>
+            <p>Förklaringar för varje av dessa inställningar finns under "Inställningar" i hjälpmenyn.</p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#fileContainer">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Kontextmenyer</h5>
+            <p>De flesta verktyg kan nås via kontextmenyer. Dessa visas när du högerklickar.
+                Det finns kontextmenyer för detektioner, valda områden i spektrogrammet och filnamn.
+            </p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#navbarRecords">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Gemensamt sparade inspelningar</h5>
+            <p>Du kan spara inspelningar för senare referens i menyn "Inspelningar". Här hittar du också diagram och utforskningssektioner
+                av applikationen. Dessa låter dig söka bland sparade detektioner och titta på diagram över förekomsten av arter över tid.
+            </p>
+        </div>
+    </div>
+    <!-- Lägg till fler carousel-items efter behov -->
+</div>
+<!-- Carousel Navigeringskontroller -->
+<a class="carousel-control-prev" href="#carouselExample" role="button" data-bs-slide="prev">
+    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Tillbaka</span>
+</a>
+<a class="carousel-control-next" href="#carouselExample" role="button" data-bs-slide="next">
+    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Nästa</span>
+</a>
+`,
+zh: `
+    <!-- Carousel items -->
+    <div class="carousel-item active">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>欢迎来到 Chirpity Nocmig</h5>
+            <p>本次导览突出了应用程序的一些重要功能。点击右箭头以查看下一个项目</p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#navbarSettings">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-start pb-4 ms-3">
+            <h5 class="text-center">开始使用</h5>
+            <ol class="ps-5 ms-5">
+                <li>首先在设置菜单中设置您的位置。</li>
+                <li>然后选择最适合您需求的模型：</li>
+                <ul>
+                    <li><b>Nocmig</b> 是专为夜间迁徙设计的，<br> 但仅包含英国名单上的鸟类</li>
+                    <li><b>BirdNET</b> 是针对全球鸟类物种进行训练的</li>
+                </ul>
+            </ol>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#filter-panel">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>快速访问设置区域</h5>
+            <p>此处显示的图标可以让您快速切换一些常用的设置。</p>
+            这些包括：
+            <div class="w-75 ms-5">
+                <ol class="text-start ps-5"> 
+                    <li>Nocmig 模式</li>
+                    <li>音频滤波器</li>
+                    <li>上下文模式（仅限 Nocmig 模型）</li>
+                    <li>频率范围调整（适用于频谱图）</li>
+                    <li>使用的检测列表</li>
+                    <li>以及置信度阈值</li>
+                </ol>
+            </div>
+            <p>每个设置的详细说明请参见帮助菜单中的“设置”。</p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#fileContainer">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>上下文菜单</h5>
+            <p>大多数工具可以通过右键菜单访问。右键点击时，会出现上下文菜单。
+                这些菜单适用于检测结果、频谱图中的选定区域以及文件名。
+            </p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#navbarRecords">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>已保存的记录</h5>
+            <p>您可以将记录保存在“记录”菜单中以供日后参考。这里还包括图表和应用程序的浏览部分。
+                它们允许您浏览已保存的检测结果，并查看随时间变化的物种出现图表。
+            </p>
+        </div>
+    </div>
+    <!-- 根据需要添加更多 Carousel 项 -->
+</div>
+<!-- Carousel 导航控制 -->
+<a class="carousel-control-prev" href="#carouselExample" role="button" data-bs-slide="prev">
+    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">上一页</span>
+</a>
+<a class="carousel-control-next" href="#carouselExample" role="button" data-bs-slide="next">
+    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">下一页</span>
+</a>
+
+`
+}
 
 
 async function localiseUI(locale) {
@@ -1540,6 +2272,10 @@ async function localiseUI(locale) {
         document.querySelector("label[for='explore-locations']").textContent = i18nHeadings[locale].location;
         document.getElementById('exploreRange').innerHTML = `<span class="material-symbols-outlined align-bottom">date_range</span><span>${localisationData['explore-datefilter']}</span> <span class="material-symbols-outlined float-end">expand_more</span>`;
         console.warn('Translation', `${Date.now() - t0} ms`)
+
+        // Tour Carousel items:
+        const tour = document.querySelector('.carousel-inner');
+        tour.innerHTML = i18nTour[locale];
         return localisationData
     } catch (error) {
         console.error('Localisation Error:', error.message);

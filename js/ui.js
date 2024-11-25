@@ -3709,18 +3709,14 @@ function formatDuration(seconds){
     async function localiseModal(filename, locale) {
         try {
             // Fetch the HTML file
-            if (filename.includes('usage') || filename.includes('settings')){
-                filename = filename.replace('.html', `.${locale}.html`);
+            if (['usage','settings', 'ebird'].includes(filename)){
+                filename = `Help/${filename}.${locale}.html`;
                 const htmlResponse = await fetch(filename);
                 if (!htmlResponse.ok) throw new Error(`Failed to load HTML file: ${filename}`);
                 return await htmlResponse.text();
-            } else if (filename.includes('ebird')){
-                locale = (locale === 'es') ? locale : 'en'; // I only have spanish so far
-                filename = filename.replace('.html', `.${locale}.html`);
-                const htmlResponse = await fetch(filename);
-                if (!htmlResponse.ok) throw new Error(`Failed to load HTML file: ${filename}`);
-                return await htmlResponse.text();
-            }
+            } 
+            // Put the filename into its path:
+            filename = `Help/${filename}.html`;
             const htmlResponse = await fetch(filename);
             if (!htmlResponse.ok) throw new Error(`Failed to load HTML file: ${filename}.html`);
         
@@ -4593,13 +4589,13 @@ function playRegion(){
                 break;
             }
             // Help Menu
-            case 'keyboardHelp': { (async () => await populateHelpModal('Help/keyboard.html', i18nHelp.keyboard[locale]))(); break }
-            case 'settingsHelp': { (async () => await populateHelpModal('Help/settings.html', i18nHelp.settings[locale]))(); break }
-            case 'usage': { (async () => await populateHelpModal('Help/usage.html', i18nHelp.usage[locale]))(); break }
-            case 'bugs': { (async () => await populateHelpModal('Help/community.html', i18nHelp.community[locale]))(); break }
+            case 'keyboardHelp': { (async () => await populateHelpModal('keyboard', i18nHelp.keyboard[locale]))(); break }
+            case 'settingsHelp': { (async () => await populateHelpModal('settings', i18nHelp.settings[locale]))(); break }
+            case 'usage': { (async () => await populateHelpModal('usage', i18nHelp.usage[locale]))(); break }
+            case 'bugs': { (async () => await populateHelpModal('community', i18nHelp.community[locale]))(); break }
             case 'species': { worker.postMessage({action: 'get-valid-species', file: STATE.currentFile}); break }
             case 'startTour': { prepTour(); break }
-            case 'eBird': { (async () => await populateHelpModal('Help/ebird.html', i18nHelp.eBird[locale]))(); break }
+            case 'eBird': { (async () => await populateHelpModal('ebird', i18nHelp.eBird[locale]))(); break }
             case 'copy-uuid': { 
                 // Get the value from the input element
                 const copyText = document.getElementById('uuid').textContent.split('\n')[0];

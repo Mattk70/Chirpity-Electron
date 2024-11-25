@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>eBird FAQ zur Dateneingabe</title>
+</head>
+<body>
+
+<table class="table table-hover p-1">
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>eBird FAQ zur Dateneingabe</h5></td>
+    </tr>
+    <tr>
+        <td><b>Was ist eBird?</b></td>
+        <td><a href="https://ebird.org/about" target="_blank">eBird</a> ist eine Online-Plattform zum Teilen von Vogelbeobachtungsdaten, betrieben vom Cornell Lab of Ornithology.</td>
+    </tr>
+    <tr>
+        <td><b>Was ist eine eBird-Dateneingabedatei?</b></td>
+        <td>Die Dateneingabedatei ist eine Tabelle mit Vogelbeobachtungsdaten, die in die eBird-Plattform importiert werden kann.</td>
+    </tr>
+    <tr>
+        <td><b>Wie organisiert Chirpity meine Erkennungen?</b></td>
+        <td>
+            <p>Die Anwendung erstellt eine Checkliste für jede Datei, die mit Ihrem Export verknüpft ist. Diese Checklisten enthalten eine Gesamtsumme der Erkennungen für jede Art in der jeweiligen Datei.
+            Wenn Sie eine Anzahl von Rufen eingegeben haben, wird diese Zahl verwendet, andernfalls wird ein Ruf angenommen.</p>
+            <p>Die exportierte Datei enthält eine Reihe von Überschriften, die erklären, was jede Spalte darstellt.
+                Weitere Informationen finden Sie auf der <a href="https://support.ebird.org/en/support/solutions/articles/48000907878-upload-spreadsheet-data-to-ebird#anchorRecordFormat" target="_blank">eBird-Website</a>.
+            </p>
+            <p><b>Wichtig:</b> Die Überschriftenzeile muss gelöscht werden, bevor Sie die Datei hochladen.</p> 
+        </td>
+    </tr>
+    <tr>
+        <td><b>Wie lade ich meine eBird-Dateneingabedatei hoch?</b></td>
+        <td>
+            Besuchen Sie <a href="https://www.ebird.org/home" target="_blank">eBird</a> und melden Sie sich für ein Konto an oder loggen Sie sich in Ihr eBird-Konto ein. Sobald Sie ein Konto haben
+            und eingeloggt sind, gehen Sie zum <a href="https://ebird.org/import/upload.form?theme=ebird" target="_blank">Importformular</a>.
+            <ol>
+                <li>Klicken Sie auf "Datei auswählen" und wählen Sie die Datei aus, die Sie vorbereitet haben.</li>
+                <li><b>Wichtig:</b> Aktivieren Sie &quot;eBird Record format (Extended)&quot;.</li>
+                <li>Klicken Sie auf &quot;Datei importieren&quot;.</li>
+            </ol>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Warum treten Fehler auf, wenn ich meine Datei hochladen möchte?</b></td>
+        <td>
+            <p>Stellen Sie zunächst sicher, dass Sie die Überschriftenzeile gelöscht haben. eBird erwartet, dass die erste Zeile der Datei eine Beobachtung enthält.</p>
+            <p>Falls dies nicht das Problem ist und Sie Fehler sehen, die sich auf nicht erkannte Arten beziehen, überprüfen Sie, ob die Spracheinstellungen in Chirpity
+                mit denen in Ihrem eBird-Konto übereinstimmen.</p> 
+        </td>
+    </tr>
+    <tr>
+        <td><b>Warum sind die Spalten für Land und Bundesland leer?</b></td>
+        <td>
+            <p>Diese Felder sind im eBird-Dateneingabeformat optional. Obwohl die von Chirpity verwendete OpensStreetMap-Platz-Such-API Bundesland und Land liefert, erfolgt dies nicht im
+                von eBird verwendeten Format. Sie können das richtige Format für Ihr Land und Ihre Region in dieser <a href="https://support.ebird.org/helpdesk/attachments/48293281603" target="_blank">Tabelle</a> nachschlagen.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Warum haben Sie sich für eBird entschieden? Planen Sie, das Teilen mit anderen Plattformen zu ermöglichen?</b></td>
+        <td>
+            <p>eBird ist die einfachste Plattform in der Anwendung. Dies liegt daran, dass es ein veröffentlichtes Dateneingabeformat gibt und, vielleicht am wichtigsten, die eBird-Taxonomie 
+            mit der von BirdNET und Nocmig verwendeten übereinstimmt.</p>
+            <p>Ich hoffe, in einer zukünftigen Version die Möglichkeit zu bieten, Audioclips mit Xeno-Canto zu teilen. Dies hängt davon ab, ob diese eine passende Upload-API bereitstellen.</p>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2">
+            <h6 class="justify-content-center">Die Verantwortung für die Überprüfung der Datei auf Genauigkeit liegt bei Ihnen. Chirpity übernimmt keinerlei Garantie für die Richtigkeit der 
+            in den Dateien enthaltenen Daten. Durch die Nutzung dieser Funktion erkennen Sie dies an und stimmen zu.</h6></td>
+    </tr>
+</table>
+
+</body>
+</html>

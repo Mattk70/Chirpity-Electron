@@ -17,7 +17,7 @@
     "High Pass Filter-circle-help": ["When set, removes low frequency noise below the threshold."],
     "IUCN-circle-help": ["When enabled, the latest Global IUCN assessment status is displayed for each species in the summary. The icon links to the assessment page on the IUCN website. The Assessment Scope will display the IUCN assessment of the species in that region (where available)."],
     "Language-circle-help": ["Select your preferred language for birds' common names"],
-    "List-circle-help": ["Filters the detections returned in results. Local Birds: excludes birds unlikely to be found in your region. Nocturnal Birds: excludes bird song and species not known to call at night. The custom list allows you to upload a file listing the species to detect"],
+    "List-circle-help": ["Filters the detections returned in results. Local Birds: excludes birds unlikely to be found in your region. Nocturnal Calls: excludes bird song and species not known to call at night. The custom list allows you to upload a file listing the species to detect"],
     "Low Shelf Filter-circle-help": ["When used, attenuates low frequency noise below the cut-off frequency."],
     "Model-circle-help": ["Select whether to use the Nocmig model, optimised for Nocturnal Migration Calls in Europe, or BirdNET, which can detect over 6000 species across the globe."],
     "Nocmig Mode-circle-help": ["When enabled, this 'Nocmig mode' only searches for and only displays detections found during the night"],
@@ -28,7 +28,7 @@
     "Signal to Noise Ratio-circle-help": ["The SNR filter, when enabled, will skip over portions of audio where any audio event is below the threshold. Higher values skip increasingly noisy segments. whilst this will result in faster processing it must be considered <b><i>experimental</i></b> and any non-zero value may miss detections. <b>Tip:</b> To find a workable SNR value, run analysis on a short file with the faintest detections you can confidently identify. Increase the SNR value until the detection is not picked up. Once you find this threshold, back it off to the highest level that picks up the detection."],
     "Species Threshold-circle-help": ["Define the minimum eBird checklist frequency for species inclusion. If 'Adjust list for the week of the year' is enabled, the list will be adjusted to include species expected for the recording week."],
     "Threads-circle-help": ["The number of parallel analyses to run. By default, this is set to the number of CPU cores on the machine for fastest performance. With the GPU backend, a lower number works better e.g. 1-3"],
-    "Use Location settings-circle-help": ["When activated, the Nocturnal birds filter reports birds based on your location settings."],
+    "Use Location settings-circle-help": ["When activated, the Nocturnal Calls filter reports birds based on your location settings."],
     "Volume Adjustment-circle-help": ["Adjust the volume of audio to compensate for low recording levels."],
     "File-timestamp-circle-help": ["Some audio recorders, for example the Zoom H1 Essential, can set the file saved date and time to the beginning of the recording, rather than the end. If you have such a recorder selecting this option will fix the times shown for your detections (changes to this setting require a Chirpity relaunch to take effect)"],
 

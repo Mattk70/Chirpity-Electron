@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>FAQ do Registro eBird</title>
+</head>
+<body>
+
+<table class="table table-hover p-1">
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>FAQ do Registro eBird</h5></td>
+    </tr>
+    <tr>
+        <td><b>O que é o eBird?</b></td>
+        <td><a href="https://ebird.org/about" target="_blank">eBird</a> é uma plataforma online para compartilhar dados de observação de aves, gerenciada pelo Cornell Lab of Ornithology.</td>
+    </tr>
+    <tr>
+        <td><b>O que é um Arquivo de Registro eBird?</b></td>
+        <td>O arquivo de registro é uma planilha com dados de observação de aves que pode ser importada para a plataforma eBird.</td>
+    </tr>
+    <tr>
+        <td><b>Como o Chirpity organiza minhas detecções?</b></td>
+        <td>
+            <p>O aplicativo cria uma lista de verificação para cada arquivo associado à sua exportação. Essas listas contêm o total de detecções de chamadas para cada espécie nesse arquivo.
+            Quando você insere uma contagem de chamadas, esse número é usado; caso contrário, presume-se uma chamada.</p>
+            <p>O arquivo exportado contém uma linha de cabeçalhos explicando o que cada coluna representa.
+                Você pode encontrar <a href="https://support.ebird.org/en/support/solutions/articles/48000907878-upload-spreadsheet-data-to-ebird#anchorRecordFormat" target="_blank">mais detalhes</a>
+                no site do eBird.</p>
+            <p><b>Importante:</b> a linha de cabeçalho precisa ser excluída antes de carregar o arquivo.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Como faço para carregar meu arquivo de registro eBird?</b></td>
+        <td>
+            Acesse <a href="https://www.ebird.org/home" target="_blank">eBird</a> e crie uma conta ou faça login. Depois de entrar, vá para
+            <a href="https://ebird.org/import/upload.form?theme=ebird" target="_blank">o formulário de importação</a>.
+            <ol>
+                <li>Clique em &quot;Escolher arquivo&quot; e selecione o arquivo que você preparou.</li>
+                <li><b>Importante:</b> marque &quot;Formato de Registro eBird (Estendido)&quot;.</li>
+                <li>Clique em &quot;Importar arquivo&quot;.</li>
+            </ol>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Por que recebo erros ao tentar carregar meu arquivo de registro?</b></td>
+        <td>
+            <p>Primeiro, certifique-se de que você excluiu a linha de cabeçalho. O eBird espera que a primeira linha do arquivo contenha uma observação.</p>
+            <p>Se esse não for o problema e você estiver vendo erros relacionados a espécies não reconhecidas, certifique-se de que as preferências de idioma definidas no Chirpity
+                correspondam às do seu perfil no eBird.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Por que as colunas País e Estado/Província estão em branco?</b></td>
+        <td>
+            <p>Esses campos são opcionais no formato de registro eBird. Embora a API de pesquisa de locais do OpenStreetMap usada pelo Chirpity forneça informações sobre Estado e País,
+            ela não os apresenta no formato usado pelo eBird. Você pode encontrar o formato correto para seu país e região nesta <a href="https://support.ebird.org/helpdesk/attachments/48293281603" target="_blank">planilha</a>.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Por que você escolheu o eBird? Há planos para compartilhar com outros sites?</b></td>
+        <td>
+            <p>O eBird é a plataforma mais simples de usar. Isso porque ele tem um formato de registro publicado e, talvez mais importante, a taxonomia do eBird
+            é compatível com a utilizada pelos modelos BirdNET e Nocmig.</p>
+            <p>Espero oferecer a possibilidade de compartilhar clipes de áudio com o Xeno-Canto em uma futura atualização. Isso depende de eles lançarem uma API de upload adequada.</p>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2">
+            <h6 class="justify-content-center">A responsabilidade de verificar a precisão do arquivo de registro é sua. O Chirpity não oferece garantias para a exatidão de nenhum dado nos arquivos de registro.
+            Ao usar este recurso, você reconhece e concorda com isso.</h6></td>
+    </tr>
+</table>
+
+</body>
+</html>

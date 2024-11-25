@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>eBird记录常见问题解答</title>
+</head>
+<body>
+
+<table class="table table-hover p-1">
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>eBird记录常见问题解答</h5></td>
+    </tr>
+    <tr>
+        <td><b>什么是 eBird？</b></td>
+        <td><a href="https://ebird.org/about" target="_blank">eBird</a> 是一个在线平台，用于共享鸟类观察数据，由康奈尔鸟类学实验室管理。</td>
+    </tr>
+    <tr>
+        <td><b>什么是 eBird 记录文件？</b></td>
+        <td>记录文件是一个包含鸟类观察数据的电子表格，可导入 eBird 平台。</td>
+    </tr>
+    <tr>
+        <td><b>Chirpity 如何组织我的检测结果？</b></td>
+        <td>
+            <p>该应用程序为与您的导出相关的每个文件创建一份清单。这些清单包含该文件中每个物种呼叫检测的总数。
+            如果您输入了呼叫数量，则使用该数字，否则假设为一次呼叫。</p>
+            <p>导出的文件包含一行标题，解释每列的含义。
+                您可以在 eBird 网站上找到<a href="https://support.ebird.org/en/support/solutions/articles/48000907878-upload-spreadsheet-data-to-ebird#anchorRecordFormat" target="_blank">更多详细信息</a>。</p>
+            <p><b>重要提示：</b>上传文件前需要删除标题行。</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>如何上传我的 eBird 记录文件？</b></td>
+        <td>
+            访问 <a href="https://www.ebird.org/home" target="_blank">eBird</a>，注册或登录您的 eBird 帐户。登录后，前往
+            <a href="https://ebird.org/import/upload.form?theme=ebird" target="_blank">导入表单</a>。
+            <ol>
+                <li>点击“选择文件”，然后选择您准备好的文件。</li>
+                <li><b>重要提示：</b>勾选“eBird Record format (Extended)”。</li>
+                <li>点击“导入文件”。</li>
+            </ol>
+        </td>
+    </tr>
+    <tr>
+        <td><b>为什么上传记录文件时会出现错误？</b></td>
+        <td>
+            <p>首先，请确保您已经删除了标题行。eBird 期望文件的第一行包含观察记录。</p>
+            <p>如果这不是问题，并且您看到与物种无法识别相关的错误，请确保您在 Chirpity 中设置的语言偏好与 eBird 帐户中设置的语言相匹配。</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>为什么国家和州/省列是空的？</b></td>
+        <td>
+            <p>这些字段在 eBird 记录格式中是可选的。尽管 Chirpity 使用的 OpenStreetMap 地点查询 API 可以提供州和国家的信息，但它未按 eBird 使用的格式提供这些信息。
+                您可以在此<a href="https://support.ebird.org/helpdesk/attachments/48293281603" target="_blank">电子表格</a>中找到您所在国家和地区的正确格式。</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>为什么选择 eBird？是否计划支持其他网站的共享？</b></td>
+        <td>
+            <p>eBird 是最简单的平台，因为它有一个已发布的记录格式，也因为 eBird 的分类法与 BirdNET 和 Nocmig 模型使用的分类法一致。</p>
+            <p>我希望在未来的版本中提供与 Xeno-Canto 共享音频剪辑的功能。这取决于他们是否发布合适的上传 API。</p>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2">
+            <h6 class="justify-content-center">检查记录文件准确性的责任在于您自己。Chirpity 对记录文件中的数据准确性不作任何保证。
+            使用此功能即表示您承认并同意这一点。</h6></td>
+    </tr>
+</table>
+
+</body>
+</html>

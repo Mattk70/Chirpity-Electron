@@ -15,7 +15,7 @@
         <td>Choisissez le modèle à utiliser pour la détection.
             <ul>
                 <li>
-                    <b>Nocmig</b> utilise un modèle conçu pour analyser les appels nocturnes des oiseaux européens.
+                    <b>Nocmig</b> utilise un modèle conçu pour analyser les cris nocturnes des oiseaux européens.
                 </li>
                 <li>
                     <b>BirdNET</b> utilise le modèle <a href="https://github.com/kahst/BirdNET-Analyzer" target="_blank">BirdNET</a> développé par Stefan Kahl et al. du K. Lisa Yang Center for Conservation Bioacoustics.
@@ -26,7 +26,7 @@
     <tr>
         <th>Seuil de Confiance</th>
         <td>Ce paramètre détermine le niveau de confiance minimal requis pour que le modèle rapporte une détection.
-            Augmenter la valeur réduit les faux positifs, mais augmente le risque de manquer des appels authentiques.
+            Augmenter la valeur réduit les faux positifs, mais augmente le risque de manquer des cris authentiques.
             <b>Note :</b> Le seuil de confiance peut être ajusté à tout moment. Les résultats sont mis à jour même après l'analyse.
         </td>
     </tr>
@@ -41,7 +41,7 @@
                 <br /> <b>Note :</b> Actuellement, une limitation des filtres spécifiques à la semaine est que le résumé des détections utilisera la liste du dernier fichier d’un lot.
                 Par exemple, si vous analysez des fichiers des 22 avril, 23 octobre et 24 février dans un lot, la liste du 24 février sera utilisée pour le résumé.
             </p>
-            <p><b>Oiseaux Nocturnes</b>. Cette option exclut les détections de chants d’oiseaux et des appels d’espèces qui ne vocalisent pas habituellement la nuit.
+            <p><b>Oiseaux Nocturnes</b>. Cette option exclut les détections de chants d’oiseaux et des cris d’espèces qui ne vocalisent pas habituellement la nuit.
                 Lorsque vous activez "<b>Utiliser les paramètres de localisation</b>" pour le modèle BirdNET, la liste comprendra les oiseaux de la liste <b>Oiseaux Locaux</b>, en excluant ceux 
                 qui ne vocalisent pas la nuit.
             </p>
@@ -61,7 +61,7 @@
         <th>Analyser uniquement les périodes nocturnes</th>
         <td>
             Recherchez uniquement des détections la nuit. Chirpity calcule le début et la fin du crépuscule civil à partir des horodatages de vos fichiers audio, en fonction de la localisation que vous avez définie.
-            Si votre enregistrement couvre à la fois des périodes diurnes et nocturnes, les périodes diurnes seront ignorées. Si vous êtes uniquement intéressé par les appels nocturnes, cela présente deux avantages :
+            Si votre enregistrement couvre à la fois des périodes diurnes et nocturnes, les périodes diurnes seront ignorées. Si vous êtes uniquement intéressé par les cris nocturnes, cela présente deux avantages :
             <ol>
                 <li>Il y aura moins de faux positifs, car les deux modèles font plus d’erreurs lorsque de nombreuses espèces vocalisent en même temps (par exemple, pendant le chœur de l’aube).</li>
                 <li>L’analyse sera plus rapide, car elle ignore les périodes diurnes.</li>
@@ -88,11 +88,11 @@
         </td>
     </tr>
     <tr>
-        <th>Effacer le cache des appels de référence</th>
+        <th>Effacer le cache des cris de référence</th>
         <td>
-            Les métadonnées de comparaison des espèces, qui déterminent ce que vous voyez lorsque vous sélectionnez "Comparer avec les appels de référence" dans un menu contextuel, sont enregistrées sur le disque.
+            Les métadonnées de comparaison des espèces, qui déterminent ce que vous voyez lorsque vous sélectionnez "Comparer avec les cris de référence" dans un menu contextuel, sont enregistrées sur le disque.
             Si vous effacez le cache, les données enregistrées seront supprimées et les données des espèces seront redemandées sur le site Web de Xeno-Canto lors de votre prochaine demande de comparaison.
-            Cela peut être utile si un fichier de référence est supprimé du site ou si vous souhaitez mettre à jour la sélection des appels.
+            Cela peut être utile si un fichier de référence est supprimé du site ou si vous souhaitez mettre à jour la sélection des cris.
         </td>
     </tr>
     <tr>
@@ -181,7 +181,7 @@
     <tr>
         <th>Filtre Étagère Basse</th>
         <td> Ce filtre est similaire au filtre Passe-Haut. Cependant, au lieu de simplement supprimer le bruit, il réduit le volume des bruits de basse fréquence. 
-            L'avantage d'un filtre Étagère Basse est que vous pouvez réduire les bourdonnements tout en pouvant entendre les espèces ayant des appels de basse fréquence.
+            L'avantage d'un filtre Étagère Basse est que vous pouvez réduire les bourdonnements tout en pouvant entendre les espèces ayant des cris de basse fréquence.
             Vous pouvez régler la fréquence seuil et la force du filtre à appliquer (Atténuation).
         </td>
     </tr>
@@ -252,13 +252,13 @@
         <td>Choisissez un thème de couleur pour l'affichage du spectrogramme ou créez votre propre palette. Si vous sélectionnez 'personnalisé', vous aurez la possibilité de définir les couleurs pour les sons forts, moyens et silencieux
             selon vos préférences. Vous pouvez également ajuster la position du point central : avec une valeur de 0 ou 1, le spectrogramme sera bicolore. Les valeurs intermédiaires mélangeront les trois couleurs. 
             Si vous définissez la couleur centrale identique à l’une des autres, vous pourrez ajuster le contraste du spectrogramme à l’aide des réglages de la position centrale.
-            <p>En combinaison avec des ajustements de filtres audio, une palette de couleurs personnalisée vous permet d'améliorer le contraste/la visibilité des appels en utilisant les couleurs de votre choix.</p>
+            <p>En combinaison avec des ajustements de filtres audio, une palette de couleurs personnalisée vous permet d'améliorer le contraste/la visibilité des cris en utilisant les couleurs de votre choix.</p>
         </td>
     </tr>
     <tr>
         <td><b>Fonction de Fenêtre</b></td>
         <td>Une variété de fonctions de fenêtre est disponible pour l'affichage du spectrogramme. Chacune a des caractéristiques légèrement différentes, donc changer la fonction de fenêtre peut également améliorer
-            l'apparence des appels dans l'affichage.
+            l'apparence des cris dans l'affichage.
         </td>
     </tr>
     <tr>
@@ -269,7 +269,7 @@
                     <b>Code temporel</b> affiche le temps écoulé depuis le début du fichier.
                 </li>
                 <li>
-                    <b>Heure du jour</b> s'appuie sur les horodatages du fichier pour déterminer l'heure réelle des appels détectés.
+                    <b>Heure du jour</b> s'appuie sur les horodatages du fichier pour déterminer l'heure réelle des cris détectés.
                     Si l'horodatage d'un fichier ne reflète pas l'heure de l'enregistrement, la lecture sera incorrecte.
                     Pour modifier l'heure de début du fichier actuel, définissez la date et l'heure souhaitées à l'aide du menu contextuel du nom de fichier.
                 </li>
@@ -299,7 +299,7 @@
         <td>Ce paramètre est également uniquement disponible pour le modèle Nocmig. Le filtre SNR (Rapport Signal/Bruit) peut uniquement être activé lors de l'utilisation du backend CPU.
             Lorsqu'il est activé, Chirpity ignore les segments audio sans événement sonore distinct.
             Un signal plus fort est nécessaire pour tenter une prédiction lorsque des valeurs SNR plus élevées sont définies.
-            Ce paramètre vise à accélérer significativement le traitement. Cependant, il peut entraîner la perte d'appels plus faibles ou plus distants.
+            Ce paramètre vise à accélérer significativement le traitement. Cependant, il peut entraîner la perte d'cris plus faibles ou plus distants.
         </td>
     </tr>
     <tr>

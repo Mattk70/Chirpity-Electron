@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <title>Vanliga frågor om eBird-registrering</title>
+</head>
+<body>
+
+<table class="table table-hover p-1">
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Vanliga frågor om eBird-registrering</h5></td>
+    </tr>
+    <tr>
+        <td><b>Vad är eBird?</b></td>
+        <td><a href="https://ebird.org/about" target="_blank">eBird</a> är en onlineplattform för att dela data om fågelobservationer, administrerad av Cornell Lab of Ornithology.</td>
+    </tr>
+    <tr>
+        <td><b>Vad är en eBird-registreringsfil?</b></td>
+        <td>Registreringsfilen är ett kalkylblad med data om fågelobservationer som kan importeras till eBird-plattformen.</td>
+    </tr>
+    <tr>
+        <td><b>Hur organiserar Chirpity mina detektioner?</b></td>
+        <td>
+            <p>Applikationen skapar en checklista för varje fil som är kopplad till din export. Dessa checklistor innehåller en total summering av anropsdetektioner för varje art i filen.
+            Om du har angett ett antal anrop används detta, annars antas ett anrop.</p>
+            <p>Den exporterade filen innehåller en rad med rubriker som förklarar vad varje kolumn representerar.
+                Du hittar <a href="https://support.ebird.org/en/support/solutions/articles/48000907878-upload-spreadsheet-data-to-ebird#anchorRecordFormat" target="_blank">mer information</a> 
+                på eBirds webbplats.</p>
+            <p><b>Viktigt:</b> rad med rubriker måste raderas innan du laddar upp filen.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Hur laddar jag upp min eBird-registreringsfil?</b></td>
+        <td>
+            Besök <a href="https://www.ebird.org/home" target="_blank">eBird</a> och registrera dig eller logga in på ditt eBird-konto. När du har ett konto och är inloggad, gå till 
+            <a href="https://ebird.org/import/upload.form?theme=ebird" target="_blank">importformuläret</a>.
+            <ol>
+                <li>Klicka på "Välj fil" och välj filen du har förberett.</li>
+                <li><b>Viktigt:</b> markera "eBird Record format (Extended)".</li>
+                <li>Klicka på "Importera fil".</li>
+            </ol>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Varför får jag fel när jag försöker ladda upp min registreringsfil?</b></td>
+        <td>
+            <p>Kontrollera först att du har raderat rad med rubriker. eBird förväntar sig att första raden i filen innehåller en observation.</p>
+            <p>Om detta inte är problemet och du ser fel som rör oigenkända arter, kontrollera att språkinställningarna du har i Chirpity matchar dem du har i ditt eBird-konto.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Varför är kolumnerna för land och delstat/provins tomma?</b></td>
+        <td>
+            <p>Dessa fält är valfria i eBirds registreringsformat. Även om OpenStreetMap API som används av Chirpity kan ge information om delstat och land, tillhandahåller det inte dem 
+                i det format som används av eBird. Du kan hitta rätt format för ditt land och region i detta <a href="https://support.ebird.org/helpdesk/attachments/48293281603" target="_blank">kalkylblad</a>.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Varför valde ni eBird? Planerar ni att möjliggöra delning med andra webbplatser?</b></td>
+        <td>
+            <p>eBird är den enklaste plattformen att använda. Detta beror på att den har ett publicerat registreringsformat och kanske viktigast av allt att eBirds taxonomi överensstämmer med den 
+            som används av både BirdNET- och Nocmig-modellerna.</p>
+            <p>Jag hoppas kunna erbjuda möjligheten att dela ljudklipp med Xeno-Canto i en framtida version. Detta beror på att de släpper ett lämpligt API för uppladdning.</p>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2">
+            <h6 class="justify-content-center">Ansvar för att kontrollera registreringsfilen för korrekthet ligger hos dig. Chirpity garanterar inte att data i registreringsfilerna är korrekta. 
+            Genom att använda den här funktionen accepterar du detta.</h6></td>
+    </tr>
+</table>
+
+</body>
+</html>

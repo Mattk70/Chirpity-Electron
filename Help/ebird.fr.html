@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>FAQ sur les fichiers d'enregistrement eBird</title>
+</head>
+<body>
+
+<table class="table table-hover p-1">
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>FAQ sur les fichiers d'enregistrement eBird</h5></td>
+    </tr>
+    <tr>
+        <td><b>Qu'est-ce qu'eBird ?</b></td>
+        <td><a href="https://ebird.org/about" target="_blank">eBird</a> est une plateforme en ligne pour partager des données d'observation des oiseaux, gérée par le Cornell Lab of Ornithology.</td>
+    </tr>
+    <tr>
+        <td><b>Qu'est-ce qu'un fichier d'enregistrement eBird ?</b></td>
+        <td>Le fichier d'enregistrement est une feuille de calcul contenant des données d'observation des oiseaux, pouvant être importée dans la plateforme eBird.</td>
+    </tr>
+    <tr>
+        <td><b>Comment Chirpity organise-t-il mes détections ?</b></td>
+        <td>
+            <p>L'application crée une liste de contrôle pour chaque fichier associé à votre exportation. Ces listes de contrôle contiennent le total des détections de chaque espèce dans le fichier.
+            Si vous avez saisi un nombre d'cris, cette valeur sera utilisée ; sinon, un seul cri est supposé.</p>
+            <p>Le fichier exporté contient une ligne d'en-tête expliquant ce que chaque colonne représente.
+                Vous trouverez <a href="https://support.ebird.org/en/support/solutions/articles/48000907878-upload-spreadsheet-data-to-ebird#anchorRecordFormat" target="_blank">plus de détails</a> 
+                sur le site eBird.</p>
+            <p><b>Important :</b> la ligne d'en-tête doit être supprimée avant de téléverser le fichier.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Comment téléverser mon fichier d'enregistrement eBird ?</b></td>
+        <td>
+            Rendez-vous sur <a href="https://www.ebird.org/home" target="_blank">eBird</a> et créez un compte ou connectez-vous à votre compte eBird. Une fois connecté,
+            allez sur le <a href="https://ebird.org/import/upload.form?theme=ebird" target="_blank">formulaire d'importation</a>.
+            <ol>
+                <li>Cliquez sur &quot;Choisir un fichier&quot; et sélectionnez le fichier que vous avez préparé.</li>
+                <li><b>Important :</b> cochez &quot;eBird Record format (Extended)&quot;.</li>
+                <li>Cliquez sur &quot;Importer le fichier&quot;.</li>
+            </ol>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Pourquoi y a-t-il des erreurs lorsque je tente de téléverser mon fichier ?</b></td>
+        <td>
+            <p>Tout d'abord, assurez-vous d'avoir supprimé la ligne d'en-tête. eBird s'attend à ce que la première ligne du fichier contienne une observation.</p>
+            <p>Si ce n'est pas le problème et que vous voyez des erreurs liées à des espèces non reconnues, vérifiez que les préférences linguistiques définies dans Chirpity 
+                correspondent à celles de votre compte eBird.</p> 
+        </td>
+    </tr>
+    <tr>
+        <td><b>Pourquoi les colonnes Pays et État/Province sont-elles vides ?</b></td>
+        <td>
+            <p>Ces champs sont facultatifs dans le format d'enregistrement eBird. Bien que l'API de recherche de lieux d'OpenStreetMap utilisée par Chirpity fournisse les informations 
+            de pays et d'État, ce n'est pas au format utilisé par eBird. Vous pouvez consulter le format correct pour votre pays et votre région dans ce <a href="https://support.ebird.org/helpdesk/attachments/48293281603" target="_blank">tableau</a>.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Pourquoi avez-vous choisi eBird ? Avez-vous des plans pour partager avec d'autres plateformes ?</b></td>
+        <td>
+            <p>eBird est la plateforme la plus simple à utiliser. Cela s'explique par son format d'enregistrement publié, et surtout parce que la taxonomie d'eBird est alignée sur celle 
+            utilisée par les modèles BirdNET et Nocmig.</p>
+            <p>J'espère offrir la possibilité de partager des clips audio avec Xeno-Canto dans une future version. Cela dépend toutefois de la publication par leur équipe d'une API de téléversement adaptée.</p>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2">
+            <h6 class="justify-content-center">Vous êtes responsable de vérifier l'exactitude des fichiers d'enregistrement. Chirpity ne garantit en aucun cas l'exactitude des 
+            données contenues dans ces fichiers. En utilisant cette fonctionnalité, vous acceptez cette condition.</h6></td>
+    </tr>
+</table>
+
+</body>
+</html>

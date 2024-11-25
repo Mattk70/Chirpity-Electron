@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <title>eBird Registrerings-FAQ</title>
+</head>
+<body>
+
+<table class="table table-hover p-1">
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>eBird Registrerings-FAQ</h5></td>
+    </tr>
+    <tr>
+        <td><b>Hvad er eBird?</b></td>
+        <td><a href="https://ebird.org/about" target="_blank">eBird</a> er en online platform til deling af fugleiagttagelsesdata, administreret af Cornell Lab of Ornithology.</td>
+    </tr>
+    <tr>
+        <td><b>Hvad er en eBird-registreringsfil?</b></td>
+        <td>Registreringsfilen er et regneark med fugleiagttagelsesdata, der kan importeres til eBird-platformen.</td>
+    </tr>
+    <tr>
+        <td><b>Hvordan organiserer Chirpity mine detektioner?</b></td>
+        <td>
+            <p>Applikationen opretter en tjekliste for hver fil, der er knyttet til din eksport. Disse tjeklister indeholder en total for kaldsdetektionerne for hver art i den pågældende fil.
+            Hvis du har indtastet et antal kald, anvendes denne værdi, ellers antages ét kald.</p>
+            <p>Den eksporterede fil indeholder en række overskrifter, der forklarer, hvad hver kolonne repræsenterer. 
+                Du kan finde <a href="https://support.ebird.org/en/support/solutions/articles/48000907878-upload-spreadsheet-data-to-ebird#anchorRecordFormat" target="_blank">yderligere oplysninger</a> 
+                på eBirds hjemmeside.
+            </p>
+            <p><b>Vigtigt:</b> overskriftsrækken skal slettes, før du uploader filen.</p> 
+        </td>
+    </tr>
+    <tr>
+        <td><b>Hvordan uploader jeg min eBird-registreringsfil?</b></td>
+        <td>
+            Besøg <a href="https://www.ebird.org/home" target="_blank">eBird</a> og tilmeld dig eller log ind på din eBird-konto. Når du har en konto
+            og er logget ind, skal du gå til <a href="https://ebird.org/import/upload.form?theme=ebird" target="_blank">importformularen</a>.
+            <ol>
+                <li>Klik på "Vælg fil" og vælg den fil, du har forberedt</li>
+                <li><b>Vigtigt:</b> marker &quot;eBird Record format (Extended)&quot;</li>
+                <li>Tryk på &quot;Importér fil&quot;</li>
+            </ol>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Hvorfor opstår der fejl, når jeg forsøger at uploade min registreringsfil?</b></td>
+        <td>
+            <p>Kontroller først, at du har slettet overskriftsrækken. eBird forventer, at den første række i filen indeholder en observation.</p>
+            <p>Hvis dette ikke er problemet, og du ser fejl relateret til arter, der ikke genkendes, skal du sikre, at de sprogindstillinger, du har indstillet i Chirpity,
+                stemmer overens med dem, du har angivet for din eBird-konto.</p> 
+        </td>
+    </tr>
+    <tr>
+        <td><b>Hvorfor er kolonnerne Land og Stat/Provins tomme?</b></td>
+        <td>
+            <p>Disse felter er valgfri i eBird-registreringsformatet. Selvom OpensStreetMap-pladsopslags-API'et, der bruges af Chirpity, angiver Stat og Land, leverer det ikke dataene i det
+                format, der bruges af eBird. Du kan finde det korrekte format for dit land og din region i dette <a href="https://support.ebird.org/helpdesk/attachments/48293281603" target="_blank">regneark</a>.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Hvorfor valgte I eBird? Har I planer om at tillade deling med andre sider?</b></td>
+        <td>
+            <p>eBird er den enkleste platform at bruge. Dette skyldes, at den har et offentliggjort registreringsformat og, måske vigtigst, at eBird-taksonomien stemmer overens med den, 
+            der bruges af både BirdNET- og Nocmig-modellerne.</p>
+            <p>Jeg håber at kunne tilbyde muligheden for at dele lydklip med Xeno-Canto i en fremtidig version. Dette afhænger af, om de udgiver et passende upload-API.</p>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2">
+            <h6 class="justify-content-center">Det er dit ansvar at kontrollere registreringsfilen for nøjagtighed. Chirpity giver ingen garantier overhovedet for nøjagtigheden af nogen af 
+            dataene i registreringsfilerne. Ved at bruge denne funktion anerkender og accepterer du dette.</h6></td>
+    </tr>
+</table>
+
+</body>
+</html>
