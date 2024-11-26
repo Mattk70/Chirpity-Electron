@@ -1729,7 +1729,7 @@ es: `
         <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
         <div class="text-center pb-4">
             <h5>Bienvenido a Chirpity Nocmig</h5>
-            <p>Este recorrido destacará algunas de las funciones clave de la aplicación. Haz clic en la flecha derecha para el siguiente elemento</p>
+            <p>Este recorrido destacará algunas de las funciones clave de la aplicación. Haga clic en la flecha derecha para el siguiente elemento.</p>
         </div>
     </div>
     <div class="carousel-item" data-element-selector="#navbarSettings">
@@ -1737,11 +1737,11 @@ es: `
         <div class="text-start pb-4 ms-3">
             <h5 class="text-center">Comenzando</h5>
             <ol class="ps-5 ms-5">
-                <li>Primero, establece tu ubicación en el menú de configuración.</li>
-                <li>Luego, considera qué modelo se adapta mejor a tus necesidades:</li>
+                <li>Primero, establezca su ubicación en el menú de configuración.</li>
+                <li>Luego, elija el modelo que mejor se adapte a sus necesidades:</li>
                 <ul>
                     <li><b>Nocmig</b> está ajustado para la migración nocturna,<br> pero solo tiene aves de la lista británica</li>
-                    <li><b>BirdNET</b> está entrenado con especies de aves globales</li>
+                    <li><b>BirdNET</b> está entrenado con especies de aves de todo el mundo</li>
                 </ul>
             </ol>
         </div>
@@ -1750,14 +1750,14 @@ es: `
         <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
         <div class="text-center pb-4">
             <h5>Panel de configuración de acceso rápido</h5>
-            <p>Los iconos aquí te permiten alternar rápidamente algunas configuraciones usadas frecuentemente.</p>
-            Estas incluyen:
+            <p>Estos iconos le permiten modificar rápidamente algunas configuraciones usadas frecuentemente.</p>
+            Entre ellas:
             <div class="w-75 ms-5">
                 <ol class="text-start ps-5"> 
                     <li>Modo Nocmig</li>
                     <li>Filtros de audio</li>
-                    <li>Modo consciente del contexto (solo modelo Nocmig)</li>
-                    <li>Ajuste del rango de frecuencias para el espectrograma</li>
+                    <li>Modo contexto (solo modelo Nocmig)</li>
+                    <li>Ajuste del rango de frecuencias para el sonograma</li>
                     <li>Qué lista de detección usar</li>
                     <li>Y el umbral de confianza</li>
                 </ol>
@@ -1769,8 +1769,8 @@ es: `
         <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
         <div class="text-center pb-4">
             <h5>Menús contextuales</h5>
-            <p>La mayoría de las herramientas se pueden acceder a través de menús contextuales. Estos aparecen cuando haces clic derecho con el ratón.
-                Hay menús contextuales para detecciones, áreas seleccionadas en el espectrograma y el nombre del archivo.
+            <p>A la mayor parte de las herramientas se puede acceder mediante menús contextuales, los cuales aparecen cuando se hace clic derecho con el ratón.
+                Hay menús contextuales para detecciones, áreas seleccionadas en el sonograma y el nombre del archivo.
             </p>
         </div>
     </div>
@@ -1778,8 +1778,8 @@ es: `
         <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
         <div class="text-center pb-4">
             <h5>Registros guardados</h5>
-            <p>Puedes guardar registros para referencia futura desde el menú de Registros. Aquí también encontrarás las secciones Gráfico y Explorar
-                de la aplicación. Estas te permiten revisar las detecciones guardadas y ver gráficos de la aparición de especies a lo largo del tiempo.
+            <p>Puedee guardar registros para referencias futuras desde el menú de Registros. Aquí también encontrará las opciones de Gráfica y Explorar
+                de la aplicación, las cuales le permiten revisar las detecciones guardadas y ver gráficas de la aparición de especies a lo largo del tiempo.
             </p>
         </div>
     </div>
@@ -1794,7 +1794,6 @@ es: `
     <span class="carousel-control-next-icon" aria-hidden="true"></span>
     <span class="visually-hidden">Siguiente</span>
 </a>
-
 `,
 nl: `
     <!-- Carousel items -->
@@ -2353,6 +2352,129 @@ const i18nSpeciesList = {
     }
 };
     
+const IUCNLabel = {
+    da: {
+        'NA': 'Ingen data',
+        'DD': 'Utilstrækkelige data',
+        'LC': 'Ikke truet',
+        'VU': 'Sårbar',
+        'NT': 'Næsten truet',
+        'EN': 'Truet',
+        'CR': 'Kritisk truet',
+        'EW': 'Uddød i naturen',
+        'EX': 'Uddød'
+    },
+    de: {
+        'NA': 'Keine Daten',
+        'DD': 'Daten unzureichend',
+        'LC': 'Ungefährdet',
+        'VU': 'Gefährdet',
+        'NT': 'Potentiell gefährdet',
+        'EN': 'Stark gefährdet',
+        'CR': 'Vom Aussterben bedroht',
+        'EW': 'In der Natur ausgestorben',
+        'EX': 'Ausgestorben'
+    },
+    en: {
+        'NA': 'No Data',
+        'DD': 'Data Deficient',
+        'LC': 'Least Concern',
+        'VU': 'Vulnerable',
+        'NT': 'Near Threatened',
+        'EN': 'Endangered',
+        'CR': 'Critically Endangered',
+        'EW': 'Extinct in the Wild',
+        'EX': 'Extinct'
+    },
+    es: {
+        'NA': 'Sin datos',
+        'DD': 'Datos insuficientes',
+        'LC': 'Preocupación menor',
+        'VU': 'Vulnerable',
+        'NT': 'Casi amenazado',
+        'EN': 'En peligro',
+        'CR': 'En peligro crítico',
+        'EW': 'Extinto en estado silvestre',
+        'EX': 'Extinto'
+    },
+    fr: {
+        'NA': 'Pas de données',
+        'DD': 'Données insuffisantes',
+        'LC': 'Préoccupation mineure',
+        'VU': 'Vulnérable',
+        'NT': 'Quasi menacé',
+        'EN': 'En danger',
+        'CR': 'En danger critique',
+        'EW': 'Éteint à l’état sauvage',
+        'EX': 'Éteint'
+    },
+    nl: {
+        'NA': 'Geen gegevens',
+        'DD': 'Gebrekkige gegevens',
+        'LC': 'Minst zorgwekkend',
+        'VU': 'Kwetsbaar',
+        'NT': 'Bijna bedreigd',
+        'EN': 'Bedreigd',
+        'CR': 'Kritiek bedreigd',
+        'EW': 'Uitgestorven in het wild',
+        'EX': 'Uitgestorven'
+    },
+    pt: {
+        'NA': 'Sem dados',
+        'DD': 'Dados insuficientes',
+        'LC': 'Pouco preocupante',
+        'VU': 'Vulnerável',
+        'NT': 'Quase ameaçado',
+        'EN': 'Em perigo',
+        'CR': 'Criticamente em perigo',
+        'EW': 'Extinto na natureza',
+        'EX': 'Extinto'
+    },
+    ru: {
+        'NA': 'Нет данных',
+        'DD': 'Недостаточно данных',
+        'LC': 'Вызывающие наименьшие опасения',
+        'VU': 'Уязвимый',
+        'NT': 'Близкий к угрожающему состоянию',
+        'EN': 'Находится под угрозой',
+        'CR': 'Находится на грани исчезновения',
+        'EW': 'Вымерший в дикой природе',
+        'EX': 'Вымерший'
+    },
+    sv: {
+        'NA': 'Inga data',
+        'DD': 'Otillräckliga data',
+        'LC': 'Livskraftig',
+        'VU': 'Sårbar',
+        'NT': 'Nära hotad',
+        'EN': 'Hotad',
+        'CR': 'Kritiskt hotad',
+        'EW': 'Utrotad i det vilda',
+        'EX': 'Utrotad'
+    },
+    zh: {
+        'NA': '没有数据',
+        'DD': '数据不足',
+        'LC': '无危',
+        'VU': '易危',
+        'NT': '近危',
+        'EN': '濒危',
+        'CR': '极危',
+        'EW': '野外灭绝',
+        'EX': '灭绝'
+    },
+    // it: {
+    //     'NA': 'Nessun dato',
+    //     'DD': 'Dati insufficienti',
+    //     'LC': 'Minima preoccupazione',
+    //     'VU': 'Vulnerabile',
+    //     'NT': 'Quasi minacciato',
+    //     'EN': 'In pericolo',
+    //     'CR': 'In pericolo critico',
+    //     'EW': 'Estinto in natura',
+    //     'EX': 'Estinto'
+    // },
+};
 
 async function localiseUI(locale) {
     let t0 = Date.now();
@@ -2474,4 +2596,4 @@ async function localiseUI(locale) {
         console.error('Localisation Error:', error.message);
     }
 }
-export {i18nSpeciesList,i18nHeadings, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, localiseUI}
+export {i18nSpeciesList,i18nHeadings, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel, localiseUI}

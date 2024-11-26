@@ -1,7 +1,7 @@
 import {trackVisit, trackEvent} from './tracking.js';
 import {DOM} from './DOMcache.js';
 import {IUCNCache} from './IUCNcache.js';
-import {i18nSpeciesList,i18nHeadings, localiseUI, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists} from './i18n.js';
+import {i18nSpeciesList,i18nHeadings, localiseUI, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel} from './i18n.js';
 let LOCATIONS, locationID = undefined, loadingTimeout, LIST_MAP;
 
 let LABELS = [], DELETE_HISTORY = [];
@@ -3181,6 +3181,7 @@ function centreSpec(){
             </tr>
             </thead><tbody id="speciesFilter">`;
             let selectedRow = null;
+            const i18nIUCN = getI18n(IUCNLabel);
             for (let i = 0; i < summary.length; i++) {
                 const item = summary[i];
                 const selected = item.cname === filterSpecies ? ' text-warning' : '';
@@ -3197,9 +3198,8 @@ function centreSpec(){
                     const iucn = record?.scopes.find(obj => obj.scope === config.detect.iucnScope);
                     const status = iucn?.status || 'NA';
                     const url = iucn?.url ? 'https://www.iucnredlist.org/species/' + iucn.url : null;
-
                     summaryHTML+=
-                        `<td class="text-end"><a id="iucn-link-${item.sname}" title="${IUCNLabel[status]}: Learn more about this species ICUN assessment" 
+                        `<td class="text-end"><a id="iucn-link-${item.sname}" title="${i18nIUCN[status]}" 
                         class="d-inline-block p-1 w-100 rounded text-decoration-none text-center ${IUCNMap[status]} ${!url ? 'disabled-link' : ''}"
                         href="${url || '#'}" target="_blank"> ${status}</a></td>`;
                 }
@@ -3818,9 +3818,7 @@ function formatDuration(seconds){
     }
     
     const populateSpeciesModal = async (included, excluded) => {
-        let locale = config[config.model].locale;
-        locale = i18nSpeciesList[locale] ? locale : 'en'; // coerce locale to one that exists
-        const i18n = i18nSpeciesList[locale];
+        const i18n = getI18n(i18nSpeciesList);
         const current_file_text =  STATE.week !== -1 && STATE.week ? interpolate(i18n.week, {week: STATE.week}) : '';
         const model = config.model === 'birdnet' ? 'BirdNET' : 'Nocmig';
         const localBirdsOnly = config.local && config.model === 'birdnet' && config.list === 'nocturnal' ? i18n.localBirds : '';
@@ -3830,22 +3828,12 @@ function formatDuration(seconds){
             species_filter_text = interpolate(i18n.threshold, {weekSpecific: weekSpecific, speciesThreshold: config.speciesThreshold});  
             location_filter_text = interpolate(i18n.location, {place: place.textContent.replace('fmd_good', ''), current_file_text: current_file_text, species_filter_text: species_filter_text});
         }
-        
-        //const species_filter_text = config.useWeek && config.list === 'location' ? `week-specific species filter threshold of <b>${config.speciesThreshold}</b>` : config.list === 'location' ? `species filter threshold of <b>${config.speciesThreshold}</b>` : '';  
-        
-        //const location_filter_text = config.list === 'location' ? ` focused on <b>${place.textContent.replace('fmd_good', '')}</b>, with a ${species_filter_text}${current_file_text}` : '';
-        
-        // let includedContent = `<br/><p>The number of species detected depends on the model, the list being used and in the case of the location filter, the species filter threshold and possibly the week in which the recording was made.<p>
-        // You are using the <b>${model}</b> model and the <b>${config.list}</b> list${localBirdsOnly}${location_filter_text}. With these settings, Chirpity will display detections for ${config.useWeek && config.list === 'location' && (STATE.week === -1 || !STATE.week ) ? 'up to' : ''} 
-        // <b>${count}</b> classes${config.useWeek && config.list === 'location' && (STATE.week === -1 || !STATE.week ) ? ', depending on the date of the file you analyse' : ''}:</p>`;
-        //includedContent += '<table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Common Name</th><th>Scientific Name</th></tr></thead><tbody>\n';
-        // includedContent += generateBirdIDList(included);
-        //includedContent += '</tbody></table>\n';
         const includedList = generateBirdIDList(included);
         const depending = config.useWeek && config.list === 'location' && (STATE.week === -1 || !STATE.week ) ? i18n.depending : '';
+        const listLabel = getI18n(i18nLists)[config.list];
         const includedContent = interpolate(i18n.included, 
             {model: model, 
-            listInUse: i18nLists[locale][config.list], 
+            listInUse: listLabel, 
             location_filter_text: location_filter_text, 
             localBirdsOnly: localBirdsOnly,
             upTo: i18n.upTo, 
@@ -4477,6 +4465,7 @@ function formatDuration(seconds){
         worker.postMessage({ action: 'update-state', filters: { highPassFrequency: config.filters.highPassFrequency } })
         showFilterEffect();
         filterIconDisplay();
+        HPSlider.blur(); // Fix slider capturing thefocus so you can't use spaceBar or hit 'p' directly
     }
     
     const HPThreshold = document.getElementById('HP-threshold');
@@ -4492,6 +4481,7 @@ function formatDuration(seconds){
         worker.postMessage({ action: 'update-state', filters: { lowShelfFrequency: config.filters.lowShelfFrequency } })
         showFilterEffect();
         filterIconDisplay();
+        LowShelfSlider.blur(); // Fix slider capturing thefocus so you can't use spaceBar or hit 'p' directly
     }
     
     const LowShelfThreshold = document.getElementById('LowShelf-threshold');
@@ -4507,6 +4497,7 @@ function formatDuration(seconds){
         worker.postMessage({ action: 'update-state', filters: { lowShelfAttenuation: config.filters.lowShelfAttenuation } })
         showFilterEffect();
         filterIconDisplay();
+        lowShelfAttenuation.blur();
     }
     
     const lowShelfAttenuation = document.getElementById('attenuation');
@@ -4947,6 +4938,7 @@ function playRegion(){
                     break }
                 case 'gain': {
                     DOM.gainAdjustment.textContent = element.value + 'dB'; //.toString();
+                    element.blur();
                     config.audio.gain = element.value;
                     worker.postMessage({action:'update-state', audio: config.audio})
                     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
@@ -4989,6 +4981,7 @@ function playRegion(){
                     config.audio.normalise = element.checked;
                     worker.postMessage({action:'update-state', audio: config.audio})
                     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+                    element.blur();
                     fileLoaded &&
                         postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
                     break }
@@ -6009,16 +6002,6 @@ const IUCNMap = {
     'EW': 'text-bg-dark',
     'EX': 'text-bg-dark'
 }
-const IUCNLabel = {
-    'NA': 'No Data',
-    'DD': 'Data Deficient',
-    'LC': 'Least Concern',
-    'VU': 'Vulnerable',
-    'NT': 'Near Threatened',
-    'EN': 'Endangered',
-    'CR': 'Critically Endangered',
-    'EW': 'Extinct in the Wild',
-    'EX': 'Extinct'
-}
+
 // Make config, LOCATIONS and displayLocationAddress and toasts available to the map script in index.html
 export { config, displayLocationAddress, LOCATIONS, generateToast };
