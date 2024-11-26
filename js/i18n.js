@@ -2160,6 +2160,199 @@ zh: `
 `
 }
 
+const i18nSpeciesList = {
+    da: {
+        title: 'Aktuel artsliste', 
+        includedButton: 'Inkluderet', 
+        excludedButton: 'Ekskluderet', 
+        cname: 'Almindeligt navn', 
+        sname: 'Videnskabeligt navn',
+        localBirds: ' begrænset til <b>lokale fugle</b>',
+        week: '. Den aktuelle fil blev gemt i uge <b>${week}</b>',
+        weekSpecific: 'uge-specifik',
+        threshold: '${weekSpecific} artsfiltergrænse på <b>${speciesThreshold}</b>',
+        location: ' fokuseret på <b>${place}</b>, med en ${species_filter_text}${current_file_text}',
+        depending: ', afhængigt af datoen for den fil, du analyserer',
+        upTo: ' op til ',
+        included: '<br/><p>Antallet af opdagede arter afhænger af modellen, den anvendte liste og i tilfælde af lokalitetsfilteret af artsfiltergrænsen og muligvis den uge, optagelsen blev lavet.<p>\
+        Du bruger modellen <b>${model}</b> og listen <b>${listInUse}</b>${localBirdsOnly}${location_filter_text}. Med disse indstillinger vil Chirpity vise detektioner for ${upTo} \
+        <b>${count}</b> klasser${depending}:</p>\
+        <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Almindeligt navn</th><th>Videnskabeligt navn</th></tr></thead><tbody>${includedList}</tbody></table>',
+        excluded: '<br/><p>Omvendt vil applikationen ikke vise detektioner blandt følgende ${excludedCount} klasser:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
+    },
+    de: {
+        title: 'Aktuelle Artenliste', 
+        includedButton: 'Eingeschlossen', 
+        excludedButton: 'Ausgeschlossen', 
+        cname: 'Trivialname', 
+        sname: 'Wissenschaftlicher Name',
+        localBirds: ' beschränkt auf <b>lokale Vögel</b>',
+        week: '. Die aktuelle Datei wurde in Woche <b>${week}</b> gespeichert',
+        weekSpecific: 'wochen-spezifisch',
+        threshold: '${weekSpecific} Artenfiltergrenze von <b>${speciesThreshold}</b>',
+        location: ' fokussiert auf <b>${place}</b>, mit einem ${species_filter_text}${current_file_text}',
+        depending: ', abhängig vom Datum der Datei, die Sie analysieren',
+        upTo: ' bis zu ',
+        included: '<br/><p>Die Anzahl der erkannten Arten hängt vom Modell, der verwendeten Liste und im Falle des Standortfilters von der Artenfiltergrenze und möglicherweise der Woche ab, in der die Aufnahme gemacht wurde.<p>\
+        Sie verwenden das Modell <b>${model}</b> und die Liste <b>${listInUse}</b>${localBirdsOnly}${location_filter_text}. Mit diesen Einstellungen zeigt Chirpity Erkennungen für bis zu \
+        <b>${count}</b> Klassen${depending}:</p>\
+        <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Trivialname</th><th>Wissenschaftlicher Name</th></tr></thead><tbody>${includedList}</tbody></table>',
+        excluded: '<br/><p>Umgekehrt zeigt die Anwendung keine Erkennungen unter den folgenden ${excludedCount} Klassen an:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
+    },
+    en: {
+        title: 'Current Species List', 
+        includedButton: 'Included', 
+        excludedButton: 'Excluded', 
+        cname: 'Common Name', 
+        sname: 'Scientific Name',
+        localBirds: ' limited to <b>local birds</b>',
+        week: '. The current file was saved in week <b>${week}</b>',
+        weekSpecific: 'week-specific',
+        threshold: '${weekSpecific} species filter threshold of <b>${speciesThreshold}</b>',
+        location: ' focused on <b>${place}</b>, with a ${species_filter_text}${current_file_text}',
+        depending: ', depending on the date of the file you analyse',
+        upTo: ' up to ',
+        included: '<br/><p>The number of species detected depends on the model, the list being used and in the case of the location filter, the species filter threshold and possibly the week in which the recording was made.<p>\
+        You are using the <b>${model}</b> model and the <b>${listInUse}</b> list${localBirdsOnly}${location_filter_text}. With these settings, Chirpity will display detections for ${upTo} \
+        <b>${count}</b> classes${depending}:</p>\
+        <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Common Name</th><th>Scientific Name</th></tr></thead><tbody>${includedList}</tbody></table>',
+        excluded: '<br/><p>Conversely, the application will not display detections among the following ${excludedCount} classes:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
+    },
+    es: {
+        title: 'Lista actual de especies', 
+        includedButton: 'Incluido', 
+        excludedButton: 'Excluido', 
+        cname: 'Nombre común', 
+        sname: 'Nombre científico',
+        localBirds: ' limitado a <b>aves locales</b>',
+        week: '. El archivo actual se guardó en la semana <b>${week}</b>',
+        weekSpecific: 'específico por semana',
+        threshold: 'umbral de filtro de especies ${weekSpecific} de <b>${speciesThreshold}</b>',
+        location: ' centrado en <b>${place}</b>, con un ${species_filter_text}${current_file_text}',
+        depending: ', dependiendo de la fecha del archivo que analices',
+        upTo: ' hasta ',
+        included: '<br/><p>El número de especies detectadas depende del modelo, la lista utilizada y, en el caso del filtro de ubicación, del umbral del filtro de especies y posiblemente de la semana en que se realizó la grabación.<p>\
+        Estás utilizando el modelo <b>${model}</b> y la lista <b>${listInUse}</b>${localBirdsOnly}${location_filter_text}. Con estas configuraciones, Chirpity mostrará detecciones para hasta \
+        <b>${count}</b> clases${depending}:</p>\
+        <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Nombre común</th><th>Nombre científico</th></tr></thead><tbody>${includedList}</tbody></table>',
+        excluded: '<br/><p>Por el contrario, la aplicación no mostrará detecciones entre las siguientes ${excludedCount} clases:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
+    },
+    fr: {
+        title: 'Liste actuelle des espèces', 
+        includedButton: 'Inclus', 
+        excludedButton: 'Exclus', 
+        cname: 'Nom commun', 
+        sname: 'Nom scientifique',
+        localBirds: ' limité aux <b>oiseaux locaux</b>',
+        week: '. Le fichier actuel a été enregistré lors de la semaine <b>${week}</b>',
+        weekSpecific: 'filtre d’espèces spécifique à la semaine',
+        threshold: 'seuil du filtre d’espèces spécifique à la semaine de <b>${speciesThreshold}</b>',
+        location: ' centré sur <b>${place}</b>, avec un ${species_filter_text}${current_file_text}',
+        depending: ', selon la date du fichier que vous analysez',
+        upTo: ' jusqu’à ',
+        included: '<br/><p>Le nombre d’espèces détectées dépend du modèle, de la liste utilisée et, dans le cas du filtre de localisation, du seuil du filtre d’espèces et éventuellement de la semaine dans laquelle l’enregistrement a été réalisé.<p>\
+        Vous utilisez le modèle <b>${model}</b> et la liste <b>${listInUse}</b>${localBirdsOnly}${location_filter_text}. Avec ces paramètres, Chirpity affichera les détections pour ${upTo} \
+        <b>${count}</b> classes${depending} :</p>\
+        <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Nom commun</th><th>Nom scientifique</th></tr></thead><tbody>${includedList}</tbody></table>',
+        excluded: '<br/><p>En revanche, l’application n’affichera pas de détections parmi les ${excludedCount} classes suivantes :</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
+    },
+    nl: {
+        title: 'Huidige soortenlijst', 
+        includedButton: 'Inbegrepen', 
+        excludedButton: 'Uitgesloten', 
+        cname: 'Gewone naam', 
+        sname: 'Wetenschappelijke naam',
+        localBirds: ' beperkt tot <b>lokale vogels</b>',
+        week: '. Het huidige bestand is opgeslagen in week <b>${week}</b>',
+        weekSpecific: 'week-specifiek',
+        threshold: 'drempelwaarde voor soortenfilter specifiek voor de week van <b>${speciesThreshold}</b>',
+        location: ' gericht op <b>${place}</b>, met een ${species_filter_text}${current_file_text}',
+        depending: ', afhankelijk van de datum van het bestand dat u analyseert',
+        upTo: ' tot ',
+        included: '<br/><p>Het aantal gedetecteerde soorten hangt af van het model, de gebruikte lijst en in het geval van de locatiefilter van de drempelwaarde voor soortenfilters en mogelijk de week waarin de opname is gemaakt.<p>\
+        U gebruikt het <b>${model}</b>-model en de <b>${listInUse}</b>-lijst${localBirdsOnly}${location_filter_text}. Met deze instellingen toont Chirpity detecties voor ${upTo} \
+        <b>${count}</b> klassen${depending}:</p>\
+        <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Gewone naam</th><th>Wetenschappelijke naam</th></tr></thead><tbody>${includedList}</tbody></table>',
+        excluded: '<br/><p>Daarentegen zal de applicatie geen detecties weergeven van de volgende ${excludedCount} klassen:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
+    },
+    pt: {
+        title: 'Lista Atual de Espécies', 
+        includedButton: 'Incluído', 
+        excludedButton: 'Excluído', 
+        cname: 'Nome Comum', 
+        sname: 'Nome Científico',
+        localBirds: ' limitado a <b>aves locais</b>',
+        week: '. O arquivo atual foi salvo na semana <b>${week}</b>',
+        weekSpecific: 'filtro de espécies específico da semana',
+        threshold: 'limite do filtro de espécies específico da semana de <b>${speciesThreshold}</b>',
+        location: ' focado em <b>${place}</b>, com um ${species_filter_text}${current_file_text}',
+        depending: ', dependendo da data do arquivo que você analisa',
+        upTo: ' até ',
+        included: '<br/><p>O número de espécies detectadas depende do modelo, da lista utilizada e, no caso do filtro de localização, do limite do filtro de espécies e possivelmente da semana em que a gravação foi feita.<p>\
+        Você está usando o modelo <b>${model}</b> e a lista <b>${listInUse}</b>${localBirdsOnly}${location_filter_text}. Com essas configurações, o Chirpity exibirá detecções para ${upTo} \
+        <b>${count}</b> classes${depending}:</p>\
+        <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Nome Comum</th><th>Nome Científico</th></tr></thead><tbody>${includedList}</tbody></table>',
+        excluded: '<br/><p>Por outro lado, o aplicativo não exibirá detecções entre as seguintes ${excludedCount} classes:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
+    },
+    ru: {
+        title: 'Текущий список видов', 
+        includedButton: 'Включено', 
+        excludedButton: 'Исключено', 
+        cname: 'Обычное название', 
+        sname: 'Научное название',
+        localBirds: ' ограничено <b>местными птицами</b>',
+        week: '. Текущий файл был сохранён на неделе <b>${week}</b>',
+        weekSpecific: 'недельный фильтр видов',
+        threshold: 'порог фильтра видов на неделе <b>${speciesThreshold}</b>',
+        location: ' ориентирован на <b>${place}</b>, с ${species_filter_text}${current_file_text}',
+        depending: ', в зависимости от даты файла, который вы анализируете',
+        upTo: ' до ',
+        included: '<br/><p>Количество обнаруженных видов зависит от модели, используемого списка и, в случае фильтра по местоположению, порога фильтра видов и, возможно, недели, в которой была сделана запись.<p>\
+        Вы используете модель <b>${model}</b> и список <b>${listInUse}</b>${localBirdsOnly}${location_filter_text}. С этими настройками Chirpity покажет обнаружения для ${upTo} \
+        <b>${count}</b> классов${depending}:</p>\
+        <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Обычное название</th><th>Научное название</th></tr></thead><tbody>${includedList}</tbody></table>',
+        excluded: '<br/><p>В то же время, приложение не будет показывать обнаружения среди следующих ${excludedCount} классов:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
+    },
+    sv: {
+        title: 'Aktuell artslista', 
+        includedButton: 'Inkluderad', 
+        excludedButton: 'Exkluderad', 
+        cname: 'Vanligt namn', 
+        sname: 'Vetenskapligt namn',
+        localBirds: ' begränsad till <b>lokala fåglar</b>',
+        week: '. Den aktuella filen sparades under vecka <b>${week}</b>',
+        weekSpecific: 'vecko-specifik',
+        threshold: 'vecko-specifik artfiltergräns på <b>${speciesThreshold}</b>',
+        location: ' fokuserad på <b>${place}</b>, med en ${species_filter_text}${current_file_text}',
+        depending: ', beroende på datumet för filen du analyserar',
+        upTo: ' upp till ',
+        included: '<br/><p>Antalet detekterade arter beror på modellen, den använda listan och, i fallet med platsfiltret, artfiltergränsen och eventuellt veckan då inspelningen gjordes.<p>\
+        Du använder modellen <b>${model}</b> och listan <b>${listInUse}</b>${localBirdsOnly}${location_filter_text}. Med dessa inställningar kommer Chirpity att visa detektioner för ${upTo} \
+        <b>${count}</b> klasser${depending}:</p>\
+        <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Vanligt namn</th><th>Vetenskapligt namn</th></tr></thead><tbody>${includedList}</tbody></table>',
+        excluded: '<br/><p>Å andra sidan kommer applikationen inte att visa detektioner bland följande ${excludedCount} klasser:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
+    },
+    zh: {
+        title: '当前物种列表', 
+        includedButton: '包含', 
+        excludedButton: '排除', 
+        cname: '常见名称', 
+        sname: '学名',
+        localBirds: ' 限制为<b>本地鸟类</b>',
+        week: '。当前文件保存于第 <b>${week}</b> 周',
+        weekSpecific: '特定周的',
+        threshold: '<b>${speciesThreshold}</b> 的特定周物种过滤阈值',
+        location: ' 专注于 <b>${place}</b>，包含 ${species_filter_text}${current_file_text}',
+        depending: '，具体取决于您分析的文件日期',
+        upTo: ' 高达 ',
+        included: '<br/><p>检测到的物种数量取决于模型、使用的列表，在位置过滤的情况下，还取决于物种过滤阈值以及录音的周数。<p>\
+        您正在使用 <b>${model}</b> 模型和 <b>${listInUse}</b> 列表${localBirdsOnly}${location_filter_text}。根据这些设置，Chirpity 将显示最多 ${upTo} \
+        <b>${count}</b> 类别的检测结果${depending}：</p>\
+        <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>常见名称</th><th>学名</th></tr></thead><tbody>${includedList}</tbody></table>',
+        excluded: '<br/><p>另一方面，应用程序不会显示以下 ${excludedCount} 类别的检测结果：</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
+    }
+};
+    
 
 async function localiseUI(locale) {
     let t0 = Date.now();
@@ -2281,4 +2474,4 @@ async function localiseUI(locale) {
         console.error('Localisation Error:', error.message);
     }
 }
-export {i18nHeadings, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, localiseUI}
+export {i18nSpeciesList,i18nHeadings, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, localiseUI}

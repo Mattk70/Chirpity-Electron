@@ -1,7 +1,7 @@
 import {trackVisit, trackEvent} from './tracking.js';
 import {DOM} from './DOMcache.js';
 import {IUCNCache} from './IUCNcache.js';
-import {i18nHeadings, localiseUI, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP} from './i18n.js';
+import {i18nSpeciesList,i18nHeadings, localiseUI, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists} from './i18n.js';
 let LOCATIONS, locationID = undefined, loadingTimeout, LIST_MAP;
 
 let LABELS = [], DELETE_HISTORY = [];
@@ -3818,33 +3818,55 @@ function formatDuration(seconds){
     }
     
     const populateSpeciesModal = async (included, excluded) => {
-        const count = included.length;
-        const current_file_text =  STATE.week !== -1 && STATE.week ? `. The current file was saved in week <b>${STATE.week}</b>` : '';
-        const model = config.model === 'birdnet' ? 'BirdNET' : 'Chirpity';
-        const localBirdsOnly = config.local && config.model === 'birdnet' && config.list === 'nocturnal' ? ' limited to <b>local birds</b>' : '';
-        const species_filter_text = config.useWeek && config.list === 'location' ? `week-specific species filter threshold of <b>${config.speciesThreshold}</b>` : config.list === 'location' ? `species filter threshold of <b>${config.speciesThreshold}</b>` : '';  
-        const location_filter_text = config.list === 'location' ? ` focused on <b>${place.textContent.replace('fmd_good', '')}</b>, with a ${species_filter_text}${current_file_text}` : '';
-        let includedContent = `<br/><p>The number of species detected depends on the model, the list being used and in the case of the location filter, the species filter threshold and possibly the week in which the recording was made.<p>
-        You are using the <b>${model}</b> model and the <b>${config.list}</b> list${localBirdsOnly}${location_filter_text}. With these settings, Chirpity will display detections for ${config.useWeek && config.list === 'location' && (STATE.week === -1 || !STATE.week ) ? 'up to' : ''} 
-        <b>${count}</b> classes${config.useWeek && config.list === 'location' && (STATE.week === -1 || !STATE.week ) ? ', depending on the date of the file you analyse' : ''}:</p>`;
-        includedContent += '<table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Common Name</th><th>Scientific Name</th></tr></thead><tbody>\n';
-        includedContent += generateBirdIDList(included);
-        includedContent += '</tbody></table>\n';
+        let locale = config[config.model].locale;
+        locale = i18nSpeciesList[locale] ? locale : 'en'; // coerce locale to one that exists
+        const i18n = i18nSpeciesList[locale];
+        const current_file_text =  STATE.week !== -1 && STATE.week ? interpolate(i18n.week, {week: STATE.week}) : '';
+        const model = config.model === 'birdnet' ? 'BirdNET' : 'Nocmig';
+        const localBirdsOnly = config.local && config.model === 'birdnet' && config.list === 'nocturnal' ? i18n.localBirds : '';
+        let species_filter_text = '', location_filter_text = '';
+        if (config.list === 'location'){
+            const weekSpecific = config.useWeek ? i18n.weekSpecific : '';
+            species_filter_text = interpolate(i18n.threshold, {weekSpecific: weekSpecific, speciesThreshold: config.speciesThreshold});  
+            location_filter_text = interpolate(i18n.location, {place: place.textContent.replace('fmd_good', ''), current_file_text: current_file_text, species_filter_text: species_filter_text});
+        }
+        
+        //const species_filter_text = config.useWeek && config.list === 'location' ? `week-specific species filter threshold of <b>${config.speciesThreshold}</b>` : config.list === 'location' ? `species filter threshold of <b>${config.speciesThreshold}</b>` : '';  
+        
+        //const location_filter_text = config.list === 'location' ? ` focused on <b>${place.textContent.replace('fmd_good', '')}</b>, with a ${species_filter_text}${current_file_text}` : '';
+        
+        // let includedContent = `<br/><p>The number of species detected depends on the model, the list being used and in the case of the location filter, the species filter threshold and possibly the week in which the recording was made.<p>
+        // You are using the <b>${model}</b> model and the <b>${config.list}</b> list${localBirdsOnly}${location_filter_text}. With these settings, Chirpity will display detections for ${config.useWeek && config.list === 'location' && (STATE.week === -1 || !STATE.week ) ? 'up to' : ''} 
+        // <b>${count}</b> classes${config.useWeek && config.list === 'location' && (STATE.week === -1 || !STATE.week ) ? ', depending on the date of the file you analyse' : ''}:</p>`;
+        //includedContent += '<table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Common Name</th><th>Scientific Name</th></tr></thead><tbody>\n';
+        // includedContent += generateBirdIDList(included);
+        //includedContent += '</tbody></table>\n';
+        const includedList = generateBirdIDList(included);
+        const depending = config.useWeek && config.list === 'location' && (STATE.week === -1 || !STATE.week ) ? i18n.depending : '';
+        const includedContent = interpolate(i18n.included, 
+            {model: model, 
+            listInUse: i18nLists[locale][config.list], 
+            location_filter_text: location_filter_text, 
+            localBirdsOnly: localBirdsOnly,
+            upTo: i18n.upTo, 
+            count: included.length,
+            depending: depending,
+            includedList: includedList})
         let excludedContent = '', disable = '';
         if (excluded){
-            excludedContent += `<br/><p>Conversely, the application will not display detections among the following ${excluded.length} classes:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Common Name</th><th>Scientific Name</th></tr></thead><tbody>\n`;
-            excludedContent += generateBirdIDList(excluded);
-            excludedContent += '</tbody></table>\n';
+            const excludedList = generateBirdIDList(excluded);
+
+            excludedContent = interpolate(i18n.excluded, {excludedList: excludedList, excludedCount: excluded.length, cname: i18n.cname, sname: i18n.sname })
         } else {
             disable = ' disabled'
         }
         let modalContent =  `
         <ul class="nav nav-tabs" id="myTab" role="tablist">
         <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="included-tab" data-bs-toggle="tab" data-bs-target="#included-tab-pane" type="button" role="tab" aria-controls="included-tab-pane" aria-selected="true">Included</button>
+        <button class="nav-link active" id="included-tab" data-bs-toggle="tab" data-bs-target="#included-tab-pane" type="button" role="tab" aria-controls="included-tab-pane" aria-selected="true">${i18n.includedButton}</button>
         </li>
         <li class="nav-item" role="presentation">
-        <button class="nav-link" id="excluded-tab" data-bs-toggle="tab" data-bs-target="#excluded-tab-pane" type="button" role="tab" aria-controls="excluded-tab-pane" aria-selected="false" ${disable}>Excluded</button>
+        <button class="nav-link" id="excluded-tab" data-bs-toggle="tab" data-bs-target="#excluded-tab-pane" type="button" role="tab" aria-controls="excluded-tab-pane" aria-selected="false" ${disable}>${i18n.excludedButton}</button>
         </li>
         </ul>
         <div class="tab-content" id="myTabContent">
@@ -3853,6 +3875,7 @@ function formatDuration(seconds){
         </div>
         `;
         document.getElementById('speciesModalBody').innerHTML = modalContent;
+        document.getElementById('speciesModalLabel').textContent = i18n.title;
         const species = new bootstrap.Modal(document.getElementById('speciesModal'));
         species.show();
         STATE.includedList = included;
@@ -4834,7 +4857,7 @@ function playRegion(){
 
                     if (! config.useWeek) STATE.week = -1;
                     worker.postMessage({action:'update-state', useWeek: config.useWeek});
-                    updateList()
+                    updateList();
                     break }
                 case 'list-to-use': {
                     setListUIState(element.value)
