@@ -138,7 +138,7 @@ test('Can create/edit a manual record', async () => {
   // const filename = await page.locator('#filename span.filename');
   // File name is blue - saved
   // const hasClass = await filename.evaluate(el => el.classList.contains('text-info'));
-  await page.waitForFunction(
+  await page.evaluate(
     ({selector, className}) => {
       const element = document.querySelector(selector);
       return element && element.classList.contains(className);
