@@ -317,11 +317,11 @@
                             <div class="form-group rounded p-2 mb-2 bg-light">
                                 <div class="row">
                                     <div class="input-group col">
-                                        <span class="input-group-text pe-2">Lat:</span>
+                                        <label id="customLatLabel" class="input-group-text pe-2" for="customLat">Lat:</label>
                                         <input id="customLat" type="text" class="form-control ps-2"
                                         placeholder="0.0" aria-label="Latitude" aria-describedby="customLat"
                                         required>
-                                        <span class="input-group-text pe-2">Lon:</span>
+                                        <label id="customLonLabel" class="input-group-text pe-2" for="customLon">Lon:</label>
                                         <input id="customLon" type="text" class="form-control ps-2"
                                         placeholder="0.0" aria-label="Longitude" aria-describedby="customLon"
                                         required>
@@ -539,15 +539,11 @@
                                 <option value="custom">Custom</option>
                             </select>
                         </div>
-                        <div class="row p-2 d-none" id="choose-file-container">
-                            <div class="col-10 pe-0">
-                                <div class="input-group">
-                                    <button class="btn btn-outline-secondary" type="button" id="list-file-selector">Select file</button>
-                                    <input type="text" class="form-control" id="custom-list-location" aria-describedby="list-file-selector" placeholder="No custom list set" disabled="" readonly="">
-                                </div>
-                            </div>
-                            <div class="col ps-0 pe-4">
-                                <span id="clear-custom-list" class="material-symbols-outlined btn btn-outline-secondary float-end p-1" title="Clear custom list">clear</span>
+                        <div class="d-none p-2" id="choose-file-container">
+                            <div class="col-auto input-group rounded pe-2">
+                                <button class="btn btn-outline-secondary" type="button" id="list-file-selector"> Select file</button>
+                                <input type="text" class="form-control" id="custom-list-location" aria-describedby="list-file-selector" placeholder="No custom list set" disabled="" readonly="">
+                                <span id="clear-custom-list" class="material-symbols-outlined btn btn-outline-secondary p-1" title="Clear custom list">clear</span>
                             </div>
                         </div>
                         <div class="d-none" id="use-location-container">
@@ -608,9 +604,9 @@
                     <legend style="font-size: large;font-weight:bold">Default Location <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Default Location" id="Default Location-circle-help"  data-bs-content="Chirpity uses location information to determine the dawn and dusk times for recordings">?</a></legend>
                     <div class="form-group rounded p-2 mb-2">
                         <div class="input-group">
-                            <span class="input-group-text pe-2">Lat:</span>
+                            <label class="input-group-text pe-2" for="latitude">Lat:</label>
                             <input id="latitude" type="text" class="form-control ps-2 " placeholder="0.0" aria-label="Latitude" aria-describedby="latitude">
-                            <span class="input-group-text pe-2">Lon:</span>
+                            <label class="input-group-text pe-2" for="longitude">Lon:</label>
                             <input id="longitude" type="text" class="form-control ps-2" placeholder="0.0" aria-label="Longitude" aria-describedby="longitude">
                         </div>
                         <div class="mt-1 float-end">
@@ -882,7 +878,7 @@
                                 <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Crop Library" id="Crop Library-circle-help"  data-bs-content="When enabled, audio files containing daylight periods are cropped, so the audio is only saved for nocturnal periods.">?</a>
                             </div>
                         </div>
-                        <div class="row p-2" id="choose-archive-location">
+                        <div class="input-group rounded p-2" id="choose-archive-location">
                             <div class="col">
                                 <div class="input-group">
                                     <button class="btn btn-outline-secondary" type="button" id="archive-location-select">Library Location:</button>
@@ -1294,7 +1290,7 @@
             </div>
 
             <!-- navbar-collapse.// -->
-            <a href="https://chirpity.mattkirkland.co.uk" title="Visit the Chirpity website" target="_blank"><img id="primaryLogo" src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"></a>
+            <a href="https://chirpity.mattkirkland.co.uk" title="Visit the Chirpity website" target="_blank"  id="primaryLogoLink"><img id="primaryLogo" src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"></a>
         </div>
         <!-- container-fluid.// -->
     </nav>

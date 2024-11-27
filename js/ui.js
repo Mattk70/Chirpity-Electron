@@ -933,9 +933,10 @@ async function setCustomLocation() {
         legends[i].textContent = i18n[i+2]; // process each node
     }
     locationModalDiv.querySelector('label[for="batchLocations"]').textContent = i18n[4];
+    document.getElementById('customLatLabel').textContent = i18n[5];
+    document.getElementById('customLonLabel').textContent = i18n[6];
     const locationModal = new bootstrap.Modal(locationModalDiv);
     locationModal.show();
-    
     
     // Submit action
     const locationForm = document.getElementById('locationForm');

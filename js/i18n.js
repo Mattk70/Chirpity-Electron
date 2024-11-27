@@ -805,70 +805,80 @@ const i18nLocation = {
         'Delete Location', 
         'Pick A Saved Location', 
         'Add, Edit or Delete Location', 
-        'Update ALL open files to this location'
+        'Update ALL open files to this location',
+        "Lat:", "Lon:"
     ],
     da: [
         'Angiv placering', 
         'Slet placering', 
         'Vælg en gemt placering', 
         'Tilføj, rediger eller slet placering', 
-        'Opdater ALLE åbne filer til denne placering'
+        'Opdater ALLE åbne filer til denne placering',
+        "Bredde:", "Længde:"
     ],
     de: [
         'Standort festlegen', 
         'Standort löschen', 
         'Gespeicherten Standort auswählen', 
         'Standort hinzufügen, bearbeiten oder löschen', 
-        'Alle geöffneten Dateien auf diesen Standort aktualisieren'
+        'Alle geöffneten Dateien auf diesen Standort aktualisieren',
+        "Breitengrad:", "Längengrad:"
     ],
     es: [
         'Establecer ubicación', 
         'Eliminar ubicación', 
         'Seleccionar una ubicación guardada', 
         'Añadir, editar o eliminar una ubicación', 
-        'Actualizar TODOS los archivos abiertos a esta ubicación'
+        'Actualizar TODOS los archivos abiertos a esta ubicación',
+        "Latitud:", "Longitud:"
     ],
     fr: [
         'Définir l’emplacement', 
         'Supprimer l’emplacement', 
         'Choisir un emplacement enregistré', 
         'Ajouter, modifier ou supprimer un emplacement', 
-        'Mettre à jour TOUS les fichiers ouverts à cet emplacement'
+        'Mettre à jour TOUS les fichiers ouverts à cet emplacement',
+        "Lat:", "Long:"
     ],
     nl: [
         'Locatie instellen', 
         'Locatie verwijderen', 
         'Kies een opgeslagen locatie', 
         'Locatie toevoegen, bewerken of verwijderen', 
-        'Werk ALLE geopende bestanden bij naar deze locatie'
+        'Werk ALLE geopende bestanden bij naar deze locatie',
+        "Breedte:", "Lengte:"
     ],
     pt: [
         'Definir localização', 
         'Excluir localização', 
         'Escolher uma localização salva', 
         'Adicionar, editar ou excluir localização', 
-        'Atualizar TODOS os arquivos abertos para esta localização'
+        'Atualizar TODOS os arquivos abertos para esta localização',
+        "Lat:", "Lon:"
     ],
     ru: [
         'Установить местоположение', 
         'Удалить местоположение', 
         'Выбрать сохранённое местоположение', 
         'Добавить, изменить или удалить местоположение', 
-        'Обновить ВСЕ открытые файлы до этого местоположения'
+        'Обновить ВСЕ открытые файлы до этого местоположения',
+        "Широта:", "Долгота:"
     ],
     sv: [
         'Ange plats', 
         'Radera plats', 
         'Välj en sparad plats', 
         'Lägg till, redigera eller radera plats', 
-        'Uppdatera ALLA öppna filer till denna plats'
+        'Uppdatera ALLA öppna filer till denna plats',
+        "Latitud:", "Longitud:"
     ],
     zh: [
         '设置位置', 
         '删除位置', 
         '选择一个保存的位置', 
         '添加、编辑或删除位置', 
-        '更新所有打开的文件到此位置'
+        '更新所有打开的文件到此位置',
+        "纬度:", "经度:"
     ]
 };
 
@@ -1149,195 +1159,208 @@ const i18nLIST_MAP = {
 
 const i18nTitles = {
     da: {
-        "filename": "Højreklik for at opdatere filens starttid eller placering",
-        "controlsWrapper": "Træk for at ændre størrelsen på spektrogramvinduet.",
-        "playToggle": "Afspil / Pause (Mellemrumstasten)",
-        "zoomIn": "Zoom ind på spektrogrammet (Genvejstast: +)",
-        "zoomOut": "Zoom ud på spektrogrammet (Genvejstast: -)",    "nocmigOn": "Nocmig-tilstand aktiveret",
-        "nocmigOff": "Nocmig-tilstand deaktiveret",
-        "audioFiltersOn": "Lydfiltre anvendt",
-        "audioFiltersOff": "Ingen lydfiltre",
-        "contextModeOn": "Kontekstafhængig tilstand aktiveret",
-        "contextModeOff": "Kontekstafhængig tilstand deaktiveret",
+        filename: "Højreklik for at opdatere filens starttid eller placering",
+        controlsWrapper: "Træk for at ændre størrelsen på spektrogramvinduet.",
+        playToggle: "Afspil / Pause (Mellemrumstasten)",
+        zoomIn: "Zoom ind på spektrogrammet (Genvejstast: +)",
+        zoomOut: "Zoom ud på spektrogrammet (Genvejstast: -)",
+        nocmigOn: "Nocmig-tilstand aktiveret",
+        nocmigOff: "Nocmig-tilstand deaktiveret",
+        audioFiltersOn: "Lydfiltre anvendt",
+        audioFiltersOff: "Ingen lydfiltre",
+        contextModeOn: "Kontekstafhængig tilstand aktiveret",
+        contextModeOff: "Kontekstafhængig tilstand deaktiveret",
         "frequency-range": "Juster spektrogrammets frekvensområde",
         "threshold-value": "Grænseværdi for forudsigelsestillid",
-        "clear-custom-list": "Ryd brugerdefineret liste"
+        "clear-custom-list": "Ryd brugerdefineret liste",
+        primaryLogoLink: "Besøg Chirpity-websitet"
       },
     de: {
-        "filename": "Rechtsklick, um die Startzeit oder den Speicherort der Datei zu aktualisieren",
-        "controlsWrapper": "Ziehen, um das Spektrogrammfenster zu ändern.",
-        "playToggle": "Abspielen / Pause (Leertaste)",
-        "zoomIn": "Ins Spektrogramm zoomen (Tastenkürzel: +)",
-        "zoomOut": "Aus dem Spektrogramm herauszoomen (Tastenkürzel: -)",
-        "nocmigOn": "Nocmig-Modus aktiviert",
-        "nocmigOff": "Nocmig-Modus deaktiviert",
-        "audioFiltersOn": "Audiofilter angewendet",
-        "audioFiltersOff": "Keine Audiofilter",
-        "contextModeOn": "Kontextbewusster Modus aktiviert",
-        "contextModeOff": "Kontextbewusster Modus deaktiviert",
+        filename: "Rechtsklick, um die Startzeit oder den Speicherort der Datei zu aktualisieren",
+        controlsWrapper: "Ziehen, um das Spektrogrammfenster zu ändern.",
+        playToggle: "Abspielen / Pause (Leertaste)",
+        zoomIn: "Ins Spektrogramm zoomen (Tastenkürzel: +)",
+        zoomOut: "Aus dem Spektrogramm herauszoomen (Tastenkürzel: -)",
+        nocmigOn: "Nocmig-Modus aktiviert",
+        nocmigOff: "Nocmig-Modus deaktiviert",
+        audioFiltersOn: "Audiofilter angewendet",
+        audioFiltersOff: "Keine Audiofilter",
+        contextModeOn: "Kontextbewusster Modus aktiviert",
+        contextModeOff: "Kontextbewusster Modus deaktiviert",
         "frequency-range": "Frequenzbereich des Spektrogramms anpassen",
         "threshold-value": "Schwellenwert für Vorhersagevertrauen",
-        "clear-custom-list": "Benutzerdefinierte Liste löschen"
+        "clear-custom-list": "Benutzerdefinierte Liste löschen",
+        primaryLogoLink: "Besuchen Sie die Chirpity-Website"
       },
     en: {
-        "filename":"Context-click to update file start time or location",
-      "controlsWrapper": "Drag to resize the Spectrogram window.",
-      "playToggle": "Play / Pause (SpaceBar)",
-      "zoomIn": "Zoom into the spectrogram (Keyboard Shortcut: + key)",
-      "zoomOut": "Zoom out of the spectrogram (Keyboard Shortcut: - key)",
-      "nocmigMode": "Nocmig mode on",
-      "audioFiltersOn": "Audio filters applied",
-      "audioFiltersOff": "No Audio filters",
-      "contextModeOn": "Context Mode enabled",
-      "contextModeOff": "Context Mode disabled",
-      "context-mode": "Context Aware mode enabled",
-      "frequency-range": "Adjust spectrogram frequency range",
-      "threshold-value": "Prediction confidence threshold",
-      "clear-custom-list": "Clear custom list"
+        filename:"Context-click to update file start time or location",
+        controlsWrapper: "Drag to resize the Spectrogram window.",
+        playToggle: "Play / Pause (SpaceBar)",
+        zoomIn: "Zoom into the spectrogram (Keyboard Shortcut: + key)",
+        zoomOut: "Zoom out of the spectrogram (Keyboard Shortcut: - key)",
+        nocmigMode: "Nocmig mode on",
+        audioFiltersOn: "Audio filters applied",
+        audioFiltersOff: "No Audio filters",
+        contextModeOn: "Context Mode enabled",
+        contextModeOff: "Context Mode disabled",
+        "context-mode": "Context Aware mode enabled",
+        "frequency-range": "Adjust spectrogram frequency range",
+        "threshold-value": "Prediction confidence threshold",
+        "clear-custom-list": "Clear custom list",
+        primaryLogoLink: "Visit the Chirpity website"
     },
     es: {
-        "filename": "Haz clic derecho para actualizar la hora de inicio o la ubicación del archivo",
-      "controlsWrapper": "Arrastra para cambiar el tamaño de la ventana del sonograma.",
-      "playToggle": "Reproducir / Pausa (Barra espaciadora)",
-      "zoomIn": "Acercar el sonograma (Atajo de teclado: tecla +)",
-      "zoomOut": "Alejar el sonograma (Atajo de teclado: tecla -)",
-      "nocmigOn": "Modo Nocmig activado",
-      "nocmigOff": "Modo Nocmig desactivado",
-      "audioFiltersOn": "Filtros de audio aplicados",
-      "audioFiltersOff": "Sin filtros de audio",
-      "contextModeOn": "Modo contexto activado",
-      "contextModeOff": "Modo contexto desactivado",
+        filename: "Haz clic derecho para actualizar la hora de inicio o la ubicación del archivo",
+      controlsWrapper: "Arrastra para cambiar el tamaño de la ventana del sonograma.",
+      playToggle: "Reproducir / Pausa (Barra espaciadora)",
+      zoomIn: "Acercar el sonograma (Atajo de teclado: tecla +)",
+      zoomOut: "Alejar el sonograma (Atajo de teclado: tecla -)",
+      nocmigOn: "Modo Nocmig activado",
+      nocmigOff: "Modo Nocmig desactivado",
+      audioFiltersOn: "Filtros de audio aplicados",
+      audioFiltersOff: "Sin filtros de audio",
+      contextModeOn: "Modo contexto activado",
+      contextModeOff: "Modo contexto desactivado",
       "frequency-range": "Ajustar el rango de frecuencias del sonograma",
       "threshold-value": "Umbral de confianza de la predicción",
-      "clear-custom-list": "Borrar lista personalizada"
+      "clear-custom-list": "Borrar lista personalizada",
+      primaryLogoLink: "Visita la web de Chirpity"
     },
     fr: {
-        "filename": "Clic droit pour mettre à jour l'heure de début ou l'emplacement du fichier",
-      "controlsWrapper": "Faites glisser pour redimensionner la fenêtre du spectrogramme.",
-      "playToggle": "Lecture / Pause (Barre d'espace)",
-      "zoomIn": "Zoomer sur le spectrogramme (Raccourci clavier : touche +)",
-      "zoomOut": "Dézoomer sur le spectrogramme (Raccourci clavier : touche -)",
-      "nocmigOn": "Mode Nocmig activé",
-      "nocmigOff": "Mode Nocmig désactivé",
-      "audioFiltersOn": "Filtres audio appliqués",
-      "audioFiltersOff": "Pas de filtres audio",
-      "contextModeOn": "Mode contextuel activé",
-      "contextModeOff": "Mode contextuel désactivé",
+        filename: "Clic droit pour mettre à jour l'heure de début ou l'emplacement du fichier",
+      controlsWrapper: "Faites glisser pour redimensionner la fenêtre du spectrogramme.",
+      playToggle: "Lecture / Pause (Barre d'espace)",
+      zoomIn: "Zoomer sur le spectrogramme (Raccourci clavier : touche +)",
+      zoomOut: "Dézoomer sur le spectrogramme (Raccourci clavier : touche -)",
+      nocmigOn: "Mode Nocmig activé",
+      nocmigOff: "Mode Nocmig désactivé",
+      audioFiltersOn: "Filtres audio appliqués",
+      audioFiltersOff: "Pas de filtres audio",
+      contextModeOn: "Mode contextuel activé",
+      contextModeOff: "Mode contextuel désactivé",
       "frequency-range": "Ajuster la plage de fréquences du spectrogramme",
       "threshold-value": "Seuil de confiance pour les prédictions",
-      "clear-custom-list": "Effacer la liste personnalisée"
+      "clear-custom-list": "Effacer la liste personnalisée",
+      primaryLogoLink: "Visitez le site Web de Chirpity"
     },
     nl: {
-        "filename": "Klik met de rechtermuisknop om de starttijd of locatie van het bestand bij te werken",
-        "controlsWrapper": "Sleep om het spectrogramvenster te vergroten of verkleinen.",
-        "playToggle": "Afspelen / Pauzeren (Spatiebalk)",
-        "zoomIn": "Inzoomen op het spectrogram (Sneltoets: + toets)",
-        "zoomOut": "Uitzoomen op het spectrogram (Sneltoets: - toets)",
-        "nocmigOn": "Nocmig-modus ingeschakeld",
-        "nocmigOff": "Nocmig-modus uitgeschakeld",
-        "audioFiltersOn": "Audiostanden toegepast",
-        "audioFiltersOff": "Geen audiostanden",
-        "contextModeOn": "Contextbewuste modus ingeschakeld",
-        "contextModeOff": "Contextbewuste modus uitgeschakeld",
+        filename: "Klik met de rechtermuisknop om de starttijd of locatie van het bestand bij te werken",
+        controlsWrapper: "Sleep om het spectrogramvenster te vergroten of verkleinen.",
+        playToggle: "Afspelen / Pauzeren (Spatiebalk)",
+        zoomIn: "Inzoomen op het spectrogram (Sneltoets: + toets)",
+        zoomOut: "Uitzoomen op het spectrogram (Sneltoets: - toets)",
+        nocmigOn: "Nocmig-modus ingeschakeld",
+        nocmigOff: "Nocmig-modus uitgeschakeld",
+        audioFiltersOn: "Audiostanden toegepast",
+        audioFiltersOff: "Geen audiostanden",
+        contextModeOn: "Contextbewuste modus ingeschakeld",
+        contextModeOff: "Contextbewuste modus uitgeschakeld",
         "frequency-range": "Frequentiebereik van het spectrogram aanpassen",
         "threshold-value": "Drempelwaarde voor voorspelling",
-        "clear-custom-list": "Aangepaste lijst wissen"
+        "clear-custom-list": "Aangepaste lijst wissen",
+        primaryLogoLink: "Bezoek de Chirpity-website"
       },
     pt: {
-        "filename": "Clique com o botão direito para atualizar o horário de início ou o local do arquivo",
-        "controlsWrapper": "Arraste para redimensionar a janela do espectrograma.",
-        "playToggle": "Reproduzir / Pausar (Tecla Espaço)",
-        "zoomIn": "Aproximar no espectrograma (Atalho: tecla +)",
-        "zoomOut": "Afastar no espectrograma (Atalho: tecla -)",
-        "nocmigOn": "Modo Nocmig ativado",
-        "nocmigOff": "Modo Nocmig desativado",
-        "audioFiltersOn": "Filtros de áudio aplicados",
-        "audioFiltersOff": "Sem filtros de áudio",
-        "contextModeOn": "Modo contextual ativado",
-        "contextModeOff": "Modo contextual desativado",
+        filename: "Clique com o botão direito para atualizar o horário de início ou o local do arquivo",
+        controlsWrapper: "Arraste para redimensionar a janela do espectrograma.",
+        playToggle: "Reproduzir / Pausar (Tecla Espaço)",
+        zoomIn: "Aproximar no espectrograma (Atalho: tecla +)",
+        zoomOut: "Afastar no espectrograma (Atalho: tecla -)",
+        nocmigOn: "Modo Nocmig ativado",
+        nocmigOff: "Modo Nocmig desativado",
+        audioFiltersOn: "Filtros de áudio aplicados",
+        audioFiltersOff: "Sem filtros de áudio",
+        contextModeOn: "Modo contextual ativado",
+        contextModeOff: "Modo contextual desativado",
         "frequency-range": "Ajustar o intervalo de frequência do espectrograma",
         "threshold-value": "Limite de confiança da previsão",
-        "clear-custom-list": "Limpar lista personalizada"
+        "clear-custom-list": "Limpar lista personalizada",
+        primaryLogoLink: "Visite o site da Chirpity"
       },
     ru: {
-        "filename": "Щелкните правой кнопкой мыши, чтобы обновить время начала или местоположение файла",
-        "controlsWrapper": "Перетащите, чтобы изменить размер окна спектрограммы.",
-        "playToggle": "Воспроизведение / Пауза (Пробел)",
-        "zoomIn": "Увеличить спектрограмму (Горячая клавиша: +)",
-        "zoomOut": "Уменьшить спектрограмму (Горячая клавиша: -)",
-        "nocmigOn": "Режим Nocmig включён",
-        "nocmigOff": "Режим Nocmig выключен",
-        "audioFiltersOn": "Применены аудиофильтры",
-        "audioFiltersOff": "Аудиофильтры отсутствуют",
-        "contextModeOn": "Контекстный режим включён",
-        "contextModeOff": "Контекстный режим выключен",
+        filename: "Щелкните правой кнопкой мыши, чтобы обновить время начала или местоположение файла",
+        controlsWrapper: "Перетащите, чтобы изменить размер окна спектрограммы.",
+        playToggle: "Воспроизведение / Пауза (Пробел)",
+        zoomIn: "Увеличить спектрограмму (Горячая клавиша: +)",
+        zoomOut: "Уменьшить спектрограмму (Горячая клавиша: -)",
+        nocmigOn: "Режим Nocmig включён",
+        nocmigOff: "Режим Nocmig выключен",
+        audioFiltersOn: "Применены аудиофильтры",
+        audioFiltersOff: "Аудиофильтры отсутствуют",
+        contextModeOn: "Контекстный режим включён",
+        contextModeOff: "Контекстный режим выключен",
         "frequency-range": "Настройте диапазон частот спектрограммы",
         "threshold-value": "Порог уверенности в прогнозе",
-        "clear-custom-list": "Очистить пользовательский список"
+        "clear-custom-list": "Очистить пользовательский список",
+        primaryLogoLink: "Посетите сайт Chirpity"
     },
     sv: {
-        "filename": "Högerklicka för att uppdatera filens starttid eller plats",
-        "controlsWrapper": "Dra för att ändra storlek på spektrogramfönstret.",
-        "playToggle": "Spela / Pausa (Mellanslag)",
-        "zoomIn": "Zooma in på spektrogrammet (Kortkommando: +)",
-        "zoomOut": "Zooma ut på spektrogrammet (Kortkommando: -)",
-        "nocmigOn": "Nocmig-läge på",
-        "nocmigOff": "Nocmig-läge av",
-        "audioFiltersOn": "Ljudfilter aktiverade",
-        "audioFiltersOff": "Inga ljudfilter",
-        "contextModeOn": "Kontextmedvetet läge aktiverat",
-        "contextModeOff": "Kontextmedvetet läge avaktiverat",
+        filename: "Högerklicka för att uppdatera filens starttid eller plats",
+        controlsWrapper: "Dra för att ändra storlek på spektrogramfönstret.",
+        playToggle: "Spela / Pausa (Mellanslag)",
+        zoomIn: "Zooma in på spektrogrammet (Kortkommando: +)",
+        zoomOut: "Zooma ut på spektrogrammet (Kortkommando: -)",
+        nocmigOn: "Nocmig-läge på",
+        nocmigOff: "Nocmig-läge av",
+        audioFiltersOn: "Ljudfilter aktiverade",
+        audioFiltersOff: "Inga ljudfilter",
+        contextModeOn: "Kontextmedvetet läge aktiverat",
+        contextModeOff: "Kontextmedvetet läge avaktiverat",
         "frequency-range": "Justera spektrogrammets frekvensomfång",
         "threshold-value": "Tröskel för förutsägelseförtroende",
-        "clear-custom-list": "Rensa anpassad lista"
+        "clear-custom-list": "Rensa anpassad lista",
+        primaryLogoLink: "Besök Chirpity-webbplatsen"
     },
     zh: {
-        "filename": "右键单击以更新文件的开始时间或位置",
-      "controlsWrapper": "拖动以调整光谱窗口的大小。",
-      "playToggle": "播放 / 暂停（空格键）",
-      "zoomIn": "放大光谱图（快捷键：+ 键）",
-      "zoomOut": "缩小光谱图（快捷键：- 键）",
-      "nocmigOn": "Nocmig 模式已开启",
-      "nocmigOff": "Nocmig 模式已关闭",
-      "audioFiltersOn": "已应用音频过滤器",
-      "audioFiltersOff": "无音频过滤器",
-      "contextModeOn": "上下文感知模式已启用",
-      "contextModeOff": "上下文感知模式已禁用",
+        filename: "右键单击以更新文件的开始时间或位置",
+      controlsWrapper: "拖动以调整光谱窗口的大小。",
+      playToggle: "播放 / 暂停（空格键）",
+      zoomIn: "放大光谱图（快捷键：+ 键）",
+      zoomOut: "缩小光谱图（快捷键：- 键）",
+      nocmigOn: "Nocmig 模式已开启",
+      nocmigOff: "Nocmig 模式已关闭",
+      audioFiltersOn: "已应用音频过滤器",
+      audioFiltersOff: "无音频过滤器",
+      contextModeOn: "上下文感知模式已启用",
+      contextModeOff: "上下文感知模式已禁用",
       "frequency-range": "调整光谱图的频率范围",
       "threshold-value": "预测置信度阈值",
-      "clear-custom-list": "清除自定义列表"
+      "clear-custom-list": "清除自定义列表",
+      primaryLogoLink: "访问 Chirpity 网站"
     },
     it: { // random! But will leave in. Italian
-        "filename": "Fai clic destro per aggiornare l'ora di inizio o la posizione del file",
-        "controlsWrapper": "Trascina per ridimensionare la finestra dello spettrogramma.",
-        "playToggle": "Riproduci / Pausa (Barra spaziatrice)",
-        "zoomIn": "Ingrandisci lo spettrogramma (Scorciatoia: tasto +)",
-        "zoomOut": "Riduci lo spettrogramma (Scorciatoia: tasto -)",
-        "nocmigOn": "Modalità Nocmig attivata",
-        "nocmigOff": "Modalità Nocmig disattivata",
-        "audioFiltersOn": "Filtri audio applicati",
-        "audioFiltersOff": "Nessun filtro audio",
-        "contextModeOn": "Modalità contestuale abilitata",
-        "contextModeOff": "Modalità contestuale disabilitata",
+        filename: "Fai clic destro per aggiornare l'ora di inizio o la posizione del file",
+        controlsWrapper: "Trascina per ridimensionare la finestra dello spettrogramma.",
+        playToggle: "Riproduci / Pausa (Barra spaziatrice)",
+        zoomIn: "Ingrandisci lo spettrogramma (Scorciatoia: tasto +)",
+        zoomOut: "Riduci lo spettrogramma (Scorciatoia: tasto -)",
+        nocmigOn: "Modalità Nocmig attivata",
+        nocmigOff: "Modalità Nocmig disattivata",
+        audioFiltersOn: "Filtri audio applicati",
+        audioFiltersOff: "Nessun filtro audio",
+        contextModeOn: "Modalità contestuale abilitata",
+        contextModeOff: "Modalità contestuale disabilitata",
         "frequency-range": "Regola l'intervallo di frequenza dello spettrogramma",
         "threshold-value": "Soglia di confidenza della previsione",
-        "clear-custom-list": "Cancella lista personalizzata"
+        "clear-custom-list": "Cancella lista personalizzata",
+        primaryLogoLink: "Visita il sito web di Chirpity"
     },
     pl: { // Also random! Polish
-        "filename": "Kliknij prawym przyciskiem myszy, aby zaktualizować czas rozpoczęcia lub lokalizację pliku",
-      "controlsWrapper": "Przeciągnij, aby zmienić rozmiar okna spektrogramu.",
-      "playToggle": "Odtwórz / Pauza (Spacja)",
-      "zoomIn": "Powiększ spektrogram (Skrót klawiaturowy: klawisz +)",
-      "zoomOut": "Pomniejsz spektrogram (Skrót klawiaturowy: klawisz -)",
-      "nocmigOn": "Tryb Nocmig włączony",
-      "nocmigOff": "Tryb Nocmig wyłączony",
-      "audioFiltersOn": "Zastosowano filtry audio",
-      "audioFiltersOff": "Brak filtrów audio",
-      "contextModeOn": "Włączono tryb kontekstowy",
-      "contextModeOff": "Wyłączono tryb kontekstowy",
+        filename: "Kliknij prawym przyciskiem myszy, aby zaktualizować czas rozpoczęcia lub lokalizację pliku",
+      controlsWrapper: "Przeciągnij, aby zmienić rozmiar okna spektrogramu.",
+      playToggle: "Odtwórz / Pauza (Spacja)",
+      zoomIn: "Powiększ spektrogram (Skrót klawiaturowy: klawisz +)",
+      zoomOut: "Pomniejsz spektrogram (Skrót klawiaturowy: klawisz -)",
+      nocmigOn: "Tryb Nocmig włączony",
+      nocmigOff: "Tryb Nocmig wyłączony",
+      audioFiltersOn: "Zastosowano filtry audio",
+      audioFiltersOff: "Brak filtrów audio",
+      contextModeOn: "Włączono tryb kontekstowy",
+      contextModeOff: "Wyłączono tryb kontekstowy",
       "frequency-range": "Dostosuj zakres częstotliwości spektrogramu",
       "threshold-value": "Próg pewności predykcji",
-      "clear-custom-list": "Wyczyść niestandardową listę"
+      "clear-custom-list": "Wyczyść niestandardową listę",
+      primaryLogoLink: "Odwiedź stronę internetową Chirpity"
     }
   };
   
@@ -1347,35 +1370,80 @@ const i18nTitles = {
         nocturnal: 'Nocturnal Calls', 
         birds: 'All Birds', 
         everything: 'Everything', 
-        custom: 'Custom' 
+        custom: 'Custom',
+        timecode: 'Timecode',
+        timeOfDay: 'Time of Day',
+        ogg: 'Lossy (recommended)',
+        flac: 'Lossless',
+        Global: "Global",
+        Europe: "Europe",
+        Mediterranean: "Mediterranean",
+        customListPH: 'No custom list set',
+        libraryLocationPH: 'No location set'
     },
     da: {
         location: 'Lokale fugle',
         nocturnal: 'Natlige kald',
         birds: 'Alle fugle',
         everything: 'Alt',
-        custom: 'Brugerdefineret'
+        custom: 'Brugerdefineret',
+        timecode: "Tidskode",
+        timeOfDay: "Tidspunkt på dagen",
+        ogg: "Tabsgivende (anbefalet)",
+        flac: "Tabsfri",
+        Global: "Global",
+        Europe: "Europa",
+        Mediterranean: "Middelhavet",
+        customListPH: "Ingen liste angivet", 
+        libraryLocationPH: "Ingen placering angivet" 
     },
     de: {
         location: 'Einheimische Vögel',
         nocturnal: 'Nächtliche Rufen',
         birds: 'Alle Vögel',
         everything: 'Alles',
-        custom: 'Benutzerdefiniert'
+        custom: 'Benutzerdefiniert',
+        timecode: "Zeitcode",
+        timeOfDay: "Tageszeit",
+        ogg: "Verlustbehaftet (empfohlen)",
+        flac: "Verlustfrei",
+        Global: "Allgemein",
+        Europe: "Europa",
+        Mediterranean: "Mittelmeer",
+        customListPH: "Keine Liste festgelegt", 
+        libraryLocationPH: "Kein Standort festgelegt" 
     },
     es: {
         location: 'Aves de la zona',
         nocturnal: 'Reclamos nocturnos',
         birds: 'Todas las aves',
         everything: 'Cualquier sonido',
-        custom: 'Personalizado'
+        custom: 'Personalizado',
+        timecode: "Código de tiempo",
+        timeOfDay: "Hora del día",
+        ogg: "Con pérdida (recomendado)",
+        flac: "Sin pérdida",
+        Global: "Global",
+        Europe: "Europa",
+        Mediterranean: "Mediterráneo",
+        customListPH: "Sin lista", 
+        libraryLocationPH: "Sin ubicación" 
     },
     fr: {
         location: 'Oiseaux locaux',
         nocturnal: 'Cris nocturnes',
         birds: 'Tous les oiseaux',
         everything: 'Tout',
-        custom: 'Personnalisé'
+        custom: 'Personnalisé',
+        timecode: "Code temporel",
+        timeOfDay: "Heure de la journée",
+        ogg: "Avec perte (recommandé)",
+        flac: "Sans perte",
+        Global: "Mondial",
+        Europe: "Europe",
+        Mediterranean: "Méditerranée",
+        customListPH: "Aucune liste définie", 
+        libraryLocationPH: "Aucun emplacement défini" 
     },
     // it: {
     //     location: 'Uccelli locali',
@@ -1389,7 +1457,16 @@ const i18nTitles = {
         nocturnal: 'Nachtelijke roepen',
         birds: 'Alle vogels',
         everything: 'Alles',
-        custom: 'Aangepast'
+        custom: 'Aangepast',
+        timecode: "Tijdcode",
+        timeOfDay: "Tijd van de dag",
+        ogg: "Verlies (aanbevolen)",
+        flac: "Verliesvrij",
+        Global: "Wereldwijd",
+        Europe: "Europa",
+        Mediterranean: "Middellandse Zeegebied",
+        customListPH: "Geen lijst ingesteld", 
+        libraryLocationPH: "Geen locatie ingesteld" 
     },
     // pl: {
     //     location: 'Lokalne ptaki',
@@ -1403,28 +1480,64 @@ const i18nTitles = {
         nocturnal: 'Chamadas noturnos',
         birds: 'Todos os pássaros',
         everything: 'Tudo',
-        custom: 'Personalizado'
+        custom: 'Personalizado',
+        timecode: "Código de tempo",
+        timeOfDay: "Hora do dia",
+        ogg: "Com perdas (recomendado)",
+        flac: "Sem perdas",
+        Global: "Global",
+        Europe: "Europa",
+        Mediterranean: "Mediterrâneo",
+        customListPH: "Nenhuma lista definida", 
+        libraryLocationPH: "Nenhuma localização definida" 
     },
     ru: {
         location: 'Местные птицы',
         nocturnal: 'Ночные звуков',
         birds: 'Все птицы',
         everything: 'Все',
-        custom: 'Пользовательский'
+        custom: 'Пользовательский',
+        timecode: "Таймкод",
+        timeOfDay: "Время суток",
+        ogg: "С потерями (рекомендуется)",
+        flac: "Без потерь",
+        Global: "Глобальный",
+        Europe: "Европа",
+        Mediterranean: "Средиземноморье",
+        customListPH: "Без списка", 
+        libraryLocationPH: "Без места" 
     },
     sv: {
         location: 'Lokala fåglar',
         nocturnal: 'Nattliga läten',
         birds: 'Alla fåglar',
         everything: 'Allt',
-        custom: 'Anpassad'
+        custom: 'Anpassad',
+        timecode: "Tidskod",
+        timeOfDay: "Tid på dagen",
+        ogg: "Förlust (rekommenderas)",
+        flac: "Förlustfri",
+        Global: "Global",
+        Europe: "Europa",
+        Mediterranean: "Medelhavet",
+        customListPH: "Ingen lista angiven", 
+        libraryLocationPH: "Ingen plats angiven" 
     },
     zh: {
         location: '本地鸟类',
         nocturnal: '夜间叫声',
         birds: '所有鸟类',
         everything: '所有',
-        custom: '自定义'
+        custom: '自定义',
+        timecode: "时间码",
+        timeOfDay: "一天中的时间",
+        ogg: "有损（推荐）",
+        flac: "无损",
+        Global: "全球的",
+        Europe: "欧洲",
+        Mediterranean: "地中海",
+        customListPH: "未设置列表", 
+        libraryLocationPH: "未设置位置" 
     }
 };
 
@@ -2506,27 +2619,22 @@ async function localiseUI(locale) {
         for (const key in localisationData) {
             // Skip settings
             if (key === 'settings' || key === 'record-entry') continue;
-            if (localisationData.hasOwnProperty(key)) {
+            const element = document.getElementById(key);
+            if (element) {
+                if (key.indexOf('circle-help') !==-1){
+                    // Help button popup text
+                    element.setAttribute('data-bs-content', localisationData[key]);
+                    // refresh the tooltip to reflect the change
+                    const popover = new bootstrap.Popover(element);
+                    popover.update();
 
-                const element = document.getElementById(key);
-                if (element) {
-                    if (key.indexOf('circle-help') !==-1){
-                        // Help button popup text
-                        element.setAttribute('data-bs-content', localisationData[key]);
-                        // refresh the tooltip to reflect the change
-                        const popover = new bootstrap.Popover(element);
-                        popover.update();
-
-                    } else {
-                        // Replace the inner text of the <a> tag but leave <span> unaffected
-                        const spans = element.querySelectorAll('span');
-                        element.textContent = ' ' + localisationData[key][0];
-                        spans.length && element.insertBefore(spans[0], element.firstChild);
-                        spans.length > 1 && element.appendChild(spans[1])
-                    };
-                        // element.innerHTML = localisationData[key];
-                    
-                }
+                } else {
+                    // Replace the inner text of the <a> tag but leave <span> unaffected
+                    const spans = element.querySelectorAll('span');
+                    element.textContent = ' ' + localisationData[key][0];
+                    spans.length && element.insertBefore(spans[0], element.firstChild);
+                    spans.length > 1 && element.appendChild(spans[1])
+                };
             }
         }
         // Update buttons without ID
@@ -2534,8 +2642,9 @@ async function localiseUI(locale) {
         buttons.forEach(button => button.textContent &&= localisationData['help-modal-close']);
         // Update Title text
         const titles = document.querySelectorAll('[title]');
+        const i18nT = i18nTitles[locale]
         titles.forEach(title =>{
-            const i18nTitle = i18nTitles[locale][title.id];
+            const i18nTitle = i18nT[title.id];
             title.title = i18nTitle ?? title.title;
         })
         // Record entry form:
@@ -2578,22 +2687,26 @@ async function localiseUI(locale) {
             if (span) heading.appendChild(span)
         }
         // Update the list options:
-        const listOptions = document.getElementById('list-to-use')
-        listOptions.querySelectorAll('option').forEach(option => {
+        const options = i18nLists[locale];
+        form.querySelectorAll('option').forEach(option => {
             const key = option.value; // Get the value of the option, which matches the key in i18nLists
-            option.textContent = i18nLists[locale][key] ?? option.textContent;
+            option.textContent = options[key] ?? option.textContent;
         });
+        // placeholholders
+        document.getElementById("custom-list-location").setAttribute('placeholder', options['customListPH'])
+        document.getElementById("archive-location").setAttribute('placeholder', options['libraryLocationPH'])
         // //Explore location header
         document.querySelector("label[for='explore-locations']").textContent = i18nHeadings[locale].location;
         document.getElementById('exploreRange').innerHTML = `<span class="material-symbols-outlined align-bottom">date_range</span><span>${localisationData['explore-datefilter']}</span> <span class="material-symbols-outlined float-end">expand_more</span>`;
-        console.warn('Translation', `${Date.now() - t0} ms`)
 
         // Tour Carousel items:
         const tour = document.querySelector('.carousel-inner');
         tour.innerHTML = i18nTour[locale];
+        console.warn('Translation', `${Date.now() - t0} ms`)
         return localisationData
     } catch (error) {
         console.error('Localisation Error:', error.message);
     }
 }
+
 export {i18nSpeciesList,i18nHeadings, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel, localiseUI}
