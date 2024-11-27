@@ -1118,14 +1118,14 @@ async function loadAudioFile({
 
     if (file) {
         fetchAudioBuffer({ file, start, end })
-        .then(audio => {
+        .then(([audio, start]) => {
             let audioArray = getMonoChannelData(audio);
             UI.postMessage({
                 event: 'worker-loaded-audio',
                 location: METADATA[file].locationID,
                 start: METADATA[file].fileStart,
                 sourceDuration: METADATA[file].duration,
-                bufferBegin: start,
+                fileBegin: start,
                 file: file,
                 position: position,
                 contents: audioArray,
@@ -1502,7 +1502,11 @@ const fetchAudioBuffer = async ({
     METADATA[file]?.duration || await setMetadata({file:file});
     end ??= METADATA[file].duration; 
     let concatenatedBuffer = Buffer.alloc(0);
-
+    if (start < 0 ){
+        // work back from file end
+        start += METADATA[file].duration;
+        end += METADATA[file].duration;
+    }
     // Ensure start is a minimum 0.1 seconds from the end of the file, and >= 0
     start = METADATA[file].duration < 0.1 ? 0 : Math.min(METADATA[file].duration - 0.1, start)
     end = Math.min(end, METADATA[file].duration);
@@ -1532,7 +1536,7 @@ const fetchAudioBuffer = async ({
             if (chunk === null){
                 // Last chunk
                 const audio = concatenatedBuffer;
-                resolve(audio)
+                resolve([audio, start])
                 stream.destroy();
             } else {
                 concatenatedBuffer = concatenatedBuffer.length ?  Buffer.concat([concatenatedBuffer, chunk]) : chunk;

@@ -2858,8 +2858,17 @@ function centreSpec(){
         PageUp: function () {
             if (currentBuffer) {
                 const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
-                bufferBegin = Math.max(0, bufferBegin - windowLength);
-                postBufferUpdate({ begin: bufferBegin, position: position })
+                bufferBegin = bufferBegin - windowLength;
+                const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
+                let fileToLoad;
+                if ( fileIndex > 0 && bufferBegin < 0){
+                    bufferBegin = -windowLength;
+                    fileToLoad = STATE.openFiles[fileIndex - 1];
+                } else {
+                    bufferBegin = Math.max(0, bufferBegin);
+                    fileToLoad = STATE.currentFile
+                }
+                postBufferUpdate({ file: fileToLoad, begin: bufferBegin, position: position })
             }
         },
         ArrowUp: function () {
@@ -2873,8 +2882,18 @@ function centreSpec(){
         PageDown: function () {
             if (currentBuffer) {
                 const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
-                bufferBegin = Math.min(bufferBegin + windowLength, currentFileDuration - windowLength);
-                postBufferUpdate({ begin: bufferBegin, position: position })
+                bufferBegin = bufferBegin + windowLength;
+                const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
+                let fileToLoad;
+                if ( fileIndex < STATE.openFiles.length - 1 && bufferBegin >= currentFileDuration - windowLength){
+                    // Move to next file
+                    fileToLoad = STATE.openFiles[fileIndex + 1];
+                    bufferBegin = 0;
+                } else {
+                    bufferBegin = Math.min(bufferBegin, currentFileDuration - windowLength);
+                    fileToLoad = STATE.currentFile;
+                }                
+                postBufferUpdate({ file: fileToLoad, begin: bufferBegin, position: position })
             }
         },
         ArrowDown: function () {
@@ -3073,7 +3092,7 @@ function centreSpec(){
         location,
         start = 0,
         sourceDuration = 0,
-        bufferBegin = 0,
+        fileBegin = 0,
         file = '',
         position = 0,
         buffer = undefined,
@@ -3085,6 +3104,7 @@ function centreSpec(){
         metadata = undefined
     }) {
         fileLoaded = true, locationID = location;
+        bufferBegin = fileBegin;
         clearTimeout(loadingTimeout)
         // Clear the loading animation
         DOM.loading.classList.add('d-none');
@@ -3101,7 +3121,7 @@ function centreSpec(){
         if (queued) {
             // Prepare arguments to call this function with
             NEXT_BUFFER = {
-                start: start, sourceDuration: sourceDuration, bufferBegin: bufferBegin, file: file,
+                start: start, sourceDuration: sourceDuration, bufferBegin: fileBegin, file: file,
                 buffer: currentBuffer, play: true, resetSpec: false, queued: false
             }
         } else {
@@ -3117,10 +3137,10 @@ function centreSpec(){
             renderFilenamePanel();
 
             if (config.timeOfDay) {
-                bufferStartTime = new Date(fileStart + (bufferBegin * 1000))
+                bufferStartTime = new Date(fileStart + (fileBegin * 1000))
             } else {
                 const zero = new Date(0,0,0, 0, 0, 0, 0);
-                bufferStartTime = new Date(zero.getTime() + (bufferBegin * 1000))
+                bufferStartTime = new Date(zero.getTime() + (fileBegin * 1000))
             }
             if (windowLength > currentFileDuration) windowLength = currentFileDuration;
             
