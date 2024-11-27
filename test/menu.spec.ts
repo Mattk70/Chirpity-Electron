@@ -76,7 +76,7 @@ test.beforeAll(async () => {
         clearInterval(checkPage);
         resolve('');
       } 
-    }, 100); 
+    }, 1000); 
   });
 })
 
@@ -101,7 +101,7 @@ REMEMBER TO REBUILD THE APP IF THE *APPLICATION CODE* NEEDS TO BE CHANGED
 // })
 
 
-test('Page title is correct', async ({page}) => {
+test('Page title is correct', async () => {
   const title = await page.title()
   console.log('title: ', title)
   console.log('url: ', page.url())
@@ -110,7 +110,7 @@ test('Page title is correct', async ({page}) => {
 })
 
 
-test(`Nocmig analyse works and second result is 61%`, async ({page}) => {
+test(`Nocmig analyse works and second result is 61%`, async () => {
   await runExampleAnalysis(page,'chirpity');
   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
   expect(callID).not.toBe(undefined)
@@ -119,7 +119,7 @@ test(`Nocmig analyse works and second result is 61%`, async ({page}) => {
   expect(secondResult).toBe('61%');
 })
 
-test(`BirdNET analyse works and second result is 34%`, async ({page}) => {
+test(`BirdNET analyse works and second result is 34%`, async () => {
   await runExampleAnalysis(page, 'birdnet');
   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
   expect(callID).not.toBe(undefined)
@@ -148,7 +148,7 @@ test(`BirdNET analyse works and second result is 34%`, async ({page}) => {
   // })
 // })
 
-test("Amend file start dialog contains date", async ({page}) =>{
+test("Amend file start dialog contains date", async () =>{
   await runExampleAnalysis(page, 'chirpity');
   await page.locator('#dropdownMenuButton').click({button: 'right'});
   await page.locator('#setFileStart').click();
@@ -159,7 +159,7 @@ test("Amend file start dialog contains date", async ({page}) =>{
   // await page.locator('#spectrogramWrapper button.btn-secondary').click();
 })
 
-test("Select inverted greyscale colourmap", async ({page}) =>{
+test("Select inverted greyscale colourmap", async () =>{
   await runExampleAnalysis(page, 'chirpity');
   await changeSettings(page, 'select', 'colourmap', 'igreys', 50)
   // await page.locator('#spectrogramWrapper button.btn-secondary').click();
