@@ -69,13 +69,14 @@ test.beforeAll(async () => {
       console.log(msg.text())
     })
   })
+
   await new Promise((resolve) => { 
     const checkPage = setInterval(async () => { 
       if (page) { 
         clearInterval(checkPage);
         resolve('');
       } 
-    }, 5000); 
+    }, 100); 
   });
 })
 

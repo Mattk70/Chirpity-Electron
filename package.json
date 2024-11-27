@@ -12,7 +12,7 @@
     "export": "electron-builder build --m  -p always",
     "AppImage": "electron-builder build --linux --x64  -p always",
     "build": "electron-builder --win --x64 -p always",
-    "testBuild": "electron-builder --win",
+    "testBuild": "electron-builder --m",
     "postinstall": "electron-builder install-app-deps",
     "test": "playwright test"
   },
