@@ -5329,7 +5329,7 @@ function getI18n(context){
             file = STATE.currentFile;
         }
         if (file) {
-            const i18n = {
+            const i18nPurge = {
                 en: `This will remove ${file} and all the associated detections from the database archive. Proceed?`,
                 da: `Dette vil fjerne ${file} og alle tilknyttede registreringer fra databasearkivet. Fortsæt?`,
                 de: `Dadurch werden ${file} und alle zugehörigen Erkennungen aus dem Datenbankarchiv entfernt. Fortfahren?`,
@@ -5341,8 +5341,7 @@ function getI18n(context){
                 sv: `Detta kommer att ta bort ${file} och alla tillhörande detektioner från databasarvet. Fortsätt?`,
                 zh: `这将删除 ${file} 及其所有相关检测记录从数据库存档中。继续吗？`
             }
-            const locale = config[config.model].locale 
-            const message = i18n[locale] || i18n['en'];
+            const message = getI18n(i18nPurge)
             if (confirm(message)) {
                 worker.postMessage({
                     action: 'purge-file',
