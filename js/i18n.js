@@ -2591,7 +2591,7 @@ const IUCNLabel = {
 
 async function localiseUI(locale) {
     let t0 = Date.now();
-    locale = locale.replace('_uk', '');
+    locale = locale.replace(/_.*$/, '');
     try {
          // Try fetching the localisation JSON file
         let localisationData = {};

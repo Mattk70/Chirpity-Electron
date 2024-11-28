@@ -2264,7 +2264,7 @@ async function processNextFile({
                     if (!sumObjectValues(predictionsReceived)) {
                         UI.postMessage({
                             event: 'progress',
-                            text: "<span class='loading text-nowrap'>Awaiting detections</span>",
+                            text: "yes",
                             file: file
                         });
                     }

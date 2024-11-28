@@ -2118,7 +2118,7 @@ function generateBirdOptionList({ store, rows, selected }) {
         let sortedList = LABELS.map(label => label.split('_')[1]);
         
         // International language sorting, recommended for large arrays - 'en_uk' not valid, but same as 'en'
-        sortedList.sort(new Intl.Collator(config[config.model].locale.replace('_uk', '')).compare);
+        sortedList.sort(new Intl.Collator(config[config.model].locale.replace(/_.*$/, '')).compare);
         // Check if we have prepared this before
         
         const lastSelectedSpecies = selected || STATE.birdList.lastSelectedSpecies;
@@ -3164,15 +3164,38 @@ function centreSpec(){
             //if (activeRow) activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     }
-    
+    const i18nFile = {
+        en: 'File ${count} of ${fileCount}',
+        da: 'Fil ${count} af ${fileCount}',
+        de: 'Datei ${count} von ${fileCount}',
+        es: 'Archivo ${count} de ${fileCount}',
+        fr: 'Fichier ${count} sur ${fileCount}',
+        nl: 'Bestand ${count} van ${fileCount}',
+        pt: 'Arquivo ${count} de ${fileCount}',
+        ru: 'Файл ${count} из ${fileCount}',
+        sv: 'Fil ${count} av ${fileCount}',
+        zh: '文件 ${count} / ${fileCount}'
+    };
+    const awaiting = {
+        en: 'Awaiting detections',
+        da: 'Afventer detektioner',
+        de: 'Warten auf Erkennungen',
+        es: 'Esperando detecciones',
+        fr: 'En attente des détections',
+        nl: 'Wachten op detecties',
+        pt: 'Aguardando detecções',
+        ru: 'Ожидание обнаружений',
+        sv: 'Väntar på detektioner',
+        zh: '等待检测'
+    };
     function onProgress(args) {
         DOM.progressDiv.classList.remove('invisible');
         if (args.text) {
-            DOM.fileNumber.innerHTML = args.text;
+            DOM.fileNumber.innerHTML = `<span class='loading text-nowrap'>${getI18n(awaiting)}</span>`;
         } else {
             DOM.progressDiv.classList.remove('invisible');
             const count = STATE.openFiles.indexOf(args.file) + 1;
-            DOM.fileNumber.textContent = `File ${count} of ${STATE.openFiles.length}`;
+            DOM.fileNumber.textContent = interpolate(getI18n(i18nFile), {count: count, fileCount: STATE.openFiles.length});
         }
         if (args.progress) {
             let progress = Math.round(args.progress * 1000) / 10;
@@ -4213,7 +4236,7 @@ function formatDuration(seconds){
             element = document.getElementById(element);
             STATE.picker = new easepick.create({
                 element: element,
-                lang: config[config.model].locale.replace('_uk', ''),
+                lang: config[config.model].locale.replace(/_.*$/, ''),
                 locale: {
                     cancel: i18n.cancel,
                     apply: i18n.apply
@@ -4570,7 +4593,7 @@ function playRegion(){
     document.addEventListener('click', function (e) {
         const element = e.target;
         const target = element.closest('[id]')?.id;
-        const locale = config[config.model].locale.replace('_uk', '');
+        const locale = config[config.model].locale.replace(/_.*$/, '');
         switch (target)
         {
             // File menu
@@ -5100,7 +5123,7 @@ async function readLabels(labelFile, updating){
 }
 
 function getI18n(context){
-    const locale = config[config.model].locale;
+    const locale = config[config.model].locale.replace(/_.*$/, '');
     return context[locale] || context['en'];
 }
     
