@@ -2790,9 +2790,9 @@ function centreSpec(){
                 centreSpec();
             }
         },
-        // D: function (e) {
-        //     if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
-        // },
+        D: function (e) {
+            if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
+        },
         e: function (e) {
             if (( e.ctrlKey || e.metaKey) && region) exportAudio();
         },

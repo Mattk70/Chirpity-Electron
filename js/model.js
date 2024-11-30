@@ -113,19 +113,16 @@ onmessage = async (e) => {
                 const spec_height = e.data.height;
                 const spec_width = e.data.width;
                 let image;
-                const signal = tf.tensor1d(buffer, "float32");
-                const bufferTensor = myModel.normalise_audio(signal);
-                signal.dispose();
-                const imageTensor = tf.tidy(() => {
-                    return myModel.makeSpectrogram(bufferTensor);
-                });
                 image = tf.tidy(() => {
+                    const signal = tf.tensor1d(buffer, "float32");
+                    const bufferTensor = myModel.normalise_audio(signal);
+                    const imageTensor = tf.tidy(() => {
+                        return myModel.makeSpectrogram(bufferTensor);
+                    });
                     let spec = myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), spec_height, spec_width);
                     const spec_max = tf.max(spec);
                     return spec.mul(255).div(spec_max).dataSync();
                 });
-                bufferTensor.dispose();
-                imageTensor.dispose();
                 response = {
                     message: "spectrogram",
                     width: myModel.inputShape[2],

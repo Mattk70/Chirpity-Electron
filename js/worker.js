@@ -15,6 +15,10 @@ import {trackEvent} from './tracking.js';
 import {extractWaveMetadata} from './metadata.js';
 let isWin32 = false;
 
+const DATASET = true;
+const adding_chirpity_additions = false;
+const dataset_database = DATASET;
+const DATASET_SAVE_LOCATION = "/media/matt/36A5CC3B5FA24585/DATASETS/MISSING_PNGS";
 let ntsuspend;
 if (process.platform === 'win32') {
     ntsuspend = require('ntsuspend');
@@ -93,10 +97,6 @@ let workerInstance = 0;
 let appPath, tempPath, BATCH_SIZE, LABELS, batchChunksToSend = {};
 let LIST_WORKER;
 
-const DATASET = false;
-const adding_chirpity_additions = true;
-const dataset_database = DATASET;
-const DATASET_SAVE_LOCATION = "E:/DATASETS/BirdNET_wavs";
 
 // Adapted from https://stackoverflow.com/questions/6117814/get-week-of-year-in-javascript-like-in-php
 Date.prototype.getWeekNumber = function(){
@@ -1492,7 +1492,7 @@ function prepareWavForModel(audio, file, end, chunkStart) {
 * @returns {Promise<unknown>}
 */
 const fetchAudioBuffer = async ({
-    file = '', start = 0, end = undefined
+    file = '', start = 0, end = undefined, rate = 24_000
 }) => {
     if (! fs.existsSync(file)) {
         const result = await getWorkingFile(file);
@@ -1518,7 +1518,7 @@ const fetchAudioBuffer = async ({
             file,
             start,
             end,
-            sampleRate: 24000,
+            sampleRate: rate,
             format: 's16le',
             channels: 1,
             additionalFilters: additionalFilters
@@ -1652,7 +1652,7 @@ const convertSpecsFromExistingSpecs = async (path) => {
 }
             
 const saveResults2DataSet = ({species, included}) => {
-    const exportType = 'audio';
+    const exportType = ''//audio';
     const rootDirectory = DATASET_SAVE_LOCATION;
     sampleRate = STATE.model === 'birdnet' ? 48_000 : 24_000;
     const height = 256, width = 384;
@@ -1687,12 +1687,12 @@ const saveResults2DataSet = ({species, included}) => {
         let ambient, threshold, value = STATE.detect.confidence;
         // adding_chirpity_additions is a flag for curated files, if true we assume every detection is correct
         if (!adding_chirpity_additions) {
-                ambient = (result.sname2 === 'Ambient Noise' ? result.score2 : result.sname3 === 'Ambient Noise' ? result.score3 : false)
-                console.log('Ambient', ambient)
-                // If we have a high level of ambient noise activation, insist on a high threshold for species detection
-                if (ambient && ambient > 0.2) {
-                    value = 0.7
-                }
+                // ambient = (result.sname2 === 'Ambient Noise' ? result.score2 : result.sname3 === 'Ambient Noise' ? result.score3 : false)
+                // console.log('Ambient', ambient)
+                // // If we have a high level of ambient noise activation, insist on a high threshold for species detection
+                // if (ambient && ambient > 0.2) {
+                //     value = 0.7
+                // }
             // Check whether top predicted species matches folder (i.e. the searched for species)
             // species not matching the top prediction sets threshold to 2000, effectively limiting treatment to manual records
             threshold = speciesMatch(result.file, result.sname) ? value : 2000;
@@ -1722,15 +1722,15 @@ const saveResults2DataSet = ({species, included}) => {
                     end = Math.min(end, result.duration);
                     if (exportType === 'audio') saveAudio(result.file, start, end, file.replace('.png', '.wav'), {Artist: 'Chirpity'}, filepath)
                     else {
-                        const AudioBuffer = await fetchAudioBuffer({
-                            start: start, end: end, file: result.file
+                        const [AudioBuffer, _] = await fetchAudioBuffer({
+                            start: start, end: end, file: result.file, rate: sampleRate
                         })
                         if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
                             if (++workerInstance === NUM_WORKERS) {
                                 workerInstance = 0;
                             }
-                            
-                            const buffer = AudioBuffer.getChannelData(0);
+
+                            const buffer = getMonoChannelData(AudioBuffer);
                             predictWorkers[workerInstance].postMessage({
                                 message: 'get-spectrogram',
                                 filepath: filepath,
