@@ -75,7 +75,7 @@ onmessage = async (e) => {
             }
             case "get-spectrogram": {
                 const buffer = e.data.buffer;
-                if (buffer.length < myModel.chunkLength) {
+                if (buffer.length < myModel.chunkLength / 2 ) {
                     DEBUG && console.log('Short spec, bailing')
                     return;
                 }

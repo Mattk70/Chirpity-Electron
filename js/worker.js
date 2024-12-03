@@ -1492,7 +1492,7 @@ function prepareWavForModel(audio, file, end, chunkStart) {
 * @returns {Promise<unknown>}
 */
 const fetchAudioBuffer = async ({
-    file = '', start = 0, end = undefined, rate = 24_000
+    file = '', start = 0, end = undefined
 }) => {
     if (! fs.existsSync(file)) {
         const result = await getWorkingFile(file);
@@ -1518,7 +1518,7 @@ const fetchAudioBuffer = async ({
             file,
             start,
             end,
-            sampleRate: rate,
+            sampleRate: 24_000,
             format: 's16le',
             channels: 1,
             additionalFilters: additionalFilters
@@ -1652,6 +1652,7 @@ const convertSpecsFromExistingSpecs = async (path) => {
 }
             
 const saveResults2DataSet = ({species, included}) => {
+    // STATE.specCount = 0; STATE.totalSpecs = 0;
     const exportType = ''//audio';
     const rootDirectory = DATASET_SAVE_LOCATION;
     sampleRate = STATE.model === 'birdnet' ? 48_000 : 24_000;
@@ -1723,14 +1724,14 @@ const saveResults2DataSet = ({species, included}) => {
                     if (exportType === 'audio') saveAudio(result.file, start, end, file.replace('.png', '.wav'), {Artist: 'Chirpity'}, filepath)
                     else {
                         const [AudioBuffer, _] = await fetchAudioBuffer({
-                            start: start, end: end, file: result.file, rate: sampleRate
+                            start: start, end: end, file: result.file
                         })
                         if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
                             if (++workerInstance === NUM_WORKERS) {
                                 workerInstance = 0;
                             }
-
                             const buffer = getMonoChannelData(AudioBuffer);
+                            // STATE.totalSpecs++
                             predictWorkers[workerInstance].postMessage({
                                 message: 'get-spectrogram',
                                 filepath: filepath,
@@ -1752,6 +1753,7 @@ const saveResults2DataSet = ({species, included}) => {
         promises.push(promise)
     }, (err) => {
         if (err) return console.log(err);
+
         Promise.all(promises).then(() => console.log(`Dataset created. ${count} files saved in ${(Date.now() - t0) / 1000} seconds`))
     })
     

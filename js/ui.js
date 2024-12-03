@@ -3193,16 +3193,13 @@ function centreSpec(){
         if (args.text) {
             DOM.fileNumber.innerHTML = `<span class='loading text-nowrap'>${getI18n(awaiting)}</span>`;
         } else {
-            DOM.progressDiv.classList.remove('invisible');
             const count = STATE.openFiles.indexOf(args.file) + 1;
             DOM.fileNumber.textContent = interpolate(getI18n(i18nFile), {count: count, fileCount: STATE.openFiles.length});
         }
         if (args.progress) {
             let progress = Math.round(args.progress * 1000) / 10;
             updateProgress(progress);
-        } else {
-            DOM.progressDiv.classList.remove('invisible');
-        }
+        } 
     }
     
     function updatePagination(total, offset) {
