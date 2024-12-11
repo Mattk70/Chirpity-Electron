@@ -1722,7 +1722,7 @@ Cuculus optatus_Oriental Cuckoo
 Cuculus poliocephalus_Lesser Cuckoo
 Cuculus rochii_Madagascar Cuckoo
 Cuculus saturatus_Himalayan Cuckoo
-Cuculus solitarius_Red-chested Cuckoo
+Cuculus solitarius_Red-chestiberiaeed Cuckoo
 Culicicapa ceylonensis_Gray-headed Canary-Flycatcher
 Culicicapa helianthea_Citrine Canary-Flycatcher
 Culicivora caudacuta_Sharp-tailed Tyrant

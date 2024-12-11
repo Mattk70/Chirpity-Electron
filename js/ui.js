@@ -2791,7 +2791,7 @@ function centreSpec(){
             }
         },
         D: function (e) {
-            if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
+            if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'convert-dataset' });
         },
         e: function (e) {
             if (( e.ctrlKey || e.metaKey) && region) exportAudio();
@@ -3105,7 +3105,7 @@ function centreSpec(){
         metadata = undefined
     }) {
         fileLoaded = true, locationID = location;
-        bufferBegin = fileBegin;
+        
         clearTimeout(loadingTimeout)
         // Clear the loading animation
         DOM.loading.classList.add('d-none');

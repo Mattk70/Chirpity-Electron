@@ -91,8 +91,7 @@ onmessage = async (e) => {
                         return myModel.makeSpectrogram(bufferTensor);
                     });
                     let spec = myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), spec_height, spec_width);
-                    const spec_max = tf.max(spec);
-                    return spec.mul(255).div(spec_max).dataSync();
+                    return spec.dataSync();
                 });
 
                 response = {
@@ -197,13 +196,26 @@ class Model {
             */
             //specBatch = tf.log1p(specBatch).mul(20);
             // Swap axes to fit output shape
+            
             specBatch = tf.transpose(specBatch, [0, 2, 1]);
             specBatch = tf.reverse(specBatch, [1]);
             // Add channel axis
-            specBatch = tf.expandDims(specBatch, -1);
+
             //specBatch = tf.slice4d(specBatch, [0, 1, 0, 0], [-1, img_height, img_width, -1]);
-            specBatch = tf.image.resizeBilinear(specBatch, [img_height, img_width], true);
-            return  this.normalise(specBatch)
+            //specBatch = tf.image.resizeBilinear(specBatch, [img_height, img_width], true);
+            // Slice to exclude the bottom 10 rows
+            const sliced_tensor = tf.slice3d(specBatch, [0, 1, 0], [-1, img_height - 10, img_width])
+
+            // Slice the bottom 10 rows
+            const bottomRows = tf.slice3d(sliced_tensor, [0, img_height - 20, 0], [-1, 10, img_width]);
+
+            // Reduce the values of the bottom rows
+            const attenuatedRows = bottomRows.div(tf.scalar(5));
+
+            // Concatenate the sliced tensor with the bottom rows
+            specBatch = tf.concat([sliced_tensor, attenuatedRows], 1)
+            specBatch = this.normalise(specBatch)
+            return  tf.expandDims(specBatch, -1);
         })
     }
     normalise(spec) {
