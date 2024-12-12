@@ -8,9 +8,6 @@ const ffmpeg = require('fluent-ffmpeg');
 const png = require('fast-png');
 const {utimesSync} = require('utimes');
 const {writeToPath} = require('@fast-csv/format');
-
-const { execSync } = require('child_process');
-
 const merge = require('lodash.merge');
 import { State } from './state.js';
 import { sqlite3 } from './database.js';
