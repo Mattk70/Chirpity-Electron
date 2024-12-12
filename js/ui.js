@@ -3104,8 +3104,7 @@ function centreSpec(){
         goToRegion = true,
         metadata = undefined
     }) {
-        fileLoaded = true, locationID = location;
-        
+        fileLoaded = true, 
         clearTimeout(loadingTimeout)
         // Clear the loading animation
         DOM.loading.classList.add('d-none');
@@ -3126,6 +3125,8 @@ function centreSpec(){
                 buffer: currentBuffer, play: true, resetSpec: false, queued: false
             }
         } else {
+            locationID = location;
+            bufferBegin = fileBegin;
             NEXT_BUFFER = undefined;
             if (STATE.currentFile !== file) {
                 STATE.currentFile = file;
