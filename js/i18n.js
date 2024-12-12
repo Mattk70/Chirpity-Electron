@@ -1837,7 +1837,7 @@ de: `
 
 `,
 es: `
-    <!-- Carousel items -->
+<!-- Carousel items -->
     <div class="carousel-item active">
         <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
         <div class="text-center pb-4">
@@ -1848,13 +1848,13 @@ es: `
     <div class="carousel-item" data-element-selector="#navbarSettings">
         <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
         <div class="text-start pb-4 ms-3">
-            <h5 class="text-center">Comenzando</h5>
+            <h5 class="text-center">Inicio</h5>
             <ol class="ps-5 ms-5">
                 <li>Primero, establezca su ubicación en el menú de configuración.</li>
                 <li>Luego, elija el modelo que mejor se adapte a sus necesidades:</li>
                 <ul>
-                    <li><b>Nocmig</b> está ajustado para la migración nocturna,<br> pero solo tiene aves de la lista británica</li>
-                    <li><b>BirdNET</b> está entrenado con especies de aves de todo el mundo</li>
+                    <li><b>Nocmig</b> está ajustado para la migración nocturna,<br> pero solo tiene aves de la lista británica.</li>
+                    <li><b>BirdNET</b> está entrenado con especies de aves de todo el mundo.</li>
                 </ul>
             </ol>
         </div>
@@ -1891,7 +1891,7 @@ es: `
         <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
         <div class="text-center pb-4">
             <h5>Registros guardados</h5>
-            <p>Puedee guardar registros para referencias futuras desde el menú de Registros. Aquí también encontrará las opciones de Gráfica y Explorar
+            <p>Puede guardar registros para referencias futuras en el menú de Registros. Aquí también encontrará las opciones de Gráfica y Explorar
                 de la aplicación, las cuales le permiten revisar las detecciones guardadas y ver gráficas de la aparición de especies a lo largo del tiempo.
             </p>
         </div>
@@ -1907,6 +1907,8 @@ es: `
     <span class="carousel-control-next-icon" aria-hidden="true"></span>
     <span class="visually-hidden">Siguiente</span>
 </a>
+
+
 `,
 nl: `
     <!-- Carousel items -->
@@ -2051,7 +2053,6 @@ pt:`
     <span class="carousel-control-next-icon" aria-hidden="true"></span>
     <span class="visually-hidden">Próximo</span>
 </a>
-
 `,
 ru: `
     <!-- Carousel items -->
@@ -2268,7 +2269,6 @@ zh: `
     <span class="carousel-control-next-icon" aria-hidden="true"></span>
     <span class="visually-hidden">下一页</span>
 </a>
-
 `
 }
 
