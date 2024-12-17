@@ -20,18 +20,14 @@ const CONFIG = {
 
 function loadModel(params){
     const version = params.model;
-    if (DEBUG) {
-        console.log("load request to worker");
-    }
+    DEBUG && console.log("load request to worker");
     const { height, width, labels, location } = JSON.parse(fs.readFileSync(path.join(__dirname, `../${version}_model_config.json`), "utf8"));
     const appPath = "../" + location + "/";
     const list = params.list;
     const batch = params.batchSize;
     const backend = BACKEND || params.backend;
     backend === 'webgpu' &&  require('@tensorflow/tfjs-backend-webgpu');
-    if (DEBUG) {
-        console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
-    }
+    DEBUG && console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
     tf.setBackend(backend).then(async () => {
         if (backend === "webgl") {
             tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
@@ -158,6 +154,7 @@ class Model {
         this.useContext = undefined;
         this.version = version;
         this.selection = false;
+        this.scalarFive = tf.scalar(5);
     }
 
     async loadModel() {
@@ -199,19 +196,8 @@ class Model {
         return true;
     }
 
-    normalise(spec) {
-        return tf.tidy(() => {
-             const spec_max = tf.max(spec, [1, 2], true)
-            // if (this.version === 'v4'){
-            //     const spec_min = tf.min(spec, [1, 2], true)
-            //     spec = tf.sub(spec, spec_min).div(tf.sub(spec_max, spec_min));
-            // } else {
-                spec = spec.mul(255);
-                spec = spec.div(spec_max);
-            // }
-            return spec
-        })
-    }
+    normalise = (spec) =>  tf.tidy(() => spec.mul(255).div(spec.max([1, 2], true)) )
+    
 
     getSNR(spectrograms) {
         return tf.tidy(() => {
@@ -224,7 +210,7 @@ class Model {
 
     padBatch(tensor) {
         return tf.tidy(() => {
-            if (DEBUG) console.log(`Adding ${this.batchSize - tensor.shape[0]} tensors to the batch`)
+            DEBUG && console.log(`Adding ${this.batchSize - tensor.shape[0]} tensors to the batch`)
             const shape = [...tensor.shape];
             shape[0] = this.batchSize - shape[0];
             const padding = tf.zeros(shape);
@@ -262,18 +248,16 @@ class Model {
     }
 
     async predictBatch(TensorBatch, keys, threshold, confidence) {
-        // const TensorBatch = this.fixUpSpecBatch(specs); // + 1 tensor
-        // specs.dispose(); // - 1 tensor
         let paddedTensorBatch, maskedTensorBatch;
         if (BACKEND === 'webgl' && TensorBatch.shape[0] < this.batchSize && !this.selection) {
             // WebGL backend works best when all batches are the same size
             paddedTensorBatch = this.padBatch(TensorBatch)  // + 1 tensor
         } else if (threshold && BACKEND === 'tensorflow' && !this.selection) {
-            if (this.version !== 'v1') threshold *= 4;
+            threshold *= 4;
             const keysTensor = tf.stack(keys); // + 1 tensor
             const snr = this.getSNR(TensorBatch)
             const condition = tf.greaterEqual(snr, threshold); // + 1 tensor
-            if (DEBUG) console.log('SNR is:', await snr.data())
+            DEBUG && console.log('SNR is:', await snr.data())
             snr.dispose();
             // Avoid mask cannot be scalar error at end of predictions
             let newCondition;
@@ -293,12 +277,12 @@ class Model {
                 maskedTensorBatch.dispose(); // - 1 tensor
                 maskedKeysTensor.dispose(); // - 1 tensor
                 TensorBatch.dispose(); // - 1 tensor
-                if (DEBUG) console.log("No surviving tensors in batch", maskedTensorBatch.shape[0])
+                DEBUG && console.log("No surviving tensors in batch", maskedTensorBatch.shape[0])
                 return []
             } else {
                 keys = Array.from(await maskedKeysTensor.data());
                 maskedKeysTensor.dispose(); // - 1 tensor
-                if (DEBUG) console.log("surviving tensors in batch", maskedTensorBatch.shape[0])
+                DEBUG && console.log("surviving tensors in batch", maskedTensorBatch.shape[0])
             }
         }
 
@@ -355,44 +339,21 @@ class Model {
             return spec;
         })
     }
+
     fixUpSpecBatch(specBatch, h, w) {
         const img_height = h || this.height;
         const img_width = w || this.width;
         return tf.tidy(() => {
-            /*
-            Try out taking log of spec when SNR is below threshold?
-            */
-            //specBatch = tf.log1p(specBatch).mul(20);
-            // Swap axes to fit output shape
-            
-            specBatch = tf.transpose(specBatch, [0, 2, 1]);
-            specBatch = tf.reverse(specBatch, [1]);
-            // Add channel axis
+            // Preprocess tensor
 
-            //specBatch = tf.slice4d(specBatch, [0, 1, 0, 0], [-1, img_height, img_width, -1]);
-            //specBatch = tf.image.resizeBilinear(specBatch, [img_height, img_width], true);
-            // Slice to exclude the bottom 10 rows
-            const sliced_tensor = tf.slice3d(specBatch, [0, 1, 0], [-1, img_height - 10, img_width])
+            specBatch = specBatch.slice([0,0,0], [-1,img_width,img_height]).transpose([0, 2, 1]).reverse([1]);
 
-            // Slice the bottom 10 rows
-            const bottomRows = tf.slice3d(sliced_tensor, [0, img_height - 20, 0], [-1, 10, img_width]);
+            // Split into main part and bottom rows
+            const [mainPart, bottomRows] = tf.split(specBatch, [img_height - 10, 10], 1);
 
-            // Reduce the values of the bottom rows
-            const attenuatedRows = bottomRows.div(tf.scalar(5));
-
-            // Concatenate the sliced tensor with the bottom rows
-            specBatch = tf.concat([sliced_tensor, attenuatedRows], 1)
-            specBatch = this.normalise(specBatch)
-            return  tf.expandDims(specBatch, -1);
-        })
-    }
-    normalise_audio_batch = (tensor) => {
-        return tf.tidy(() => {        
-        const sigMax = tf.max(tensor, 1, true);
-        const sigMin = tf.min(tensor, 1, true);
-        const normalized = tensor.sub(sigMin).divNoNan(sigMax.sub(sigMin)).mul(tf.scalar(2)).sub(tf.scalar(1));
-        return normalized;
-        })
+            // Concatenate after adjusting bottom rows
+            return this.normalise(tf.concat([mainPart, bottomRows.div(this.scalarFive)], 1)).expandDims(-1);
+        });
     }
 
     //Used by get-spectrogram
@@ -419,20 +380,18 @@ class Model {
     };
 
     async predictChunk(audioBuffer, start, fileStart, file, threshold, confidence) {
-        if (DEBUG) console.log('predictCunk begin', tf.memory().numTensors);
+        DEBUG && console.log('predictCunk begin', tf.memory().numTensors);
         audioBuffer = this.padAudio(audioBuffer);
         audioBuffer = tf.tensor1d(audioBuffer);
+
         const numSamples = audioBuffer.shape / this.chunkLength;
         let buffers = tf.reshape(audioBuffer, [numSamples, this.chunkLength]);
         audioBuffer.dispose();
-        const bufferList = this.version !== 'v4' ? this.normalise_audio_batch(buffers) : buffers;
-        const specBatch = tf.tidy(() => {
-            const toStack = tf.unstack(bufferList).map(x => this.makeSpectrogram(x));
+        const specBatch =  tf.tidy(() => {
+            const toStack = tf.unstack(buffers).map(x => this.makeSpectrogram(x));
             return this.fixUpSpecBatch(tf.stack(toStack));
         });
         buffers.dispose();
-        bufferList.dispose();
-        //const specBatch = tf.stack(bufferList);
         const batchKeys = [...Array(numSamples).keys()].map(i => start + this.chunkLength * i);
         const result = await this.predictBatch(specBatch, batchKeys, threshold, confidence);
         return [result, file, fileStart];

@@ -790,8 +790,9 @@ const prepSummaryStatement = (included) => {
 }
     
 
-const getTotal = async ({species = undefined, offset = undefined, included = STATE.included, file = undefined}= {}) => {
+const getTotal = async ({species = undefined, offset = undefined, included = undefined, file = undefined}= {}) => {
     let params = [];
+    included ??= await getIncludedIDs(file);
     const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
     offset = offset ?? (species !== undefined ? STATE.filteredOffset[species] : STATE.globalOffset);
     let SQL = ` WITH MaxConfidencePerDateTime AS (
@@ -801,12 +802,9 @@ const getTotal = async ({species = undefined, offset = undefined, included = STA
         FROM records 
         JOIN files ON records.fileID = files.id 
         WHERE confidence >= ${STATE.detect.confidence} `;
-    if (file) {
-        params.push(file)
-        SQL += ' AND files.name = ? '
-    }
-    else if (filtersApplied(included)) SQL += ` AND speciesID IN (${included}) `;
-    if (STATE.detect.nocmig) SQL += ' AND COALESCE(isDaylight, 0) != 1 ';
+
+    if (filtersApplied(included)) SQL += ` AND speciesID IN (${included}) `;
+    if (STATE.detect.nocmig) SQL += ' AND NOT isDaylight';
     if (STATE.locationID) SQL += ` AND locationID =  ${STATE.locationID}`;
     const [SQLtext, fileParams] = getFileSQLAndParams(range);
     SQL += SQLtext, params.push(...fileParams);
@@ -1397,7 +1395,7 @@ async function processAudio (file, start, end, chunkStart, highWaterMark, sample
                         isPaused = false;
                         clearInterval(interval)
                     }
-                }, 100)
+                }, 10)
             }
             if (aborted) {
                 STREAM.destroy();
@@ -2245,7 +2243,7 @@ const parsePredictions = async (response) => {
 
     if (!STATE.selection && STATE.increment() === 0) {
         getSummary({ interim: true });
-        getTotal()
+        getTotal({file})
     }
 
     return response.worker
@@ -3433,8 +3431,7 @@ async function getLocations({ db = STATE.db, file }) {
  * @returns a list of IDs included in filtered results
  */
 async function getIncludedIDs(file){
-    t0 = Date.now();
-    let lat, lon, week, hitOrMiss = 'hit';
+    let lat, lon, week;
     if (STATE.list === 'location' || (STATE.list === 'nocturnal' && STATE.local)){
         if (file){
             file = METADATA[file];
@@ -3451,18 +3448,14 @@ async function getIncludedIDs(file){
         if (STATE.included?.[STATE.model]?.[STATE.list]?.[week]?.[location] === undefined ) {
             // Cache miss
             const list = await setIncludedIDs(lat,lon,week)
-            hitOrMiss = 'miss';
         } 
-        //DEBUG && console.log(`Cache ${hitOrMiss}: setting the ${STATE.list} list took ${Date.now() -t0}ms`)
         return STATE.included[STATE.model][STATE.list][week][location];
         
     } else {
         if (STATE.included?.[STATE.model]?.[STATE.list] === undefined) {
             // The object lacks the week / location
             LIST_WORKER && await setIncludedIDs();
-            hitOrMiss = 'miss';
         }
-        //DEBUG && console.log(`Cache ${hitOrMiss}: setting the ${STATE.list} list took ${Date.now() -t0}ms`)
         return STATE.included[STATE.model][STATE.list];
     }
 }
