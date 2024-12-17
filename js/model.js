@@ -359,11 +359,9 @@ class Model {
     //Used by get-spectrogram
     normalise_audio = (signal) => {
         return tf.tidy(() => {
-            //signal = tf.tensor1d(signal, 'float32');
             const sigMax = tf.max(signal);
             const sigMin = tf.min(signal);
             const range = sigMax.sub(sigMin);
-            //return signal.sub(sigMin).div(range).mul(tf.scalar(8192.0, 'float32')).sub(tf.scalar(4095, 'float32'))
             return signal.sub(sigMin).divNoNan(range).mul(tf.scalar(2)).sub(tf.scalar(1))
         })
     };
