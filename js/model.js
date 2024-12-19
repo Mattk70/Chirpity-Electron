@@ -8,6 +8,7 @@ try {
 }
 const fs = require('node:fs');
 const path = require('node:path');
+import {BaseModel} from './BaseModel.js';
 let DEBUG = false;
 
 
@@ -45,7 +46,7 @@ function loadModel(params){
             console.log(tf.env());
             console.log(tf.env().getFlags());
         }
-        myModel = new Model(appPath, version);
+        myModel = new ChirpityModel(appPath, version);
         myModel.height = height;
         myModel.width = width;
 
@@ -111,9 +112,8 @@ onmessage = async (e) => {
                 let image;
                 image = tf.tidy(() => {
                     const signal = tf.tensor1d(buffer, "float32");
-                    const bufferTensor = myModel.normalise_audio(signal);
                     const imageTensor = tf.tidy(() => {
-                        return myModel.makeSpectrogram(bufferTensor);
+                        return myModel.makeSpectrogram(signal);
                     });
                     let spec = myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), spec_height, spec_width);
                     return spec.dataSync();
@@ -139,83 +139,9 @@ onmessage = async (e) => {
     }
 };
 
-class Model {
+class ChirpityModel extends BaseModel {
     constructor(appPath, version) {
-        this.model = undefined;
-        this.labels = undefined;
-        this.height = undefined;
-        this.width = undefined;
-        this.config = CONFIG;
-        this.chunkLength = this.config.sampleRate * this.config.specLength;
-        this.model_loaded = false;
-        this.frame_length = 512;
-        this.frame_step = 186;
-        this.appPath = appPath;
-        this.useContext = undefined;
-        this.version = version;
-        this.selection = false;
-        this.scalarFive = tf.scalar(5);
-    }
-
-    async loadModel() {
-        if (this.model_loaded === false) {
-            // Model files must be in a different folder than the js, assets files
-            if (DEBUG) console.log('loading model from', this.appPath + 'model.json')
-            this.model = await tf.loadGraphModel(this.appPath + 'model.json',
-                { weightPathPrefix: this.appPath });
-            this.model_loaded = true;
-            this.inputShape = [...this.model.inputs[0].shape];
-        }
-    }
-
-    async warmUp(batchSize) {
-        this.batchSize = parseInt(batchSize);
-        this.inputShape[0] = this.batchSize;
-        DEBUG && console.log('WarmUp begin', tf.memory().numTensors)
-        const input = tf.zeros(this.inputShape);
-        
-        // Parallel compilation for faster warmup
-        // https://github.com/tensorflow/tfjs/pull/7755/files#diff-a70aa640d286e39c922aa79fc636e610cae6e3a50dd75b3960d0acbe543c3a49R316
-        if (tf.getBackend() === 'webgl') {
-            tf.env().set('ENGINE_COMPILE_ONLY', true);
-            const compileRes = this.model.predict(input, { batchSize: this.batchSize });
-            tf.env().set('ENGINE_COMPILE_ONLY', false);
-            await tf.backend().checkCompileCompletionAsync();
-            tf.backend().getUniformLocations();
-            tf.dispose(compileRes);
-            input.dispose();
-        } else if (tf.getBackend() === 'webgpu') {
-            tf.env().set('WEBGPU_ENGINE_COMPILE_ONLY', true);
-            const compileRes = this.model.predict(input, { batchSize: this.batchSize });
-            tf.env().set('WEBGPU_ENGINE_COMPILE_ONLY', false);
-            await tf.backend().checkCompileCompletionAsync();
-            tf.dispose(compileRes);
-        }
-        input.dispose()
-        DEBUG && console.log('WarmUp end', tf.memory().numTensors)
-        return true;
-    }
-
-    normalise = (spec) =>  tf.tidy(() => spec.mul(255).div(spec.max([1, 2], true)) )
-    
-
-    getSNR(spectrograms) {
-        return tf.tidy(() => {
-            const { mean, variance } = tf.moments(spectrograms, 2);
-            const peak = tf.div(variance, mean)
-            let snr = tf.squeeze(tf.max(peak, 1));
-            return snr
-        })
-    }
-
-    padBatch(tensor) {
-        return tf.tidy(() => {
-            DEBUG && console.log(`Adding ${this.batchSize - tensor.shape[0]} tensors to the batch`)
-            const shape = [...tensor.shape];
-            shape[0] = this.batchSize - shape[0];
-            const padding = tf.zeros(shape);
-            return tf.concat([tensor, padding], 0)
-        })
+        super(appPath, version);
     }
 
     addContext(prediction, tensor, confidence) {
@@ -247,6 +173,14 @@ class Model {
         })
     }
 
+    getSNR(spectrograms) {
+        return tf.tidy(() => {
+            const { mean, variance } = tf.moments(spectrograms, 2);
+            const peak = tf.div(variance, mean)
+            let snr = tf.squeeze(tf.max(peak, 1));
+            return snr
+        })
+    }
     async predictBatch(TensorBatch, keys, threshold, confidence) {
         let paddedTensorBatch, maskedTensorBatch;
         if (BACKEND === 'webgl' && TensorBatch.shape[0] < this.batchSize && !this.selection) {
@@ -332,65 +266,15 @@ class Model {
         return [keys, topIndices, topValues];
     }
 
-    makeSpectrogram(signal) {
-        return tf.tidy(() => {
-            let spec = tf.abs(tf.signal.stft(signal, this.frame_length, this.frame_step));
-            signal.dispose();
-            return spec;
-        })
-    }
-
-    fixUpSpecBatch(specBatch, h, w) {
-        const img_height = h || this.height;
-        const img_width = w || this.width;
-        return tf.tidy(() => {
-            // Preprocess tensor
-
-            specBatch = specBatch.slice([0,0,0], [-1,img_width,img_height]).transpose([0, 2, 1]).reverse([1]);
-
-            // Split into main part and bottom rows
-            const [mainPart, bottomRows] = tf.split(specBatch, [img_height - 10, 10], 1);
-
-            // Concatenate after adjusting bottom rows
-            return this.normalise(tf.concat([mainPart, bottomRows.div(this.scalarFive)], 1)).expandDims(-1);
-        });
-    }
-
-    //Used by get-spectrogram
-    normalise_audio = (signal) => {
-        return tf.tidy(() => {
-            const sigMax = tf.max(signal);
-            const sigMin = tf.min(signal);
-            const range = sigMax.sub(sigMin);
-            return signal.sub(sigMin).divNoNan(range).mul(tf.scalar(2)).sub(tf.scalar(1))
-        })
-    };
-
-    padAudio = (audio) => {
-        const remainder = audio.length % this.chunkLength;
-        if (remainder){ 
-            // Create a new array with the desired length
-            const paddedAudio = new Float32Array(audio.length + (this.chunkLength -remainder));
-            // Copy the existing values into the new array
-            paddedAudio.set(audio);
-            return paddedAudio;
-        } else return audio
-    };
-
     async predictChunk(audioBuffer, start, fileStart, file, threshold, confidence) {
         DEBUG && console.log('predictCunk begin', tf.memory().numTensors);
-        audioBuffer = this.padAudio(audioBuffer);
-        audioBuffer = tf.tensor1d(audioBuffer);
-
-        const numSamples = audioBuffer.shape / this.chunkLength;
-        let buffers = tf.reshape(audioBuffer, [numSamples, this.chunkLength]);
-        audioBuffer.dispose();
+        const [buffers, numSamples] = this.createAudioTensorBatch(audioBuffer);
         const specBatch =  tf.tidy(() => {
             const toStack = tf.unstack(buffers).map(x => this.makeSpectrogram(x));
             return this.fixUpSpecBatch(tf.stack(toStack));
         });
         buffers.dispose();
-        const batchKeys = [...Array(numSamples).keys()].map(i => start + this.chunkLength * i);
+        const batchKeys = this.getKeys(numSamples, start);
         const result = await this.predictBatch(specBatch, batchKeys, threshold, confidence);
         return [result, file, fileStart];
     }
