@@ -194,43 +194,48 @@ class MelSpecLayerSimple extends tf.layers.Layer {
         return tf.tidy(() => {
             // inputs is a tensor representing the input data
             inputs = inputs[0];
-            return tf.stack(inputs.split(inputs.shape[0]).map(input =>{
+            const inputList = tf.split(inputs, inputs.shape[0])
+            const specBatch = inputList.map(input =>{
                 input = input.squeeze();
                 // Normalize values between -1 and 1
-                input = input.sub(tf.min(input, -1, true))
-                    .div(tf.max(input, -1, true).add(0.000001))
-                    .sub(0.5)
-                    .mul(2.0);
+                input = tf.sub(input, tf.min(input, -1, true));
+                input = tf.div(input, tf.max(input, -1, true).add(0.000001));
+                input = tf.sub(input, 0.5);
+                input = tf.mul(input, 2.0);
 
-                // Perform STFT and cast result to float
+                // Perform STFT
                 let spec = tf.signal.stft(
                     input,
                     this.frameLength,
                     this.frameStep,
                     this.frameLength,
                     tf.signal.hannWindow,
-                ).cast('float32');
+                );
+
+                // Cast from complex to float
+                spec = tf.cast(spec, 'float32');
 
                 // Apply mel filter bank
-                spec = spec.matMul(this.melFilterbank)
+                spec = tf.matMul(spec, this.melFilterbank);
 
                 // Convert to power spectrogram
-                    .pow(2.0)
+                spec = spec.pow(2.0);
 
                 // Apply nonlinearity
-                    .pow(tf.div(1.0, tf.add(1.0, tf.exp(this.magScale.read()))))
+                spec = spec.pow(tf.div(1.0, tf.add(1.0, tf.exp(this.magScale.read()))));
 
                 // Flip the spectrogram
-                    .reverse(-1)
+                spec = tf.reverse(spec, -1);
 
                 // Swap axes to fit input shape
-                    .transpose()
+                spec = tf.transpose(spec)
 
                 // Adding the channel dimension
-                    .expandDims(-1);
+                spec = spec.expandDims(-1);
 
                 return spec;
-            }))
+            })
+            return tf.stack(specBatch)
         });
     }
 
