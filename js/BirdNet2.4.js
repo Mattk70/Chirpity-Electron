@@ -194,8 +194,7 @@ class MelSpecLayerSimple extends tf.layers.Layer {
         return tf.tidy(() => {
             // inputs is a tensor representing the input data
             inputs = inputs[0];
-            const inputList = tf.split(inputs, inputs.shape[0])
-            const specBatch = inputList.map(input =>{
+            return tf.stack(inputs.split(inputs.shape[0]).map(input =>{
                 input = input.squeeze();
                 // Normalize values between -1 and 1
                 input = tf.sub(input, tf.min(input, -1, true));
@@ -203,39 +202,36 @@ class MelSpecLayerSimple extends tf.layers.Layer {
                 input = tf.sub(input, 0.5);
                 input = tf.mul(input, 2.0);
 
-                // Perform STFT
+
+                // Perform STFT and cast result to float
                 let spec = tf.signal.stft(
                     input,
                     this.frameLength,
                     this.frameStep,
                     this.frameLength,
                     tf.signal.hannWindow,
-                );
-
-                // Cast from complex to float
-                spec = tf.cast(spec, 'float32');
+                ).cast('float32');
 
                 // Apply mel filter bank
-                spec = tf.matMul(spec, this.melFilterbank);
+                spec = spec.matMul(this.melFilterbank)
 
                 // Convert to power spectrogram
-                spec = spec.pow(2.0);
+                    .pow(2.0)
 
                 // Apply nonlinearity
-                spec = spec.pow(tf.div(1.0, tf.add(1.0, tf.exp(this.magScale.read()))));
+                    .pow(tf.div(1.0, tf.add(1.0, tf.exp(this.magScale.read()))))
 
                 // Flip the spectrogram
-                spec = tf.reverse(spec, -1);
+                    .reverse(-1)
 
                 // Swap axes to fit input shape
-                spec = tf.transpose(spec)
+                    .transpose()
 
                 // Adding the channel dimension
-                spec = spec.expandDims(-1);
+                    .expandDims(-1);
 
                 return spec;
-            })
-            return tf.stack(specBatch)
+            }))
         });
     }
 
