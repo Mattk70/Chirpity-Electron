@@ -550,7 +550,6 @@ input[type="range"].vertical {
     margin: 3px;
     appearance: auto;
     writing-mode: vertical-lr;
-    -webkit-appearance: slider-vertical;
     direction: rtl;
     top: -160px;
     right: 15px;

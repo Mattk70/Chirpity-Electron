@@ -1356,7 +1356,7 @@ const getPredictBuffers = async ({
 }
 
 async function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBatch){
-    const MAX_CHUNKS = NUM_WORKERS * 2;
+    const MAX_CHUNKS = Math.max(12, NUM_WORKERS * 4);
     let isPaused = false;
     return new Promise((resolve, reject) => {
         // Many compressed files start with a small section of silence due to encoder padding, which affects predictions
@@ -1391,7 +1391,7 @@ async function processAudio (file, start, end, chunkStart, highWaterMark, sample
                 console.log('about to set the interval ', pid)
                 const interval = setInterval(() =>{
                     console.log('Backlog', AUDIO_BACKLOG)
-                    if (AUDIO_BACKLOG < NUM_WORKERS){
+                    if (AUDIO_BACKLOG < NUM_WORKERS * 2){
                         resumeFfmpeg(command, pid)
                         console.log('resumed ', pid)
                         isPaused = false;
