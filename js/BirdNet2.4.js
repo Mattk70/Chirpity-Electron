@@ -9,6 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 let DEBUG = false;
 
+import {BaseModel} from './BaseModel.js';
 
 //GLOBALS
 let myModel;
@@ -55,11 +56,11 @@ onmessage = async (e) => {
                         console.log(tf.env());
                         console.log(tf.env().getFlags());
                     }
-                    myModel = new Model(appPath, version);
+                    myModel = new BirdNETModel(appPath, version);
                     myModel.height = height;
                     myModel.width = width;
                     myModel.labels = labels;
-                    await myModel.loadModel();
+                    await myModel.loadModel('layers');
                     await myModel.warmUp(batch);
                     BACKEND = tf.getBackend();
                     postMessage({
@@ -86,9 +87,9 @@ onmessage = async (e) => {
                 let image;
                 image = tf.tidy(() => {
                     const signal = tf.tensor1d(buffer, "float32");
-                    const bufferTensor = myModel.normalise_audio(signal);
+                    // const bufferTensor = myModel.normalise_audio(signal);
                     const imageTensor = tf.tidy(() => {
-                        return myModel.makeSpectrogram(bufferTensor);
+                        return myModel.makeSpectrogram(signal);
                     });
                     let spec = myModel.fixUpSpecBatch(tf.expandDims(imageTensor, 0), spec_height, spec_width);
                     return spec.dataSync();
@@ -136,179 +137,17 @@ onmessage = async (e) => {
     }
 };
 
-class Model {
+class BirdNETModel extends BaseModel {
     constructor(appPath, version) {
-        this.model = undefined;
-        this.labels = undefined;
-        this.height = undefined;
-        this.width = undefined;
-        this.config = CONFIG;
+        super(appPath, version);
+        this.config.sampleRate = 48_000;
         this.chunkLength = this.config.sampleRate * this.config.specLength;
-        this.model_loaded = false;
-        this.appPath = appPath;
-        this.useContext = undefined;
-        this.version = version;
-        this.selection = false;
-        this.frame_length = 512;
-        this.frame_step = 186;
     }
-
-    async loadModel() {
-        DEBUG && console.log('loading model')
-        if (this.model_loaded === false) {
-            // Model files must be in a different folder than the js, assets files
-            DEBUG && console.log('loading model from', this.appPath + 'model.json')
-            this.model = await tf.loadLayersModel(this.appPath + 'model.json',
-                { weightPathPrefix: this.appPath });
-            this.model_loaded = true;
-            this.inputShape = [...this.model.inputs[0].shape];
-        }
-    }
-    
-    //Used by get-spectrogram
-    makeSpectrogram(signal) {
-        return tf.tidy(() => {
-            let spec = tf.abs(tf.signal.stft(signal, this.frame_length, this.frame_step));
-            signal.dispose();
-            return spec;
-        })
-    }
-
-    //Used by get-spectrogram
-    normalise_audio = (signal) => {
-        return tf.tidy(() => {
-            //signal = tf.tensor1d(signal, 'float32');
-            const sigMax = tf.max(signal);
-            const sigMin = tf.min(signal);
-            const range = sigMax.sub(sigMin);
-            //return signal.sub(sigMin).div(range).mul(tf.scalar(8192.0, 'float32')).sub(tf.scalar(4095, 'float32'))
-            return signal.sub(sigMin).divNoNan(range).mul(tf.scalar(2)).sub(tf.scalar(1))
-        })
-    };
-
-    //Used by get-spectrogram
-    fixUpSpecBatch(specBatch, h, w) {
-        const img_height = h || this.height;
-        const img_width = w || this.width;
-        return tf.tidy(() => {
-            /*
-            Try out taking log of spec when SNR is below threshold?
-            */
-            //specBatch = tf.log1p(specBatch).mul(20);
-            // Swap axes to fit output shape
-            
-            specBatch = tf.transpose(specBatch, [0, 2, 1]);
-            specBatch = tf.reverse(specBatch, [1]);
-            // Add channel axis
-
-            //specBatch = tf.slice4d(specBatch, [0, 1, 0, 0], [-1, img_height, img_width, -1]);
-            //specBatch = tf.image.resizeBilinear(specBatch, [img_height, img_width], true);
-            // Slice to exclude the bottom 10 rows
-            const sliced_tensor = tf.slice3d(specBatch, [0, 1, 0], [-1, img_height - 10, img_width])
-
-            // Slice the bottom 10 rows
-            const bottomRows = tf.slice3d(sliced_tensor, [0, img_height - 20, 0], [-1, 10, img_width]);
-
-            // Reduce the values of the bottom rows
-            const attenuatedRows = bottomRows.div(tf.scalar(5));
-
-            // Concatenate the sliced tensor with the bottom rows
-            specBatch = tf.concat([sliced_tensor, attenuatedRows], 1)
-            specBatch = this.normalise(specBatch)
-            return  tf.expandDims(specBatch, -1);
-        })
-    }
-    normalise(spec) {
-        return tf.tidy(() => {
-             const spec_max = tf.max(spec, [1, 2], true)
-            // if (this.version === 'v4'){
-            //     const spec_min = tf.min(spec, [1, 2], true)
-            //     spec = tf.sub(spec, spec_min).div(tf.sub(spec_max, spec_min));
-            // } else {
-                spec = spec.mul(255);
-                spec = spec.div(spec_max);
-            // }
-            return spec
-        })
-    }
-    async warmUp(batchSize) {
-        this.batchSize = parseInt(batchSize);
-        this.inputShape[0] = this.batchSize;
-        DEBUG && console.log('WarmUp begin', tf.memory().numTensors);
-        const input = tf.zeros(this.inputShape);
-        
-        // Parallel compilation for faster warmup
-        // https://github.com/tensorflow/tfjs/pull/7755/files#diff-a70aa640d286e39c922aa79fc636e610cae6e3a50dd75b3960d0acbe543c3a49R316
-        if (tf.getBackend() === 'webgl') {
-            tf.env().set('ENGINE_COMPILE_ONLY', true);
-            const compileRes = this.model.predict(input, { batchSize: this.batchSize });
-            tf.env().set('ENGINE_COMPILE_ONLY', false);
-            await tf.backend().checkCompileCompletionAsync();
-            tf.backend().getUniformLocations();
-            tf.dispose(compileRes);
-            input.dispose();
-        } else if (tf.getBackend() === 'webgpu') {
-            tf.env().set('WEBGPU_ENGINE_COMPILE_ONLY', true);
-            const compileRes = this.model.predict(input, { batchSize: this.batchSize });
-            tf.env().set('WEBGPU_ENGINE_COMPILE_ONLY', false);
-            await tf.backend().checkCompileCompletionAsync();
-            tf.dispose(compileRes);
-        }
-        input.dispose()
-        DEBUG && console.log('WarmUp end', tf.memory().numTensors)
-        return true;
-    }
-
-    async predictBatch(audio, keys) {
-        const tb = audio; //this.fixUpSpecBatch(audio); // + 1 tensor
-
-        const prediction = this.model.predict(tb, { batchSize: this.batchSize })
-        
-        let newPrediction;
-        if (this.selection) {
-            newPrediction = tf.max(prediction, 0, true);
-            prediction.dispose();
-            keys = keys.splice(0, 1);
-        }
-        tb.dispose();
-
-        const finalPrediction = newPrediction || prediction;
-        
-        const { indices, values } = tf.topk(finalPrediction, 5, true);
-        
-        // The GPU backend is *so* slow with BirdNET, let's not queue up predictions
-        const [topIndices, topValues] = 
-            await Promise.all([indices.array(), values.array()]).catch(err => console.log('Data transfer error:',err));
-        indices.dispose();
-        values.dispose();
-
-        finalPrediction.dispose();
-        if (newPrediction) newPrediction.dispose();
-        keys = keys.map(key => (key / CONFIG.sampleRate).toFixed(3));
-        return [keys, topIndices, topValues];
-
-    }
-
-
-    padAudio = (audio) => {
-        const remainder = audio.length % this.chunkLength;
-        if (remainder){ 
-            // Create a new array with the desired length
-            const paddedAudio = new Float32Array(audio.length + (this.chunkLength -remainder));
-            // Copy the existing values into the new array
-            paddedAudio.set(audio);
-            return paddedAudio;
-        } else return audio
-    };
 
     async predictChunk(audioBuffer, start, fileStart, file, threshold, confidence) {
         DEBUG && console.log('predictCunk begin', tf.memory());
-        audioBuffer = this.padAudio(audioBuffer);
-        audioBuffer = tf.tensor1d(audioBuffer);
-        const numSamples = audioBuffer.shape / this.chunkLength;
-        const audioBatch = audioBuffer.reshape([numSamples, this.chunkLength]);
-        audioBuffer.dispose();
-        const batchKeys = [...Array(numSamples).keys()].map(i => start + this.chunkLength * i);
+        const [audioBatch, numSamples] = this.createAudioTensorBatch(audioBuffer);
+        const batchKeys = this.getKeys(numSamples, start)
         const result = await this.predictBatch(audioBatch, batchKeys, threshold, confidence);
         DEBUG && console.log('predictCunk end', tf.memory());
         return [result, file, fileStart];
@@ -355,8 +194,7 @@ class MelSpecLayerSimple extends tf.layers.Layer {
         return tf.tidy(() => {
             // inputs is a tensor representing the input data
             inputs = inputs[0];
-            const inputList = tf.split(inputs, inputs.shape[0])
-            const specBatch = inputList.map(input =>{
+            return tf.stack(inputs.split(inputs.shape[0]).map(input =>{
                 input = input.squeeze();
                 // Normalize values between -1 and 1
                 input = tf.sub(input, tf.min(input, -1, true));
@@ -364,39 +202,36 @@ class MelSpecLayerSimple extends tf.layers.Layer {
                 input = tf.sub(input, 0.5);
                 input = tf.mul(input, 2.0);
 
-                // Perform STFT
+
+                // Perform STFT and cast result to float
                 let spec = tf.signal.stft(
                     input,
                     this.frameLength,
                     this.frameStep,
                     this.frameLength,
                     tf.signal.hannWindow,
-                );
-
-                // Cast from complex to float
-                spec = tf.cast(spec, 'float32');
+                ).cast('float32');
 
                 // Apply mel filter bank
-                spec = tf.matMul(spec, this.melFilterbank);
+                spec = spec.matMul(this.melFilterbank)
 
                 // Convert to power spectrogram
-                spec = spec.pow(2.0);
+                    .pow(2.0)
 
                 // Apply nonlinearity
-                spec = spec.pow(tf.div(1.0, tf.add(1.0, tf.exp(this.magScale.read()))));
+                    .pow(tf.div(1.0, tf.add(1.0, tf.exp(this.magScale.read()))))
 
                 // Flip the spectrogram
-                spec = tf.reverse(spec, -1);
+                    .reverse(-1)
 
                 // Swap axes to fit input shape
-                spec = tf.transpose(spec)
+                    .transpose()
 
                 // Adding the channel dimension
-                spec = spec.expandDims(-1);
+                    .expandDims(-1);
 
                 return spec;
-            })
-            return tf.stack(specBatch)
+            }))
         });
     }
 
@@ -411,15 +246,17 @@ tf.serialization.registerClass(MelSpecLayerSimple);
 
 
 /////////////////////////  Build GlobalExpPool2D Layer  /////////////////////////
+// function logmeanexp(x, axis, keepdims, sharpness) {
+//     const xmax = tf.max(x, axis, true);
+//     const xmax2 = tf.max(x, axis, keepdims);
+//     x = tf.mul(sharpness, tf.sub(x, xmax));
+//     let y = tf.log(tf.mean(tf.exp(x), axis, keepdims));
+//     y = tf.add(tf.div(y, sharpness), xmax2);
+//     return y
+// }
 function logmeanexp(x, axis, keepdims, sharpness) {
-    const xmax = tf.max(x, axis, true);
-    const xmax2 = tf.max(x, axis, keepdims);
-    x = tf.mul(sharpness, tf.sub(x, xmax));
-    let y = tf.log(tf.mean(tf.exp(x), axis, keepdims));
-    y = tf.add(tf.div(y, sharpness), xmax2);
-    return y
+    return tf.add(tf.div(tf.log(tf.mean(tf.exp( x.mul(sharpness, x.sub(tf.max(x, axis, true)))), axis, keepdims)), sharpness), tf.max(x, axis, keepdims))
 }
-
 class GlobalLogExpPooling2D extends tf.layers.Layer {
     constructor(config) {
       super(config);
@@ -456,8 +293,9 @@ class SigmoidLayer extends tf.layers.Layer {
     computeOutputShape(inputShape) { return inputShape; }
 
     call(input, kwargs) { 
-        
-        return tf.sigmoid(tf.mul(input[0], CONFIG.sigmoid))
+        // Since sigmoid is always 1, we simplify here
+        //return tf.sigmoid(tf.mul(input[0], CONFIG.sigmoid))
+        return tf.sigmoid(input[0])
         
     }   
    
