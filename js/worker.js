@@ -2223,9 +2223,10 @@ const parsePredictions = async (response) => {
                 }
             }
         } 
-    } else if (index === 500){
+    } else if (index > 500){
         // Slow down the summary updates
         setGetSummaryQueryInterval(NUM_WORKERS)
+        DEBUG && console.log('Reducing summary updates to one every ', STATE.incrementor)
     }
     predictionsReceived[file]++;
     const received = sumObjectValues(predictionsReceived);
