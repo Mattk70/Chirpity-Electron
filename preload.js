@@ -1,4 +1,4 @@
-const {contextBridge, ipcRenderer } = require("electron");
+const {contextBridge, ipcRenderer, webUtils } = require("electron");
 const fs = require('node:fs');
 const colormap = require("colormap");
 const p = require('node:path');
@@ -45,6 +45,7 @@ ipcRenderer.on('error', (event, errorMessage) => {
   });
 
 contextBridge.exposeInMainWorld('electron', {
+    showFilePath: (file) => webUtils.getPathForFile(file),
     requestWorkerChannel: () => ipcRenderer.invoke('request-worker-channel'),
     unsavedRecords: (isTrue) => ipcRenderer.invoke('unsaved-records', { newValue: isTrue }),
     onDownloadProgress: (callback) => ipcRenderer.on('download-progress', callback),

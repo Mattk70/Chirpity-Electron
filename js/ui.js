@@ -2791,7 +2791,7 @@ function centreSpec(){
             }
         },
         D: function (e) {
-            if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'convert-dataset' });
+            if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
         },
         e: function (e) {
             if (( e.ctrlKey || e.metaKey) && region) exportAudio();
@@ -4124,17 +4124,14 @@ function formatDuration(seconds){
     // Drag file to app window to open
     document.addEventListener('dragover', (event) => {
         event.preventDefault();
-        event.stopPropagation();
+        //event.stopPropagation();
     });
     
-    document.addEventListener('drop', async (event) => {
+    document.addEventListener('drop', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        let filelist = [];
-        for (const f of event.dataTransfer.files) {
-            // Using the path attribute to get absolute file path
-            filelist.push(f.path);
-        }
+        console.log(event.dataTransfer.files[0])
+        const filelist = Array.from(event.dataTransfer.files).map(file => window.electron.showFilePath(file));
         if (filelist.length) filterValidFiles({ filePaths: filelist })
     });
     

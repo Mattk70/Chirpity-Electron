@@ -18,7 +18,7 @@ let isWin32 = false;
 const DATASET = true;
 const DATABASE = 'archive_test'
 const adding_chirpity_additions = false;
-const DATASET_SAVE_LOCATION = "/media/matt/36A5CC3B5FA24585/DATASETS/ATTENUATED_pngs/call";
+const DATASET_SAVE_LOCATION = "/media/matt/36A5CC3B5FA24585/DATASETS/ATTENUATED_pngs/dog";
 let ntsuspend;
 if (process.platform === 'win32') {
     ntsuspend = require('ntsuspend');
@@ -197,6 +197,15 @@ const createDB = async (file) => {
             const [sname, cname] = LABELS[i].split('_');
             await db.runAsync('INSERT INTO species VALUES (?,?,?)', i, sname, cname);
         }
+        await db.runAsync(`
+            CREATE TABLE IF NOT EXISTS db_upgrade (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            );
+        `);
+        await db.runAsync(`
+            INSERT INTO db_upgrade (key, value) VALUES ('last_update', 'add_columns_archiveName_and_metadata_and_foreign_key_to_files')
+        `);
     } else {
         const filename = diskDB.filename;
         let { code } = await db.runAsync('ATTACH ? as disk', filename);
@@ -339,7 +348,7 @@ async function checkAndApplyUpdates(db) {
 
     // Apply updates that come after the last update applied
     let updateIndex = DB_updates.findIndex(m => m.name === lastUpdate.value);
-    
+    trackEvent(STATE.UUID, 'DB', 'UPDATE', updateIndex);
     // Start from the next Update
     updateIndex = updateIndex >= 0 ? updateIndex + 1 : 0;
 
