@@ -4130,8 +4130,11 @@ function formatDuration(seconds){
     document.addEventListener('drop', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        console.log(event.dataTransfer.files[0])
-        const filelist = Array.from(event.dataTransfer.files).map(file => window.electron.showFilePath(file));
+        const audioFiles = Array.from(event.dataTransfer.files).filter(file => {
+            //include folders - file.type === '', audio & video files
+            return !file.type || file.type.startsWith('audio/') || file.type.startsWith('video/');
+        });
+        const filelist = audioFiles.map(file => window.electron.showFilePath(file));
         if (filelist.length) filterValidFiles({ filePaths: filelist })
     });
     
