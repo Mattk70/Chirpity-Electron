@@ -1698,12 +1698,13 @@ const defaultConfig = {
     customColormap: {'loud': "#00f5d8", 'mid': "#000000", 'quiet': "#000000", 'threshold': 0.5, 'windowFn': 'hann'},
     timeOfDay: true,
     list: 'birds',
-    customListFile: {birdnet: '', chirpity: ''},
+    customListFile: {birdnet: '', chirpity: '', nocmig: ''},
     local: true,
     speciesThreshold: 0.03,
     useWeek: false,
     model: 'chirpity',
     chirpity: {locale: 'en_uk', backend: 'tensorflow'},
+    nocmig: {locale: 'en_uk', backend: 'tensorflow'},
     birdnet: {locale: 'en', backend: 'tensorflow'},
     latitude: 52.87,
     longitude: 0.89, 
@@ -1737,6 +1738,7 @@ window.onload = async () => {
     systemLocale = systemLocale === 'en_uk' ? systemLocale : systemLocale.slice(0,2).toLowerCase();
     defaultConfig.chirpity.locale = systemLocale;
     defaultConfig.birdnet.locale = systemLocale;
+    defaultConfig.nocmig.locale = systemLocale;
     // establish the message channel
     setUpWorkerMessaging()
 
@@ -1767,7 +1769,7 @@ window.onload = async () => {
         // set version
         config.VERSION = VERSION;
         DIAGNOSTICS['UUID'] = config.UUID;
-        // switch off debug mode we don't want this to be remembered
+        
         // Initialize Spectrogram
         initWavesurfer({});
         // Set UI option state
