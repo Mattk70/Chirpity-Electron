@@ -793,7 +793,7 @@ const prepSummaryStatement = (included) => {
     FROM ranked_records
     WHERE ranked_records.rank <= ${STATE.topRankin}`;
     
-    summaryStatement +=  ` GROUP BY speciesID  ORDER BY cname`;
+    summaryStatement +=  ` GROUP BY speciesID  ORDER BY ${STATE.summarySortOrder}`;
 
     return [summaryStatement, params]
 }
@@ -911,7 +911,7 @@ const prepResultsStatement = (species, noLimit, included, offset, topRankin) => 
     const limitClause = noLimit ? '' : 'LIMIT ?  OFFSET ?';
     noLimit || params.push(STATE.limit, offset);
 
-    resultStatement += ` ORDER BY ${STATE.sortOrder}, callCount DESC ${limitClause} `;
+    resultStatement += ` ORDER BY ${STATE.resultsSortOrder}, callCount DESC ${limitClause} `;
     
     return [resultStatement, params];
 }

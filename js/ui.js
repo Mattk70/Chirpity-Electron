@@ -69,7 +69,8 @@ let STATE = {
         species: undefined,
         range: { start: undefined, end: undefined }
     },
-    sortOrder: 'timestamp',
+    resultsSortOrder: 'timestamp',
+    summarySortOrder: 'cname ASC',
     birdList: { lastSelectedSpecies: undefined }, // Used to put the last selected species at the top of the all-species list
     selection: { start: undefined, end: undefined },
     currentAnalysis: {currentFile: null, openFiles: [],  mode: null, species: null, offset: 0, active: null},
@@ -1270,7 +1271,7 @@ function saveAnalyseState() {
             offset: STATE.offset,
             active: active,
             analysisDone: STATE.analysisDone,
-            sortOrder: STATE.sortOrder
+            resultsSortOrder: STATE.resultsSortOrder
         }
     }
 }
@@ -1318,7 +1319,7 @@ async function showAnalyse() {
     hideAll();
     if (STATE.currentFile) {
         showElement(['spectrogramWrapper'], false);
-        worker.postMessage({ action: 'update-state', filesToAnalyse: STATE.openFiles, sortOrder: STATE.sortOrder});
+        worker.postMessage({ action: 'update-state', filesToAnalyse: STATE.openFiles, resultsSortOrder: STATE.resultsSortOrder});
         if (STATE.analysisDone) {
             filterResults({ 
                 species: STATE.species, 
@@ -3216,12 +3217,12 @@ function centreSpec(){
         const showIUCN = config.detect.iucn;
         if (summary.length){
             let summaryHTML = `<table id="resultSummary" class="table table-dark p-1"><thead>
-            <tr>
-            <th class="col-3" scope="col">${i18n.max}</th>
-            <th class="col-5" scope="col">${i18n.species[0]}</th>
-            ${showIUCN ? '<th class="col-1" scope="col"></th>' : ''}
-            <th class="col-1 text-end" scope="col">${i18n.detections}</th>
-            <th class="col-1 text-end" scope="col">${i18n.calls}</th>
+            <tr class="pointer col-auto">
+            <th id="summary-max" scope="col"><span id="summary-max-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${i18n.max}</th>
+            <th id="summary-cname" scope="col"><span id="summary-cname-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${i18n.species[0]}</th>
+            ${showIUCN ? '<th scope="col"></th>' : ''}
+            <th id="summary-count" class="text-end" scope="col"><span id="summary-count-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${i18n.detections}</th>
+            <th id="summary-calls" class="text-end" scope="col"><span id="summary-calls-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${i18n.calls}</th>
             </tr>
             </thead><tbody id="speciesFilter">`;
             let selectedRow = null;
@@ -4087,8 +4088,7 @@ function formatDuration(seconds){
     function activateResultFilters() {
         const timeHeadings = document.getElementsByClassName('time-sort-icon');
         const speciesHeadings = document.getElementsByClassName('species-sort-icon');
-        
-        const sortOrderScore = STATE.sortOrder.includes('score');
+        const sortOrderScore = STATE.resultsSortOrder.includes('score');
         
         [...timeHeadings].forEach(heading => {
             heading.classList.toggle('d-none', sortOrderScore);
@@ -4098,13 +4098,15 @@ function formatDuration(seconds){
         [...speciesHeadings].forEach(heading => {
             heading.classList.toggle('d-none', !sortOrderScore);
             heading.parentNode.classList.add('pointer');
-            if (sortOrderScore && STATE.sortOrder.includes('ASC')){
+            if (sortOrderScore && STATE.resultsSortOrder.includes('ASC')){
                 // Flip the sort icon
                 heading.classList.add('flipped')
             } else {
                 heading.classList.remove('flipped')
             }
         });
+
+
         // Add pointer icon to species summaries
         const summarySpecies = DOM.summary.querySelectorAll('.cname');
         summarySpecies.forEach(row => row.classList.add('pointer'))
@@ -4115,12 +4117,32 @@ function formatDuration(seconds){
         const summary = document.getElementById('resultSummary');
         // If there were no results, there'll be no summary
         summary?.classList.add('table-hover');
+
+
+        const [column, direction] = STATE.summarySortOrder.split(' ');
+        const iconId = `summary-${column}-icon`;
+        const targetIcon = document.getElementById(iconId);
+        if (targetIcon) {
+            // Hide all sort icons
+            document.querySelectorAll('.summary-sort-icon').forEach(icon => {
+                icon.classList.add('d-none');
+            });
+            direction === 'ASC' ? targetIcon.classList.add('flipped') : targetIcon.classList.remove('flipped')
+            targetIcon.classList.remove('d-none');
+        }
     }
     
     const setSortOrder = (order) => {
-        STATE.sortOrder = order;
-        worker.postMessage({ action: 'update-state', sortOrder: order })
+        STATE.resultsSortOrder = order;
+        worker.postMessage({ action: 'update-state', resultsSortOrder: order })
         resetResults({clearSummary: false, clearPagination: false, clearResults: true});
+        filterResults();
+    }
+
+    const setSummarySortOrder = (order) => {
+        STATE.summarySortOrder = order;
+        worker.postMessage({ action: 'update-state', summarySortOrder: order })
+        resetResults({clearSummary: false, clearPagination: false, clearResults: false});
         filterResults();
     }
     // Drag file to app window to open
@@ -4712,9 +4734,29 @@ function playRegion(){
             }
             case 'confidence-sort': {
                 if (! PREDICTING){
-                    const sortBy = STATE.sortOrder === 'score DESC ' ? 'score ASC ' : 'score DESC ';
+                    const sortBy = STATE.resultsSortOrder === 'score DESC ' ? 'score ASC ' : 'score DESC ';
                     setSortOrder(sortBy);
                 }
+                break;
+            }
+            case 'summary-max': {
+                const sortBy = STATE.summarySortOrder === 'max DESC ' ? 'max ASC ' : 'max DESC ';
+                setSummarySortOrder(sortBy);
+                break;
+            }
+            case 'summary-cname': {
+                const sortBy = STATE.summarySortOrder === 'cname ASC ' ? 'cname DESC ' : 'cname ASC ';
+                setSummarySortOrder(sortBy);
+                break;
+            }
+            case 'summary-count': {
+                const sortBy = STATE.summarySortOrder === 'count DESC ' ? 'count ASC ' : 'count DESC ';
+                setSummarySortOrder(sortBy);
+                break;
+            }
+            case 'summary-calls': {
+                const sortBy = STATE.summarySortOrder === 'calls DESC ' ? 'calls ASC ' : 'calls DESC ';
+                setSummarySortOrder(sortBy);
                 break;
             }
             case 'reset-defaults': {

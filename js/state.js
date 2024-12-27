@@ -4,7 +4,8 @@ export class State {
     constructor(db) {
         this.db = db,
             this.mode = 'analyse', // analyse, explore, chart
-            this.sortOrder = 'dateTime',
+            this.resultsSortOrder = 'dateTime',
+            this.summarySortOrder = 'cname ASC',
             this.filesToAnalyse = [],
             this.limit = 500,
             this.saved = new Set(), // list of files requested that are in the disk database
