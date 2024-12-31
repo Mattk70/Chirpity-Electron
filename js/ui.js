@@ -3258,6 +3258,7 @@ function centreSpec(){
             const buffer = old_summary.cloneNode();
             buffer.innerHTML = summaryHTML;
             old_summary.replaceWith(buffer);
+            showSummarySortIcon();
             // scroll to the selected species
             if (selectedRow){
                 const table = document.getElementById('resultSummary');
@@ -3304,6 +3305,7 @@ function centreSpec(){
         // hide progress div
         DOM.progressDiv.classList.add('invisible');
         renderFilenamePanel();
+        activateResultFilters();
     }
 
     function getRowFromStart(table, start){
@@ -3373,7 +3375,7 @@ function formatDuration(seconds){
         AUDACITY_LABELS = audacityLabels;
         if (summary.length) {
             enableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven']);
-            STATE.mode !== 'explore' && enableMenuItem(['save2db'])            
+            STATE.mode !== 'explore' && enableMenuItem(['save2db']);
         } else {
             disableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven', 'save2db']);
         }
@@ -4108,7 +4110,7 @@ function formatDuration(seconds){
 
 
         // Add pointer icon to species summaries
-        const summarySpecies = DOM.summary.querySelectorAll('.cname');
+        const summarySpecies = DOM.summaryTable.querySelectorAll('.cname');
         summarySpecies.forEach(row => row.classList.add('pointer'))
         // change results header to indicate activation
         DOM.resultHeader.classList.remove('text-bg-secondary');
@@ -4117,21 +4119,23 @@ function formatDuration(seconds){
         const summary = document.getElementById('resultSummary');
         // If there were no results, there'll be no summary
         summary?.classList.add('table-hover');
-
-
-        const [column, direction] = STATE.summarySortOrder.split(' ');
-        const iconId = `summary-${column}-icon`;
-        const targetIcon = document.getElementById(iconId);
-        if (targetIcon) {
-            // Hide all sort icons
-            document.querySelectorAll('.summary-sort-icon').forEach(icon => {
-                icon.classList.add('d-none');
-            });
-            direction === 'ASC' ? targetIcon.classList.add('flipped') : targetIcon.classList.remove('flipped')
-            targetIcon.classList.remove('d-none');
-        }
+        showSummarySortIcon()
     }
     
+function showSummarySortIcon(){
+    const [column, direction] = STATE.summarySortOrder.split(' ');
+    const iconId = `summary-${column}-icon`;
+    const targetIcon = document.getElementById(iconId);
+    if (targetIcon) {
+        // Hide all sort icons
+        DOM.summaryTable.querySelectorAll('.summary-sort-icon').forEach(icon => {
+            icon.classList.add('d-none');
+        });
+        direction === 'ASC' ? targetIcon.classList.add('flipped') : targetIcon.classList.remove('flipped')
+        targetIcon.classList.remove('d-none');
+    }
+}
+
     const setSortOrder = (order) => {
         STATE.resultsSortOrder = order;
         worker.postMessage({ action: 'update-state', resultsSortOrder: order })
