@@ -15,7 +15,7 @@ import {trackEvent} from './tracking.js';
 import {extractWaveMetadata} from './metadata.js';
 let isWin32 = false;
 
-const DATASET = true;
+const DATASET = false;
 const DATABASE = 'archive_test'
 const adding_chirpity_additions = false;
 const DATASET_SAVE_LOCATION = "/media/matt/36A5CC3B5FA24585/DATASETS/European/call";
